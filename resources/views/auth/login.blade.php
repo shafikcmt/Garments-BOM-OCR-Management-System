@@ -1,47 +1,151 @@
 <x-guest-layout>
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    /* User icon */
+    .user-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 15px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        border: 1px solid rgba(255,255,255,0.4);
+    }
+
+    .user-icon i {
+        font-size: 38px;
+        color: #ffffff;
+        text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    }
+
+    body {
+        min-height: 100vh;
+        background: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
+                    url('https://media.licdn.com/dms/image/v2/D5622AQGfw4ASqNhfGg/feedshare-shrink_800/B56Zm8jMevI8Ag-/0/1759804969977?e=2147483647&v=beta&t=K7PQdu5ANALnDAY7XlUONfpm-J3-rab1h8MDKsDUTFM');
+        background-size: cover;
+        background-position: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Segoe UI', sans-serif;
+    }
+
+    .login-card {
+        background: rgba(255, 255, 255, 0.18);
+        backdrop-filter: blur(12px) saturate(180%);
+        -webkit-backdrop-filter: blur(12px) saturate(180%);
+        border-radius: 10px;
+        padding: 30px;
+        width: 100%;
+        max-width: 460px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .login-card::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 18px;
+        background: linear-gradient(120deg, rgba(255,255,255,0.35), rgba(255,255,255,0.05), rgba(255,255,255,0.25));
+        opacity: 0.6;
+        pointer-events: none;
+    }
+
+    .brand {
+        text-align: center;
+        font-size: 20px;
+        font-weight: 700;
+        color: #ffffff;
+        text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        margin-bottom: 5px;
+    }
+
+    .login-title {
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 5px;
+        color: #ffffff;
+        text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    }
+
+    .login-subtitle {
+        text-align: center;
+        color: #e0e0e0;
+        font-size: 14px;
+        margin-bottom: 25px;
+    }
+
+    .login-card label {
+        color: #ffffff;
+        font-weight: 500;
+    }
+
+    .login-card .form-control {
+        background: rgba(255,255,255,0.85);
+        border: none;
+        color: #212529;
+        border-radius:5px;
+    }
+
+    .login-card .form-control::placeholder {
+        color: #6c757d;
+    }
+
+    .login-card .form-check-label,
+    .login-card a {
+        color: #f1f1f1;
+    }
+
+    .login-card a:hover {
+        color: #ffffff;
+        text-decoration: underline;
+    }
+</style>
+
+<div class="login-card">
+    <div class="user-icon">
+        <i class="bi bi-person-fill"></i>
+    </div>
+    <div class="brand">Humana Apparels Pvt. Ltd</div>
+    <!-- <div class="login-title">User Login</div> -->
+    <div class="login-subtitle">OCR Management System</div>
+
+    <x-auth-session-status class="mb-3" :status="session('status')" />
 
     <form method="POST" action="{{ route('login') }}">
         @csrf
 
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
+        <div class="mb-3">
+            <label class="form-label">Email / Username</label>
+            <input type="email" name="email" value="{{ old('email') }}" required autofocus class="form-control">
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
 
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
-
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="current-password" />
-
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input type="password" name="password" required class="form-control">
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
-        <!-- Remember Me -->
-        <div class="block mt-4">
-            <label for="remember_me" class="inline-flex items-center">
-                <input id="remember_me" type="checkbox" class="rounded dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800" name="remember">
-                <span class="ms-2 text-sm text-gray-600 dark:text-gray-400">{{ __('Remember me') }}</span>
-            </label>
-        </div>
-
-        <div class="flex items-center justify-end mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="remember" id="remember">
+                <label class="form-check-label" for="remember">Remember me</label>
+            </div>
             @if (Route::has('password.request'))
-                <a class="underline text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-800" href="{{ route('password.request') }}">
-                    {{ __('Forgot your password?') }}
-                </a>
+                <a href="{{ route('password.request') }}" class="text-decoration-none small">Forgot password?</a>
             @endif
-
-            <x-primary-button class="ms-3">
-                {{ __('Log in') }}
-            </x-primary-button>
         </div>
+
+        <button type="submit" class="btn btn-primary w-100 fw-semibold">Login</button>
     </form>
+
+    <div class="text-center mt-3 small text-muted">© 2025 Humana Apparels Pvt. Ltd – OCR Management</div>
+</div>
 </x-guest-layout>

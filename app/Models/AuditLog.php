@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class OrderValue extends Model
+class AuditLog extends Model
 {
-    protected $table = 'order_values';
+    public $timestamps = false; // Using only created_at
+
+    protected $table = 'audit_logs';
 
     /**
      * Mass assignable fields
@@ -14,37 +16,32 @@ class OrderValue extends Model
     protected $fillable = [
         'order_id',
         'field_id',
-        'value',
-        'role_id',
+        'old_value',
+        'new_value',
+        'action',
         'user_id',
-        'is_locked',
+        'created_at',
     ];
 
     /**
      * Relationships
      */
 
-    // Value belongs to an Order
+    // Log belongs to an Order
     public function order()
     {
         return $this->belongsTo(Order::class);
     }
 
-    // Value belongs to a Field
+    // Log belongs to a Field
     public function field()
     {
         return $this->belongsTo(OrderField::class, 'field_id');
     }
 
-    // Value entered by a User
+    // Log performed by a User
     public function user()
     {
         return $this->belongsTo(User::class);
-    }
-
-    // Value entered by a Role
-    public function role()
-    {
-        return $this->belongsTo(Role::class);
     }
 }
