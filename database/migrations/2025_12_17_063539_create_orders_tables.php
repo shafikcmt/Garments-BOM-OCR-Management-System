@@ -19,7 +19,6 @@ return new class extends Migration
             $table->string('style_name'); // Style
             $table->integer('quantity'); // Quantity
             $table->date('shipment_date'); // Contract shipment date
-            $table->integer('shipment_month'); // Month (1–12)
             $table->string('contract_number'); // Contract No
             $table->string('status')->default('Open'); // Open / Processing / Completed
             $table->foreignId('created_by')->constrained('users')->onDelete('cascade'); // Admin ID

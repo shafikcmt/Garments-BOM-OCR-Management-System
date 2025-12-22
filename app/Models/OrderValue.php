@@ -4,47 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class OrderValue extends Model
-{
-    protected $table = 'order_values';
-
-    /**
-     * Mass assignable fields
-     */
-    protected $fillable = [
-        'order_id',
-        'field_id',
-        'value',
-        'role_id',
-        'user_id',
-        'is_locked',
-    ];
-
-    /**
-     * Relationships
-     */
-
-    // Value belongs to an Order
-    public function order()
-    {
-        return $this->belongsTo(Order::class);
-    }
-
-    // Value belongs to a Field
-    public function field()
-    {
-        return $this->belongsTo(OrderField::class, 'field_id');
-    }
-
-    // Value entered by a User
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    // Value entered by a Role
-    public function role()
-    {
-        return $this->belongsTo(Role::class);
-    }
+class OrderValue extends Model {
+    protected $fillable = ['order_id','field_id','value','role_id','user_id','is_locked'];
+    public function order() { return $this->belongsTo(Order::class); }
+    public function field() { return $this->belongsTo(OrderField::class,'field_id'); }
+    public function user() { return $this->belongsTo(User::class); }
+    public function role() { return $this->belongsTo(Role::class); }
 }
