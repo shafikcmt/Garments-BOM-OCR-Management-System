@@ -24,7 +24,7 @@
         body {
             min-height: 100vh;
             background: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)),
-                        url('https://media.licdn.com/dms/image/v2/D5622AQGfw4ASqNhfGg/feedshare-shrink_800/B56Zm8jMevI8Ag-/0/1759804969977?e=2147483647&v=beta&t=K7PQdu5ANALnDAY7XlUONfpm-J3-rab1h8MDKsDUTFM');
+                        url('https://www.humana-bulgaria.org/wp-content/uploads/2021/10/DSC_0917-Copy.jpg');
             background-size: cover;
             background-position: center;
             font-family: 'Segoe UI', sans-serif;

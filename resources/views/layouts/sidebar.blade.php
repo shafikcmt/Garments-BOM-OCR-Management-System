@@ -57,9 +57,10 @@
                         <li class="nav-item">
                             <a class="nav-link text-white"
                                href="{{ route('merchant.orders.index') }}">
-                                <i class="bi bi-bag-check me-2"></i> My Orders
+                               <i class="bi bi-shop-window me-2"></i> Marketing Plan
                             </a>
                         </li>
+                         
                         @endrole
 
                         {{-- COMMERCIAL --}}

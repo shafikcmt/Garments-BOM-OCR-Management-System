@@ -1,84 +1,94 @@
 <?php
-
 namespace App\Http\Controllers\Merchant;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Order;
 use Auth;
-use Carbon\Carbon;
 
 class OrderController extends Controller
 {
     // List Orders
     public function index()
     {
-        $orders = Order::where('created_by', Auth::id())
-            ->latest()
-            ->get();
-
+        $orders = Order::where('created_by', Auth::id())->latest()->get();
         return view('merchant.orders.index', compact('orders'));
     }
 
-    // Create / Edit Order
-    public function store(Request $request)
+    // Show single order
+    public function show($id)
     {
-        $request->validate([
-            'buyer_name'      => 'required',
-            'season_name'     => 'required',
-            'order_number'    => 'required',
-            'style_name'      => 'required',
-            'quantity'        => 'required|numeric',
-            'shipment_date'   => 'required|date',
-            'contract_number' => 'required',
-        ]);
+        $order = Order::where('id', $id)
+            ->where('created_by', Auth::id())
+            ->firstOrFail();
 
-        // EDIT EXISTING ORDER
-        if ($request->order_id) {
-            $order = Order::where('id', $request->order_id)
-                ->where('created_by', Auth::id())
-                ->where('status', '!=', 'approved')
-                ->firstOrFail();
-
-            $order->update([
-                'buyer_name'      => $request->buyer_name,
-                'season_name'     => $request->season_name,
-                'order_number'    => $request->order_number,
-                'style_name'      => $request->style_name,
-                'quantity'        => $request->quantity,
-                'shipment_date'   => $request->shipment_date,
-                'contract_number' => $request->contract_number,
-                'status'          => $request->status ?? 'draft',
-            ]);
-
-            return redirect()->back()->with('success','Order updated successfully');
-        }
-
-        // CREATE NEW ORDER
-        Order::create([
-            'buyer_name'      => $request->buyer_name,
-            'season_name'     => $request->season_name,
-            'order_number'    => $request->order_number,
-            'style_name'      => $request->style_name,
-            'quantity'        => $request->quantity,
-            'shipment_date'   => $request->shipment_date,
-            'contract_number' => $request->contract_number,
-            'status'          => $request->status ?? 'draft',
-            'created_by'      => Auth::id(),
-        ]);
-
-        return redirect()->back()->with('success','Order created successfully');
+        return response()->json($order);
     }
 
-    // Delete Order
+    // Store new order
+    public function store(Request $request)
+    {
+        $data = $this->validateOrder($request);
+
+        $order = Order::create(array_merge($data, ['created_by' => Auth::id()]));
+
+        return redirect()->back()->with('success', 'Order created successfully.');
+    }
+
+    // Update existing order
+    public function update(Request $request, $id)
+    {
+        $data = $this->validateOrder($request);
+
+        $order = Order::where('id', $id)
+            ->where('created_by', Auth::id())
+            ->firstOrFail();
+
+        $order->update($data);
+
+        return redirect()->back()->with('success', 'Order updated successfully.');
+    }
+
+    // Delete order
     public function destroy($id)
     {
         $order = Order::where('id', $id)
             ->where('created_by', Auth::id())
-            ->where('status', '!=', 'approved') // cannot delete approved orders
+            ->where('status', '!=', 'approved')
             ->firstOrFail();
 
         $order->delete();
-        return redirect()->back()->with('success','Order deleted successfully');
+        return redirect()->back()->with('success', 'Order deleted successfully');
+    }
+
+    // Validation helper
+    private function validateOrder(Request $request)
+    {
+        return $request->validate([
+            'buyer_name' => 'required|string|max:255',
+            'division' => 'required|string|max:255',
+            'season_name' => 'required|string|max:255',
+            'order_status' => 'required|string|max:50',
+            'order_category' => 'required|string|max:50',
+            'product_type' => 'required|string|max:255',
+            'style_name' => 'required|string|max:255',
+            'po_number' => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
+            'wash_type' => 'nullable|string|max:255',
+            'order_qty' => 'required|numeric|min:0',
+            'sewing_qty' => 'required|numeric|min:0',
+            'smv' => 'nullable|numeric|min:0',
+            'fob' => 'nullable|numeric|min:0',
+            'gm' => 'nullable|numeric|min:0',
+            'destination' => 'nullable|string|max:255',
+            'pcd' => 'nullable|date',
+            'x_fty' => 'nullable|date',
+            'x_country' => 'nullable|date',
+            'original_x_fty' => 'nullable|date',
+            'original_x_country' => 'nullable|date',
+            'shipment_status' => 'nullable|string|max:255',
+            'fabric_booking_status' => 'nullable|string|max:255',
+            'remarks' => 'nullable|string|max:500',
+        ]);
     }
 }

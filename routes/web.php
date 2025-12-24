@@ -88,22 +88,26 @@ Route::prefix('merchant')
     ->name('merchant.')
     ->group(function () {
 
-        // Merchant Dashboard
         Route::get('/dashboard', [MerchantDashboardController::class, 'index'])
             ->name('dashboard');
 
-        // Orders
         Route::get('/orders', [MerchantOrderController::class, 'index'])
             ->name('orders.index');
 
-        // Store (Create + Edit)
         Route::post('/orders', [MerchantOrderController::class, 'store'])
             ->name('orders.store');
 
-        // Delete Order
+        Route::put('/orders/{id}', [MerchantOrderController::class, 'update'])
+            ->name('orders.update');  // ✅ added
+
+        Route::get('/orders/{id}', [MerchantOrderController::class, 'show'])
+            ->name('orders.show');
+
         Route::delete('/orders/{id}', [MerchantOrderController::class, 'destroy'])
             ->name('orders.destroy');
 });
+
+
 
 
 
