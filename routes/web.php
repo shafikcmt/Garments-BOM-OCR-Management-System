@@ -83,29 +83,28 @@ Route::prefix('admin')->middleware(['auth', 'role:admin'])->group(function() {
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('merchant')
-    ->middleware(['auth', 'role:merchant'])
-    ->name('merchant.')
-    ->group(function () {
+Route::prefix('merchant')->middleware(['auth', 'role:merchant'])->name('merchant.')->group(function () {
 
-        Route::get('/dashboard', [MerchantDashboardController::class, 'index'])
-            ->name('dashboard');
+    Route::get('/orders', [MerchantOrderController::class, 'index'])->name('orders.index');
+    Route::post('/orders', [MerchantOrderController::class, 'store'])->name('orders.store');
+    Route::put('/orders/{id}', [MerchantOrderController::class, 'update'])->name('orders.update');
+    Route::get('/orders/{id}', [MerchantOrderController::class, 'show'])->name('orders.show');
+    Route::delete('/orders/{id}', [MerchantOrderController::class, 'destroy'])->name('orders.destroy');
 
-        Route::get('/orders', [MerchantOrderController::class, 'index'])
-            ->name('orders.index');
+    // Bulk upload
+    Route::post('/orders/import', [MerchantOrderController::class, 'import'])->name('orders.import');
+    Route::get('/orders/demo-file', [MerchantOrderController::class, 'downloadDemoFile'])->name('orders.demo');
 
-        Route::post('/orders', [MerchantOrderController::class, 'store'])
-            ->name('orders.store');
+    // Export reports
+    Route::get('/orders/export/excel', [MerchantOrderController::class, 'exportExcel'])->name('orders.export.excel');
+    Route::get('/orders/export/pdf', [MerchantOrderController::class, 'exportPDF'])->name('orders.export.pdf');
+   // routes/web.php
+    Route::get('/merchant/orders/demo-file', function () {
+        return response()->download(public_path('demo/orders_demo.xlsx'));
+    })->name('merchant.orders.demo');
 
-        Route::put('/orders/{id}', [MerchantOrderController::class, 'update'])
-            ->name('orders.update');  // ✅ added
-
-        Route::get('/orders/{id}', [MerchantOrderController::class, 'show'])
-            ->name('orders.show');
-
-        Route::delete('/orders/{id}', [MerchantOrderController::class, 'destroy'])
-            ->name('orders.destroy');
 });
+
 
 
 

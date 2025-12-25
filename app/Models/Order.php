@@ -9,80 +9,52 @@ class Order extends Model
 {
     use HasFactory;
 
-    /**
-     * Mass assignable fields
-     */
     protected $fillable = [
-
-        // BASIC INFO
         'buyer_name',
         'division',
         'season_name',
         'order_status',
         'order_category',
         'product_type',
-
-        // STYLE & PO
         'style_name',
         'po_number',
         'description',
         'wash_type',
-
-        // QUANTITY
         'order_qty',
         'sewing_qty',
-        'balance_to_sewing',
-
-        // PRODUCTION METRICS
         'smv',
         'total_minutes',
-
-        // COMMERCIAL
         'fob',
         'sales_value',
         'gm',
         'destination',
-
-        // DATES
         'pcd',
         'x_fty',
         'x_country',
         'original_x_fty',
         'original_x_country',
-
-        // STATUS
         'shipment_status',
         'fabric_booking_status',
-
-        // REMARKS
         'remarks',
-
-        // SYSTEM
         'status',
         'created_by',
         'approved_by',
     ];
 
-    /**
-     * Attribute casting
-     */
     protected $casts = [
-        'pcd'                 => 'date',
-        'x_fty'               => 'date',
-        'x_country'           => 'date',
-        'original_x_fty'      => 'date',
-        'original_x_country'  => 'date',
-
-        'smv'            => 'decimal:2',
-        'total_minutes'  => 'decimal:2',
-        'fob'            => 'decimal:2',
-        'sales_value'    => 'decimal:2',
-        'gm'             => 'decimal:2',
+        'pcd' => 'date',
+        'x_fty' => 'date',
+        'x_country' => 'date',
+        'original_x_fty' => 'date',
+        'original_x_country' => 'date',
+        'smv' => 'decimal:2',
+        'total_minutes' => 'decimal:2',
+        'fob' => 'decimal:2',
+        'sales_value' => 'decimal:2',
+        'gm' => 'decimal:2',
     ];
 
-    /**
-     * Relationships
-     */
+    // Relationships
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -93,16 +65,35 @@ class Order extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-    /**
-     * Optional computed helpers (recommended)
-     */
-    public function getCalculatedBalanceToSewingAttribute()
+    // Model events for auto-calculation
+    protected static function booted()
     {
-        return $this->order_qty - $this->sewing_qty;
-    }
+        static::creating(function ($order) {
+            $order->total_minutes = ($order->order_qty * $order->smv);
+            $order->sales_value = ($order->order_qty * $order->fob);
 
-    public function getCalculatedSalesValueAttribute()
-    {
-        return $this->order_qty * $this->fob;
+            if ($order->x_fty) {
+                $order->pcd = now()->parse($order->x_fty)->subDays(45)->format('d-m-Y');
+                $order->x_country = now()->parse($order->x_fty)->addDays(2)->format('d-m-Y');
+            }
+
+            if ($order->original_x_fty) {
+                $order->original_x_country = now()->parse($order->original_x_fty)->addDays(2)->format('d-m-Y');
+            }
+        });
+
+        static::updating(function ($order) {
+            $order->total_minutes = ($order->order_qty * $order->smv);
+            $order->sales_value = ($order->order_qty * $order->fob);
+
+            if ($order->x_fty) {
+                $order->pcd = now()->parse($order->x_fty)->subDays(45)->format('d-m-Y');
+                $order->x_country = now()->parse($order->x_fty)->addDays(2)->format('d-m-Y');
+            }
+
+            if ($order->original_x_fty) {
+                $order->original_x_country = now()->parse($order->original_x_fty)->addDays(2)->format('d-m-Y');
+            }
+        });
     }
 }

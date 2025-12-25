@@ -24,7 +24,7 @@ return new class extends Migration
 
             // STYLE & PO
             $table->string('style_name');                  // Style Number / Style Name
-            $table->string('po_number')->unique();         // PO #
+            $table->string('po_number')->nullable();         // PO #
             $table->string('description')->nullable();     // Description
             $table->string('wash_type')->nullable();       // Wash Type
 

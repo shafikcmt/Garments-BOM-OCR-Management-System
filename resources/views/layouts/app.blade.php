@@ -9,6 +9,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    
 <style>
 
 /* ================= SIDEBAR BASE ================= */
@@ -187,6 +188,31 @@
 
 <!-- Main Content -->
 <div class="content">
+   <!-- Toast container -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 1080">
+@if(session('success'))
+    <div id="flash-message" class="alert alert-success">
+        {!! session('success') !!}
+    </div>
+@endif
+
+@if(session('error'))
+    <div id="flash-message" class="alert alert-danger">
+        {!! session('error') !!}
+    </div>
+@endif
+
+@if(session('import_errors'))
+    <div class="alert alert-danger" id="flash-message">
+        <ul>
+            @foreach(session('import_errors') as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+</div>
+
     @yield('content')
 </div>
 
@@ -234,6 +260,16 @@
         });
     });
 });
+
+ // Hide flash messages after 5 seconds
+    setTimeout(function() {
+        const flash = document.getElementById('flash-message');
+        if(flash){
+            flash.style.transition = "opacity 0.5s ease";
+            flash.style.opacity = '0';
+            setTimeout(() => flash.remove(), 500); // remove from DOM after fade
+        }
+    }, 5000); // 5000ms = 5 seconds
 
 </script>
 @yield('scripts')
