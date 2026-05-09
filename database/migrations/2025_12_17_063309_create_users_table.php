@@ -11,39 +11,29 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // -------------------------------
-        // Users Table
-        // -------------------------------
         Schema::create('users', function (Blueprint $table) {
-            $table->id(); // bigint PK
-            $table->string('name'); // User name
-            $table->string('email')->unique(); // Login email
-            $table->string('password'); // Hashed password
-            $table->foreignId('role_id')->nullable()->constrained('roles')->onDelete('set null'); // Primary role (optional, dynamic roles via Spatie)
-            $table->tinyInteger('status')->default(1); // Active = 1 / Inactive = 0
-            $table->rememberToken(); // For "remember me"
-            $table->timestamps(); // created_at, updated_at
+            $table->id();
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->tinyInteger('status')->default(1); // 1 = active, 0 = inactive
+            $table->rememberToken();
+            $table->timestamps();
         });
 
-        // -------------------------------
-        // Password Reset Tokens Table
-        // -------------------------------
         Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->string('email')->primary(); // User email (unique)
-            $table->string('token'); // Reset token
-            $table->timestamp('created_at')->nullable(); // Token creation time
+            $table->string('email')->primary();
+            $table->string('token');
+            $table->timestamp('created_at')->nullable();
         });
 
-        // -------------------------------
-        // Sessions Table
-        // -------------------------------
         Schema::create('sessions', function (Blueprint $table) {
-            $table->string('id')->primary(); // Session ID
-            $table->foreignId('user_id')->nullable()->index()->constrained('users')->onDelete('set null'); // FK to users
-            $table->string('ip_address', 45)->nullable(); // User IP
-            $table->text('user_agent')->nullable(); // Browser / device info
-            $table->longText('payload'); // Session data
-            $table->integer('last_activity')->index(); // Timestamp of last activity
+            $table->string('id')->primary();
+            $table->foreignId('user_id')->nullable()->index()->constrained('users')->nullOnDelete();
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+            $table->longText('payload');
+            $table->integer('last_activity')->index();
         });
     }
 

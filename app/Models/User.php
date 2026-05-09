@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-// use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
@@ -16,7 +15,6 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role_id', // Primary role
         'status',
     ];
 
@@ -25,10 +23,23 @@ class User extends Authenticatable
         'remember_token',
     ];
 
-  
-    // Primary role relation
-    public function primaryRole()
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+    ];
+
+    public function excelFiles()
     {
-        return $this->belongsTo(Role::class, 'role_id');
+        return $this->hasMany(ExcelFile::class, 'uploaded_by');
+    }
+
+    public function updatedCells()
+    {
+        return $this->hasMany(ExcelCell::class, 'updated_by');
+    }
+
+    public function activityLogs()
+    {
+        return $this->hasMany(ActivityLog::class);
     }
 }

@@ -2,112 +2,66 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\Admin\OrderController as AdminOrderController;
-use App\Http\Controllers\Merchant\OrderController as MerchantOrderController;
-use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Merchant\DashboardController as MerchantDashboardController;
-use App\Http\Controllers\Admin\FieldController;
+use App\Http\Controllers\Shared\ExcelFileController;
+use App\Http\Controllers\NotificationController;
 
+Route::get('/', function () {
+    return view('welcome');
+});
 
-/*
-|--------------------------------------------------------------------------
-| Public Routes
-|--------------------------------------------------------------------------
-*/
-Route::get('/', fn() => view('welcome'));
+Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', function () {
+        $user = auth()->user();
 
-/*
-|--------------------------------------------------------------------------
-| Authenticated Routes
-|--------------------------------------------------------------------------
-*/
-Route::middleware('auth')->group(function () {
+        if ($user->hasRole('admin')) {
+            return redirect()->route('admin.dashboard');
+        }
 
-    Route::get('/dashboard', fn() => view('dashboard'))
-        ->middleware('verified')
-        ->name('dashboard');
+        if ($user->hasRole('merchant')) {
+            return redirect()->route('merchant.dashboard');
+        }
+
+        if ($user->hasRole('account')) {
+            return redirect()->route('account.dashboard');
+        }
+
+        if ($user->hasRole('commercial')) {
+            return redirect()->route('commercial.dashboard');
+        }
+
+        if ($user->hasRole('store')) {
+            return redirect()->route('store.dashboard');
+        }
+
+        if ($user->hasRole('supply_chain')) {
+            return redirect()->route('supply_chain.dashboard');
+        }
+
+        abort(403, 'No dashboard route assigned for this role.');
+    })->name('dashboard');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
 
-/*
-|--------------------------------------------------------------------------
-| Admin Routes
-|--------------------------------------------------------------------------
-*/
-Route::prefix('admin')->middleware(['auth', 'role:admin'])->group(function () {
+    Route::get('/uploaded-files/{excelFile}', [ExcelFileController::class, 'show'])->name('uploaded-files.show');
+    Route::put('/uploaded-files/{excelFile}', [ExcelFileController::class, 'update'])->name('uploaded-files.update');
+    Route::post('/uploaded-files/{excelFile}/rows', [ExcelFileController::class, 'addRow'])->name('uploaded-files.rows.store');
+    Route::delete('/uploaded-files/{excelFile}', [ExcelFileController::class, 'destroy'])->name('uploaded-files.destroy');
+     Route::get('/notifications/{notification}', [NotificationController::class, 'open'])
+        ->name('notifications.open');
 
-    // Dashboard
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
-
-    // Orders CRUD & Approval
-    Route::get('/orders', [AdminOrderController::class, 'index'])->name('admin.orders.index');
-    
-    // Show order + role-wise dynamic fields
-    Route::get('/orders/{order}', [AdminOrderController::class, 'show'])->name('admin.orders.show');
-    Route::post('/orders/{order}/fields', [AdminOrderController::class, 'storeFieldData'])->name('admin.orders.storeFieldData');
-
-    // Approve / Reject
-    Route::post('/orders/{order}/approve', [AdminOrderController::class, 'approve'])->name('admin.orders.approve');
-    Route::post('/orders/{order}/reject', [AdminOrderController::class, 'reject'])->name('admin.orders.reject');
-});
-
-
-// Admin dynamic fields management
-Route::prefix('admin')->middleware(['auth', 'role:admin'])->group(function() {
-    // Sections
-    Route::get('/fields', [FieldController::class, 'index'])->name('admin.fields.index');
-    Route::get('/fields/create', [FieldController::class, 'create'])->name('admin.fields.create');
-    Route::post('/fields', [FieldController::class, 'store'])->name('admin.fields.store');
-    Route::get('/fields/{section}/edit', [FieldController::class, 'edit'])->name('admin.fields.edit');
-    Route::put('/fields/{section}', [FieldController::class, 'update'])->name('admin.fields.update');
-    Route::delete('/fields/{section}', [FieldController::class, 'destroy'])->name('admin.fields.destroy');
-
-    // Fields inside a section
-    Route::get('/fields/{section}/field/create', [FieldController::class, 'createField'])->name('admin.fields.create_field');
-    Route::post('/fields/{section}/field', [FieldController::class, 'storeField'])->name('admin.fields.store_field');
-    Route::get('/fields/{section}/field/{field}/edit', [FieldController::class, 'editField'])->name('admin.fields.edit_field');
-    Route::put('/fields/{section}/field/{field}', [FieldController::class, 'updateField'])->name('admin.fields.update_field');
-    Route::delete('/fields/{section}/field/{field}', [FieldController::class, 'destroyField'])->name('admin.fields.destroy_field');
-
-    // ✅ Reorder fields via AJAX (drag & drop)
-    Route::post('/fields/{section}/fields/reorder', [FieldController::class, 'reorderFields'])
-        ->name('admin.fields.reorder_fields');
-});
-
-/*
-|--------------------------------------------------------------------------
-| Merchant Routes (Single Page Orders)
-|--------------------------------------------------------------------------
-*/
-
-Route::prefix('merchant')->middleware(['auth', 'role:merchant'])->name('merchant.')->group(function () {
-
-    Route::get('/orders', [MerchantOrderController::class, 'index'])->name('orders.index');
-    Route::post('/orders', [MerchantOrderController::class, 'store'])->name('orders.store');
-    Route::put('/orders/{id}', [MerchantOrderController::class, 'update'])->name('orders.update');
-    Route::get('/orders/{id}', [MerchantOrderController::class, 'show'])->name('orders.show');
-    Route::delete('/orders/{id}', [MerchantOrderController::class, 'destroy'])->name('orders.destroy');
-
-    // Bulk upload
-    Route::post('/orders/import', [MerchantOrderController::class, 'import'])->name('orders.import');
-    Route::get('/orders/demo-file', [MerchantOrderController::class, 'downloadDemoFile'])->name('orders.demo');
-
-    // Export reports
-    Route::get('/orders/export/excel', [MerchantOrderController::class, 'exportExcel'])->name('orders.export.excel');
-    Route::get('/orders/export/pdf', [MerchantOrderController::class, 'exportPDF'])->name('orders.export.pdf');
-   // routes/web.php
-    Route::get('/merchant/orders/demo-file', function () {
-        return response()->download(public_path('demo/orders_demo.xlsx'));
-    })->name('merchant.orders.demo');
-
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])
+        ->name('notifications.read-all');
 });
 
 
 
 
-
-
+require __DIR__.'/admin.php';
+require __DIR__.'/merchant.php';
+require __DIR__.'/account.php';
+require __DIR__.'/commercial.php';
+require __DIR__.'/store.php';
+require __DIR__.'/supply-chain.php';
 require __DIR__.'/auth.php';

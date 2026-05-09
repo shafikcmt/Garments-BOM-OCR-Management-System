@@ -4,20 +4,23 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class RoleCheck
 {
     /**
      * Handle an incoming request.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure  $next
-     * @param  string  $role
      */
-    public function handle(Request $request, Closure $next, $role)
+    public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        if (!$request->user() || !$request->user()->hasRole($role)) {
-            abort(403, 'Unauthorized'); // Redirect or show 403
+        $user = $request->user();
+
+        if (! $user) {
+            abort(403, 'Unauthorized');
+        }
+
+        if (! empty($roles) && ! $user->hasAnyRole($roles)) {
+            abort(403, 'Unauthorized');
         }
 
         return $next($request);

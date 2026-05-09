@@ -4,30 +4,30 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7b023b7992acd1bffdc4581dcb76a17b",
+    "content-hash": "a151f9a8d74395ced00bba65ab21bbec",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
-            "version": "v3.1.1",
+            "version": "v3.1.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/barryvdh/laravel-dompdf.git",
-                "reference": "8e71b99fc53bb8eb77f316c3c452dd74ab7cb25d"
+                "reference": "ee3b72b19ccdf57d0243116ecb2b90261344dedc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/barryvdh/laravel-dompdf/zipball/8e71b99fc53bb8eb77f316c3c452dd74ab7cb25d",
-                "reference": "8e71b99fc53bb8eb77f316c3c452dd74ab7cb25d",
+                "url": "https://api.github.com/repos/barryvdh/laravel-dompdf/zipball/ee3b72b19ccdf57d0243116ecb2b90261344dedc",
+                "reference": "ee3b72b19ccdf57d0243116ecb2b90261344dedc",
                 "shasum": ""
             },
             "require": {
                 "dompdf/dompdf": "^3.0",
-                "illuminate/support": "^9|^10|^11|^12",
+                "illuminate/support": "^9|^10|^11|^12|^13.0",
                 "php": "^8.1"
             },
             "require-dev": {
                 "larastan/larastan": "^2.7|^3.0",
-                "orchestra/testbench": "^7|^8|^9|^10",
+                "orchestra/testbench": "^7|^8|^9.16|^10|^11.0",
                 "phpro/grumphp": "^2.5",
                 "squizlabs/php_codesniffer": "^3.5"
             },
@@ -69,7 +69,7 @@
             ],
             "support": {
                 "issues": "https://github.com/barryvdh/laravel-dompdf/issues",
-                "source": "https://github.com/barryvdh/laravel-dompdf/tree/v3.1.1"
+                "source": "https://github.com/barryvdh/laravel-dompdf/tree/v3.1.2"
             },
             "funding": [
                 {
@@ -81,7 +81,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-02-13T15:07:54+00:00"
+            "time": "2026-02-21T08:51:10+00:00"
         },
         {
             "name": "brick/math",
@@ -7040,6 +7040,95 @@
                 }
             ],
             "time": "2024-11-21T01:49:47+00:00"
+        },
+        {
+            "name": "yajra/laravel-datatables-oracle",
+            "version": "v12.6.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/yajra/laravel-datatables.git",
+                "reference": "4f308d0fbb57673226cf42d296ca9f3befe86cdb"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/yajra/laravel-datatables/zipball/4f308d0fbb57673226cf42d296ca9f3befe86cdb",
+                "reference": "4f308d0fbb57673226cf42d296ca9f3befe86cdb",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/database": "^12",
+                "illuminate/filesystem": "^12",
+                "illuminate/http": "^12",
+                "illuminate/support": "^12",
+                "illuminate/view": "^12",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "algolia/algoliasearch-client-php": "^3.4.1",
+                "larastan/larastan": "^3.1.0",
+                "laravel/pint": "^1.14",
+                "laravel/scout": "^10.8.3",
+                "meilisearch/meilisearch-php": "^1.6.1",
+                "orchestra/testbench": "^10",
+                "rector/rector": "^2.0"
+            },
+            "suggest": {
+                "yajra/laravel-datatables-buttons": "Plugin for server-side exporting of dataTables.",
+                "yajra/laravel-datatables-editor": "Plugin to use DataTables Editor (requires a license).",
+                "yajra/laravel-datatables-export": "Plugin for server-side exporting using livewire and queue worker.",
+                "yajra/laravel-datatables-fractal": "Plugin for server-side response using Fractal.",
+                "yajra/laravel-datatables-html": "Plugin for server-side HTML builder of dataTables."
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "DataTables": "Yajra\\DataTables\\Facades\\DataTables"
+                    },
+                    "providers": [
+                        "Yajra\\DataTables\\DataTablesServiceProvider"
+                    ]
+                },
+                "branch-alias": {
+                    "dev-master": "12.x-dev"
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helper.php"
+                ],
+                "psr-4": {
+                    "Yajra\\DataTables\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Arjay Angeles",
+                    "email": "aqangeles@gmail.com"
+                }
+            ],
+            "description": "jQuery DataTables API for Laravel",
+            "keywords": [
+                "datatables",
+                "jquery",
+                "laravel",
+                "yajra"
+            ],
+            "support": {
+                "issues": "https://github.com/yajra/laravel-datatables/issues",
+                "source": "https://github.com/yajra/laravel-datatables/tree/v12.6.3"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/sponsors/yajra",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-12-09T05:57:29+00:00"
         }
     ],
     "packages-dev": [

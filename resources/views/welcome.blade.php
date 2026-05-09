@@ -37,6 +37,6 @@
 
         <button type="submit" class="btn btn-primary w-100">Login</button>
 
-        <div class="text-center mt-3 small text-muted">© 2025 Humana Apparels Pvt. Ltd – OCR Management</div>
+        <div class="text-center mt-3 small text-white">© 2025 Humana Apparels Pvt. Ltd – OCR Management</div>
     </form>
 </x-guest-layout>

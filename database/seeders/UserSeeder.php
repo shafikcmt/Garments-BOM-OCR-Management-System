@@ -57,21 +57,20 @@ class UserSeeder extends Seeder
 
         foreach ($users as $data) {
 
-            $user = User::firstOrCreate(
-                ['email' => $data['email']],
-                [
-                    'name' => $data['name'],
-                    'password' => Hash::make('password123'),
-                    'role_id' => $roles[$data['role']]->id ?? null,
-                    'status' => 1,
-                    'remember_token' => Str::random(10),
-                ]
-            );
+                $user = User::firstOrCreate(
+                    ['email' => $data['email']],
+                    [
+                        'name' => $data['name'],
+                        'password' => Hash::make('password123'),
+                        'status' => 1,
+                        'remember_token' => Str::random(10),
+                    ]
+                );
 
-            // Assign Spatie role (sync = safe re-run)
-            if (isset($roles[$data['role']])) {
-                $user->syncRoles([$roles[$data['role']]]);
+                // Assign Spatie role
+                if (isset($roles[$data['role']])) {
+                    $user->syncRoles([$roles[$data['role']]]);
+                }
             }
-        }
     }
 }
