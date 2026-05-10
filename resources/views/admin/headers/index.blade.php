@@ -279,7 +279,32 @@
     .header-page .actions-stack {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 8px;
+    }
+
+    .header-page .table tbody tr {
+        background: #fff;
+        transition: background 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .header-page .table tbody tr:nth-child(even) {
+        background: #fcfdff;
+    }
+
+    .header-page .table tbody tr:hover {
+        background: #f8fbff;
+        box-shadow: inset 4px 0 0 #376ac3;
+    }
+
+    .header-page .header-action-btn {
+        min-width: 36px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        border-radius: 11px;
+        font-weight: 800;
     }
 
     .header-page #headerControlTable th:nth-child(1),
@@ -342,8 +367,8 @@
             </div>
 
             <div class="d-flex flex-wrap gap-2">
-                <a href="{{ route('admin.headers.create') }}" class="btn btn-primary px-3">
-                    + Add New Header
+                <a href="{{ route('admin.headers.create') }}" class="btn btn-primary px-3 d-inline-flex align-items-center gap-2">
+                    <i class="bi bi-plus-circle"></i> Add New Header
                 </a>
             </div>
         </div>
@@ -519,15 +544,15 @@
                                 </td>
                                 <td>
                                     <div class="actions-stack">
-                                        <a href="{{ route('admin.headers.edit', $header->id) }}" class="btn btn-sm btn-outline-warning">
-                                            Edit
+                                        <a href="{{ route('admin.headers.edit', $header->id) }}" class="btn btn-sm btn-outline-warning header-action-btn" title="Edit header">
+                                            <i class="bi bi-pencil-square"></i><span class="d-none d-xl-inline">Edit</span>
                                         </a>
 
                                         <form action="{{ route('admin.headers.destroy', $header->id) }}" method="POST" class="d-inline">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this header?')">
-                                                Delete
+                                            <button type="submit" class="btn btn-sm btn-outline-danger header-action-btn" title="Delete header" onclick="return confirm('Delete this header?')">
+                                                <i class="bi bi-trash3"></i><span class="d-none d-xl-inline">Delete</span>
                                             </button>
                                         </form>
                                     </div>

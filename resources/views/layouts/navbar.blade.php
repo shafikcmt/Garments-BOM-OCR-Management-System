@@ -5,17 +5,17 @@
         </button>
 
         <div class="min-w-0">
-            <div class="d-flex align-items-center gap-2">
-                <span class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-sky-700">OCR</span>
-                <span class="text-muted small d-none d-sm-inline">Enterprise Workspace</span>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.14em] text-blue-700 border border-blue-100">OCR</span>
+                <span class="text-muted small d-none d-sm-inline">Operations Workspace</span>
             </div>
-            <h5 class="mb-0 fw-bold text-slate-900 text-truncate" style="letter-spacing:-.03em;">
+            <h5 class="mb-0 fw-bold text-slate-900 text-truncate" style="font-size:1rem;letter-spacing:-.025em;">
                 Humana Apparels Pvt. Ltd
             </h5>
         </div>
     </div>
 
-    <div class="d-flex align-items-center gap-3">
+    <div class="d-flex align-items-center gap-2 gap-sm-3">
         @php
             $navNotifications = \App\Models\AppNotification::with('actor')
                 ->where('user_id', auth()->id())
@@ -30,7 +30,7 @@
 
         <div class="dropdown">
             <button class="app-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications">
-                <i class="bi bi-bell fs-5"></i>
+                <i class="bi bi-bell fs-6"></i>
                 @if($unreadNotificationCount > 0)
                     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger shadow-sm">
                         {{ $unreadNotificationCount > 99 ? '99+' : $unreadNotificationCount }}
@@ -38,7 +38,7 @@
                 @endif
             </button>
 
-            <div class="dropdown-menu dropdown-menu-end p-0 border-0 shadow-lg overflow-hidden" style="width:min(380px, calc(100vw - 32px)); border-radius:22px; max-height:460px; overflow-y:auto;">
+            <div class="dropdown-menu dropdown-menu-end p-0 border-0 shadow-lg overflow-hidden" style="width:min(380px, calc(100vw - 32px)); border-radius:20px; max-height:460px; overflow-y:auto;">
                 <div class="px-3 py-3 border-bottom bg-light d-flex justify-content-between align-items-center gap-2">
                     <div>
                         <strong class="text-slate-900">Notifications</strong>
@@ -57,7 +57,7 @@
                     <a href="{{ route('notifications.open', $notification->id) }}"
                        class="dropdown-item py-3 px-3 {{ $notification->read_at ? '' : 'bg-sky-50' }}">
                         <div class="d-flex gap-2">
-                            <span class="flex-shrink-0 d-inline-flex align-items-center justify-content-center rounded-4 bg-primary text-white" style="width:34px;height:34px;">
+                            <span class="flex-shrink-0 d-inline-flex align-items-center justify-content-center rounded-4 bg-primary text-white" style="width:32px;height:32px;">
                                 <i class="bi bi-info-lg"></i>
                             </span>
                             <span class="min-w-0">
@@ -77,15 +77,21 @@
         </div>
 
         <div class="profile-wrapper">
-            <img
-                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTxz7qJ9pU6Xj2EJKaRDVz-9Bd0xh2LnMklGw&s"
-                class="profile-img"
-                alt="User"
-            >
+            <button type="button" class="d-flex align-items-center gap-2 border-0 bg-transparent p-0">
+                <img
+                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTxz7qJ9pU6Xj2EJKaRDVz-9Bd0xh2LnMklGw&s"
+                    class="profile-img"
+                    alt="User"
+                >
+                <span class="d-none d-md-block text-start min-w-0">
+                    <span class="d-block fw-bold text-slate-900 text-truncate" style="font-size:13px;max-width:150px;">{{ auth()->user()->name }}</span>
+                    <span class="d-block text-muted text-truncate" style="font-size:11px;max-width:150px;">{{ auth()->user()->email }}</span>
+                </span>
+            </button>
 
             <div class="profile-card">
                 <div class="d-flex align-items-center gap-3 border-bottom pb-3 mb-2">
-                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTxz7qJ9pU6Xj2EJKaRDVz-9Bd0xh2LnMklGw&s" class="rounded-4" style="width:46px;height:46px;object-fit:cover;" alt="User">
+                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTxz7qJ9pU6Xj2EJKaRDVz-9Bd0xh2LnMklGw&s" class="rounded-4" style="width:44px;height:44px;object-fit:cover;" alt="User">
                     <div class="min-w-0">
                         <strong class="d-block text-truncate">{{ auth()->user()->name }}</strong>
                         <p class="mb-0 text-muted small text-truncate">{{ auth()->user()->email }}</p>

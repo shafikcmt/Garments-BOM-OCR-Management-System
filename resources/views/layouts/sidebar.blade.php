@@ -1,160 +1,201 @@
+@php
+    $isAdminDashboard = request()->routeIs('admin.dashboard');
+    $isAdminWorkspace = request()->routeIs('admin.workspace') || request()->routeIs('uploaded-files.*') || request()->routeIs('admin.headers.*');
+    $isAdminUserRole = request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*');
+    $isAdminBookingSettings = request()->routeIs('admin.suppliers.*') || request()->routeIs('admin.booking-delivery-destinations.*') || request()->routeIs('admin.booking-instructions.*') || request()->routeIs('admin.po-generate-control.*');
+    $isSupplyBooking = request()->routeIs('supply_chain.bookings.*');
+    $supplyBookingUrl = route('supply_chain.bookings.index');
+@endphp
+
 <nav class="sidebar" aria-label="Main sidebar navigation">
-    <div class="sidebar-logo d-flex align-items-center justify-content-between gap-3">
-        <a href="{{ url('/dashboard') }}" class="d-flex align-items-center gap-3 text-white min-w-0">
-            <span class="brand-mark"><i class="bi bi-grid-1x2-fill"></i></span>
-            <span class="min-w-0">
-                <span class="d-block fw-bold fs-6 lh-1">HAPL OCR</span>
-                <span class="d-block small text-sky-100 opacity-75 mt-1 text-truncate">Management System</span>
-            </span>
-        </a>
-        <button type="button" class="btn btn-sm btn-outline-light d-lg-none rounded-4" id="sidebarClose" aria-label="Close sidebar">
-            <i class="bi bi-x-lg"></i>
-        </button>
-    </div>
+    <div class="sidebar-inner">
+        <div class="sidebar-logo">
+            <a href="{{ url('/dashboard') }}" class="sidebar-brand-link">
+                <span class="brand-mark"><i class="bi bi-grid-1x2-fill"></i></span>
+                <span class="min-w-0">
+                    <span class="sidebar-brand-title">HAPL OCR</span>
+                    <span class="sidebar-brand-subtitle">Management System</span>
+                </span>
+            </a>
+            <button type="button" class="btn btn-sm d-lg-none sidebar-close-btn" id="sidebarClose" aria-label="Close sidebar">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
 
-    <div class="sidebar-menu">
-        <div class="px-2 pb-2 small text-sky-100 text-uppercase fw-bold opacity-75" style="letter-spacing:.08em;">Menu</div>
-        <ul class="nav flex-column" id="sidebarMenu">
-
+        <div class="sidebar-menu">
             @role('admin')
-            <li class="nav-item">
-                <a href="{{ route('admin.dashboard') }}" class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
-                    <i class="bi bi-speedometer2"></i>
-                    <span>Admin Dashboard</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('admin.workspace') }}" class="nav-link {{ request()->routeIs('admin.workspace') || request()->routeIs('uploaded-files.*') ? 'active' : '' }}">
-                    <i class="bi bi-layout-text-window-reverse"></i>
-                    <span>Workspace Control</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('admin.users.index') }}" class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
-                    <i class="bi bi-people"></i>
-                    <span>User Control</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('admin.roles.index') }}" class="nav-link {{ request()->routeIs('admin.roles.*') ? 'active' : '' }}">
-                    <i class="bi bi-person-badge"></i>
-                    <span>Role Control</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('admin.suppliers.index') }}" class="nav-link {{ request()->routeIs('admin.suppliers.*') ? 'active' : '' }}">
-                    <i class="bi bi-building"></i>
-                    <span>Vendor Control</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('admin.booking-delivery-destinations.index') }}" class="nav-link {{ request()->routeIs('admin.booking-delivery-destinations.*') ? 'active' : '' }}">
-                    <i class="bi bi-geo-alt"></i>
-                    <span>Delivery Destination</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('admin.booking-instructions.index') }}" class="nav-link {{ request()->routeIs('admin.booking-instructions.*') ? 'active' : '' }}">
-                    <i class="bi bi-card-checklist"></i>
-                    <span>Booking Instructions</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('admin.headers.index') }}" class="nav-link {{ request()->routeIs('admin.headers.*') ? 'active' : '' }}">
-                    <i class="bi bi-file-earmark-spreadsheet"></i>
-                    <span>Excel Header Control</span>
-                </a>
-            </li>
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Main Menu</div>
+                <ul class="sidebar-list">
+                    <li class="sidebar-item">
+                        <a href="{{ route('admin.dashboard') }}" class="sidebar-nav-link {{ $isAdminDashboard ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span>
+                                <span class="sidebar-link-text">Dashboard</span>
+                            </span>
+                        </a>
+                    </li>
+
+                    <li class="sidebar-group {{ $isAdminWorkspace ? 'is-open' : '' }}">
+                        <button type="button" class="sidebar-group-button {{ $isAdminWorkspace ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminWorkspace ? 'true' : 'false' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-grid"></i></span>
+                                <span class="sidebar-link-text">Workspace</span>
+                            </span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                        </button>
+                        <div class="sidebar-submenu {{ $isAdminWorkspace ? 'is-open' : '' }}">
+                            <span class="sidebar-submenu-rail"></span>
+                            <a href="{{ route('admin.workspace') }}" class="sidebar-sub-link {{ request()->routeIs('admin.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">Workspace</a>
+                            <a href="{{ route('admin.headers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.headers.*') ? 'is-active' : '' }}">Excel Headers</a>
+                        </div>
+                    </li>
+
+                    <li class="sidebar-group {{ $isAdminUserRole ? 'is-open' : '' }}">
+                        <button type="button" class="sidebar-group-button {{ $isAdminUserRole ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminUserRole ? 'true' : 'false' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-people"></i></span>
+                                <span class="sidebar-link-text">Users &amp; Roles</span>
+                            </span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                        </button>
+                        <div class="sidebar-submenu {{ $isAdminUserRole ? 'is-open' : '' }}">
+                            <span class="sidebar-submenu-rail"></span>
+                            <a href="{{ route('admin.users.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.users.*') ? 'is-active' : '' }}">Users</a>
+                            <a href="{{ route('admin.roles.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.roles.*') ? 'is-active' : '' }}">Roles</a>
+                        </div>
+                    </li>
+
+                    <li class="sidebar-group {{ $isAdminBookingSettings ? 'is-open' : '' }}">
+                        <button type="button" class="sidebar-group-button {{ $isAdminBookingSettings ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminBookingSettings ? 'true' : 'false' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-sliders"></i></span>
+                                <span class="sidebar-link-text">Booking Setup</span>
+                            </span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                        </button>
+                        <div class="sidebar-submenu {{ $isAdminBookingSettings ? 'is-open' : '' }}">
+                            <span class="sidebar-submenu-rail"></span>
+                            <a href="{{ route('admin.suppliers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.suppliers.*') ? 'is-active' : '' }}">Vendors</a>
+                            <a href="{{ route('admin.booking-delivery-destinations.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.booking-delivery-destinations.*') ? 'is-active' : '' }}">Destinations</a>
+                            <a href="{{ route('admin.booking-instructions.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.booking-instructions.*') ? 'is-active' : '' }}">Instructions</a>
+                            <a href="{{ route('admin.po-generate-control.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.po-generate-control.*') ? 'is-active' : '' }}">PO Generate Control</a>
+                        </div>
+                    </li>
+                </ul>
+            </div>
             @endrole
 
             @role('merchant')
-            <li class="nav-item">
-                <a href="{{ route('merchant.dashboard') }}" class="nav-link {{ request()->routeIs('merchant.dashboard') ? 'active' : '' }}">
-                    <i class="bi bi-speedometer2"></i>
-                    <span>Merchant Dashboard</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('merchant.workspace') }}" class="nav-link {{ request()->routeIs('merchant.workspace') || request()->routeIs('uploaded-files.*') ? 'active' : '' }}">
-                    <i class="bi bi-layout-text-window-reverse"></i>
-                    <span>Merchant Workspace</span>
-                </a>
-            </li>
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Main Menu</div>
+                <ul class="sidebar-list">
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.dashboard') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span><span class="sidebar-link-text">Dashboard</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
             @endrole
 
             @role('account')
-            <li class="nav-item">
-                <a href="{{ route('account.dashboard') }}" class="nav-link {{ request()->routeIs('account.dashboard') ? 'active' : '' }}">
-                    <i class="bi bi-speedometer2"></i>
-                    <span>Account Dashboard</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('account.workspace') }}" class="nav-link {{ request()->routeIs('account.workspace') || request()->routeIs('uploaded-files.*') ? 'active' : '' }}">
-                    <i class="bi bi-layout-text-window-reverse"></i>
-                    <span>Account Workspace</span>
-                </a>
-            </li>
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Main Menu</div>
+                <ul class="sidebar-list">
+                    <li class="sidebar-item">
+                        <a href="{{ route('account.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('account.dashboard') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span><span class="sidebar-link-text">Dashboard</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('account.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('account.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
             @endrole
 
             @role('commercial')
-            <li class="nav-item">
-                <a href="{{ route('commercial.dashboard') }}" class="nav-link {{ request()->routeIs('commercial.dashboard') ? 'active' : '' }}">
-                    <i class="bi bi-speedometer2"></i>
-                    <span>Commercial Dashboard</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('commercial.workspace') }}" class="nav-link {{ request()->routeIs('commercial.workspace') || request()->routeIs('uploaded-files.*') ? 'active' : '' }}">
-                    <i class="bi bi-layout-text-window-reverse"></i>
-                    <span>Commercial Workspace</span>
-                </a>
-            </li>
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Main Menu</div>
+                <ul class="sidebar-list">
+                    <li class="sidebar-item">
+                        <a href="{{ route('commercial.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.dashboard') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span><span class="sidebar-link-text">Dashboard</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('commercial.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
             @endrole
 
             @role('store')
-            <li class="nav-item">
-                <a href="{{ route('store.dashboard') }}" class="nav-link {{ request()->routeIs('store.dashboard') ? 'active' : '' }}">
-                    <i class="bi bi-speedometer2"></i>
-                    <span>Store Dashboard</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('store.workspace') }}" class="nav-link {{ request()->routeIs('store.workspace') || request()->routeIs('uploaded-files.*') ? 'active' : '' }}">
-                    <i class="bi bi-layout-text-window-reverse"></i>
-                    <span>Store Workspace</span>
-                </a>
-            </li>
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Main Menu</div>
+                <ul class="sidebar-list">
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('store.dashboard') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span><span class="sidebar-link-text">Dashboard</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('store.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
             @endrole
 
             @role('supply_chain')
-            <li class="nav-item">
-                <a href="{{ route('supply_chain.dashboard') }}" class="nav-link {{ request()->routeIs('supply_chain.dashboard') ? 'active' : '' }}">
-                    <i class="bi bi-speedometer2"></i>
-                    <span>Supply Chain Dashboard</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('supply_chain.workspace') }}" class="nav-link {{ request()->routeIs('supply_chain.workspace') || request()->routeIs('uploaded-files.*') ? 'active' : '' }}">
-                    <i class="bi bi-layout-text-window-reverse"></i>
-                    <span>Supply Chain Workspace</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="{{ route('supply_chain.bookings.index') }}" class="nav-link {{ request()->routeIs('supply_chain.bookings.*') ? 'active' : '' }}">
-                    <i class="bi bi-file-earmark-plus"></i>
-                    <span>Booking Preview</span>
-                </a>
-            </li>
-            @endrole
-        </ul>
-
-        <div class="mt-4 mx-1 rounded-4 border border-white/10 p-3" style="background:rgba(255,255,255,.07);">
-            <div class="d-flex align-items-center gap-2 text-sky-100 fw-bold">
-                <i class="bi bi-shield-check"></i>
-                Secure workspace
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Main Menu</div>
+                <ul class="sidebar-list">
+                    <li class="sidebar-item">
+                        <a href="{{ route('supply_chain.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.dashboard') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span>
+                                <span class="sidebar-link-text">Dashboard</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('supply_chain.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-columns-gap"></i></span>
+                                <span class="sidebar-link-text">Workspace</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-group {{ $isSupplyBooking ? 'is-open' : '' }}">
+                        <button type="button" class="sidebar-group-button {{ $isSupplyBooking ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isSupplyBooking ? 'true' : 'false' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-file-earmark-plus"></i></span>
+                                <span class="sidebar-link-text">PO Generate</span>
+                            </span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                        </button>
+                        <div class="sidebar-submenu {{ $isSupplyBooking ? 'is-open' : '' }}">
+                            <span class="sidebar-submenu-rail"></span>
+                            <a href="{{ $supplyBookingUrl }}#pending-generated-po" data-hash="pending-generated-po" class="sidebar-sub-link {{ $isSupplyBooking ? 'is-active' : '' }}">Booking Preview</a>
+                            <a href="{{ $supplyBookingUrl }}#recent-generated-po" data-hash="recent-generated-po" class="sidebar-sub-link">Generated PO List</a>
+                        </div>
+                    </li>
+                </ul>
             </div>
-            <div class="small text-sky-100 opacity-75 mt-1">Role-based OCR workflow and approvals.</div>
+            @endrole
+
         </div>
     </div>
 </nav>

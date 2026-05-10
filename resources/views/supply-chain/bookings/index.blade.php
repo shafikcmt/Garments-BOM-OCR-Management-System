@@ -340,6 +340,135 @@
     }
     .revision-mini-pill { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; }
     .needs-regenerate-pill { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+
+    .booking-view-switch {
+        display: inline-flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 8px;
+        border-radius: 18px;
+        border: 1px solid rgba(199, 210, 254, .65);
+        background: rgba(255,255,255,.78);
+        box-shadow: 0 18px 40px rgba(15, 23, 42, .08);
+        backdrop-filter: blur(10px);
+    }
+    .booking-view-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 44px;
+        padding: 0 16px;
+        border-radius: 14px;
+        color: #475569;
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: -.01em;
+        border: 1px solid transparent;
+        transition: .18s ease;
+    }
+    .booking-view-btn:hover {
+        color: #312e81;
+        background: #eef2ff;
+    }
+    .booking-view-btn.is-active {
+        color: #fff;
+        border-color: rgba(79, 70, 229, .24);
+        background: linear-gradient(135deg, #4f46e5, #312e81);
+        box-shadow: 0 12px 28px rgba(79, 70, 229, .24);
+    }
+    .booking-tab-panel.is-hidden { display: none; }
+
+
+    .po-control-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+    }
+    .po-control-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        background: linear-gradient(180deg, #fff 0%, #fbfdff 100%);
+        padding: 15px;
+        box-shadow: 0 14px 34px rgba(15,23,42,.055);
+    }
+    .po-control-label { display:block; color:#64748b; font-size:12px; font-weight:800; }
+    .po-control-value { display:block; color:#0f172a; font-size:1.55rem; line-height:1; font-weight:950; letter-spacing:-.045em; margin-top:5px; }
+    .po-control-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        background:#eef2ff;
+        color:#4338ca;
+        font-size:18px;
+    }
+    .po-control-filter-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        background: #fff;
+        padding: 14px;
+        box-shadow: 0 12px 28px rgba(15,23,42,.045);
+    }
+    .po-control-search { position: relative; }
+    .po-control-search i { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#94a3b8; pointer-events:none; }
+    .po-control-search .form-control { padding-left:42px; min-height:44px; }
+    .po-status-stack { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+    .po-status-pill, .po-change-pill {
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        padding:6px 10px;
+        border-radius:999px;
+        font-size:11px;
+        font-weight:900;
+        border:1px solid transparent;
+        white-space:nowrap;
+    }
+    .po-status-generated { color:#047857; background:#ecfdf5; border-color:#bbf7d0; }
+    .po-status-regenerated { color:#9a3412; background:#fff7ed; border-color:#fed7aa; }
+    .po-status-completed { color:#1d4ed8; background:#eff6ff; border-color:#bfdbfe; }
+    .po-change-clean { color:#475569; background:#f8fafc; border-color:#e2e8f0; }
+    .po-change-warning { color:#b91c1c; background:#fef2f2; border-color:#fecaca; }
+    .po-change-card {
+        border:1px solid #e2e8f0;
+        border-radius:14px;
+        background:#fff;
+        padding:10px;
+        margin-top:8px;
+        min-width:320px;
+    }
+    .po-change-table { margin-bottom:0; }
+    .po-change-table th { color:#475569; font-size:10px; text-transform:uppercase; letter-spacing:.05em; }
+    .po-change-table td { font-size:11px; color:#334155; padding:6px 8px; vertical-align:top; }
+    .po-history-list { display:flex; flex-direction:column; gap:6px; }
+    .po-history-entry { border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px; background:#f8fafc; }
+    .po-history-entry .title { color:#0f172a; font-size:12px; font-weight:900; text-transform:capitalize; }
+    .po-history-entry .meta { color:#64748b; font-size:11px; }
+    .po-control-empty { min-height:180px; display:flex; align-items:center; justify-content:center; text-align:center; color:#64748b; }
+    .generated-po-card .card-header { background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); }
+    .generated-po-actions { display:flex; justify-content:center; gap:7px; flex-wrap:wrap; }
+    .generated-po-action {
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+        min-height:32px;
+        padding:6px 9px;
+        border-radius:999px;
+        border:1px solid #dbe4f0;
+        background:#fff;
+        color:#334155;
+        text-decoration:none;
+        font-size:11px;
+        font-weight:900;
+        box-shadow:0 8px 16px rgba(15,23,42,.05);
+    }
+    .generated-po-action:hover { color:#312e81; border-color:#c7d2fe; background:#eef2ff; }
+    @media (max-width: 1199px) { .po-control-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 575px) { .po-control-grid { grid-template-columns: 1fr; } }
+
 </style>
 @endsection
 
@@ -350,6 +479,7 @@
     $selectedVendor = request('vendor');
     $selectedIhod = request('ihod');
     $selectedKeyword = request('keyword');
+    $generatedPoCount = $generatedPos->count();
 @endphp
 
 <div class="booking-page p-2 p-md-3"><div class="booking-shell">
@@ -364,16 +494,24 @@
         <div class="booking-hero-stats d-flex gap-3 flex-wrap">
             <span class="booking-stat">
                 <span class="booking-stat-icon"><i class="bi bi-clipboard-check"></i></span>
-                <span><span class="booking-stat-label">Pending / Applied</span><span class="booking-stat-value" id="pendingTotal">{{ $pendingRows->total() }}</span></span>
+                <span><span class="booking-stat-label">Pending Preview</span><span class="booking-stat-value" id="pendingTotal">{{ $pendingRows->total() }}</span></span>
             </span>
             <span class="booking-stat">
-                <span class="booking-stat-icon"><i class="bi bi-clock-history"></i></span>
-                <span><span class="booking-stat-label">Recent PO</span><span class="booking-stat-value" id="recentTotal">{{ $generatedPos->count() }}</span></span>
+                <span class="booking-stat-icon"><i class="bi bi-file-earmark-check"></i></span>
+                <span><span class="booking-stat-label">Generated PO List</span><span class="booking-stat-value" id="recentTotal">{{ $generatedPoCount }}</span></span>
             </span>
         </div>
     </div>
 
     <div id="bookingAjaxAlert" class="alert d-none" role="alert"></div>
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div class="booking-view-switch" id="bookingViewSwitch">
+            <a href="#pending-generated-po" class="booking-view-btn is-active" data-booking-tab="pending-generated-po"><i class="bi bi-list-check"></i>Pending PO Generate</a>
+            <a href="#recent-generated-po" class="booking-view-btn" data-booking-tab="recent-generated-po"><i class="bi bi-sliders"></i>Generated PO List</a>
+        </div>
+        <div class="small text-muted fw-semibold">Use PO Generate menu to open Booking Preview or Generated PO List.</div>
+    </div>
 
     <div class="card booking-card mb-4">
         <div class="card-header py-3">
@@ -432,6 +570,7 @@
         </div>
     </div>
 
+    <section id="pending-generated-po" class="booking-tab-panel" data-booking-panel="pending-generated-po">
     <div class="card booking-card mb-4">
         <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <h6 class="mb-0 fw-bold booking-section-title"><span class="booking-title-icon"><i class="bi bi-list-check"></i></span>Pending PO Generate Orders</h6>
@@ -474,6 +613,7 @@
             @include('supply-chain.bookings.partials.pagination', ['pendingRows' => $pendingRows])
         </div>
     </div>
+    </section>
 
     <div class="modal fade booking-preview-modal" id="bookingPreviewPanel" tabindex="-1" aria-labelledby="bookingPreviewTitle" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -496,74 +636,122 @@
         </div>
     </div>
 
-    <div class="card booking-card">
-        <div class="card-header py-3">
-            <h6 class="mb-0 fw-bold booking-section-title"><span class="booking-title-icon"><i class="bi bi-clock-history"></i></span>Recent Generated PO</h6>
+    <section id="recent-generated-po" class="booking-tab-panel is-hidden" data-booking-panel="recent-generated-po">
+    <div class="card booking-card generated-po-card">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h6 class="mb-0 fw-bold booking-section-title"><span class="booking-title-icon"><i class="bi bi-file-earmark-check"></i></span>Generated PO List</h6>
+                <small class="text-muted">Supply-chain users can only view, print and download generated PO. Admin controls re-generate and change history separately.</small>
+            </div>
+            <span class="badge rounded-pill text-bg-primary px-3 py-2">{{ $generatedPoCount }} PO</span>
+        </div>
+        <div class="card-body border-bottom">
+            <div class="row g-3 align-items-end">
+                <div class="col-lg-8">
+                    <label class="form-label mb-1 fw-bold small text-muted">Search generated PO</label>
+                    <div class="po-control-search">
+                        <i class="bi bi-search"></i>
+                        <input type="text" id="poControlSearch" class="form-control" placeholder="Search PO no, buyer, season, vendor, style or item...">
+                    </div>
+                </div>
+                <div class="col-lg-4 d-grid d-lg-flex justify-content-lg-end">
+                    <button type="button" class="btn btn-soft-reset" id="poControlSearchClear"><i class="bi bi-arrow-counterclockwise me-1"></i>Clear Search</button>
+                </div>
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0 booking-table">
+                <table class="table table-hover mb-0 booking-table generated-po-table" id="poControlTable">
                     <thead>
                         <tr>
-                            <th>PO No</th>
-                            <th>Buyer</th>
-                            <th>Season</th>
+                            <th style="width:170px;">PO No</th>
+                            <th>Buyer / Season</th>
                             <th>Vendor</th>
                             <th>Style / Item</th>
                             <th class="text-end">Qty</th>
-                            <th class="text-center">Booking Format</th>
+                            <th>Generated</th>
+                            <th class="text-center" style="width:230px;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($generatedPos as $po)
-                            <tr>
+                            @php
+                                $poData = $po->booking_data ?: [];
+                                $revisionNo = (int) ($po->revision_no ?? 0);
+                                $statusTokens = collect(['all', 'generated'])
+                                    ->when(($po->status ?? '') === 'completed', fn ($items) => $items->push('completed'))
+                                    ->implode(' ');
+                                $searchText = strtolower(implode(' ', array_filter([
+                                    $po->po_no,
+                                    $po->buyer_name,
+                                    $po->season_name,
+                                    $po->vendor_name,
+                                    $po->style_name,
+                                    $po->item_name,
+                                    $po->qty,
+                                    $po->status,
+                                ])));
+                            @endphp
+                            <tr class="po-control-row" data-status="{{ $statusTokens }}" data-search="{{ $searchText }}">
                                 <td>
                                     <span class="po-pill"><i class="bi bi-upc-scan"></i>{{ $po->po_no }}</span>
-                                    @if(($po->revision_no ?? 0) > 0)
-                                        <span class="revision-mini-pill ms-1">R-{{ $po->revision_no }}</span>
-                                    @endif
-                                    @if($po->needs_regenerate ?? false)
-                                        <span class="needs-regenerate-pill ms-1"><i class="bi bi-exclamation-triangle"></i>Source changed</span>
+                                    @if($revisionNo > 0)
+                                        <span class="revision-mini-pill mt-1"><i class="bi bi-arrow-repeat"></i>R-{{ $revisionNo }}</span>
                                     @endif
                                 </td>
-                                <td>{{ $po->buyer_name ?: '-' }}</td>
-                                <td>{{ $po->season_name ?: '-' }}</td>
-                                <td>{{ $po->vendor_name ?: '-' }}</td>
                                 <td>
-                                    <div class="fw-semibold">{{ $po->style_name ?: '-' }}</div>
-                                    <div class="small text-muted">{{ $po->item_name ?: '-' }}</div>
+                                    <div class="fw-bold text-slate-900">{{ $po->buyer_name ?: '-' }}</div>
+                                    <div class="small text-muted">Season: {{ $po->season_name ?: '-' }}</div>
+                                </td>
+                                <td>{{ $po->vendor_name ?: ($poData['to'] ?? '-') }}</td>
+                                <td>
+                                    <div class="fw-semibold">{{ $po->style_name ?: ($poData['order_style_no'] ?? '-') }}</div>
+                                    <div class="small text-muted">{{ $po->item_name ?: ($poData['item_type'] ?? '-') }}</div>
                                 </td>
                                 <td class="text-end fw-bold">{{ $po->qty !== null && $po->qty !== '' ? $po->qty : '-' }}</td>
+                                <td>
+                                    <span class="po-status-pill po-status-generated"><i class="bi bi-check2-circle"></i>Generated</span>
+                                    <div class="small text-muted mt-1">{{ optional($po->generated_at)->format('d M Y, h:i A') ?: '-' }}</div>
+                                </td>
                                 <td class="text-center">
-                                    <div class="dropdown d-inline-block">
-                                        <button class="btn booking-kebab-btn btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More actions">
-                                            <i class="bi bi-three-dots-vertical"></i>
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end booking-action-dropdown">
-                                            <li><a href="{{ route('supply_chain.bookings.show', $po) }}" class="dropdown-item"><i class="bi bi-eye me-2"></i>View booking</a></li>
-                                            <li><a href="{{ route('supply_chain.bookings.print', $po) }}" target="_blank" class="dropdown-item"><i class="bi bi-printer me-2"></i>Print</a></li>
-                                            <li><a href="{{ route('supply_chain.bookings.download', $po) }}" target="_blank" class="dropdown-item"><i class="bi bi-filetype-pdf me-2"></i>Download PDF</a></li>
-                                            <li>
-                                                <button type="button" class="dropdown-item regenerate-po-preview-btn" data-url="{{ route('supply_chain.bookings.regenerate_preview', $po) }}">
-                                                    <i class="bi bi-arrow-repeat me-2"></i>Re-generate PO
-                                                </button>
-                                            </li>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li><a href="{{ route('supply_chain.bookings.download_excel', $po) }}" target="_blank" class="dropdown-item"><i class="bi bi-file-earmark-excel me-2"></i>Download Excel</a></li>
-                                        </ul>
+                                    <div class="generated-po-actions">
+                                        <a href="{{ route('supply_chain.bookings.show', $po) }}" class="generated-po-action" title="View"><i class="bi bi-eye"></i><span>View</span></a>
+                                        <a href="{{ route('supply_chain.bookings.print', $po) }}" target="_blank" class="generated-po-action" title="Print"><i class="bi bi-printer"></i><span>Print</span></a>
+                                        <a href="{{ route('supply_chain.bookings.download', $po) }}" target="_blank" class="generated-po-action" title="Download PDF"><i class="bi bi-filetype-pdf"></i><span>PDF</span></a>
+                                        <a href="{{ route('supply_chain.bookings.download_excel', $po) }}" target="_blank" class="generated-po-action" title="Download Excel"><i class="bi bi-file-earmark-excel"></i><span>Excel</span></a>
                                     </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center py-4 text-muted">No PO generated yet.</td>
+                                <td colspan="7">
+                                    <div class="po-control-empty">
+                                        <div>
+                                            <span class="d-inline-flex align-items-center justify-content-center rounded-5 bg-light border mb-3" style="width:78px;height:78px;"><i class="bi bi-inbox fs-1 text-slate-300"></i></span>
+                                            <div class="fw-bold text-slate-900">No PO generated yet</div>
+                                            <div class="small text-muted">Generated PO will appear here for view, print and download.</div>
+                                        </div>
+                                    </div>
+                                </td>
                             </tr>
                         @endforelse
+                        <tr id="poControlNoMatchRow" style="display:none;">
+                            <td colspan="7">
+                                <div class="po-control-empty">
+                                    <div>
+                                        <span class="d-inline-flex align-items-center justify-content-center rounded-5 bg-light border mb-3" style="width:78px;height:78px;"><i class="bi bi-search fs-1 text-slate-300"></i></span>
+                                        <div class="fw-bold text-slate-900">No matching PO found</div>
+                                        <div class="small text-muted">Try another PO number, buyer, vendor, style or item.</div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
+    </section>
 </div></div>
 @endsection
 
@@ -579,6 +767,78 @@ document.addEventListener('DOMContentLoaded', function () {
     const selectedCount = document.getElementById('bookingSelectedCount');
     const pendingTotal = document.getElementById('pendingTotal');
     const recentTotal = document.getElementById('recentTotal');
+    const bookingTabButtons = document.querySelectorAll('[data-booking-tab]');
+    const bookingTabPanels = document.querySelectorAll('[data-booking-panel]');
+
+    function activateBookingTab(tabId, pushHash = false) {
+        if (!tabId) tabId = 'pending-generated-po';
+
+        bookingTabButtons.forEach(function (button) {
+            button.classList.toggle('is-active', button.dataset.bookingTab === tabId);
+        });
+
+        bookingTabPanels.forEach(function (panel) {
+            const match = panel.dataset.bookingPanel === tabId;
+            panel.classList.toggle('is-hidden', !match);
+        });
+
+        if (pushHash) {
+            history.replaceState(null, '', '#' + tabId);
+            window.dispatchEvent(new HashChangeEvent('hashchange'));
+        }
+    }
+
+    bookingTabButtons.forEach(function (button) {
+        button.addEventListener('click', function (event) {
+            event.preventDefault();
+            activateBookingTab(this.dataset.bookingTab, true);
+        });
+    });
+
+    const initialBookingTab = window.location.hash === '#recent-generated-po' ? 'recent-generated-po' : 'pending-generated-po';
+    activateBookingTab(initialBookingTab);
+
+    window.addEventListener('hashchange', function () {
+        const hash = window.location.hash.replace('#', '');
+        if (hash === 'pending-generated-po' || hash === 'recent-generated-po') {
+            activateBookingTab(hash);
+        }
+    });
+
+
+    const poControlSearch = document.getElementById('poControlSearch');
+    const poControlFilter = document.getElementById('poControlFilter');
+    const poControlRows = Array.from(document.querySelectorAll('#poControlTable .po-control-row'));
+    const poControlNoMatchRow = document.getElementById('poControlNoMatchRow');
+
+    function applyPoControlFilters() {
+        const keyword = (poControlSearch?.value || '').toLowerCase().trim();
+        const status = (poControlFilter?.value || 'all').toLowerCase();
+        let visible = 0;
+
+        poControlRows.forEach(function (row) {
+            const searchText = row.dataset.search || '';
+            const statusText = row.dataset.status || 'all';
+            const matchesSearch = !keyword || searchText.includes(keyword);
+            const matchesStatus = status === 'all' || statusText.split(' ').includes(status);
+            const shouldShow = matchesSearch && matchesStatus;
+            row.style.display = shouldShow ? '' : 'none';
+            if (shouldShow) visible++;
+        });
+
+        if (poControlNoMatchRow) {
+            poControlNoMatchRow.style.display = visible === 0 && poControlRows.length > 0 ? '' : 'none';
+        }
+    }
+
+    poControlSearch?.addEventListener('input', applyPoControlFilters);
+    poControlFilter?.addEventListener('change', applyPoControlFilters);
+    document.getElementById('poControlSearchClear')?.addEventListener('click', function () {
+        if (poControlSearch) poControlSearch.value = '';
+        if (poControlFilter) poControlFilter.value = 'all';
+        applyPoControlFilters();
+    });
+    applyPoControlFilters();
     const previewPanel = document.getElementById('bookingPreviewPanel');
     const previewContent = document.getElementById('bookingPreviewContent');
     const zoomOutBtn = document.getElementById('bookingPreviewZoomOut');
@@ -838,27 +1098,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    document.addEventListener('click', async function (event) {
-        const regeneratePreviewBtn = event.target.closest('.regenerate-po-preview-btn');
-        if (!regeneratePreviewBtn) return;
-
-        event.preventDefault();
-        if (regeneratePreviewBtn.disabled) return;
-
-        regeneratePreviewBtn.disabled = true;
-        showLoading(true);
-        try {
-            const data = await postJson(regeneratePreviewBtn.dataset.url, {});
-            showAlert(data.message || 'Re-generate preview ready. Edit first, then confirm re-generate.');
-            showPreview(data.preview_html);
-        } catch (error) {
-            showAlert(error.message, 'danger');
-        } finally {
-            regeneratePreviewBtn.disabled = false;
-            showLoading(false);
-        }
-    });
-
     previewContent?.addEventListener('click', async function (event) {
         const editToggle = event.target.closest('.booking-preview-edit-toggle');
         if (editToggle) {
@@ -914,9 +1153,8 @@ document.addEventListener('DOMContentLoaded', function () {
         showLoading(true);
         try {
             const data = await postJson(generateBtn.dataset.url, payload);
-            const successMessage = data.message || (isRegenerate ? 'PO re-generated successfully.' : 'PO generated successfully. Booking completed.');
+            const successMessage = data.message || 'PO generated successfully. Booking completed.';
             showAlert(successMessage);
-            window.alert(successMessage);
             if (data.preview_html) {
                 showPreview(data.preview_html);
             }

@@ -19,6 +19,25 @@ use Illuminate\Support\Str;
 
 class BookingController extends Controller
 {
+    protected function bookingRoutePrefix(): string
+    {
+        return 'supply_chain.bookings';
+    }
+
+    protected function bookingRouteName(string $action): string
+    {
+        return $this->bookingRoutePrefix() . '.' . $action;
+    }
+
+    protected function bookingRoute(string $action, mixed $parameters = []): string
+    {
+        return route($this->bookingRouteName($action), $parameters);
+    }
+
+    protected function canControlPo(): bool
+    {
+        return false;
+    }
     public function index(Request $request)
     {
         [$pendingRows, $generatedPos, $filterOptions] = $this->indexData($request);
@@ -42,7 +61,7 @@ class BookingController extends Controller
     {
         [$bookingPo, $bookingData, $groupRows] = $this->previewBookingForRow($excelRow);
         $previewMode = ! $bookingPo->exists;
-        $generateUrl = $previewMode ? route('supply_chain.bookings.generate', $excelRow) : null;
+        $generateUrl = $previewMode ? $this->bookingRoute('generate', $excelRow) : null;
 
         $instructionOptions = $this->bookingInstructionOptions();
         $deliveryDestinationOptions = $this->deliveryDestinationOptions();
@@ -93,7 +112,7 @@ class BookingController extends Controller
             $seenGroups[$groupKey] = true;
             [$bookingPo, $bookingData, $groupRows] = $this->previewBookingForRow($row);
             $previewMode = ! $bookingPo->exists;
-            $generateUrl = $previewMode ? route('supply_chain.bookings.generate', $row) : null;
+            $generateUrl = $previewMode ? $this->bookingRoute('generate', $row) : null;
             $previewHtml .= view('supply-chain.bookings.partials.preview', compact('bookingPo', 'bookingData', 'previewMode', 'generateUrl', 'instructionOptions', 'deliveryDestinationOptions'))->render();
             $previewCount++;
         }
@@ -109,6 +128,8 @@ class BookingController extends Controller
     {
         $editData = $this->requestHasBookingEdits($request) ? $this->validateBookingEditRequest($request) : null;
         $bookingPo = $this->generateBookingForRow($excelRow, $editData, $request);
+        $bookingPo = $this->syncBookingPoSourceControl($bookingPo, true);
+        $bookingPo = $this->appendBookingGenerationHistory($bookingPo, 'generated');
         $this->markBookingPoCompleted($bookingPo);
 
         $message = 'PO generated successfully: ' . $bookingPo->po_no . '. Booking completed and hidden from pending list.';
@@ -128,13 +149,15 @@ class BookingController extends Controller
                         'generateUrl' => null,
                         'instructionOptions' => $this->bookingInstructionOptions(),
                         'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
+                        'bookingRoutePrefix' => $this->bookingRoutePrefix(),
+                        'canControlPo' => $this->canControlPo(),
                     ]
                 ))->render(),
             ]);
         }
 
         return redirect()
-            ->route('supply_chain.bookings.index')
+            ->route($this->bookingRouteName('index'))
             ->with('success', e($message));
     }
 
@@ -142,10 +165,12 @@ class BookingController extends Controller
     public function regeneratePreview(Request $request, BookingPo $bookingPo)
     {
         $this->authorizeBookingPo($bookingPo);
+        abort_if(! $this->canControlPo(), 403);
         $bookingPo->loadMissing(['excelFile', 'excelRow.cells.header', 'generatedBy']);
         $bookingPo = $this->refreshBookingPoQtyFromSource($bookingPo);
+        $bookingPo = $this->syncBookingPoSourceControl($bookingPo);
 
-        $bookingData = $this->bookingData($bookingPo);
+        $bookingData = $this->bookingDataWithLatestSource($bookingPo);
         $bookingData['po_number'] = $bookingPo->po_no;
         $bookingData['revision_no'] = $this->bookingRevisionNo($bookingPo);
 
@@ -158,9 +183,11 @@ class BookingController extends Controller
                 'previewMode' => true,
                 'regenerateMode' => true,
                 'editPanelOpen' => true,
-                'generateUrl' => route('supply_chain.bookings.regenerate', $bookingPo),
+                'generateUrl' => $this->bookingRoute('regenerate', $bookingPo),
                 'instructionOptions' => $this->bookingInstructionOptions(),
                 'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
+                'bookingRoutePrefix' => $this->bookingRoutePrefix(),
+                'canControlPo' => $this->canControlPo(),
             ])->render(),
         ]);
     }
@@ -168,15 +195,21 @@ class BookingController extends Controller
     public function regenerate(Request $request, BookingPo $bookingPo)
     {
         $this->authorizeBookingPo($bookingPo);
+        abort_if(! $this->canControlPo(), 403);
+        $bookingPo = $this->syncBookingPoSourceControl($bookingPo);
+        $beforeAudit = $this->bookingAuditSnapshot($bookingPo->booking_data ?: []);
         $validated = $this->requestHasBookingEdits($request) ? $this->validateBookingEditRequest($request) : null;
 
         if ($validated !== null) {
+            $bookingPo = $this->applyLatestSourceDataToBookingPo($bookingPo);
             $bookingPo = $this->applyBookingEditDataToPo($bookingPo, $validated, $request);
         } else {
-            $bookingPo = $this->refreshBookingPoQtyFromSource($bookingPo);
+            $bookingPo = $this->applyLatestSourceDataToBookingPo($bookingPo);
         }
 
         $bookingPo = $this->incrementBookingRevision($bookingPo);
+        $bookingPo = $this->syncBookingPoSourceControl($bookingPo, true);
+        $bookingPo = $this->appendBookingGenerationHistory($bookingPo, 'regenerated', $beforeAudit);
         $bookingData = $this->bookingData($bookingPo);
         $message = 'PO re-generated successfully: ' . $bookingPo->po_no . ' (R-' . $this->bookingRevisionNo($bookingPo) . ').';
 
@@ -194,12 +227,14 @@ class BookingController extends Controller
                     'generateUrl' => null,
                     'instructionOptions' => $this->bookingInstructionOptions(),
                     'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
+                    'bookingRoutePrefix' => $this->bookingRoutePrefix(),
+                    'canControlPo' => $this->canControlPo(),
                 ])->render(),
             ]);
         }
 
         return redirect()
-            ->route('supply_chain.bookings.show', $bookingPo)
+            ->route($this->bookingRouteName('show'), $bookingPo)
             ->with('success', $message);
     }
 
@@ -238,6 +273,8 @@ class BookingController extends Controller
 
             $seenGroups[$groupKey] = true;
             $po = $this->generateBookingForRow($row);
+            $po = $this->syncBookingPoSourceControl($po, true);
+            $po = $this->appendBookingGenerationHistory($po, 'generated');
             $this->markBookingPoCompleted($po);
             $generated[] = $po->po_no;
             $previewPo ??= $po;
@@ -261,13 +298,234 @@ class BookingController extends Controller
     }
 
 
-    private function bookingRevisionNo(BookingPo $bookingPo): int
+    protected function bookingSourceControlFields(): array
+    {
+        return [
+            'buyer_name' => 'Buyer',
+            'season_name' => 'Season',
+            'ihod' => 'IHOD',
+            'vendor_name' => 'Vendor',
+            'style_name' => 'Style',
+            'item_name' => 'Item',
+            'qty' => 'Booking Qty',
+            'pp_qty' => 'PP Qty',
+            'uom' => 'UOM',
+            'item_type' => 'Item Type',
+            'description' => 'Description',
+            'color' => 'Color',
+            'size' => 'Size',
+            'width' => 'Width',
+            'size_width' => 'Size / Width',
+            'supplier_article' => 'Supplier Article',
+            'consumption' => 'Consumption',
+            'remarks' => 'Remarks',
+        ];
+    }
+
+    protected function bookingSourceSnapshot(BookingPo $bookingPo): array
+    {
+        $bookingPo->loadMissing(['excelRow.cells.header']);
+
+        if (! $bookingPo->excelRow) {
+            return [];
+        }
+
+        $rowData = $this->extractRowData($bookingPo->excelRow);
+        $snapshot = [];
+
+        foreach ($this->bookingSourceControlFields() as $key => $label) {
+            $snapshot[$key] = [
+                'label' => $label,
+                'value' => $this->normalizeSnapshotValue($rowData[$key] ?? null),
+            ];
+        }
+
+        return $snapshot;
+    }
+
+    protected function normalizeSnapshotValue($value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        return trim(preg_replace('/\s+/', ' ', (string) $value));
+    }
+
+    protected function bookingSourceSnapshotChanges(array $baseline, array $current): array
+    {
+        $changes = [];
+
+        foreach ($this->bookingSourceControlFields() as $key => $label) {
+            $before = $this->normalizeSnapshotValue($baseline[$key]['value'] ?? $baseline[$key] ?? null);
+            $after = $this->normalizeSnapshotValue($current[$key]['value'] ?? $current[$key] ?? null);
+
+            if ($before === $after) {
+                continue;
+            }
+
+            $changes[] = [
+                'key' => $key,
+                'label' => $label,
+                'before' => $before,
+                'after' => $after,
+            ];
+        }
+
+        return $changes;
+    }
+
+    protected function syncBookingPoSourceControl(BookingPo $bookingPo, bool $resetBaseline = false): BookingPo
+    {
+        $bookingPo = $bookingPo->fresh(['excelRow.cells.header', 'generatedBy', 'completedBy']) ?: $bookingPo;
+        $data = $bookingPo->booking_data ?: [];
+        $currentSnapshot = $this->bookingSourceSnapshot($bookingPo);
+
+        if (empty($currentSnapshot)) {
+            return $bookingPo;
+        }
+
+        if ($resetBaseline || empty($data['source_snapshot']) || ! is_array($data['source_snapshot'])) {
+            $data['source_snapshot'] = $currentSnapshot;
+            $data['source_current_snapshot'] = $currentSnapshot;
+            $data['source_change_log'] = [];
+            $data['source_changed_at'] = null;
+            $data['needs_regenerate'] = false;
+        } else {
+            $changes = $this->bookingSourceSnapshotChanges($data['source_snapshot'], $currentSnapshot);
+            $data['source_current_snapshot'] = $currentSnapshot;
+            $data['source_change_log'] = $changes;
+            $data['source_changed_at'] = ! empty($changes) ? now()->format('Y-m-d H:i:s') : null;
+            $data['needs_regenerate'] = ! empty($changes);
+        }
+
+        $bookingPo->booking_data = $data;
+        $bookingPo->save();
+
+        return $bookingPo->fresh(['excelRow.cells.header', 'generatedBy', 'completedBy']) ?: $bookingPo;
+    }
+
+    protected function bookingAuditSnapshot(array $bookingData): array
+    {
+        $snapshot = [];
+        $scalarLabels = [
+            'to' => 'Vendor / To',
+            'attn' => 'Attention',
+            'email' => 'Email',
+            'address' => 'Supplier Address',
+            'date' => 'Date',
+            'buyer' => 'Buyer',
+            'season' => 'Season',
+            'from' => 'From',
+            'po_number' => 'PO Number',
+            'supplier' => 'Supplier',
+            'incoterm' => 'Incoterm',
+            'item_type' => 'Item Type',
+            'ship_mode' => 'Ship Mode',
+            'order_style_no' => 'Style No',
+            'tolerance' => 'Tolerance',
+            'consignee' => 'Consignee',
+            'delivery_destination_name' => 'Delivery Destination',
+            'delivery_destination_details' => 'Delivery Details',
+            'best_regards' => 'Best Regards',
+        ];
+
+        foreach ($scalarLabels as $key => $label) {
+            $snapshot[$key] = [
+                'label' => $label,
+                'value' => $this->normalizeSnapshotValue($bookingData[$key] ?? null),
+            ];
+        }
+
+        foreach (($bookingData['items'] ?? []) as $index => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            foreach ([
+                'style_order' => 'Style',
+                'item_name' => 'Item',
+                'description' => 'Description',
+                'color' => 'Color',
+                'size' => 'Size',
+                'width' => 'Width',
+                'supplier_article' => 'Supplier Article',
+                'booking_qty' => 'Booking Qty',
+                'pp_qty' => 'PP Qty',
+                'uom' => 'UOM',
+                'remarks' => 'Remarks',
+            ] as $key => $label) {
+                $snapshot['items.' . ($index + 1) . '.' . $key] = [
+                    'label' => 'Line ' . ($index + 1) . ' ' . $label,
+                    'value' => $this->normalizeSnapshotValue($item[$key] ?? null),
+                ];
+            }
+        }
+
+        return $snapshot;
+    }
+
+    protected function bookingAuditChanges(array $before, array $after): array
+    {
+        $keys = collect(array_keys($before))->merge(array_keys($after))->unique()->values()->all();
+        $changes = [];
+
+        foreach ($keys as $key) {
+            $beforeValue = $this->normalizeSnapshotValue($before[$key]['value'] ?? null);
+            $afterValue = $this->normalizeSnapshotValue($after[$key]['value'] ?? null);
+
+            if ($beforeValue === $afterValue) {
+                continue;
+            }
+
+            $changes[] = [
+                'key' => $key,
+                'label' => $after[$key]['label'] ?? $before[$key]['label'] ?? Str::headline(str_replace('.', ' ', $key)),
+                'before' => $beforeValue,
+                'after' => $afterValue,
+            ];
+        }
+
+        return $changes;
+    }
+
+    protected function appendBookingGenerationHistory(BookingPo $bookingPo, string $action, ?array $beforeAudit = null): BookingPo
+    {
+        $bookingPo = $bookingPo->fresh(['generatedBy', 'completedBy']) ?: $bookingPo;
+        $data = $bookingPo->booking_data ?: [];
+        $afterAudit = $this->bookingAuditSnapshot($data);
+        $history = collect($data['generation_history'] ?? []);
+
+        if ($action === 'generated' && $history->contains(fn ($entry) => ($entry['action'] ?? '') === 'generated')) {
+            return $bookingPo;
+        }
+
+        $history->push([
+            'action' => $action,
+            'revision_no' => $this->bookingRevisionNo($bookingPo),
+            'po_no' => $bookingPo->po_no,
+            'changed_by' => auth()->id(),
+            'changed_by_name' => optional(auth()->user())->name,
+            'changed_at' => now()->format('Y-m-d H:i:s'),
+            'changes' => $beforeAudit ? $this->bookingAuditChanges($beforeAudit, $afterAudit) : [],
+            'source_changes' => $data['source_change_log'] ?? [],
+        ]);
+
+        $data['generation_history'] = $history->take(-25)->values()->all();
+        $bookingPo->booking_data = $data;
+        $bookingPo->save();
+
+        return $bookingPo->fresh(['excelRow.cells.header', 'generatedBy', 'completedBy']) ?: $bookingPo;
+    }
+
+
+    protected function bookingRevisionNo(BookingPo $bookingPo): int
     {
         $data = $bookingPo->booking_data ?: [];
         return max(0, (int) ($data['revision_no'] ?? 0));
     }
 
-    private function incrementBookingRevision(BookingPo $bookingPo): BookingPo
+    protected function incrementBookingRevision(BookingPo $bookingPo): BookingPo
     {
         $bookingPo = $bookingPo->fresh() ?: $bookingPo;
         $data = $bookingPo->booking_data ?: [];
@@ -288,7 +546,7 @@ class BookingController extends Controller
         return $bookingPo->fresh() ?: $bookingPo;
     }
 
-    private function markBookingPoCompleted(BookingPo $bookingPo): void
+    protected function markBookingPoCompleted(BookingPo $bookingPo): void
     {
         if (($bookingPo->status ?? null) === 'completed') {
             return;
@@ -304,6 +562,7 @@ class BookingController extends Controller
     public function complete(Request $request, BookingPo $bookingPo)
     {
         $this->authorizeBookingPo($bookingPo);
+        abort_if(! $this->canControlPo(), 403);
 
         $bookingPo->update([
             'status' => 'completed',
@@ -321,12 +580,13 @@ class BookingController extends Controller
         }
 
         return redirect()
-            ->route('supply_chain.bookings.index')
+            ->route($this->bookingRouteName('index'))
             ->with('success', $message);
     }
 
     public function bulkComplete(Request $request)
     {
+        abort_if(! $this->canControlPo(), 403);
         $poIds = collect($request->input('booking_pos', []))
             ->map(fn ($id) => (int) $id)
             ->filter()
@@ -363,6 +623,7 @@ class BookingController extends Controller
     {
         $this->authorizeBookingPo($bookingPo);
         $bookingPo->loadMissing(['excelFile', 'excelRow.cells.header', 'generatedBy']);
+        $bookingPo = $this->syncBookingPoSourceControl($bookingPo);
 
         $bookingData = $this->bookingData($bookingPo);
         $instructionOptions = $this->bookingInstructionOptions();
@@ -374,12 +635,15 @@ class BookingController extends Controller
     public function update(Request $request, BookingPo $bookingPo)
     {
         $this->authorizeBookingPo($bookingPo);
+        abort_if(! $this->canControlPo(), 403);
 
         $validated = $this->validateBookingEditRequest($request);
-        $this->applyBookingEditDataToPo($bookingPo, $validated, $request);
+        $beforeAudit = $this->bookingAuditSnapshot($bookingPo->booking_data ?: []);
+        $bookingPo = $this->applyBookingEditDataToPo($bookingPo, $validated, $request);
+        $this->appendBookingGenerationHistory($bookingPo, 'updated', $beforeAudit);
 
         return redirect()
-            ->route('supply_chain.bookings.show', $bookingPo)
+            ->route($this->bookingRouteName('show'), $bookingPo)
             ->with('success', 'Booking format updated successfully.');
     }
 
@@ -432,12 +696,12 @@ class BookingController extends Controller
             ->header('Expires', '0');
     }
 
-    private function authorizeBookingPo(BookingPo $bookingPo): void
+    protected function authorizeBookingPo(BookingPo $bookingPo): void
     {
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
     }
 
-    private function indexData(Request $request, bool $includeFilters = true): array
+    protected function indexData(Request $request, bool $includeFilters = true): array
     {
         $pendingRows = $this->buildPendingRowsQuery($request)
             ->latest('id')
@@ -447,12 +711,14 @@ class BookingController extends Controller
         $this->decoratePendingRows($pendingRows);
 
         $generatedPos = BookingPo::query()
-            ->with(['excelFile', 'excelRow.cells.header'])
+            ->with(['excelFile', 'excelRow.cells.header', 'generatedBy', 'completedBy'])
             ->latest('id')
-            ->take(12)
-            ->get();
-
-        $generatedPos->each(fn (BookingPo $po) => $this->refreshBookingPoQtyFromSource($po));
+            ->take(50)
+            ->get()
+            ->map(function (BookingPo $po) {
+                $po = $this->refreshBookingPoQtyFromSource($po);
+                return $this->syncBookingPoSourceControl($po);
+            });
 
         $filterOptions = [];
         if ($includeFilters) {
@@ -467,7 +733,7 @@ class BookingController extends Controller
         return [$pendingRows, $generatedPos, $filterOptions];
     }
 
-    private function buildPendingRowsQuery(Request $request)
+    protected function buildPendingRowsQuery(Request $request)
     {
         $pendingRowsQuery = ExcelRow::query()
             ->with(['excelFile', 'cells.header', 'bookingPo'])
@@ -491,7 +757,7 @@ class BookingController extends Controller
         return $pendingRowsQuery;
     }
 
-    private function decoratePendingRows($pendingRows): void
+    protected function decoratePendingRows($pendingRows): void
     {
         $seenGroups = [];
         $decorated = collect();
@@ -524,7 +790,12 @@ class BookingController extends Controller
             }
 
             if ($row->bookingPo) {
-                $storedItems = $row->bookingPo->booking_data['items'] ?? [];
+                $controlledPo = $this->syncBookingPoSourceControl($row->bookingPo);
+                $row->setRelation('bookingPo', $controlledPo);
+                $row->booking_needs_regenerate = (bool) ($controlledPo->needs_regenerate ?? false);
+                $row->booking_revision_no = (int) ($controlledPo->revision_no ?? 0);
+
+                $storedItems = $controlledPo->booking_data['items'] ?? [];
                 if (count($storedItems) > 1) {
                     $row->booking_group_count = count($storedItems);
                     $row->booking_group_items = collect($storedItems)->pluck('item_name')->filter()->unique()->values()->all();
@@ -537,7 +808,7 @@ class BookingController extends Controller
         $pendingRows->setCollection($decorated->values());
     }
 
-    private function rowBookingStatus(ExcelRow $row): string
+    protected function rowBookingStatus(ExcelRow $row): string
     {
         if (! $row->bookingPo) {
             return 'pending';
@@ -546,12 +817,12 @@ class BookingController extends Controller
         return $row->bookingPo->status ?: 'applied';
     }
 
-    private function isAjaxRequest(Request $request): bool
+    protected function isAjaxRequest(Request $request): bool
     {
         return $request->ajax() || $request->wantsJson();
     }
 
-    private function previewBookingForRow(ExcelRow $excelRow): array
+    protected function previewBookingForRow(ExcelRow $excelRow): array
     {
         $excelRow->loadMissing(['excelFile', 'cells.header', 'bookingPo']);
 
@@ -616,7 +887,7 @@ class BookingController extends Controller
         return [$bookingPo, $bookingData, $groupRows];
     }
 
-    private function generateBookingForRow(ExcelRow $excelRow, ?array $editData = null, ?Request $request = null): BookingPo
+    protected function generateBookingForRow(ExcelRow $excelRow, ?array $editData = null, ?Request $request = null): BookingPo
     {
         $excelRow->loadMissing(['excelFile', 'cells.header', 'bookingPo']);
 
@@ -721,7 +992,7 @@ class BookingController extends Controller
         });
     }
 
-    private function pendingRowsForSameBookingGroup(ExcelRow $primaryRow, array $rowData)
+    protected function pendingRowsForSameBookingGroup(ExcelRow $primaryRow, array $rowData)
     {
         $groupKey = $this->bookingGroupKey($rowData);
 
@@ -752,7 +1023,7 @@ class BookingController extends Controller
             ->values();
     }
 
-    private function bookingGroupKey(array $data): string
+    protected function bookingGroupKey(array $data): string
     {
         $parts = [
             $this->normalize($data['buyer_name'] ?? ''),
@@ -768,9 +1039,9 @@ class BookingController extends Controller
         return implode('|', $parts);
     }
 
-    private array $headerIdCache = [];
+    protected array $headerIdCache = [];
 
-    private function dropdownOptions(string $group)
+    protected function dropdownOptions(string $group)
     {
         $headerIds = $this->headerIdsForGroup($group);
 
@@ -792,7 +1063,7 @@ class BookingController extends Controller
             ->values();
     }
 
-    private function applyPendingPoFilter($query): void
+    protected function applyPendingPoFilter($query): void
     {
         // Pending means both workspace columns are still empty or contain placeholder values:
         // 1) Material PO Number  2) PO Date
@@ -800,7 +1071,7 @@ class BookingController extends Controller
         $this->whereHeaderGroupHasNoRealValue($query, 'po_date');
     }
 
-    private function whereHeaderGroupHasNoRealValue($query, string $group): void
+    protected function whereHeaderGroupHasNoRealValue($query, string $group): void
     {
         $headerIds = $this->headerIdsForGroup($group);
 
@@ -825,7 +1096,7 @@ class BookingController extends Controller
         });
     }
 
-    private function applyHasBookingSourceData($query): void
+    protected function applyHasBookingSourceData($query): void
     {
         $sourceHeaderIds = collect(['buyer', 'season', 'ihod', 'vendor', 'style', 'item', 'qty'])
             ->flatMap(fn ($group) => $this->headerIdsForGroup($group))
@@ -844,7 +1115,7 @@ class BookingController extends Controller
         });
     }
 
-    private function applyCellFilter($query, string $group, ?string $value): void
+    protected function applyCellFilter($query, string $group, ?string $value): void
     {
         $value = trim((string) $value);
 
@@ -867,7 +1138,7 @@ class BookingController extends Controller
         });
     }
 
-    private function applyKeywordFilter($query, ?string $keyword): void
+    protected function applyKeywordFilter($query, ?string $keyword): void
     {
         $keyword = trim((string) $keyword);
 
@@ -889,7 +1160,7 @@ class BookingController extends Controller
         }
     }
 
-    private function headerIdsForGroup(string $group): array
+    protected function headerIdsForGroup(string $group): array
     {
         if (array_key_exists($group, $this->headerIdCache)) {
             return $this->headerIdCache[$group];
@@ -920,7 +1191,7 @@ class BookingController extends Controller
         return $this->headerIdCache[$group] = $headerIds;
     }
 
-    private function hasAnyBookingSourceData(array $data): bool
+    protected function hasAnyBookingSourceData(array $data): bool
     {
         foreach (['buyer_name', 'season_name', 'ihod', 'vendor_name', 'style_name', 'item_name', 'qty'] as $key) {
             if (trim((string) ($data[$key] ?? '')) !== '') {
@@ -931,7 +1202,7 @@ class BookingController extends Controller
         return false;
     }
 
-    private function hasRealPoNumber($value): bool
+    protected function hasRealPoNumber($value): bool
     {
         $value = trim((string) $value);
 
@@ -958,7 +1229,7 @@ class BookingController extends Controller
         ], true);
     }
 
-    private function syncPoToWorkspace(ExcelRow $row, string $poNo, $generatedAt): void
+    protected function syncPoToWorkspace(ExcelRow $row, string $poNo, $generatedAt): void
     {
         $batchId = (string) Str::uuid();
         $poDate = $generatedAt->format('Y-m-d');
@@ -970,7 +1241,7 @@ class BookingController extends Controller
         $this->writeWorkspaceCell($row, $dateHeader, $poDate, $batchId);
     }
 
-    private function writeWorkspaceCell(ExcelRow $row, ?ExcelHeader $header, string $value, string $batchId): void
+    protected function writeWorkspaceCell(ExcelRow $row, ?ExcelHeader $header, string $value, string $batchId): void
     {
         if (! $header) {
             return;
@@ -1015,7 +1286,7 @@ class BookingController extends Controller
         ]);
     }
 
-    private function findHeader(string $group): ?ExcelHeader
+    protected function findHeader(string $group): ?ExcelHeader
     {
         $aliases = collect($this->headerAliases($group))->map(fn ($alias) => $this->normalize($alias))->all();
         $names = collect($this->headerNameAliases($group))->map(fn ($name) => $this->normalize($name))->all();
@@ -1046,7 +1317,7 @@ class BookingController extends Controller
         return null;
     }
 
-    private function constrainPoNumberHeaders($headerQuery): void
+    protected function constrainPoNumberHeaders($headerQuery): void
     {
         $headerQuery->where(function ($inner) {
             $inner->whereIn('header_key', $this->headerAliases('po_no'))
@@ -1056,7 +1327,7 @@ class BookingController extends Controller
         });
     }
 
-    private function extractRowData(ExcelRow $row): array
+    protected function extractRowData(ExcelRow $row): array
     {
         $row->loadMissing(['cells.header', 'excelFile']);
 
@@ -1083,7 +1354,7 @@ class BookingController extends Controller
         ];
     }
 
-    private function bookingQtyValueFor(ExcelRow $row): ?string
+    protected function bookingQtyValueFor(ExcelRow $row): ?string
     {
         $storedQty = $this->valueFor($row, 'qty');
         $storedQtyNumber = $this->numericValue($storedQty);
@@ -1104,7 +1375,7 @@ class BookingController extends Controller
         return $storedQty;
     }
 
-    private function calculateMaterialsToBeOrderedQty(ExcelRow $row): ?float
+    protected function calculateMaterialsToBeOrderedQty(ExcelRow $row): ?float
     {
         $sourceQty = $this->numericFormulaValueAny($row, [
             'bom_quantity',
@@ -1148,7 +1419,7 @@ class BookingController extends Controller
         return round(($bookingConsumption * (1 + $orderingWastage)) * $sourceQty, 0);
     }
 
-    private function numericFormulaValueAny(ExcelRow $row, array $keys): float
+    protected function numericFormulaValueAny(ExcelRow $row, array $keys): float
     {
         $fallback = null;
 
@@ -1175,7 +1446,7 @@ class BookingController extends Controller
         return $fallback ?? 0.0;
     }
 
-    private function formulaValueForKey(ExcelRow $row, string $key): ?string
+    protected function formulaValueForKey(ExcelRow $row, string $key): ?string
     {
         $candidates = collect([$key])
             ->merge($this->formulaAliases($key))
@@ -1207,7 +1478,7 @@ class BookingController extends Controller
         return null;
     }
 
-    private function formulaAliases(string $key): array
+    protected function formulaAliases(string $key): array
     {
         return match ($key) {
             'bom_quantity' => ['BOM Quantity', 'BOM Qty', 'BOM Qnty'],
@@ -1231,14 +1502,14 @@ class BookingController extends Controller
         };
     }
 
-    private function percentFormulaValue($value): float
+    protected function percentFormulaValue($value): float
     {
         $number = $this->numericValue($value) ?? 0.0;
 
         return $number > 1 ? ($number / 100) : $number;
     }
 
-    private function formatBookingNumber(float $value): string
+    protected function formatBookingNumber(float $value): string
     {
         if (abs($value - round($value)) < 0.000001) {
             return (string) round($value);
@@ -1247,7 +1518,7 @@ class BookingController extends Controller
         return rtrim(rtrim(number_format($value, 4, '.', ''), '0'), '.');
     }
 
-    private function valueFor(ExcelRow $row, string $group): ?string
+    protected function valueFor(ExcelRow $row, string $group): ?string
     {
         $aliases = collect($this->headerAliases($group))
             ->merge($this->headerNameAliases($group))
@@ -1295,7 +1566,7 @@ class BookingController extends Controller
         return null;
     }
 
-    private function fallbackMatch(string $group, string $header): bool
+    protected function fallbackMatch(string $group, string $header): bool
     {
         return match ($group) {
             'buyer' => str_contains($header, 'buyer') && ! str_contains($header, 'liability') && ! str_contains($header, 'value'),
@@ -1336,7 +1607,7 @@ class BookingController extends Controller
         };
     }
 
-    private function headerAliases(string $group): array
+    protected function headerAliases(string $group): array
     {
         return match ($group) {
             'buyer' => ['buyer_name', 'buyer'],
@@ -1377,7 +1648,7 @@ class BookingController extends Controller
         };
     }
 
-    private function headerNameAliases(string $group): array
+    protected function headerNameAliases(string $group): array
     {
         return match ($group) {
             'buyer' => ['Buyer Name'],
@@ -1403,7 +1674,7 @@ class BookingController extends Controller
         };
     }
 
-    private function makeCode(?string $value, int $length): string
+    protected function makeCode(?string $value, int $length): string
     {
         $value = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $value));
 
@@ -1414,7 +1685,7 @@ class BookingController extends Controller
         return str_pad(substr($value, 0, $length), $length, 'X');
     }
 
-    private function makeSeasonCode(?string $value): string
+    protected function makeSeasonCode(?string $value): string
     {
         $value = strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $value));
 
@@ -1425,7 +1696,7 @@ class BookingController extends Controller
         return str_pad(substr($value, -4), 4, 'X', STR_PAD_LEFT);
     }
 
-    private function makeUniquePoNo(string $buyerCode, string $seasonCode): string
+    protected function makeUniquePoNo(string $buyerCode, string $seasonCode): string
     {
         $prefix = $buyerCode . $seasonCode;
         $lastPo = BookingPo::where('po_no', 'like', $prefix . '%')
@@ -1445,7 +1716,7 @@ class BookingController extends Controller
         return $poNo;
     }
 
-    private function refreshBookingPoQtyFromSource(BookingPo $bookingPo): BookingPo
+    protected function refreshBookingPoQtyFromSource(BookingPo $bookingPo): BookingPo
     {
         $bookingPo->loadMissing(['excelRow.cells.header']);
 
@@ -1498,7 +1769,7 @@ class BookingController extends Controller
         return $bookingPo;
     }
 
-    private function defaultBookingData(BookingPo $bookingPo, ?array $sourceRows = null): array
+    protected function defaultBookingData(BookingPo $bookingPo, ?array $sourceRows = null): array
     {
         $supplier = $this->findSupplier($bookingPo->vendor_name);
         $tolerancePercent = $supplier?->tolerance_percent ?? 3;
@@ -1569,7 +1840,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         ];
     }
 
-    private function bookingLineItemFromData(array $rowData, ?Supplier $supplier, float $tolerancePercent): array
+    protected function bookingLineItemFromData(array $rowData, ?Supplier $supplier, float $tolerancePercent): array
     {
         $qty = $this->numericValue($rowData['qty'] ?? null) ?? 0;
         $toleranceQty = $qty > 0 ? round(($qty * $tolerancePercent) / 100, 2) : null;
@@ -1594,7 +1865,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         ];
     }
 
-    private function sizeWidthPairForItem(array $rowData): array
+    protected function sizeWidthPairForItem(array $rowData): array
     {
         $size = trim((string) ($rowData['size'] ?? ''));
         $width = trim((string) ($rowData['width'] ?? ''));
@@ -1625,7 +1896,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         return [$size !== '' ? $size : 'N/A', $width !== '' ? $width : 'N/A'];
     }
 
-    private function itemUsuallyUsesWidth(array $item): bool
+    protected function itemUsuallyUsesWidth(array $item): bool
     {
         $text = $this->normalize(implode(' ', [
             $item['item_name'] ?? '',
@@ -1647,7 +1918,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         return false;
     }
 
-    private function bookingData(BookingPo $bookingPo): array
+    protected function bookingData(BookingPo $bookingPo): array
     {
         $bookingPo = $this->refreshBookingPoQtyFromSource($bookingPo);
         $defaults = $this->defaultBookingData($bookingPo->loadMissing('generatedBy'));
@@ -1685,7 +1956,115 @@ BIN: 005635381-0406 TIN: 780096271681",
         return $data;
     }
 
-    private function findSupplier(?string $vendorName): ?Supplier
+
+    protected function bookingDataWithLatestSource(BookingPo $bookingPo): array
+    {
+        $data = $this->bookingData($bookingPo);
+        $bookingPo->loadMissing(['excelRow.cells.header']);
+
+        if (! $bookingPo->excelRow) {
+            return $data;
+        }
+
+        return $this->mergeLatestSourceIntoBookingData($data, $this->extractRowData($bookingPo->excelRow));
+    }
+
+    protected function mergeLatestSourceIntoBookingData(array $data, array $rowData): array
+    {
+        $value = fn (string $key): string => $this->normalizeSnapshotValue($rowData[$key] ?? null);
+        $setIfPresent = function (string $dataKey, string $sourceKey) use (&$data, $value) {
+            $sourceValue = $value($sourceKey);
+            if ($sourceValue !== '') {
+                $data[$dataKey] = $sourceValue;
+            }
+        };
+
+        $setIfPresent('buyer', 'buyer_name');
+        $setIfPresent('season', 'season_name');
+        $setIfPresent('order_style_no', 'style_name');
+        $setIfPresent('item_type', 'item_type');
+
+        $vendorName = $value('vendor_name');
+        if ($vendorName !== '') {
+            $data['to'] = $vendorName;
+            $data['supplier'] = $vendorName;
+        }
+
+        $items = array_values($data['items'] ?? []);
+        $item = is_array($items[0] ?? null) ? $items[0] : [];
+        [$size, $width] = $this->sizeWidthPairForItem($rowData);
+
+        foreach ([
+            'style_name' => 'style_order',
+            'item_type' => 'item_type',
+            'item_name' => 'item_name',
+            'description' => 'description',
+            'color' => 'color',
+            'supplier_article' => 'supplier_article',
+            'consumption' => 'bulk_cons',
+            'qty' => 'booking_qty',
+            'pp_qty' => 'pp_qty',
+            'uom' => 'uom',
+            'remarks' => 'remarks',
+        ] as $sourceKey => $itemKey) {
+            $sourceValue = $value($sourceKey);
+            if ($sourceValue !== '') {
+                $item[$itemKey] = $sourceValue;
+            }
+        }
+
+        if ($size !== 'N/A') {
+            $item['size'] = $size;
+        }
+
+        if ($width !== 'N/A') {
+            $item['width'] = $width;
+        }
+
+        $sizeWidth = $value('size_width');
+        if ($sizeWidth !== '') {
+            $item['size_width'] = $sizeWidth;
+        }
+
+        $items[0] = $item;
+        $data['items'] = $items;
+
+        return $data;
+    }
+
+    protected function applyLatestSourceDataToBookingPo(BookingPo $bookingPo): BookingPo
+    {
+        $bookingPo = $bookingPo->fresh(['excelRow.cells.header', 'generatedBy']) ?: $bookingPo;
+
+        if (! $bookingPo->excelRow) {
+            return $this->refreshBookingPoQtyFromSource($bookingPo);
+        }
+
+        $data = $this->bookingDataWithLatestSource($bookingPo);
+        $firstItem = $data['items'][0] ?? [];
+
+        $bookingPo->update([
+            'booking_data' => $data,
+            'buyer_name' => $data['buyer'] ?? $bookingPo->buyer_name,
+            'season_name' => $data['season'] ?? $bookingPo->season_name,
+            'vendor_name' => $data['to'] ?? $bookingPo->vendor_name,
+            'style_name' => $firstItem['style_order'] ?? $bookingPo->style_name,
+            'item_name' => $firstItem['item_name'] ?? $bookingPo->item_name,
+            'qty' => $this->numericValue($firstItem['booking_qty'] ?? $bookingPo->qty),
+            'uom' => $firstItem['uom'] ?? $bookingPo->uom,
+            'item_type' => $firstItem['item_type'] ?? $bookingPo->item_type,
+            'description' => $firstItem['description'] ?? $bookingPo->description,
+            'color' => $firstItem['color'] ?? $bookingPo->color,
+            'size_width' => trim(((string) ($firstItem['size'] ?? '')) . ' ' . ((string) ($firstItem['width'] ?? ''))) ?: ($firstItem['size_width'] ?? $bookingPo->size_width),
+            'supplier_article' => $firstItem['supplier_article'] ?? $bookingPo->supplier_article,
+            'consumption' => $this->numericValue($firstItem['bulk_cons'] ?? $bookingPo->consumption),
+            'remarks' => $firstItem['remarks'] ?? $bookingPo->remarks,
+        ]);
+
+        return $bookingPo->fresh(['excelRow.cells.header', 'generatedBy']) ?: $bookingPo;
+    }
+
+    protected function findSupplier(?string $vendorName): ?Supplier
     {
         $vendorName = trim((string) $vendorName);
 
@@ -1705,7 +2084,7 @@ BIN: 005635381-0406 TIN: 780096271681",
             ->first();
     }
 
-    private function bookingInstructionOptions()
+    protected function bookingInstructionOptions()
     {
         if (! Schema::hasTable('booking_instructions')) {
             return collect();
@@ -1718,7 +2097,7 @@ BIN: 005635381-0406 TIN: 780096271681",
             ->get();
     }
 
-    private function deliveryDestinationOptions()
+    protected function deliveryDestinationOptions()
     {
         if (! Schema::hasTable('booking_delivery_destinations')) {
             return collect();
@@ -1731,7 +2110,7 @@ BIN: 005635381-0406 TIN: 780096271681",
             ->get();
     }
 
-    private function applyDeliveryDestinationDefaults(array $data): array
+    protected function applyDeliveryDestinationDefaults(array $data): array
     {
         $destinationId = (int) ($data['delivery_destination_id'] ?? 0);
 
@@ -1755,7 +2134,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         return $data;
     }
 
-    private function defaultInstructionTexts(): array
+    protected function defaultInstructionTexts(): array
     {
         if (Schema::hasTable('booking_instructions')) {
             $instructions = BookingInstruction::query()
@@ -1775,7 +2154,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         return $this->fallbackInstructionTexts();
     }
 
-    private function fallbackInstructionTexts(): array
+    protected function fallbackInstructionTexts(): array
     {
         return [
             'Please make sure buyer-required quality and approval are completed before bulk production.',
@@ -1787,7 +2166,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         ];
     }
 
-    private function instructionTextsByIds(array $ids): array
+    protected function instructionTextsByIds(array $ids): array
     {
         $ids = collect($ids)->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
 
@@ -1805,7 +2184,7 @@ BIN: 005635381-0406 TIN: 780096271681",
             ->all();
     }
 
-    private function saveCommonInstruction(string $instruction): BookingInstruction
+    protected function saveCommonInstruction(string $instruction): BookingInstruction
     {
         return BookingInstruction::firstOrCreate(
             ['instruction' => $instruction],
@@ -1817,7 +2196,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         );
     }
 
-    private function requestHasBookingEdits(Request $request): bool
+    protected function requestHasBookingEdits(Request $request): bool
     {
         foreach (['booking', 'items', 'notes', 'common_instruction_ids', 'new_instruction', 'save_new_instruction'] as $key) {
             if ($request->has($key)) {
@@ -1828,7 +2207,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         return false;
     }
 
-    private function validateBookingEditRequest(Request $request): array
+    protected function validateBookingEditRequest(Request $request): array
     {
         return $request->validate([
             'booking' => ['nullable', 'array'],
@@ -1842,7 +2221,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         ]);
     }
 
-    private function applyBookingEditDataToPo(BookingPo $bookingPo, array $validated, ?Request $request = null): BookingPo
+    protected function applyBookingEditDataToPo(BookingPo $bookingPo, array $validated, ?Request $request = null): BookingPo
     {
         $data = $this->bookingData($bookingPo);
         $bookingInput = $validated['booking'] ?? [];
@@ -1911,7 +2290,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         return $bookingPo->fresh();
     }
 
-    private function syncSupplierFromBookingData(?BookingPo $bookingPo, array $data, ?string $previousVendorName = null): void
+    protected function syncSupplierFromBookingData(?BookingPo $bookingPo, array $data, ?string $previousVendorName = null): void
     {
         if (! $bookingPo) {
             return;
@@ -1955,7 +2334,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         $supplier->save();
     }
 
-    private function tolerancePercentFromText($value): ?float
+    protected function tolerancePercentFromText($value): ?float
     {
         $value = trim((string) $value);
 
@@ -1970,7 +2349,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         return null;
     }
 
-    private function bookingScalarKeys(): array
+    protected function bookingScalarKeys(): array
     {
         return [
             'to', 'date', 'attn', 'buyer', 'email', 'address', 'season', 'from', 'po_number',
@@ -1980,7 +2359,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         ];
     }
 
-    private function cleanItem(array $item): array
+    protected function cleanItem(array $item): array
     {
         $keys = [
             'style_order', 'item_type', 'item_name', 'description', 'color',
@@ -1996,13 +2375,13 @@ BIN: 005635381-0406 TIN: 780096271681",
         return $clean;
     }
 
-    private function cleanText($value): ?string
+    protected function cleanText($value): ?string
     {
         $value = trim((string) $value);
         return $value === '' ? null : $value;
     }
 
-    private function numericValue($value): ?float
+    protected function numericValue($value): ?float
     {
         if ($value === null || $value === '') {
             return null;
@@ -2025,7 +2404,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         return $isNegativeAccounting ? -1 * $number : $number;
     }
 
-    private function normalize($value): string
+    protected function normalize($value): string
     {
         $value = strtolower(trim((string) $value));
         $value = str_replace(['&', '+'], ' and ', $value);

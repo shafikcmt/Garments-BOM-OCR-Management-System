@@ -4,10 +4,55 @@
 
 @section('content')
 <div class="container-fluid">
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
-            <h2 class="mb-2">Welcome, {{ auth()->user()->name }}</h2>
-            <p class="text-muted mb-0">You are successfully logged in to Supply Chain Dashboard.</p>
+    <div class="app-hero-card p-4 p-lg-5 mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <span class="app-stat-icon" style="width:52px;height:52px;border-radius:18px;font-size:22px;"><i class="bi bi-truck"></i></span>
+                <div>
+                    <div class="app-hero-eyebrow">Supply Chain</div>
+                    <h2 class="app-hero-title">Welcome, {{ auth()->user()->name }}</h2>
+                    <p class="app-hero-copy mb-0">Manage booking previews and PO generation workflow.</p>
+                </div>
+            </div>
+            <a href="{{ route('supply_chain.bookings.index') }}" class="btn btn-primary px-4 d-inline-flex align-items-center gap-2">
+                <i class="bi bi-box-arrow-up-right"></i>Open PO Generate
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="app-stat-card p-3 h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="app-stat-icon"><i class="bi bi-shield-check"></i></span>
+                    <div>
+                        <div class="app-stat-label">Access</div>
+                        <div class="fw-bold text-slate-900">Role-based workspace</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="app-stat-card p-3 h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="app-stat-icon"><i class="bi bi-file-earmark-text"></i></span>
+                    <div>
+                        <div class="app-stat-label">OCR</div>
+                        <div class="fw-bold text-slate-900">Document workflow</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="app-stat-card p-3 h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="app-stat-icon"><i class="bi bi-lightning-charge"></i></span>
+                    <div>
+                        <div class="app-stat-label">Status</div>
+                        <div class="fw-bold text-slate-900">Ready to work</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

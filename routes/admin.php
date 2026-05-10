@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\SupplierController;
 use App\Http\Controllers\Admin\BookingDeliveryDestinationController;
 use App\Http\Controllers\Admin\BookingInstructionController;
+use App\Http\Controllers\Admin\PoGenerateControlController;
 
 Route::prefix('admin')
     ->middleware(['auth', 'role:admin'])
@@ -22,6 +23,14 @@ Route::prefix('admin')
         Route::resource('suppliers', SupplierController::class)->except(['show']);
         Route::resource('booking-delivery-destinations', BookingDeliveryDestinationController::class)->except(['show']);
         Route::resource('booking-instructions', BookingInstructionController::class)->except(['show']);
+
+        Route::get('/po-generate-control', [PoGenerateControlController::class, 'index'])->name('po-generate-control.index');
+        Route::get('/po-generate-control/po/{bookingPo}', [PoGenerateControlController::class, 'show'])->name('po-generate-control.show');
+        Route::post('/po-generate-control/po/{bookingPo}/regenerate-preview', [PoGenerateControlController::class, 'regeneratePreview'])->name('po-generate-control.regenerate_preview');
+        Route::post('/po-generate-control/po/{bookingPo}/regenerate', [PoGenerateControlController::class, 'regenerate'])->name('po-generate-control.regenerate');
+        Route::get('/po-generate-control/po/{bookingPo}/print', [PoGenerateControlController::class, 'print'])->name('po-generate-control.print');
+        Route::get('/po-generate-control/po/{bookingPo}/download', [PoGenerateControlController::class, 'download'])->name('po-generate-control.download');
+        Route::get('/po-generate-control/po/{bookingPo}/download-excel', [PoGenerateControlController::class, 'downloadExcel'])->name('po-generate-control.download_excel');
         
         Route::get('/workspace', [DashboardController::class, 'workspace'])->name('workspace');
     });

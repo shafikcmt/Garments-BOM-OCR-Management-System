@@ -9,6 +9,7 @@ use App\Models\User;
 use Spatie\Permission\Models\Role;
 use App\Models\Supplier;
 use App\Models\BookingInstruction;
+use App\Models\BookingPo;
 
 class DashboardController extends Controller
 {
@@ -23,6 +24,7 @@ class DashboardController extends Controller
         $activeSuppliers = Supplier::where('is_active', true)->count();
         $totalBookingInstructions = BookingInstruction::count();
         $defaultBookingInstructions = BookingInstruction::where('is_default', true)->count();
+        $totalGeneratedPos = BookingPo::count();
 
         return view('admin.dashboard', compact(
             'totalUsers',
@@ -34,6 +36,7 @@ class DashboardController extends Controller
             'activeSuppliers',
             'totalBookingInstructions',
             'defaultBookingInstructions',
+            'totalGeneratedPos',
         ));
     }
 

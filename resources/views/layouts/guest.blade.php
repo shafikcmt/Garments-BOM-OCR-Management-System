@@ -130,6 +130,42 @@
         }
 
         .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 20px 36px rgba(37, 99, 235, .30); }
+    
+        /* Compact polished auth UI */
+        body {
+            background:
+                radial-gradient(circle at 12% 8%, rgba(59,130,246,.16), transparent 24rem),
+                radial-gradient(circle at 88% 12%, rgba(14,165,233,.12), transparent 26rem),
+                linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%) !important;
+        }
+        .auth-card {
+            width: min(100%, 430px) !important;
+            padding: 28px !important;
+            border-radius: 24px !important;
+            border: 1px solid rgba(226,232,240,.95) !important;
+            box-shadow: 0 22px 60px rgba(15, 23, 42, .12) !important;
+        }
+        .user-icon {
+            width: 58px !important;
+            height: 58px !important;
+            border-radius: 18px !important;
+            font-size: 24px !important;
+        }
+        .auth-card h1, .auth-card h2, .auth-card h3 {
+            letter-spacing: -.03em;
+            font-weight: 800;
+        }
+        .form-label { font-size: 12px; font-weight: 750; color: #334155; }
+        .form-control {
+            min-height: 44px;
+            border-radius: 13px !important;
+            border-color: #dbe4f0 !important;
+            font-size: 13px;
+        }
+        .form-control:focus { border-color: #60a5fa !important; box-shadow: 0 0 0 .2rem rgba(37, 99, 235, .10) !important; }
+        .btn { border-radius: 13px !important; font-weight: 750; }
+        .btn-primary { background: linear-gradient(135deg, #2563eb, #1d4ed8) !important; border-color: #2563eb !important; box-shadow: 0 12px 24px rgba(37,99,235,.18); }
+
     </style>
 </head>
 <body>

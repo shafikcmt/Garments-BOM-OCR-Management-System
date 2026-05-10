@@ -13,6 +13,9 @@
     $revisionLabel = $revisionNo > 0 ? 'R-' . $revisionNo : '';
     $instructionOptions = $instructionOptions ?? collect();
     $deliveryDestinationOptions = $deliveryDestinationOptions ?? collect();
+    $bookingRoutePrefix = $bookingRoutePrefix ?? 'supply_chain.bookings';
+    $canControlPo = $canControlPo ?? (auth()->user()?->hasRole('admin') ?? false);
+    $canEditThisPreview = $previewMode && $generateUrl && (! $regenerateMode || $canControlPo);
     $deliveryDestinationName = trim((string) ($bookingData['delivery_destination_name'] ?? ''));
     $deliveryDestinationDetails = trim((string) ($bookingData['delivery_destination_details'] ?? ''));
     $hasDeliveryDestination = $deliveryDestinationName !== '' || $deliveryDestinationDetails !== '';
@@ -21,6 +24,8 @@
     $selectedIncoterm = trim((string) ($bookingData['incoterm'] ?? ''));
     $selectedShipMode = trim((string) ($bookingData['ship_mode'] ?? ''));
     $previewFormUid = uniqid('bookingPreviewEdit');
+    $sourceChanges = collect($bookingData['source_change_log'] ?? []);
+    $generationHistory = collect($bookingData['generation_history'] ?? [])->reverse()->values();
 @endphp
 
 <style>
@@ -201,6 +206,23 @@
     .booking-format-preview-box .booking-preview-edit-panel .form-check-label { text-transform: none; letter-spacing: 0; font-size: 12px; }
     .booking-format-preview-box .booking-preview-note-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
     .booking-format-preview-box .booking-preview-note-row textarea { flex: 1; }
+
+    .booking-format-preview-box .booking-change-control-panel {
+        width: 198mm;
+        max-width: 100%;
+        margin: 0 auto 12px;
+        border: 1px solid #fecaca;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #fff7f7 0%, #ffffff 100%);
+        padding: 12px;
+        box-shadow: 0 14px 30px rgba(185, 28, 28, .08);
+    }
+    .booking-format-preview-box .booking-change-control-panel h6 { font-size: 13px; font-weight: 900; color: #991b1b; }
+    .booking-format-preview-box .booking-change-table { margin-bottom: 0; }
+    .booking-format-preview-box .booking-change-table th { font-size: 10px; color: #7f1d1d; text-transform: uppercase; letter-spacing: .05em; }
+    .booking-format-preview-box .booking-change-table td { font-size: 11px; color: #334155; vertical-align: top; }
+    .booking-format-preview-box .booking-history-mini { width: 198mm; max-width:100%; margin: 0 auto 12px; border: 1px solid #e2e8f0; border-radius: 14px; background:#fff; padding: 10px 12px; }
+    .booking-format-preview-box .booking-history-mini .history-line { color:#64748b; font-size:11px; }
     @media (max-width: 767px) {
         .booking-format-preview-box { padding: 6px; }
         .booking-format-preview-box .bf-sheet { max-width: none; }
@@ -208,11 +230,11 @@
 </style>
 
 <div class="booking-format-preview-box">
-@if($previewMode && $generateUrl)
+@if($canEditThisPreview)
     <form class="booking-preview-edit-form">
 @endif
     <div class="bf-action-bar no-print">
-        @if($previewMode && $generateUrl)
+        @if($canEditThisPreview)
             <button type="button" class="btn btn-outline-primary btn-sm booking-preview-edit-toggle">
                 @if($editPanelOpen)
                     <i class="bi bi-eye me-1"></i>Hide Edit
@@ -221,13 +243,48 @@
                 @endif
             </button>
         @elseif(! $previewMode && isset($bookingPo) && $bookingPo?->exists)
-            <a href="{{ route('supply_chain.bookings.print', $bookingPo) }}" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer me-1"></i>Print</a>
-            <a href="{{ route('supply_chain.bookings.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
-            <a href="{{ route('supply_chain.bookings.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+            <a href="{{ route($bookingRoutePrefix . '.print', $bookingPo) }}" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer me-1"></i>Print</a>
+            <a href="{{ route($bookingRoutePrefix . '.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
+            <a href="{{ route($bookingRoutePrefix . '.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
         @endif
     </div>
 
-    @if($previewMode && $generateUrl)
+    @if($canControlPo && $sourceChanges->isNotEmpty())
+        <div class="booking-change-control-panel no-print">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+                <div>
+                    <h6 class="mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Source data changed after PO generation</h6>
+                    <div class="small text-muted">Check before/after values, then re-generate PO if the latest data should update this booking.</div>
+                </div>
+                <span class="badge rounded-pill text-bg-danger">{{ $sourceChanges->count() }} field(s)</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm booking-change-table">
+                    <thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead>
+                    <tbody>
+                        @foreach($sourceChanges->take(10) as $change)
+                            <tr>
+                                <td class="fw-bold">{{ $change['label'] ?? '-' }}</td>
+                                <td>{{ ($change['before'] ?? '') !== '' ? $change['before'] : 'Blank' }}</td>
+                                <td>{{ ($change['after'] ?? '') !== '' ? $change['after'] : 'Blank' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
+    @if($canControlPo && ! $previewMode && $generationHistory->isNotEmpty())
+        <div class="booking-history-mini no-print">
+            <div class="fw-bold text-slate-900"><i class="bi bi-clock-history me-1 text-primary"></i>PO control history</div>
+            @foreach($generationHistory->take(3) as $entry)
+                <div class="history-line">{{ ucfirst(str_replace('_', ' ', $entry['action'] ?? 'generated')) }} @if(($entry['revision_no'] ?? 0) > 0) · R-{{ $entry['revision_no'] }}@endif · {{ $entry['changed_by_name'] ?? 'System' }} · {{ $entry['changed_at'] ?? '-' }} @if(! empty($entry['changes'])) · {{ count($entry['changes']) }} edited field(s) @endif</div>
+            @endforeach
+        </div>
+    @endif
+
+    @if($canEditThisPreview)
         <div class="booking-preview-edit-panel no-print {{ $editPanelOpen ? '' : 'd-none' }}">
             <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
                 <div>
@@ -502,7 +559,7 @@
 
             <div class="bf-footer-note">Generated from HAPL OCR Supply Chain Booking Generate module - PO {{ $poNo }}</div>
 
-            @if($previewMode && $generateUrl)
+            @if($canEditThisPreview)
                 <div class="bf-generate-wrap no-print">
                     <button type="button"
                             class="btn btn-primary fw-bold px-4 py-2 rounded-pill preview-generate-po-btn"
@@ -514,7 +571,7 @@
             @endif
         </div>
     </div>
-@if($previewMode && $generateUrl)
+@if($canEditThisPreview)
     </form>
 @endif
 </div>

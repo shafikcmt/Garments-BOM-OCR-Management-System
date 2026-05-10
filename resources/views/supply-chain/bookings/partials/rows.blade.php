@@ -45,9 +45,6 @@
                     @if($revisionNo > 0)
                         <span class="revision-mini-pill">R{{ $revisionNo }}</span>
                     @endif
-                    @if($needsRegenerate)
-                        <span class="needs-regenerate-pill">Changed</span>
-                    @endif
                     <div class="dropdown">
                         <button class="btn booking-kebab-btn btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More actions">
                             <i class="bi bi-three-dots-vertical"></i>
