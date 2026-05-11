@@ -26,8 +26,9 @@
 
     <style>
         :root {
-            --app-sidebar: 260px;
-            --app-header: 76px;
+            --app-sidebar: clamp(228px, 16.25vw, 260px);
+            --app-header: clamp(64px, 4.75vw, 76px);
+            --app-content-padding: clamp(14px, 1.35vw, 24px);
             --app-shell-bg: #f3f6fb;
             --app-border: #dbe7f3;
             --app-border-strong: #cad8e7;
@@ -46,7 +47,7 @@
         }
 
         * { box-sizing: border-box; }
-        html, body { min-height: 100%; }
+        html, body { min-height: 100%; width: 100%; overflow-x: hidden; }
         body {
             margin: 0;
             font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -691,6 +692,126 @@
             :root { --app-sidebar: 260px; --app-header: 70px; }
             .content { padding: 16px; }
             .sidebar-inner { padding: 16px 10px 12px; }
+        }
+
+
+        /* Responsive / browser zoom stability fixes */
+        .sidebar {
+            width: var(--app-sidebar);
+            max-width: calc(100vw - 24px);
+        }
+        .header {
+            left: var(--app-sidebar);
+            right: 0;
+            width: auto;
+            min-width: 0;
+            padding-inline: clamp(14px, 1.5vw, 24px);
+        }
+        .content {
+            margin-left: var(--app-sidebar);
+            width: auto;
+            min-width: 0;
+            padding: var(--app-content-padding);
+            overflow-x: clip;
+        }
+        .content > .container,
+        .content > .container-fluid {
+            width: 100%;
+            max-width: 100%;
+            margin-left: 0;
+            margin-right: 0;
+            padding-left: 0;
+            padding-right: 0;
+        }
+        .app-hero-card,
+        .app-stat-card,
+        .card:not(.booking-card) { min-width: 0; }
+        .app-hero-layout { min-width: 0; }
+        .app-hero-main {
+            flex: 1 1 360px;
+            min-width: 0;
+        }
+        .app-hero-main > div:last-child { min-width: 0; }
+        .app-hero-action {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+        .app-stat-card .d-flex,
+        .card-body { min-width: 0; }
+        .table-responsive { border-radius: 16px; }
+
+        @media (max-width: 1199.98px) {
+            .app-hero-card { padding: 1.25rem !important; }
+            .app-hero-title { font-size: clamp(1.18rem, 3.2vw, 1.55rem); }
+            .app-hero-copy { font-size: 13px; }
+        }
+
+        @media (max-width: 991.98px) {
+            :root {
+                --app-sidebar: min(272px, calc(100vw - 32px));
+                --app-header: 68px;
+                --app-content-padding: 16px;
+            }
+            .header {
+                left: 0;
+                right: 0;
+                width: auto;
+            }
+            .content {
+                margin-left: 0;
+                width: auto;
+                padding: var(--app-content-padding);
+            }
+            .sidebar { width: var(--app-sidebar); }
+        }
+
+        @media (max-width: 575.98px) {
+            :root { --app-content-padding: 12px; }
+            .header {
+                position: sticky;
+                top: 0;
+                min-height: 64px;
+                height: auto;
+                padding-top: 10px;
+                padding-bottom: 10px;
+                align-items: flex-start;
+            }
+            .content {
+                margin-top: 0;
+                padding-top: 14px;
+            }
+            .app-icon-btn {
+                width: 38px;
+                height: 38px;
+                border-radius: 12px;
+            }
+            .profile-img {
+                width: 38px;
+                height: 38px;
+                border-radius: 13px;
+            }
+            .app-hero-card { border-radius: 18px; }
+            .app-hero-layout { align-items: stretch !important; }
+            .app-hero-main {
+                flex: 1 1 100%;
+                align-items: flex-start !important;
+            }
+            .app-hero-main .app-stat-icon {
+                width: 46px !important;
+                height: 46px !important;
+                flex-basis: 46px;
+            }
+            .app-hero-action {
+                width: 100%;
+                justify-content: center;
+            }
+            .app-stat-card { border-radius: 16px; }
+            .app-stat-value { font-size: 1.35rem; }
+            .app-flash-wrapper {
+                top: 74px;
+                right: 12px;
+                width: calc(100vw - 24px);
+            }
         }
 
     </style>

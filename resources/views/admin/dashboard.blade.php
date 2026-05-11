@@ -5,8 +5,8 @@
 @section('content')
 <div class="container-fluid">
     <div class="app-hero-card p-4 p-lg-5 mb-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-3">
+        <div class="app-hero-layout d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="app-hero-main d-flex align-items-center gap-3">
                 <span class="app-stat-icon" style="width:54px;height:54px;border-radius:18px;font-size:23px;"><i class="bi bi-speedometer2"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Admin Control Center</div>
@@ -14,14 +14,14 @@
                     <p class="app-hero-copy mb-0">Manage users, roles, booking settings and excel header access from one clean workspace.</p>
                 </div>
             </div>
-            <a href="{{ route('admin.workspace') }}" class="btn btn-primary px-4">
+            <a href="{{ route('admin.workspace') }}" class="app-hero-action btn btn-primary px-4 d-inline-flex align-items-center gap-2">
                 <i class="bi bi-grid me-1"></i>Open Workspace
             </a>
         </div>
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-md-3">
+        <div class="col-12 col-sm-6 col-xl-3">
             <div class="app-stat-card p-3 h-100">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="app-stat-label">Total Users</div><div class="app-stat-value">{{ $totalUsers }}</div></div>
@@ -30,7 +30,7 @@
             </div>
         </div>
 
-        <div class="col-md-3">
+        <div class="col-12 col-sm-6 col-xl-3">
             <div class="app-stat-card p-3 h-100">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="app-stat-label">Active Users</div><div class="app-stat-value">{{ $activeUsers }}</div></div>
@@ -39,7 +39,7 @@
             </div>
         </div>
 
-        <div class="col-md-3">
+        <div class="col-12 col-sm-6 col-xl-3">
             <div class="app-stat-card p-3 h-100">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="app-stat-label">Total Roles</div><div class="app-stat-value">{{ $totalRoles }}</div></div>
@@ -48,7 +48,7 @@
             </div>
         </div>
 
-        <div class="col-md-3">
+        <div class="col-12 col-sm-6 col-xl-3">
             <div class="app-stat-card p-3 h-100">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div>
@@ -61,7 +61,7 @@
             </div>
         </div>
 
-        <div class="col-md-3">
+        <div class="col-12 col-sm-6 col-xl-3">
             <div class="app-stat-card p-3 h-100">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div>
@@ -74,7 +74,7 @@
             </div>
         </div>
 
-        <div class="col-md-3">
+        <div class="col-12 col-sm-6 col-xl-3">
             <div class="app-stat-card p-3 h-100">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div>
@@ -89,7 +89,7 @@
     </div>
 
     <div class="row g-3">
-        <div class="col-md-4">
+        <div class="col-12 col-md-6 col-xl-4">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body d-flex flex-column">
                     <span class="app-stat-icon mb-3"><i class="bi bi-people"></i></span>
@@ -100,7 +100,7 @@
             </div>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-12 col-md-6 col-xl-4">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body d-flex flex-column">
                     <span class="app-stat-icon mb-3"><i class="bi bi-person-badge"></i></span>
@@ -111,7 +111,7 @@
             </div>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-12 col-md-6 col-xl-4">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body d-flex flex-column">
                     <span class="app-stat-icon mb-3"><i class="bi bi-file-earmark-spreadsheet"></i></span>
@@ -122,7 +122,7 @@
             </div>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-12 col-md-6 col-xl-4">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body d-flex flex-column">
                     <span class="app-stat-icon mb-3"><i class="bi bi-shield-lock"></i></span>

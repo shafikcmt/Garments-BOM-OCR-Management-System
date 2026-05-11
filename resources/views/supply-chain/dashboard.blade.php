@@ -5,8 +5,8 @@
 @section('content')
 <div class="container-fluid">
     <div class="app-hero-card p-4 p-lg-5 mb-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-3">
+        <div class="app-hero-layout d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="app-hero-main d-flex align-items-center gap-3">
                 <span class="app-stat-icon" style="width:52px;height:52px;border-radius:18px;font-size:22px;"><i class="bi bi-truck"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Supply Chain</div>
@@ -14,14 +14,14 @@
                     <p class="app-hero-copy mb-0">Manage booking previews and PO generation workflow.</p>
                 </div>
             </div>
-            <a href="{{ route('supply_chain.bookings.index') }}" class="btn btn-primary px-4 d-inline-flex align-items-center gap-2">
+            <a href="{{ route('supply_chain.bookings.index') }}" class="app-hero-action btn btn-primary px-4 d-inline-flex align-items-center gap-2">
                 <i class="bi bi-box-arrow-up-right"></i>Open PO Generate
             </a>
         </div>
     </div>
 
     <div class="row g-3">
-        <div class="col-md-4">
+        <div class="col-12 col-md-6 col-xl-4">
             <div class="app-stat-card p-3 h-100">
                 <div class="d-flex align-items-center gap-3">
                     <span class="app-stat-icon"><i class="bi bi-shield-check"></i></span>
@@ -32,7 +32,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-12 col-md-6 col-xl-4">
             <div class="app-stat-card p-3 h-100">
                 <div class="d-flex align-items-center gap-3">
                     <span class="app-stat-icon"><i class="bi bi-file-earmark-text"></i></span>
@@ -43,7 +43,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-12 col-md-6 col-xl-4">
             <div class="app-stat-card p-3 h-100">
                 <div class="d-flex align-items-center gap-3">
                     <span class="app-stat-icon"><i class="bi bi-lightning-charge"></i></span>
