@@ -1,0 +1,17 @@
+name: Deploy Garments OCR Live
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    name: Deploy to live server
+    runs-on: self-hosted
+
+    steps:
+      - name: Run deployment script
+        run: |
+          cd /home/hapl/hapl_ocr_3002/garments-ocr
+          bash deploy.sh
