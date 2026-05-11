@@ -87,6 +87,26 @@
         color: var(--soft-text);
     }
 
+    .header-page .filter-field {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .header-page .filter-field .form-label-sm {
+        min-height: 18px;
+    }
+
+    .header-page .filter-field .form-control,
+    .header-page .filter-field .form-select,
+    .header-page .filter-field .btn {
+        height: 40px;
+    }
+
+    .header-page .filter-action-field .form-label-sm {
+        visibility: hidden;
+    }
+
     .header-page .form-control,
     .header-page .form-select {
         border-radius: 10px;
@@ -278,8 +298,9 @@
 
     .header-page .actions-stack {
         display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+        flex-wrap: nowrap;
+        gap: 7px;
+        align-items: center;
     }
 
     .header-page .table tbody tr {
@@ -297,20 +318,26 @@
     }
 
     .header-page .header-action-btn {
-        min-width: 36px;
-        height: 32px;
+        width: 34px;
+        min-width: 34px;
+        height: 34px;
+        padding: 0 !important;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 5px;
+        gap: 0;
         border-radius: 11px;
         font-weight: 800;
+    }
+
+    .header-page .header-action-btn span {
+        display: none !important;
     }
 
     .header-page #headerControlTable th:nth-child(1),
     .header-page #headerControlTable td:nth-child(1) { width: 7%; }
     .header-page #headerControlTable th:nth-child(2),
-    .header-page #headerControlTable td:nth-child(2) { width: 23%; }
+    .header-page #headerControlTable td:nth-child(2) { width: 24%; }
     .header-page #headerControlTable th:nth-child(3),
     .header-page #headerControlTable td:nth-child(3) { width: 12%; }
     .header-page #headerControlTable th:nth-child(4),
@@ -318,9 +345,9 @@
     .header-page #headerControlTable th:nth-child(5),
     .header-page #headerControlTable td:nth-child(5) { width: 14%; }
     .header-page #headerControlTable th:nth-child(6),
-    .header-page #headerControlTable td:nth-child(6) { width: 22%; }
+    .header-page #headerControlTable td:nth-child(6) { width: 25%; }
     .header-page #headerControlTable th:nth-child(7),
-    .header-page #headerControlTable td:nth-child(7) { width: 12%; }
+    .header-page #headerControlTable td:nth-child(7) { width: 8%; }
 
     @media (max-width: 1199.98px) {
         .header-page .page-hero {
@@ -403,8 +430,8 @@
 
     <div class="card filters-card mb-3">
         <div class="card-body">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-4 col-lg-4">
+            <div class="row g-3 align-items-start">
+                <div class="col-12 col-md-6 col-xl-4 filter-field">
                     <label class="form-label-sm" for="headerSearchInput">Search Header</label>
                     <input
                         type="text"
@@ -415,7 +442,7 @@
                     <div class="search-hint mt-1">Name, key, role, type, formula key sobkichu diye search korte parben.</div>
                 </div>
 
-                <div class="col-md-3 col-lg-2">
+                <div class="col-12 col-md-6 col-xl-2 filter-field">
                     <label class="form-label-sm" for="roleFilter">Owner Role</label>
                     <select id="roleFilter" class="form-select">
                         <option value="">All Roles</option>
@@ -425,7 +452,7 @@
                     </select>
                 </div>
 
-                <div class="col-md-3 col-lg-2">
+                <div class="col-12 col-md-6 col-xl-2 filter-field">
                     <label class="form-label-sm" for="modeFilter">Value Mode</label>
                     <select id="modeFilter" class="form-select">
                         <option value="">All Modes</option>
@@ -435,7 +462,7 @@
                     </select>
                 </div>
 
-                <div class="col-md-2 col-lg-2">
+                <div class="col-12 col-md-6 col-xl-2 filter-field">
                     <label class="form-label-sm" for="statusFilter">Status</label>
                     <select id="statusFilter" class="form-select">
                         <option value="">All</option>
@@ -444,7 +471,8 @@
                     </select>
                 </div>
 
-                <div class="col-md-12 col-lg-2 d-grid">
+                <div class="col-12 col-md-6 col-xl-2 d-grid filter-field filter-action-field">
+                    <label class="form-label-sm" aria-hidden="true">Reset</label>
                     <button type="button" id="resetHeaderFilters" class="btn btn-outline-secondary">
                         Reset Filters
                     </button>
@@ -544,14 +572,14 @@
                                 </td>
                                 <td>
                                     <div class="actions-stack">
-                                        <a href="{{ route('admin.headers.edit', $header->id) }}" class="btn btn-sm btn-outline-warning header-action-btn" title="Edit header">
+                                        <a href="{{ route('admin.headers.edit', $header->id) }}" class="btn btn-sm btn-outline-warning header-action-btn" title="Edit header" aria-label="Edit header">
                                             <i class="bi bi-pencil-square"></i><span class="d-none d-xl-inline">Edit</span>
                                         </a>
 
                                         <form action="{{ route('admin.headers.destroy', $header->id) }}" method="POST" class="d-inline">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger header-action-btn" title="Delete header" onclick="return confirm('Delete this header?')">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger header-action-btn" title="Delete header" aria-label="Delete header" onclick="return confirm('Delete this header?')">
                                                 <i class="bi bi-trash3"></i><span class="d-none d-xl-inline">Delete</span>
                                             </button>
                                         </form>

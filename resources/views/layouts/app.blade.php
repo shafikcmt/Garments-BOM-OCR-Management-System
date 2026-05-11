@@ -26,9 +26,8 @@
 
     <style>
         :root {
-            --app-sidebar: clamp(228px, 16.25vw, 260px);
-            --app-header: clamp(64px, 4.75vw, 76px);
-            --app-content-padding: clamp(14px, 1.35vw, 24px);
+            --app-sidebar: 260px;
+            --app-header: 76px;
             --app-shell-bg: #f3f6fb;
             --app-border: #dbe7f3;
             --app-border-strong: #cad8e7;
@@ -47,7 +46,7 @@
         }
 
         * { box-sizing: border-box; }
-        html, body { min-height: 100%; width: 100%; overflow-x: hidden; }
+        html, body { min-height: 100%; }
         body {
             margin: 0;
             font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -600,8 +599,16 @@
         .sidebar-footer-card { display: none !important; }
 
         .header { background: rgba(255,255,255,.82); border-bottom: 1px solid rgba(226,232,240,.82); box-shadow: 0 12px 32px rgba(15, 23, 42, .055); }
-        .content { padding: 24px; }
-        .container-fluid { max-width: 1540px; }
+        .content { padding: 24px; width: auto; max-width: 100%; overflow-x: hidden; }
+        .content > .container-fluid,
+        .content .container-fluid {
+            width: 100%;
+            max-width: none !important;
+            margin-left: 0;
+            margin-right: 0;
+            padding-left: clamp(.5rem, 1vw, 1rem);
+            padding-right: clamp(.5rem, 1vw, 1rem);
+        }
 
         .card:not(.booking-card) {
             border: 1px solid rgba(226, 232, 240, .92) !important;
@@ -688,130 +695,212 @@
         .app-stat-value { color: #0f172a; font-size: 1.6rem; font-weight: 850; letter-spacing: -.04em; }
         .app-stat-icon { width: 38px; height: 38px; border-radius: 13px; display: inline-flex; align-items: center; justify-content: center; background: #eff6ff; color: #2563eb; }
 
+        .app-hero-layout,
+        .app-hero-main,
+        .app-stat-card,
+        .card,
+        .table-card,
+        .filters-card {
+            min-width: 0;
+        }
+        .app-hero-layout {
+            width: 100%;
+        }
+        .app-hero-main {
+            flex: 1 1 320px;
+        }
+        .app-hero-action {
+            flex: 0 0 auto;
+        }
+        .row > [class*="col-"] {
+            min-width: 0;
+        }
+
+
+        /* Project-wide attractive data tables */
+        .content .card > .card-body.table-responsive {
+            padding: 14px !important;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        }
+        .content .card > .card-body.table-responsive::-webkit-scrollbar { height: 8px; width: 8px; }
+        .content .card > .card-body.table-responsive::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+        .content .card > .card-body.table-responsive::-webkit-scrollbar-track { background: transparent; }
+
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) {
+            --bs-table-bg: transparent;
+            --bs-table-hover-bg: transparent;
+            min-width: 760px;
+            border-collapse: separate !important;
+            border-spacing: 0 10px !important;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table).table-bordered > :not(caption) > * {
+            border-width: 0 !important;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table).table-bordered > :not(caption) > * > * {
+            border-width: 0 !important;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) thead th {
+            padding: 13px 14px !important;
+            border: 0 !important;
+            background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%) !important;
+            color: #475569 !important;
+            font-size: 11px !important;
+            font-weight: 850 !important;
+            letter-spacing: .07em !important;
+            text-transform: uppercase;
+            vertical-align: middle;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) thead th:first-child {
+            border-radius: 15px 0 0 15px;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) thead th:last-child {
+            border-radius: 0 15px 15px 0;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody tr {
+            position: relative;
+            transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody td {
+            padding: 14px !important;
+            border-top: 1px solid #e6eef8 !important;
+            border-bottom: 1px solid #e6eef8 !important;
+            background: #ffffff !important;
+            color: #334155 !important;
+            font-size: 13px !important;
+            line-height: 1.45;
+            vertical-align: middle;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, .035);
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody td:first-child {
+            border-left: 1px solid #e6eef8 !important;
+            border-radius: 16px 0 0 16px;
+            color: #2563eb !important;
+            font-weight: 800;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody td:last-child {
+            border-right: 1px solid #e6eef8 !important;
+            border-radius: 0 16px 16px 0;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody tr:hover td {
+            background: #f8fbff !important;
+            border-color: #bfdbfe !important;
+            box-shadow: 0 16px 34px rgba(37, 99, 235, .08);
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody tr:hover {
+            transform: translateY(-1px);
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody tr:has(td[colspan]) td {
+            border-radius: 16px !important;
+            text-align: center;
+            color: #64748b !important;
+            font-weight: 700;
+            box-shadow: none;
+            background: #f8fafc !important;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) .badge {
+            min-height: 22px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            padding: 5px 9px;
+            font-size: 10.5px;
+            font-weight: 850;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.32);
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) td:last-child .d-flex,
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) td:last-child form.d-inline {
+            align-items: center;
+            gap: 8px !important;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) td:last-child form {
+            margin: 0;
+        }
+        .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) td:last-child .btn-sm {
+            min-width: 34px;
+            height: 34px;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 18px rgba(15, 23, 42, .08);
+        }
+        .content .pagination { gap: 6px; }
+        .content .page-link {
+            border: 1px solid #dbeafe;
+            border-radius: 11px !important;
+            color: #2563eb;
+            font-size: 12px;
+            font-weight: 800;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, .04);
+        }
+        .content .page-item.active .page-link {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border-color: #2563eb;
+        }
+
+
+        /* Project-wide compact icon actions: any button/link that already has a Bootstrap icon
+           is rendered as an attractive square icon button. The original text remains available
+           for title/aria-label through the script below, but no longer breaks layouts at zoom. */
+        .content :is(a, button).btn:has(> i.bi),
+        .content .generated-po-action:has(> i.bi) {
+            width: 38px !important;
+            min-width: 38px !important;
+            height: 38px !important;
+            padding: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 0 !important;
+            border-radius: 13px !important;
+            font-size: 0 !important;
+            line-height: 1 !important;
+            white-space: nowrap !important;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, .08);
+            overflow: hidden;
+        }
+        .content :is(a, button).btn.btn-sm:has(> i.bi),
+        .content .generated-po-action:has(> i.bi) {
+            width: 34px !important;
+            min-width: 34px !important;
+            height: 34px !important;
+            border-radius: 11px !important;
+        }
+        .content :is(a, button).btn:has(> i.bi) > i.bi,
+        .content .generated-po-action:has(> i.bi) > i.bi {
+            margin: 0 !important;
+            font-size: 15px !important;
+            line-height: 1 !important;
+        }
+        .content :is(a, button).btn.btn-sm:has(> i.bi) > i.bi,
+        .content .generated-po-action:has(> i.bi) > i.bi {
+            font-size: 14px !important;
+        }
+        .content :is(a, button).btn:has(> i.bi) > span,
+        .content .generated-po-action:has(> i.bi) > span {
+            display: none !important;
+        }
+        .content :is(a, button).btn:has(> i.bi):hover,
+        .content .generated-po-action:has(> i.bi):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 26px rgba(15, 23, 42, .12);
+        }
+
         @media (max-width: 991.98px) {
             :root { --app-sidebar: 260px; --app-header: 70px; }
             .content { padding: 16px; }
             .sidebar-inner { padding: 16px 10px 12px; }
         }
-
-
-        /* Responsive / browser zoom stability fixes */
-        .sidebar {
-            width: var(--app-sidebar);
-            max-width: calc(100vw - 24px);
-        }
-        .header {
-            left: var(--app-sidebar);
-            right: 0;
-            width: auto;
-            min-width: 0;
-            padding-inline: clamp(14px, 1.5vw, 24px);
-        }
-        .content {
-            margin-left: var(--app-sidebar);
-            width: auto;
-            min-width: 0;
-            padding: var(--app-content-padding);
-            overflow-x: clip;
-        }
-        .content > .container,
-        .content > .container-fluid {
-            width: 100%;
-            max-width: 100%;
-            margin-left: 0;
-            margin-right: 0;
-            padding-left: 0;
-            padding-right: 0;
-        }
-        .app-hero-card,
-        .app-stat-card,
-        .card:not(.booking-card) { min-width: 0; }
-        .app-hero-layout { min-width: 0; }
-        .app-hero-main {
-            flex: 1 1 360px;
-            min-width: 0;
-        }
-        .app-hero-main > div:last-child { min-width: 0; }
-        .app-hero-action {
-            flex: 0 0 auto;
-            white-space: nowrap;
-        }
-        .app-stat-card .d-flex,
-        .card-body { min-width: 0; }
-        .table-responsive { border-radius: 16px; }
-
-        @media (max-width: 1199.98px) {
-            .app-hero-card { padding: 1.25rem !important; }
-            .app-hero-title { font-size: clamp(1.18rem, 3.2vw, 1.55rem); }
-            .app-hero-copy { font-size: 13px; }
-        }
-
-        @media (max-width: 991.98px) {
-            :root {
-                --app-sidebar: min(272px, calc(100vw - 32px));
-                --app-header: 68px;
-                --app-content-padding: 16px;
-            }
-            .header {
-                left: 0;
-                right: 0;
-                width: auto;
-            }
-            .content {
-                margin-left: 0;
-                width: auto;
-                padding: var(--app-content-padding);
-            }
-            .sidebar { width: var(--app-sidebar); }
-        }
-
         @media (max-width: 575.98px) {
-            :root { --app-content-padding: 12px; }
-            .header {
-                position: sticky;
-                top: 0;
-                min-height: 64px;
-                height: auto;
-                padding-top: 10px;
-                padding-bottom: 10px;
-                align-items: flex-start;
-            }
-            .content {
-                margin-top: 0;
-                padding-top: 14px;
-            }
-            .app-icon-btn {
-                width: 38px;
-                height: 38px;
-                border-radius: 12px;
-            }
-            .profile-img {
-                width: 38px;
-                height: 38px;
-                border-radius: 13px;
-            }
+            .header { padding: 0 10px; gap: 8px; }
+            .content { padding: 12px; }
+            .content > .container-fluid,
+            .content .container-fluid { padding-left: 0; padding-right: 0; }
             .app-hero-card { border-radius: 18px; }
-            .app-hero-layout { align-items: stretch !important; }
-            .app-hero-main {
-                flex: 1 1 100%;
-                align-items: flex-start !important;
-            }
-            .app-hero-main .app-stat-icon {
-                width: 46px !important;
-                height: 46px !important;
-                flex-basis: 46px;
-            }
-            .app-hero-action {
-                width: 100%;
-                justify-content: center;
-            }
-            .app-stat-card { border-radius: 16px; }
-            .app-stat-value { font-size: 1.35rem; }
-            .app-flash-wrapper {
-                top: 74px;
-                right: 12px;
-                width: calc(100vw - 24px);
-            }
+            .app-hero-main { align-items: flex-start !important; flex-basis: 100%; }
+            .app-hero-action { margin-left: auto; }
+            .app-hero-card::after { width: 130px; height: 130px; top: -42px; right: -48px; }
+            .card:not(.booking-card) .card-body { padding: 1rem; }
         }
 
     </style>
@@ -952,6 +1041,30 @@
 
             syncSidebarHashActive();
             window.addEventListener('hashchange', syncSidebarHashActive);
+
+            document.querySelectorAll('.content a.btn, .content button.btn, .content .generated-po-action').forEach(function (action) {
+                let hasDirectIcon = Array.from(action.children).some(function (child) {
+                    return child.classList && child.classList.contains('bi');
+                });
+                const label = (action.textContent || '').replace(/\s+/g, ' ').trim();
+                const normalizedLabel = label.toLowerCase();
+
+                if (!hasDirectIcon && (normalizedLabel === 'edit' || normalizedLabel === 'delete')) {
+                    const icon = document.createElement('i');
+                    icon.className = normalizedLabel === 'edit' ? 'bi bi-pencil-square' : 'bi bi-trash';
+                    action.prepend(icon);
+                    hasDirectIcon = true;
+                }
+
+                if (!hasDirectIcon) return;
+
+                if (label && !action.getAttribute('title')) {
+                    action.setAttribute('title', label);
+                }
+                if (label && !action.getAttribute('aria-label')) {
+                    action.setAttribute('aria-label', label);
+                }
+            });
 
             document.querySelectorAll('.app-flash-alert').forEach(function (flash) {
                 const closeBtn = flash.querySelector('.app-flash-close');

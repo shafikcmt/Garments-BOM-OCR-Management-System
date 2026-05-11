@@ -6,6 +6,7 @@
     $totalQty = collect($items)->sum(fn ($item) => $lineTotalQty($item));
     $previewMode = $previewMode ?? false;
     $regenerateMode = $regenerateMode ?? false;
+    $adminEditMode = $adminEditMode ?? false;
     $editPanelOpen = $editPanelOpen ?? false;
     $generateUrl = $generateUrl ?? null;
     $poNo = $bookingData['po_number'] ?? ($bookingPo->po_no ?? '');
@@ -288,9 +289,11 @@
         <div class="booking-preview-edit-panel no-print {{ $editPanelOpen ? '' : 'd-none' }}">
             <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
                 <div>
-                    <h6 class="mb-1 fw-bold"><i class="bi bi-pencil-square me-1 text-primary"></i>{{ $regenerateMode ? 'Edit Before PO Re-generate' : 'Edit Vendor Details & Instructions' }}</h6>
+                    <h6 class="mb-1 fw-bold"><i class="bi bi-pencil-square me-1 text-primary"></i>{{ $adminEditMode ? 'Edit PO Control Data' : ($regenerateMode ? 'Edit Before PO Re-generate' : 'Edit Vendor Details & Instructions') }}</h6>
                     <div class="small text-muted">
-                        @if($regenerateMode)
+                        @if($adminEditMode)
+                            Admin edit mode: update PO data, delivery details, item values, and instructions without changing the PO number.
+                        @elseif($regenerateMode)
                             Review latest supply-chain data first. Change anything needed, then click Re-generate PO to confirm. The PO number will remain unchanged.
                         @else
                             Edited vendor name, contact, email, address, incoterm and ship mode will update the vendor database after PO generation.
@@ -564,8 +567,9 @@
                     <button type="button"
                             class="btn btn-primary fw-bold px-4 py-2 rounded-pill preview-generate-po-btn"
                             data-url="{{ $generateUrl }}"
-                            data-regenerate="{{ $regenerateMode ? '1' : '0' }}">
-                        <i class="bi {{ $regenerateMode ? 'bi-arrow-repeat' : 'bi-magic' }} me-1"></i>{{ $regenerateMode ? 'Re-generate PO' : 'Generate PO' }}
+                            data-regenerate="{{ $regenerateMode ? '1' : '0' }}"
+                            data-edit="{{ $adminEditMode ? '1' : '0' }}">
+                        <i class="bi {{ $adminEditMode ? 'bi-check2-circle' : ($regenerateMode ? 'bi-arrow-repeat' : 'bi-magic') }} me-1"></i>{{ $adminEditMode ? 'Save PO Edit' : ($regenerateMode ? 'Re-generate PO' : 'Generate PO') }}
                     </button>
                 </div>
             @endif

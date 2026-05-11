@@ -25,7 +25,13 @@ Route::prefix('admin')
         Route::resource('booking-instructions', BookingInstructionController::class)->except(['show']);
 
         Route::get('/po-generate-control', [PoGenerateControlController::class, 'index'])->name('po-generate-control.index');
+        Route::get('/po-generate-control/pending', [PoGenerateControlController::class, 'pending'])->name('po-generate-control.pending');
+        Route::get('/po-generate-control/generated', [PoGenerateControlController::class, 'generated'])->name('po-generate-control.generated');
         Route::get('/po-generate-control/po/{bookingPo}', [PoGenerateControlController::class, 'show'])->name('po-generate-control.show');
+        Route::post('/po-generate-control/po/{bookingPo}/edit-preview', [PoGenerateControlController::class, 'editPreview'])->name('po-generate-control.edit_preview');
+        Route::post('/po-generate-control/po/{bookingPo}/update', [PoGenerateControlController::class, 'update'])->name('po-generate-control.update');
+        Route::patch('/po-generate-control/po/{bookingPo}/access', [PoGenerateControlController::class, 'saveAccess'])->name('po-generate-control.access');
+        Route::delete('/po-generate-control/po/{bookingPo}', [PoGenerateControlController::class, 'destroy'])->name('po-generate-control.destroy');
         Route::post('/po-generate-control/po/{bookingPo}/regenerate-preview', [PoGenerateControlController::class, 'regeneratePreview'])->name('po-generate-control.regenerate_preview');
         Route::post('/po-generate-control/po/{bookingPo}/regenerate', [PoGenerateControlController::class, 'regenerate'])->name('po-generate-control.regenerate');
         Route::get('/po-generate-control/po/{bookingPo}/print', [PoGenerateControlController::class, 'print'])->name('po-generate-control.print');
