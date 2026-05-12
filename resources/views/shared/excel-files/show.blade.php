@@ -651,12 +651,34 @@
             width: 100%;
         }
     }
+
+    .po-row-locked { background: #fff7ed !important; }
+    .file-row-locked { background: #f8fafc !important; }
+    .po-row-lock-badge,
+    .file-row-lock-badge { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 3px 7px; border-radius: 999px; background: #fee2e2; color: #b91c1c; font-size: 10px; font-weight: 800; }
+    .file-row-lock-badge { background: #e0f2fe; color: #075985; }
 </style>
 
 <div class="container-fluid">
     @if(session('success'))
         <div id="pageSuccessAlert" class="alert custom-success-alert py-2 px-3 mb-3">
             {{ session('success') }}
+        </div>
+    @endif
+
+    @if(session('warning'))
+        <div class="alert alert-warning py-2 px-3 mb-3 rounded-3">
+            {{ session('warning') }}
+        </div>
+    @endif
+
+    @if($isFileLockedForUser ?? false)
+        <div class="alert alert-warning py-2 px-3 mb-3 rounded-3">
+            <div class="fw-bold"><i class="bi bi-lock-fill me-1"></i>This workspace file is locked for your user or role.</div>
+            <div class="small">You can view this file, but you cannot edit, update, paste changes, or add rows until admin unlocks it for you.</div>
+            @if(!empty($fileLockInfo['reason'] ?? ''))
+                <div class="small mt-1"><strong>Reason:</strong> {{ $fileLockInfo['reason'] }}</div>
+            @endif
         </div>
     @endif
 
@@ -686,6 +708,9 @@
                 <div class="small">Batch: {{ $excelFile->upload_batch_no }}</div>
                 <div class="small">Rows: {{ $excelFile->total_rows }}</div>
                 <div class="small">Status: {{ ucfirst($excelFile->status ?? 'pending') }}</div>
+                @if($excelFile->is_locked)
+                    <div class="small"><i class="bi bi-lock-fill me-1"></i>{{ $fileLockInfo['summary'] ?? $excelFile->lockScopeLabel() }}</div>
+                @endif
             </div>
 
             <div class="d-flex gap-2 flex-wrap">
@@ -821,9 +846,23 @@
                         @forelse($rows as $row)
                             @php
                                 $cellsByHeaderId = $row->cells->keyBy('header_id');
+                                $rowLockedInfo = ($lockedRowInfo ?? collect())->get($row->id);
+                                $isPoRowLocked = ($lockedRowIds ?? collect())->has($row->id);
                             @endphp
-                            <tr>
-                                <td>{{ $row->row_number }}</td>
+                            <tr class="{{ trim(($isFileLockedForUser ?? false ? 'file-row-locked ' : '') . ($isPoRowLocked ? 'po-row-locked' : '')) }}">
+                                <td>
+                                    {{ $row->row_number }}
+                                    @if($isFileLockedForUser ?? false)
+                                        <div class="file-row-lock-badge" title="This workspace file is locked by admin">
+                                            <i class="bi bi-lock-fill"></i> File Locked
+                                        </div>
+                                    @endif
+                                    @if($isPoRowLocked)
+                                        <div class="po-row-lock-badge" title="PO {{ $rowLockedInfo['po_no'] ?? '' }} locked{{ !empty($rowLockedInfo['reason'] ?? '') ? ': ' . $rowLockedInfo['reason'] : '' }}">
+                                            <i class="bi bi-lock-fill"></i> PO Locked
+                                        </div>
+                                    @endif
+                                </td>
 
                                @foreach($headers as $header)
                                 @php
@@ -831,7 +870,7 @@
                                     $value = $cell->value ?? '';
                                     $isCalculated = in_array($header->id, $calculatedHeaderIds ?? [], true)
                                         || in_array($header->header_key, $calculatedHeaderKeys ?? [], true);
-                                    $editable = in_array($header->id, $editableHeaderIds, true) && !$isCalculated;
+                                    $editable = in_array($header->id, $editableHeaderIds, true) && !$isCalculated && !$isPoRowLocked && !($isFileLockedForUser ?? false);
                                     $cellHighlightKey = $row->id . '-' . $header->id;
                                     $isHighlightedCell = isset($highlightedCellKeys) && $highlightedCellKeys->contains($cellHighlightKey);
                                     $roleClass = $headerRoleClass($header);
@@ -874,7 +913,7 @@
                                                 data-cell-display="1"
                                                 data-formula-output="{{ $isCalculated ? '1' : '0' }}"
                                                 data-cell-value="{{ $value }}"
-                                                title="{{ $isCalculated ? 'Calculated field - live auto update before save' : '' }}"
+                                                title="{{ ($isFileLockedForUser ?? false) ? 'This workspace file is locked by admin' : ($isPoRowLocked ? 'This PO row is locked by admin control' : ($isCalculated ? 'Calculated field - live auto update before save' : '')) }}"
                                             >
                                                 {{ $value !== '' && $value !== null ? $value : '-' }}
                                             </div>

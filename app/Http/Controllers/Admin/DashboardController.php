@@ -42,10 +42,13 @@ class DashboardController extends Controller
 
     public function workspace()
     {
-        $files = ExcelFile::with(['uploader', 'rows.cells.header'])
+        $files = ExcelFile::with(['uploader', 'lockedBy', 'rows.cells.header'])
             ->latest()
             ->get();
 
-        return view('admin.workspace', compact('files'));
+        $workspaceLockRoles = Role::orderBy('name')->get(['id', 'name']);
+        $workspaceLockUsers = User::orderBy('name')->get(['id', 'name', 'email']);
+
+        return view('admin.workspace', compact('files', 'workspaceLockRoles', 'workspaceLockUsers'));
     }
 }

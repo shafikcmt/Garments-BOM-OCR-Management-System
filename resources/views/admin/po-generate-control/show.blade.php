@@ -13,6 +13,14 @@
         default => 'Admin only',
     };
     $poAuthorizedIds = collect($poAdminControl['authorized_user_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
+    $poLockScope = $poAdminControl['lock_scope'] ?? 'all_users';
+    $poLockScopeText = match ($poLockScope) {
+        'specific_users' => 'Locked users only',
+        'specific_roles' => 'Locked roles only',
+        default => 'All users locked',
+    };
+    $poLockedUserIds = collect($poAdminControl['locked_user_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
+    $poLockedRoleIds = collect($poAdminControl['locked_role_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
 @endphp
 
 @section('styles')
@@ -66,6 +74,9 @@
                             <span class="po-control-chip open"><i class="bi bi-unlock"></i>Open</span>
                         @endif
                         <span class="po-control-chip permission"><i class="bi bi-person-gear"></i>{{ $poPermissionText }}</span>
+                        @if($poLocked)
+                            <span class="po-control-chip locked"><i class="bi bi-people-fill"></i>{{ $poLockScopeText }}</span>
+                        @endif
                     </div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap justify-content-end">
@@ -75,7 +86,7 @@
                     <a href="{{ route('admin.po-generate-control.print', $bookingPo) }}" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill fw-bold"><i class="bi bi-printer me-1"></i>Print</a>
                     <a href="{{ route('admin.po-generate-control.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm rounded-pill fw-bold"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
                     <a href="{{ route('admin.po-generate-control.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm rounded-pill fw-bold"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
-                    <form method="POST" action="{{ route('admin.po-generate-control.destroy', $bookingPo) }}" onsubmit="return confirm('Delete PO {{ $bookingPo->po_no }}? This will remove the generated PO record.');">
+                    <form method="POST" action="{{ route('admin.po-generate-control.destroy', $bookingPo) }}" onsubmit="return confirm('Delete PO {{ $bookingPo->po_no }}? This will remove only the generated PO number and move source rows back to Pending PO.');">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill fw-bold"><i class="bi bi-trash me-1"></i>Delete</button>
@@ -101,8 +112,17 @@
                         <label class="form-label">PO Lock</label>
                         <div class="form-check form-switch border rounded-4 p-3 ps-5 bg-light">
                             <input class="form-check-input" type="checkbox" role="switch" id="lockPoShow{{ $bookingPo->id }}" name="locked" value="1" @checked($poLocked)>
-                            <label class="form-check-label fw-bold" for="lockPoShow{{ $bookingPo->id }}">Lock edit / re-generate</label>
+                            <label class="form-check-label fw-bold" for="lockPoShow{{ $bookingPo->id }}">Lock source row edit / update</label>
                         </div>
+                        <div class="form-text">Locked source rows become read-only in the worksheet.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Lock Applies To</label>
+                        <select name="lock_scope" class="form-select">
+                            <option value="all_users" @selected($poLockScope === 'all_users')>Lock all users</option>
+                            <option value="specific_roles" @selected($poLockScope === 'specific_roles')>Lock selected roles</option>
+                            <option value="specific_users" @selected($poLockScope === 'specific_users')>Lock selected users</option>
+                        </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Edit Permission</label>
@@ -111,6 +131,24 @@
                             <option value="authorized_users" @selected($poPermissionMode === 'authorized_users')>Only authorized Supply Chain users</option>
                             <option value="all_users" @selected($poPermissionMode === 'all_users')>All users can edit</option>
                         </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Locked Roles</label>
+                        <select name="locked_role_ids[]" class="form-select" multiple size="5">
+                            @foreach($poControlRoles as $controlRole)
+                                <option value="{{ $controlRole->id }}" @selected(in_array((int) $controlRole->id, $poLockedRoleIds, true))>{{ ucfirst(str_replace('_', ' ', $controlRole->name)) }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-text">Used when Lock Applies To is "Lock selected roles".</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Locked Users</label>
+                        <select name="locked_user_ids[]" class="form-select" multiple size="5">
+                            @foreach($poLockUsers as $lockUser)
+                                <option value="{{ $lockUser->id }}" @selected(in_array((int) $lockUser->id, $poLockedUserIds, true))>{{ $lockUser->name }} - {{ $lockUser->email }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-text">Used when Lock Applies To is "Lock selected users".</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Authorized Supply Chain Users</label>

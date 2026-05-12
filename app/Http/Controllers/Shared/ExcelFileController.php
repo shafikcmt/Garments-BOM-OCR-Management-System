@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Shared;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\BookingPo;
 use App\Models\ExcelCell;
 use App\Models\ExcelFile;
 use App\Models\ExcelHeader;
@@ -27,6 +28,10 @@ class ExcelFileController extends Controller
         DB::disableQueryLog();
         @set_time_limit(300);
 
+        $user = auth()->user();
+        $isFileLockedForUser = $excelFile->isLockedForUser($user);
+        $fileLockInfo = $this->fileLockInfo($excelFile);
+
         $roleIds = $this->getRoleIds();
 
         $minimumVisibleRows = 20;
@@ -47,11 +52,13 @@ class ExcelFileController extends Controller
             ->pluck('id')
             ->all();
 
-        $editableHeaderIds = $headers
-            ->filter(fn ($header) => $this->canEditHeader($header, $roleIds))
-            ->reject(fn ($header) => $this->isCalculatedHeader($header, $calculatedHeaderKeys))
-            ->pluck('id')
-            ->all();
+        $editableHeaderIds = $isFileLockedForUser
+            ? []
+            : $headers
+                ->filter(fn ($header) => $this->canEditHeader($header, $roleIds))
+                ->reject(fn ($header) => $this->isCalculatedHeader($header, $calculatedHeaderKeys))
+                ->pluck('id')
+                ->all();
 
         $orderInfo = $this->buildOrderInfo($excelFile);
 
@@ -120,6 +127,9 @@ class ExcelFileController extends Controller
                 ->values();
         }
 
+        $lockedRowInfo = $this->poLockedRowInfoForUser($rows->getCollection(), $user);
+        $lockedRowIds = $lockedRowInfo->keys()->flip();
+
         if (request('notification')) {
             AppNotification::where('id', request('notification'))
                 ->where('user_id', auth()->id())
@@ -127,8 +137,8 @@ class ExcelFileController extends Controller
                 ->update(['read_at' => now()]);
         }
 
-        $canAddRow = auth()->user()->hasRole('admin') || auth()->user()->hasRole('merchant');
-        $canDeleteFile = auth()->user()->hasRole('admin') || auth()->user()->hasRole('merchant');
+        $canAddRow = ($user->hasRole('admin') || $user->hasRole('merchant')) && ! $isFileLockedForUser;
+        $canDeleteFile = $user->hasRole('admin') || $user->hasRole('merchant');
 
         return view('shared.excel-files.show', compact(
             'excelFile',
@@ -141,6 +151,10 @@ class ExcelFileController extends Controller
             'canDeleteFile',
             'highlightBatchId',
             'highlightedCellKeys',
+            'lockedRowIds',
+            'lockedRowInfo',
+            'isFileLockedForUser',
+            'fileLockInfo',
             'orderInfo',
             'perPage'
         ));
@@ -178,6 +192,13 @@ class ExcelFileController extends Controller
    public function update(Request $request, ExcelFile $excelFile)
     {
         $user = auth()->user();
+
+        if ($excelFile->isLockedForUser($user)) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'This file is locked by admin. You can view it, but you cannot edit or update records.');
+        }
+
         $roleIds = $this->getRoleIds();
         $calculatedHeaderKeys = $this->calculatedHeaderKeys();
         $batchId = (string) Str::uuid();
@@ -197,9 +218,21 @@ class ExcelFileController extends Controller
             ->get(['id', 'header_name'])
             ->keyBy('id');
 
-        DB::transaction(function () use ($request, $excelFile, $user, $editableHeaderIds, $validRowIds,$rowLookup,$headerLookup,$batchId,&$changedCells) {
+        $submittedRowIds = collect(array_keys((array) $request->input('cells', [])))
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $validRowIds->has($id))
+            ->values();
+        $lockedRowInfo = $this->poLockedRowInfoForUser(
+            $excelFile->rows()->whereIn('id', $submittedRowIds->all())->with('cells')->get(),
+            $user
+        );
+        $lockedRowIds = $lockedRowInfo->keys()->flip();
+
+        DB::transaction(function () use ($request, $excelFile, $user, $editableHeaderIds, $validRowIds,$rowLookup,$headerLookup,$batchId,&$changedCells,$lockedRowIds) {
             foreach ((array) $request->input('cells', []) as $rowId => $rowCells) {
-                if (! $validRowIds->has((int) $rowId)) {
+                $rowId = (int) $rowId;
+
+                if (! $validRowIds->has($rowId) || $lockedRowIds->has($rowId)) {
                     continue;
                 }
 
@@ -262,7 +295,7 @@ class ExcelFileController extends Controller
                 }
             }
 
-            $this->recalculateFile($excelFile, $user->id);
+            $this->recalculateFile($excelFile, $user->id, $lockedRowIds->keys()->all());
             $this->refreshFileStatus($excelFile);
         });
 
@@ -285,8 +318,14 @@ class ExcelFileController extends Controller
             $redirectUrl .= '?' . http_build_query($queryParams);
         }
 
-        return redirect($redirectUrl)
+        $redirect = redirect($redirectUrl)
             ->with('success', 'File updated successfully.');
+
+        if ($lockedRowIds->isNotEmpty()) {
+            $redirect->with('warning', $lockedRowIds->count() . ' locked PO row(s) were skipped. Unlock the PO in Admin PO Control or change the lock scope before editing.');
+        }
+
+        return $redirect;
 
 }
 
@@ -296,6 +335,12 @@ class ExcelFileController extends Controller
 
         if (! $user->hasRole('admin') && ! $user->hasRole('merchant')) {
             abort(403, 'You are not allowed to add a new row.');
+        }
+
+        if ($excelFile->isLockedForUser($user)) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'This file is locked by admin. New rows cannot be added until it is unlocked for your user or role.');
         }
 
         DB::transaction(function () use ($excelFile, $user) {
@@ -373,8 +418,78 @@ class ExcelFileController extends Controller
         });
 
         return redirect()
-            ->route('merchant.workspace')
+            ->route($user->hasRole('admin') ? 'admin.workspace' : 'merchant.workspace', $user->hasRole('admin') ? [] : ['tab' => 'files'])
             ->with('success', 'File deleted successfully.');
+    }
+
+    public function updateLock(Request $request, ExcelFile $excelFile)
+    {
+        $user = auth()->user();
+
+        if (! $user->hasRole('admin')) {
+            abort(403, 'Only admin users can lock or unlock workspace files.');
+        }
+
+        $validated = $request->validate([
+            'locked' => ['nullable', 'boolean'],
+            'lock_scope' => ['required', 'in:all_users,specific_roles,specific_users'],
+            'locked_user_ids' => ['nullable', 'array'],
+            'locked_user_ids.*' => ['integer', 'exists:users,id'],
+            'locked_role_ids' => ['nullable', 'array'],
+            'locked_role_ids.*' => ['integer', 'exists:roles,id'],
+            'lock_reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $isLocked = (bool) ($validated['locked'] ?? false);
+        $scope = $validated['lock_scope'] ?? 'all_users';
+
+        $lockedUserIds = collect($validated['locked_user_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $lockedRoleIds = collect($validated['locked_role_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($isLocked && $scope === 'specific_users' && $lockedUserIds->isEmpty()) {
+            return back()->with('warning', 'Please select at least one user for specific user lock.');
+        }
+
+        if ($isLocked && $scope === 'specific_roles' && $lockedRoleIds->isEmpty()) {
+            return back()->with('warning', 'Please select at least one role for specific role lock.');
+        }
+
+        $oldLockText = $this->fileLockInfo($excelFile)['summary'];
+
+        DB::transaction(function () use ($excelFile, $user, $isLocked, $scope, $lockedUserIds, $lockedRoleIds, $validated, $oldLockText) {
+            $excelFile->forceFill([
+                'is_locked' => $isLocked,
+                'lock_scope' => $isLocked ? $scope : 'all_users',
+                'locked_user_ids' => $isLocked && $scope === 'specific_users' ? $lockedUserIds->all() : [],
+                'locked_role_ids' => $isLocked && $scope === 'specific_roles' ? $lockedRoleIds->all() : [],
+                'lock_reason' => $isLocked ? trim((string) ($validated['lock_reason'] ?? '')) : null,
+                'locked_by' => $isLocked ? $user->id : null,
+                'locked_at' => $isLocked ? now() : null,
+            ])->save();
+
+            ActivityLog::create([
+                'excel_file_id' => $excelFile->id,
+                'row_id' => null,
+                'header_id' => null,
+                'old_value' => $oldLockText,
+                'new_value' => $this->fileLockInfo($excelFile->fresh())['summary'],
+                'action' => $isLocked ? 'file_locked' : 'file_unlocked',
+                'user_id' => $user->id,
+            ]);
+        });
+
+        return back()->with('success', $isLocked
+            ? 'File lock saved. Matching users can view this file but cannot edit or update records.'
+            : 'File unlocked successfully.');
     }
 
     private function notifyOtherRolesAboutFileUpdate(ExcelFile $excelFile, array $changedCells, string $batchId, $actor): void
@@ -408,9 +523,10 @@ class ExcelFileController extends Controller
         }
     }
 
-    public function recalculateFile(ExcelFile $excelFile, ?int $userId = null): void
+    public function recalculateFile(ExcelFile $excelFile, ?int $userId = null, array $exceptRowIds = []): void
     {
         $userId = $userId ?: auth()->id();
+        $exceptRowIds = collect($exceptRowIds)->map(fn ($id) => (int) $id)->flip();
 
         $headers = ExcelHeader::where('is_active', true)
             ->orderBy('position')
@@ -428,6 +544,10 @@ class ExcelFileController extends Controller
         $previousFormulaKey = null;
 
         foreach ($rows as $row) {
+            if ($exceptRowIds->has((int) $row->id)) {
+                continue;
+            }
+
             $cellMap = [];
             foreach ($row->cells as $cell) {
                 $cellMap[$cell->header_id] = $cell;
@@ -739,6 +859,8 @@ class ExcelFileController extends Controller
     private function headerAliases(): array
     {
         return [
+            'po_no' => ['material po number', 'material po no', 'material purchase order', 'material purchase order number'],
+            'po_date' => ['po date', 'material po date', 'material purchase order date'],
             'style_name' => ['style', 'buyer name'],
             'contract_number' => ['initial contract number', 'contract number', 'gmnts po number', 'gmts po number', 'po number'],
             'contract_shipment_date' => ['contract shipment date', 'initial contract shipment date', 'po shipment date'],
@@ -1097,6 +1219,145 @@ class ExcelFileController extends Controller
 
         return false;
     }
+    private function fileLockInfo(ExcelFile $excelFile): array
+    {
+        if (! $excelFile->is_locked) {
+            return [
+                'locked' => false,
+                'scope' => 'open',
+                'summary' => 'Open',
+                'reason' => '',
+            ];
+        }
+
+        $scope = $excelFile->lock_scope ?: 'all_users';
+        $summary = match ($scope) {
+            'specific_users' => 'Locked for selected users',
+            'specific_roles' => 'Locked for selected roles',
+            default => 'Locked for all users',
+        };
+
+        return [
+            'locked' => true,
+            'scope' => $scope,
+            'summary' => $summary,
+            'reason' => $excelFile->lock_reason ?? '',
+            'locked_by' => optional($excelFile->lockedBy)->name,
+            'locked_at' => optional($excelFile->locked_at)->format('Y-m-d H:i'),
+        ];
+    }
+
+    private function poLockedRowInfoForUser($rows, User $user)
+    {
+        $rows = collect($rows);
+
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $poHeaderIds = $this->headerIdsForCanonical('po_no');
+
+        if (empty($poHeaderIds)) {
+            return collect();
+        }
+
+        $rowIds = $rows->pluck('id')->map(fn ($id) => (int) $id)->values();
+        $rowPoNumbers = ExcelCell::query()
+            ->whereIn('row_id', $rowIds->all())
+            ->whereIn('header_id', $poHeaderIds)
+            ->whereNotNull('value')
+            ->whereRaw("TRIM(value) <> ''")
+            ->get(['row_id', 'value'])
+            ->mapWithKeys(fn (ExcelCell $cell) => [(int) $cell->row_id => trim((string) $cell->value)])
+            ->filter();
+
+        if ($rowPoNumbers->isEmpty()) {
+            return collect();
+        }
+
+        $bookingPos = BookingPo::query()
+            ->whereIn('po_no', $rowPoNumbers->unique()->values()->all())
+            ->get()
+            ->keyBy('po_no');
+
+        return $rowPoNumbers->map(function (string $poNo) use ($bookingPos, $user) {
+            $bookingPo = $bookingPos->get($poNo);
+
+            if (! $bookingPo || ! $this->poLockAppliesToUser($bookingPo, $user)) {
+                return null;
+            }
+
+            $control = $bookingPo->booking_data['admin_control'] ?? [];
+
+            return [
+                'po_no' => $bookingPo->po_no,
+                'reason' => $control['lock_reason'] ?? '',
+                'scope' => $control['lock_scope'] ?? 'all_users',
+            ];
+        })->filter();
+    }
+
+    private function poLockAppliesToUser(BookingPo $bookingPo, User $user): bool
+    {
+        $control = $bookingPo->booking_data['admin_control'] ?? [];
+
+        if (! is_array($control) || ! (bool) ($control['locked'] ?? false)) {
+            return false;
+        }
+
+        $scope = $control['lock_scope'] ?? 'all_users';
+
+        if ($scope === 'specific_users') {
+            return in_array((int) $user->id, collect($control['locked_user_ids'] ?? [])->map(fn ($id) => (int) $id)->all(), true);
+        }
+
+        if ($scope === 'specific_roles') {
+            $lockedRoleIds = collect($control['locked_role_ids'] ?? [])->map(fn ($id) => (int) $id);
+
+            if ($lockedRoleIds->isEmpty()) {
+                return false;
+            }
+
+            $userRoleIds = $user->roles()->pluck('id')->map(fn ($id) => (int) $id);
+
+            return $userRoleIds->intersect($lockedRoleIds)->isNotEmpty();
+        }
+
+        return true;
+    }
+
+    private function headerIdsForCanonical(string $canonical): array
+    {
+        $canonicalKey = $this->normalizeHeaderKey($canonical);
+        $aliasKeys = collect($this->headerAliases()[$canonical] ?? [])
+            ->map(fn ($alias) => $this->normalizeHeaderKey($alias))
+            ->push($canonicalKey)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($aliasKeys->isEmpty()) {
+            return [];
+        }
+
+        return ExcelHeader::query()
+            ->where('is_active', true)
+            ->get(['id', 'header_name', 'header_key', 'formula_key'])
+            ->filter(function ($header) use ($aliasKeys) {
+                $keys = collect([
+                    $this->normalizeHeaderKey($header->header_name ?? null),
+                    $this->normalizeHeaderKey($header->header_key ?? null),
+                    $this->normalizeHeaderKey($header->formula_key ?? null),
+                ])->filter();
+
+                return $keys->intersect($aliasKeys)->isNotEmpty();
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
     private function refreshFileStatus(ExcelFile $excelFile): void
     {
         if ($excelFile->status === 'locked') {

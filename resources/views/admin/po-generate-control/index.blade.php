@@ -644,6 +644,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                 if (empty($control)) {
                                     $control = [
                                         'locked' => false,
+                                        'lock_scope' => 'all_users',
+                                        'locked_user_ids' => [],
+                                        'locked_users_snapshot' => [],
+                                        'locked_role_ids' => [],
+                                        'locked_roles_snapshot' => [],
                                         'edit_permission' => 'authorized_users',
                                         'authorized_user_ids' => $poControlUsers->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
                                         'authorized_users_snapshot' => $poControlUsers->map(fn ($user) => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email])->values()->all(),
@@ -658,6 +663,14 @@ document.addEventListener('DOMContentLoaded', function () {
                                     default => 'Admin only',
                                 };
                                 $authorizedSnapshot = collect($control['authorized_users_snapshot'] ?? []);
+                                $lockScope = $control['lock_scope'] ?? 'all_users';
+                                $lockScopeText = match ($lockScope) {
+                                    'specific_users' => 'Locked users only',
+                                    'specific_roles' => 'Locked roles only',
+                                    default => 'All users locked',
+                                };
+                                $lockedUsersSnapshot = collect($control['locked_users_snapshot'] ?? []);
+                                $lockedRolesSnapshot = collect($control['locked_roles_snapshot'] ?? []);
                                 $revisionNo = max(0, (int) $bookingPo->revision_no);
                                 if ($history->isEmpty()) {
                                     $history = collect([[
@@ -719,7 +732,10 @@ document.addEventListener('DOMContentLoaded', function () {
                                             <span class="po-control-chip open"><i class="bi bi-unlock"></i>Open</span>
                                         @endif
                                         <span class="po-control-chip permission"><i class="bi bi-person-gear"></i>{{ $permissionText }}</span>
-                                        <div class="small text-muted">{{ $authorizedSnapshot->count() }} supply-chain user(s)</div>
+                                        @if($isLocked)
+                                            <div class="small text-danger fw-bold">{{ $lockScopeText }}</div>
+                                        @endif
+                                        <div class="small text-muted">{{ $authorizedSnapshot->count() }} authorized supply-chain user(s)</div>
                                     </div>
                                 </td>
                                 <td>
@@ -734,7 +750,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                         <button class="btn btn-outline-primary btn-sm po-icon-btn" type="button" data-bs-toggle="modal" data-bs-target="#poAccessModal{{ $bookingPo->id }}" title="Control, permission and history">
                                             <i class="bi bi-sliders2"></i><span class="visually-hidden">Control and history</span>
                                         </button>
-                                        <form method="POST" action="{{ route('admin.po-generate-control.destroy', $bookingPo) }}" class="d-inline" onsubmit="return confirm('Delete PO {{ $bookingPo->po_no }}? This will remove the generated PO record.');">
+                                        <form method="POST" action="{{ route('admin.po-generate-control.destroy', $bookingPo) }}" class="d-inline" onsubmit="return confirm('Delete PO {{ $bookingPo->po_no }}? This will remove only the generated PO number and move source rows back to Pending PO.');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-outline-danger btn-sm po-icon-btn" title="Delete PO">
@@ -809,6 +825,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (empty($modalControl)) {
                         $modalControl = [
                             'locked' => false,
+                            'lock_scope' => 'all_users',
+                            'locked_user_ids' => [],
+                            'locked_users_snapshot' => [],
+                            'locked_role_ids' => [],
+                            'locked_roles_snapshot' => [],
                             'edit_permission' => 'authorized_users',
                             'authorized_user_ids' => $poControlUsers->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
                             'authorized_users_snapshot' => $poControlUsers->map(fn ($user) => ['id' => $user->id, 'name' => $user->name, 'email' => $user->email])->values()->all(),
@@ -817,6 +838,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         ];
                     }
                     $modalLocked = (bool) ($modalControl['locked'] ?? false);
+                    $modalLockScope = $modalControl['lock_scope'] ?? 'all_users';
+                    $modalLockedUserIds = collect($modalControl['locked_user_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
+                    $modalLockedRoleIds = collect($modalControl['locked_role_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
                     $modalPermission = $modalControl['edit_permission'] ?? 'authorized_users';
                     $modalAuthorizedIds = collect($modalControl['authorized_user_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
                     $modalSourceChanges = collect($modalData['source_change_log'] ?? []);
@@ -856,8 +880,35 @@ document.addEventListener('DOMContentLoaded', function () {
                                             <label class="form-label">PO Lock</label>
                                             <div class="form-check form-switch border rounded-4 p-3 ps-5 bg-light">
                                                 <input class="form-check-input" type="checkbox" role="switch" id="lockPo{{ $modalPo->id }}" name="locked" value="1" @checked($modalLocked)>
-                                                <label class="form-check-label fw-bold" for="lockPo{{ $modalPo->id }}">Lock this PO from edit / re-generate</label>
+                                                <label class="form-check-label fw-bold" for="lockPo{{ $modalPo->id }}">Lock source row edit / update</label>
                                             </div>
+                                            <div class="form-text">Locked source rows become read-only in the worksheet for the selected users/roles.</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Lock Applies To</label>
+                                            <select name="lock_scope" class="form-select">
+                                                <option value="all_users" @selected($modalLockScope === 'all_users')>Lock all users</option>
+                                                <option value="specific_roles" @selected($modalLockScope === 'specific_roles')>Lock selected roles</option>
+                                                <option value="specific_users" @selected($modalLockScope === 'specific_users')>Lock selected users</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Locked Roles</label>
+                                            <select name="locked_role_ids[]" class="form-select" multiple size="5">
+                                                @foreach($poControlRoles as $controlRole)
+                                                    <option value="{{ $controlRole->id }}" @selected(in_array((int) $controlRole->id, $modalLockedRoleIds, true))>{{ ucfirst(str_replace('_', ' ', $controlRole->name)) }}</option>
+                                                @endforeach
+                                            </select>
+                                            <div class="form-text">Used when Lock Applies To is "Lock selected roles".</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Locked Users</label>
+                                            <select name="locked_user_ids[]" class="form-select" multiple size="5">
+                                                @foreach($poLockUsers as $lockUser)
+                                                    <option value="{{ $lockUser->id }}" @selected(in_array((int) $lockUser->id, $modalLockedUserIds, true))>{{ $lockUser->name }} - {{ $lockUser->email }}</option>
+                                                @endforeach
+                                            </select>
+                                            <div class="form-text">Used when Lock Applies To is "Lock selected users".</div>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label">Edit Permission</label>
@@ -942,7 +993,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 </form>
                             </div>
                             <div class="modal-footer justify-content-between">
-                                <form method="POST" action="{{ route('admin.po-generate-control.destroy', $modalPo) }}" onsubmit="return confirm('Delete PO {{ $modalPo->po_no }}? This will remove the generated PO record.');">
+                                <form method="POST" action="{{ route('admin.po-generate-control.destroy', $modalPo) }}" onsubmit="return confirm('Delete PO {{ $modalPo->po_no }}? This will remove only the generated PO number and move source rows back to Pending PO.');">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-outline-danger rounded-pill fw-bold"><i class="bi bi-trash me-1"></i>Delete PO</button>

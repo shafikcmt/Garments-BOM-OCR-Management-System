@@ -119,6 +119,14 @@
 <div class="container-fluid merchant-workspace-page">
 
 
+    @if(session('success'))
+        <div class="alert alert-success rounded-4 border-0 shadow-sm">{{ session('success') }}</div>
+    @endif
+
+    @if(session('warning'))
+        <div class="alert alert-warning rounded-4 border-0 shadow-sm">{{ session('warning') }}</div>
+    @endif
+
     @if($errors->any())
         <div class="alert alert-danger mb-3">
             <ul class="mb-0">

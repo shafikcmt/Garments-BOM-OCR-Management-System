@@ -4,7 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\SupplyChain\BookingController as SupplyChainBookingController;
 use App\Models\BookingPo;
+use App\Models\ExcelCell;
+use App\Models\ExcelHeader;
+use App\Models\ExcelRow;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role as SpatieRole;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -48,9 +54,11 @@ class PoGenerateControlController extends SupplyChainBookingController
         $filtered = $this->applyControlFilters($allPos, $request);
         $bookingPos = $this->paginateControlCollection($filtered, $request, 20);
         $poControlUsers = $this->poControlUsers();
+        $poLockUsers = $this->poLockUsers();
+        $poControlRoles = $this->poControlRoles();
         $filterOptions = $this->poFilterOptions($allPos);
 
-        return view('admin.po-generate-control.index', compact('bookingPos', 'pendingRows', 'stats', 'poControlUsers', 'filterOptions', 'activePoPage'));
+        return view('admin.po-generate-control.index', compact('bookingPos', 'pendingRows', 'stats', 'poControlUsers', 'poLockUsers', 'poControlRoles', 'filterOptions', 'activePoPage'));
     }
 
     public function pending(Request $request)
@@ -77,6 +85,8 @@ class PoGenerateControlController extends SupplyChainBookingController
         $bookingRoutePrefix = $this->bookingRoutePrefix();
         $canControlPo = $this->canControlPo();
         $poControlUsers = $this->poControlUsers();
+        $poLockUsers = $this->poLockUsers();
+        $poControlRoles = $this->poControlRoles();
         $poAdminControl = $this->poAdminControl($bookingPo);
 
         return view('admin.po-generate-control.show', compact(
@@ -87,6 +97,8 @@ class PoGenerateControlController extends SupplyChainBookingController
             'bookingRoutePrefix',
             'canControlPo',
             'poControlUsers',
+            'poLockUsers',
+            'poControlRoles',
             'poAdminControl'
         ));
     }
@@ -210,6 +222,11 @@ class PoGenerateControlController extends SupplyChainBookingController
         $validated = $request->validate([
             'locked' => ['nullable', 'boolean'],
             'lock_reason' => ['nullable', 'string', 'max:500'],
+            'lock_scope' => ['required', 'in:all_users,specific_users,specific_roles'],
+            'locked_user_ids' => ['nullable', 'array'],
+            'locked_user_ids.*' => ['integer', 'exists:users,id'],
+            'locked_role_ids' => ['nullable', 'array'],
+            'locked_role_ids.*' => ['integer', 'exists:roles,id'],
             'edit_permission' => ['required', 'in:admin_only,authorized_users,all_users'],
             'authorized_user_ids' => ['nullable', 'array'],
             'authorized_user_ids.*' => ['integer', 'exists:users,id'],
@@ -229,8 +246,40 @@ class PoGenerateControlController extends SupplyChainBookingController
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
+        $lockedUserIds = collect($validated['locked_user_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+        $lockedUsers = User::query()
+            ->whereIn('id', $lockedUserIds->all())
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        $lockedRoleIds = collect($validated['locked_role_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+        $lockedRoles = SpatieRole::query()
+            ->whereIn('id', $lockedRoleIds->all())
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         $control['locked'] = $isLocked;
         $control['lock_reason'] = trim((string) ($validated['lock_reason'] ?? ''));
+        $control['lock_scope'] = $validated['lock_scope'] ?? 'all_users';
+        $control['locked_user_ids'] = $lockedUsers->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+        $control['locked_users_snapshot'] = $lockedUsers->map(fn (User $user) => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+        ])->values()->all();
+        $control['locked_role_ids'] = $lockedRoles->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+        $control['locked_roles_snapshot'] = $lockedRoles->map(fn (SpatieRole $role) => [
+            'id' => $role->id,
+            'name' => $role->name,
+        ])->values()->all();
         if ($isLocked && ! $wasLocked) {
             $control['locked_by'] = auth()->id();
             $control['locked_by_name'] = optional(auth()->user())->name;
@@ -260,6 +309,9 @@ class PoGenerateControlController extends SupplyChainBookingController
             'edit_permission' => $control['edit_permission'],
             'authorized_users' => collect($control['authorized_users_snapshot'])->pluck('name')->values()->all(),
             'locked' => $isLocked,
+            'lock_scope' => $control['lock_scope'] ?? 'all_users',
+            'locked_users' => collect($control['locked_users_snapshot'] ?? [])->pluck('name')->values()->all(),
+            'locked_roles' => collect($control['locked_roles_snapshot'] ?? [])->pluck('name')->values()->all(),
             'note' => $control['control_note'],
         ]);
 
@@ -271,11 +323,16 @@ class PoGenerateControlController extends SupplyChainBookingController
         $this->authorizeBookingPo($bookingPo);
 
         $poNo = $bookingPo->po_no;
-        $bookingPo->delete();
+        $clearedRows = DB::transaction(function () use ($bookingPo) {
+            $clearedRows = $this->clearPoFromWorkspace($bookingPo);
+            $bookingPo->delete();
+
+            return $clearedRows;
+        });
 
         return redirect()
-            ->route($this->bookingRouteName('index'))
-            ->with('success', 'PO deleted successfully: ' . $poNo . '.');
+            ->route($this->bookingRouteName('pending'))
+            ->with('success', 'PO number ' . $poNo . ' removed. ' . $clearedRows . ' source row(s) moved back to the Pending PO list. No source rows were deleted.');
     }
 
     protected function authorizeBookingPo(BookingPo $bookingPo): void
@@ -286,6 +343,21 @@ class PoGenerateControlController extends SupplyChainBookingController
     private function poControlUsers(): Collection
     {
         return $this->supplyChainPoUsers();
+    }
+
+    private function poLockUsers(): Collection
+    {
+        return User::query()
+            ->where('status', 1)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+    }
+
+    private function poControlRoles(): Collection
+    {
+        return SpatieRole::query()
+            ->orderBy('name')
+            ->get(['id', 'name']);
     }
 
     private function supplyChainPoUsers(): Collection
@@ -308,6 +380,11 @@ class PoGenerateControlController extends SupplyChainBookingController
         return [
             'locked' => false,
             'lock_reason' => '',
+            'lock_scope' => 'all_users',
+            'locked_user_ids' => [],
+            'locked_users_snapshot' => [],
+            'locked_role_ids' => [],
+            'locked_roles_snapshot' => [],
             'locked_by' => null,
             'locked_by_name' => null,
             'locked_at' => null,
@@ -371,6 +448,52 @@ class PoGenerateControlController extends SupplyChainBookingController
         $bookingPo->save();
 
         return $bookingPo->fresh(['excelFile', 'excelRow.cells.header', 'generatedBy', 'completedBy']) ?: $bookingPo;
+    }
+
+    private function clearPoFromWorkspace(BookingPo $bookingPo): int
+    {
+        $poNo = trim((string) $bookingPo->po_no);
+        $poHeaderIds = $this->headerIdsForGroup('po_no');
+        $dateHeaderIds = $this->headerIdsForGroup('po_date');
+
+        $rowIds = collect([$bookingPo->excel_row_id])->filter()->map(fn ($id) => (int) $id);
+
+        if ($poNo !== '' && ! empty($poHeaderIds)) {
+            $rowIds = $rowIds->merge(
+                ExcelCell::query()
+                    ->whereIn('header_id', $poHeaderIds)
+                    ->whereRaw('TRIM(value) = ?', [$poNo])
+                    ->pluck('row_id')
+                    ->map(fn ($id) => (int) $id)
+            );
+        }
+
+        $rowIds = $rowIds->unique()->values();
+
+        if ($rowIds->isEmpty()) {
+            return 0;
+        }
+
+        $headers = ExcelHeader::query()
+            ->whereIn('id', collect($poHeaderIds)->merge($dateHeaderIds)->unique()->values()->all())
+            ->get();
+
+        if ($headers->isEmpty()) {
+            return $rowIds->count();
+        }
+
+        $batchId = (string) Str::uuid();
+        ExcelRow::query()
+            ->whereIn('id', $rowIds->all())
+            ->with('excelFile')
+            ->get()
+            ->each(function (ExcelRow $row) use ($headers, $batchId) {
+                foreach ($headers as $header) {
+                    $this->writeWorkspaceCell($row, $header, '', $batchId);
+                }
+            });
+
+        return $rowIds->count();
     }
 
     private function poControlStats(Collection $bookingPos): array
