@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SupplyChain\DashboardController;
 use App\Http\Controllers\SupplyChain\WorkspaceController;
 use App\Http\Controllers\SupplyChain\BookingController;
+use App\Http\Controllers\SupplyChain\PaymentRequestController;
 
 Route::prefix('supply-chain')
     ->middleware(['auth', 'role:supply_chain'])
@@ -11,6 +12,14 @@ Route::prefix('supply-chain')
     ->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace');
+
+
+        Route::get('/payment-requests', [PaymentRequestController::class, 'index'])->name('payment_requests.index');
+        Route::get('/payment-requests/create', [PaymentRequestController::class, 'create'])->name('payment_requests.create');
+        Route::post('/payment-requests', [PaymentRequestController::class, 'store'])->name('payment_requests.store');
+        Route::get('/payment-requests/{paymentRequest}', [PaymentRequestController::class, 'show'])->name('payment_requests.show');
+        Route::get('/payment-requests/{paymentRequest}/download-pdf', [PaymentRequestController::class, 'downloadPdf'])->name('payment_requests.download_pdf');
+        Route::get('/payment-requests/{paymentRequest}/download-excel', [PaymentRequestController::class, 'downloadExcel'])->name('payment_requests.download_excel');
 
         Route::get('/booking-generate', [BookingController::class, 'index'])->name('bookings.index');
         Route::get('/booking-generate/data', [BookingController::class, 'data'])->name('bookings.data');

@@ -54,15 +54,23 @@
                 </div>
 
                 @forelse($navNotifications as $notification)
+                    @php
+                        $isPiMissingAlert = $notification->type === 'pi_missing_alert';
+                        $notificationBg = $notification->read_at
+                            ? ''
+                            : ($isPiMissingAlert ? 'bg-danger-subtle' : 'bg-sky-50');
+                        $notificationIconClass = $isPiMissingAlert ? 'bg-danger text-white' : 'bg-primary text-white';
+                        $notificationIcon = $isPiMissingAlert ? 'bi-exclamation-octagon-fill' : 'bi-info-lg';
+                    @endphp
                     <a href="{{ route('notifications.open', $notification->id) }}"
-                       class="dropdown-item py-3 px-3 {{ $notification->read_at ? '' : 'bg-sky-50' }}">
+                       class="dropdown-item py-3 px-3 {{ $notificationBg }}">
                         <div class="d-flex gap-2">
-                            <span class="flex-shrink-0 d-inline-flex align-items-center justify-content-center rounded-4 bg-primary text-white" style="width:32px;height:32px;">
-                                <i class="bi bi-info-lg"></i>
+                            <span class="flex-shrink-0 d-inline-flex align-items-center justify-content-center rounded-4 {{ $notificationIconClass }}" style="width:32px;height:32px;">
+                                <i class="bi {{ $notificationIcon }}"></i>
                             </span>
                             <span class="min-w-0">
-                                <span class="d-block fw-bold text-slate-900 text-truncate">{{ $notification->title }}</span>
-                                <span class="d-block small text-muted text-wrap">{{ $notification->message }}</span>
+                                <span class="d-block fw-bold {{ $isPiMissingAlert ? 'text-danger' : 'text-slate-900' }} text-truncate">{{ $notification->title }}</span>
+                                <span class="d-block small {{ $isPiMissingAlert ? 'text-danger-emphasis' : 'text-muted' }} text-wrap">{{ $notification->message }}</span>
                                 <span class="d-block small text-muted mt-1">{{ $notification->created_at->diffForHumans() }}</span>
                             </span>
                         </div>

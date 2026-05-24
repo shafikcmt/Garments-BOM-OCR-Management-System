@@ -4,7 +4,9 @@
     $isAdminUserRole = request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*');
     $isAdminBookingSettings = request()->routeIs('admin.suppliers.*') || request()->routeIs('admin.booking-delivery-destinations.*') || request()->routeIs('admin.booking-instructions.*') || request()->routeIs('admin.po-generate-control.*');
     $isSupplyBooking = request()->routeIs('supply_chain.bookings.*');
+    $isSupplyPayment = request()->routeIs('supply_chain.payment_requests.*');
     $supplyBookingUrl = route('supply_chain.bookings.index');
+    $supplyPaymentUrl = route('supply_chain.payment_requests.index');
 @endphp
 
 <nav class="sidebar" aria-label="Main sidebar navigation">
@@ -190,6 +192,20 @@
                             <span class="sidebar-submenu-rail"></span>
                             <a href="{{ $supplyBookingUrl }}#pending-generated-po" data-hash="pending-generated-po" class="sidebar-sub-link {{ $isSupplyBooking ? 'is-active' : '' }}">Booking Preview</a>
                             <a href="{{ $supplyBookingUrl }}#recent-generated-po" data-hash="recent-generated-po" class="sidebar-sub-link">Generated PO List</a>
+                        </div>
+                    </li>
+                    <li class="sidebar-group {{ $isSupplyPayment ? 'is-open' : '' }}">
+                        <button type="button" class="sidebar-group-button {{ $isSupplyPayment ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isSupplyPayment ? 'true' : 'false' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-cash-coin"></i></span>
+                                <span class="sidebar-link-text">Payment Request</span>
+                            </span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                        </button>
+                        <div class="sidebar-submenu {{ $isSupplyPayment ? 'is-open' : '' }}">
+                            <span class="sidebar-submenu-rail"></span>
+                            <a href="{{ $supplyPaymentUrl }}#pending-pi-payment" data-hash="pending-pi-payment" class="sidebar-sub-link {{ request()->routeIs('supply_chain.payment_requests.index') || request()->routeIs('supply_chain.payment_requests.create') ? 'is-active' : '' }}">Pending PI Payment</a>
+                            <a href="{{ $supplyPaymentUrl }}#payment-request-list" data-hash="payment-request-list" class="sidebar-sub-link {{ request()->routeIs('supply_chain.payment_requests.show') ? 'is-active' : '' }}">Payment Request List</a>
                         </div>
                     </li>
                 </ul>
