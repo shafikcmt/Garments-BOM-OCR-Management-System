@@ -24,25 +24,62 @@
         'supplychain' => 'role-supply-chain',
         'production' => 'role-production',
         'accounts' => 'role-accounts',
+        'account' => 'role-accounts',
         'store' => 'role-store',
     ];
 
-    $headerRoleClass = function ($header) use ($roleColorClasses) {
-        $roleName = strtolower(trim(optional($header->ownerRole)->name ?? 'default'));
-        $roleSlug = preg_replace('/[^a-z0-9]+/', '-', $roleName);
-        $roleSlug = trim($roleSlug, '-');
+    $normalizeRoleSlug = function ($roleName) {
+        $roleSlug = strtolower(trim((string) $roleName));
+        $roleSlug = preg_replace('/[^a-z0-9]+/', '-', $roleSlug);
+
+        return trim($roleSlug, '-');
+    };
+
+    $headerRoleClass = function ($header) use ($roleColorClasses, $normalizeRoleSlug) {
+        $roleSlug = $normalizeRoleSlug(optional($header->ownerRole)->name ?? 'default');
 
         return $roleColorClasses[$roleSlug] ?? 'role-default';
     };
 
+    $currentUserRoleSlugs = auth()->check()
+        ? auth()->user()->roles->pluck('name')
+            ->map($normalizeRoleSlug)
+            ->filter()
+            ->flatMap(function ($roleSlug) {
+                $aliases = [$roleSlug];
+
+                if ($roleSlug === 'account') {
+                    $aliases[] = 'accounts';
+                }
+
+                if ($roleSlug === 'accounts') {
+                    $aliases[] = 'account';
+                }
+
+                if (in_array($roleSlug, ['supply-chain', 'supplychain'], true)) {
+                    $aliases[] = 'supply-chain';
+                    $aliases[] = 'supplychain';
+                }
+
+                return $aliases;
+            })
+            ->unique()
+            ->values()
+        : collect();
+
+    $shouldAutoScrollToUserColumns = $globalSearchValue === '' && count($filterValues) === 0;
+
     // Keep this outside @json(...complex expression...) because Blade can break
     // when arrow functions return arrays inside @json().
-    $sheetHeadersForJs = $headers->map(function ($header) {
+    $sheetHeadersForJs = $headers->map(function ($header) use ($normalizeRoleSlug) {
+        $ownerRoleName = optional($header->ownerRole)->name;
+
         return [
             'id' => $header->id,
             'header_key' => $header->header_key,
             'header_name' => $header->header_name,
-            'owner_role' => optional($header->ownerRole)->name,
+            'owner_role' => $ownerRoleName,
+            'owner_role_slug' => $normalizeRoleSlug($ownerRoleName),
             'field_type' => $header->field_type,
             'value_mode' => $header->value_mode ?? 'input',
         ];
@@ -487,6 +524,64 @@
         font-weight: 600;
     }
 
+    .header-find-tools {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 7px;
+        margin-left: auto;
+    }
+
+    .header-find-label {
+        font-size: 11px;
+        font-weight: 800;
+        color: #334155;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+    }
+
+    .header-find-input,
+    .header-find-select {
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid #dbe4ef;
+        font-size: 12px;
+        color: #334155;
+    }
+
+    .header-find-input {
+        width: min(230px, 58vw);
+    }
+
+    .header-find-select {
+        width: min(260px, 62vw);
+    }
+
+    .active-header-column {
+        position: relative;
+        box-shadow: inset 0 0 0 2px #2563eb !important;
+        background-color: #eff6ff !important;
+    }
+
+    .active-header-column input,
+    .active-header-column .excel-readonly-cell {
+        border-color: #2563eb !important;
+        background: #ffffff !important;
+    }
+
+    @media (max-width: 992px) {
+        .header-find-tools {
+            width: 100%;
+            justify-content: flex-start;
+            margin-left: 0;
+        }
+
+        .search-help-text {
+            width: 100%;
+        }
+    }
+
     .table-toolbar {
         display: flex;
         flex-wrap: wrap;
@@ -782,6 +877,31 @@
                         </a>
                     @endif
                 </div>
+                <div class="header-find-tools">
+                    <span class="header-find-label">Header Finder</span>
+                    <input
+                        type="text"
+                        id="headerQuickFind"
+                        class="form-control form-control-sm header-find-input"
+                        list="headerQuickFindList"
+                        placeholder="Type header name..."
+                        autocomplete="off"
+                    >
+                    <datalist id="headerQuickFindList">
+                        @foreach($headers as $header)
+                            <option value="{{ $header->header_name }}">{{ ucfirst(str_replace('_', ' ', optional($header->ownerRole)->name ?? 'N/A')) }}</option>
+                        @endforeach
+                    </datalist>
+                    <select id="headerJumpSelect" class="form-select form-select-sm header-find-select">
+                        <option value="">Select header to find/edit</option>
+                        @foreach($headers as $header)
+                            <option value="{{ $header->id }}">{{ $header->header_name }} — {{ ucfirst(str_replace('_', ' ', optional($header->ownerRole)->name ?? 'N/A')) }}</option>
+                        @endforeach
+                    </select>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="headerFindButton">Find</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="jumpToMyColumnsButton">My Columns</button>
+                </div>
+
                 <div class="search-help-text">
                     Search now works across all {{ $excelFile->total_rows ?: $rows->total() }} rows, not only this page.
                 </div>
@@ -798,6 +918,7 @@
                                         || in_array($header->header_key, $calculatedHeaderKeys ?? [], true);
                                     $roleClass = $headerRoleClass($header);
                                     $roleLabel = ucfirst(str_replace('_', ' ', optional($header->ownerRole)->name ?? 'N/A'));
+                                    $canEditHeaderColumn = in_array($header->id, $editableHeaderIds, true) && !($isFileLockedForUser ?? false) && !$isHeaderCalculated;
                                 @endphp
                                 <th
                                     class="role-column {{ $roleClass }} {{ $isHeaderCalculated ? 'formula-header-cell' : '' }}"
@@ -805,6 +926,8 @@
                                     data-header-key="{{ $header->header_key }}"
                                     data-role-name="{{ optional($header->ownerRole)->name ?? '' }}"
                                     data-value-mode="{{ $header->value_mode ?? 'input' }}"
+                                    data-col-index="{{ $loop->index }}"
+                                    data-can-edit="{{ $canEditHeaderColumn ? '1' : '0' }}"
                                 >
                                     <div class="header-title">{{ $header->header_name }}</div>
                                     <div class="header-meta">
@@ -827,7 +950,11 @@
                                         || in_array($header->header_key, $calculatedHeaderKeys ?? [], true);
                                     $roleClass = $headerRoleClass($header);
                                 @endphp
-                                <th class="role-column {{ $roleClass }} {{ $isHeaderCalculated ? 'formula-header-cell' : '' }}">
+                                <th
+                                    class="role-column {{ $roleClass }} {{ $isHeaderCalculated ? 'formula-header-cell' : '' }}"
+                                    data-header-id="{{ $header->id }}"
+                                    data-col-index="{{ $loop->index }}"
+                                >
                                     <input
                                         type="text"
                                         class="form-control form-control-sm filter-input"
@@ -1020,6 +1147,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const sheetHeaders = @json($sheetHeadersForJs);
     const calculatedHeaderKeys = @json($calculatedHeaderKeys ?? []);
     const calculatedHeaderIds = @json($calculatedHeaderIds ?? []);
+    const currentUserRoleSlugs = @json($currentUserRoleSlugs);
+    const shouldAutoScrollToUserColumns = @json($shouldAutoScrollToUserColumns);
+
+    const headerQuickFind = document.getElementById('headerQuickFind');
+    const headerJumpSelect = document.getElementById('headerJumpSelect');
+    const headerFindButton = document.getElementById('headerFindButton');
+    const jumpToMyColumnsButton = document.getElementById('jumpToMyColumnsButton');
 
     const draftModal = document.getElementById('draftRestoreModal');
     const discardDraftBtn = document.getElementById('discardDraftBtn');
@@ -1060,6 +1194,132 @@ document.addEventListener('DOMContentLoaded', function () {
             editableGrid[rowIndex][colIndex].focus();
             editableGrid[rowIndex][colIndex].select();
         }
+    }
+
+    function normalizeSearchText(value) {
+        return String(value ?? '')
+            .toLowerCase()
+            .replace(/[_\-]+/g, ' ')
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
+    }
+
+    function headerIndexById(headerId) {
+        const id = Number(headerId);
+        return sheetHeaders.findIndex(header => Number(header.id) === id);
+    }
+
+    function headerById(headerId) {
+        const index = headerIndexById(headerId);
+        return index >= 0 ? sheetHeaders[index] : null;
+    }
+
+    function findHeaderByName(query) {
+        const normalized = normalizeSearchText(query);
+
+        if (normalized === '') {
+            return null;
+        }
+
+        return sheetHeaders.find(header => normalizeSearchText(header.header_name) === normalized)
+            || sheetHeaders.find(header => normalizeSearchText(header.header_key) === normalized)
+            || sheetHeaders.find(header => normalizeSearchText(header.header_name).includes(normalized))
+            || sheetHeaders.find(header => normalizeSearchText(header.header_key).includes(normalized));
+    }
+
+    function clearActiveHeaderColumn() {
+        document.querySelectorAll('.active-header-column').forEach(element => {
+            element.classList.remove('active-header-column');
+        });
+    }
+
+    function highlightHeaderColumn(headerId) {
+        clearActiveHeaderColumn();
+
+        const selector = `[data-header-id="${headerId}"]`;
+        document.querySelectorAll(selector).forEach(element => {
+            element.classList.add('active-header-column');
+        });
+
+        setTimeout(clearActiveHeaderColumn, 3500);
+    }
+
+    function scrollToHeader(header, focusFirstEditable = true) {
+        if (!header || !table) {
+            return;
+        }
+
+        const index = headerIndexById(header.id);
+        const headerCell = table.querySelector(`thead tr:first-child th[data-header-id="${header.id}"]`);
+
+        if (!headerCell) {
+            return;
+        }
+
+        headerCell.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        highlightHeaderColumn(header.id);
+
+        if (typeof searchColumnStorageKey !== 'undefined') {
+            localStorage.setItem(searchColumnStorageKey, String(index + 1));
+        }
+
+        if (headerJumpSelect) {
+            headerJumpSelect.value = String(header.id);
+        }
+
+        if (focusFirstEditable) {
+            setTimeout(function () {
+                const editable = document.querySelector(`.excel-editable-cell[data-header-id="${header.id}"]`);
+
+                if (editable) {
+                    editable.focus({ preventScroll: true });
+                    editable.select();
+                    return;
+                }
+
+                const filter = document.querySelector(`.filter-input[data-filter-key="${header.id}"]`);
+
+                if (filter) {
+                    filter.focus({ preventScroll: true });
+                    filter.select();
+                }
+            }, 450);
+        }
+    }
+
+    function scrollToHeaderFromFinder() {
+        const selectedHeader = headerJumpSelect && headerJumpSelect.value ? headerById(headerJumpSelect.value) : null;
+        const typedHeader = headerQuickFind ? findHeaderByName(headerQuickFind.value) : null;
+        const targetHeader = selectedHeader || typedHeader;
+
+        if (!targetHeader) {
+            if (headerQuickFind) {
+                headerQuickFind.focus();
+            }
+            return;
+        }
+
+        scrollToHeader(targetHeader, true);
+    }
+
+    function firstHeaderForCurrentUser() {
+        const roles = Array.isArray(currentUserRoleSlugs) ? currentUserRoleSlugs : [];
+
+        if (roles.length === 0) {
+            return null;
+        }
+
+        return sheetHeaders.find(header => roles.includes(header.owner_role_slug)) || null;
+    }
+
+    function scrollToCurrentUserColumns(focusFirstEditable = false) {
+        const targetHeader = firstHeaderForCurrentUser();
+
+        if (!targetHeader) {
+            return;
+        }
+
+        scrollToHeader(targetHeader, focusFirstEditable);
     }
 
     function normalizeValue(value) {
@@ -1788,7 +2048,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function restoreSearchColumnPosition() {
         const savedColumn = localStorage.getItem(searchColumnStorageKey);
-        if (!savedColumn) return;
+        if (!savedColumn) return false;
 
         setTimeout(function () {
             const target = savedColumn === 'global'
@@ -1805,9 +2065,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 target.setSelectionRange(valueLength, valueLength);
             }
         }, 250);
+
+        return true;
     }
 
-    restoreSearchColumnPosition();
+    const restoredSearchColumn = restoreSearchColumnPosition();
+
+    if (shouldAutoScrollToUserColumns && !restoredSearchColumn) {
+        setTimeout(function () {
+            scrollToCurrentUserColumns(false);
+        }, 450);
+    }
 
     function submitServerSheetSearch() {
         rememberActiveSearchColumn();
@@ -1858,6 +2126,41 @@ document.addEventListener('DOMContentLoaded', function () {
         applySheetSearchButton.addEventListener('click', function () {
             clearTimeout(sheetSearchTimer);
             submitServerSheetSearch();
+        });
+    }
+
+    if (headerJumpSelect) {
+        headerJumpSelect.addEventListener('change', function () {
+            const header = headerById(this.value);
+
+            if (header) {
+                if (headerQuickFind) {
+                    headerQuickFind.value = header.header_name || '';
+                }
+
+                scrollToHeader(header, true);
+            }
+        });
+    }
+
+    if (headerFindButton) {
+        headerFindButton.addEventListener('click', scrollToHeaderFromFinder);
+    }
+
+    if (headerQuickFind) {
+        headerQuickFind.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                scrollToHeaderFromFinder();
+            }
+        });
+
+        headerQuickFind.addEventListener('change', scrollToHeaderFromFinder);
+    }
+
+    if (jumpToMyColumnsButton) {
+        jumpToMyColumnsButton.addEventListener('click', function () {
+            scrollToCurrentUserColumns(true);
         });
     }
 
