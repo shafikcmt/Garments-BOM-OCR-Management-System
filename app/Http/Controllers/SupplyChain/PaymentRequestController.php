@@ -48,9 +48,29 @@ class PaymentRequestController extends Controller
             'remarks' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        $selectedIds = collect($validated['booking_po_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $selectedPoNumbers = BookingPo::query()
+            ->whereIn('id', $selectedIds)
+            ->pluck('po_no')
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique(fn ($value) => Str::lower($value))
+            ->values();
+
         $bookingPos = BookingPo::query()
             ->with(['excelFile.uploader', 'excelRow.cells.header', 'generatedBy'])
-            ->whereIn('id', collect($validated['booking_po_ids'])->map(fn ($id) => (int) $id)->unique()->values())
+            ->where(function ($query) use ($selectedIds, $selectedPoNumbers) {
+                $query->whereIn('id', $selectedIds);
+
+                if ($selectedPoNumbers->isNotEmpty()) {
+                    $query->orWhereIn('po_no', $selectedPoNumbers);
+                }
+            })
+            ->whereNotNull('generated_at')
             ->get();
 
         $snapshots = $bookingPos
@@ -126,9 +146,10 @@ class PaymentRequestController extends Controller
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
 
         $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy']);
-        $summary = $this->summaryFromItems($paymentRequest->items);
+        $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
+        $summary = $this->summaryFromApprovalRows($approvalRows);
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows'));
     }
 
     public function downloadPdf(PaymentRequest $paymentRequest)
@@ -136,12 +157,14 @@ class PaymentRequestController extends Controller
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
 
         $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy']);
-        $summary = $this->summaryFromItems($paymentRequest->items);
+        $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
+        $summary = $this->summaryFromApprovalRows($approvalRows);
 
         if (class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('supply-chain.payment-requests.approval_pdf', [
                 'paymentRequest' => $paymentRequest,
                 'summary' => $summary,
+                'approvalRows' => $approvalRows,
                 'isPdf' => true,
             ])->setPaper('a4', 'landscape');
 
@@ -151,6 +174,7 @@ class PaymentRequestController extends Controller
         return view('supply-chain.payment-requests.approval_pdf', [
             'paymentRequest' => $paymentRequest,
             'summary' => $summary,
+            'approvalRows' => $approvalRows,
             'isPdf' => false,
         ]);
     }
@@ -160,15 +184,16 @@ class PaymentRequestController extends Controller
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
 
         $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy']);
-        $summary = $this->summaryFromItems($paymentRequest->items);
+        $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
+        $summary = $this->summaryFromApprovalRows($approvalRows);
         $fileName = 'PAYMENT_REQUEST_APPROVAL_' . $paymentRequest->request_no;
 
         if (class_exists('PhpOffice\\PhpSpreadsheet\\Spreadsheet')) {
-            return $this->downloadXlsx($paymentRequest, $summary, $fileName . '.xlsx');
+            return $this->downloadXlsx($paymentRequest, $summary, $fileName . '.xlsx', $approvalRows);
         }
 
         return response()
-            ->view('supply-chain.payment-requests.approval_excel', compact('paymentRequest', 'summary'))
+            ->view('supply-chain.payment-requests.approval_excel', compact('paymentRequest', 'summary', 'approvalRows'))
             ->header('Content-Type', 'application/vnd.ms-excel; charset=UTF-8')
             ->header('Content-Disposition', 'attachment; filename="' . $fileName . '.xls"')
             ->header('Pragma', 'no-cache')
@@ -396,6 +421,173 @@ class PaymentRequestController extends Controller
             ->all();
     }
 
+    protected function approvalRowsFromItems($items): \Illuminate\Support\Collection
+    {
+        return collect($items)
+            ->map(fn (PaymentRequestItem $item) => $this->approvalRowFromItem($item))
+            ->groupBy('merge_key')
+            ->map(fn ($rows) => $this->mergeApprovalRows($rows))
+            ->sortBy([
+                ['vendor_name', 'asc'],
+                ['style', 'asc'],
+                ['material_type', 'asc'],
+                ['material_po_number', 'asc'],
+            ])
+            ->values();
+    }
+
+    protected function approvalRowFromItem(PaymentRequestItem $item): array
+    {
+        $itemIdentity = collect([
+            data_get($item->data, 'material_description'),
+            $item->material_description,
+            data_get($item->data, 'description'),
+            $item->sap_code,
+            $item->material_color,
+            data_get($item->data, 'material_type'),
+            $item->material_type,
+        ])->map(fn ($value) => trim((string) $value))->filter()->implode('|');
+
+        $style = $item->style_name ?: data_get($item->data, 'style_name');
+
+        return [
+            'merge_key' => $this->mergeKey($style, $itemIdentity, $item->supplier_name, $item->po_no, $item->pi_number),
+            'booking_po_ids' => collect([$item->booking_po_id])->filter()->values()->all(),
+            'vendor_name' => $item->supplier_name ?: '-',
+            'style' => $style ?: '-',
+            'pcd_required' => $this->reportDate(data_get($item->data, 'pcd_required')),
+            'payment_term' => $item->payment_term ?: data_get($item->data, 'payment_term') ?: '-',
+            'material_po_number' => $item->po_no ?: data_get($item->data, 'po_no') ?: '-',
+            'material_pi_number' => $item->pi_number ?: data_get($item->data, 'pi_number') ?: '-',
+            'material_type' => data_get($item->data, 'material_type') ?: $item->material_description ?: $item->material_type ?: '-',
+            'contract_shipment' => $this->reportDate(data_get($item->data, 'contract_shipment')),
+            'committed_ex_mill' => $this->reportDate(data_get($item->data, 'committed_ex_mill')),
+            'comments' => $item->remarks ?: data_get($item->data, 'remarks') ?: data_get($item->data, 'comments') ?: '(blank)',
+            'pi_amount' => (float) $item->pi_amount,
+            'payment_required_date' => $item->payment_required_date ?: data_get($item->data, 'payment_required_date'),
+            'buyer_name' => $item->buyer_name,
+            'season_name' => $item->season_name,
+            'payment_status' => $item->payment_status,
+            'final_status' => data_get($item->data, 'final_status'),
+            'vendor_type' => data_get($item->data, 'vendor_type'),
+            'shipment_month' => data_get($item->data, 'shipment_month'),
+            'delivery_term' => $item->delivery_term,
+            'source_count' => 1,
+        ];
+    }
+
+    protected function mergeApprovalRows($rows): array
+    {
+        $first = $rows->first();
+        $paymentRequiredDate = $rows
+            ->map(fn ($row) => $this->sourceService->dateValue($row['payment_required_date'] ?? null))
+            ->filter()
+            ->sortBy(fn ($date) => $date->timestamp)
+            ->first();
+
+        return [
+            'booking_po_ids' => $rows->flatMap(fn ($row) => $row['booking_po_ids'] ?? [])->filter()->unique()->values()->all(),
+            'vendor_name' => $this->joinUnique($rows->pluck('vendor_name')), 
+            'style' => $this->joinUnique($rows->pluck('style')), 
+            'pcd_required' => $this->joinUnique($rows->pluck('pcd_required')), 
+            'payment_term' => $this->joinUnique($rows->pluck('payment_term')), 
+            'material_po_number' => $this->joinUnique($rows->pluck('material_po_number')), 
+            'material_pi_number' => $this->joinUnique($rows->pluck('material_pi_number')), 
+            'material_type' => $this->joinUnique($rows->pluck('material_type')), 
+            'contract_shipment' => $this->joinUnique($rows->pluck('contract_shipment')), 
+            'committed_ex_mill' => $this->joinUnique($rows->pluck('committed_ex_mill')), 
+            'comments' => $this->joinUnique($rows->pluck('comments'), '(blank)', '; '), 
+            'pi_amount' => $rows->sum(fn ($row) => (float) ($row['pi_amount'] ?? 0)),
+            'payment_required_date' => $paymentRequiredDate ?: ($first['payment_required_date'] ?? null),
+            'buyer_name' => $this->joinUnique($rows->pluck('buyer_name')), 
+            'season_name' => $this->joinUnique($rows->pluck('season_name')), 
+            'payment_status' => $this->joinUnique($rows->pluck('payment_status')), 
+            'final_status' => $this->joinUnique($rows->pluck('final_status')), 
+            'vendor_type' => $this->joinUnique($rows->pluck('vendor_type')), 
+            'shipment_month' => $this->joinUnique($rows->pluck('shipment_month')), 
+            'delivery_term' => $this->joinUnique($rows->pluck('delivery_term')), 
+            'source_count' => $rows->sum(fn ($row) => (int) ($row['source_count'] ?? 1)),
+        ];
+    }
+
+    protected function summaryFromApprovalRows($rows): array
+    {
+        $rows = collect($rows);
+        $dateValues = $rows->map(fn ($row) => $this->sourceService->dateValue($row['payment_required_date'] ?? null))->filter();
+        $earliestPaymentRequired = $dateValues->sortBy(fn ($date) => $date->timestamp)->first();
+
+        return [
+            'total_pi_amount' => $rows->sum(fn (array $row) => (float) ($row['pi_amount'] ?? 0)),
+            'total_budget' => 0,
+            'total_savings' => 0,
+            'total_po_count' => $rows->pluck('material_po_number')->flatMap(fn ($value) => explode(',', (string) $value))->map(fn ($value) => trim($value))->filter()->unique(fn ($value) => Str::lower($value))->count(),
+            'pending_payment_count' => $rows->filter(fn (array $row) => $this->sourceService->normalize($row['payment_status'] ?? '') === 'pmt_pending')->count(),
+            'earliest_payment_required_date' => $earliestPaymentRequired,
+            'payment_status_summary' => $rows->countBy('payment_status')->all(),
+            'pi_numbers' => $this->uniqueRowValues($rows, 'material_pi_number'),
+            'payment_terms' => $this->uniqueRowValues($rows, 'payment_term'),
+            'delivery_terms' => $this->uniqueRowValues($rows, 'delivery_term'),
+            'buyers' => $this->uniqueRowValues($rows, 'buyer_name'),
+            'seasons' => $this->uniqueRowValues($rows, 'season_name'),
+            'suppliers' => $this->uniqueRowValues($rows, 'vendor_name'),
+            'shipment_months' => $this->uniqueRowValues($rows, 'shipment_month'),
+            'vendor_types' => $this->uniqueRowValues($rows, 'vendor_type'),
+            'final_statuses' => $this->uniqueRowValues($rows, 'final_status'),
+            'payment_statuses' => $this->uniqueRowValues($rows, 'payment_status'),
+            'material_types' => $this->uniqueRowValues($rows, 'material_type'),
+        ];
+    }
+
+    protected function uniqueRowValues($rows, string $key): array
+    {
+        return collect($rows)
+            ->pluck($key)
+            ->flatMap(fn ($value) => explode(',', (string) $value))
+            ->map(fn ($value) => trim((string) $value))
+            ->reject(fn ($value) => $value === '' || $value === '-')
+            ->unique(fn ($value) => Str::lower($value))
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    protected function joinUnique($values, string $fallback = '-', string $glue = ', '): string
+    {
+        $values = collect($values)
+            ->map(fn ($value) => trim((string) $value))
+            ->reject(fn ($value) => $value === '' || $value === '-')
+            ->unique(fn ($value) => Str::lower($value))
+            ->values();
+
+        return $values->isEmpty() ? $fallback : $values->implode($glue);
+    }
+
+    protected function firstFilled(array $values): string
+    {
+        foreach ($values as $value) {
+            $value = trim((string) $value);
+            if ($value !== '' && $value !== '-') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    protected function mergeKey(...$values): string
+    {
+        return collect($values)
+            ->map(fn ($value) => $this->sourceService->normalize($value ?? ''))
+            ->implode('|');
+    }
+
+    protected function reportDate($value): string
+    {
+        $date = $this->sourceService->dateValue($value);
+
+        return $date ? $date->format('d-M-y') : (trim((string) $value) ?: '-');
+    }
+
     protected function approvalFiltersFromSnapshots($snapshots): array
     {
         return [
@@ -461,180 +653,163 @@ class PaymentRequestController extends Controller
         return ($value === null || trim((string) $value) === '') ? $fallback : $value;
     }
 
-    protected function downloadXlsx(PaymentRequest $paymentRequest, array $summary, string $fileName)
+    protected function downloadXlsx(PaymentRequest $paymentRequest, array $summary, string $fileName, $approvalRows = null)
     {
+        $approvalRows = $approvalRows ? collect($approvalRows) : $this->approvalRowsFromItems($paymentRequest->items);
+
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Payment Approval');
         $sheet->getSheetView()->setShowGridLines(false);
 
-        $lastColumn = 'L';
+        $lastColumn = 'K';
         $list = fn ($values, $fallback = '-') => collect($values ?? [])->map(fn ($value) => trim((string) $value))->filter()->take(5)->implode(', ') ?: $fallback;
-        $paymentRequired = $summary['earliest_payment_required_date'] ? optional($summary['earliest_payment_required_date'])->format('jS M-Y') : '-';
-        $filters = [
-            'Final Status' => $this->shortList($summary['final_statuses'] ?? []),
-            'Vendor Type' => $this->shortList($summary['vendor_types'] ?? []),
-            'Payment Term' => $this->shortList($summary['payment_terms'] ?? []),
-            'Payment Status' => $this->shortList($summary['payment_statuses'] ?? []),
-            'Vendor Name' => $this->shortList($summary['suppliers'] ?? [], $paymentRequest->supplier_name ?: '-'),
-        ];
+        $moneyFormat = '$#,##0.00;[Red]($#,##0.00)';
+        $paymentRequiredDate = $summary['earliest_payment_required_date'] ?? null;
+        $paymentRequired = $paymentRequiredDate ? optional($paymentRequiredDate)->format('d / m / Y') : '-';
+        $paymentRequiredParts = $paymentRequiredDate
+            ? [optional($paymentRequiredDate)->format('d'), optional($paymentRequiredDate)->format('m'), optional($paymentRequiredDate)->format('Y')]
+            : ['-', '-', '-'];
 
         $logoPath = public_path('images/humana-logo.png');
         if (file_exists($logoPath)) {
             $drawing = new \PhpOffice\PhpSpreadsheet\Worksheet\Drawing();
             $drawing->setName('Logo');
             $drawing->setPath($logoPath);
-            $drawing->setHeight(56);
+            $drawing->setHeight(44);
             $drawing->setCoordinates('A1');
             $drawing->setOffsetX(8);
-            $drawing->setOffsetY(6);
+            $drawing->setOffsetY(4);
             $drawing->setWorksheet($sheet);
         }
 
-        $sheet->mergeCells('A1:C2');
-        $sheet->mergeCells('D1:I1');
-        $sheet->mergeCells('D2:I2');
-        $sheet->mergeCells('J1:L2');
-        $sheet->setCellValue('A1', 'Humana');
+        $sheet->mergeCells('A1:B3');
+        $sheet->mergeCells('D1:H1');
+        $sheet->mergeCells('D2:H2');
+        $sheet->mergeCells('I1:K1');
+        $sheet->setCellValue('A1', 'HUMANA' . "\n" . 'APPARELS PVT. LTD.');
         $sheet->setCellValue('D1', 'Payment Request Approval');
         $sheet->setCellValue('D2', $paymentRequest->request_no);
-        $sheet->setCellValue('J1', "Date: " . optional($paymentRequest->created_at)->format('jS M-Y') . "
-Payment Require Date: " . $paymentRequired);
+        $sheet->setCellValue('I1', 'Date:  ' . optional($paymentRequest->created_at)->format('jS M-Y'));
+        $sheet->getStyle('A1:K3')->getFont()->getColor()->setARGB('FF000B6F');
+        $sheet->getStyle('A1:B3')->getFont()->setBold(true)->setSize(12);
+        $sheet->getStyle('A1:B3')->getAlignment()->setWrapText(true)->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('D1')->getFont()->setBold(true)->setSize(20);
+        $sheet->getStyle('D2')->getFont()->setSize(10);
+        $sheet->getStyle('D1:H2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('I1:K1')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
 
-        $sheet->getStyle('A1:L2')->applyFromArray([
-            'font' => ['bold' => true, 'color' => ['argb' => 'FF111827']],
-            'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true],
-        ]);
-        $sheet->getStyle('D1')->getFont()->setSize(16);
-        $sheet->getStyle('D1:I1')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('D2:I2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('D2')->getFont()->setSize(10)->getColor()->setARGB('FF1D4ED8');
-        $sheet->getStyle('J1:L2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
-        $sheet->getRowDimension(1)->setRowHeight(30);
-        $sheet->getRowDimension(2)->setRowHeight(24);
-
-        $sheet->mergeCells('A3:D3');
-        $sheet->mergeCells('E3:H3');
-        $sheet->mergeCells('I3:L3');
-        $sheet->setCellValue('A3', 'Buyer: ' . $list($summary['buyers'] ?? [], $paymentRequest->buyer_name ?: '-'));
-        $sheet->setCellValue('E3', 'Season: ' . $list($summary['seasons'] ?? [], $paymentRequest->season_name ?: '-'));
-        $sheet->setCellValue('I3', 'Total PI Amount: $' . number_format((float) ($summary['total_pi_amount'] ?? 0), 2));
-        $sheet->getStyle('A3:L3')->applyFromArray([
-            'font' => ['bold' => true, 'size' => 11],
-            'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
-        ]);
-        $sheet->getStyle('E3:H3')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('I3:L3')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
-
-        $filterTitleRow = 5;
-        $filterValueRow = 6;
-        $ranges = ['A:B', 'C:D', 'E:F', 'G:H', 'I:J'];
-        $i = 0;
-        foreach ($filters as $label => $value) {
-            [$from, $to] = explode(':', $ranges[$i]);
-            $sheet->mergeCells($from . $filterTitleRow . ':' . $to . $filterTitleRow);
-            $sheet->mergeCells($from . $filterValueRow . ':' . $to . $filterValueRow);
-            $sheet->setCellValue($from . $filterTitleRow, $label);
-            $sheet->setCellValue($from . $filterValueRow, $value ?: '-');
-            $sheet->getStyle($from . $filterTitleRow . ':' . $to . $filterValueRow)->applyFromArray([
-                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FFB8C2CC']]],
-                'alignment' => ['wrapText' => true, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
-            ]);
-            $sheet->getStyle($from . $filterTitleRow . ':' . $to . $filterTitleRow)->applyFromArray([
-                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFE5E7EB']],
-                'font' => ['bold' => true, 'size' => 9],
-            ]);
-            $i++;
-        }
-        $sheet->mergeCells('K5:L5');
-        $sheet->mergeCells('K6:L6');
-        $sheet->setCellValue('K5', 'Request No');
-        $sheet->setCellValue('K6', $paymentRequest->request_no);
-        $sheet->getStyle('K5:L6')->applyFromArray([
-            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FFB8C2CC']]],
-            'alignment' => ['wrapText' => true, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
-        ]);
-        $sheet->getStyle('K5:L5')->applyFromArray([
-            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFE5E7EB']],
-            'font' => ['bold' => true, 'size' => 9],
+        $sheet->setCellValue('H3', 'Payment Require Date:');
+        $sheet->setCellValue('I3', $paymentRequiredParts[0]);
+        $sheet->setCellValue('J3', $paymentRequiredParts[1]);
+        $sheet->setCellValue('K3', $paymentRequiredParts[2]);
+        $sheet->getStyle('H3:K3')->getFont()->setBold(true)->getColor()->setARGB('FF000B6F');
+        $sheet->getStyle('I3:K3')->applyFromArray([
+            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF8EA0D4']]],
+            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
         ]);
 
-        $headers = ['Vendor Name', 'Style', 'PCD Required', 'Payment Term', 'Material PO Number', 'Season', 'Material PI Number', 'Material Type', 'Payment Status', 'Contract Shipment', 'Committed Ex Mill', 'PI Amount'];
-        $tableStart = 8;
+        $sheet->setCellValue('A5', 'Buyer');
+        $sheet->setCellValue('B5', ':');
+        $sheet->setCellValue('C5', $list($summary['buyers'] ?? [], $paymentRequest->buyer_name ?: '-'));
+        $sheet->setCellValue('A6', 'Season');
+        $sheet->setCellValue('B6', ':');
+        $sheet->setCellValue('C6', $list($summary['seasons'] ?? [], $paymentRequest->season_name ?: '-'));
+        $sheet->mergeCells('C5:E5');
+        $sheet->mergeCells('C6:E6');
+        $sheet->getStyle('A5:C6')->getFont()->setBold(true)->getColor()->setARGB('FF000B6F');
+
+        $sheet->mergeCells('I5:K8');
+        $sheet->setCellValue('I5', "OCR Checked:     ☐ Yes      ☐ No\n\nChecker Name     : ______________________\n\nDate             : ______________________");
+        $sheet->getStyle('I5:K8')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 9, 'color' => ['argb' => 'FF000B6F']],
+            'alignment' => ['wrapText' => true, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP],
+            'borders' => ['outline' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF4B5FAE']]],
+        ]);
+
+        $sheet->mergeCells('A8:E9');
+        $sheet->setCellValue('A8', "* Buyer nominated supplier.\n  No excess quantity has been booked.");
+        $sheet->getStyle('A8:E9')->getFont()->getColor()->setARGB('FF000B6F');
+        $sheet->getStyle('A8:E9')->getAlignment()->setWrapText(true);
+
+        $sheet->mergeCells('I10:K10');
+        $sheet->setCellValue('I10', 'Total PI Amount: $ ' . number_format((float) ($summary['total_pi_amount'] ?? 0), 2));
+        $sheet->getStyle('I10:K10')->getFont()->setBold(true)->setSize(11)->getColor()->setARGB('FF000B6F');
+        $sheet->getStyle('I10:K10')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+
+        $headers = ['Vendor Name', 'Style', 'PCD Required', 'Payment Term', 'Material PO Number', 'Material PI Number', 'Material Type', 'Contract Shipment', 'Committed Ex Mill', 'Comments', 'PI Amount (USD)'];
+        $tableStart = 11;
         $sheet->fromArray($headers, null, 'A' . $tableStart);
         $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . $tableStart)->applyFromArray([
-            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFD9DEE8']],
-            'font' => ['bold' => true, 'size' => 9, 'color' => ['argb' => 'FF111827']],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF000B6F']],
+            'font' => ['bold' => true, 'size' => 8, 'color' => ['argb' => 'FFFFFFFF']],
             'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF9CA3AF']]],
+            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF4253A8']]],
         ]);
-        $sheet->getRowDimension($tableStart)->setRowHeight(24);
+        $sheet->getRowDimension($tableStart)->setRowHeight(26);
 
         $rowNo = $tableStart + 1;
-        foreach ($paymentRequest->items as $item) {
+        foreach ($approvalRows as $row) {
             $sheet->fromArray([
-                $item->supplier_name ?: '-',
-                $item->style_name ?: '-',
-                $this->itemReportValue($item, 'pcd_required', '-'),
-                $item->payment_term ?: '-',
-                $item->po_no ?: '-',
-                $item->season_name ?: '-',
-                $item->pi_number ?: '-',
-                $this->itemReportValue($item, 'material_type', '-'),
-                $item->payment_status ?: '-',
-                $this->itemReportValue($item, 'contract_shipment', '-'),
-                $this->itemReportValue($item, 'committed_ex_mill', '-'),
-                (float) $item->pi_amount,
+                $row['vendor_name'] ?: '-',
+                $row['style'] ?: '-',
+                $row['pcd_required'] ?: '-',
+                $row['payment_term'] ?: '-',
+                $row['material_po_number'] ?: '-',
+                $row['material_pi_number'] ?: '-',
+                $row['material_type'] ?: '-',
+                $row['contract_shipment'] ?: '-',
+                $row['committed_ex_mill'] ?: '-',
+                $row['comments'] ?: '(blank)',
+                (float) ($row['pi_amount'] ?? 0),
             ], null, 'A' . $rowNo);
             $sheet->getStyle('A' . $rowNo . ':' . $lastColumn . $rowNo)->applyFromArray([
-                'font' => ['size' => 9],
-                'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP, 'wrapText' => true],
-                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FFD1D5DB']]],
+                'font' => ['size' => 8],
+                'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true],
+                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FFE4E7EF']]],
             ]);
-            if (($rowNo % 2) === 0) {
-                $sheet->getStyle('A' . $rowNo . ':' . $lastColumn . $rowNo)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FFF8FAFC');
-            }
             $rowNo++;
         }
 
         $sheet->setCellValue('A' . $rowNo, 'Grand Total');
-        $sheet->setCellValue('L' . $rowNo, (float) ($summary['total_pi_amount'] ?? 0));
-        $sheet->mergeCells('A' . $rowNo . ':K' . $rowNo);
+        $sheet->setCellValue('K' . $rowNo, (float) ($summary['total_pi_amount'] ?? 0));
+        $sheet->mergeCells('A' . $rowNo . ':J' . $rowNo);
         $sheet->getStyle('A' . $rowNo . ':' . $lastColumn . $rowNo)->applyFromArray([
-            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFEEF2F7']],
-            'font' => ['bold' => true, 'size' => 10],
-            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF9CA3AF']]],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFEAF0FB']],
+            'font' => ['bold' => true, 'size' => 10, 'color' => ['argb' => 'FF000B6F']],
+            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FFE4E7EF']]],
         ]);
-        $sheet->getStyle('L' . ($tableStart + 1) . ':L' . $rowNo)->getNumberFormat()->setFormatCode('$#,##0.00;[Red]($#,##0.00)');
-        $sheet->getStyle('L' . ($tableStart + 1) . ':L' . $rowNo)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+        $sheet->getStyle('K' . ($tableStart + 1) . ':K' . $rowNo)->getNumberFormat()->setFormatCode($moneyFormat);
+        $sheet->getStyle('K' . ($tableStart + 1) . ':K' . $rowNo)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
         $sheet->getStyle('C' . ($tableStart + 1) . ':C' . $rowNo)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('J' . ($tableStart + 1) . ':K' . $rowNo)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('H' . ($tableStart + 1) . ':I' . $rowNo)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
 
-        $rowNo += 3;
-        foreach ([['A', 'D', 'Prepared By', optional($paymentRequest->createdBy)->name], ['E', 'H', 'Checked By', optional($paymentRequest->checkedBy)->name], ['I', 'L', 'Approved By', optional($paymentRequest->approvedBy)->name]] as [$from, $to, $title, $name]) {
-            $sheet->mergeCells($from . $rowNo . ':' . $to . ($rowNo + 1));
-            $sheet->setCellValue($from . $rowNo, $title . "
-Name: " . ($name ?: ''));
-            $sheet->getStyle($from . $rowNo . ':' . $to . ($rowNo + 1))->applyFromArray([
-                'font' => ['bold' => true, 'size' => 9],
-                'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP, 'wrapText' => true],
-                'borders' => ['top' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF111827']]],
+        $rowNo += 4;
+        $signatureBlocks = [
+            ['A', 'C', 'Prepared By'],
+            ['E', 'G', 'Checked By'],
+            ['I', 'K', 'Approved By'],
+        ];
+
+        foreach ($signatureBlocks as [$from, $to, $title]) {
+            $sheet->mergeCells($from . $rowNo . ':' . $to . $rowNo);
+            $sheet->mergeCells($from . ($rowNo + 2) . ':' . $to . ($rowNo + 2));
+            $sheet->setCellValue($from . $rowNo, $title);
+            $sheet->setCellValue($from . ($rowNo + 2), 'Signature & Date');
+            $sheet->getStyle($from . $rowNo . ':' . $to . ($rowNo + 3))->getFont()->getColor()->setARGB('FF000B6F');
+            $sheet->getStyle($from . $rowNo . ':' . $to . $rowNo)->getFont()->setBold(true);
+            $sheet->getStyle($from . ($rowNo + 3) . ':' . $to . ($rowNo + 3))->applyFromArray([
+                'borders' => ['bottom' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF000B6F']]],
             ]);
         }
 
-        $rowNo += 3;
-        $sheet->mergeCells('A' . $rowNo . ':G' . ($rowNo + 2));
-        $sheet->mergeCells('H' . $rowNo . ':L' . ($rowNo + 2));
-        $sheet->setCellValue('A' . $rowNo, "Buyer nominated supplier.
-No excess quantity has been booked.");
-        $sheet->setCellValue('H' . $rowNo, "OCR Checked: ☐ Yes   ☐ No
-Nominated Supplier: ☐ Yes   ☐ No
-Checker Name: __________________   Date: __________________");
-        $sheet->getStyle('A' . $rowNo . ':L' . ($rowNo + 2))->getAlignment()->setWrapText(true);
-
-        $columnWidths = ['A' => 19, 'B' => 15, 'C' => 13, 'D' => 15, 'E' => 18, 'F' => 12, 'G' => 18, 'H' => 14, 'I' => 15, 'J' => 15, 'K' => 16, 'L' => 13];
+        $columnWidths = ['A' => 20, 'B' => 16, 'C' => 14, 'D' => 16, 'E' => 18, 'F' => 19, 'G' => 14, 'H' => 16, 'I' => 16, 'J' => 14, 'K' => 15];
         foreach ($columnWidths as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
+        }
+
+        foreach (range(1, $rowNo + 4) as $row) {
+            $sheet->getRowDimension($row)->setRowHeight($row === $tableStart ? 26 : 22);
         }
 
         $sheet->getPageMargins()->setTop(0.25);
@@ -644,7 +819,7 @@ Checker Name: __________________   Date: __________________");
         $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
         $sheet->getPageSetup()->setFitToWidth(1);
         $sheet->getPageSetup()->setFitToHeight(0);
-        $sheet->freezePane('A9');
+        $sheet->freezePane('A12');
 
         $tmp = tempnam(sys_get_temp_dir(), 'payment_request_');
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);

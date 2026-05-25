@@ -1,5 +1,45 @@
 @extends('layouts.app')
 
+@section('styles')
+<style>
+    .payment-request-table-wrap { overflow: visible; }
+    .payment-request-table { width: 100%; table-layout: fixed; min-width: 0; }
+    .payment-request-table th,
+    .payment-request-table td {
+        line-height: 1.18;
+        padding: .48rem .32rem;
+        vertical-align: middle;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .payment-request-table thead th {
+        white-space: nowrap;
+        font-size: .58rem;
+        letter-spacing: .015em;
+        text-transform: uppercase;
+        color: #1c2d5a;
+    }
+    .payment-request-table tbody td {
+        white-space: nowrap;
+        font-size: .68rem;
+    }
+    .payment-request-table .payment-code { font-size: .62rem; }
+    .payment-request-table .comments-cell { max-width: 1px; }
+    .payment-request-table .row-create-btn {
+        font-size: .62rem;
+        padding: .25rem .42rem;
+        white-space: nowrap;
+    }
+    @media (max-width: 1199.98px) {
+        .payment-request-table thead th { font-size: .52rem; letter-spacing: 0; }
+        .payment-request-table tbody td { font-size: .62rem; }
+        .payment-request-table th, .payment-request-table td { padding: .38rem .22rem; }
+        .payment-request-table .payment-code { font-size: .56rem; }
+        .payment-request-table .row-create-btn { font-size: .55rem; padding: .22rem .32rem; }
+    }
+</style>
+@endsection
+
 @section('content')
 @php
     $filterOptions = $filterOptions ?? [];
@@ -110,83 +150,97 @@
         </div>
     </div>
 
-    <form method="POST" action="{{ route('supply_chain.payment_requests.store') }}">
-        @csrf
-        <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4" id="pending-pi-payment">
-            <div class="card-header bg-white border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-                <div>
-                    <h6 class="fw-bold mb-0">Pending PI Payment</h6>
-                    <div class="small text-muted">Reference approval table follow করে row select করুন।</div>
-                </div>
-                <button type="submit" class="btn btn-success rounded-pill"><i class="bi bi-file-earmark-plus me-1"></i> Create Payment Request Approval</button>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0 small">
-                    <thead class="table-light text-nowrap">
-                        <tr>
-                            <th><input type="checkbox" class="form-check-input" id="selectAllPaymentRows"></th>
-                            <th>Vendor Name</th>
-                            <th>Style Name</th>
-                            <th>Contract Shipment</th>
-                            <th>Committed Ex Mill</th>
-                            <th>Payment Term</th>
-                            <th>Material PO Number</th>
-                            <th>Material PI Number</th>
-                            <th>Material Type</th>
-                            <th>Payment Status</th>
-                            <th>PCD Required</th>
-                            <th class="text-end">Sum of PI Amount</th>
-                            <th class="text-end">Budget</th>
-                            <th class="text-end">Savings</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($pendingRows as $row)
-                            <tr>
-                                <td><input type="checkbox" name="booking_po_ids[]" value="{{ $row['booking_po_id'] }}" class="form-check-input payment-row-check"></td>
-                                <td>
-                                    <div class="fw-semibold">{{ $row['supplier_name'] ?: '-' }}</div>
-                                    <div class="text-muted small">{{ $row['buyer_name'] ?: '-' }} · {{ $row['season_name'] ?: '-' }}</div>
-                                </td>
-                                <td>{{ $row['style_name'] ?: '-' }}</td>
-                                <td>{{ $row['contract_shipment'] ?: '-' }}</td>
-                                <td>{{ $row['committed_ex_mill'] ?: '-' }}</td>
-                                <td>{{ $row['payment_term'] ?: '-' }}</td>
-                                <td class="fw-bold text-nowrap">{{ $row['po_no'] ?: '-' }}</td>
-                                <td class="fw-bold text-nowrap">{{ $row['pi_number'] ?: '-' }}</td>
-                                <td>{{ $row['material_type'] ?: '-' }}</td>
-                                <td><span class="badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle">{{ $row['payment_status'] ?: '-' }}</span></td>
-                                <td>{{ $row['pcd_required'] ?: '-' }}</td>
-                                <td class="text-end fw-bold">{{ number_format((float) ($row['pi_amount'] ?? 0), 2) }}</td>
-                                <td class="text-end">{{ number_format((float) ($row['budget'] ?? 0), 2) }}</td>
-                                <td class="text-end">{{ number_format((float) ($row['savings'] ?? 0), 2) }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="14" class="text-center py-5 text-muted">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                    No PI received payment pending rows found. PI Number / Payment Status / Payment Doc No headers check করুন।
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                    @if($pendingRows->count())
-                        <tfoot class="table-light">
-                            <tr>
-                                <th colspan="11" class="text-end">Grand Total</th>
-                                <th class="text-end">{{ number_format((float) ($kpis['total_pi_amount'] ?? 0), 2) }}</th>
-                                <th class="text-end">{{ number_format((float) ($kpis['total_budget'] ?? 0), 2) }}</th>
-                                <th class="text-end">{{ number_format((float) ($kpis['total_savings'] ?? 0), 2) }}</th>
-                            </tr>
-                        </tfoot>
-                    @endif
-                </table>
-            </div>
-            <div class="card-footer bg-white border-0">
-                {{ $pendingRows->links() }}
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4" id="pending-pi-payment">
+        <div class="card-header bg-white border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h6 class="fw-bold mb-0">Pending PI Payment</h6>
+                <div class="small text-muted">প্রতি row-এর Action থেকে Create করলে সেই PO-এর eligible সব style/item নিয়ে একটাই Payment Request Approval form হবে।</div>
             </div>
         </div>
-    </form>
+        <div class="payment-request-table-wrap">
+            <table class="table table-hover align-middle mb-0 payment-request-table">
+                <colgroup>
+                    <col style="width:11%">
+                    <col style="width:7%">
+                    <col style="width:7%">
+                    <col style="width:8%">
+                    <col style="width:10%">
+                    <col style="width:10%">
+                    <col style="width:7%">
+                    <col style="width:8%">
+                    <col style="width:8%">
+                    <col style="width:7%">
+                    <col style="width:9%">
+                    <col style="width:8%">
+                </colgroup>
+                <thead class="table-light">
+                    <tr>
+                        <th title="Vendor Name">Vendor</th>
+                        <th title="Style">Style</th>
+                        <th title="PCD Required">PCD Req.</th>
+                        <th title="Payment Term">Pay Term</th>
+                        <th title="Material PO Number">PO No.</th>
+                        <th title="Material PI Number">PI No.</th>
+                        <th title="Material Type">Mat Type</th>
+                        <th title="Contract Shipment">Cont. Ship</th>
+                        <th title="Committed Ex Mill">Ex Mill</th>
+                        <th title="Comments">Comments</th>
+                        <th class="text-end" title="PI Amount (USD)">PI Amt USD</th>
+                        <th class="text-end" title="Action">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($pendingRows as $row)
+                        <tr>
+                            <td title="{{ $row['supplier_name'] ?: '-' }}">
+                                <div class="fw-semibold text-truncate">{{ $row['supplier_name'] ?: '-' }}</div>
+                                <div class="text-muted small text-truncate" title="{{ ($row['buyer_name'] ?: '-') . ' · ' . ($row['season_name'] ?: '-') }}">{{ $row['buyer_name'] ?: '-' }} · {{ $row['season_name'] ?: '-' }}</div>
+                            </td>
+                            <td title="{{ $row['style_name'] ?: '-' }}">{{ $row['style_name'] ?: '-' }}</td>
+                            <td title="{{ $row['pcd_required'] ?: '-' }}">{{ $row['pcd_required'] ?: '-' }}</td>
+                            <td title="{{ $row['payment_term'] ?: '-' }}">{{ $row['payment_term'] ?: '-' }}</td>
+                            <td class="fw-bold payment-code" title="{{ $row['po_no'] ?: '-' }}">{{ $row['po_no'] ?: '-' }}</td>
+                            <td class="fw-bold payment-code" title="{{ $row['pi_number'] ?: '-' }}">{{ $row['pi_number'] ?: '-' }}</td>
+                            <td title="{{ $row['material_type'] ?: '-' }}">{{ $row['material_type'] ?: '-' }}</td>
+                            <td title="{{ $row['contract_shipment'] ?: '-' }}">{{ $row['contract_shipment'] ?: '-' }}</td>
+                            <td title="{{ $row['committed_ex_mill'] ?: '-' }}">{{ $row['committed_ex_mill'] ?: '-' }}</td>
+                            <td class="comments-cell" title="{{ $row['remarks'] ?: '(blank)' }}">{{ $row['remarks'] ?: '(blank)' }}</td>
+                            <td class="text-end fw-bold" title="{{ number_format((float) ($row['pi_amount'] ?? 0), 2) }}">{{ number_format((float) ($row['pi_amount'] ?? 0), 2) }}</td>
+                            <td class="text-end">
+                                <form method="POST" action="{{ route('supply_chain.payment_requests.store') }}" class="m-0 d-inline-block">
+                                    @csrf
+                                    <input type="hidden" name="booking_po_ids[]" value="{{ $row['booking_po_id'] }}">
+                                    <button type="submit" class="btn btn-sm btn-success rounded-pill row-create-btn" title="Create payment request approval for this PO">
+                                        <i class="bi bi-file-earmark-plus"></i>
+                                        <span class="d-none d-xl-inline">Create</span>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="12" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                No PI received payment pending rows found. PI Number / Payment Status / Payment Doc No headers check করুন।
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+                @if($pendingRows->count())
+                    <tfoot class="table-light">
+                        <tr>
+                            <th colspan="10" class="text-end">Grand Total</th>
+                            <th class="text-end">{{ number_format((float) ($kpis['total_pi_amount'] ?? 0), 2) }}</th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                @endif
+            </table>
+        </div>
+        <div class="card-footer bg-white border-0">
+            {{ $pendingRows->links() }}
+        </div>
+    </div>
 
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden" id="payment-request-list">
         <div class="card-header bg-white border-0 py-3">
@@ -235,16 +289,4 @@
         </div>
     </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const selectAll = document.getElementById('selectAllPaymentRows');
-    const checks = document.querySelectorAll('.payment-row-check');
-    if (selectAll) {
-        selectAll.addEventListener('change', function () {
-            checks.forEach((check) => check.checked = selectAll.checked);
-        });
-    }
-});
-</script>
 @endsection

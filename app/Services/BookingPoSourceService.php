@@ -142,6 +142,9 @@ class BookingPoSourceService
         $committedEta = $this->dateValue($this->sourceValueForBookingPo($bookingPo, 'committed_eta'));
         $paymentStatus = $this->bookingPoPaymentStatus($bookingPo);
         $piNumber = $this->sourceValueForBookingPo($bookingPo, 'pi_number');
+        $comments = $this->sourceValueForBookingPo($bookingPo, 'comments')
+            ?: $this->sourceValueForBookingPo($bookingPo, 'remarks')
+            ?: $bookingPo->remarks;
 
         $shipmentMonth = $this->sourceValueForBookingPo($bookingPo, 'shipment_month');
         if ($this->isBlankValue($shipmentMonth)) {
@@ -183,7 +186,8 @@ class BookingPoSourceService
             'payment_required_date' => $this->formatDate($paymentRequiredDate),
             'payment_status' => $paymentStatus,
             'payment_doc_no' => $this->sourceValueForBookingPo($bookingPo, 'pmt_doc_no'),
-            'remarks' => $this->sourceValueForBookingPo($bookingPo, 'remarks') ?: $bookingPo->remarks,
+            'comments' => $comments,
+            'remarks' => $comments,
             'generated_at' => optional($bookingPo->generated_at)->format('Y-m-d H:i:s'),
             'created_by_name' => optional($bookingPo->generatedBy)->name,
         ];
@@ -516,6 +520,7 @@ class BookingPoSourceService
             'committed_ex_mill' => str_contains($header, 'committed_ex_mill') || str_contains($header, 'committed_x_fty') || str_contains($header, 'committed_ex_fty') || str_contains($header, 'committed_exmill'),
             'budget' => str_contains($header, 'budget'),
             'savings' => str_contains($header, 'saving'),
+            'comments' => $header === 'comments' || str_contains($header, 'comments'),
             'remarks' => str_contains($header, 'remarks') || str_contains($header, 'comments'),
             default => false,
         };
@@ -557,6 +562,7 @@ class BookingPoSourceService
             'committed_ex_mill' => ['committed_ex_mill', 'committed_x_fty_date', 'committed_ex_fty_date', 'committed_x_fty', 'committed_ex_fty', 'Committed Ex Mill', 'Committed Ex-Mill'],
             'budget' => ['budget', 'Budget'],
             'savings' => ['savings', 'saving', 'Savings'],
+            'comments' => ['comments', 'Comments'],
             'remarks' => ['remarks', 'comments', 'merchant_remarks', 'supply_chain_remarks', 'Supply Chain Remarks', 'Comments'],
             default => [],
         };

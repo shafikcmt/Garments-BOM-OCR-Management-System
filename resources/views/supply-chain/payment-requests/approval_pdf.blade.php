@@ -3,110 +3,100 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @page { size: A4 landscape; margin: 10px 14px; }
+        @page { size: A4 landscape; margin: 12px 14px; }
         * { box-sizing: border-box; }
-        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8.2px; color: #111827; margin: 0; }
+        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; color: #000b6f; margin: 0; }
         table { width: 100%; border-collapse: collapse; }
-        .accent { height: 4px; background: #1d4ed8; margin-bottom: 8px; }
-        .no-border td { border: 0; }
-        .top td { vertical-align: middle; border: 0; padding: 0 4px 5px; }
-        .logo { height: 48px; max-width: 180px; object-fit: contain; }
-        .title { text-align: center; font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: .02em; }
-        .req { text-align: center; font-size: 9px; font-weight: 700; color: #1d4ed8; padding-top: 1px; }
-        .meta { text-align: right; font-size: 8.5px; line-height: 1.35; font-weight: 700; }
-        .buyer-line td { border-top: 1px solid #dbe3ee; border-bottom: 1px solid #dbe3ee; background:#f8fafc; padding: 4px 5px; font-size: 9.3px; font-weight: 800; }
-        .buyer-line .center { text-align: center; }
-        .buyer-line .right { text-align: right; }
-        .filter-table { margin: 7px 0 7px; }
-        .filter-table td { border: 1px solid #b8c2cc; padding: 3px 5px; vertical-align: top; }
-        .filter-label { background: #e5e7eb; color: #111827; font-weight: 800; font-size: 7.5px; text-transform: uppercase; letter-spacing: .02em; }
-        .filter-value { min-height: 16px; background: #fff; font-size: 7.6px; }
-        .report { table-layout: fixed; }
-        .report th { background: #1f2937; color:#fff; border: 1px solid #4b5563; padding: 3px 2px; font-size: 6.8px; font-weight: 800; text-align: left; line-height:1.1; text-transform:uppercase; }
-        .report td { border: 1px solid #d1d5db; padding: 3px 2px; font-size: 7px; line-height: 1.15; vertical-align: top; word-break: break-word; }
-        .report tbody tr:nth-child(even) td { background: #f8fafc; }
-        .right { text-align: right; }
-        .center { text-align: center; }
-        .grand td { background: #eef2f7 !important; border-top: 2px solid #6b7280; font-weight: 800; }
-        .sign { margin-top: 30px; }
-        .sign td { border: 0; width: 33.33%; padding: 0 18px 0 0; vertical-align: bottom; }
-        .line { border-top: 1px solid #111827; padding-top: 4px; font-weight: 800; }
-        .name { color: #4b5563; padding-top: 4px; font-size: 7.8px; }
-        .bottom { margin-top: 12px; }
-        .bottom td { border: 0; vertical-align: top; }
-        .note { font-size: 11.5px; line-height: 1.45; padding-top: 2px; }
-        .check { color: #1d4ed8; font-size: 9px; line-height: 1.55; }
-        .box { display: inline-block; width: 10px; height: 10px; border: 1px solid #2563eb; margin: 0 3px 0 8px; vertical-align: middle; }
-        .w-vendor { width: 11%; } .w-style { width: 8%; } .w-date { width: 8%; } .w-term { width: 10%; }
-        .w-po { width: 11%; } .w-season { width: 6%; } .w-pi { width: 11%; } .w-type { width: 8%; }
-        .w-status { width: 9%; } .w-amount { width: 9%; }
+        .top td { border: 0; vertical-align: top; padding: 0; }
+        .logo-text { font-size: 25px; letter-spacing: .09em; font-weight: 600; line-height: .95; }
+        .logo-small { font-size: 7px; letter-spacing: .06em; font-weight: 700; padding-left: 48px; }
+        .company { font-size: 8.5px; letter-spacing: .08em; font-weight: 700; margin-top: 10px; }
+        .logo-img { height: 50px; max-width: 160px; object-fit: contain; }
+        .title { text-align: center; font-size: 25px; font-weight: 800; line-height: 1; letter-spacing: .02em; }
+        .request-no { text-align: center; font-size: 10.5px; margin-top: 6px; letter-spacing: .04em; }
+        .date-area { text-align: right; font-size: 9px; font-weight: 700; line-height: 1.5; }
+        .date-box { display: inline-block; min-width: 30px; height: 23px; line-height: 21px; text-align: center; border: 1px solid #8da0d8; border-radius: 3px; margin: 0 4px; font-weight: 800; }
+        .date-box.year { min-width: 44px; }
+        .info td { border: 0; vertical-align: top; padding: 12px 0 8px; }
+        .buyer { font-size: 9px; line-height: 2.2; font-weight: 700; }
+        .note { font-size: 8.5px; line-height: 1.45; font-weight: 700; padding-top: 8px; }
+        .check { border: 1px solid #4a5cb2; border-radius: 3px; min-height: 78px; padding: 11px 12px; font-size: 8.5px; line-height: 1.75; }
+        .mini-box { display: inline-block; width: 11px; height: 11px; border: 1px solid #91a1d0; vertical-align: middle; margin: 0 5px 0 13px; }
+        .line { display: inline-block; border-bottom: 1px solid #4a5cb2; width: 132px; height: 10px; }
+        .total { text-align: right; font-size: 12px; font-weight: 800; margin: 4px 0 7px; }
+        .report { table-layout: fixed; color: #111827; }
+        .report th { background:#000b6f; color:#fff; border:1px solid #33439e; padding: 7px 3px; font-size: 6.9px; line-height:1.1; font-weight:800; text-align:center; vertical-align:middle; }
+        .report td { border:1px solid #e2e6ef; padding: 6px 4px; font-size: 7.5px; line-height:1.15; vertical-align:middle; word-break: break-word; }
+        .center { text-align:center; } .right { text-align:right; }
+        .grand td { background:#eaf0fb !important; color:#000b6f; font-size: 10px; font-weight:800; padding: 8px 5px; }
+        .sign { margin-top: 34px; color:#000b6f; }
+        .sign td { border:0; width:33.33%; padding:0 22px; vertical-align:bottom; }
+        .sign td + td { border-left:1px solid #8d9bd3; }
+        .sign-title { font-size:9px; font-weight:800; margin-bottom:25px; }
+        .sign-text { font-size:9px; margin-bottom:25px; }
+        .sign-line { border-bottom:1px solid #000b6f; height:1px; }
+        .w-vendor { width: 12%; } .w-style { width: 10%; } .w-date { width: 9.5%; } .w-term { width: 10%; }
+        .w-po { width: 11%; } .w-pi { width: 12%; } .w-type { width: 9%; } .w-comments { width: 8%; } .w-amount { width: 9%; }
     </style>
 </head>
 <body>
 @php
+    $approvalRows = collect($approvalRows ?? []);
     $list = fn ($values, $fallback = '-') => collect($values ?? [])->map(fn ($v) => trim((string) $v))->filter()->take(5)->implode(', ') ?: $fallback;
     $money = fn ($value) => number_format((float) $value, 2);
-    $paymentRequired = $summary['earliest_payment_required_date'] ? optional($summary['earliest_payment_required_date'])->format('jS M-Y') : '-';
+    $paymentRequiredDate = $summary['earliest_payment_required_date'] ?? null;
+    $paymentRequiredParts = $paymentRequiredDate
+        ? [optional($paymentRequiredDate)->format('d'), optional($paymentRequiredDate)->format('m'), optional($paymentRequiredDate)->format('Y')]
+        : ['--', '--', '----'];
     $logoPath = public_path('images/humana-logo.png');
-    $logoData = null;
-    if (file_exists($logoPath)) {
-        $logoData = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
-        if (function_exists('imagecreatefrompng') && function_exists('imagecrop')) {
-            $src = @imagecreatefrompng($logoPath);
-            if ($src) {
-                $w = imagesx($src); $h = imagesy($src);
-                $crop = @imagecrop($src, ['x' => 0, 'y' => max(0, (int) ($h * .22)), 'width' => $w, 'height' => min($h, (int) ($h * .58))]);
-                if ($crop) {
-                    imagesavealpha($crop, true);
-                    ob_start(); imagepng($crop); $png = ob_get_clean();
-                    $logoData = 'data:image/png;base64,' . base64_encode($png);
-                    imagedestroy($crop);
-                }
-                imagedestroy($src);
-            }
-        }
-    }
-    $filters = [
-        'Final Status' => $list($summary['final_statuses'] ?? []),
-        'Vendor Type' => $list($summary['vendor_types'] ?? []),
-        'Payment Term' => $list($summary['payment_terms'] ?? []),
-        'Payment Status' => $list($summary['payment_statuses'] ?? []),
-        'Vendor Name' => $list($summary['suppliers'] ?? [], $paymentRequest->supplier_name ?: '-'),
-    ];
+    $logoData = file_exists($logoPath) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath)) : null;
 @endphp
-<div class="accent"></div>
 <table class="top">
     <tr>
-        <td style="width:24%;">@if($logoData)<img src="{{ $logoData }}" class="logo" alt="Logo">@endif</td>
-        <td style="width:46%;">
+        <td style="width:25%;">
+            @if($logoData)
+                <img src="{{ $logoData }}" class="logo-img" alt="Humana">
+            @else
+                <div class="logo-text">HUMANA</div>
+                <div class="logo-small">APPARELS PVT. LTD.</div>
+            @endif
+            <div class="company">HUMANA APPARELS PVT. LTD.</div>
+        </td>
+        <td style="width:50%; padding-top:2px;">
             <div class="title">Payment Request Approval</div>
-            <div class="req">{{ $paymentRequest->request_no }}</div>
+            <div class="request-no">{{ $paymentRequest->request_no }}</div>
         </td>
-        <td style="width:30%;" class="meta">
-            Date: {{ optional($paymentRequest->created_at)->format('jS M-Y') }}<br>
-            Payment Require Date: {{ $paymentRequired }}
+        <td style="width:25%;" class="date-area">
+            Date:&nbsp;&nbsp; {{ optional($paymentRequest->created_at)->format('jS M-Y') }}<br><br>
+            Payment Require Date:
+            <span class="date-box">{{ $paymentRequiredParts[0] }}</span> /
+            <span class="date-box">{{ $paymentRequiredParts[1] }}</span> /
+            <span class="date-box year">{{ $paymentRequiredParts[2] }}</span>
         </td>
     </tr>
 </table>
-<table class="buyer-line">
+
+<table class="info">
     <tr>
-        <td style="width:33%;">Buyer: {{ $list($summary['buyers'] ?? [], $paymentRequest->buyer_name ?: '-') }}</td>
-        <td style="width:34%;" class="center">Season: {{ $list($summary['seasons'] ?? [], $paymentRequest->season_name ?: '-') }}</td>
-        <td style="width:33%;" class="right">Total PI Amount: ${{ $money($summary['total_pi_amount'] ?? 0) }}</td>
+        <td style="width:65%;">
+            <div class="buyer">
+                Buyer&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: &nbsp;{{ $list($summary['buyers'] ?? [], $paymentRequest->buyer_name ?: '-') }}<br>
+                Season&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: &nbsp;{{ $list($summary['seasons'] ?? [], $paymentRequest->season_name ?: '-') }}
+            </div>
+            <div class="note">* Buyer nominated supplier.<br>&nbsp;&nbsp;No excess quantity has been booked.</div>
+        </td>
+        <td style="width:35%;">
+            <div class="check">
+                <strong>OCR Checked:</strong> <span class="mini-box"></span> Yes <span class="mini-box"></span> No<br>
+                Checker Name&nbsp;&nbsp;&nbsp;&nbsp;: <span class="line"></span><br>
+                Date&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <span class="line"></span>
+            </div>
+        </td>
     </tr>
 </table>
-<table class="filter-table">
-    <tr>
-        @foreach($filters as $label => $value)
-            <td class="filter-label">{{ $label }}</td>
-        @endforeach
-    </tr>
-    <tr>
-        @foreach($filters as $label => $value)
-            <td class="filter-value">{{ $value ?: '-' }}</td>
-        @endforeach
-    </tr>
-</table>
+
+<div class="total">Total PI Amount: $ {{ $money($summary['total_pi_amount'] ?? 0) }}</div>
+
 <table class="report">
     <thead>
         <tr>
@@ -115,53 +105,55 @@
             <th class="w-date">PCD Required</th>
             <th class="w-term">Payment Term</th>
             <th class="w-po">Material PO Number</th>
-            <th class="w-season">Season</th>
             <th class="w-pi">Material PI Number</th>
             <th class="w-type">Material Type</th>
-            <th class="w-status">Payment Status</th>
             <th class="w-date">Contract Shipment</th>
             <th class="w-date">Committed Ex Mill</th>
-            <th class="w-amount right">PI Amount</th>
+            <th class="w-comments">Comments</th>
+            <th class="w-amount right">PI Amount (USD)</th>
         </tr>
     </thead>
     <tbody>
-        @foreach($paymentRequest->items as $item)
+        @forelse($approvalRows as $row)
             <tr>
-                <td>{{ $item->supplier_name ?: '-' }}</td>
-                <td>{{ $item->style_name ?: '-' }}</td>
-                <td class="center">{{ data_get($item->data, 'pcd_required') ?: '-' }}</td>
-                <td>{{ $item->payment_term ?: '-' }}</td>
-                <td>{{ $item->po_no ?: '-' }}</td>
-                <td>{{ $item->season_name ?: '-' }}</td>
-                <td>{{ $item->pi_number ?: '-' }}</td>
-                <td>{{ data_get($item->data, 'material_type') ?: '-' }}</td>
-                <td>{{ $item->payment_status ?: '-' }}</td>
-                <td class="center">{{ data_get($item->data, 'contract_shipment') ?: '-' }}</td>
-                <td class="center">{{ data_get($item->data, 'committed_ex_mill') ?: '-' }}</td>
-                <td class="right">${{ $money($item->pi_amount) }}</td>
+                <td>{{ $row['vendor_name'] ?: '-' }}</td>
+                <td>{{ $row['style'] ?: '-' }}</td>
+                <td class="center">{{ $row['pcd_required'] ?: '-' }}</td>
+                <td>{{ $row['payment_term'] ?: '-' }}</td>
+                <td>{{ $row['material_po_number'] ?: '-' }}</td>
+                <td>{{ $row['material_pi_number'] ?: '-' }}</td>
+                <td>{{ $row['material_type'] ?: '-' }}</td>
+                <td class="center">{{ $row['contract_shipment'] ?: '-' }}</td>
+                <td class="center">{{ $row['committed_ex_mill'] ?: '-' }}</td>
+                <td>{{ $row['comments'] ?: '(blank)' }}</td>
+                <td class="right">${{ $money($row['pi_amount'] ?? 0) }}</td>
             </tr>
-        @endforeach
+        @empty
+            <tr><td colspan="11" class="center">No payment request item found.</td></tr>
+        @endforelse
         <tr class="grand">
-            <td colspan="11">Grand Total</td>
+            <td colspan="10">Grand Total</td>
             <td class="right">${{ $money($summary['total_pi_amount'] ?? 0) }}</td>
         </tr>
     </tbody>
 </table>
+
 <table class="sign">
     <tr>
-        <td><div class="line">Prepared By</div><div class="name">Name: {{ optional($paymentRequest->createdBy)->name ?: '' }}</div></td>
-        <td><div class="line">Checked By</div><div class="name">Name: {{ optional($paymentRequest->checkedBy)->name ?: '' }}</div></td>
-        <td style="padding-right:0;"><div class="line">Approved By</div><div class="name">Name: {{ optional($paymentRequest->approvedBy)->name ?: '' }}</div></td>
-    </tr>
-</table>
-<table class="bottom">
-    <tr>
-        <td style="width:58%;" class="note">Buyer nominated supplier.<br>No excess quantity has been booked.</td>
-        <td style="width:42%;" class="check">
-            OCR Checked <span class="box"></span>Yes <span class="box"></span>No<br>
-            Nominated Supplier <span class="box"></span>Yes <span class="box"></span>No<br>
-            Checker Name : ___________________________<br>
-            Date&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ___________________________
+        <td style="padding-left:0;">
+            <div class="sign-title">Prepared By</div>
+            <div class="sign-text">Signature &amp; Date</div>
+            <div class="sign-line"></div>
+        </td>
+        <td>
+            <div class="sign-title">Checked By</div>
+            <div class="sign-text">Signature &amp; Date</div>
+            <div class="sign-line"></div>
+        </td>
+        <td style="padding-right:0;">
+            <div class="sign-title">Approved By</div>
+            <div class="sign-text">Signature &amp; Date</div>
+            <div class="sign-line"></div>
         </td>
     </tr>
 </table>
