@@ -154,7 +154,7 @@
         <div class="card-header bg-white border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h6 class="fw-bold mb-0">Pending PI Payment</h6>
-                <div class="small text-muted">প্রতি row-এর Action থেকে Create করলে সেই PO-এর eligible সব style/item নিয়ে একটাই Payment Request Approval form হবে।</div>
+                <div class="small text-muted">প্রতি row-এর Action থেকে আগে Preview দেখাবে, check করার পর Create করলে সেই PO-এর eligible সব style/item নিয়ে একটাই Payment Request Approval form হবে।</div>
             </div>
         </div>
         <div class="payment-request-table-wrap">
@@ -207,12 +207,11 @@
                             <td class="comments-cell" title="{{ $row['remarks'] ?: '(blank)' }}">{{ $row['remarks'] ?: '(blank)' }}</td>
                             <td class="text-end fw-bold" title="{{ number_format((float) ($row['pi_amount'] ?? 0), 2) }}">{{ number_format((float) ($row['pi_amount'] ?? 0), 2) }}</td>
                             <td class="text-end">
-                                <form method="POST" action="{{ route('supply_chain.payment_requests.store') }}" class="m-0 d-inline-block">
-                                    @csrf
+                                <form method="GET" action="{{ route('supply_chain.payment_requests.preview') }}" class="m-0 d-inline-block">
                                     <input type="hidden" name="booking_po_ids[]" value="{{ $row['booking_po_id'] }}">
-                                    <button type="submit" class="btn btn-sm btn-success rounded-pill row-create-btn" title="Create payment request approval for this PO">
-                                        <i class="bi bi-file-earmark-plus"></i>
-                                        <span class="d-none d-xl-inline">Create</span>
+                                    <button type="submit" class="btn btn-sm btn-primary rounded-pill row-create-btn" title="Preview payment request approval for this PO">
+                                        <i class="bi bi-eye"></i>
+                                        <span class="d-none d-xl-inline">Preview</span>
                                     </button>
                                 </form>
                             </td>

@@ -38,6 +38,56 @@ class PaymentRequestController extends Controller
         return $this->index($request);
     }
 
+    public function preview(Request $request)
+    {
+        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+
+        $validated = $request->validate([
+            'booking_po_ids' => ['required', 'array', 'min:1'],
+            'booking_po_ids.*' => ['integer', 'exists:booking_pos,id'],
+            'payment_required_date' => ['nullable', 'date'],
+        ]);
+
+        $selectedIds = collect($validated['booking_po_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $paymentRequiredInput = $validated['payment_required_date'] ?? now()->addDays(7)->toDateString();
+        $snapshots = $this->snapshotsForSelectedBookingPos($selectedIds)
+            ->map(fn (array $snapshot) => array_replace($snapshot, [
+                'payment_required_date' => $paymentRequiredInput,
+            ]))
+            ->values();
+
+        if ($snapshots->isEmpty()) {
+            return redirect()
+                ->route('supply_chain.payment_requests.index')
+                ->with('warning', 'No eligible PI received / payment pending row was selected. Please check PI Number, PI Status and Payment Status.');
+        }
+
+        $paymentRequest = new PaymentRequest([
+            'request_no' => 'PREVIEW-' . now()->format('Ymd'),
+            'supplier_name' => $this->uniqueText($snapshots, 'supplier_name'),
+            'buyer_name' => $this->uniqueText($snapshots, 'buyer_name'),
+            'season_name' => $this->uniqueText($snapshots, 'season_name'),
+            'total_pi_amount' => $snapshots->sum(fn (array $row) => (float) ($row['pi_amount'] ?? 0)),
+            'status' => 'preview',
+            'created_by' => auth()->id(),
+            'data' => [
+                'source' => 'supply_chain_payment_request_preview',
+            ],
+        ]);
+        $paymentRequest->created_at = now();
+
+        $approvalRows = $this->approvalRowsFromSnapshots($snapshots);
+        $summary = $this->summaryFromApprovalRows($approvalRows);
+        $isPreview = true;
+        $bookingPoIds = $selectedIds->all();
+
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput'));
+    }
+
     public function store(Request $request)
     {
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
@@ -45,6 +95,7 @@ class PaymentRequestController extends Controller
         $validated = $request->validate([
             'booking_po_ids' => ['required', 'array', 'min:1'],
             'booking_po_ids.*' => ['integer', 'exists:booking_pos,id'],
+            'payment_required_date' => ['nullable', 'date'],
             'remarks' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -53,36 +104,18 @@ class PaymentRequestController extends Controller
             ->unique()
             ->values();
 
-        $selectedPoNumbers = BookingPo::query()
-            ->whereIn('id', $selectedIds)
-            ->pluck('po_no')
-            ->map(fn ($value) => trim((string) $value))
-            ->filter()
-            ->unique(fn ($value) => Str::lower($value))
-            ->values();
-
-        $bookingPos = BookingPo::query()
-            ->with(['excelFile.uploader', 'excelRow.cells.header', 'generatedBy'])
-            ->where(function ($query) use ($selectedIds, $selectedPoNumbers) {
-                $query->whereIn('id', $selectedIds);
-
-                if ($selectedPoNumbers->isNotEmpty()) {
-                    $query->orWhereIn('po_no', $selectedPoNumbers);
-                }
-            })
-            ->whereNotNull('generated_at')
-            ->get();
-
-        $snapshots = $bookingPos
-            ->map(fn (BookingPo $bookingPo) => $this->sourceService->paymentSnapshot($bookingPo))
-            ->filter(fn (array $row) => (bool) ($row['eligible_for_payment_request'] ?? false))
+        $paymentRequiredDate = $validated['payment_required_date'] ?? now()->addDays(7)->toDateString();
+        $snapshots = $this->snapshotsForSelectedBookingPos($selectedIds)
+            ->map(fn (array $snapshot) => array_replace($snapshot, [
+                'payment_required_date' => $paymentRequiredDate,
+            ]))
             ->values();
 
         if ($snapshots->isEmpty()) {
             return back()->with('warning', 'No eligible PI received / payment pending row was selected. Please check PI Number, PI Status and Payment Status.');
         }
 
-        $paymentRequest = DB::transaction(function () use ($snapshots, $validated) {
+        $paymentRequest = DB::transaction(function () use ($snapshots, $validated, $paymentRequiredDate) {
             $paymentRequest = PaymentRequest::create([
                 'request_no' => $this->nextRequestNo(),
                 'supplier_name' => $this->uniqueText($snapshots, 'supplier_name'),
@@ -97,6 +130,7 @@ class PaymentRequestController extends Controller
                     'po_numbers' => $snapshots->pluck('po_no')->filter()->unique()->values()->all(),
                     'approval_filters' => $this->approvalFiltersFromSnapshots($snapshots),
                     'payment_status_summary' => $snapshots->countBy('payment_status')->all(),
+                    'payment_required_date' => $paymentRequiredDate,
                     'source' => 'supply_chain_payment_request',
                 ],
             ]);
@@ -198,6 +232,37 @@ class PaymentRequestController extends Controller
             ->header('Content-Disposition', 'attachment; filename="' . $fileName . '.xls"')
             ->header('Pragma', 'no-cache')
             ->header('Expires', '0');
+    }
+
+    protected function snapshotsForSelectedBookingPos($selectedIds): \Illuminate\Support\Collection
+    {
+        $selectedIds = collect($selectedIds)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $selectedPoNumbers = BookingPo::query()
+            ->whereIn('id', $selectedIds)
+            ->pluck('po_no')
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique(fn ($value) => Str::lower($value))
+            ->values();
+
+        return BookingPo::query()
+            ->with(['excelFile.uploader', 'excelRow.cells.header', 'generatedBy'])
+            ->where(function ($query) use ($selectedIds, $selectedPoNumbers) {
+                $query->whereIn('id', $selectedIds);
+
+                if ($selectedPoNumbers->isNotEmpty()) {
+                    $query->orWhereIn('po_no', $selectedPoNumbers);
+                }
+            })
+            ->whereNotNull('generated_at')
+            ->get()
+            ->map(fn (BookingPo $bookingPo) => $this->sourceService->paymentSnapshot($bookingPo))
+            ->filter(fn (array $row) => (bool) ($row['eligible_for_payment_request'] ?? false))
+            ->values();
     }
 
     protected function pendingPaymentRows(Request $request): array
@@ -419,6 +484,42 @@ class PaymentRequestController extends Controller
             ->sort()
             ->values()
             ->all();
+    }
+
+    protected function approvalRowsFromSnapshots($snapshots): \Illuminate\Support\Collection
+    {
+        $items = collect($snapshots)->map(function (array $snapshot) {
+            return new PaymentRequestItem([
+                'booking_po_id' => $snapshot['booking_po_id'] ?? null,
+                'excel_file_id' => $snapshot['excel_file_id'] ?? null,
+                'excel_row_id' => $snapshot['excel_row_id'] ?? null,
+                'po_no' => $snapshot['po_no'] ?? null,
+                'pi_number' => $snapshot['pi_number'] ?? null,
+                'pi_status' => $snapshot['pi_status'] ?? null,
+                'pi_rate' => $snapshot['pi_rate'] ?? null,
+                'pi_amount' => $snapshot['pi_amount'] ?? null,
+                'payment_status' => $snapshot['payment_status'] ?? null,
+                'payment_required_date' => $snapshot['payment_required_date'] ?? null,
+                'supplier_name' => $snapshot['supplier_name'] ?? null,
+                'buyer_name' => $snapshot['buyer_name'] ?? null,
+                'season_name' => $snapshot['season_name'] ?? null,
+                'style_name' => $snapshot['style_name'] ?? null,
+                'material_description' => $snapshot['material_description'] ?? null,
+                'sap_code' => $snapshot['sap_code'] ?? null,
+                'material_color' => $snapshot['material_color'] ?? null,
+                'qty' => $snapshot['qty'] ?? null,
+                'delivery_term' => $snapshot['delivery_term'] ?? null,
+                'payment_term' => $snapshot['payment_term'] ?? null,
+                'ship_mode' => $snapshot['ship_mode'] ?? null,
+                'forwarder' => $snapshot['forwarder'] ?? null,
+                'committed_etd' => $snapshot['committed_etd'] ?? null,
+                'committed_eta' => $snapshot['committed_eta'] ?? null,
+                'remarks' => $snapshot['remarks'] ?? null,
+                'data' => $snapshot,
+            ]);
+        });
+
+        return $this->approvalRowsFromItems($items);
     }
 
     protected function approvalRowsFromItems($items): \Illuminate\Support\Collection

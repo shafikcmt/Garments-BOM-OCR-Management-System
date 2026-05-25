@@ -3,12 +3,15 @@
 @section('content')
 @php
     $approvalRows = collect($approvalRows ?? []);
+    $isPreview = (bool) ($isPreview ?? false);
+    $bookingPoIds = collect($bookingPoIds ?? [])->filter()->unique()->values();
     $list = fn ($values, $fallback = '-') => collect($values ?? [])->map(fn ($v) => trim((string) $v))->filter()->take(5)->implode(', ') ?: $fallback;
     $money = fn ($value) => number_format((float) $value, 2);
     $paymentRequiredDate = $summary['earliest_payment_required_date'] ?? null;
     $paymentRequiredParts = $paymentRequiredDate
         ? [optional($paymentRequiredDate)->format('d'), optional($paymentRequiredDate)->format('m'), optional($paymentRequiredDate)->format('Y')]
         : ['--', '--', '----'];
+    $paymentRequiredInput = $paymentRequiredInput ?? ($paymentRequiredDate ? optional($paymentRequiredDate)->format('Y-m-d') : now()->addDays(7)->toDateString());
     $logoPath = public_path('images/humana-logo.png');
     $logoData = null;
     if (file_exists($logoPath)) {
@@ -55,15 +58,46 @@
 
 <div class="pra-wrap py-3">
     <div class="container-fluid">
-        <div class="pra-toolbar d-flex justify-content-between align-items-center gap-2 mb-3">
-            <div>
+        <div class="pra-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div class="d-flex flex-wrap align-items-center gap-2">
                 <a href="{{ route('supply_chain.payment_requests.index') }}" class="btn btn-light border rounded-pill">← Back</a>
+                @if($isPreview)
+                    <span class="badge rounded-pill text-bg-warning px-3 py-2">Preview Mode</span>
+                    <span class="small text-muted">Check করার পর Create Approval চাপুন।</span>
+                @endif
             </div>
-            <div class="d-flex flex-wrap gap-2">
-                <button type="button" onclick="window.print()" class="btn btn-outline-primary rounded-pill">Print</button>
-                <a href="{{ route('supply_chain.payment_requests.download_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-outline-danger rounded-pill">PDF Preview</a>
-                <a href="{{ route('supply_chain.payment_requests.download_excel', $paymentRequest) }}" class="btn btn-success rounded-pill">Excel Download</a>
-            </div>
+
+            @if($isPreview)
+                <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
+                    <form method="GET" action="{{ route('supply_chain.payment_requests.preview') }}" class="d-flex flex-wrap align-items-end gap-2 m-0">
+                        @foreach($bookingPoIds as $bookingPoId)
+                            <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
+                        @endforeach
+                        <div>
+                            <label class="form-label small fw-bold mb-1">Payment Require Date</label>
+                            <input type="date" name="payment_required_date" id="paymentRequiredPreviewDate" value="{{ $paymentRequiredInput }}" class="form-control form-control-sm rounded-3" required>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill px-3">Update Preview</button>
+                    </form>
+
+                    <form method="POST" action="{{ route('supply_chain.payment_requests.store') }}" class="m-0">
+                        @csrf
+                        @foreach($bookingPoIds as $bookingPoId)
+                            <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
+                        @endforeach
+                        <input type="hidden" name="payment_required_date" id="paymentRequiredCreateDate" value="{{ $paymentRequiredInput }}">
+                        <button type="submit" class="btn btn-success rounded-pill px-4">
+                            <i class="bi bi-check2-circle me-1"></i> Create Approval
+                        </button>
+                    </form>
+                </div>
+            @else
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" onclick="window.print()" class="btn btn-outline-primary rounded-pill">Print</button>
+                    <a href="{{ route('supply_chain.payment_requests.download_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-outline-danger rounded-pill">PDF Preview</a>
+                    <a href="{{ route('supply_chain.payment_requests.download_excel', $paymentRequest) }}" class="btn btn-success rounded-pill">Excel Download</a>
+                </div>
+            @endif
         </div>
 
         <div class="pra-sheet mx-auto">
@@ -79,7 +113,7 @@
                 </div>
                 <div class="col-6 pt-1">
                     <div class="pra-title">Payment Request Approval</div>
-                    <div class="pra-request-no">{{ $paymentRequest->request_no }}</div>
+                    <div class="pra-request-no">{{ $isPreview ? 'Preview - PR number will generate after Create' : $paymentRequest->request_no }}</div>
                 </div>
                 <div class="col-3">
                     <div class="pra-date mb-3">Date:&nbsp;&nbsp; {{ optional($paymentRequest->created_at)->format('jS M-Y') }}</div>
@@ -179,4 +213,21 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+@if($isPreview)
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const previewDate = document.getElementById('paymentRequiredPreviewDate');
+        const createDate = document.getElementById('paymentRequiredCreateDate');
+
+        if (previewDate && createDate) {
+            previewDate.addEventListener('change', function () {
+                createDate.value = previewDate.value;
+            });
+        }
+    });
+</script>
+@endif
 @endsection
