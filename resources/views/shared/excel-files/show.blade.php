@@ -257,46 +257,116 @@
         border-color: #3f7ceb;
     }
     .order-summary-card {
-        border: 0;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(15,23,42,.05);
         overflow: hidden;
     }
 
     .order-summary-top {
-        background: linear-gradient(135deg, #1d4ed8, #0f766e);
-        color: #fff;
-        padding: 12px 16px;
+        background: #f8fafc;
+        border-bottom: 1px solid #e9eef5;
+        padding: 8px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        min-height: 44px;
+    }
+
+    .order-summary-meta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .order-meta-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .order-meta-chip-label {
+        color: #94a3b8;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+    }
+
+    .order-meta-chip-value {
+        color: #0f172a;
+    }
+
+    .order-meta-chip-batch {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+    }
+
+    .order-meta-chip-status {
+        background: #f0fdf4;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
+
+    .order-meta-chip-locked {
+        background: #fef2f2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+    }
+
+    .order-meta-chip-rows {
+        background: #f8fafc;
+        color: #475569;
+        border: 1px solid #e2e8f0;
     }
 
     .order-summary-grid {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(150px, 1fr));
-        gap: 8px;
-        padding: 10px 12px;
-        background: #fff;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0;
+        border-top: 1px solid #f1f5f9;
     }
 
     .order-info-box {
-        background: #f8fafc;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 8px 10px;
+        flex: 1 1 160px;
+        padding: 8px 14px;
+        border-right: 1px solid #f1f5f9;
+        min-width: 0;
+    }
+
+    .order-info-box:last-child {
+        border-right: 0;
     }
 
     .order-info-label {
-        font-size: 11px;
-        font-weight: 600;
-        color: #64748b;
+        font-size: 10px;
+        font-weight: 700;
+        color: #94a3b8;
         text-transform: uppercase;
+        letter-spacing: .04em;
         margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .order-info-value {
-        font-size: 14px;
-        font-weight: 600;
+        font-size: 12px;
+        font-weight: 700;
         color: #0f172a;
-        word-break: break-word;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .excel-work-card {
@@ -497,30 +567,30 @@
         flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
-        gap: 10px;
-        padding: 10px 12px;
+        gap: 6px;
+        padding: 6px 12px;
         border-top: 1px solid #edf2f7;
-        background: #f8fafc;
+        background: #ffffff;
     }
 
     .server-search-left {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 8px;
+        gap: 5px;
     }
 
     .server-search-input {
-        width: min(360px, 70vw);
-        height: 34px;
+        width: min(280px, 60vw);
+        height: 30px;
         font-size: 12px;
-        border-radius: 8px;
+        border-radius: 7px;
         border: 1px solid #dbe4ef;
     }
 
     .search-help-text {
-        font-size: 11px;
-        color: #64748b;
+        font-size: 10px;
+        color: #94a3b8;
         font-weight: 600;
     }
 
@@ -529,33 +599,33 @@
         flex-wrap: wrap;
         align-items: center;
         justify-content: flex-end;
-        gap: 7px;
+        gap: 5px;
         margin-left: auto;
     }
 
     .header-find-label {
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 800;
-        color: #334155;
+        color: #64748b;
         text-transform: uppercase;
-        letter-spacing: .03em;
+        letter-spacing: .04em;
     }
 
     .header-find-input,
     .header-find-select {
-        height: 32px;
-        border-radius: 8px;
+        height: 30px;
+        border-radius: 7px;
         border: 1px solid #dbe4ef;
         font-size: 12px;
         color: #334155;
     }
 
     .header-find-input {
-        width: min(230px, 58vw);
+        width: min(180px, 46vw);
     }
 
     .header-find-select {
-        width: min(260px, 62vw);
+        width: min(210px, 54vw);
     }
 
     .active-header-column {
@@ -585,32 +655,35 @@
     .table-toolbar {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 6px;
         align-items: center;
         justify-content: space-between;
-        padding: 10px 14px;
+        padding: 7px 12px;
         border-bottom: 1px solid #edf2f7;
-        background: linear-gradient(180deg, #ffffff, #fbfdff);
+        background: #f8fafc;
+        min-height: 46px;
     }
 
     .table-toolbar-left {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 6px;
         align-items: center;
     }
 
     .section-title {
-        font-size: 15px;
+        font-size: 13px;
         font-weight: 700;
         color: #0f172a;
         margin: 0;
+        white-space: nowrap;
     }
 
     .paste-note {
-        font-size: 12px;
-        color: #64748b;
+        font-size: 11px;
+        color: #94a3b8;
         margin: 0;
+        display: none;
     }
 
     .custom-success-alert {
@@ -796,37 +869,29 @@
         </form>
     @endif
 
-    <div class="order-summary-card mb-3">
-        <div class="order-summary-top d-flex justify-content-between align-items-start">
-            <div>
-                <h4 class="mb-1">Order Information</h4>
-                <div class="small">Batch: {{ $excelFile->upload_batch_no }}</div>
-                <div class="small">Rows: {{ $excelFile->total_rows }}</div>
-                <div class="small">Status: {{ ucfirst($excelFile->status ?? 'pending') }}</div>
+    <div class="order-summary-card mb-2">
+        <div class="order-summary-top">
+            <div class="order-summary-meta">
+                <span class="fw-bold text-slate-900 me-1" style="font-size:13px;">Order Information</span>
+                <span class="order-meta-chip order-meta-chip-batch"><span class="order-meta-chip-label">Batch</span><span class="order-meta-chip-value">{{ $excelFile->upload_batch_no }}</span></span>
+                <span class="order-meta-chip order-meta-chip-rows"><span class="order-meta-chip-label">Rows</span><span class="order-meta-chip-value">{{ $excelFile->total_rows }}</span></span>
+                <span class="order-meta-chip order-meta-chip-status"><span class="order-meta-chip-label">Status</span><span class="order-meta-chip-value">{{ ucfirst($excelFile->status ?? 'pending') }}</span></span>
                 @if($excelFile->is_locked)
-                    <div class="small"><i class="bi bi-lock-fill me-1"></i>{{ $fileLockInfo['summary'] ?? $excelFile->lockScopeLabel() }}</div>
+                    <span class="order-meta-chip order-meta-chip-locked"><i class="bi bi-lock-fill me-1"></i>{{ $fileLockInfo['summary'] ?? $excelFile->lockScopeLabel() }}</span>
                 @endif
             </div>
-
-            <div class="d-flex gap-2 flex-wrap">
-                <a href="{{ url()->previous() }}" class="btn btn-light btn-sm">Back</a>
-
+            <div class="d-flex gap-2 flex-shrink-0">
+                <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"><i class="bi bi-arrow-left"></i></a>
                 @if($canDeleteFile ?? false)
-                    <button type="submit"
-                            form="delete-file-form"
-                            class="btn btn-danger btn-sm"
-                            onclick="return confirm('Are you sure you want to delete this file?');">
-                        Delete File
-                    </button>
+                    <button type="submit" form="delete-file-form" class="btn btn-outline-danger btn-sm" style="min-height:32px;font-size:12px;" onclick="return confirm('Are you sure you want to delete this file?');"><i class="bi bi-trash"></i></button>
                 @endif
             </div>
         </div>
-
         <div class="order-summary-grid">
             @foreach($orderInfo as $label => $value)
                 <div class="order-info-box">
                     <div class="order-info-label">{{ $label }}</div>
-                    <div class="order-info-value">{{ $value ?: '-' }}</div>
+                    <div class="order-info-value" title="{{ $value ?: '-' }}">{{ $value ?: '-' }}</div>
                 </div>
             @endforeach
         </div>
@@ -902,9 +967,7 @@
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="jumpToMyColumnsButton">My Columns</button>
                 </div>
 
-                <div class="search-help-text">
-                    Search now works across all {{ $excelFile->total_rows ?: $rows->total() }} rows, not only this page.
-                </div>
+                <span class="search-help-text">All {{ $excelFile->total_rows ?: $rows->total() }} rows</span>
             </div>
 
             <div class="excel-table-wrap">

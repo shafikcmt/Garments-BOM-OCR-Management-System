@@ -24,11 +24,11 @@
     .booking-hero {
         position: relative;
         overflow: hidden;
-        background: linear-gradient(135deg, #11114f 0%, #27206f 58%, #4438ca 100%);
+        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
         color: #fff;
-        border-radius: 24px;
-        padding: 28px 30px;
-        box-shadow: 0 22px 58px rgba(67, 56, 202, .24);
+        border-radius: 16px;
+        padding: 14px 20px;
+        box-shadow: 0 12px 30px rgba(67, 56, 202, .18);
     }
     .booking-hero::before,
     .booking-hero::after {
@@ -52,32 +52,32 @@
         background: rgba(125, 211, 252, .12);
     }
     .booking-hero > * { position: relative; z-index: 1; }
-    .booking-hero h4 { letter-spacing: -.55px; font-size: clamp(1.35rem, 2vw, 1.85rem); }
+    .booking-hero h4 { letter-spacing: -.4px; font-size: clamp(1rem, 1.5vw, 1.25rem); margin-bottom: 0 !important; }
     .booking-hero-copy { max-width: 680px; }
     .booking-hero-icon {
-        width: 64px;
-        height: 64px;
-        flex: 0 0 64px;
-        border-radius: 22px;
+        width: 40px;
+        height: 40px;
+        flex: 0 0 40px;
+        border-radius: 13px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         background: rgba(255,255,255,.1);
         border: 1px solid rgba(255,255,255,.18);
         box-shadow: inset 0 1px 0 rgba(255,255,255,.16);
-        font-size: 30px;
+        font-size: 18px;
     }
     .booking-hero-stats { min-width: 350px; justify-content: flex-end; }
     .booking-stat {
-        min-width: 170px;
+        min-width: 140px;
         display: inline-flex;
         align-items: center;
-        gap: 12px;
-        padding: 14px 18px;
-        border-radius: 18px;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 12px;
         background: rgba(255,255,255,.96);
         color: var(--booking-ink);
-        box-shadow: 0 18px 35px rgba(15, 23, 42, .16);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, .12);
         border: 1px solid rgba(255,255,255,.65);
     }
     .booking-stat-icon {
@@ -93,7 +93,7 @@
         flex: 0 0 38px;
     }
     .booking-stat-label { display: block; font-size: 12px; color: var(--booking-muted); font-weight: 700; line-height: 1.1; }
-    .booking-stat-value { display: block; margin-top: 3px; font-size: 24px; line-height: 1; color: var(--booking-ink); font-weight: 900; letter-spacing: -.03em; }
+    .booking-stat-value { display: block; margin-top: 2px; font-size: 18px; line-height: 1; color: var(--booking-ink); font-weight: 900; letter-spacing: -.03em; }
     .booking-card {
         border: 1px solid rgba(226, 232, 240, .9);
         border-radius: 24px;
@@ -128,8 +128,8 @@
     }
     .booking-filter .form-control,
     .booking-filter .form-select {
-        min-height: 48px;
-        border-radius: 14px;
+        min-height: 38px;
+        border-radius: 11px;
         border-color: #dbe4f0;
         color: var(--booking-ink);
         box-shadow: none;
@@ -356,9 +356,10 @@
     .booking-view-btn {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        min-height: 44px;
-        padding: 0 16px;
+        gap: 7px;
+        min-height: 36px;
+        padding: 0 14px;
+        font-size: 13px;
         border-radius: 14px;
         color: #475569;
         font-size: 14px;
@@ -483,12 +484,12 @@
 @endphp
 
 <div class="booking-page p-2 p-md-3"><div class="booking-shell">
-    <div class="booking-hero mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <div class="booking-hero mb-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div class="d-flex align-items-center gap-3 booking-hero-copy">
             <span class="booking-hero-icon"><i class="bi bi-file-earmark-text"></i></span>
             <div>
-                <h4 class="mb-1 fw-bold">Booking Preview / Booking Generate</h4>
-                <div class="small opacity-75">Supply-chain module: filter workspace orders, preview booking format first, then generate PO from the preview.</div>
+                <div class="small opacity-60" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;">Supply Chain</div>
+                <h4 class="fw-bold">PO Generation</h4>
             </div>
         </div>
         <div class="booking-hero-stats d-flex gap-3 flex-wrap">
@@ -505,12 +506,11 @@
 
     <div id="bookingAjaxAlert" class="alert d-none" role="alert"></div>
 
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
         <div class="booking-view-switch" id="bookingViewSwitch">
-            <a href="#pending-generated-po" class="booking-view-btn is-active" data-booking-tab="pending-generated-po"><i class="bi bi-list-check"></i>Pending PO Generate</a>
-            <a href="#recent-generated-po" class="booking-view-btn" data-booking-tab="recent-generated-po"><i class="bi bi-sliders"></i>Generated PO List</a>
+            <a href="#pending-generated-po" class="booking-view-btn is-active" data-booking-tab="pending-generated-po"><i class="bi bi-list-check"></i>Pending Preview</a>
+            <a href="#recent-generated-po" class="booking-view-btn" data-booking-tab="recent-generated-po"><i class="bi bi-file-earmark-check"></i>Generated PO</a>
         </div>
-        <div class="small text-muted fw-semibold">Use PO Generate menu to open Booking Preview or Generated PO List.</div>
     </div>
 
     <div class="card booking-card mb-4">

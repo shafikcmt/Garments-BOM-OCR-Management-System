@@ -27,7 +27,7 @@
     <style>
         :root {
             --app-sidebar: 260px;
-            --app-header: 76px;
+            --app-header: 60px;
             --app-shell-bg: #f3f6fb;
             --app-border: #dbe7f3;
             --app-border-strong: #cad8e7;
@@ -385,7 +385,7 @@
             justify-content: space-between;
             align-items: center;
             gap: 16px;
-            padding: 0 24px;
+            padding: 0 18px;
             background: rgba(255,255,255,.76);
             backdrop-filter: blur(18px);
             border-bottom: 1px solid rgba(219, 231, 243, .9);
@@ -396,7 +396,7 @@
             min-height: 100vh;
             margin-top: var(--app-header);
             margin-left: var(--app-sidebar);
-            padding: 22px;
+            padding: 16px;
         }
 
         .app-page-card {
@@ -599,7 +599,7 @@
         .sidebar-footer-card { display: none !important; }
 
         .header { background: rgba(255,255,255,.82); border-bottom: 1px solid rgba(226,232,240,.82); box-shadow: 0 12px 32px rgba(15, 23, 42, .055); }
-        .content { padding: 24px; width: auto; max-width: 100%; overflow-x: hidden; }
+        .content { padding: 16px; width: auto; max-width: 100%; overflow-x: hidden; }
         .content > .container-fluid,
         .content .container-fluid {
             width: 100%;
@@ -622,7 +622,7 @@
             border-radius: 20px 20px 0 0 !important;
             font-weight: 700;
         }
-        .card:not(.booking-card) .card-body { padding: 1.25rem; }
+        .card:not(.booking-card) .card-body { padding: 1rem; }
 
         .table:not(.booking-table) { margin-bottom: 0; }
         .table:not(.booking-table) thead th {
@@ -646,7 +646,7 @@
         .btn-outline-primary:hover { background: #eff6ff !important; color: #1e40af !important; }
         .form-label { color: #334155; font-size: 12px; font-weight: 750; letter-spacing: .015em; }
         .form-control, .form-select {
-            min-height: 42px;
+            min-height: 36px;
             border-radius: 12px !important;
             border-color: #dbe4f0 !important;
             background-color: #fff;
@@ -688,7 +688,7 @@
         }
         .app-hero-card > * { position: relative; z-index: 1; }
         .app-hero-eyebrow { color: #2563eb; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-        .app-hero-title { margin: 4px 0 4px; color: #0f172a; font-size: clamp(1.35rem, 2vw, 1.75rem); font-weight: 800; letter-spacing: -.035em; }
+        .app-hero-title { margin: 4px 0 4px; color: #0f172a; font-size: clamp(1.1rem, 1.6vw, 1.4rem); font-weight: 800; letter-spacing: -.035em; }
         .app-hero-copy { color: #64748b; font-size: 14px; line-height: 1.6; }
         .app-stat-card { border-radius: 18px; border: 1px solid #e2e8f0; background: #fff; box-shadow: 0 14px 32px rgba(15,23,42,.055); }
         .app-stat-label { color: #64748b; font-size: 12px; font-weight: 700; }
@@ -742,7 +742,7 @@
             border-width: 0 !important;
         }
         .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) thead th {
-            padding: 13px 14px !important;
+            padding: 10px 12px !important;
             border: 0 !important;
             background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%) !important;
             color: #475569 !important;
@@ -763,7 +763,7 @@
             transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease;
         }
         .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody td {
-            padding: 14px !important;
+            padding: 10px !important;
             border-top: 1px solid #e6eef8 !important;
             border-bottom: 1px solid #e6eef8 !important;
             background: #ffffff !important;
