@@ -1,27 +1,24 @@
 <x-guest-layout>
-    <div class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-        {{ __('This is a secure area of the application. Please confirm your password before continuing.') }}
+    <div class="user-icon">
+        <i class="bi bi-shield-lock-fill"></i>
     </div>
+    <div class="brand">Humana Apparels Pvt. Ltd</div>
+    <div class="login-subtitle">Confirm your password to continue.</div>
 
     <form method="POST" action="{{ route('password.confirm') }}">
         @csrf
 
-        <!-- Password -->
-        <div>
-            <x-input-label for="password" :value="__('Password')" />
-
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="current-password" />
-
+        <div class="mb-4 text-start">
+            <label for="password" class="form-label">Password</label>
+            <div class="position-relative">
+                <i class="bi bi-lock position-absolute text-slate-400" style="left:14px;top:50%;transform:translateY(-50%);"></i>
+                <input type="password" name="password" id="password" required autocomplete="current-password" class="form-control" style="padding-left:42px;" placeholder="Enter your password">
+            </div>
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
-        <div class="flex justify-end mt-4">
-            <x-primary-button>
-                {{ __('Confirm') }}
-            </x-primary-button>
-        </div>
+        <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-check2-circle me-1"></i> Confirm
+        </button>
     </form>
 </x-guest-layout>

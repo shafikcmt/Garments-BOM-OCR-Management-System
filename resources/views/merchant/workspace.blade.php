@@ -169,7 +169,7 @@
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                         <div>
                             <h5 class="mb-1">Upload Excel File</h5>
-                            <p class="text-muted mb-0 small">Sample file-e only merchant input headers thakbe. Formula/conditional headers upload file-e thakbe na.</p>
+                            <p class="text-muted mb-0 small">Upload only merchant input headers. Formula fields are calculated automatically.</p>
                         </div>
                         <a href="{{ route('merchant.excel.sample') }}" class="btn btn-outline-primary btn-sm">
                             Download Sample
@@ -182,7 +182,7 @@
                         <div class="mb-3">
                             <label class="form-label">Select Excel File</label>
                             <input type="file" name="file" class="form-control" accept=".xlsx,.xls,.csv" required>
-                            <small class="text-muted">Only merchant owner + input type headers allowed. Formula/conditional fields auto calculate hobe.</small>
+                            <small class="text-muted">Only merchant input headers are accepted. Formula fields calculate automatically.</small>
                         </div>
 
                         <div class="mb-3">
@@ -212,7 +212,7 @@
 
                     @if($merchantInputHeaders->isEmpty())
                         <div class="alert alert-warning mb-0">
-                            Merchant input header found hoyni. Admin panel theke merchant owner + input type headers configure korte hobe.
+                            No merchant input headers configured. Contact the admin to set up input headers.
                         </div>
                     @else
                         <form method="POST" action="{{ route('merchant.excel.manual-store') }}" id="manualOrderForm">

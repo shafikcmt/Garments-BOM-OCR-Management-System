@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
 @php
@@ -75,7 +75,7 @@
                     <a href="{{ route('supply_chain.payment_requests.index') }}" class="pra-back-btn">← Back</a>
                     @if($isPreview)
                         <span class="pra-preview-badge"><i class="bi bi-eye"></i> Preview Mode</span>
-                        <span class="pra-preview-help">Check করে Payment Require Date ঠিক থাকলে Create PRA করুন।</span>
+                        <span class="pra-preview-help">Review the Payment Required Date, then click Create PRA to generate the approval.</span>
                     @endif
                 </div>
 

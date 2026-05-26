@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('styles')
 <style>
@@ -71,7 +71,7 @@
         <div>
             <div class="text-uppercase text-primary fw-bold small mb-1" style="letter-spacing:.08em;">Supply Chain</div>
             <h4 class="fw-bold mb-1">Payment Request Approval</h4>
-            <p class="text-muted mb-0">Reference image/PDF format অনুযায়ী filter, approval sheet, PDF এবং Excel format সাজানো হয়েছে।</p>
+            <p class="text-muted mb-0">Filter workspace rows, preview the approval format, then create or download the Payment Request Approval.</p>
         </div>
         <a href="#payment-request-list" class="btn btn-outline-primary rounded-pill">
             <i class="bi bi-list-check me-1"></i> Payment Request List
@@ -104,7 +104,7 @@
         <div class="card-header bg-white border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h6 class="fw-bold mb-1">Approval Format Filters</h6>
-                <div class="small text-muted">PDF reference এর মত: Shipment Month, Vendor Type, Final Status, Payment Term, Payment Status auto-suggest dropdown.</div>
+                <div class="small text-muted">Use filters to narrow down records. Auto-suggest dropdowns for Shipment Month, Vendor Type, Final Status, Payment Term, and Payment Status.</div>
             </div>
             @if(count($activeFilters))
                 <span class="badge rounded-pill text-bg-primary">{{ count($activeFilters) }} Active Filter</span>
@@ -154,7 +154,7 @@
         <div class="card-header bg-white border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h6 class="fw-bold mb-0">Pending PI Payment</h6>
-                <div class="small text-muted">প্রতি row-এর Action থেকে আগে Preview দেখাবে, check করার পর Create করলে সেই PO-এর eligible সব style/item নিয়ে একটাই Payment Request Approval form হবে।</div>
+                <div class="small text-muted">Click Preview to review the payment format, then click Create to generate a Payment Request Approval for the selected PO.</div>
             </div>
         </div>
         <div class="payment-request-table-wrap">
@@ -220,7 +220,7 @@
                         <tr>
                             <td colspan="12" class="text-center py-5 text-muted">
                                 <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                No PI received payment pending rows found. PI Number / Payment Status / Payment Doc No headers check করুন।
+                                No pending PI payment rows found. Verify PI Number, Payment Status, and Payment Doc No headers in the workspace.
                             </td>
                         </tr>
                     @endforelse

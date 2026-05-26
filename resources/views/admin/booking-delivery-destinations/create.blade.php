@@ -1,25 +1,35 @@
 @extends('layouts.app')
 
-@section('title', 'Add Booking Delivery Destination')
+@section('title', 'Add Delivery Destination')
 
 @section('content')
 <div class="container-fluid">
-    <div class="card shadow-sm border-0">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h5 class="mb-0">Add Booking Delivery Destination</h5>
-            <a href="{{ route('admin.booking-delivery-destinations.index') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i>Back
+    <div class="app-hero-card p-4 mb-4">
+        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-3">
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-geo-alt"></i></span>
+                <div>
+                    <div class="app-hero-eyebrow">Admin / Booking Setup</div>
+                    <h3 class="app-hero-title mb-0">Add Delivery Destination</h3>
+                </div>
+            </div>
+            <a href="{{ route('admin.booking-delivery-destinations.index') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-arrow-left"></i> Back
             </a>
         </div>
-        <form method="POST" action="{{ route('admin.booking-delivery-destinations.store') }}">
-            @csrf
-            <div class="card-body">
+    </div>
+
+    <div class="card border-0 shadow-sm" style="border-radius:14px;max-width:720px;">
+        <div class="card-body p-4">
+            <form method="POST" action="{{ route('admin.booking-delivery-destinations.store') }}">
+                @csrf
                 @include('admin.booking-delivery-destinations._form')
-            </div>
-            <div class="card-footer bg-white text-end">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Save Destination</button>
-            </div>
-        </form>
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1"></i>Save Destination</button>
+                    <a href="{{ route('admin.booking-delivery-destinations.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 @endsection

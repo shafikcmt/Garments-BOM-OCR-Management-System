@@ -4,26 +4,33 @@
 
 @section('content')
 <div class="container-fluid">
-    <div class="card shadow-sm border-0">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div>
-                <h5 class="mb-0">Edit Booking Instruction</h5>
-                <small class="text-muted">Update the instruction text, default/suggestion use, order and active status.</small>
+    <div class="app-hero-card p-4 mb-4">
+        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-3">
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-card-list"></i></span>
+                <div>
+                    <div class="app-hero-eyebrow">Admin / Booking Setup</div>
+                    <h3 class="app-hero-title mb-0">Edit Booking Instruction</h3>
+                </div>
             </div>
-            <a href="{{ route('admin.booking-instructions.index') }}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i>Back
+            <a href="{{ route('admin.booking-instructions.index') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-arrow-left"></i> Back
             </a>
         </div>
-        <form method="POST" action="{{ route('admin.booking-instructions.update', $instruction) }}">
-            @csrf
-            @method('PUT')
-            <div class="card-body">
+    </div>
+
+    <div class="card border-0 shadow-sm" style="border-radius:14px;max-width:720px;">
+        <div class="card-body p-4">
+            <form method="POST" action="{{ route('admin.booking-instructions.update', $instruction) }}">
+                @csrf
+                @method('PUT')
                 @include('admin.booking-instructions._form', ['instruction' => $instruction])
-            </div>
-            <div class="card-footer bg-white text-end">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Update Instruction</button>
-            </div>
-        </form>
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1"></i>Update Instruction</button>
+                    <a href="{{ route('admin.booking-instructions.index') }}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 @endsection

@@ -1,7 +1,7 @@
 <div class="mb-3">
     <label class="form-label">Role Name</label>
     <input type="text" name="name" class="form-control" value="{{ old('name', $role->name ?? '') }}" placeholder="Example: merchant" required>
-    <small class="text-muted">Use small letters. Example: admin, merchant, account, commercial, store, supply_chain</small>
+    <small class="text-muted">Lowercase only. e.g. admin, merchant, supply_chain</small>
 </div>
 
 <div class="mb-3">
