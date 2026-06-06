@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Git
+.git/
+.github/
+
+# Environment / secrets
+.env
+.env.*
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.secret
+secrets/
+credentials/
+storage/oauth-*.json
+
+# Laravel generated / runtime files
+storage/logs/
+storage/framework/cache/
+storage/framework/sessions/
+storage/framework/views/
+bootstrap/cache/
+public/storage/
+
+# Build output
+dist/
+build/
+public/build/
+.hot
+
+# Cache
+.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Test / coverage generated files
+coverage/
+.phpunit.result.cache
+
+# Large uploads / generated exports
+storage/app/public/uploads/
+storage/app/public/exports/
+storage/app/public/pdf/
+storage/app/public/temp/
