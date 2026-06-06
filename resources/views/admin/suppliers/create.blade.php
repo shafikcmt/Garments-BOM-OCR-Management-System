@@ -5,34 +5,31 @@
 @section('content')
 <div class="container-fluid">
 
-    <div class="card shadow-sm border-0 mb-3">
-        <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-                <h3 class="mb-1">Create Vendor</h3>
-                <p class="text-muted mb-0">Add supplier information for booking format.</p>
+    <div class="app-hero-card p-4 mb-4">
+        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-3">
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-buildings"></i></span>
+                <div>
+                    <div class="app-hero-eyebrow">Admin / Vendors</div>
+                    <h3 class="app-hero-title mb-0">Create Vendor</h3>
+                </div>
             </div>
-
-            <a href="{{ route('admin.suppliers.index') }}" class="btn btn-secondary">
-                <i class="bi bi-arrow-left me-1"></i> Back
+            <a href="{{ route('admin.suppliers.index') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-arrow-left"></i> Back to Vendors
             </a>
         </div>
     </div>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
+    <div class="card border-0 shadow-sm" style="border-radius:14px;">
+        <div class="card-body p-4">
             <form action="{{ route('admin.suppliers.store') }}" method="POST">
                 @csrf
-
                 @include('admin.suppliers._form')
-
                 <div class="mt-4 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary px-4">
                         <i class="bi bi-save me-1"></i> Save Vendor
                     </button>
-
-                    <a href="{{ route('admin.suppliers.index') }}" class="btn btn-light">
-                        Cancel
-                    </a>
+                    <a href="{{ route('admin.suppliers.index') }}" class="btn btn-outline-secondary">Cancel</a>
                 </div>
             </form>
         </div>

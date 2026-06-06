@@ -4,10 +4,14 @@
 
 @section('content')
 <div class="container-fluid">
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
-            <h3 class="mb-2">Welcome, {{ auth()->user()->name }}</h3>
-            <p class="text-muted mb-0">You are successfully logged in.</p>
+    <div class="app-hero-card p-4 mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <span class="app-stat-icon" style="width:54px;height:54px;border-radius:18px;font-size:23px;"><i class="bi bi-house"></i></span>
+            <div>
+                <div class="app-hero-eyebrow">Dashboard</div>
+                <h2 class="app-hero-title mb-1">Welcome, {{ auth()->user()->name }}</h2>
+                <p class="app-hero-copy mb-0">Use the sidebar to navigate to your workspace.</p>
+            </div>
         </div>
     </div>
 </div>

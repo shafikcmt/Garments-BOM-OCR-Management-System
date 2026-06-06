@@ -439,7 +439,7 @@
                         class="form-control"
                         placeholder="Search by name, key, role, type..."
                     >
-                    <div class="search-hint mt-1">Name, key, role, type, formula key sobkichu diye search korte parben.</div>
+                    <div class="search-hint mt-1">Search by name, key, role, type, or formula key.</div>
                 </div>
 
                 <div class="col-12 col-md-6 col-xl-2 filter-field">

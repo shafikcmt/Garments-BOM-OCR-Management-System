@@ -173,7 +173,7 @@
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
             <div>
                 <h3 class="hero-title">Create Header</h3>
-                <p class="hero-text">New header add korun. Input, formula, ba conditional field easily configure korte parben.</p>
+                <p class="hero-text">Define a new header. Configure input, formula, or conditional field settings.</p>
             </div>
             <a href="{{ route('admin.headers.index') }}" class="btn btn-outline-secondary">Back to List</a>
         </div>

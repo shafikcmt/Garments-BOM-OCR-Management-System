@@ -1,116 +1,110 @@
 @extends('layouts.app')
 
-@section('title', 'Booking Instruction Control')
+@section('title', 'Booking Instructions')
 
 @section('content')
 <div class="container-fluid">
     @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
+        <div class="alert alert-success border-0 shadow-sm rounded-4">{{ session('success') }}</div>
     @endif
 
-    <div class="card shadow-sm border-0 mb-3">
-        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
-            <div>
-                <h3 class="mb-1">Booking Instruction Control</h3>
-                <p class="text-muted mb-0">Admin can add, edit or delete default booking instructions and extra suggestions for Supply Chain users.</p>
+    <div class="app-hero-card p-4 mb-4">
+        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-3">
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-card-list"></i></span>
+                <div>
+                    <div class="app-hero-eyebrow">Admin / Booking Setup</div>
+                    <h3 class="app-hero-title mb-0">Booking Instructions</h3>
+                </div>
             </div>
-            <a href="{{ route('admin.booking-instructions.create') }}" class="btn btn-primary">
-                <i class="bi bi-plus-circle me-1"></i>Add Instruction
+            <a href="{{ route('admin.booking-instructions.create') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-plus-lg"></i> Add Instruction
             </a>
         </div>
     </div>
 
-    <div class="row g-3 mb-3">
+    <div class="row g-3 mb-4">
         <div class="col-sm-6 col-xl-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <small class="text-muted">Total Instructions</small>
-                    <h3 class="mb-0">{{ $stats['total'] ?? 0 }}</h3>
+                    <div class="small text-muted mb-1">Total</div>
+                    <div class="fs-4 fw-bold">{{ $stats['total'] ?? 0 }}</div>
                 </div>
             </div>
         </div>
         <div class="col-sm-6 col-xl-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <small class="text-muted">Default Auto Added</small>
-                    <h3 class="mb-0">{{ $stats['default'] ?? 0 }}</h3>
+                    <div class="small text-muted mb-1">Default (Auto Added)</div>
+                    <div class="fs-4 fw-bold">{{ $stats['default'] ?? 0 }}</div>
                 </div>
             </div>
         </div>
         <div class="col-sm-6 col-xl-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <small class="text-muted">Extra Suggestions</small>
-                    <h3 class="mb-0">{{ $stats['suggested'] ?? 0 }}</h3>
+                    <div class="small text-muted mb-1">Suggestions</div>
+                    <div class="fs-4 fw-bold">{{ $stats['suggested'] ?? 0 }}</div>
                 </div>
             </div>
         </div>
         <div class="col-sm-6 col-xl-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <small class="text-muted">Active</small>
-                    <h3 class="mb-0">{{ $stats['active'] ?? 0 }}</h3>
+                    <div class="small text-muted mb-1">Active</div>
+                    <div class="fs-4 fw-bold">{{ $stats['active'] ?? 0 }}</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="alert alert-info border-0 shadow-sm">
+    <div class="alert alert-info border-0 shadow-sm rounded-4 mb-4">
         <div class="d-flex gap-2">
-            <i class="bi bi-info-circle mt-1"></i>
-            <div>
-                <strong>How it works:</strong>
-                <span>Default instructions automatically appear in every new booking format. Extra suggestions stay in the Supply Chain booking preview dropdown so the user can add them only when needed. Supply Chain users can still add one-time custom instruction lines in the booking format.</span>
-            </div>
+            <i class="bi bi-info-circle mt-1 flex-shrink-0"></i>
+            <div class="small"><strong>Default</strong> instructions appear automatically in every new booking. <strong>Suggestions</strong> stay in the dropdown for Supply Chain users to add when needed.</div>
         </div>
     </div>
 
-    <div class="card shadow-sm border-0">
+    <div class="card border-0 shadow-sm">
         <div class="card-body table-responsive">
-            <table class="table table-bordered table-hover align-middle mb-0">
-                <thead class="table-dark">
+            <table class="table table-bordered align-middle mb-0">
+                <thead>
                     <tr>
-                        <th style="width:60px;">SL</th>
+                        <th style="width:60px;">#</th>
                         <th>Instruction</th>
-                        <th style="width:150px;">Use</th>
-                        <th style="width:110px;">Sort</th>
-                        <th style="width:100px;">Status</th>
-                        <th style="width:170px;">Action</th>
+                        <th style="width:140px;">Type</th>
+                        <th style="width:90px;">Sort</th>
+                        <th style="width:110px;">Status</th>
+                        <th style="width:110px;">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($instructions as $instruction)
                         <tr>
                             <td>{{ $loop->iteration + ($instructions->currentPage() - 1) * $instructions->perPage() }}</td>
-                            <td>{!! nl2br(e($instruction->instruction)) !!}</td>
+                            <td class="small">{!! nl2br(e($instruction->instruction)) !!}</td>
                             <td>
                                 @if($instruction->is_default)
-                                    <span class="badge bg-primary">Default</span>
-                                    <div class="small text-muted mt-1">Auto added</div>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Default</span>
                                 @else
-                                    <span class="badge bg-info text-dark">Suggestion</span>
-                                    <div class="small text-muted mt-1">User selectable</div>
+                                    <span class="badge bg-info-subtle text-info border border-info-subtle">Suggestion</span>
                                 @endif
                             </td>
                             <td>{{ $instruction->sort_order }}</td>
                             <td>
                                 @if($instruction->is_active)
-                                    <span class="badge bg-success">Active</span>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
                                 @else
-                                    <span class="badge bg-danger">Inactive</span>
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Inactive</span>
                                 @endif
                             </td>
                             <td>
-                                <div class="d-flex gap-1">
-                                    <a href="{{ route('admin.booking-instructions.edit', $instruction) }}" class="btn btn-sm btn-warning" title="Edit">
-                                        <i class="bi bi-pencil-square"></i>
-                                    </a>
-                                    <form action="{{ route('admin.booking-instructions.destroy', $instruction) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this booking instruction?');">
+                                <div class="d-flex gap-2">
+                                    <a href="{{ route('admin.booking-instructions.edit', $instruction) }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil-square"></i></a>
+                                    <form action="{{ route('admin.booking-instructions.destroy', $instruction) }}" method="POST" onsubmit="return confirm('Delete this instruction?');">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                                     </form>
                                 </div>
                             </td>
@@ -122,7 +116,6 @@
                     @endforelse
                 </tbody>
             </table>
-
             <div class="mt-3">
                 {{ $instructions->links() }}
             </div>

@@ -208,7 +208,7 @@
         <div class="upload-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
             <div>
                 <h3 class="mb-1">Upload Excel File</h3>
-                <p class="text-muted mb-0">Merchant input header diye file upload korun. Upload er somoy smart loading animation dekhabe.</p>
+                <p class="text-muted mb-0">Upload your merchant data using the sample file format.</p>
             </div>
             <a href="{{ route('merchant.excel.sample') }}" class="btn btn-outline-primary">
                 Download Sample Excel
@@ -231,9 +231,9 @@
             @endif
 
             <div class="upload-note-box mb-4">
-                <div class="fw-semibold mb-1">Upload Tips</div>
+                <div class="fw-semibold mb-1">Important</div>
                 <div class="text-muted small mb-0">
-                    Sample file download kore same header order maintain korun. Upload button press korar por file processing shesh na howa porjonto page close korben na.
+                    Download the sample file and maintain the same column order. Do not close this page while the upload is in progress.
                 </div>
             </div>
 
@@ -251,7 +251,7 @@
 
                 <div class="mb-4">
                     <label class="form-label fw-semibold">Remarks</label>
-                    <input type="text" name="remarks" class="form-control" placeholder="Optional remarks likhun">
+                    <input type="text" name="remarks" class="form-control" placeholder="Optional remarks">
                 </div>
 
                 <button type="submit" id="uploadSubmitBtn" class="btn btn-primary upload-submit-btn px-4">
@@ -294,19 +294,19 @@
             <ul class="upload-status-list">
                 <li class="upload-status-item active" data-step="1">
                     <span class="upload-status-dot"></span>
-                    <span>File upload hocche</span>
+                    <span>Uploading file</span>
                 </li>
                 <li class="upload-status-item" data-step="2">
                     <span class="upload-status-dot"></span>
-                    <span>Header validation check hocche</span>
+                    <span>Validating file headers</span>
                 </li>
                 <li class="upload-status-item" data-step="3">
                     <span class="upload-status-dot"></span>
-                    <span>Rows process ebong save hocche</span>
+                    <span>Reading rows and saving data</span>
                 </li>
                 <li class="upload-status-item" data-step="4">
                     <span class="upload-status-dot"></span>
-                    <span>Formula/conditional calculation complete hocche</span>
+                    <span>Running formula calculations</span>
                 </li>
             </ul>
         </div>
@@ -334,19 +334,19 @@
         const stepTexts = {
             1: {
                 headline: 'Uploading your Excel file',
-                subtext: 'Please wait... file upload and validation in progress.'
+                subtext: 'Please wait while your file is being uploaded and validated.'
             },
             2: {
-                headline: 'Validating headers and file structure',
-                subtext: 'System check korche upload file er header sample file er sathe match kore kina.'
+                headline: 'Validating file headers',
+                subtext: 'Checking whether the uploaded file headers match the sample format.'
             },
             3: {
                 headline: 'Processing rows and saving data',
-                subtext: 'Rows read kore database e save korar preparation hocche.'
+                subtext: 'Reading data rows and preparing to save to the database.'
             },
             4: {
                 headline: 'Finalizing upload',
-                subtext: 'Formula ebong conditional calculation complete hocche. Almost done...'
+                subtext: 'Applying formula and conditional calculations. Almost done.'
             }
         };
 
