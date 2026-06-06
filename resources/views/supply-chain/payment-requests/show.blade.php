@@ -22,6 +22,17 @@
 <style>
     .pra-wrap { background:#f3f6fb; }
     .pra-toolbar { position:sticky; top:0; z-index:5; background:rgba(243,246,251,.94); backdrop-filter:blur(6px); padding-top:.75rem; }
+    .pra-toolbar-card { background:#fff; border:1px solid #e4ebf7; border-radius:18px; padding:12px 14px; box-shadow:0 10px 28px rgba(15,23,42,.08); }
+    .pra-back-btn { height:36px; display:inline-flex; align-items:center; gap:6px; border-radius:10px; padding:0 13px; font-weight:700; color:#0f172a; background:#fff; border:1px solid #d8e1ef; text-decoration:none; }
+    .pra-back-btn:hover { color:#0b1d5b; background:#f8fbff; border-color:#b9c8df; }
+    .pra-preview-badge { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:8px 12px; background:#fff3cd; color:#7a4b00; font-size:12px; font-weight:800; }
+    .pra-preview-help { color:#64748b; font-size:13px; font-weight:600; }
+    .pra-date-panel { display:flex; align-items:flex-end; justify-content:flex-end; flex-wrap:wrap; gap:10px; }
+    .pra-date-panel label { font-size:11px; font-weight:800; color:#0b1d5b; margin-bottom:5px; letter-spacing:.03em; }
+    .pra-date-panel .form-control { height:36px; min-width:154px; border-radius:10px; border-color:#d4deef; font-size:13px; font-weight:600; }
+    .pra-toolbar-btn { height:36px; display:inline-flex; align-items:center; justify-content:center; gap:6px; border-radius:10px; padding:0 14px; font-size:12px; font-weight:800; white-space:nowrap; }
+    .pra-toolbar-btn-create { min-width:116px; }
+    @media (max-width: 991.98px) { .pra-date-panel { justify-content:flex-start; } .pra-toolbar-card { align-items:flex-start !important; } }
     .pra-sheet { background:#fff; color:#000b6f; padding:26px 28px 34px; min-width:1120px; box-shadow:0 12px 36px rgba(15,23,42,.12); border:1px solid #e6ebf4; }
     .pra-logo-text { font-size:30px; line-height:.95; letter-spacing:.08em; font-weight:600; color:#000b6f; }
     .pra-logo-small { font-size:9px; letter-spacing:.06em; font-weight:700; margin-left:58px; }
@@ -58,46 +69,50 @@
 
 <div class="pra-wrap py-3">
     <div class="container-fluid">
-        <div class="pra-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-            <div class="d-flex flex-wrap align-items-center gap-2">
-                <a href="{{ route('supply_chain.payment_requests.index') }}" class="btn btn-light border rounded-pill">← Back</a>
+        <div class="pra-toolbar mb-3">
+            <div class="pra-toolbar-card d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <a href="{{ route('supply_chain.payment_requests.index') }}" class="pra-back-btn">← Back</a>
+                    @if($isPreview)
+                        <span class="pra-preview-badge"><i class="bi bi-eye"></i> Preview Mode</span>
+                        <span class="pra-preview-help">Check করে Payment Require Date ঠিক থাকলে Create PRA করুন।</span>
+                    @endif
+                </div>
+
                 @if($isPreview)
-                    <span class="badge rounded-pill text-bg-warning px-3 py-2">Preview Mode</span>
-                    <span class="small text-muted">Check করার পর Create Approval চাপুন।</span>
+                    <div class="pra-date-panel">
+                        <form method="GET" action="{{ route('supply_chain.payment_requests.preview') }}" class="d-flex flex-wrap align-items-end gap-2 m-0">
+                            @foreach($bookingPoIds as $bookingPoId)
+                                <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
+                            @endforeach
+                            <div>
+                                <label for="paymentRequiredPreviewDate">Payment Require Date</label>
+                                <input type="date" name="payment_required_date" id="paymentRequiredPreviewDate" value="{{ $paymentRequiredInput }}" class="form-control form-control-sm" required>
+                            </div>
+                            <button type="submit" class="btn btn-outline-primary pra-toolbar-btn">
+                                <i class="bi bi-arrow-repeat"></i> Update Preview
+                            </button>
+                        </form>
+
+                        <form method="POST" action="{{ route('supply_chain.payment_requests.store') }}" class="m-0">
+                            @csrf
+                            @foreach($bookingPoIds as $bookingPoId)
+                                <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
+                            @endforeach
+                            <input type="hidden" name="payment_required_date" id="paymentRequiredCreateDate" value="{{ $paymentRequiredInput }}">
+                            <button type="submit" class="btn btn-success pra-toolbar-btn pra-toolbar-btn-create">
+                                <i class="bi bi-check2-circle"></i> Create PRA
+                            </button>
+                        </form>
+                    </div>
+                @else
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" onclick="window.print()" class="btn btn-outline-primary rounded-pill">Print</button>
+                        <a href="{{ route('supply_chain.payment_requests.download_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-outline-danger rounded-pill">PDF Preview</a>
+                        <a href="{{ route('supply_chain.payment_requests.download_excel', $paymentRequest) }}" class="btn btn-success rounded-pill">Excel Download</a>
+                    </div>
                 @endif
             </div>
-
-            @if($isPreview)
-                <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
-                    <form method="GET" action="{{ route('supply_chain.payment_requests.preview') }}" class="d-flex flex-wrap align-items-end gap-2 m-0">
-                        @foreach($bookingPoIds as $bookingPoId)
-                            <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
-                        @endforeach
-                        <div>
-                            <label class="form-label small fw-bold mb-1">Payment Require Date</label>
-                            <input type="date" name="payment_required_date" id="paymentRequiredPreviewDate" value="{{ $paymentRequiredInput }}" class="form-control form-control-sm rounded-3" required>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill px-3">Update Preview</button>
-                    </form>
-
-                    <form method="POST" action="{{ route('supply_chain.payment_requests.store') }}" class="m-0">
-                        @csrf
-                        @foreach($bookingPoIds as $bookingPoId)
-                            <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
-                        @endforeach
-                        <input type="hidden" name="payment_required_date" id="paymentRequiredCreateDate" value="{{ $paymentRequiredInput }}">
-                        <button type="submit" class="btn btn-success rounded-pill px-4">
-                            <i class="bi bi-check2-circle me-1"></i> Create Approval
-                        </button>
-                    </form>
-                </div>
-            @else
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="button" onclick="window.print()" class="btn btn-outline-primary rounded-pill">Print</button>
-                    <a href="{{ route('supply_chain.payment_requests.download_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-outline-danger rounded-pill">PDF Preview</a>
-                    <a href="{{ route('supply_chain.payment_requests.download_excel', $paymentRequest) }}" class="btn btn-success rounded-pill">Excel Download</a>
-                </div>
-            @endif
         </div>
 
         <div class="pra-sheet mx-auto">
