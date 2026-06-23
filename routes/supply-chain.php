@@ -26,6 +26,8 @@ Route::prefix('supply-chain')
         Route::get('/booking-generate/data', [BookingController::class, 'data'])->name('bookings.data');
         Route::post('/booking-generate/bulk-preview', [BookingController::class, 'bulkPreview'])->name('bookings.bulk_preview');
         Route::post('/booking-generate/bulk-generate', [BookingController::class, 'bulkGenerate'])->name('bookings.bulk_generate');
+        Route::post('/booking-generate/batch-preview', [BookingController::class, 'batchPreview'])->name('bookings.batch_preview');
+        Route::post('/booking-generate/batch-generate', [BookingController::class, 'batchGenerate'])->name('bookings.batch_generate');
         Route::post('/booking-generate/bulk-complete', [BookingController::class, 'bulkComplete'])->name('bookings.bulk_complete');
         Route::post('/booking-generate/{excelRow}/preview', [BookingController::class, 'preview'])->name('bookings.preview');
         Route::post('/booking-generate/{excelRow}', [BookingController::class, 'generate'])->name('bookings.generate');
