@@ -309,7 +309,67 @@
     .booking-preview-header-tools { display: inline-flex; align-items: center; gap: 6px; flex-wrap: nowrap; margin-left: auto; }
     .booking-preview-zoom-btn { width: 32px; height: 30px; padding: 0; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
     .booking-preview-zoom-value { min-width: 48px; text-align: center; font-size: 12px; font-weight: 900; color: #312e81; }
-    .booking-preview-inner { max-height: 86vh; overflow: auto; background: #edf3f8; padding: .5rem !important; }
+    .booking-preview-inner { max-height: 86vh; overflow: auto; background: #eef2f6; padding: .65rem !important; scroll-behavior: smooth; }
+    .booking-preview-steps { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+    .booking-preview-steps .bp-step {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .01em;
+        color: #64748b;
+        background: #eef2ff;
+        border: 1px solid #e2e8f0;
+    }
+    .booking-preview-steps .bp-step.is-active { color: #fff; background: linear-gradient(135deg, #4f46e5, #312e81); border-color: transparent; }
+    .booking-preview-steps .bp-step-arrow { color: #94a3b8; font-size: 13px; }
+    .booking-confirm-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 30;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(15, 23, 42, .42);
+        backdrop-filter: blur(3px);
+        border-radius: 20px;
+    }
+    .booking-confirm-overlay[hidden] { display: none; }
+    .booking-confirm-card {
+        width: 100%;
+        max-width: 420px;
+        background: #fff;
+        border-radius: 18px;
+        padding: 24px 22px 20px;
+        text-align: center;
+        box-shadow: 0 30px 70px rgba(15, 23, 42, .3);
+        animation: bookingConfirmPop .18s ease-out;
+    }
+    @keyframes bookingConfirmPop { from { transform: translateY(8px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+    .booking-confirm-icon {
+        width: 54px;
+        height: 54px;
+        margin: 0 auto 12px;
+        border-radius: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #eef2ff;
+        color: #4338ca;
+        font-size: 26px;
+    }
+    .booking-confirm-title { font-weight: 900; color: #0f172a; margin-bottom: 8px; font-size: 1.15rem; }
+    .booking-confirm-message { color: #475569; font-size: 13.5px; line-height: 1.5; margin-bottom: 18px; }
+    .booking-confirm-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .booking-confirm-actions .btn { min-width: 120px; }
+    @media (max-width: 575px) {
+        .booking-confirm-actions { flex-direction: column-reverse; }
+        .booking-confirm-actions .btn { width: 100%; }
+    }
     .text-slate-900 { color:#0f172a !important; }
     .text-slate-700 { color:#334155 !important; }
     .text-slate-300 { color:#cbd5e1 !important; }
@@ -621,7 +681,12 @@
                 <div class="modal-header bg-white border-bottom">
                     <div class="booking-preview-title-wrap">
                         <h6 class="modal-title fw-bold mb-0" id="bookingPreviewTitle"><i class="bi bi-file-earmark-richtext me-2 text-primary"></i>Booking Format Preview</h6>
-                        <small class="text-muted">Preview the booking format in popup, then click Generate PO. The order will be completed automatically after PO generation.</small>
+                        <small class="text-muted d-block">Review the booking format carefully, then generate PO.</small>
+                        <div class="booking-preview-steps" aria-label="Booking steps">
+                            <span class="bp-step is-active"><i class="bi bi-eye"></i>Preview</span>
+                            <i class="bi bi-arrow-right bp-step-arrow"></i>
+                            <span class="bp-step"><i class="bi bi-check2-circle"></i>Generate PO</span>
+                        </div>
                     </div>
                     <div class="booking-preview-header-tools no-print" aria-label="Booking preview zoom controls">
                         <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomOut" title="Zoom out" aria-label="Zoom out"><i class="bi bi-zoom-out"></i></button>
@@ -632,6 +697,18 @@
                     <button type="button" class="btn-close ms-1" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body booking-preview-inner p-2" id="bookingPreviewContent"></div>
+
+                <div class="booking-confirm-overlay" id="bookingGenerateConfirm" hidden>
+                    <div class="booking-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="bookingConfirmTitle" aria-describedby="bookingConfirmMessage">
+                        <div class="booking-confirm-icon"><i class="bi bi-patch-question"></i></div>
+                        <h5 class="booking-confirm-title" id="bookingConfirmTitle">Generate PO?</h5>
+                        <p class="booking-confirm-message" id="bookingConfirmMessage">After generating PO, the order will be completed automatically. Please confirm that all booking details are correct.</p>
+                        <div class="booking-confirm-actions">
+                            <button type="button" class="btn btn-soft-reset" id="bookingConfirmCancel">Cancel</button>
+                            <button type="button" class="btn booking-primary-btn px-4" id="bookingConfirmAccept">Yes, Generate PO</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -845,12 +922,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const zoomInBtn = document.getElementById('bookingPreviewZoomIn');
     const zoomResetBtn = document.getElementById('bookingPreviewZoomReset');
     const zoomValue = document.getElementById('bookingPreviewZoomValue');
+    const confirmOverlay = document.getElementById('bookingGenerateConfirm');
+    const confirmTitle = document.getElementById('bookingConfirmTitle');
+    const confirmMessage = document.getElementById('bookingConfirmMessage');
+    const confirmAccept = document.getElementById('bookingConfirmAccept');
+    const confirmCancel = document.getElementById('bookingConfirmCancel');
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
     const dataUrl = @json(route('supply_chain.bookings.data'));
     const indexUrl = @json(route('supply_chain.bookings.index'));
     const bulkPreviewUrl = @json(route('supply_chain.bookings.bulk_preview'));
     const bulkGenerateUrl = @json(route('supply_chain.bookings.bulk_generate'));
+    const batchPreviewUrl = @json(route('supply_chain.bookings.batch_preview'));
 
     if (!form || !rowsBody) return;
 
@@ -904,6 +987,53 @@ document.addEventListener('DOMContentLoaded', function () {
         previewPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    function askGenerateConfirm(options) {
+        const settings = options || {};
+        if (!confirmOverlay) {
+            return Promise.resolve(window.confirm(settings.message || 'Generate this PO?'));
+        }
+
+        if (confirmTitle) confirmTitle.textContent = settings.title || 'Generate PO?';
+        if (confirmMessage) confirmMessage.textContent = settings.message || '';
+        if (confirmAccept) confirmAccept.textContent = settings.confirmLabel || 'Yes, Generate PO';
+
+        confirmOverlay.hidden = false;
+
+        return new Promise(function (resolve) {
+            function cleanup(result) {
+                confirmOverlay.hidden = true;
+                confirmAccept?.removeEventListener('click', onAccept);
+                confirmCancel?.removeEventListener('click', onCancel);
+                confirmOverlay.removeEventListener('click', onBackdrop);
+                resolve(result);
+            }
+            function onAccept() { cleanup(true); }
+            function onCancel() { cleanup(false); }
+            function onBackdrop(event) { if (event.target === confirmOverlay) cleanup(false); }
+
+            confirmAccept?.addEventListener('click', onAccept);
+            confirmCancel?.addEventListener('click', onCancel);
+            confirmOverlay.addEventListener('click', onBackdrop);
+            confirmAccept?.focus();
+        });
+    }
+
+    function setGenerateLoading(btn, loading) {
+        if (!btn) return;
+        if (loading) {
+            btn.disabled = true;
+            btn.classList.add('is-loading');
+            const label = btn.dataset.loadingLabel || 'Generating PO...';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' + label;
+        } else {
+            btn.disabled = false;
+            btn.classList.remove('is-loading');
+            const label = btn.getAttribute('aria-label') || 'Generate PO';
+            const icon = btn.dataset.regenerate === '1' ? 'bi-arrow-repeat' : 'bi-check2-circle';
+            btn.innerHTML = '<span class="bf-btn-generate-content"><i class="bi ' + icon + ' me-1"></i>' + label + '</span>';
+        }
+    }
+
     function updateSelectionCount() {
         const checked = rowsBody.querySelectorAll('.booking-row-check:checked').length;
         selectedCount.textContent = checked;
@@ -955,9 +1085,16 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             body: JSON.stringify(payload),
         });
-        const data = await response.json();
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (parseError) {
+            data = {};
+        }
         if (!response.ok || data.success === false) {
-            throw new Error(data.message || 'Request failed.');
+            const error = new Error(data.message || 'Request failed.');
+            error.friendly = !!data.message;
+            throw error;
         }
         return data;
     }
@@ -1088,11 +1225,14 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         showLoading(true);
         try {
-            const data = await postJson(bulkPreviewUrl, { rows: ids });
-            showAlert(data.message || 'Selected booking preview ready.');
+            const data = await postJson(batchPreviewUrl, { rows: ids });
+            const readyMessage = ids.length > 1
+                ? 'Selected orders combined into one booking preview.'
+                : 'Booking preview ready.';
+            showAlert(data.message || readyMessage);
             showPreview(data.preview_html);
         } catch (error) {
-            showAlert(error.message, 'danger');
+            showAlert(error.friendly && error.message ? error.message : 'Unable to open preview. Please check selected orders and try again.', 'danger');
         } finally {
             showLoading(false);
         }
@@ -1137,24 +1277,55 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const generateBtn = event.target.closest('.preview-generate-po-btn');
-        if (!generateBtn) return;
+        if (!generateBtn || generateBtn.classList.contains('is-loading')) return;
 
         const editForm = generateBtn.closest('.booking-preview-edit-form');
         const editPanel = editForm?.querySelector('.booking-preview-edit-panel');
         const isRegenerate = generateBtn.dataset.regenerate === '1';
+        const isBatch = generateBtn.dataset.batch === '1';
         const payload = editForm && (isRegenerate || (editPanel && !editPanel.classList.contains('d-none'))) ? formDataToObject(editForm) : {};
 
-        if (isRegenerate) {
-            const confirmed = window.confirm('Confirm re-generate this PO? PO number will stay the same and revision count will increase.');
-            if (!confirmed) return;
+        if (isBatch) {
+            payload.rows = (generateBtn.dataset.rows || '')
+                .split(',')
+                .map(value => parseInt(value, 10))
+                .filter(value => !Number.isNaN(value));
+
+            if (!payload.rows.length) {
+                showAlert('Please select at least one order.', 'warning');
+                return;
+            }
         }
 
-        generateBtn.disabled = true;
+        let confirmOptions;
+        if (isBatch) {
+            confirmOptions = {
+                title: 'Generate PO for Selected Orders?',
+                message: 'You have selected multiple orders. One PO number will be generated for all selected orders. Do you want to continue?',
+                confirmLabel: 'Yes, Generate PO',
+            };
+        } else if (isRegenerate) {
+            confirmOptions = {
+                title: 'Re-generate PO?',
+                message: 'Re-generating keeps the same PO number and increases the revision count. Please confirm that the latest booking details are correct.',
+                confirmLabel: 'Yes, Re-generate PO',
+            };
+        } else {
+            confirmOptions = {
+                title: 'Generate PO?',
+                message: 'Do you want to generate PO for this order? The order will be completed automatically after PO generation.',
+                confirmLabel: 'Yes, Generate PO',
+            };
+        }
+
+        const confirmed = await askGenerateConfirm(confirmOptions);
+        if (!confirmed) return;
+
+        setGenerateLoading(generateBtn, true);
         showLoading(true);
         try {
             const data = await postJson(generateBtn.dataset.url, payload);
-            const successMessage = data.message || 'PO generated successfully. Booking completed.';
-            showAlert(successMessage);
+            showAlert(data.message || 'PO generated successfully.');
             if (data.preview_html) {
                 showPreview(data.preview_html);
             }
@@ -1164,9 +1335,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 await loadRows();
             }
         } catch (error) {
-            showAlert(error.message, 'danger');
+            showAlert(error.friendly && error.message ? error.message : 'Unable to generate PO. Please try again or contact admin.', 'danger');
+            setGenerateLoading(generateBtn, false);
         } finally {
-            generateBtn.disabled = false;
             showLoading(false);
         }
     });

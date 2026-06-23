@@ -246,6 +246,22 @@ document.addEventListener('DOMContentLoaded', function () {
         return payload;
     }
 
+    function setGenerateLoading(btn, loading) {
+        if (!btn) return;
+        if (loading) {
+            btn.disabled = true;
+            btn.classList.add('is-loading');
+            const label = btn.dataset.loadingLabel || 'Saving...';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' + label;
+        } else {
+            btn.disabled = false;
+            btn.classList.remove('is-loading');
+            const label = btn.getAttribute('aria-label') || 'Generate PO';
+            const icon = btn.dataset.regenerate === '1' ? 'bi-arrow-repeat' : 'bi-check2-circle';
+            btn.innerHTML = '<span class="bf-btn-generate-content"><i class="bi ' + icon + ' me-1"></i>' + label + '</span>';
+        }
+    }
+
     document.querySelector('.booking-show-edit-start')?.addEventListener('click', async function () {
         this.disabled = true;
         try {
@@ -308,27 +324,32 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        const cancelBtn = event.target.closest('.booking-preview-cancel');
+        if (cancelBtn) {
+            window.location.reload();
+            return;
+        }
+
         const generateBtn = event.target.closest('.preview-generate-po-btn');
-        if (!generateBtn) return;
+        if (!generateBtn || generateBtn.classList.contains('is-loading')) return;
         const editForm = generateBtn.closest('.booking-preview-edit-form');
         const payload = editForm ? formDataToObject(editForm) : {};
         const isEdit = generateBtn.dataset.edit === '1';
         const isRegenerate = generateBtn.dataset.regenerate === '1';
         const confirmText = isEdit
-            ? 'Confirm save this PO edit?'
-            : (isRegenerate ? 'Confirm re-generate this PO? PO number will stay the same and revision count will increase.' : 'Confirm generate this PO?');
+            ? 'Save this PO edit? The PO number will stay the same.'
+            : (isRegenerate ? 'Re-generate this PO? The PO number will stay the same and the revision count will increase.' : 'Generate this PO?');
         if (!window.confirm(confirmText)) return;
 
-        generateBtn.disabled = true;
+        setGenerateLoading(generateBtn, true);
         try {
             const data = await postJson(generateBtn.dataset.url, payload);
             showAlert(data.message || (isEdit ? 'PO edited successfully.' : 'PO re-generated successfully.'));
             if (data.preview_html && previewContent) previewContent.innerHTML = data.preview_html;
             setTimeout(function () { window.location.reload(); }, 1200);
         } catch (error) {
-            showAlert(error.message, 'danger');
-        } finally {
-            generateBtn.disabled = false;
+            showAlert('Unable to complete the request. Please try again or contact admin.', 'danger');
+            setGenerateLoading(generateBtn, false);
         }
     });
 

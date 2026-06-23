@@ -7,6 +7,9 @@
     $previewMode = $previewMode ?? false;
     $regenerateMode = $regenerateMode ?? false;
     $adminEditMode = $adminEditMode ?? false;
+    $batchMode = $batchMode ?? false;
+    $batchRowIds = $batchRowIds ?? [];
+    $selectedOrderCount = $selectedOrderCount ?? null;
     $editPanelOpen = $editPanelOpen ?? false;
     $generateUrl = $generateUrl ?? null;
     $poNo = $bookingData['po_number'] ?? ($bookingPo->po_no ?? '');
@@ -37,7 +40,7 @@
         background: linear-gradient(180deg, #eef6fb 0%, #ffffff 100%);
         padding: 8px;
         border-radius: 12px;
-        overflow: auto;
+        overflow: visible;
     }
     .booking-format-preview-box .bf-sheet {
         width: 198mm;
@@ -180,10 +183,93 @@
         flex-wrap: wrap;
         margin-bottom: 12px;
     }
-    .booking-format-preview-box .bf-generate-wrap {
+    .booking-format-preview-box .bf-batch-banner {
         display: flex;
-        justify-content: flex-end;
-        padding-top: 14px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+        padding: 10px 14px;
+        border-radius: 12px;
+        border: 1px solid #c7d2fe;
+        background: linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%);
+        box-shadow: 0 8px 20px rgba(67, 56, 202, .08);
+    }
+    .booking-format-preview-box .bf-batch-count {
+        display: inline-flex;
+        align-items: center;
+        font-size: 13px;
+        font-weight: 900;
+        color: #312e81;
+    }
+    .booking-format-preview-box .bf-batch-note {
+        display: inline-flex;
+        align-items: center;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #4338ca;
+    }
+    .booking-format-preview-box .bf-action-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 6;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin: 14px -8px -8px;
+        padding: 12px 16px;
+        background: rgba(255, 255, 255, .97);
+        backdrop-filter: blur(8px);
+        border-top: 1px solid #d7e1ec;
+        border-radius: 0 0 12px 12px;
+        box-shadow: 0 -12px 26px rgba(15, 23, 42, .09);
+    }
+    .booking-format-preview-box .bf-action-footer-help {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #475569;
+        font-size: 12.5px;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+    .booking-format-preview-box .bf-action-footer-help i { color: var(--hapl-blue); font-size: 15px; flex: 0 0 auto; }
+    .booking-format-preview-box .bf-action-footer-buttons { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .booking-format-preview-box .bf-btn-cancel {
+        border: 1px solid #d6deea;
+        background: #ffffff;
+        color: #475569;
+        font-weight: 700;
+        border-radius: 11px;
+        padding: 9px 18px;
+        display: inline-flex;
+        align-items: center;
+    }
+    .booking-format-preview-box .bf-btn-cancel:hover { background: #f1f5f9; color: #1e293b; border-color: #c3cfde; }
+    .booking-format-preview-box .bf-btn-cancel:focus-visible { outline: 3px solid rgba(100, 116, 139, .3); outline-offset: 2px; }
+    .booking-format-preview-box .bf-btn-generate {
+        border: 0;
+        border-radius: 11px;
+        padding: 9px 22px;
+        font-weight: 800;
+        color: #ffffff;
+        background: linear-gradient(135deg, #4f46e5, #312e81);
+        box-shadow: 0 12px 24px rgba(79, 70, 229, .26);
+        display: inline-flex;
+        align-items: center;
+        transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
+    }
+    .booking-format-preview-box .bf-btn-generate:hover { color: #fff; filter: brightness(1.06); transform: translateY(-1px); }
+    .booking-format-preview-box .bf-btn-generate:focus-visible { outline: 3px solid rgba(79, 70, 229, .4); outline-offset: 2px; }
+    .booking-format-preview-box .bf-btn-generate:disabled { opacity: .8; cursor: progress; transform: none; box-shadow: none; filter: none; }
+    @media (max-width: 575px) {
+        .booking-format-preview-box .bf-action-footer { flex-direction: column; align-items: stretch; text-align: center; }
+        .booking-format-preview-box .bf-action-footer-help { justify-content: center; }
+        .booking-format-preview-box .bf-action-footer-buttons { justify-content: stretch; }
+        .booking-format-preview-box .bf-action-footer-buttons .btn { flex: 1; justify-content: center; }
     }
     .booking-format-preview-box .booking-preview-edit-panel {
         width: 198mm;
@@ -234,6 +320,12 @@
 @if($canEditThisPreview)
     <form class="booking-preview-edit-form">
 @endif
+    @if($batchMode)
+        <div class="bf-batch-banner no-print" role="status">
+            <span class="bf-batch-count"><i class="bi bi-collection me-1"></i>Selected Orders: {{ $selectedOrderCount ?? count($batchRowIds) }}</span>
+            <span class="bf-batch-note"><i class="bi bi-info-circle me-1"></i>One PO number will be generated for all selected orders.</span>
+        </div>
+    @endif
     <div class="bf-action-bar no-print">
         @if($canEditThisPreview)
             <button type="button" class="btn btn-outline-primary btn-sm booking-preview-edit-toggle">
@@ -561,20 +653,43 @@
             </table>
 
             <div class="bf-footer-note">Generated from HAPL OCR Supply Chain Booking Generate module - PO {{ $poNo }}</div>
-
-            @if($canEditThisPreview)
-                <div class="bf-generate-wrap no-print">
-                    <button type="button"
-                            class="btn btn-primary fw-bold px-4 py-2 rounded-pill preview-generate-po-btn"
-                            data-url="{{ $generateUrl }}"
-                            data-regenerate="{{ $regenerateMode ? '1' : '0' }}"
-                            data-edit="{{ $adminEditMode ? '1' : '0' }}">
-                        <i class="bi {{ $adminEditMode ? 'bi-check2-circle' : ($regenerateMode ? 'bi-arrow-repeat' : 'bi-magic') }} me-1"></i>{{ $adminEditMode ? 'Save PO Edit' : ($regenerateMode ? 'Re-generate PO' : 'Generate PO') }}
-                    </button>
-                </div>
-            @endif
         </div>
     </div>
+
+    @if($canEditThisPreview)
+        @php
+            $generateLabel = $adminEditMode
+                ? 'Save PO Edit'
+                : ($regenerateMode ? 'Re-generate PO' : ($batchMode ? 'Generate PO for Selected Orders' : 'Generate PO'));
+            $generateIcon = $regenerateMode ? 'bi-arrow-repeat' : 'bi-check2-circle';
+            $loadingLabel = $adminEditMode ? 'Saving PO...' : ($regenerateMode ? 'Re-generating PO...' : 'Generating PO...');
+            $footerHelp = $batchMode
+                ? 'One PO number will be generated for all selected orders.'
+                : 'Please review all booking details before generating PO.';
+        @endphp
+        <div class="bf-action-footer no-print">
+            <div class="bf-action-footer-help">
+                <i class="bi bi-info-circle"></i>
+                <span>{{ $footerHelp }}</span>
+            </div>
+            <div class="bf-action-footer-buttons">
+                <button type="button" class="btn bf-btn-cancel booking-preview-cancel" data-bs-dismiss="modal" aria-label="Close preview">
+                    <i class="bi bi-x-lg me-1"></i>Cancel
+                </button>
+                <button type="button"
+                        class="btn bf-btn-generate preview-generate-po-btn"
+                        data-url="{{ $generateUrl }}"
+                        data-regenerate="{{ $regenerateMode ? '1' : '0' }}"
+                        data-edit="{{ $adminEditMode ? '1' : '0' }}"
+                        data-batch="{{ $batchMode ? '1' : '0' }}"
+                        @if($batchMode) data-rows="{{ implode(',', $batchRowIds) }}" @endif
+                        data-loading-label="{{ $loadingLabel }}"
+                        aria-label="{{ $generateLabel }}">
+                    <span class="bf-btn-generate-content"><i class="bi {{ $generateIcon }} me-1"></i>{{ $generateLabel }}</span>
+                </button>
+            </div>
+        </div>
+    @endif
 @if($canEditThisPreview)
     </form>
 @endif

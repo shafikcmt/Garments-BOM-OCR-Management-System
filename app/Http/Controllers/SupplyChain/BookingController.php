@@ -297,6 +297,341 @@ class BookingController extends Controller
         ]);
     }
 
+    /**
+     * Combined preview for one or many selected pending orders.
+     *
+     * - One selected order keeps the existing single-order behavior unchanged.
+     * - Multiple selected orders are combined into one preview that will
+     *   generate a single PO number for the whole selected batch.
+     */
+    public function batchPreview(Request $request)
+    {
+        $rowIds = $this->normalizeSelectedRowIds($request->input('rows', []));
+
+        if ($rowIds->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please select at least one pending order.',
+            ], 422);
+        }
+
+        // Single order -> reuse the existing single preview formula as-is.
+        if ($rowIds->count() === 1) {
+            $row = ExcelRow::query()
+                ->with(['excelFile', 'cells.header', 'bookingPo'])
+                ->find($rowIds->first());
+
+            if (! $row) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to generate PO. Please check selected orders and try again.',
+                ], 422);
+            }
+
+            return $this->preview($request, $row);
+        }
+
+        try {
+            $rows = $this->collectBatchRows($rowIds);
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
+
+        $lineData = $rows
+            ->map(fn (ExcelRow $row) => $this->extractRowData($row))
+            ->filter(fn (array $data) => $this->hasAnyBookingSourceData($data))
+            ->values()
+            ->all();
+
+        if (empty($lineData)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to generate PO. Please check selected orders and try again.',
+            ], 422);
+        }
+
+        $primaryRow = $rows->first();
+        $primaryData = $this->extractRowData($primaryRow);
+        $totalQty = collect($lineData)->sum(fn (array $data) => (float) ($this->numericValue($data['qty'] ?? null) ?? 0));
+
+        $bookingPo = new BookingPo([
+            'excel_file_id' => $primaryRow->excel_file_id,
+            'excel_row_id' => $primaryRow->id,
+            'po_no' => '[Generate after preview]',
+            'buyer_code' => $this->makeCode($primaryData['buyer_name'] ?? '', 2),
+            'season_code' => $this->makeSeasonCode($primaryData['season_name'] ?? ''),
+            'buyer_name' => $primaryData['buyer_name'] ?? null,
+            'season_name' => $primaryData['season_name'] ?? null,
+            'ihod' => $primaryData['ihod'] ?? null,
+            'vendor_name' => $primaryData['vendor_name'] ?? null,
+            'style_name' => $primaryData['style_name'] ?? null,
+            'item_name' => $primaryData['item_name'] ?? null,
+            'qty' => $totalQty ?: $this->numericValue($primaryData['qty'] ?? null),
+            'uom' => $primaryData['uom'] ?? null,
+            'item_type' => $primaryData['item_type'] ?? null,
+            'description' => $primaryData['description'] ?? null,
+            'color' => $primaryData['color'] ?? null,
+            'size_width' => $primaryData['size_width'] ?? null,
+            'supplier_article' => $primaryData['supplier_article'] ?? null,
+            'consumption' => $this->numericValue($primaryData['consumption'] ?? null),
+            'remarks' => $primaryData['remarks'] ?? null,
+            'status' => 'preview',
+            'generated_by' => auth()->id(),
+            'generated_at' => now(),
+        ]);
+
+        $bookingData = $this->defaultBookingData($bookingPo, $lineData);
+        $bookingData['po_number'] = 'Will be generated after confirmation';
+
+        $selectedOrderCount = $rowIds->count();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Selected orders combined. One PO number will be generated for all selected orders.',
+            'multiple' => true,
+            'selected_count' => $selectedOrderCount,
+            'preview_html' => view('supply-chain.bookings.partials.preview', [
+                'bookingPo' => $bookingPo,
+                'bookingData' => $bookingData,
+                'previewMode' => true,
+                'generateUrl' => $this->bookingRoute('batch_generate'),
+                'instructionOptions' => $this->bookingInstructionOptions(),
+                'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
+                'batchMode' => true,
+                'batchRowIds' => $rowIds->all(),
+                'selectedOrderCount' => $selectedOrderCount,
+            ])->render(),
+        ]);
+    }
+
+    /**
+     * Generate a single PO number for many selected orders inside one safe transaction.
+     *
+     * One selected order is delegated to the existing single-order generate formula.
+     */
+    public function batchGenerate(Request $request)
+    {
+        $rowIds = $this->normalizeSelectedRowIds($request->input('rows', []));
+
+        if ($rowIds->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please select at least one pending order.',
+            ], 422);
+        }
+
+        // Single order -> reuse the existing single generate formula as-is.
+        if ($rowIds->count() === 1) {
+            $row = ExcelRow::query()->find($rowIds->first());
+
+            if (! $row) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to generate PO. Please check selected orders and try again.',
+                ], 422);
+            }
+
+            return $this->generate($request, $row);
+        }
+
+        $editData = $this->requestHasBookingEdits($request) ? $this->validateBookingEditRequest($request) : null;
+
+        try {
+            $bookingPo = DB::transaction(function () use ($rowIds, $editData, $request) {
+                $rows = $this->collectBatchRows($rowIds);
+
+                $lockedRows = ExcelRow::query()
+                    ->whereIn('id', $rows->pluck('id')->all())
+                    ->lockForUpdate()
+                    ->with(['excelFile', 'cells.header', 'bookingPo'])
+                    ->get()
+                    ->sortBy(fn (ExcelRow $row) => $rows->search(fn (ExcelRow $original) => $original->id === $row->id))
+                    ->values();
+
+                // Re-validate under lock so no row was generated by a parallel request.
+                foreach ($lockedRows as $row) {
+                    if ($row->bookingPo) {
+                        throw new \RuntimeException('Some selected orders already have PO generated.');
+                    }
+                }
+
+                $primaryRow = $lockedRows->first();
+                $primaryData = $this->extractRowData($primaryRow);
+
+                $buyerCode = $this->makeCode($primaryData['buyer_name'] ?? '', 2);
+                $seasonCode = $this->makeSeasonCode($primaryData['season_name'] ?? '');
+                $generatedAt = now();
+                $poNo = $this->makeUniquePoNo($buyerCode, $seasonCode);
+
+                $lineData = $lockedRows
+                    ->map(fn (ExcelRow $row) => $this->extractRowData($row))
+                    ->filter(fn (array $data) => $this->hasAnyBookingSourceData($data))
+                    ->values()
+                    ->all();
+
+                if (empty($lineData)) {
+                    $lineData = [$primaryData];
+                }
+
+                $totalQty = collect($lineData)->sum(fn (array $data) => (float) ($this->numericValue($data['qty'] ?? null) ?? 0));
+
+                $bookingPo = BookingPo::create([
+                    'excel_file_id' => $primaryRow->excel_file_id,
+                    'excel_row_id' => $primaryRow->id,
+                    'po_no' => $poNo,
+                    'buyer_code' => $buyerCode,
+                    'season_code' => $seasonCode,
+                    'buyer_name' => $primaryData['buyer_name'] ?? null,
+                    'season_name' => $primaryData['season_name'] ?? null,
+                    'ihod' => $primaryData['ihod'] ?? null,
+                    'vendor_name' => $primaryData['vendor_name'] ?? null,
+                    'style_name' => $primaryData['style_name'] ?? null,
+                    'item_name' => $primaryData['item_name'] ?? null,
+                    'qty' => $totalQty ?: $this->numericValue($primaryData['qty'] ?? null),
+                    'uom' => $primaryData['uom'] ?? null,
+                    'item_type' => $primaryData['item_type'] ?? null,
+                    'description' => $primaryData['description'] ?? null,
+                    'color' => $primaryData['color'] ?? null,
+                    'size_width' => $primaryData['size_width'] ?? null,
+                    'supplier_article' => $primaryData['supplier_article'] ?? null,
+                    'consumption' => $this->numericValue($primaryData['consumption'] ?? null),
+                    'remarks' => $primaryData['remarks'] ?? null,
+                    'booking_data' => null,
+                    'status' => 'applied',
+                    'generated_by' => auth()->id(),
+                    'generated_at' => $generatedAt,
+                ]);
+
+                $bookingPo->booking_data = $this->defaultBookingData($bookingPo, $lineData);
+                $bookingPo->save();
+
+                if ($editData !== null) {
+                    $bookingPo = $this->applyBookingEditDataToPo($bookingPo, $editData, $request);
+                }
+
+                // Assign the same PO number to every selected related row.
+                foreach ($lockedRows as $row) {
+                    $this->syncPoToWorkspace($row, $poNo, $generatedAt);
+                }
+
+                return $bookingPo;
+            });
+        } catch (\RuntimeException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
+
+        $bookingPo = $this->syncBookingPoSourceControl($bookingPo, true);
+        $bookingPo = $this->appendBookingGenerationHistory($bookingPo, 'generated');
+        $this->markBookingPoCompleted($bookingPo);
+
+        $bookingData = $this->bookingData($bookingPo);
+        $message = 'PO generated successfully. One PO number has been assigned to all selected orders: ' . $bookingPo->po_no . '.';
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'po_no' => $bookingPo->po_no,
+            'booking_po_id' => $bookingPo->id,
+            'preview_html' => view('supply-chain.bookings.partials.preview', array_merge(
+                compact('bookingPo', 'bookingData'),
+                [
+                    'previewMode' => false,
+                    'generateUrl' => null,
+                    'instructionOptions' => $this->bookingInstructionOptions(),
+                    'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
+                    'bookingRoutePrefix' => $this->bookingRoutePrefix(),
+                    'canControlPo' => $this->canControlPo(),
+                ]
+            ))->render(),
+        ]);
+    }
+
+    protected function normalizeSelectedRowIds($input): \Illuminate\Support\Collection
+    {
+        return collect(is_array($input) ? $input : [$input])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->take(200)
+            ->values();
+    }
+
+    /**
+     * Validate selected leader rows and expand them into one combinable batch.
+     *
+     * Throws a RuntimeException with a friendly message when the selection
+     * is invalid, already generated, or spans more than one vendor/supplier.
+     */
+    protected function collectBatchRows(\Illuminate\Support\Collection $leaderIds): \Illuminate\Support\Collection
+    {
+        $leaders = ExcelRow::query()
+            ->whereIn('id', $leaderIds->all())
+            ->with(['excelFile', 'cells.header', 'bookingPo'])
+            ->get();
+
+        if ($leaders->count() !== $leaderIds->count()) {
+            throw new \RuntimeException('Unable to generate PO. Please check selected orders and try again.');
+        }
+
+        foreach ($leaders as $leader) {
+            if (! $leader->excelFile) {
+                throw new \RuntimeException('Unable to generate PO. Please check selected orders and try again.');
+            }
+
+            if ($leader->bookingPo) {
+                throw new \RuntimeException('Some selected orders already have PO generated.');
+            }
+        }
+
+        // Keep the user-selected order and expand each selection to its pending group.
+        $rows = collect();
+        foreach ($leaderIds as $leaderId) {
+            $leader = $leaders->firstWhere('id', $leaderId);
+            if (! $leader) {
+                continue;
+            }
+
+            $groupRows = $this->pendingRowsForSameBookingGroup($leader, $this->extractRowData($leader));
+            if ($groupRows->isEmpty()) {
+                $groupRows = collect([$leader]);
+            }
+
+            foreach ($groupRows as $row) {
+                $rows->put($row->id, $row);
+            }
+        }
+
+        $rows = $rows->values();
+
+        if ($rows->isEmpty()) {
+            throw new \RuntimeException('Unable to generate PO. Please check selected orders and try again.');
+        }
+
+        foreach ($rows as $row) {
+            if ($row->bookingPo) {
+                throw new \RuntimeException('Some selected orders already have PO generated.');
+            }
+        }
+
+        // A PO is issued to a single supplier, so every selected order must share the same vendor.
+        $vendors = $rows
+            ->map(fn (ExcelRow $row) => $this->normalize($this->extractRowData($row)['vendor_name'] ?? ''))
+            ->filter(fn (string $vendor) => $vendor !== '')
+            ->unique()
+            ->values();
+
+        if ($vendors->count() > 1) {
+            throw new \RuntimeException('Selected orders cannot be combined because vendor/supplier is different.');
+        }
+
+        return $rows;
+    }
 
     protected function bookingSourceControlFields(): array
     {
