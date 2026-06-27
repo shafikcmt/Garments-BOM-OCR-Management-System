@@ -2,9 +2,8 @@
 node_modules/
 vendor/
 
-# Git
+# Git internals
 .git/
-.github/
 
 # Environment / secrets
 .env
@@ -28,17 +27,19 @@ bootstrap/cache/
 public/storage/
 
 # Build output
+public/build/
 dist/
 build/
-public/build/
 .hot
 
-# Cache
+# Cache / debug
 .cache/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.phpunit.result.cache
+coverage/
 
 # OS / editor
 .DS_Store
@@ -47,12 +48,20 @@ Thumbs.db
 .vscode/
 *.swp
 
-# Test / coverage generated files
-coverage/
-.phpunit.result.cache
-
-# Large uploads / generated exports
+# Large generated uploads / exports
 storage/app/public/uploads/
 storage/app/public/exports/
 storage/app/public/pdf/
 storage/app/public/temp/
+storage/app/private/
+
+# Database dumps / backups
+*.sql
+*.sqlite
+*.sqlite3
+*.bak
+*.backup
+*.dump
+*.zip
+*.rar
+*.7z
