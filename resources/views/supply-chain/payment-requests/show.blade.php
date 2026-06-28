@@ -8,9 +8,10 @@
     $list = fn ($values, $fallback = '-') => collect($values ?? [])->map(fn ($v) => trim((string) $v))->filter()->take(5)->implode(', ') ?: $fallback;
     $money = fn ($value) => number_format((float) $value, 2);
     $paymentRequiredDate = $summary['earliest_payment_required_date'] ?? null;
-    $paymentRequiredParts = $paymentRequiredDate
-        ? [optional($paymentRequiredDate)->format('d'), optional($paymentRequiredDate)->format('m'), optional($paymentRequiredDate)->format('Y')]
-        : ['--', '--', '----'];
+    if (! $paymentRequiredDate) {
+        $snapshotRequiredDate = data_get($paymentRequest->data ?? [], 'payment_required_date');
+        $paymentRequiredDate = $snapshotRequiredDate ? \Illuminate\Support\Carbon::parse($snapshotRequiredDate) : null;
+    }
     $paymentRequiredInput = $paymentRequiredInput ?? ($paymentRequiredDate ? optional($paymentRequiredDate)->format('Y-m-d') : now()->addDays(7)->toDateString());
     $logoPath = public_path('images/humana-logo.png');
     $logoData = null;
@@ -40,19 +41,19 @@
     .pra-title { font-size:32px; line-height:1; font-weight:800; letter-spacing:.02em; color:#000b6f; text-align:center; }
     .pra-request-no { font-size:15px; margin-top:8px; text-align:center; color:#000b6f; letter-spacing:.04em; }
     .pra-date { font-size:13px; font-weight:700; text-align:right; color:#000b6f; }
-    .pra-date-box { display:inline-flex; width:45px; height:34px; align-items:center; justify-content:center; border:1px solid #8da0d8; border-radius:3px; font-weight:800; margin:0 6px; }
-    .pra-date-box.year { width:64px; }
+    .pra-date-value { font-weight:800; white-space:nowrap; margin-left:6px; }
     .pra-check-box { border:1px solid #4a5cb2; border-radius:3px; min-height:102px; padding:15px 16px; font-size:13px; color:#000b6f; }
     .pra-mini-box { display:inline-block; width:16px; height:16px; border:1px solid #91a1d0; vertical-align:middle; margin:0 7px 0 18px; }
     .pra-info { font-size:13px; line-height:2.05; font-weight:700; color:#000b6f; }
     .pra-note { font-size:12px; line-height:1.45; font-weight:700; color:#000b6f; }
     .pra-total { font-size:18px; font-weight:800; text-align:right; color:#000b6f; margin-bottom:10px; }
-    .pra-table { color:#101828; border-color:#e5e7eb; table-layout:fixed; }
-    .pra-table thead th { background:#000b6f; color:#fff; border-color:#33439e; font-size:11px; line-height:1.15; padding:12px 8px; text-align:center; vertical-align:middle; }
-    .pra-table tbody td { font-size:12px; padding:12px 9px; border-color:#e7eaf1; vertical-align:middle; word-break:break-word; }
-    .pra-table tfoot td { background:#eaf0fb; color:#000b6f; font-size:16px; font-weight:800; padding:13px 9px; border-color:#e7eaf1; }
-    .c-vendor { width:12%; } .c-style { width:10%; } .c-date { width:9.5%; } .c-term { width:10%; } .c-po { width:11%; }
-    .c-pi { width:12%; } .c-type { width:9%; } .c-comments { width:8%; } .c-amount { width:9%; }
+    .pra-table { color:#101828; border-color:#e5e7eb; table-layout:fixed; width:100%; }
+    .pra-table thead th { background:#000b6f; color:#fff; border-color:#33439e; font-size:10px; line-height:1.2; padding:8px 5px; text-align:center; vertical-align:middle; word-break:break-word; overflow-wrap:break-word; }
+    .pra-table tbody td { font-size:11px; padding:8px 6px; border-color:#e7eaf1; vertical-align:top; word-break:break-word; overflow-wrap:break-word; }
+    .pra-table tfoot td { background:#eaf0fb; color:#000b6f; font-size:14px; font-weight:800; padding:10px 6px; border-color:#e7eaf1; }
+    .pra-table td.text-end, .pra-table th.text-end, .pra-table tfoot td.text-end { white-space:nowrap; }
+    .c-vendor { width:11%; } .c-style { width:9%; } .c-pcd { width:8%; } .c-term { width:8%; } .c-po { width:12%; }
+    .c-pi { width:12%; } .c-type { width:7%; } .c-cship { width:8%; } .c-exmill { width:8%; } .c-comments { width:9%; } .c-amount { width:8%; }
     .pra-sign-area { margin-top:52px; color:#000b6f; }
     .pra-sign-title { font-size:13px; font-weight:800; margin-bottom:30px; }
     .pra-sign-text { font-size:13px; margin-bottom:30px; }
@@ -63,6 +64,11 @@
         .pra-toolbar, .sidebar, nav, header { display:none !important; }
         .content-wrapper, main, .pra-wrap { margin:0 !important; padding:0 !important; background:#fff !important; }
         .pra-sheet { min-width:0; width:100%; box-shadow:none; border:0; padding:12px; }
+        .table-responsive { overflow:visible !important; }
+        .pra-table { width:100% !important; table-layout:fixed; }
+        .pra-table thead th { font-size:8.5px; padding:4px 3px; }
+        .pra-table tbody td { font-size:8.5px; padding:4px 3px; }
+        .pra-table tfoot td { font-size:10px; padding:5px 3px; }
         @page { size: A4 landscape; margin:8mm; }
     }
 </style>
@@ -132,11 +138,8 @@
                 </div>
                 <div class="col-3">
                     <div class="pra-date mb-3">Date:&nbsp;&nbsp; {{ optional($paymentRequest->created_at)->format('jS M-Y') }}</div>
-                    <div class="pra-date d-flex justify-content-end align-items-center flex-wrap">
-                        <span>Payment Require Date:</span>
-                        <span class="pra-date-box">{{ $paymentRequiredParts[0] }}</span><span>/</span>
-                        <span class="pra-date-box">{{ $paymentRequiredParts[1] }}</span><span>/</span>
-                        <span class="pra-date-box year">{{ $paymentRequiredParts[2] }}</span>
+                    <div class="pra-date">
+                        Payment Require Date:<span class="pra-date-value">{{ $paymentRequiredDate ? optional($paymentRequiredDate)->format('jS M-Y') : '-' }}</span>
                     </div>
                 </div>
             </div>
@@ -167,17 +170,17 @@
                 <table class="table table-bordered align-middle pra-table mb-0">
                     <thead>
                         <tr>
-                            <th class="c-vendor">Vendor Name</th>
+                            <th class="c-vendor">Vendor</th>
                             <th class="c-style">Style</th>
-                            <th class="c-date">PCD Required</th>
-                            <th class="c-term">Payment Term</th>
-                            <th class="c-po">Material PO Number</th>
-                            <th class="c-pi">Material PI Number</th>
-                            <th class="c-type">Material Type</th>
-                            <th class="c-date">Contract Shipment</th>
-                            <th class="c-date">Committed Ex Mill</th>
+                            <th class="c-pcd">PCD Date</th>
+                            <th class="c-term">Pay Term</th>
+                            <th class="c-po">PO No.</th>
+                            <th class="c-pi">PI No.</th>
+                            <th class="c-type">Type</th>
+                            <th class="c-cship">C. Shipment</th>
+                            <th class="c-exmill">Ex Mill</th>
                             <th class="c-comments">Comments</th>
-                            <th class="c-amount text-end">PI Amount (USD)</th>
+                            <th class="c-amount text-end">PI Amt (USD)</th>
                         </tr>
                     </thead>
                     <tbody>
