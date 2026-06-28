@@ -52,11 +52,11 @@
                             </td>
                             <td>
                                 <div class="d-flex gap-2">
-                                    <a href="{{ route('admin.booking-delivery-destinations.edit', $destination) }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil-square"></i></a>
+                                    <a href="{{ route('admin.booking-delivery-destinations.edit', $destination) }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil-square"></i><span class="ms-1">Edit</span></a>
                                     <form action="{{ route('admin.booking-delivery-destinations.destroy', $destination) }}" method="POST" onsubmit="return confirm('Delete this destination?');">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i><span class="ms-1">Delete</span></button>
                                     </form>
                                 </div>
                             </td>

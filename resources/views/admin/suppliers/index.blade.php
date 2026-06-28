@@ -134,12 +134,15 @@
     .supplier-name { color: var(--vendor-ink); font-size: 13px; font-weight: 850; letter-spacing: -.015em; }
     .supplier-sub { color: var(--vendor-muted); font-size: 12px; line-height: 1.35; }
     .supplier-action-btn {
-        width: 34px;
-        height: 34px;
+        height: auto;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border-radius: 12px !important;
+        gap: 6px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 10px !important;
         border: 1px solid transparent;
         box-shadow: none !important;
     }
@@ -297,14 +300,14 @@
                             <td>
                                 <div class="d-flex justify-content-center gap-2">
                                     <a href="{{ route('admin.suppliers.edit', $supplier) }}" class="btn supplier-action-btn supplier-action-edit" title="Edit vendor">
-                                        <i class="bi bi-pencil-square"></i>
+                                        <i class="bi bi-pencil-square"></i><span class="ms-1">Edit</span>
                                     </a>
 
                                     <form action="{{ route('admin.suppliers.destroy', $supplier) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this vendor?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn supplier-action-btn supplier-action-delete" title="Delete vendor">
-                                            <i class="bi bi-trash3"></i>
+                                            <i class="bi bi-trash3"></i><span class="ms-1">Delete</span>
                                         </button>
                                     </form>
                                 </div>

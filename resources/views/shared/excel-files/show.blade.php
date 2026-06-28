@@ -881,9 +881,9 @@
                 @endif
             </div>
             <div class="d-flex gap-2 flex-shrink-0">
-                <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"><i class="bi bi-arrow-left"></i></a>
+                <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"><i class="bi bi-arrow-left"></i><span class="ms-1">Back</span></a>
                 @if($canDeleteFile ?? false)
-                    <button type="submit" form="delete-file-form" class="btn btn-outline-danger btn-sm" style="min-height:32px;font-size:12px;" onclick="return confirm('Are you sure you want to delete this file?');"><i class="bi bi-trash"></i></button>
+                    <button type="submit" form="delete-file-form" class="btn btn-outline-danger btn-sm" style="min-height:32px;font-size:12px;" onclick="return confirm('Are you sure you want to delete this file?');"><i class="bi bi-trash"></i><span class="ms-1">Delete</span></button>
                 @endif
             </div>
         </div>

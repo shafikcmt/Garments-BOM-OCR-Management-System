@@ -573,14 +573,14 @@
                                 <td>
                                     <div class="actions-stack">
                                         <a href="{{ route('admin.headers.edit', $header->id) }}" class="btn btn-sm btn-outline-warning header-action-btn" title="Edit header" aria-label="Edit header">
-                                            <i class="bi bi-pencil-square"></i><span class="d-none d-xl-inline">Edit</span>
+                                            <i class="bi bi-pencil-square"></i><span class="ms-1">Edit</span>
                                         </a>
 
                                         <form action="{{ route('admin.headers.destroy', $header->id) }}" method="POST" class="d-inline">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-outline-danger header-action-btn" title="Delete header" aria-label="Delete header" onclick="return confirm('Delete this header?')">
-                                                <i class="bi bi-trash3"></i><span class="d-none d-xl-inline">Delete</span>
+                                                <i class="bi bi-trash3"></i><span class="ms-1">Delete</span>
                                             </button>
                                         </form>
                                     </div>

@@ -1257,7 +1257,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (list) {
                 const row = document.createElement('div');
                 row.className = 'booking-preview-note-row';
-                row.innerHTML = '<textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea><button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg"></i></button>';
+                row.innerHTML = '<textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea><button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg"></i><span class="ms-1">Remove</span></button>';
                 list.appendChild(row);
             }
             return;

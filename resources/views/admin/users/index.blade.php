@@ -54,12 +54,15 @@
                             </td>
                             <td>
                                 <div class="d-flex gap-2">
-                                    <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil-square"></i></a>
-                                    <form action="{{ route('admin.users.destroy', $user) }}" method="POST" class="d-inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button onclick="return confirm('Delete this user?')" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                                    </form>
+                                    <a href="{{ route('admin.users.show', $user) }}" class="btn btn-sm btn-outline-secondary" title="View profile"><i class="bi bi-eye"></i><span class="ms-1">View</span></a>
+                                    <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-sm btn-outline-warning" title="Edit user"><i class="bi bi-pencil-square"></i><span class="ms-1">Edit</span></a>
+                                    @if($user->id !== auth()->id())
+                                        <form action="{{ route('admin.users.destroy', $user) }}" method="POST" class="d-inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button onclick="return confirm('Delete this user?')" class="btn btn-sm btn-outline-danger" title="Delete user"><i class="bi bi-trash"></i><span class="ms-1">Delete</span></button>
+                                        </form>
+                                    @endif
                                 </div>
                             </td>
                         </tr>

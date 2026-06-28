@@ -509,12 +509,12 @@
                         @forelse($notes as $note)
                             <div class="booking-preview-note-row">
                                 <textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text">{{ $note }}</textarea>
-                                <button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg"></i></button>
+                                <button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg"></i><span class="ms-1">Remove</span></button>
                             </div>
                         @empty
                             <div class="booking-preview-note-row">
                                 <textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea>
-                                <button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg"></i></button>
+                                <button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg"></i><span class="ms-1">Remove</span></button>
                             </div>
                         @endforelse
                     </div>

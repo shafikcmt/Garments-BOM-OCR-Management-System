@@ -311,7 +311,7 @@
                                     <input type="hidden" name="booking_po_ids[]" value="{{ $row['booking_po_id'] }}">
                                     <button type="submit" class="btn btn-sm btn-primary rounded-pill row-create-btn" title="Preview payment request approval for this PO">
                                         <i class="bi bi-eye"></i>
-                                        <span class="d-none d-xl-inline">Preview</span>
+                                        <span class="ms-1">Preview</span>
                                     </button>
                                 </form>
                             </td>

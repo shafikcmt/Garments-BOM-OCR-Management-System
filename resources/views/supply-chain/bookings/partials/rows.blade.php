@@ -47,7 +47,7 @@
                     @endif
                     <div class="dropdown">
                         <button class="btn booking-kebab-btn btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More actions">
-                            <i class="bi bi-three-dots-vertical"></i>
+                            <i class="bi bi-three-dots-vertical"></i><span class="ms-1">Actions</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end booking-action-dropdown">
                             <li><a href="{{ route('supply_chain.bookings.show', $po) }}" class="dropdown-item"><i class="bi bi-eye me-2"></i>View booking</a></li>
@@ -66,7 +66,7 @@
                     </button>
                     <div class="dropdown">
                         <button class="btn booking-kebab-btn btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More actions">
-                            <i class="bi bi-three-dots-vertical"></i>
+                            <i class="bi bi-three-dots-vertical"></i><span class="ms-1">Actions</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end booking-action-dropdown">
                             <li>
