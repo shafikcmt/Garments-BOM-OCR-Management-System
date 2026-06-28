@@ -326,8 +326,8 @@
             <span class="bf-batch-note"><i class="bi bi-info-circle me-1"></i>One PO number will be generated for all selected orders.</span>
         </div>
     @endif
-    <div class="bf-action-bar no-print">
-        @if($canEditThisPreview)
+    @if($canEditThisPreview)
+        <div class="bf-action-bar no-print">
             <button type="button" class="btn btn-outline-primary btn-sm booking-preview-edit-toggle">
                 @if($editPanelOpen)
                     <i class="bi bi-eye me-1"></i>Hide Edit
@@ -335,12 +335,8 @@
                     <i class="bi bi-pencil-square me-1"></i>Edit Preview
                 @endif
             </button>
-        @elseif(! $previewMode && isset($bookingPo) && $bookingPo?->exists)
-            <a href="{{ route($bookingRoutePrefix . '.print', $bookingPo) }}" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer me-1"></i>Print</a>
-            <a href="{{ route($bookingRoutePrefix . '.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
-            <a href="{{ route($bookingRoutePrefix . '.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
-        @endif
-    </div>
+        </div>
+    @endif
 
     @if($canControlPo && $sourceChanges->isNotEmpty())
         <div class="booking-change-control-panel no-print">

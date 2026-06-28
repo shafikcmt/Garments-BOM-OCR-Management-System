@@ -30,8 +30,8 @@
             <div class="d-flex gap-2 flex-wrap">
                 <a href="{{ route('supply_chain.bookings.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
                 <a href="{{ route('supply_chain.bookings.print', $bookingPo) }}" target="_blank" class="btn btn-outline-primary btn-sm"><i class="bi bi-printer me-1"></i>Print</a>
-                <a href="{{ route('supply_chain.bookings.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
-                <a href="{{ route('supply_chain.bookings.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                <a href="{{ route('supply_chain.bookings.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-pdf me-1"></i>Download PDF</a>
+                <a href="{{ route('supply_chain.bookings.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Export Excel</a>
             </div>
         </div>
 
