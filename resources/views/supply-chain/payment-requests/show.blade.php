@@ -52,8 +52,8 @@
     .pra-table tbody td { font-size:11px; padding:8px 6px; border-color:#e7eaf1; vertical-align:top; word-break:break-word; overflow-wrap:break-word; }
     .pra-table tfoot td { background:#eaf0fb; color:#000b6f; font-size:14px; font-weight:800; padding:10px 6px; border-color:#e7eaf1; }
     .pra-table td.text-end, .pra-table th.text-end, .pra-table tfoot td.text-end { white-space:nowrap; }
-    .c-vendor { width:11%; } .c-style { width:9%; } .c-pcd { width:8%; } .c-term { width:8%; } .c-po { width:12%; }
-    .c-pi { width:12%; } .c-type { width:7%; } .c-cship { width:8%; } .c-exmill { width:8%; } .c-comments { width:9%; } .c-amount { width:8%; }
+    .c-vendor { width:13%; } .c-style { width:9%; } .c-pcd { width:9%; } .c-term { width:9%; } .c-po { width:11%; }
+    .c-pi { width:11%; } .c-type { width:8%; } .c-cship { width:9%; } .c-exmill { width:9%; } .c-amount { width:12%; }
     .pra-sign-area { margin-top:52px; color:#000b6f; }
     .pra-sign-title { font-size:13px; font-weight:800; margin-bottom:30px; }
     .pra-sign-text { font-size:13px; margin-bottom:30px; }
@@ -179,7 +179,6 @@
                             <th class="c-type">Type</th>
                             <th class="c-cship">C. Shipment</th>
                             <th class="c-exmill">Ex Mill</th>
-                            <th class="c-comments">Comments</th>
                             <th class="c-amount text-end">PI Amt (USD)</th>
                         </tr>
                     </thead>
@@ -195,16 +194,15 @@
                                 <td>{{ $row['material_type'] ?: '-' }}</td>
                                 <td class="text-center">{{ $row['contract_shipment'] ?: '-' }}</td>
                                 <td class="text-center">{{ $row['committed_ex_mill'] ?: '-' }}</td>
-                                <td>{{ $row['comments'] ?: '(blank)' }}</td>
                                 <td class="text-end fw-bold">$ {{ $money($row['pi_amount'] ?? 0) }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="11" class="text-center py-5 text-muted">No payment request item found.</td></tr>
+                            <tr><td colspan="10" class="text-center py-5 text-muted">No payment request item found.</td></tr>
                         @endforelse
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="10">Grand Total</td>
+                            <td colspan="9">Grand Total</td>
                             <td class="text-end">$ {{ $money($summary['total_pi_amount'] ?? 0) }}</td>
                         </tr>
                     </tfoot>
