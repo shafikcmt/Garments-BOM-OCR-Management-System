@@ -334,7 +334,7 @@
                             </div>
                         </div>
                         <div id="emailBodyEditor" class="form-control" contenteditable="true"
-                             style="min-height:200px;overflow-y:auto;font-size:14px;line-height:1.6;">{!! old('body', $emailDefaults['body']) !!}</div>
+                             style="height:220px;max-height:40vh;overflow-y:auto;font-size:14px;line-height:1.6;">{!! old('body', $emailDefaults['body']) !!}</div>
                         <textarea name="body" id="emailBodyInput" class="d-none" required>{{ old('body', $emailDefaults['body']) }}</textarea>
                         <div class="form-text">Pre-filled from the admin template. Edit the text directly — formatting is kept in the email.</div>
                     </div>
@@ -388,6 +388,18 @@
             const form = input.closest('form');
             if (form) {
                 form.addEventListener('submit', sync);
+
+                // Enter inside single-line fields (From/To/Cc/Subject) must not
+                // submit the form — only an explicit Send click submits. The
+                // Message editor is contenteditable, so Enter keeps inserting
+                // newlines there as normal.
+                form.querySelectorAll('input[type="email"], input[type="text"]').forEach(function (field) {
+                    field.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                        }
+                    });
+                });
             }
         }
     });

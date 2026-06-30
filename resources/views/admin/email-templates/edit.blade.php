@@ -42,10 +42,11 @@
                             subject and body before sending.
                         </p>
 
+                        @php($defaultSubject = $template->subject ?? 'Payment Request Approval - {{pr_number}}')
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Subject</label>
                             <input type="text" name="subject" class="form-control" maxlength="255" required
-                                   value="{{ old('subject', $template->subject ?? 'Payment Request Approval - {{pr_number}}') }}">
+                                   value="{{ old('subject', $defaultSubject) }}">
                         </div>
 
                         <div class="row g-3 mb-3">
