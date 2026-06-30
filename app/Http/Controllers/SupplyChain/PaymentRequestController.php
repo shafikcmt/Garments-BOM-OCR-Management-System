@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\SupplyChain;
 
 use App\Http\Controllers\Controller;
+use App\Mail\PaymentRequestMail;
 use App\Models\BookingPo;
+use App\Models\EmailLog;
+use App\Models\EmailTemplate;
 use App\Models\PaymentRequest;
 use App\Models\PaymentRequestItem;
 use App\Services\BookingPoSourceService;
@@ -11,6 +14,8 @@ use App\Support\PaymentRequestSettings;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class PaymentRequestController extends Controller
@@ -183,27 +188,24 @@ class PaymentRequestController extends Controller
         $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy']);
         $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
         $summary = $this->summaryFromApprovalRows($approvalRows);
+        $emailLogs = EmailLog::where('payment_request_id', $paymentRequest->id)
+            ->with('sentBy')
+            ->latest('id')
+            ->get();
+        $emailDefaults = $this->praEmailDefaults($paymentRequest, $summary);
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'emailLogs', 'emailDefaults'));
     }
 
     public function downloadPdf(PaymentRequest $paymentRequest)
     {
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
 
-        $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy']);
-        $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
-        $summary = $this->summaryFromApprovalRows($approvalRows);
+        [$approvalRows, $summary] = $this->approvalDataFor($paymentRequest);
 
         if (class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('supply-chain.payment-requests.approval_pdf', [
-                'paymentRequest' => $paymentRequest,
-                'summary' => $summary,
-                'approvalRows' => $approvalRows,
-                'isPdf' => true,
-            ])->setPaper('a4', 'landscape');
-
-            return $pdf->stream('PAYMENT_REQUEST_APPROVAL_' . $paymentRequest->request_no . '.pdf', ['Attachment' => false]);
+            return $this->buildPaymentRequestPdf($paymentRequest)
+                ->stream('PAYMENT_REQUEST_APPROVAL_' . $paymentRequest->request_no . '.pdf', ['Attachment' => false]);
         }
 
         return view('supply-chain.payment-requests.approval_pdf', [
@@ -212,6 +214,150 @@ class PaymentRequestController extends Controller
             'approvalRows' => $approvalRows,
             'isPdf' => false,
         ]);
+    }
+
+    /**
+     * Send the Payment Request Approval as an email with the PDF attached.
+     * Failures are logged and surfaced to the user without breaking the flow.
+     */
+    public function sendEmail(Request $request, PaymentRequest $paymentRequest)
+    {
+        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+
+        $validated = $request->validate([
+            'to' => ['required', 'string', 'max:2000'],
+            'cc' => ['nullable', 'string', 'max:2000'],
+            'from' => ['nullable', 'email', 'max:255'],
+            'subject' => ['required', 'string', 'max:255'],
+            'body' => ['required', 'string', 'max:20000'],
+        ]);
+
+        $to = $this->parseEmails($validated['to']);
+        $cc = $this->parseEmails($validated['cc'] ?? '');
+        $replyTo = $validated['from'] ?? null;
+
+        if (empty($to)) {
+            return back()->with('error', 'Please enter at least one valid recipient email address.');
+        }
+
+        $pdfData = null;
+        if (class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
+            $pdfData = $this->buildPaymentRequestPdf($paymentRequest)->output();
+        }
+        $pdfName = 'PAYMENT_REQUEST_APPROVAL_' . $paymentRequest->request_no . '.pdf';
+
+        $status = 'sent';
+        $error = null;
+
+        try {
+            $mail = new PaymentRequestMail($validated['subject'], $validated['body'], $pdfData, $pdfName, $replyTo);
+            Mail::to($to)->cc($cc)->send($mail);
+        } catch (\Throwable $e) {
+            $status = 'failed';
+            $error = $e->getMessage();
+            Log::error('PRA email failed: ' . $e->getMessage(), ['payment_request_id' => $paymentRequest->id]);
+        }
+
+        EmailLog::create([
+            'payment_request_id' => $paymentRequest->id,
+            'recipients' => implode(', ', $to),
+            'cc' => $cc ? implode(', ', $cc) : null,
+            'subject' => $validated['subject'],
+            'body' => $validated['body'],
+            'sent_by' => auth()->id(),
+            'status' => $status,
+            'error' => $error,
+        ]);
+
+        if ($status === 'sent') {
+            return back()->with('success', 'Email sent successfully to ' . implode(', ', $to) . '.');
+        }
+
+        return back()->with('error', 'Email could not be sent. Please check the mail (SMTP) configuration and try again.');
+    }
+
+    /**
+     * Build the official PRA PDF (same view/format as the download).
+     */
+    protected function buildPaymentRequestPdf(PaymentRequest $paymentRequest)
+    {
+        [$approvalRows, $summary] = $this->approvalDataFor($paymentRequest);
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('supply-chain.payment-requests.approval_pdf', [
+            'paymentRequest' => $paymentRequest,
+            'summary' => $summary,
+            'approvalRows' => $approvalRows,
+            'isPdf' => true,
+        ])->setPaper('a4', 'landscape');
+    }
+
+    /**
+     * @return array{0: \Illuminate\Support\Collection, 1: array}
+     */
+    protected function approvalDataFor(PaymentRequest $paymentRequest): array
+    {
+        $paymentRequest->loadMissing(['items', 'createdBy', 'checkedBy', 'approvedBy']);
+        $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
+        $summary = $this->summaryFromApprovalRows($approvalRows);
+
+        return [$approvalRows, $summary];
+    }
+
+    /**
+     * Pre-filled subject/body for the Send Email form, using the admin PRA
+     * template with its placeholders replaced by this PRA's data.
+     *
+     * @return array{subject: string, body: string, to: string, cc: string, from: string}
+     */
+    protected function praEmailDefaults(PaymentRequest $paymentRequest, array $summary): array
+    {
+        $template = EmailTemplate::forType('pra');
+        $subject = $template->subject ?? 'Payment Request Approval - {{pr_number}}';
+        $body = $template->body ?? '<p>Please find attached Payment Request Approval {{pr_number}}.</p>';
+
+        $requiredDate = $summary['earliest_payment_required_date']
+            ?? ($paymentRequest->data['payment_required_date'] ?? null);
+        if ($requiredDate && ! ($requiredDate instanceof \Illuminate\Support\Carbon)) {
+            $requiredDate = $this->sourceService->dateValue($requiredDate);
+        }
+
+        $placeholders = [
+            'pr_number' => $paymentRequest->request_no,
+            'buyer' => $this->joinUnique(collect($summary['buyers'] ?? []), $paymentRequest->buyer_name ?: '-'),
+            'season' => $this->joinUnique(collect($summary['seasons'] ?? []), $paymentRequest->season_name ?: '-'),
+            'supplier' => $this->joinUnique(collect($summary['suppliers'] ?? []), $paymentRequest->supplier_name ?: '-'),
+            'payment_require_date' => $requiredDate ? $requiredDate->format('jS M-Y') : '-',
+            'total_amount' => '$ ' . number_format((float) ($summary['total_pi_amount'] ?? $paymentRequest->total_pi_amount), 2),
+            'date' => optional($paymentRequest->created_at)->format('jS M-Y') ?? '-',
+            'company_name' => 'Humana Apparels Pvt. Ltd.',
+        ];
+
+        return [
+            'subject' => EmailTemplate::render($subject, $placeholders),
+            'body' => EmailTemplate::render($body, $placeholders),
+            'to' => $template->default_to ?? '',
+            'cc' => $template->default_cc ?? '',
+            'from' => auth()->user()?->email ?? '',
+        ];
+    }
+
+    /**
+     * Parse a comma / semicolon / newline separated list into valid emails.
+     *
+     * @return array<int, string>
+     */
+    protected function parseEmails(?string $raw): array
+    {
+        if (! $raw || trim($raw) === '') {
+            return [];
+        }
+
+        return collect(preg_split('/[,;\r\n]+/', $raw))
+            ->map(fn ($email) => trim($email))
+            ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function downloadExcel(PaymentRequest $paymentRequest)

@@ -21,6 +21,7 @@ Route::prefix('supply-chain')
         Route::get('/payment-requests/{paymentRequest}', [PaymentRequestController::class, 'show'])->name('payment_requests.show');
         Route::get('/payment-requests/{paymentRequest}/download-pdf', [PaymentRequestController::class, 'downloadPdf'])->name('payment_requests.download_pdf');
         Route::get('/payment-requests/{paymentRequest}/download-excel', [PaymentRequestController::class, 'downloadExcel'])->name('payment_requests.download_excel');
+        Route::post('/payment-requests/{paymentRequest}/email', [PaymentRequestController::class, 'sendEmail'])->name('payment_requests.email');
 
         Route::get('/booking-generate', [BookingController::class, 'index'])->name('bookings.index');
         Route::get('/booking-generate/data', [BookingController::class, 'data'])->name('bookings.data');

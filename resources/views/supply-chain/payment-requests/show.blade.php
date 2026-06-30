@@ -120,6 +120,9 @@
                         <button type="button" onclick="window.print()" class="btn btn-outline-primary rounded-pill">Print</button>
                         <a href="{{ route('supply_chain.payment_requests.download_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-outline-danger rounded-pill">PDF Preview</a>
                         <a href="{{ route('supply_chain.payment_requests.download_excel', $paymentRequest) }}" class="btn btn-success rounded-pill">Excel Download</a>
+                        <button type="button" class="btn btn-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#sendEmailModal" title="Email this PRA as a PDF attachment">
+                            <i class="bi bi-envelope me-1"></i> Send Email
+                        </button>
                     </div>
                 @endif
             </div>
@@ -233,8 +236,118 @@
                 @endforeach
             </div>
         </div>
+
+        @unless($isPreview)
+            <div class="card border-0 shadow-sm mx-auto mt-3" style="max-width:1120px;border-radius:14px;">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-1"></i> Email History</h6>
+                    @if($emailLogs->isEmpty())
+                        <p class="text-muted small mb-0">No emails have been sent for this PRA yet.</p>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr class="text-muted small">
+                                        <th>Sent At</th>
+                                        <th>Recipients</th>
+                                        <th>Subject</th>
+                                        <th>Sent By</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($emailLogs as $log)
+                                        <tr>
+                                            <td class="small">{{ optional($log->created_at)->format('d-M-Y H:i') }}</td>
+                                            <td class="small">{{ $log->recipients }}@if($log->cc)<br><span class="text-muted">Cc: {{ $log->cc }}</span>@endif</td>
+                                            <td class="small">{{ $log->subject }}</td>
+                                            <td class="small">{{ optional($log->sentBy)->name ?? '-' }}</td>
+                                            <td>
+                                                @if($log->status === 'sent')
+                                                    <span class="badge bg-success-subtle text-success">Sent</span>
+                                                @else
+                                                    <span class="badge bg-danger-subtle text-danger" title="{{ $log->error }}">Failed</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        @endunless
     </div>
 </div>
+
+@unless($isPreview)
+<div class="modal fade" id="sendEmailModal" tabindex="-1" aria-labelledby="sendEmailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:14px;">
+            <form method="POST" action="{{ route('supply_chain.payment_requests.email', $paymentRequest) }}">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sendEmailModalLabel"><i class="bi bi-envelope me-1"></i> Send Payment Request Approval</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info border-0 small py-2">
+                        <i class="bi bi-paperclip me-1"></i> The official PRA PDF (<strong>{{ $paymentRequest->request_no }}</strong>) will be attached automatically.
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">From</label>
+                        <input type="email" name="from" class="form-control" maxlength="255"
+                               value="{{ old('from', $emailDefaults['from']) }}"
+                               placeholder="your@email.com">
+                        <div class="form-text">Used as the Reply-To address. Pre-filled with your email; you can change it.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">To <span class="text-danger">*</span></label>
+                        <input type="text" name="to" class="form-control" required value="{{ old('to', $emailDefaults['to']) }}"
+                               placeholder="name@example.com, another@example.com">
+                        <div class="form-text">Separate multiple recipients with commas.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Cc</label>
+                        <input type="text" name="cc" class="form-control" value="{{ old('cc', $emailDefaults['cc']) }}"
+                               placeholder="optional, comma separated">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
+                        <input type="text" name="subject" class="form-control" maxlength="255" required
+                               value="{{ old('subject', $emailDefaults['subject']) }}">
+                    </div>
+
+                    <div class="mb-1">
+                        <label class="form-label fw-semibold">Message <span class="text-danger">*</span></label>
+                        <div class="btn-toolbar mb-2" role="toolbar" aria-label="Formatting">
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-light border" data-rt-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
+                            </div>
+                        </div>
+                        <div id="emailBodyEditor" class="form-control" contenteditable="true"
+                             style="min-height:200px;overflow-y:auto;font-size:14px;line-height:1.6;">{!! old('body', $emailDefaults['body']) !!}</div>
+                        <textarea name="body" id="emailBodyInput" class="d-none" required>{{ old('body', $emailDefaults['body']) }}</textarea>
+                        <div class="form-text">Pre-filled from the admin template. Edit the text directly — formatting is kept in the email.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i> Send</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endunless
 @endsection
 
 @section('scripts')
@@ -248,6 +361,45 @@
             previewDate.addEventListener('change', function () {
                 createDate.value = previewDate.value;
             });
+        }
+    });
+</script>
+@endif
+
+@unless($isPreview)
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const editor = document.getElementById('emailBodyEditor');
+        const input = document.getElementById('emailBodyInput');
+
+        if (editor && input) {
+            const sync = function () { input.value = editor.innerHTML.trim(); };
+            editor.addEventListener('input', sync);
+            sync();
+
+            document.querySelectorAll('[data-rt-cmd]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    editor.focus();
+                    document.execCommand(btn.dataset.rtCmd, false, null);
+                    sync();
+                });
+            });
+
+            const form = input.closest('form');
+            if (form) {
+                form.addEventListener('submit', sync);
+            }
+        }
+    });
+</script>
+@endunless
+
+@if(! $isPreview && $errors->any() && old('to') !== null)
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const modalEl = document.getElementById('sendEmailModal');
+        if (modalEl && window.bootstrap) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
         }
     });
 </script>

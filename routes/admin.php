@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\BookingInstructionController;
 use App\Http\Controllers\Admin\PoGenerateControlController;
 use App\Http\Controllers\Admin\AlertSettingController;
 use App\Http\Controllers\Admin\PaymentSettingController;
+use App\Http\Controllers\Admin\EmailTemplateController;
 
 Route::prefix('admin')
     ->middleware(['auth', 'role:admin'])
@@ -48,6 +49,9 @@ Route::prefix('admin')
 
         Route::get('/payment-settings', [PaymentSettingController::class, 'edit'])->name('payment-settings.edit');
         Route::post('/payment-settings', [PaymentSettingController::class, 'update'])->name('payment-settings.update');
+
+        Route::get('/email-templates', [EmailTemplateController::class, 'edit'])->name('email-templates.edit');
+        Route::put('/email-templates', [EmailTemplateController::class, 'update'])->name('email-templates.update');
 
         Route::get('/workspace', [DashboardController::class, 'workspace'])->name('workspace');
     });
