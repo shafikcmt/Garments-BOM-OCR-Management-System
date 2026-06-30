@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
@@ -14,9 +15,11 @@ class AuthenticatedSessionController extends Controller
     /**
      * Display the login view.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('auth.login');
+        return view('auth.login', [
+            'rememberedEmail' => $request->cookie('remembered_email'),
+        ]);
     }
 
     /**
@@ -28,7 +31,19 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $request->user()->forceFill(['last_login_at' => now()])->save();
+
+        $response = redirect()->intended(route('dashboard', absolute: false));
+
+        // Remember the email/username for convenience on the next visit.
+        // (Staying logged in is handled by Laravel's remember-me token above.)
+        if ($request->boolean('remember')) {
+            $response->cookie('remembered_email', $request->input('email'), 60 * 24 * 365);
+        } else {
+            $response->withCookie(Cookie::forget('remembered_email'));
+        }
+
+        return $response;
     }
 
     /**
@@ -42,6 +57,6 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        return redirect('/')->withCookie(Cookie::forget('remembered_email'));
     }
 }

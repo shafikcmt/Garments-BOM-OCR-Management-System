@@ -14,7 +14,7 @@
             <label class="form-label">Email / Username</label>
             <div class="position-relative">
                 <i class="bi bi-envelope position-absolute text-slate-400" style="left:14px;top:50%;transform:translateY(-50%);"></i>
-                <input type="email" placeholder="Enter your email" name="email" value="{{ old('email') }}" required autofocus class="form-control" style="padding-left:42px;">
+                <input type="email" placeholder="Enter your email" name="email" value="{{ old('email', $rememberedEmail ?? '') }}" required autofocus class="form-control" style="padding-left:42px;">
             </div>
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
@@ -30,7 +30,7 @@
 
         <div class="d-flex justify-content-between align-items-center gap-3">
             <div class="form-check text-start">
-                <input class="form-check-input" type="checkbox" name="remember" id="remember">
+                <input class="form-check-input" type="checkbox" name="remember" id="remember" {{ old('email', $rememberedEmail ?? '') ? 'checked' : '' }}>
                 <label class="form-check-label small fw-semibold" for="remember">Remember me</label>
             </div>
             @if (Route::has('password.request'))
