@@ -9,6 +9,8 @@ use App\Http\Controllers\Admin\SupplierController;
 use App\Http\Controllers\Admin\BookingDeliveryDestinationController;
 use App\Http\Controllers\Admin\BookingInstructionController;
 use App\Http\Controllers\Admin\PoGenerateControlController;
+use App\Http\Controllers\Admin\AlertSettingController;
+use App\Http\Controllers\Admin\PaymentSettingController;
 
 Route::prefix('admin')
     ->middleware(['auth', 'role:admin'])
@@ -17,6 +19,9 @@ Route::prefix('admin')
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
         Route::resource('users', UserController::class)->except(['show']);
+        Route::put('users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
+        Route::post('users/{user}/send-reset-link', [UserController::class, 'sendPasswordResetLink'])->name('users.send-reset-link');
+        Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');
         Route::resource('roles', RoleController::class)->except(['show']);
         Route::resource('headers', HeaderController::class)->except(['show']);
 
@@ -38,5 +43,11 @@ Route::prefix('admin')
         Route::get('/po-generate-control/po/{bookingPo}/download', [PoGenerateControlController::class, 'download'])->name('po-generate-control.download');
         Route::get('/po-generate-control/po/{bookingPo}/download-excel', [PoGenerateControlController::class, 'downloadExcel'])->name('po-generate-control.download_excel');
         
+        Route::get('/alert-settings', [AlertSettingController::class, 'edit'])->name('alert-settings.edit');
+        Route::put('/alert-settings', [AlertSettingController::class, 'update'])->name('alert-settings.update');
+
+        Route::get('/payment-settings', [PaymentSettingController::class, 'edit'])->name('payment-settings.edit');
+        Route::post('/payment-settings', [PaymentSettingController::class, 'update'])->name('payment-settings.update');
+
         Route::get('/workspace', [DashboardController::class, 'workspace'])->name('workspace');
     });

@@ -7,6 +7,7 @@ use App\Models\BookingPo;
 use App\Models\PaymentRequest;
 use App\Models\PaymentRequestItem;
 use App\Services\BookingPoSourceService;
+use App\Support\PaymentRequestSettings;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -53,7 +54,7 @@ class PaymentRequestController extends Controller
             ->unique()
             ->values();
 
-        $paymentRequiredInput = $validated['payment_required_date'] ?? now()->addDays(7)->toDateString();
+        $paymentRequiredInput = $validated['payment_required_date'] ?? PaymentRequestSettings::defaultPaymentRequiredDate()->toDateString();
         $snapshots = $this->snapshotsForSelectedBookingPos($selectedIds)
             ->map(fn (array $snapshot) => array_replace($snapshot, [
                 'payment_required_date' => $paymentRequiredInput,
@@ -104,7 +105,7 @@ class PaymentRequestController extends Controller
             ->unique()
             ->values();
 
-        $paymentRequiredDate = $validated['payment_required_date'] ?? now()->addDays(7)->toDateString();
+        $paymentRequiredDate = $validated['payment_required_date'] ?? PaymentRequestSettings::defaultPaymentRequiredDate()->toDateString();
         $snapshots = $this->snapshotsForSelectedBookingPos($selectedIds)
             ->map(fn (array $snapshot) => array_replace($snapshot, [
                 'payment_required_date' => $paymentRequiredDate,
@@ -761,7 +762,7 @@ class PaymentRequestController extends Controller
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Payment Approval');
-        $sheet->getSheetView()->setShowGridLines(false);
+        $sheet->setShowGridlines(false);
 
         $lastColumn = 'K';
         $list = fn ($values, $fallback = '-') => collect($values ?? [])->map(fn ($value) => trim((string) $value))->filter()->take(5)->implode(', ') ?: $fallback;

@@ -12,7 +12,8 @@
         $snapshotRequiredDate = data_get($paymentRequest->data ?? [], 'payment_required_date');
         $paymentRequiredDate = $snapshotRequiredDate ? \Illuminate\Support\Carbon::parse($snapshotRequiredDate) : null;
     }
-    $paymentRequiredInput = $paymentRequiredInput ?? ($paymentRequiredDate ? optional($paymentRequiredDate)->format('Y-m-d') : now()->addDays(7)->toDateString());
+    $paymentRequiredInput = $paymentRequiredInput ?? ($paymentRequiredDate ? optional($paymentRequiredDate)->format('Y-m-d') : \App\Support\PaymentRequestSettings::defaultPaymentRequiredDate()->toDateString());
+    $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocks(false);
     $logoPath = public_path('images/humana-logo.png');
     $logoData = null;
     if (file_exists($logoPath)) {
@@ -59,6 +60,9 @@
     .pra-sign-text { font-size:13px; margin-bottom:30px; }
     .pra-sign-line { border-bottom:1px solid #000b6f; height:1px; }
     .pra-sign-sep { border-left:1px solid #8d9bd3; }
+    .pra-sign-img { max-height:54px; max-width:100%; object-fit:contain; display:block; margin-bottom:6px; }
+    .pra-sign-meta { font-size:12px; line-height:1.35; margin-top:6px; color:#000b6f; }
+    .pra-sign-meta .pra-sign-name { font-weight:800; }
     @media print {
         body { background:#fff !important; }
         .pra-toolbar, .sidebar, nav, header { display:none !important; }
@@ -210,21 +214,23 @@
             </div>
 
             <div class="row g-0 pra-sign-area">
-                <div class="col-4 pe-4">
-                    <div class="pra-sign-title">Prepared By</div>
-                    <div class="pra-sign-text">Signature &amp; Date</div>
-                    <div class="pra-sign-line"></div>
-                </div>
-                <div class="col-4 px-4 pra-sign-sep">
-                    <div class="pra-sign-title">Checked By</div>
-                    <div class="pra-sign-text">Signature &amp; Date</div>
-                    <div class="pra-sign-line"></div>
-                </div>
-                <div class="col-4 ps-4 pra-sign-sep">
-                    <div class="pra-sign-title">Approved By</div>
-                    <div class="pra-sign-text">Signature &amp; Date</div>
-                    <div class="pra-sign-line"></div>
-                </div>
+                @foreach($signatureBlocks as $i => $sign)
+                    <div class="col-4 {{ $i === 0 ? 'pe-4' : ($i === 2 ? 'ps-4 pra-sign-sep' : 'px-4 pra-sign-sep') }}">
+                        <div class="pra-sign-title">{{ $sign['title'] }}</div>
+                        @if($sign['src'])
+                            <img src="{{ $sign['src'] }}" alt="{{ $sign['title'] }} signature" class="pra-sign-img">
+                            <div class="pra-sign-line"></div>
+                            <div class="pra-sign-meta">
+                                @if($sign['name'])<div class="pra-sign-name">{{ $sign['name'] }}</div>@endif
+                                @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
+                                <div>Signature &amp; Date</div>
+                            </div>
+                        @else
+                            <div class="pra-sign-text">Signature &amp; Date</div>
+                            <div class="pra-sign-line"></div>
+                        @endif
+                    </div>
+                @endforeach
             </div>
         </div>
     </div>

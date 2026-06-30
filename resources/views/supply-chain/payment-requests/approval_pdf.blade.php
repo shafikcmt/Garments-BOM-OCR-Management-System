@@ -34,6 +34,9 @@
         .sign-title { font-size:9px; font-weight:800; margin-bottom:25px; }
         .sign-text { font-size:9px; margin-bottom:25px; }
         .sign-line { border-bottom:1px solid #000b6f; height:1px; }
+        .sign-img { max-height:42px; max-width:100%; margin-bottom:4px; }
+        .sign-meta { font-size:8.5px; line-height:1.4; margin-top:4px; }
+        .sign-meta .sign-name { font-weight:800; }
         .w-vendor { width: 13%; } .w-style { width: 9%; } .w-pcd { width: 9%; } .w-term { width: 9%; }
         .w-po { width: 11%; } .w-pi { width: 11%; } .w-type { width: 8%; } .w-cship { width: 9%; } .w-exmill { width: 9%; }
         .w-amount { width: 12%; }
@@ -47,6 +50,7 @@
     $paymentRequiredDate = $summary['earliest_payment_required_date'] ?? null;
     $logoPath = public_path('images/humana-logo.png');
     $logoData = file_exists($logoPath) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath)) : null;
+    $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocks(true);
 @endphp
 <table class="top">
     <tr>
@@ -132,21 +136,23 @@
 
 <table class="sign">
     <tr>
-        <td style="padding-left:0;">
-            <div class="sign-title">Prepared By</div>
-            <div class="sign-text">Signature &amp; Date</div>
-            <div class="sign-line"></div>
-        </td>
-        <td>
-            <div class="sign-title">Checked By</div>
-            <div class="sign-text">Signature &amp; Date</div>
-            <div class="sign-line"></div>
-        </td>
-        <td style="padding-right:0;">
-            <div class="sign-title">Approved By</div>
-            <div class="sign-text">Signature &amp; Date</div>
-            <div class="sign-line"></div>
-        </td>
+        @foreach($signatureBlocks as $i => $sign)
+            <td style="{{ $i === 0 ? 'padding-left:0;' : ($i === 2 ? 'padding-right:0;' : '') }}">
+                <div class="sign-title">{{ $sign['title'] }}</div>
+                @if($sign['src'])
+                    <img src="{{ $sign['src'] }}" alt="signature" class="sign-img">
+                    <div class="sign-line"></div>
+                    <div class="sign-meta">
+                        @if($sign['name'])<div class="sign-name">{{ $sign['name'] }}</div>@endif
+                        @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
+                        <div>Signature &amp; Date</div>
+                    </div>
+                @else
+                    <div class="sign-text">Signature &amp; Date</div>
+                    <div class="sign-line"></div>
+                @endif
+            </td>
+        @endforeach
     </tr>
 </table>
 </body>

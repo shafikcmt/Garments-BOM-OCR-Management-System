@@ -3,6 +3,7 @@
     $isAdminWorkspace = request()->routeIs('admin.workspace') || request()->routeIs('uploaded-files.*') || request()->routeIs('admin.headers.*');
     $isAdminUserRole = request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*');
     $isAdminBookingSettings = request()->routeIs('admin.suppliers.*') || request()->routeIs('admin.booking-delivery-destinations.*') || request()->routeIs('admin.booking-instructions.*') || request()->routeIs('admin.po-generate-control.*');
+    $isAdminSettings = request()->routeIs('admin.alert-settings.*') || request()->routeIs('admin.payment-settings.*');
     $isSupplyBooking = request()->routeIs('supply_chain.bookings.*');
     $isSupplyPayment = request()->routeIs('supply_chain.payment_requests.*');
     $supplyBookingUrl = route('supply_chain.bookings.index');
@@ -82,6 +83,21 @@
                             <a href="{{ route('admin.booking-delivery-destinations.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.booking-delivery-destinations.*') ? 'is-active' : '' }}">Destinations</a>
                             <a href="{{ route('admin.booking-instructions.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.booking-instructions.*') ? 'is-active' : '' }}">Instructions</a>
                             <a href="{{ route('admin.po-generate-control.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.po-generate-control.*') ? 'is-active' : '' }}">PO Generate Control</a>
+                        </div>
+                    </li>
+
+                    <li class="sidebar-group {{ $isAdminSettings ? 'is-open' : '' }}">
+                        <button type="button" class="sidebar-group-button {{ $isAdminSettings ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminSettings ? 'true' : 'false' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-gear"></i></span>
+                                <span class="sidebar-link-text">Settings</span>
+                            </span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                        </button>
+                        <div class="sidebar-submenu {{ $isAdminSettings ? 'is-open' : '' }}">
+                            <span class="sidebar-submenu-rail"></span>
+                            <a href="{{ route('admin.alert-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.alert-settings.*') ? 'is-active' : '' }}">Alert Settings</a>
+                            <a href="{{ route('admin.payment-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.payment-settings.*') ? 'is-active' : '' }}">PI / PRA Settings</a>
                         </div>
                     </li>
                 </ul>
