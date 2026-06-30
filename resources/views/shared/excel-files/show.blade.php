@@ -1210,7 +1210,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const sheetHeaders = @json($sheetHeadersForJs);
     const calculatedHeaderKeys = @json($calculatedHeaderKeys ?? []);
     const calculatedHeaderIds = @json($calculatedHeaderIds ?? []);
-    const rowPraDates = @json($rowPraDates ?? []);
+    const piPraDates = @json($piPraDates ?? []);
     const currentUserRoleSlugs = @json($currentUserRoleSlugs);
     const shouldAutoScrollToUserColumns = @json($shouldAutoScrollToUserColumns);
 
@@ -2007,10 +2007,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const piAmount = piRate * materialsOrdered;
             let paymentReqdDate = committedExMill ? addDays(committedExMill, -7) : null;
 
-            // A created PRA overrides the formula for this row (latest PRA wins).
-            // Rows without a PRA keep the committed ex-mill - 7 days formula.
-            const rowId = row.getAttribute('data-row-id');
-            const pra = (rowId && rowPraDates[rowId]) ? rowPraDates[rowId] : null;
+            // A created PRA overrides the formula. Matching is by PI No., so every
+            // row sharing the same PI No. as the PRA updates together (latest PRA
+            // wins). Rows whose PI No. has no PRA keep the ex-mill - 7 days formula.
+            const piKey = String(materialPiNumber ?? '').trim().toLowerCase();
+            const pra = (piKey && piPraDates[piKey]) ? piPraDates[piKey] : null;
             const paymentStatus = piStatus !== 'PI Received'
                 ? piStatus
                 : (blank(pmtDocNo) ? 'Pmt Pending' : 'Pmt Done');

@@ -140,8 +140,10 @@ class ExcelFileController extends Controller
         $canAddRow = ($user->hasRole('admin') || $user->hasRole('merchant')) && ! $isFileLockedForUser;
         $canDeleteFile = $user->hasRole('admin') || $user->hasRole('merchant');
 
-        // Latest PRA dates per row, pre-formatted for the live (client-side) formulas.
-        $rowPraDates = collect($this->praDatesByRow($excelFile))
+        // Latest PRA dates per PI No., pre-formatted for the live (client-side)
+        // formulas. Keyed by normalised PI No. so every row sharing that PI No.
+        // picks up the same dates.
+        $piPraDates = collect($this->praDatesByPiNumber($excelFile))
             ->map(fn ($pra) => [
                 'submission' => $this->fmtDate($pra['submission']),
                 'reqd' => $pra['reqd'] ? $this->fmtDate($pra['reqd']) : null,
@@ -165,7 +167,7 @@ class ExcelFileController extends Controller
             'fileLockInfo',
             'orderInfo',
             'perPage',
-            'rowPraDates'
+            'piPraDates'
         ));
     }
 
@@ -533,22 +535,26 @@ class ExcelFileController extends Controller
     }
 
     /**
-     * Latest Payment Request Approval (PRA) date per worksheet row for this file.
-     * Preview PRAs are ignored. When a row appears in more than one PRA the most
-     * recently created PRA wins.
+     * Latest Payment Request Approval (PRA) dates per PI No. for this file.
      *
-     * @return array<int, array{submission: ?Carbon, reqd: ?Carbon}>
+     * A booking/PI spans many worksheet rows (one per style/spec). Because the
+     * PRA's Payment Require Date and submission date apply to the whole PI, the
+     * dates are keyed by PI number (normalised) so every row sharing that PI No.
+     * receives them. Preview PRAs are ignored and the most recently created PRA
+     * wins when a PI appears in more than one PRA.
+     *
+     * @return array<string, array{submission: ?Carbon, reqd: ?Carbon}>
      */
-    private function praDatesByRow(ExcelFile $excelFile): array
+    private function praDatesByPiNumber(ExcelFile $excelFile): array
     {
         $items = \App\Models\PaymentRequestItem::query()
             ->where('excel_file_id', $excelFile->id)
-            ->whereNotNull('excel_row_id')
+            ->whereNotNull('pi_number')
             ->whereHas('paymentRequest', fn ($q) => $q->where('status', '!=', 'preview'))
             ->with(['paymentRequest:id,created_at,status'])
-            ->get(['id', 'excel_row_id', 'payment_required_date', 'payment_request_id']);
+            ->get(['id', 'pi_number', 'payment_required_date', 'payment_request_id']);
 
-        $byRow = [];
+        $byPi = [];
 
         foreach ($items as $item) {
             $pr = $item->paymentRequest;
@@ -556,8 +562,12 @@ class ExcelFileController extends Controller
                 continue;
             }
 
-            $rowId = (int) $item->excel_row_id;
-            $existing = $byRow[$rowId] ?? null;
+            $piKey = $this->normalizePiNumber($item->pi_number);
+            if ($piKey === '') {
+                continue;
+            }
+
+            $existing = $byPi[$piKey] ?? null;
 
             // Latest PRA wins (by created_at, tie-break on id).
             if ($existing) {
@@ -569,7 +579,7 @@ class ExcelFileController extends Controller
                 }
             }
 
-            $byRow[$rowId] = [
+            $byPi[$piKey] = [
                 'created_at' => $pr->created_at,
                 'pr_id' => $pr->id,
                 'submission' => $pr->created_at,
@@ -577,7 +587,15 @@ class ExcelFileController extends Controller
             ];
         }
 
-        return $byRow;
+        return $byPi;
+    }
+
+    /**
+     * Normalise a PI number for matching (trim + lowercase). Returns '' when blank.
+     */
+    private function normalizePiNumber($value): string
+    {
+        return strtolower(trim((string) $value));
     }
 
     public function recalculateFile(ExcelFile $excelFile, ?int $userId = null, array $exceptRowIds = []): void
@@ -598,7 +616,7 @@ class ExcelFileController extends Controller
             ->orderBy('row_number')
             ->get();
 
-        $praDates = $this->praDatesByRow($excelFile);
+        $praByPi = $this->praDatesByPiNumber($excelFile);
         $previousFormulaKey = null;
 
         foreach ($rows as $row) {
@@ -747,8 +765,10 @@ class ExcelFileController extends Controller
 
             // A created PRA overrides the formula: Payment Req'd Date follows the
             // date confirmed on the PRA, and PI Summary Submission Date follows the
-            // PRA's creation date. Rows without a PRA keep the formula above.
-            $pra = $praDates[(int) $row->id] ?? null;
+            // PRA's creation date. Matching is by PI No., so every row sharing the
+            // same PI No. as the PRA is updated together. Rows whose PI No. has no
+            // PRA keep the formula above.
+            $pra = $praByPi[$this->normalizePiNumber($materialPiNumber)] ?? null;
             $piSummarySubmissionDate = $pra['submission'] ?? null;
             if ($pra && $pra['reqd']) {
                 $paymentReqdDate = $pra['reqd'];
