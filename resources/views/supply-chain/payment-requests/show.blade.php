@@ -284,14 +284,15 @@
 @unless($isPreview)
 <div class="modal fade" id="sendEmailModal" tabindex="-1" aria-labelledby="sendEmailModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:14px;">
-            <form method="POST" action="{{ route('supply_chain.payment_requests.email', $paymentRequest) }}">
+        <div class="modal-content" style="border-radius:14px;overflow:hidden;">
+            <form method="POST" action="{{ route('supply_chain.payment_requests.email', $paymentRequest) }}"
+                  style="display:flex;flex-direction:column;min-height:0;overflow:hidden;">
                 @csrf
                 <div class="modal-header">
                     <h5 class="modal-title" id="sendEmailModalLabel"><i class="bi bi-envelope me-1"></i> Send Payment Request Approval</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body" style="flex:1 1 auto;overflow-y:auto;min-height:0;">
                     <div class="alert alert-info border-0 small py-2">
                         <i class="bi bi-paperclip me-1"></i> The official PRA PDF (<strong>{{ $paymentRequest->request_no }}</strong>) will be attached automatically.
                     </div>
