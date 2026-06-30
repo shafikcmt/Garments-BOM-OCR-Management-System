@@ -140,6 +140,14 @@ class ExcelFileController extends Controller
         $canAddRow = ($user->hasRole('admin') || $user->hasRole('merchant')) && ! $isFileLockedForUser;
         $canDeleteFile = $user->hasRole('admin') || $user->hasRole('merchant');
 
+        // Latest PRA dates per row, pre-formatted for the live (client-side) formulas.
+        $rowPraDates = collect($this->praDatesByRow($excelFile))
+            ->map(fn ($pra) => [
+                'submission' => $this->fmtDate($pra['submission']),
+                'reqd' => $pra['reqd'] ? $this->fmtDate($pra['reqd']) : null,
+            ])
+            ->all();
+
         return view('shared.excel-files.show', compact(
             'excelFile',
             'headers',
@@ -156,7 +164,8 @@ class ExcelFileController extends Controller
             'isFileLockedForUser',
             'fileLockInfo',
             'orderInfo',
-            'perPage'
+            'perPage',
+            'rowPraDates'
         ));
     }
 
@@ -523,6 +532,54 @@ class ExcelFileController extends Controller
         }
     }
 
+    /**
+     * Latest Payment Request Approval (PRA) date per worksheet row for this file.
+     * Preview PRAs are ignored. When a row appears in more than one PRA the most
+     * recently created PRA wins.
+     *
+     * @return array<int, array{submission: ?Carbon, reqd: ?Carbon}>
+     */
+    private function praDatesByRow(ExcelFile $excelFile): array
+    {
+        $items = \App\Models\PaymentRequestItem::query()
+            ->where('excel_file_id', $excelFile->id)
+            ->whereNotNull('excel_row_id')
+            ->whereHas('paymentRequest', fn ($q) => $q->where('status', '!=', 'preview'))
+            ->with(['paymentRequest:id,created_at,status'])
+            ->get(['id', 'excel_row_id', 'payment_required_date', 'payment_request_id']);
+
+        $byRow = [];
+
+        foreach ($items as $item) {
+            $pr = $item->paymentRequest;
+            if (! $pr) {
+                continue;
+            }
+
+            $rowId = (int) $item->excel_row_id;
+            $existing = $byRow[$rowId] ?? null;
+
+            // Latest PRA wins (by created_at, tie-break on id).
+            if ($existing) {
+                $isNewer = $pr->created_at && $existing['created_at']
+                    && ($pr->created_at->gt($existing['created_at'])
+                        || ($pr->created_at->eq($existing['created_at']) && $pr->id > $existing['pr_id']));
+                if (! $isNewer) {
+                    continue;
+                }
+            }
+
+            $byRow[$rowId] = [
+                'created_at' => $pr->created_at,
+                'pr_id' => $pr->id,
+                'submission' => $pr->created_at,
+                'reqd' => $item->payment_required_date, // Carbon (date cast) or null
+            ];
+        }
+
+        return $byRow;
+    }
+
     public function recalculateFile(ExcelFile $excelFile, ?int $userId = null, array $exceptRowIds = []): void
     {
         $userId = $userId ?: auth()->id();
@@ -541,6 +598,7 @@ class ExcelFileController extends Controller
             ->orderBy('row_number')
             ->get();
 
+        $praDates = $this->praDatesByRow($excelFile);
         $previousFormulaKey = null;
 
         foreach ($rows as $row) {
@@ -687,6 +745,15 @@ class ExcelFileController extends Controller
 
             $paymentReqdDate = $committedExMill ? $committedExMill->copy()->subDays(7) : null;
 
+            // A created PRA overrides the formula: Payment Req'd Date follows the
+            // date confirmed on the PRA, and PI Summary Submission Date follows the
+            // PRA's creation date. Rows without a PRA keep the formula above.
+            $pra = $praDates[(int) $row->id] ?? null;
+            $piSummarySubmissionDate = $pra['submission'] ?? null;
+            if ($pra && $pra['reqd']) {
+                $paymentReqdDate = $pra['reqd'];
+            }
+
             $paymentStatus = $piStatus !== 'PI Received'
                 ? $piStatus
                 : (blank($pmtDocNo) ? 'Pmt Pending' : 'Pmt Done');
@@ -774,6 +841,9 @@ class ExcelFileController extends Controller
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['pi_status'], $piStatus, $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['pi_amount'], $this->fmtNum($piAmount), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['payment_reqd_date', 'payment_req_d_date', 'payment_required_date'], $this->fmtDate($paymentReqdDate), $userId);
+            if ($pra) {
+                $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['pi_summary_submission_date', 'pi_summary_submission'], $this->fmtDate($piSummarySubmissionDate), $userId);
+            }
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['payment_status'], $paymentStatus, $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['bl_status'], $blStatus, $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['arrival_status'], $arrivalStatus, $userId);
@@ -873,6 +943,7 @@ class ExcelFileController extends Controller
             'consumption_incl_yy' => ['consumption based on which materials order including yy', 'consumption including yy', 'consumption incl yy', 'yy + waste %'],
             'short_excess_ordered' => ['(short)/excess ordered', '(short) / excess ordered', 'short excess ordered'],
             'payment_reqd_date' => ["payment req'd date", 'payment reqd date', 'payment required date'],
+            'pi_summary_submission_date' => ['pi summary submission date', 'pi summary submission'],
             'pmt_doc_no' => ['pmt doc no', 'payment doc no', 'payment reference number', 'payment ref no'],
             'committed_ex_mill' => ['committed ex mill', 'committed x-fty date', 'committed x fty date', 'committed ex-fty date', 'committed ex fty date'],
             'bl_awb_no' => ['bl / awb no', 'bl awb no', 'bl no', 'awb no'],
@@ -1133,6 +1204,8 @@ class ExcelFileController extends Controller
             'pi_status',
             'pi_amount',
             'payment_reqd_date',
+            'pi_summary_submission_date',
+            'pi_summary_submission',
             'payment_status',
             'bl_status',
             'arrival_status',

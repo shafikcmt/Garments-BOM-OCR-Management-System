@@ -1039,7 +1039,7 @@
                                 $rowLockedInfo = ($lockedRowInfo ?? collect())->get($row->id);
                                 $isPoRowLocked = ($lockedRowIds ?? collect())->has($row->id);
                             @endphp
-                            <tr class="{{ trim(($isFileLockedForUser ?? false ? 'file-row-locked ' : '') . ($isPoRowLocked ? 'po-row-locked' : '')) }}">
+                            <tr data-row-id="{{ $row->id }}" class="{{ trim(($isFileLockedForUser ?? false ? 'file-row-locked ' : '') . ($isPoRowLocked ? 'po-row-locked' : '')) }}">
                                 <td>
                                     {{ $row->row_number }}
                                     @if($isFileLockedForUser ?? false)
@@ -1210,6 +1210,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const sheetHeaders = @json($sheetHeadersForJs);
     const calculatedHeaderKeys = @json($calculatedHeaderKeys ?? []);
     const calculatedHeaderIds = @json($calculatedHeaderIds ?? []);
+    const rowPraDates = @json($rowPraDates ?? []);
     const currentUserRoleSlugs = @json($currentUserRoleSlugs);
     const shouldAutoScrollToUserColumns = @json($shouldAutoScrollToUserColumns);
 
@@ -1739,6 +1740,7 @@ document.addEventListener('DOMContentLoaded', function () {
         pi_status: ['pi status'],
         pi_amount: ['pi amount'],
         payment_reqd_date: ["payment req'd date", 'payment reqd date', 'payment required date'],
+        pi_summary_submission_date: ['pi summary submission date', 'pi summary submission'],
         payment_status: ['payment status'],
         bl_status: ['bl status'],
         arrival_status: ['arrival status'],
@@ -2003,7 +2005,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? 'Waiting for PO'
                 : (blank(materialPiNumber) ? 'PI Pending' : 'PI Received');
             const piAmount = piRate * materialsOrdered;
-            const paymentReqdDate = committedExMill ? addDays(committedExMill, -7) : null;
+            let paymentReqdDate = committedExMill ? addDays(committedExMill, -7) : null;
+
+            // A created PRA overrides the formula for this row (latest PRA wins).
+            // Rows without a PRA keep the committed ex-mill - 7 days formula.
+            const rowId = row.getAttribute('data-row-id');
+            const pra = (rowId && rowPraDates[rowId]) ? rowPraDates[rowId] : null;
             const paymentStatus = piStatus !== 'PI Received'
                 ? piStatus
                 : (blank(pmtDocNo) ? 'Pmt Pending' : 'Pmt Done');
@@ -2057,7 +2064,10 @@ document.addEventListener('DOMContentLoaded', function () {
             setFormulaValue(row, ['material_order_status'], materialOrderStatus);
             setFormulaValue(row, ['pi_status'], piStatus);
             setFormulaValue(row, ['pi_amount'], fmtNum(piAmount));
-            setFormulaValue(row, ['payment_reqd_date', 'payment_req_d_date', 'payment_required_date'], fmtDate(paymentReqdDate));
+            setFormulaValue(row, ['payment_reqd_date', 'payment_req_d_date', 'payment_required_date'], (pra && pra.reqd) ? pra.reqd : fmtDate(paymentReqdDate));
+            if (pra && pra.submission) {
+                setFormulaValue(row, ['pi_summary_submission_date', 'pi_summary_submission'], pra.submission);
+            }
             setFormulaValue(row, ['payment_status'], paymentStatus);
             setFormulaValue(row, ['bl_status'], blStatus);
             setFormulaValue(row, ['arrival_status'], arrivalStatus);
