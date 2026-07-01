@@ -1061,7 +1061,6 @@ class BookingController extends Controller
     protected function bookingEmailDefaults(BookingPo $bookingPo, array $bookingData): array
     {
         $template = EmailTemplate::forType('po_booking');
-        $subject = $template->subject ?? 'PO Booking {{po_number}} - {{buyer}} {{season}}';
         $body = $template->body ?? '<p>Please find attached PO Booking {{po_number}}.</p>';
 
         $supplierEmail = trim((string) ($bookingData['email'] ?? ''));
@@ -1084,9 +1083,31 @@ class BookingController extends Controller
             'to' => $supplierEmail,
             'cc' => $template->default_cc ?? '',
             'from' => auth()->user()?->email ?? '',
-            'subject' => EmailTemplate::render($subject, $placeholders),
+            'subject' => $this->bookingEmailSubject($bookingPo, $bookingData),
             'body' => EmailTemplate::render($body, $placeholders),
         ];
+    }
+
+    /**
+     * Build the pre-filled PO Booking email subject in the fixed business
+     * format: BUYER - SEASON - HUMANA - VENDOR - PO#{PO_NO} (uppercased).
+     * This is only the default value; the sender can still edit it freely.
+     *
+     * @param array<string, mixed> $bookingData
+     */
+    protected function bookingEmailSubject(BookingPo $bookingPo, array $bookingData): string
+    {
+        $vendorName = $bookingPo->vendor_name ?: ($bookingData['supplier'] ?? '');
+
+        $parts = array_filter([
+            $bookingPo->buyer_name ?: ($bookingData['buyer'] ?? ''),
+            $bookingPo->season_name ?: ($bookingData['season'] ?? ''),
+            'HUMANA',
+            $vendorName,
+            $bookingPo->po_no ? 'PO#' . $bookingPo->po_no : '',
+        ], fn ($part) => trim((string) $part) !== '');
+
+        return strtoupper(implode(' - ', array_map(fn ($part) => trim((string) $part), $parts)));
     }
 
     /**
