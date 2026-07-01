@@ -686,20 +686,16 @@ class PaymentRequestController extends Controller
 
     protected function approvalRowFromItem(PaymentRequestItem $item): array
     {
-        $itemIdentity = collect([
-            data_get($item->data, 'material_description'),
-            $item->material_description,
-            data_get($item->data, 'description'),
-            $item->sap_code,
-            $item->material_color,
-            data_get($item->data, 'material_type'),
-            $item->material_type,
-        ])->map(fn ($value) => trim((string) $value))->filter()->implode('|');
-
+        // Rows merge into a single PRA line only when Style, Color and Size all
+        // match. Any difference in one of these keeps the rows separate. Other
+        // differing fields (PO No, PI No, dates, etc.) are comma-joined and the
+        // PI Amount is summed in mergeApprovalRows().
         $style = $item->style_name ?: data_get($item->data, 'style_name');
+        $color = $item->material_color ?: data_get($item->data, 'material_color');
+        $size = data_get($item->data, 'size') ?: data_get($item->data, 'size_width');
 
         return [
-            'merge_key' => $this->mergeKey($style, $itemIdentity, $item->supplier_name, $item->po_no, $item->pi_number),
+            'merge_key' => $this->mergeKey($style, $color, $size),
             'booking_po_ids' => collect([$item->booking_po_id])->filter()->values()->all(),
             'vendor_name' => $item->supplier_name ?: '-',
             'style' => $style ?: '-',
