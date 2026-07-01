@@ -8,6 +8,7 @@ class EmailLog extends Model
 {
     protected $fillable = [
         'payment_request_id',
+        'booking_po_id',
         'recipients',
         'cc',
         'subject',
@@ -20,6 +21,11 @@ class EmailLog extends Model
     public function paymentRequest()
     {
         return $this->belongsTo(PaymentRequest::class);
+    }
+
+    public function bookingPo()
+    {
+        return $this->belongsTo(BookingPo::class);
     }
 
     public function sentBy()

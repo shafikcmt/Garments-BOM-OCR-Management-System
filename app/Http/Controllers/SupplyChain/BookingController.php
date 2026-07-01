@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\SupplyChain;
 
 use App\Http\Controllers\Controller;
+use App\Mail\PoBookingMail;
 use App\Models\ActivityLog;
 use App\Models\BookingPo;
 use App\Models\BookingInstruction;
 use App\Models\BookingDeliveryDestination;
+use App\Models\EmailLog;
+use App\Models\EmailTemplate;
 use App\Models\ExcelCell;
 use App\Models\ExcelFileChangeLog;
 use App\Models\ExcelHeader;
@@ -14,6 +17,8 @@ use App\Models\ExcelRow;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -963,8 +968,144 @@ class BookingController extends Controller
         $bookingData = $this->bookingData($bookingPo);
         $instructionOptions = $this->bookingInstructionOptions();
         $deliveryDestinationOptions = $this->deliveryDestinationOptions();
+        $emailDefaults = $this->bookingEmailDefaults($bookingPo, $bookingData);
+        $emailLogs = EmailLog::where('booking_po_id', $bookingPo->id)
+            ->with('sentBy')
+            ->latest('id')
+            ->get();
 
-        return view('supply-chain.bookings.show', compact('bookingPo', 'bookingData', 'instructionOptions', 'deliveryDestinationOptions'));
+        return view('supply-chain.bookings.show', compact('bookingPo', 'bookingData', 'instructionOptions', 'deliveryDestinationOptions', 'emailDefaults', 'emailLogs'));
+    }
+
+    /**
+     * Email the generated PO Booking to the supplier with the booking PDF
+     * attached. The send is logged for management visibility; failures are
+     * recorded without breaking the page.
+     */
+    public function sendEmail(Request $request, BookingPo $bookingPo)
+    {
+        $this->authorizeBookingPo($bookingPo);
+
+        $validated = $request->validate([
+            'to' => ['required', 'string', 'max:2000'],
+            'cc' => ['nullable', 'string', 'max:2000'],
+            'from' => ['nullable', 'email', 'max:255'],
+            'subject' => ['required', 'string', 'max:255'],
+            'body' => ['required', 'string', 'max:20000'],
+        ]);
+
+        $to = $this->parseEmailList($validated['to']);
+        $cc = $this->parseEmailList($validated['cc'] ?? '');
+        $replyTo = $validated['from'] ?? null;
+
+        if (empty($to)) {
+            return back()->with('error', 'Please enter at least one valid recipient email address.');
+        }
+
+        $pdfData = null;
+        if (class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')) {
+            $pdfData = $this->buildBookingPdf($bookingPo)->output();
+        }
+        $pdfName = $bookingPo->po_no . '_booking_format.pdf';
+
+        $status = 'sent';
+        $error = null;
+
+        try {
+            $mail = new PoBookingMail($validated['subject'], $validated['body'], $pdfData, $pdfName, $replyTo);
+            Mail::to($to)->cc($cc)->send($mail);
+        } catch (\Throwable $e) {
+            $status = 'failed';
+            $error = $e->getMessage();
+            Log::error('PO Booking email failed: ' . $e->getMessage(), ['booking_po_id' => $bookingPo->id]);
+        }
+
+        EmailLog::create([
+            'booking_po_id' => $bookingPo->id,
+            'recipients' => implode(', ', $to),
+            'cc' => $cc ? implode(', ', $cc) : null,
+            'subject' => $validated['subject'],
+            'body' => $validated['body'],
+            'sent_by' => auth()->id(),
+            'status' => $status,
+            'error' => $error,
+        ]);
+
+        if ($status === 'sent') {
+            return back()->with('success', 'Email sent successfully to ' . implode(', ', $to) . '.');
+        }
+
+        return back()->with('error', 'Email could not be sent. Please check the mail (SMTP) configuration and try again.');
+    }
+
+    /**
+     * Build the PO Booking PDF (same view/format as the Download PDF action).
+     */
+    protected function buildBookingPdf(BookingPo $bookingPo)
+    {
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('supply-chain.bookings.print', [
+            'bookingPo' => $bookingPo,
+            'bookingData' => $this->bookingData($bookingPo),
+            'autoPrint' => false,
+            'isPdf' => true,
+        ])->setPaper('a4', 'portrait');
+    }
+
+    /**
+     * Pre-filled subject/body/recipients for the "Email to Supplier" form,
+     * using the admin "po_booking" template with placeholders replaced.
+     *
+     * @param array<string, mixed> $bookingData
+     * @return array{to: string, cc: string, from: string, subject: string, body: string}
+     */
+    protected function bookingEmailDefaults(BookingPo $bookingPo, array $bookingData): array
+    {
+        $template = EmailTemplate::forType('po_booking');
+        $subject = $template->subject ?? 'PO Booking {{po_number}} - {{buyer}} {{season}}';
+        $body = $template->body ?? '<p>Please find attached PO Booking {{po_number}}.</p>';
+
+        $supplierEmail = trim((string) ($bookingData['email'] ?? ''));
+        if ($supplierEmail === '' || ! filter_var($supplierEmail, FILTER_VALIDATE_EMAIL)) {
+            $supplierEmail = '';
+        }
+
+        $placeholders = [
+            'supplier_name' => $bookingData['supplier'] ?? ($bookingPo->vendor_name ?: '-'),
+            'po_number' => $bookingData['po_number'] ?? ($bookingPo->po_no ?: '-'),
+            'buyer' => $bookingData['buyer'] ?? ($bookingPo->buyer_name ?: '-'),
+            'style_no' => $bookingData['order_style_no'] ?? ($bookingPo->style_name ?: '-'),
+            'season' => $bookingData['season'] ?? ($bookingPo->season_name ?: '-'),
+            'date' => optional($bookingPo->generated_at ?: now())->format('jS M-Y'),
+            'sender_name' => $bookingData['from'] ?? (optional(auth()->user())->name ?: '-'),
+            'company_name' => 'Humana Apparels Pvt. Ltd.',
+        ];
+
+        return [
+            'to' => $supplierEmail,
+            'cc' => $template->default_cc ?? '',
+            'from' => auth()->user()?->email ?? '',
+            'subject' => EmailTemplate::render($subject, $placeholders),
+            'body' => EmailTemplate::render($body, $placeholders),
+        ];
+    }
+
+    /**
+     * Parse a comma / semicolon / newline separated list into valid emails.
+     *
+     * @return array<int, string>
+     */
+    protected function parseEmailList(?string $raw): array
+    {
+        if (! $raw || trim($raw) === '') {
+            return [];
+        }
+
+        return collect(preg_split('/[,;\r\n]+/', $raw))
+            ->map(fn ($email) => trim($email))
+            ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function update(Request $request, BookingPo $bookingPo)

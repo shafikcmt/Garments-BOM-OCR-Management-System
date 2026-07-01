@@ -40,4 +40,5 @@ Route::prefix('supply-chain')
         Route::get('/booking-generate/po/{bookingPo}/print', [BookingController::class, 'print'])->name('bookings.print');
         Route::get('/booking-generate/po/{bookingPo}/download', [BookingController::class, 'download'])->name('bookings.download');
         Route::get('/booking-generate/po/{bookingPo}/download-excel', [BookingController::class, 'downloadExcel'])->name('bookings.download_excel');
+        Route::post('/booking-generate/po/{bookingPo}/email', [BookingController::class, 'sendEmail'])->name('bookings.email');
     });
