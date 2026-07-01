@@ -1060,6 +1060,7 @@ class BookingController extends Controller
             $filterOptions = [
                 'buyers' => $this->dropdownOptions('buyer'),
                 'seasons' => $this->dropdownOptions('season'),
+                'sap_codes' => $this->dropdownOptions('sap_code'),
                 'vendors' => $this->dropdownOptions('vendor'),
                 'ihods' => $this->dropdownOptions('ihod'),
             ];
@@ -1085,6 +1086,7 @@ class BookingController extends Controller
         $this->applyHasBookingSourceData($pendingRowsQuery);
         $this->applyCellFilter($pendingRowsQuery, 'buyer', $request->input('buyer'));
         $this->applyCellFilter($pendingRowsQuery, 'season', $request->input('season'));
+        $this->applyCellFilter($pendingRowsQuery, 'sap_code', $request->input('sap_code'));
         $this->applyCellFilter($pendingRowsQuery, 'vendor', $request->input('vendor'));
         $this->applyCellFilter($pendingRowsQuery, 'ihod', $request->input('ihod'));
         $this->applyKeywordFilter($pendingRowsQuery, $request->input('keyword'));
@@ -1342,10 +1344,19 @@ class BookingController extends Controller
 
         $this->applyPendingPoFilter($query);
         $this->applyHasBookingSourceData($query);
-        $this->applyCellFilter($query, 'buyer', $rowData['buyer_name'] ?? null);
-        $this->applyCellFilter($query, 'season', $rowData['season_name'] ?? null);
-        $this->applyCellFilter($query, 'ihod', $rowData['ihod'] ?? null);
-        $this->applyCellFilter($query, 'vendor', $rowData['vendor_name'] ?? null);
+
+        // Coarse narrowing must follow the same scheme as bookingGroupKey(): when a SAP
+        // Code drives the group, narrow by vendor + SAP Code (styles/buyers may differ);
+        // otherwise keep the legacy buyer/season/ihod/vendor narrowing.
+        if (trim((string) ($rowData['sap_code'] ?? '')) !== '') {
+            $this->applyCellFilter($query, 'vendor', $rowData['vendor_name'] ?? null);
+            $this->applyCellFilter($query, 'sap_code', $rowData['sap_code'] ?? null);
+        } else {
+            $this->applyCellFilter($query, 'buyer', $rowData['buyer_name'] ?? null);
+            $this->applyCellFilter($query, 'season', $rowData['season_name'] ?? null);
+            $this->applyCellFilter($query, 'ihod', $rowData['ihod'] ?? null);
+            $this->applyCellFilter($query, 'vendor', $rowData['vendor_name'] ?? null);
+        }
 
         return $query
             ->orderBy('excel_file_id')
@@ -1360,6 +1371,16 @@ class BookingController extends Controller
 
     protected function bookingGroupKey(array $data): string
     {
+        // Business rule: group same SAP Code (material) for the same vendor into one
+        // booking/PO, even when the styles differ. When a SAP Code is present it drives
+        // the grouping; otherwise fall back to the legacy buyer/season/ihod/vendor key so
+        // existing data without a SAP Code keeps its previous behaviour.
+        $sapCode = $this->normalize($data['sap_code'] ?? '');
+
+        if ($sapCode !== '') {
+            return 'sap|' . $this->normalize($data['vendor_name'] ?? '') . '|' . $sapCode;
+        }
+
         $parts = [
             $this->normalize($data['buyer_name'] ?? ''),
             $this->normalize($data['season_name'] ?? ''),
@@ -1682,8 +1703,10 @@ class BookingController extends Controller
             'color' => $this->valueFor($row, 'color'),
             'size' => $this->valueFor($row, 'size'),
             'width' => $this->valueFor($row, 'width'),
+            'fabric_cw' => $this->valueFor($row, 'fabric_cw'),
             'size_width' => $this->valueFor($row, 'size_width'),
             'supplier_article' => $this->valueFor($row, 'supplier_article'),
+            'sap_code' => $this->valueFor($row, 'sap_code'),
             'consumption' => $this->valueFor($row, 'consumption'),
             'remarks' => $this->valueFor($row, 'remarks'),
         ];
@@ -1929,8 +1952,10 @@ class BookingController extends Controller
             'color' => str_contains($header, 'color') || str_contains($header, 'colour'),
             'size' => (str_contains($header, 'size') || str_contains($header, 'measurement')) && ! str_contains($header, 'width') && ! str_contains($header, 'size_width'),
             'width' => str_contains($header, 'width') && ! str_contains($header, 'size_width'),
+            'fabric_cw' => str_contains($header, 'fabric_cw') || (str_contains($header, 'fabric') && str_contains($header, 'cw')),
             'size_width' => str_contains($header, 'size_width') || str_contains($header, 'size_or_width') || str_contains($header, 'size_and_width') || str_contains($header, 'size_width'),
             'supplier_article' => str_contains($header, 'article') || str_contains($header, 'sap_code'),
+            'sap_code' => str_contains($header, 'sap_code') || str_contains($header, 'sapcode'),
             'consumption' => str_contains($header, 'consumption') || str_contains($header, 'bulk_cons'),
             'remarks' => str_contains($header, 'remarks') || str_contains($header, 'comments'),
             'po_no' => str_contains($header, 'material_po_number')
@@ -1968,8 +1993,10 @@ class BookingController extends Controller
             'color' => ['material_color', 'color', 'colour', 'gmts_color_name'],
             'size' => ['size', 'item_size', 'material_size', 'auto_size'],
             'width' => ['width', 'item_width', 'material_width', 'fabric_width', 'cuttable_width'],
+            'fabric_cw' => ['fabric_cw', 'fabric_c_w', 'fabriccw', 'fab_cw'],
             'size_width' => ['size_width', 'size_or_width', 'size_and_width', 'size_width_value'],
             'supplier_article' => ['supplier_article', 'article', 'sap_code'],
+            'sap_code' => ['sap_code', 'sapcode'],
             'consumption' => ['bulk_cons', 'consumption', 'booking_consumption_from_cad', 'consumption_based_on_which_materials_order_including_yy'],
             'remarks' => ['remarks', 'comments', 'merchant_remarks'],
             'po_no' => [
@@ -2004,6 +2031,8 @@ class BookingController extends Controller
             'pp_qty' => ['PP Qty', 'P/P Qty', 'PP Quantity', 'P/P Quantity'],
             'size' => ['Size', 'Item Size', 'Material Size'],
             'width' => ['Width', 'Item Width', 'Material Width', 'Fabric Width'],
+            'fabric_cw' => ['Fabric CW', 'FABRIC CW', 'Fabric C/W', 'Fabric C W'],
+            'sap_code' => ['SAP Code', 'SAP CODE', 'Sap Code'],
             'size_width' => ['Size / Width', 'Size & Width', 'Size Width'],
             default => [],
         };
@@ -2122,6 +2151,7 @@ class BookingController extends Controller
                 'color' => $bookingPo->color,
                 'size' => null,
                 'width' => null,
+                'fabric_cw' => null,
                 'size_width' => $bookingPo->size_width,
                 'supplier_article' => $bookingPo->supplier_article,
                 'consumption' => $bookingPo->consumption,
@@ -2189,6 +2219,7 @@ BIN: 005635381-0406 TIN: 780096271681",
             'color' => $rowData['color'] ?? '[Color]',
             'size' => $size,
             'width' => $width,
+            'fabric_cw' => ($cw = trim((string) ($rowData['fabric_cw'] ?? ''))) !== '' ? $cw : 'N/A',
             'size_width' => trim((string) ($rowData['size_width'] ?? '')),
             'supplier_article' => $rowData['supplier_article'] ?? ($supplier?->display_name ?: ($rowData['vendor_name'] ?? '')),
             'bulk_cons' => $rowData['consumption'] ?? '1.00',
@@ -2335,6 +2366,7 @@ BIN: 005635381-0406 TIN: 780096271681",
             'item_name' => 'item_name',
             'description' => 'description',
             'color' => 'color',
+            'fabric_cw' => 'fabric_cw',
             'supplier_article' => 'supplier_article',
             'consumption' => 'bulk_cons',
             'qty' => 'booking_qty',
@@ -2698,7 +2730,7 @@ BIN: 005635381-0406 TIN: 780096271681",
     {
         $keys = [
             'style_order', 'item_type', 'item_name', 'description', 'color',
-            'size', 'width', 'size_width', 'supplier_article', 'bulk_cons', 'booking_qty', 'tolerance_qty',
+            'size', 'width', 'fabric_cw', 'size_width', 'supplier_article', 'bulk_cons', 'booking_qty', 'tolerance_qty',
             'pp_qty', 'uom', 'remarks',
         ];
 

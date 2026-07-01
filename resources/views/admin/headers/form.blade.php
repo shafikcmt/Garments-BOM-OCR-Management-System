@@ -7,6 +7,7 @@
         'materials_to_be_ordered' => 'Materials to be Ordered',
         'short_excess_ordered' => '(Short)/Excess Ordered',
         'material_order_status' => 'Material Order Status',
+        'pi_amount' => 'PI Amount',
         'committed_inhouse' => 'Committed Inhouse',
         'pcd_as_per_committed_inhouse' => 'PCD as per Committed Inhouse',
         'liability_based_on_receiving' => 'Liability Based On Receiving',
@@ -34,6 +35,7 @@
             'source_header_keys' => ['materials_ordered', 'materials_to_be_ordered'],
         ],
         'material_order_status' => ['source_header_key' => 'short_excess_ordered'],
+        'pi_amount' => ['formula' => 'pi_rate * materials_to_be_ordered', 'source_header_keys' => ['pi_rate', 'materials_to_be_ordered']],
         'committed_inhouse' => ['formula' => 'committed_eta + 7 days', 'source_header_key' => 'committed_eta', 'add_days' => 7, 'format' => 'Y-m-d'],
         'pcd_as_per_committed_inhouse' => ['formula' => 'committed_inhouse + 2 days', 'source_header_key' => 'committed_inhouse', 'add_days' => 2, 'format' => 'Y-m-d'],
         'liability_based_on_receiving' => [
@@ -57,6 +59,20 @@
     }
 @endphp
 
+@if($errors->any())
+    <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+        <div>
+            <strong>Please fix the following {{ $errors->count() }} error(s):</strong>
+            <ul class="mb-0 mt-1 ps-3">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    </div>
+@endif
+
 <div class="row g-3">
     <div class="col-12">
         <div class="section-card">
@@ -70,11 +86,13 @@
                         type="text"
                         name="header_name"
                         id="header_name"
-                        class="form-control"
+                        class="form-control @error('header_name') is-invalid @enderror"
                         value="{{ old('header_name', $header->header_name ?? '') }}"
                         placeholder="Example: Delivery Date"
+                        maxlength="255"
                         required
                     >
+                    @error('header_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
 
                 <div class="col-md-6">
@@ -83,18 +101,20 @@
                         type="text"
                         name="header_key"
                         id="header_key"
-                        class="form-control"
+                        class="form-control @error('header_key') is-invalid @enderror"
                         value="{{ old('header_key', $header->header_key ?? '') }}"
                         placeholder="Example: delivery_date"
                         data-auto="{{ old('header_key', $header->header_key ?? '') ? '0' : '1' }}"
+                        maxlength="255"
                         required
                     >
+                    @error('header_key')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     <small class="text-muted">Auto generate hobe, chaile manually edit korte parben.</small>
                 </div>
 
                 <div class="col-md-4">
                     <label class="form-label">Owner Role</label>
-                    <select name="owner_role_id" class="form-select" required>
+                    <select name="owner_role_id" class="form-select @error('owner_role_id') is-invalid @enderror" required>
                         <option value="">Select Role</option>
                         @foreach($roles as $role)
                             <option value="{{ $role->id }}" @selected(old('owner_role_id', $header->owner_role_id ?? '') == $role->id)>
@@ -102,6 +122,7 @@
                             </option>
                         @endforeach
                     </select>
+                    @error('owner_role_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
 
                 <div class="col-md-4">
@@ -110,31 +131,34 @@
                         type="number"
                         name="position"
                         min="1"
-                        class="form-control"
+                        class="form-control @error('position') is-invalid @enderror"
                         value="{{ old('position', $header->position ?? ($nextPosition ?? 1)) }}"
                         placeholder="Auto position"
                         required
                     >
+                    @error('position')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     <small class="text-muted">Auto value asbe, chaile change korte parben. Existing position dile oi position theke porer sob header auto shift hobe.</small>
                 </div>
 
                 <div class="col-md-4">
                     <label class="form-label">Field Type</label>
-                    <select name="field_type" class="form-select" required>
+                    <select name="field_type" class="form-select @error('field_type') is-invalid @enderror" required>
                         <option value="text" @selected(old('field_type', $header->field_type ?? 'text') === 'text')>Text</option>
                         <option value="number" @selected(old('field_type', $header->field_type ?? '') === 'number')>Number</option>
                         <option value="date" @selected(old('field_type', $header->field_type ?? '') === 'date')>Date</option>
                     </select>
+                    @error('field_type')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     <small class="text-muted">Output type ki hobe seta select korun.</small>
                 </div>
 
                 <div class="col-md-4">
                     <label class="form-label">Value Mode</label>
-                    <select name="value_mode" id="value_mode" class="form-select" required>
+                    <select name="value_mode" id="value_mode" class="form-select @error('value_mode') is-invalid @enderror" required>
                         <option value="input" @selected(old('value_mode', $header->value_mode ?? 'input') === 'input')>Input</option>
                         <option value="formula" @selected(old('value_mode', $header->value_mode ?? '') === 'formula')>Formula</option>
                         <option value="conditional" @selected(old('value_mode', $header->value_mode ?? '') === 'conditional')>Conditional</option>
                     </select>
+                    @error('value_mode')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     <small class="text-muted">Input = manual value, Formula = calculated value, Conditional = rule based value.</small>
                 </div>
             </div>
@@ -147,7 +171,7 @@
             <div class="section-subtitle">Formula or conditional header hole logic key select korun.</div>
 
             <label class="form-label">Formula / Rule Key</label>
-            <select name="formula_key" id="formula_key" class="form-select">
+            <select name="formula_key" id="formula_key" class="form-select @error('formula_key') is-invalid @enderror">
                 <option value="">Select Formula Logic</option>
                 @foreach($formulaOptions as $key => $label)
                     <option value="{{ $key }}" @selected(old('formula_key', $header->formula_key ?? '') === $key)>
@@ -155,6 +179,7 @@
                     </option>
                 @endforeach
             </select>
+            @error('formula_key')<div class="invalid-feedback">{{ $message }}</div>@enderror
             <small class="text-muted">Formula/conditional header hole ekhane business logic key select korun.</small>
         </div>
     </div>
@@ -232,10 +257,11 @@
             <textarea
                 name="formula_meta"
                 id="formula_meta"
-                class="form-control"
+                class="form-control @error('formula_meta') is-invalid @enderror"
                 rows="7"
                 placeholder='{"source_header_key":"contract_shipment_date"}'
             >{{ $formulaMetaValue }}</textarea>
+            @error('formula_meta')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
 
             <small class="text-muted d-block mt-2" id="formulaMetaHelp">
                 Example: shipment_month = {"source_header_key":"contract_shipment_date","format":"M"}
@@ -265,6 +291,7 @@ document.addEventListener('DOMContentLoaded', function () {
         materials_to_be_ordered: 'Materials to be Ordered: Consumption including YY * order quantity.',
         short_excess_ordered: '(Short)/Excess Ordered: Materials Ordered - Materials to be Ordered.',
         material_order_status: 'Material Order Status: Short/excess/order quantity check kore status set hobe.',
+        pi_amount: 'PI Amount: PI Rate * Materials to be Ordered diye calculate hobe.',
         committed_inhouse: 'Committed Inhouse: Committed ETA + 7 days.',
         pcd_as_per_committed_inhouse: 'PCD as per Committed Inhouse: Committed Inhouse + 2 days.',
         liability_based_on_receiving: 'Liability Based On Receiving: Receipt qty - Materials to be Ordered.',
@@ -336,18 +363,27 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    if (formulaKey) {
-        formulaKey.addEventListener('change', function () {
-            const selectedKey = this.value;
-            const template = formulaTemplates[selectedKey];
-
-            if (valueMode && valueMode.value !== 'input' && formulaMeta && template && formulaMeta.dataset.touched !== '1') {
-                formulaMeta.value = prettyJson(template);
-                formulaMeta.dataset.touched = '1';
-            }
-
+    // Auto-generate the Formula Meta JSON from the selected key's template.
+    // Only fills when the field is still empty (untouched), so a manually edited
+    // or already-saved JSON is never overwritten.
+    function applyFormulaTemplate() {
+        if (!formulaKey || !formulaMeta || !valueMode) {
             updateFormulaHelp();
-        });
+            return;
+        }
+
+        const template = formulaTemplates[formulaKey.value];
+
+        if (valueMode.value !== 'input' && template && formulaMeta.dataset.touched !== '1') {
+            formulaMeta.value = prettyJson(template);
+            formulaMeta.dataset.touched = '1';
+        }
+
+        updateFormulaHelp();
+    }
+
+    if (formulaKey) {
+        formulaKey.addEventListener('change', applyFormulaTemplate);
     }
 
     if (valueMode) {
@@ -363,5 +399,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     toggleFormulaFields();
+
+    // On edit pages the formula key may already be selected while the JSON is empty;
+    // fire once on load so the correct JSON auto-fills without manual typing.
+    applyFormulaTemplate();
 });
 </script>

@@ -11,7 +11,6 @@ use App\Models\ExcelRow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -232,105 +231,6 @@ class ExcelUploadController extends Controller
         return redirect()
             ->route('merchant.workspace', ['tab' => 'files'])
             ->with('success', 'Excel file uploaded successfully. Formula and conditional fields calculated automatically.');
-    }
-
-    public function manualStore(Request $request)
-    {
-        $request->validate([
-            'manual_rows' => ['required', 'array'],
-            'manual_rows.*' => ['array'],
-            'remarks' => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        $uploadableHeaders = $this->merchantInputHeaders();
-
-        if ($uploadableHeaders->isEmpty()) {
-            return back()->withErrors([
-                'manual_rows' => 'No merchant input headers found. Please configure merchant input headers first.',
-            ])->withInput();
-        }
-
-        $allowedHeaderIds = $uploadableHeaders->pluck('id')->map(fn ($id) => (int) $id)->flip();
-        $allHeaders = $this->allActiveHeaders();
-        $manualRows = (array) $request->input('manual_rows', []);
-
-        $cleanRows = [];
-        foreach ($manualRows as $rowValues) {
-            $rowValues = (array) $rowValues;
-            $cleanValues = [];
-
-            foreach ($rowValues as $headerId => $value) {
-                $headerId = (int) $headerId;
-
-                if (! $allowedHeaderIds->has($headerId)) {
-                    continue;
-                }
-
-                $value = is_string($value) ? trim($value) : $value;
-                $cleanValues[$headerId] = $value === '' ? null : $value;
-            }
-
-            $hasAnyData = collect($cleanValues)->contains(function ($value) {
-                return trim((string) ($value ?? '')) !== '';
-            });
-
-            if ($hasAnyData) {
-                $cleanRows[] = $cleanValues;
-            }
-        }
-
-        if (empty($cleanRows)) {
-            return back()->withErrors([
-                'manual_rows' => 'Please enter at least one row value before creating order.',
-            ])->withInput();
-        }
-
-        $fileName = 'MANUAL_ORDER_' . now()->format('YmdHis') . '.xlsx';
-        $path = 'excel_uploads/' . $fileName;
-        $this->storeManualWorkbook($uploadableHeaders, $cleanRows, $path);
-
-        $excelFile = DB::transaction(function () use ($request, $fileName, $path, $allHeaders, $cleanRows) {
-            $excelFile = ExcelFile::create([
-                'file_name' => $fileName,
-                'original_file_name' => 'Manual Order ' . now()->format('Y-m-d H:i:s'),
-                'file_path' => $path,
-                'uploaded_by' => auth()->id(),
-                'upload_batch_no' => 'BATCH-' . now()->format('YmdHis'),
-                'total_rows' => 0,
-                'status' => 'pending',
-                'remarks' => $request->remarks,
-                'submitted_at' => now(),
-            ]);
-
-            foreach ($cleanRows as $rowIndex => $valueByHeaderId) {
-                $excelRow = ExcelRow::create([
-                    'excel_file_id' => $excelFile->id,
-                    'row_number' => $rowIndex + 1,
-                ]);
-
-                $this->createCellsForRow($excelRow, $allHeaders, $valueByHeaderId);
-            }
-
-            $excelFile->update([
-                'total_rows' => count($cleanRows),
-            ]);
-
-            return $excelFile;
-        });
-
-        app(\App\Http\Controllers\Shared\ExcelFileController::class)
-            ->recalculateFile($excelFile, auth()->id());
-
-            $this->notifyOtherRoles(
-                $excelFile,
-                'excel_created',
-                'New order created',
-                auth()->user()->name . ' created a new order file: ' . $excelFile->original_file_name
-            );
-
-        return redirect()
-            ->route('merchant.workspace', ['tab' => 'files'])
-            ->with('success', 'New order created successfully. Formula and conditional fields calculated automatically.');
     }
 
     private function extractUploadedCellValue($sheet, int $columnIndex, int $rowNumber, $header): ?string
@@ -623,31 +523,6 @@ class ExcelUploadController extends Controller
         if (! empty($cellInsertBatch)) {
             ExcelCell::insert($cellInsertBatch);
         }
-    }
-
-    private function createCellsForRow(ExcelRow $excelRow, Collection $allHeaders, array $valueByHeaderId): void
-    {
-        foreach ($allHeaders as $header) {
-            ExcelCell::create([
-                'row_id' => $excelRow->id,
-                'header_id' => $header->id,
-                'value' => $valueByHeaderId[$header->id] ?? null,
-                'updated_by' => auth()->id(),
-            ]);
-        }
-    }
-
-    private function storeManualWorkbook(Collection $headers, array $rows, string $path): void
-    {
-        $spreadsheet = $this->buildMerchantInputWorkbook($headers, $rows);
-
-        $tempPath = tempnam(sys_get_temp_dir(), 'manual_order_');
-        $writer = new Xlsx($spreadsheet);
-        $writer->save($tempPath);
-
-        Storage::put($path, file_get_contents($tempPath));
-
-        @unlink($tempPath);
     }
 
     private function buildMerchantInputWorkbook(Collection $headers, array $rows = []): Spreadsheet

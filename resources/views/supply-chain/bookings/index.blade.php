@@ -3,6 +3,7 @@
 @section('title', 'Booking Preview / Booking Generate')
 
 @section('styles')
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
 <style>
     :root {
         --booking-primary: #4338ca;
@@ -173,6 +174,39 @@
         background: #fff;
     }
     .btn-soft-reset:hover { background: #f8fafc; color: var(--booking-ink); }
+    /* Searchable dropdowns (Tom Select) — matched to the booking filter input style */
+    .booking-filter .ts-wrapper { font-weight: 600; }
+    .booking-filter .ts-control {
+        min-height: 38px;
+        border-radius: 11px;
+        border-color: #dbe4f0;
+        color: var(--booking-ink);
+        background-color: #fff;
+        box-shadow: none;
+        padding: 5px 12px;
+    }
+    .booking-filter .ts-control input::placeholder { color: #94a3b8; font-weight: 500; }
+    .booking-filter .ts-wrapper.focus .ts-control,
+    .booking-filter .ts-wrapper.dropdown-active .ts-control {
+        border-color: #818cf8;
+        box-shadow: 0 0 0 .22rem rgba(99, 102, 241, .13);
+    }
+    .booking-filter .ts-dropdown {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 18px 44px rgba(15, 23, 42, .14);
+        overflow: hidden;
+        margin-top: 6px;
+    }
+    .booking-filter .ts-dropdown .ts-dropdown-content { padding: 4px; }
+    .booking-filter .ts-dropdown .option {
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-weight: 600;
+        color: var(--booking-ink);
+    }
+    .booking-filter .ts-dropdown .option.active { background: var(--booking-primary-soft); color: var(--booking-primary); }
+    .booking-filter .ts-dropdown .no-results { padding: 8px 12px; color: var(--booking-muted); font-weight: 600; }
     .booking-toolbar {
         background: #fbfdff;
         border-bottom: 1px solid var(--booking-border);
@@ -537,6 +571,7 @@
 @php
     $selectedBuyer = request('buyer');
     $selectedSeason = request('season');
+    $selectedSapCode = request('sap_code');
     $selectedVendor = request('vendor');
     $selectedIhod = request('ihod');
     $selectedKeyword = request('keyword');
@@ -599,6 +634,15 @@
                         </select>
                     </div>
                     <div class="col-md-3">
+                        <label class="form-label">SAP Code</label>
+                        <select name="sap_code" class="form-select booking-auto-filter">
+                            <option value="">All SAP Code</option>
+                            @foreach($filterOptions['sap_codes'] as $sapCode)
+                                <option value="{{ $sapCode }}" @selected($selectedSapCode === $sapCode)>{{ $sapCode }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label">Vendor</label>
                         <select name="vendor" class="form-select booking-auto-filter">
                             <option value="">All Vendor / Supplier</option>
@@ -616,7 +660,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-9 booking-search-field">
+                    <div class="col-md-6 booking-search-field">
                         <label class="form-label">Quick keyword search</label>
                         <i class="bi bi-search booking-search-icon"></i>
                         <input type="text" name="keyword" value="{{ $selectedKeyword }}" class="form-control booking-auto-filter-text" placeholder="Search buyer / season / vendor / item / style / PO keyword...">
@@ -644,7 +688,7 @@
                 <span class="small text-muted"><span id="bookingSelectedCount">0</span> selected</span>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <button type="button" class="btn booking-primary-btn btn-sm" id="bulkPreviewBtn"><i class="bi bi-eye me-1"></i>Preview selected</button>
+                <button type="button" class="btn booking-primary-btn btn-sm" id="bulkPreviewBtn"><i class="bi bi-eye me-1"></i>Preview Selected</button>
             </div>
         </div>
         <div class="card-body p-0 booking-table-wrap">
@@ -833,6 +877,7 @@
 @endsection
 
 @section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('bookingFilterForm');
@@ -1166,6 +1211,27 @@ document.addEventListener('DOMContentLoaded', function () {
         loadRows();
     });
 
+    // Turn each filter dropdown into a searchable (typeable) dropdown. Falls back to the
+    // native <select> if the Tom Select library fails to load — filter logic is unchanged.
+    if (window.TomSelect) {
+        document.querySelectorAll('.booking-auto-filter').forEach(function (select) {
+            const placeholder = (select.options[0] && select.options[0].value === '')
+                ? select.options[0].text
+                : 'Search...';
+
+            new TomSelect(select, {
+                allowEmptyOption: true,
+                placeholder: placeholder,
+                searchField: ['text'],
+                render: {
+                    no_results: function () {
+                        return '<div class="no-results">No match found</div>';
+                    }
+                }
+            });
+        });
+    }
+
     document.querySelectorAll('.booking-auto-filter').forEach(function (select) {
         select.addEventListener('change', function () {
             clearTimeout(filterTimer);
@@ -1182,7 +1248,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('bookingFilterReset')?.addEventListener('click', function () {
         form.querySelectorAll('select, input').forEach(function (field) {
-            field.value = '';
+            if (field.tomselect) {
+                field.tomselect.clear(true); // silent: avoid per-field reload
+            } else {
+                field.value = '';
+            }
         });
         loadRows();
     });

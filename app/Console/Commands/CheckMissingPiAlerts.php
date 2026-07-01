@@ -4,17 +4,21 @@ namespace App\Console\Commands;
 
 use App\Models\BookingPo;
 use App\Services\BookingPoSourceService;
+use App\Support\PiAlertSettings;
 use Illuminate\Console\Command;
 
 class CheckMissingPiAlerts extends Command
 {
-    protected $signature = 'po:check-missing-pi-alerts {--days=3 : Number of days to wait after PO generation}';
+    protected $signature = 'po:check-missing-pi-alerts {--days= : Override the configured number of days to wait after PO generation}';
 
     protected $description = 'Send red alert notifications when PI is not received within the configured PO generation waiting period.';
 
     public function handle(BookingPoSourceService $sourceService): int
     {
-        $days = max(1, (int) $this->option('days'));
+        $days = $this->option('days') !== null && $this->option('days') !== ''
+            ? max(1, (int) $this->option('days'))
+            : PiAlertSettings::days();
+
         $cutoff = now()->subDays($days);
         $checked = 0;
         $notifications = 0;
@@ -28,10 +32,10 @@ class CheckMissingPiAlerts extends Command
                     ->orWhereNotNull('completed_at');
             })
             ->orderBy('id')
-            ->chunkById(100, function ($bookingPos) use ($sourceService, &$checked, &$notifications) {
+            ->chunkById(100, function ($bookingPos) use ($sourceService, $days, &$checked, &$notifications) {
                 foreach ($bookingPos as $bookingPo) {
                     $checked++;
-                    $notifications += $sourceService->notifyPiMissingForBookingPo($bookingPo);
+                    $notifications += $sourceService->notifyPiMissingForBookingPo($bookingPo, $days);
                 }
             });
 

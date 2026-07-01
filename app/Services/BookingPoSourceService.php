@@ -2,13 +2,17 @@
 
 namespace App\Services;
 
+use App\Mail\PiMissingAlertMail;
 use App\Models\AppNotification;
 use App\Models\BookingPo;
 use App\Models\ExcelHeader;
 use App\Models\ExcelRow;
 use App\Models\User;
+use App\Support\PiAlertSettings;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class BookingPoSourceService
 {
@@ -202,8 +206,10 @@ class BookingPoSourceService
         return $this->isEligibleForPaymentRequestSnapshot($this->paymentSnapshot($bookingPo), $bookingPo);
     }
 
-    public function notifyPiMissingForBookingPo(BookingPo $bookingPo): int
+    public function notifyPiMissingForBookingPo(BookingPo $bookingPo, ?int $thresholdDays = null): int
     {
+        $thresholdDays = $thresholdDays !== null ? max(1, $thresholdDays) : PiAlertSettings::days();
+
         $bookingPo->loadMissing(['excelFile.uploader', 'excelRow.cells.header', 'generatedBy']);
 
         $data = is_array($bookingPo->booking_data) ? $bookingPo->booking_data : [];
@@ -217,7 +223,7 @@ class BookingPoSourceService
             return 0;
         }
 
-        if (! $bookingPo->generated_at || $bookingPo->generated_at->gt(now()->subDays(3))) {
+        if (! $bookingPo->generated_at || $bookingPo->generated_at->gt(now()->subDays($thresholdDays))) {
             $bookingPo->booking_data = $data;
             $bookingPo->save();
 
@@ -231,14 +237,7 @@ class BookingPoSourceService
             return 0;
         }
 
-        $recipients = collect([
-                $bookingPo->generated_by,
-                optional($bookingPo->excelFile)->uploaded_by,
-            ])
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
+        $recipients = $this->piAlertRecipientUsers($bookingPo);
 
         if ($recipients->isEmpty()) {
             $bookingPo->booking_data = $data;
@@ -261,12 +260,7 @@ class BookingPoSourceService
         ];
 
         $created = 0;
-        foreach ($recipients as $userId) {
-            $user = User::find($userId);
-            if (! $user) {
-                continue;
-            }
-
+        foreach ($recipients as $user) {
             AppNotification::create([
                 'user_id' => $user->id,
                 'actor_id' => $bookingPo->generated_by,
@@ -281,12 +275,86 @@ class BookingPoSourceService
             $created++;
         }
 
+        $this->sendPiMissingMail($recipients, $notificationData);
+
         $data['pi_alert_sent_at'] = now()->format('Y-m-d H:i:s');
-        $data['pi_alert_sent_to'] = $recipients->all();
+        $data['pi_alert_sent_to'] = $recipients->pluck('id')->all();
         $bookingPo->booking_data = $data;
         $bookingPo->save();
 
         return $created;
+    }
+
+    /**
+     * Resolve the users who should receive the PI missing alert, based on the
+     * admin-configured department visibility setting. Falls back to the PO
+     * creator and file uploader when no department is configured.
+     *
+     * @return Collection<int, User>
+     */
+    protected function piAlertRecipientUsers(BookingPo $bookingPo): Collection
+    {
+        $departments = PiAlertSettings::departments();
+
+        if (! empty($departments)) {
+            return User::whereHas('roles', function ($query) use ($departments) {
+                    $query->whereIn('name', $departments);
+                })
+                ->get()
+                ->unique('id')
+                ->values();
+        }
+
+        $fallbackIds = collect([
+                $bookingPo->generated_by,
+                optional($bookingPo->excelFile)->uploaded_by,
+            ])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($fallbackIds->isEmpty()) {
+            return collect();
+        }
+
+        return User::whereIn('id', $fallbackIds)->get();
+    }
+
+    /**
+     * Send the PI missing alert email when enabled by the admin.
+     *
+     * @param Collection<int, User> $recipients
+     * @param array<string, mixed> $notificationData
+     */
+    protected function sendPiMissingMail(Collection $recipients, array $notificationData): void
+    {
+        if (! PiAlertSettings::mailEnabled()) {
+            return;
+        }
+
+        if (PiAlertSettings::mailRecipientsMode() === 'specific') {
+            $emails = PiAlertSettings::mailEmails();
+        } else {
+            $emails = $recipients
+                ->pluck('email')
+                ->filter(fn ($email) => filter_var($email, FILTER_VALIDATE_EMAIL))
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        if (empty($emails)) {
+            return;
+        }
+
+        try {
+            Mail::to($emails)->send(new PiMissingAlertMail($notificationData));
+        } catch (\Throwable $e) {
+            Log::error('PI missing alert mail failed: ' . $e->getMessage(), [
+                'po_no' => $notificationData['po_no'] ?? null,
+            ]);
+        }
     }
 
     public function paymentRequiredDateForBookingPo(BookingPo $bookingPo): ?Carbon

@@ -14,5 +14,4 @@ Route::prefix('merchant')
 
         Route::get('/excel/sample', [ExcelUploadController::class, 'downloadSample'])->name('excel.sample');
         Route::post('/excel/upload', [ExcelUploadController::class, 'store'])->name('excel.store');
-        Route::post('/excel/manual-store', [ExcelUploadController::class, 'manualStore'])->name('excel.manual-store');
     });

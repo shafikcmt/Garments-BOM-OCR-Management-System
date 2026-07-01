@@ -54,7 +54,7 @@ class HeaderController extends Controller
 
         return redirect()
             ->route('admin.headers.index')
-            ->with('success', 'Header created successfully. Position sequence updated.');
+            ->with('success', 'Header created successfully.');
     }
 
     public function edit(ExcelHeader $header)
@@ -102,7 +102,7 @@ class HeaderController extends Controller
 
         return redirect()
             ->route('admin.headers.index')
-            ->with('success', 'Header updated successfully. Position sequence updated.');
+            ->with('success', 'Header updated successfully.');
     }
 
     public function destroy(ExcelHeader $header)
@@ -162,6 +162,20 @@ class HeaderController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'can_view_all' => ['nullable', 'boolean'],
             'can_edit_owner_only' => ['nullable', 'boolean'],
+        ], [
+            'header_name.required' => 'Header name is required.',
+            'header_name.unique' => 'Header name already exists. Please use a unique name.',
+            'header_key.required' => 'Header key is required.',
+            'header_key.unique' => 'Header key already exists. Please use a unique key.',
+            'owner_role_id.required' => 'Owner role is required.',
+            'owner_role_id.exists' => 'Selected owner role is invalid.',
+            'position.required' => 'Position is required.',
+            'position.integer' => 'Position must be a valid number.',
+            'field_type.required' => 'Field type is required.',
+            'value_mode.required' => 'Value mode is required.',
+            'formula_key.required' => 'Formula / rule key is required for formula or conditional headers.',
+            'formula_key.in' => 'Selected formula / rule key is invalid.',
+            'formula_meta.json' => 'Formula meta must be valid JSON.',
         ]);
 
         $merchantRoleId = (int) Role::where('name', 'merchant')->value('id');
@@ -213,6 +227,7 @@ class HeaderController extends Controller
             'materials_to_be_ordered' => 'Materials to be Ordered',
             'short_excess_ordered' => '(Short)/Excess Ordered',
             'material_order_status' => 'Material Order Status',
+            'pi_amount' => 'PI Amount',
             'committed_inhouse' => 'Committed Inhouse',
             'pcd_as_per_committed_inhouse' => 'PCD as per Committed Inhouse',
             'liability_based_on_receiving' => 'Liability Based On Receiving',
@@ -261,6 +276,13 @@ class HeaderController extends Controller
             ],
             'material_order_status' => [
                 'source_header_key' => 'short_excess_ordered',
+            ],
+            'pi_amount' => [
+                'formula' => 'pi_rate * materials_to_be_ordered',
+                'source_header_keys' => [
+                    'pi_rate',
+                    'materials_to_be_ordered',
+                ],
             ],
             'committed_inhouse' => [
                 'formula' => 'committed_eta + 7 days',

@@ -241,7 +241,7 @@
                     <th style="width:38mm;">Description</th>
                     <th style="width:12mm;">Color</th>
                     <th style="width:9mm;">Size</th>
-                    <th style="width:10mm;">Width</th>
+                    <th style="width:10mm;">Fabric CW</th>
                     <th style="width:19mm;">Supplier / Article</th>
                     <th style="width:13mm;">Booking Qty</th>
                     <th style="width:9mm;">PP Qty</th>
@@ -259,7 +259,7 @@
                         <td>{{ $item['description'] ?? '' }}</td>
                         <td>{{ $item['color'] ?? '' }}</td>
                         <td>{{ $item['size'] ?? 'N/A' }}</td>
-                        <td>{{ $item['width'] ?? 'N/A' }}</td>
+                        <td>{{ $item['fabric_cw'] ?? 'N/A' }}</td>
                         <td>{{ $item['supplier_article'] ?? '' }}</td>
                         <td class="text-right">{{ $item['booking_qty'] ?? '' }}</td>
                         <td class="text-right">{{ $item['pp_qty'] ?? '' }}</td>

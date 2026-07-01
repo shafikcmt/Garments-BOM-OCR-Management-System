@@ -2004,7 +2004,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const piStatus = materialOrderStatus === 'PO Pending'
                 ? 'Waiting for PO'
                 : (blank(materialPiNumber) ? 'PI Pending' : 'PI Received');
-            const piAmount = piRate * materialsOrdered;
+            const piAmount = piRate * materialsToBeOrdered;
             let paymentReqdDate = committedExMill ? addDays(committedExMill, -7) : null;
 
             // A created PRA overrides the formula. Matching is by PI No., so every

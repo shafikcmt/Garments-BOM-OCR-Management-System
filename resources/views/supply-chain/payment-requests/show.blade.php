@@ -99,8 +99,8 @@
                                 <label for="paymentRequiredPreviewDate">Payment Require Date</label>
                                 <input type="date" name="payment_required_date" id="paymentRequiredPreviewDate" value="{{ $paymentRequiredInput }}" class="form-control form-control-sm" required>
                             </div>
-                            <button type="submit" class="btn btn-outline-primary pra-toolbar-btn">
-                                <i class="bi bi-arrow-repeat"></i> Update Preview
+                            <button type="submit" class="btn btn-outline-primary pra-toolbar-btn" title="Recalculate the payment require date and refresh the preview">
+                                <i class="bi bi-arrow-repeat"></i> Recalculate
                             </button>
                         </form>
 
@@ -110,7 +110,7 @@
                                 <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
                             @endforeach
                             <input type="hidden" name="payment_required_date" id="paymentRequiredCreateDate" value="{{ $paymentRequiredInput }}">
-                            <button type="submit" class="btn btn-success pra-toolbar-btn pra-toolbar-btn-create">
+                            <button type="submit" class="btn btn-success pra-toolbar-btn pra-toolbar-btn-create" title="Create the Payment Request Approval">
                                 <i class="bi bi-check2-circle"></i> Create PRA
                             </button>
                         </form>

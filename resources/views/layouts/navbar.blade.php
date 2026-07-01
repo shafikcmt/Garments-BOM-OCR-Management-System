@@ -19,11 +19,13 @@
         @php
             $navNotifications = \App\Models\AppNotification::with('actor')
                 ->where('user_id', auth()->id())
+                ->visibleTo(auth()->user())
                 ->latest()
                 ->limit(8)
                 ->get();
 
             $unreadNotificationCount = \App\Models\AppNotification::where('user_id', auth()->id())
+                ->visibleTo(auth()->user())
                 ->whereNull('read_at')
                 ->count();
         @endphp
@@ -84,13 +86,14 @@
             </div>
         </div>
 
+        @php $navAvatarUrl = auth()->user()->avatarUrl(); @endphp
         <div class="profile-wrapper">
             <button type="button" class="d-flex align-items-center gap-2 border-0 bg-transparent p-0">
-                <img
-                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTxz7qJ9pU6Xj2EJKaRDVz-9Bd0xh2LnMklGw&s"
-                    class="profile-img"
-                    alt="User"
-                >
+                @if($navAvatarUrl)
+                    <img src="{{ $navAvatarUrl }}" class="profile-img" alt="{{ auth()->user()->name }}">
+                @else
+                    <span class="profile-img d-inline-flex align-items-center justify-content-center bg-primary text-white fw-bold" style="font-size:13px;">{{ auth()->user()->initials() }}</span>
+                @endif
                 <span class="d-none d-md-block text-start min-w-0">
                     <span class="d-block fw-bold text-slate-900 text-truncate" style="font-size:13px;max-width:150px;">{{ auth()->user()->name }}</span>
                     <span class="d-block text-muted text-truncate" style="font-size:11px;max-width:150px;">{{ auth()->user()->email }}</span>
@@ -99,7 +102,11 @@
 
             <div class="profile-card">
                 <div class="d-flex align-items-center gap-3 border-bottom pb-3 mb-2">
-                    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTxz7qJ9pU6Xj2EJKaRDVz-9Bd0xh2LnMklGw&s" class="rounded-4" style="width:44px;height:44px;object-fit:cover;" alt="User">
+                    @if($navAvatarUrl)
+                        <img src="{{ $navAvatarUrl }}" class="rounded-4" style="width:44px;height:44px;object-fit:cover;" alt="{{ auth()->user()->name }}">
+                    @else
+                        <span class="rounded-4 d-inline-flex align-items-center justify-content-center bg-primary text-white fw-bold" style="width:44px;height:44px;font-size:16px;">{{ auth()->user()->initials() }}</span>
+                    @endif
                     <div class="min-w-0">
                         <strong class="d-block text-truncate">{{ auth()->user()->name }}</strong>
                         <p class="mb-0 text-muted small text-truncate">{{ auth()->user()->email }}</p>

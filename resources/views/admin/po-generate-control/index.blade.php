@@ -132,19 +132,22 @@
     .po-control-chip.open { background: #ecfdf5; color: #047857; border: 1px solid #bbf7d0; }
     .po-control-chip.locked { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
     .po-control-chip.permission { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
-    .po-action-stack { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: nowrap; white-space: nowrap; min-width: 124px; }
+    .po-action-stack { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 132px; }
     .po-table thead th:last-child,
-    .po-table tbody td:last-child { width: 148px; min-width: 148px; }
+    .po-table tbody td:last-child { width: 150px; min-width: 150px; }
     .po-icon-btn {
-        width: 36px;
-        height: 36px;
+        width: 100%;
+        height: auto;
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        border-radius: 12px;
-        font-weight: 900;
+        justify-content: flex-start;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 12px;
         border-width: 1px;
-        flex: 0 0 36px;
+        flex: 0 0 auto;
         box-shadow: 0 8px 18px rgba(15, 23, 42, .06);
     }
     .po-icon-btn.btn-primary { box-shadow: 0 10px 22px rgba(37, 99, 235, .18); }
@@ -461,8 +464,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 <input type="text" name="vendor" value="{{ request('vendor') }}" class="form-control" placeholder="Vendor" list="poVendorOptions" autocomplete="off">
             </div>
             <div class="col-lg-2 d-flex gap-2">
-                <button class="btn btn-primary rounded-pill fw-bold flex-fill" type="submit" title="Filter"><i class="bi bi-funnel"></i></button>
-                <a href="{{ ($activePoPage ?? 'generated') === 'pending' ? route('admin.po-generate-control.pending') : route('admin.po-generate-control.generated') }}" class="btn btn-outline-secondary rounded-pill fw-bold" title="Reset"><i class="bi bi-arrow-clockwise"></i></a>
+                <button class="btn btn-primary rounded-pill fw-bold flex-fill" type="submit" title="Filter"><i class="bi bi-funnel me-1"></i>Filter</button>
+                <a href="{{ ($activePoPage ?? 'generated') === 'pending' ? route('admin.po-generate-control.pending') : route('admin.po-generate-control.generated') }}" class="btn btn-outline-secondary rounded-pill fw-bold" title="Reset"><i class="bi bi-arrow-clockwise me-1"></i>Reset</a>
             </div>
         </div>
     </form>
@@ -745,16 +748,16 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <td class="text-end">
                                     <div class="po-action-stack">
                                         <a href="{{ route('admin.po-generate-control.show', $bookingPo) }}" class="btn btn-primary btn-sm po-icon-btn" title="Open PO control">
-                                            <i class="bi bi-box-arrow-up-right"></i><span class="visually-hidden">Open</span>
+                                            <i class="bi bi-box-arrow-up-right"></i><span>Open</span>
                                         </a>
                                         <button class="btn btn-outline-primary btn-sm po-icon-btn" type="button" data-bs-toggle="modal" data-bs-target="#poAccessModal{{ $bookingPo->id }}" title="Control, permission and history">
-                                            <i class="bi bi-sliders2"></i><span class="visually-hidden">Control and history</span>
+                                            <i class="bi bi-sliders2"></i><span>Control</span>
                                         </button>
                                         <form method="POST" action="{{ route('admin.po-generate-control.destroy', $bookingPo) }}" class="d-inline" onsubmit="return confirm('Delete PO {{ $bookingPo->po_no }}? This will remove only the generated PO number and move source rows back to Pending PO.');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-outline-danger btn-sm po-icon-btn" title="Delete PO">
-                                                <i class="bi bi-trash3"></i><span class="visually-hidden">Delete</span>
+                                                <i class="bi bi-trash3"></i><span>Delete</span>
                                             </button>
                                         </form>
                                     </div>

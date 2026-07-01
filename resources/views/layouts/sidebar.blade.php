@@ -3,7 +3,7 @@
     $isAdminWorkspace = request()->routeIs('admin.workspace') || request()->routeIs('uploaded-files.*') || request()->routeIs('admin.headers.*');
     $isAdminUserRole = request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*');
     $isAdminBookingSettings = request()->routeIs('admin.suppliers.*') || request()->routeIs('admin.booking-delivery-destinations.*') || request()->routeIs('admin.booking-instructions.*') || request()->routeIs('admin.po-generate-control.*');
-    $isAdminSettings = request()->routeIs('admin.alert-settings.*') || request()->routeIs('admin.payment-settings.*');
+    $isAdminSettings = request()->routeIs('admin.alert-settings.*') || request()->routeIs('admin.payment-settings.*') || request()->routeIs('admin.email-templates.*');
     $isSupplyBooking = request()->routeIs('supply_chain.bookings.*');
     $isSupplyPayment = request()->routeIs('supply_chain.payment_requests.*');
     $supplyBookingUrl = route('supply_chain.bookings.index');
@@ -98,6 +98,7 @@
                             <span class="sidebar-submenu-rail"></span>
                             <a href="{{ route('admin.alert-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.alert-settings.*') ? 'is-active' : '' }}">Alert Settings</a>
                             <a href="{{ route('admin.payment-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.payment-settings.*') ? 'is-active' : '' }}">PI / PRA Settings</a>
+                            <a href="{{ route('admin.email-templates.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.email-templates.*') ? 'is-active' : '' }}">Email Templates</a>
                         </div>
                     </li>
                 </ul>
