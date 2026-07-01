@@ -6,6 +6,7 @@
     $isAdminSettings = request()->routeIs('admin.alert-settings.*') || request()->routeIs('admin.payment-settings.*') || request()->routeIs('admin.email-templates.*');
     $isSupplyBooking = request()->routeIs('supply_chain.bookings.*');
     $isSupplyPayment = request()->routeIs('supply_chain.payment_requests.*');
+    $isSupplyEmails = request()->routeIs('supply_chain.sent_emails.*');
     $supplyBookingUrl = route('supply_chain.bookings.index');
     $supplyPaymentUrl = route('supply_chain.payment_requests.index');
 @endphp
@@ -224,6 +225,14 @@
                             <a href="{{ $supplyPaymentUrl }}#pending-pi-payment" data-hash="pending-pi-payment" class="sidebar-sub-link {{ request()->routeIs('supply_chain.payment_requests.index') || request()->routeIs('supply_chain.payment_requests.create') ? 'is-active' : '' }}">Pending PI Payment</a>
                             <a href="{{ $supplyPaymentUrl }}#payment-request-list" data-hash="payment-request-list" class="sidebar-sub-link {{ request()->routeIs('supply_chain.payment_requests.show') ? 'is-active' : '' }}">Payment Request List</a>
                         </div>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('supply_chain.sent_emails.index') }}" class="sidebar-nav-link {{ $isSupplyEmails ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-envelope-paper"></i></span>
+                                <span class="sidebar-link-text">Sent Emails</span>
+                            </span>
+                        </a>
                     </li>
                 </ul>
             </div>

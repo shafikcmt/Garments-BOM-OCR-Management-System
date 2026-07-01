@@ -5,6 +5,7 @@ use App\Http\Controllers\SupplyChain\DashboardController;
 use App\Http\Controllers\SupplyChain\WorkspaceController;
 use App\Http\Controllers\SupplyChain\BookingController;
 use App\Http\Controllers\SupplyChain\PaymentRequestController;
+use App\Http\Controllers\SupplyChain\SentEmailController;
 
 Route::prefix('supply-chain')
     ->middleware(['auth', 'role:supply_chain'])
@@ -12,6 +13,8 @@ Route::prefix('supply-chain')
     ->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace');
+
+        Route::get('/sent-emails', [SentEmailController::class, 'index'])->name('sent_emails.index');
 
 
         Route::get('/payment-requests', [PaymentRequestController::class, 'index'])->name('payment_requests.index');
