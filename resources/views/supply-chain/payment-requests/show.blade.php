@@ -32,8 +32,12 @@
     .pra-date-panel { display:flex; align-items:flex-end; justify-content:flex-end; flex-wrap:wrap; gap:10px; }
     .pra-date-panel label { font-size:11px; font-weight:800; color:#0b1d5b; margin-bottom:5px; letter-spacing:.03em; }
     .pra-date-panel .form-control { height:36px; min-width:154px; border-radius:10px; border-color:#d4deef; font-size:13px; font-weight:600; }
-    .pra-toolbar-btn { height:36px; display:inline-flex; align-items:center; justify-content:center; gap:6px; border-radius:10px; padding:0 14px; font-size:12px; font-weight:800; white-space:nowrap; }
-    .pra-toolbar-btn-create { min-width:116px; }
+    .pra-toolbar-btn { height:36px; display:inline-flex; align-items:center; justify-content:center; gap:6px; border-radius:10px; padding:0 14px; font-size:12px; font-weight:800; white-space:nowrap; transition:transform .12s ease, box-shadow .12s ease; }
+    .pra-toolbar-btn:not(:disabled):hover { transform:translateY(-1px); box-shadow:0 6px 14px rgba(15,23,42,.14); }
+    .pra-toolbar-btn:disabled { opacity:.6; cursor:not-allowed; box-shadow:none; transform:none; }
+    .pra-toolbar-btn i { font-size:14px; line-height:1; }
+    .pra-toolbar-btn-update { min-width:120px; }
+    .pra-toolbar-btn-create { min-width:120px; }
     @media (max-width: 991.98px) { .pra-date-panel { justify-content:flex-start; } .pra-toolbar-card { align-items:flex-start !important; } }
     .pra-sheet { background:#fff; color:#000b6f; padding:26px 28px 34px; min-width:1120px; box-shadow:0 12px 36px rgba(15,23,42,.12); border:1px solid #e6ebf4; }
     .pra-logo-text { font-size:30px; line-height:.95; letter-spacing:.08em; font-weight:600; color:#000b6f; }
@@ -99,8 +103,8 @@
                                 <label for="paymentRequiredPreviewDate">Payment Require Date</label>
                                 <input type="date" name="payment_required_date" id="paymentRequiredPreviewDate" value="{{ $paymentRequiredInput }}" class="form-control form-control-sm" required>
                             </div>
-                            <button type="submit" class="btn btn-outline-primary pra-toolbar-btn" title="Recalculate the payment require date and refresh the preview">
-                                <i class="bi bi-arrow-repeat"></i> Recalculate
+                            <button type="submit" class="btn btn-outline-primary pra-toolbar-btn pra-toolbar-btn-update" title="Update the Payment Require Date and refresh the preview">
+                                <i class="bi bi-arrow-repeat"></i> Update Date
                             </button>
                         </form>
 
