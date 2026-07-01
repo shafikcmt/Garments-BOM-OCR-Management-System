@@ -43,24 +43,13 @@
             <div class="alert alert-danger border-0 shadow-sm rounded-3 py-2">{{ session('error') }}</div>
         @endif
 
-        @if(($emailLogs ?? collect())->isNotEmpty())
-            @php($lastEmail = $emailLogs->first())
-            <div class="card border-0 shadow-sm rounded-3 mb-3">
-                <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center gap-2 small">
-                    <span class="badge {{ $lastEmail->status === 'sent' ? 'bg-success' : 'bg-danger' }}">
-                        <i class="bi bi-envelope-check me-1"></i>{{ $lastEmail->status === 'sent' ? 'Emailed' : 'Send failed' }}
-                    </span>
-                    <span class="text-muted">
-                        Last sent to <strong>{{ $lastEmail->recipients }}</strong>
-                        on {{ optional($lastEmail->created_at)->format('jS M-Y, g:i A') }}
-                        by {{ optional($lastEmail->sentBy)->name ?? 'Unknown' }}
-                    </span>
-                    @if($emailLogs->count() > 1)
-                        <span class="text-muted">· {{ $emailLogs->count() }} total sends</span>
-                    @endif
-                </div>
-            </div>
-        @endif
+        @include('partials.email-history', [
+            'emailLogs' => $emailLogs ?? collect(),
+            'composeModalId' => 'bookingEmailModal',
+            'composeEditorId' => 'bookingEmailBodyEditor',
+            'composeInputId' => 'bookingEmailBodyInput',
+            'attachmentName' => $bookingPo->po_no . '_booking_format.pdf',
+        ])
 
         <div id="bookingShowAlert"></div>
         <div id="bookingShowPreviewContent">

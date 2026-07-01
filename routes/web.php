@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Shared\ExcelFileController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\EmailLogController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -54,6 +55,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])
         ->name('notifications.read-all');
+
+    Route::delete('/emails/{emailLog}', [EmailLogController::class, 'destroy'])->name('emails.destroy');
 });
 
 

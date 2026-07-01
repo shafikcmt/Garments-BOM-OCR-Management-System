@@ -242,44 +242,23 @@
         </div>
 
         @unless($isPreview)
-            <div class="card border-0 shadow-sm mx-auto mt-3" style="max-width:1120px;border-radius:14px;">
-                <div class="card-body p-4">
-                    <h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-1"></i> Email History</h6>
-                    @if($emailLogs->isEmpty())
-                        <p class="text-muted small mb-0">No emails have been sent for this PRA yet.</p>
-                    @else
-                        <div class="table-responsive">
-                            <table class="table table-sm align-middle mb-0">
-                                <thead>
-                                    <tr class="text-muted small">
-                                        <th>Sent At</th>
-                                        <th>Recipients</th>
-                                        <th>Subject</th>
-                                        <th>Sent By</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($emailLogs as $log)
-                                        <tr>
-                                            <td class="small">{{ optional($log->created_at)->format('d-M-Y H:i') }}</td>
-                                            <td class="small">{{ $log->recipients }}@if($log->cc)<br><span class="text-muted">Cc: {{ $log->cc }}</span>@endif</td>
-                                            <td class="small">{{ $log->subject }}</td>
-                                            <td class="small">{{ optional($log->sentBy)->name ?? '-' }}</td>
-                                            <td>
-                                                @if($log->status === 'sent')
-                                                    <span class="badge bg-success-subtle text-success">Sent</span>
-                                                @else
-                                                    <span class="badge bg-danger-subtle text-danger" title="{{ $log->error }}">Failed</span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+            <div class="mx-auto mt-3" style="max-width:1120px;">
+                @if($emailLogs->isEmpty())
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-body p-4">
+                            <h6 class="fw-bold mb-2"><i class="bi bi-clock-history me-1"></i> Sent Emails</h6>
+                            <p class="text-muted small mb-0">No emails have been sent for this PRA yet.</p>
                         </div>
-                    @endif
-                </div>
+                    </div>
+                @else
+                    @include('partials.email-history', [
+                        'emailLogs' => $emailLogs,
+                        'composeModalId' => 'sendEmailModal',
+                        'composeEditorId' => 'emailBodyEditor',
+                        'composeInputId' => 'emailBodyInput',
+                        'attachmentName' => 'PAYMENT_REQUEST_APPROVAL_' . $paymentRequest->request_no . '.pdf',
+                    ])
+                @endif
             </div>
         @endunless
     </div>
