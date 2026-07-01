@@ -18,15 +18,15 @@ class PaymentRequestMail extends Mailable
      * @param string      $subjectLine Final subject (placeholders already replaced).
      * @param string      $bodyHtml    Final HTML body (placeholders already replaced).
      * @param string|null $pdfData     Raw PDF bytes to attach, or null when unavailable.
-     * @param string      $pdfName     File name for the PDF attachment.
-     * @param string|null $replyTo     Sender's email used as the Reply-To address.
+     * @param string      $pdfName        File name for the PDF attachment.
+     * @param string|null $replyToAddress Sender's email used as the Reply-To address.
      */
     public function __construct(
         public string $subjectLine,
         public string $bodyHtml,
         public ?string $pdfData = null,
         public string $pdfName = 'payment-request.pdf',
-        public ?string $replyTo = null,
+        public ?string $replyToAddress = null,
     ) {
     }
 
@@ -34,7 +34,7 @@ class PaymentRequestMail extends Mailable
     {
         return new Envelope(
             subject: $this->subjectLine,
-            replyTo: $this->replyTo ? [new Address($this->replyTo)] : [],
+            replyTo: $this->replyToAddress ? [new Address($this->replyToAddress)] : [],
         );
     }
 
