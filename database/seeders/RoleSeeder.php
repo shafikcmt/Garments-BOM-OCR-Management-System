@@ -34,6 +34,10 @@ class RoleSeeder extends Seeder
                 'name' => 'admin',
                 'description' => 'System Administration & Full Access',
             ],
+            [
+                'name' => 'management',
+                'description' => 'Management / Oversight & PRA Approval',
+            ],
         ];
 
         foreach ($roles as $role) {

@@ -70,6 +70,15 @@ class RolePermissionSeeder extends Seeder
                 'store.return',
                 'store.adjust',
             ],
+
+            // ===== MANAGEMENT =====
+            'management' => [
+                'orders.view',
+                'payments.view',
+                'shipments.view',
+                'reports.view',
+                'approve-pra',
+            ],
         ];
 
         foreach ($rolePermissions as $roleName => $permissionNames) {

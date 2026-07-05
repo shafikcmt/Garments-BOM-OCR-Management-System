@@ -240,6 +240,22 @@
             </div>
             @endrole
 
+            @role('management')
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Main Menu</div>
+                <ul class="sidebar-list">
+                    <li class="sidebar-item">
+                        <a href="{{ route('management.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('management.dashboard') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span>
+                                <span class="sidebar-link-text">Dashboard</span>
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            @endrole
+
             @can('approve-pra')
                 @php
                     $praPendingCount = \App\Models\PaymentRequest::where('status', 'pending_approval')

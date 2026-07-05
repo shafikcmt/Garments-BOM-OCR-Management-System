@@ -39,6 +39,10 @@ Route::middleware(['auth'])->group(function () {
             return redirect()->route('supply_chain.dashboard');
         }
 
+        if ($user->hasRole('management')) {
+            return redirect()->route('management.dashboard');
+        }
+
         abort(403, 'No dashboard route assigned for this role.');
     })->name('dashboard');
 
@@ -78,4 +82,5 @@ require __DIR__.'/account.php';
 require __DIR__.'/commercial.php';
 require __DIR__.'/store.php';
 require __DIR__.'/supply-chain.php';
+require __DIR__.'/management.php';
 require __DIR__.'/auth.php';
