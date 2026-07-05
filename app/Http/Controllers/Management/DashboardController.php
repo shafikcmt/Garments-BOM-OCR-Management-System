@@ -13,20 +13,27 @@ class DashboardController extends Controller
         $userId = auth()->id();
 
         $stats = [
-            'pending' => PaymentRequest::where('status', PaymentRequest::STATUS_PENDING_APPROVAL)->count(),
+            'pending' => PaymentRequest::whereIn('status', [PaymentRequest::STATUS_PENDING_CHECK, PaymentRequest::STATUS_PENDING_APPROVAL])->count(),
             'approved' => PaymentRequest::where('status', PaymentRequest::STATUS_APPROVED)->count(),
             'rejected' => PaymentRequest::where('status', PaymentRequest::STATUS_REJECTED)->count(),
         ];
 
-        // PRAs currently waiting on this management user specifically.
-        $myPending = PaymentRequest::where('status', PaymentRequest::STATUS_PENDING_APPROVAL)
+        // PRAs currently waiting on this management user specifically, at the
+        // stage (check or approve) that is actually active for them right now.
+        $myPending = PaymentRequest::whereIn('status', [PaymentRequest::STATUS_PENDING_CHECK, PaymentRequest::STATUS_PENDING_APPROVAL])
             ->whereHas('approvals', fn ($q) => $q->where('approver_id', $userId)->where('status', PraApproval::STATUS_PENDING))
             ->with(['approvals'])
             ->get()
-            ->filter(fn (PaymentRequest $pr) => $pr->currentApprovals()
-                ->where('approver_id', $userId)
-                ->where('status', PraApproval::STATUS_PENDING)
-                ->isNotEmpty())
+            ->filter(function (PaymentRequest $pr) use ($userId) {
+                if ($pr->status === PaymentRequest::STATUS_PENDING_CHECK) {
+                    $check = $pr->currentCheckApproval();
+
+                    return $check && $check->approver_id === $userId && $check->isPending();
+                }
+
+                return $pr->currentApproveApprovals()
+                    ->first(fn (PraApproval $a) => $a->approver_id === $userId && $a->isPending()) !== null;
+            })
             ->count();
 
         $recentActivity = PraApproval::whereNotNull('acted_at')

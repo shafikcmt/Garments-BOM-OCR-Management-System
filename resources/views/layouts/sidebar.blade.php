@@ -258,9 +258,16 @@
 
             @can('approve-pra')
                 @php
-                    $praPendingCount = \App\Models\PaymentRequest::where('status', 'pending_approval')
-                        ->whereHas('approvals', fn ($q) => $q->where('approver_id', auth()->id())->where('status', 'pending'))
-                        ->count();
+                    $praUid = auth()->id();
+                    $praPendingCount = \App\Models\PaymentRequest::where(function ($q) use ($praUid) {
+                            $q->where(function ($qq) use ($praUid) {
+                                $qq->where('status', 'pending_check')
+                                   ->whereHas('approvals', fn ($a) => $a->where('approver_id', $praUid)->where('stage', 'check')->where('status', 'pending'));
+                            })->orWhere(function ($qq) use ($praUid) {
+                                $qq->where('status', 'pending_approval')
+                                   ->whereHas('approvals', fn ($a) => $a->where('approver_id', $praUid)->where('stage', 'approve')->where('status', 'pending'));
+                            });
+                        })->count();
                 @endphp
                 <div class="sidebar-section">
                     <div class="sidebar-section-label">Approvals</div>

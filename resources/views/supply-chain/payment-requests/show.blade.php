@@ -250,12 +250,23 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
-                                <p class="small text-muted mb-3">Optionally send this PRA to management approver(s). If none is selected, the PRA is saved without an approval request.</p>
+                                <p class="small text-muted mb-3">Optionally route this PRA for checking and approval. If nothing is selected, the PRA is saved without an approval request.</p>
                                 @if(($approverPool ?? collect())->isEmpty())
                                     <div class="alert alert-info small mb-0">No active approvers configured. The PRA will be created without an approval request.</div>
                                 @else
+                                    @if(($checkerPool ?? collect())->isNotEmpty())
+                                        <label class="form-label fw-semibold">Send for check to <span class="text-muted small fw-normal">(optional)</span></label>
+                                        <select name="checker_id" class="form-select mb-1">
+                                            <option value="">— No checker (send straight to approvers) —</option>
+                                            @foreach($checkerPool as $checker)
+                                                <option value="{{ $checker->id }}">{{ $checker->name }} ({{ $checker->email }})</option>
+                                            @endforeach
+                                        </select>
+                                        <div class="form-text mb-3">The checker reviews first. Approvers are notified only after the check is complete.</div>
+                                    @endif
+
                                     <label class="form-label fw-semibold">Send for approval to</label>
-                                    <div class="d-flex flex-column gap-2" style="max-height:240px;overflow-y:auto;">
+                                    <div class="d-flex flex-column gap-2" style="max-height:200px;overflow-y:auto;">
                                         @foreach($approverPool as $approver)
                                             <label class="d-flex align-items-center gap-2 border rounded-3 px-3 py-2 mb-0" style="cursor:pointer;">
                                                 <input type="checkbox" class="form-check-input mt-0" name="approver_ids[]" value="{{ $approver->id }}">
@@ -283,6 +294,7 @@
                         'approved' => 'bg-success-subtle text-success',
                         'rejected' => 'bg-danger-subtle text-danger',
                         'pending_approval' => 'bg-warning-subtle text-warning-emphasis',
+                        'pending_check' => 'bg-info-subtle text-info-emphasis',
                     ];
                     $decisionBadge = [
                         'approved' => 'bg-success-subtle text-success',
@@ -303,7 +315,10 @@
                                     <div class="col-12 col-md-6 col-xl-4">
                                         <div class="d-flex justify-content-between align-items-start gap-2 border rounded-3 px-3 py-2">
                                             <div class="min-w-0">
-                                                <div class="fw-semibold small text-slate-900">{{ optional($approval->approver)->name ?? '—' }}</div>
+                                                <div class="fw-semibold small text-slate-900">
+                                                    {{ optional($approval->approver)->name ?? '—' }}
+                                                    <span class="badge bg-light text-muted border ms-1 fw-normal">{{ $approval->stage === \App\Models\PraApproval::STAGE_CHECK ? 'Checker' : 'Approver' }}</span>
+                                                </div>
                                                 @if($approval->comment)<div class="small text-muted">{{ $approval->comment }}</div>@endif
                                             </div>
                                             <span class="badge rounded-pill {{ $decisionBadge[$approval->status] ?? 'bg-secondary-subtle text-secondary' }}">{{ ucfirst($approval->status) }}</span>

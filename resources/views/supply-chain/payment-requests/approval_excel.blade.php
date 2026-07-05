@@ -83,12 +83,23 @@
     @endforelse
     <tr class="grand"><td colspan="10">Grand Total</td><td class="right">{{ $money($summary['total_pi_amount'] ?? 0) }}</td></tr>
     <tr><td colspan="11" class="no-border"></td></tr>
+    @php $signBlocks = \App\Support\PaymentRequestSettings::signatureBlocksFor($paymentRequest, true); @endphp
     <tr>
-        <td colspan="3" class="signature"><strong>Prepared By</strong><br><br>Signature &amp; Date<br>________________________</td>
-        <td colspan="1" class="no-border"></td>
-        <td colspan="3" class="signature"><strong>Checked By</strong><br><br>Signature &amp; Date<br>________________________</td>
-        <td colspan="1" class="no-border"></td>
-        <td colspan="3" class="signature"><strong>Approved By</strong><br><br>Signature &amp; Date<br>________________________</td>
+        @foreach($signBlocks as $i => $sign)
+            @if($i > 0)<td colspan="1" class="no-border"></td>@endif
+            <td colspan="3" class="signature">
+                <strong>{{ $sign['title'] }}</strong><br>
+                @if($sign['src'])
+                    <img src="{{ $sign['src'] }}" style="max-height:40px;"><br>
+                    {{ $sign['name'] }}{{ !empty($sign['date']) ? ' — ' . $sign['date'] : '' }}<br>Signature &amp; Date
+                @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
+                    <br>{{ $sign['name'] }}{{ !empty($sign['date']) ? ' — ' . $sign['date'] : '' }}<br>Signature &amp; Date
+                @else
+                    <br><br>Signature &amp; Date
+                @endif
+                <br>________________________
+            </td>
+        @endforeach
     </tr>
 </table>
 </body>

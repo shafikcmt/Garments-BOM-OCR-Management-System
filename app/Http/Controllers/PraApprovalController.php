@@ -4,14 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\PaymentRequest;
 use App\Models\PraApproval;
+use App\Models\User;
 use App\Services\PraApprovalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Approver-facing screens: the "Pending PRA Approvals" list, the review page
- * and the approve / reject actions. Access is gated by the `approve-pra`
- * permission; each approver only ever sees the PRAs they were selected for.
+ * and the check / approve / reject actions. Access is gated by the
+ * `approve-pra` permission; each user only ever sees the PRAs they were
+ * selected for, and only for the stage (check or approve) that is currently
+ * active in the sequential Check -> Approve flow.
  */
 class PraApprovalController extends Controller
 {
@@ -23,21 +26,17 @@ class PraApprovalController extends Controller
     {
         $userId = auth()->id();
 
-        // Candidate PRAs still in the approval stage that this approver has a
-        // row for; the current-cycle pending check is applied in PHP so stale
-        // rows from earlier (rejected) cycles never leak in.
+        // PRAs awaiting either a check or an approval from this user. The
+        // stage-correct, current-cycle pending check is applied in PHP so stale
+        // rows from earlier (rejected) cycles or the not-yet-active stage never
+        // leak in.
         $pending = PaymentRequest::query()
-            ->where('status', PaymentRequest::STATUS_PENDING_APPROVAL)
+            ->whereIn('status', [PaymentRequest::STATUS_PENDING_CHECK, PaymentRequest::STATUS_PENDING_APPROVAL])
             ->whereHas('approvals', fn ($q) => $q->where('approver_id', $userId)->where('status', PraApproval::STATUS_PENDING))
             ->with(['createdBy', 'approvals.approver'])
             ->latest('id')
             ->get()
-            ->filter(function (PaymentRequest $pr) use ($userId) {
-                return $pr->currentApprovals()
-                    ->where('approver_id', $userId)
-                    ->where('status', PraApproval::STATUS_PENDING)
-                    ->isNotEmpty();
-            })
+            ->filter(fn (PaymentRequest $pr) => $this->actionableApprovalFor($pr, $userId) !== null)
             ->values();
 
         return view('pra-approvals.index', [
@@ -49,16 +48,19 @@ class PraApprovalController extends Controller
     {
         $paymentRequest->load(['items', 'createdBy', 'approvals.approver']);
 
-        $myApproval = $this->currentApprovalFor($paymentRequest, auth()->id());
+        $userId = auth()->id();
+        $actionable = $this->actionableApprovalFor($paymentRequest, $userId);
+        $myRow = $paymentRequest->currentApprovals()->firstWhere('approver_id', $userId);
 
         // Only someone who was selected for this PRA (current or a past cycle)
         // or an admin may open the review page.
-        abort_if(! $myApproval && ! $paymentRequest->approvals->contains('approver_id', auth()->id()) && ! auth()->user()->hasRole('admin'), 403);
+        abort_if(! $myRow && ! $paymentRequest->approvals->contains('approver_id', $userId) && ! auth()->user()->hasRole('admin'), 403);
 
         return view('pra-approvals.show', [
             'paymentRequest' => $paymentRequest,
             'progress' => $paymentRequest->approvalProgress(),
-            'myApproval' => $myApproval,
+            'myApproval' => $myRow,
+            'actionable' => $actionable,
             'currentApprovals' => $paymentRequest->currentApprovals()->load('approver'),
         ]);
     }
@@ -70,26 +72,49 @@ class PraApprovalController extends Controller
         ]);
 
         $paymentRequest->load(['approvals', 'createdBy']);
-        $approval = $this->currentApprovalFor($paymentRequest, auth()->id());
+        $approval = $this->actionableApprovalFor($paymentRequest, auth()->id());
 
-        if (! $approval || ! $approval->isPending() || $paymentRequest->status !== PaymentRequest::STATUS_PENDING_APPROVAL) {
+        if (! $approval) {
             return redirect()->route('pra_approvals.index')
-                ->with('warning', 'This PRA is no longer awaiting your approval.');
+                ->with('warning', 'This PRA is no longer awaiting your action.');
         }
 
-        DB::transaction(function () use ($approval, $paymentRequest, $validated) {
+        $isCheckStage = $approval->isCheckStage();
+
+        DB::transaction(function () use ($approval, $paymentRequest, $validated, $isCheckStage) {
             $approval->update([
                 'status' => PraApproval::STATUS_APPROVED,
                 'comment' => $validated['comment'] ?? null,
+                'signature_path' => auth()->user()?->signature_path,
                 'acted_at' => now(),
             ]);
 
             $paymentRequest->load('approvals');
-            $current = $paymentRequest->currentApprovals();
 
-            // All-must-approve: only finalise when every selected approver in
-            // this cycle has approved.
-            if ($current->where('status', PraApproval::STATUS_APPROVED)->count() === $current->count()) {
+            if ($isCheckStage) {
+                // Record the check, then release the PRA to the approvers (or
+                // finalise it when the checker is the only reviewer).
+                $paymentRequest->update([
+                    'checked_by' => auth()->id(),
+                    'checked_at' => now(),
+                ]);
+
+                $hasApprovers = $paymentRequest->currentApproveApprovals()->isNotEmpty();
+
+                $paymentRequest->update([
+                    'status' => $hasApprovers
+                        ? PaymentRequest::STATUS_PENDING_APPROVAL
+                        : PaymentRequest::STATUS_APPROVED,
+                    'approved_at' => $hasApprovers ? null : now(),
+                ]);
+
+                return;
+            }
+
+            // Approve stage: all-must-approve — finalise only when every approver
+            // in this cycle has approved.
+            $approveRows = $paymentRequest->currentApproveApprovals();
+            if ($approveRows->where('status', PraApproval::STATUS_APPROVED)->count() === $approveRows->count()) {
                 $paymentRequest->update([
                     'status' => PaymentRequest::STATUS_APPROVED,
                     'approved_by' => auth()->id(),
@@ -100,11 +125,24 @@ class PraApprovalController extends Controller
 
         $paymentRequest->refresh()->load(['approvals.approver', 'createdBy']);
 
+        // Check completed and approvers are now due -> notify them.
+        if ($isCheckStage && $paymentRequest->status === PaymentRequest::STATUS_PENDING_APPROVAL) {
+            $approverIds = $paymentRequest->currentApproveApprovals()->pluck('approver_id');
+            $approvers = User::whereIn('id', $approverIds)->get();
+            $this->notifier->notifyApprovalRequest($paymentRequest, $approvers);
+
+            return redirect()->route('pra_approvals.index')
+                ->with('success', 'PRA ' . $paymentRequest->request_no . ' checked and sent to ' . $approvers->count() . ' approver(s).');
+        }
+
         if ($paymentRequest->status === PaymentRequest::STATUS_APPROVED) {
             $this->notifier->notifyResult($paymentRequest, PaymentRequest::STATUS_APPROVED, auth()->id());
 
-            return redirect()->route('pra_approvals.index')
-                ->with('success', 'PRA ' . $paymentRequest->request_no . ' is now fully approved.');
+            $msg = $isCheckStage
+                ? 'PRA ' . $paymentRequest->request_no . ' has been checked and approved.'
+                : 'PRA ' . $paymentRequest->request_no . ' is now fully approved.';
+
+            return redirect()->route('pra_approvals.index')->with('success', $msg);
         }
 
         $progress = $paymentRequest->approvalProgress();
@@ -122,11 +160,11 @@ class PraApprovalController extends Controller
         ]);
 
         $paymentRequest->load(['approvals', 'createdBy']);
-        $approval = $this->currentApprovalFor($paymentRequest, auth()->id());
+        $approval = $this->actionableApprovalFor($paymentRequest, auth()->id());
 
-        if (! $approval || ! $approval->isPending() || $paymentRequest->status !== PaymentRequest::STATUS_PENDING_APPROVAL) {
+        if (! $approval) {
             return redirect()->route('pra_approvals.index')
-                ->with('warning', 'This PRA is no longer awaiting your approval.');
+                ->with('warning', 'This PRA is no longer awaiting your action.');
         }
 
         DB::transaction(function () use ($approval, $paymentRequest, $validated) {
@@ -136,8 +174,8 @@ class PraApprovalController extends Controller
                 'acted_at' => now(),
             ]);
 
-            // A single rejection rejects the whole PRA; remaining approvers no
-            // longer need to act.
+            // A single rejection (at either stage) rejects the whole PRA; the
+            // remaining reviewers no longer need to act.
             $paymentRequest->update([
                 'status' => PaymentRequest::STATUS_REJECTED,
                 'approved_by' => null,
@@ -153,11 +191,23 @@ class PraApprovalController extends Controller
     }
 
     /**
-     * The current-cycle approval row for a given user, or null.
+     * The current-cycle row this user may act on right now, respecting the
+     * active stage: the check row while the PRA is pending_check, or their
+     * approve row while it is pending_approval. Null when nothing is due.
      */
-    protected function currentApprovalFor(PaymentRequest $paymentRequest, int $userId): ?PraApproval
+    protected function actionableApprovalFor(PaymentRequest $paymentRequest, int $userId): ?PraApproval
     {
-        return $paymentRequest->currentApprovals()
-            ->firstWhere('approver_id', $userId);
+        if ($paymentRequest->status === PaymentRequest::STATUS_PENDING_CHECK) {
+            $check = $paymentRequest->currentCheckApproval();
+
+            return ($check && $check->approver_id === $userId && $check->isPending()) ? $check : null;
+        }
+
+        if ($paymentRequest->status === PaymentRequest::STATUS_PENDING_APPROVAL) {
+            return $paymentRequest->currentApproveApprovals()
+                ->first(fn (PraApproval $a) => $a->approver_id === $userId && $a->isPending());
+        }
+
+        return null;
     }
 }

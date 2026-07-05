@@ -45,6 +45,22 @@ class PaymentRequestController extends Controller
             ->values();
     }
 
+    /**
+     * Active pooled users flagged as eligible checkers, for the creator's
+     * "Send for check to" selection (sequential Check -> Approve flow).
+     */
+    protected function checkerPool(): \Illuminate\Support\Collection
+    {
+        return PraApprover::where('is_active', true)
+            ->where('can_check', true)
+            ->with('user')
+            ->get()
+            ->map(fn (PraApprover $approver) => $approver->user)
+            ->filter()
+            ->sortBy('name')
+            ->values();
+    }
+
     public function index(Request $request)
     {
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
@@ -112,8 +128,9 @@ class PaymentRequestController extends Controller
         $isPreview = true;
         $bookingPoIds = $selectedIds->all();
         $approverPool = $this->approverPool();
+        $checkerPool = $this->checkerPool();
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'checkerPool'));
     }
 
     public function store(Request $request)
@@ -125,6 +142,7 @@ class PaymentRequestController extends Controller
             'booking_po_ids.*' => ['integer', 'exists:booking_pos,id'],
             'payment_required_date' => ['nullable', 'date'],
             'remarks' => ['nullable', 'string', 'max:2000'],
+            'checker_id' => ['nullable', 'integer'],
             'approver_ids' => ['nullable', 'array'],
             'approver_ids.*' => ['integer'],
         ]);
@@ -137,6 +155,15 @@ class PaymentRequestController extends Controller
         $approverUserIds = PraApprover::where('is_active', true)
             ->whereIn('user_id', $approverUserIds)
             ->pluck('user_id');
+
+        // The checker must be an active pooled user flagged as a checker.
+        $checkerUserId = $validated['checker_id'] ?? null;
+        if ($checkerUserId) {
+            $checkerUserId = PraApprover::where('is_active', true)
+                ->where('can_check', true)
+                ->where('user_id', (int) $checkerUserId)
+                ->value('user_id');
+        }
 
         $selectedIds = collect($validated['booking_po_ids'])
             ->map(fn ($id) => (int) $id)
@@ -154,15 +181,25 @@ class PaymentRequestController extends Controller
             return back()->with('warning', 'No eligible PI received / payment pending row was selected. Please check PI Number, PI Status and Payment Status.');
         }
 
-        $paymentRequest = DB::transaction(function () use ($snapshots, $validated, $paymentRequiredDate, $approverUserIds) {
+        // Snapshot the creator's personal signature for the Prepared By box, but
+        // only when the PRA actually enters an approval flow.
+        $hasFlow = $checkerUserId || $approverUserIds->isNotEmpty();
+        $creatorSignaturePath = $hasFlow ? (auth()->user()?->signature_path) : null;
+
+        $paymentRequest = DB::transaction(function () use ($snapshots, $validated, $paymentRequiredDate, $approverUserIds, $checkerUserId, $creatorSignaturePath) {
+            $status = $checkerUserId
+                ? PaymentRequest::STATUS_PENDING_CHECK
+                : ($approverUserIds->isNotEmpty() ? PaymentRequest::STATUS_PENDING_APPROVAL : 'draft');
+
             $paymentRequest = PaymentRequest::create([
                 'request_no' => $this->nextRequestNo(),
                 'supplier_name' => $this->uniqueText($snapshots, 'supplier_name'),
                 'buyer_name' => $this->uniqueText($snapshots, 'buyer_name'),
                 'season_name' => $this->uniqueText($snapshots, 'season_name'),
                 'total_pi_amount' => $snapshots->sum(fn (array $row) => (float) ($row['pi_amount'] ?? 0)),
-                'status' => $approverUserIds->isNotEmpty() ? PaymentRequest::STATUS_PENDING_APPROVAL : 'draft',
+                'status' => $status,
                 'created_by' => auth()->id(),
+                'prepared_signature_path' => $creatorSignaturePath,
                 'remarks' => $validated['remarks'] ?? null,
                 'data' => [
                     'pi_numbers' => $snapshots->pluck('pi_number')->filter()->unique()->values()->all(),
@@ -206,18 +243,44 @@ class PaymentRequestController extends Controller
                 ]);
             }
 
-            // First approval cycle: one pending row per selected approver.
+            // First cycle. The checker row (if any) gates the approver rows: the
+            // approvers are created now but stay hidden until the PRA moves from
+            // pending_check to pending_approval once the checker approves.
+            if ($checkerUserId) {
+                PraApproval::create([
+                    'payment_request_id' => $paymentRequest->id,
+                    'approver_id' => $checkerUserId,
+                    'cycle' => 1,
+                    'stage' => PraApproval::STAGE_CHECK,
+                    'status' => PraApproval::STATUS_PENDING,
+                ]);
+            }
+
             foreach ($approverUserIds as $approverId) {
                 PraApproval::create([
                     'payment_request_id' => $paymentRequest->id,
                     'approver_id' => $approverId,
                     'cycle' => 1,
+                    'stage' => PraApproval::STAGE_APPROVE,
                     'status' => PraApproval::STATUS_PENDING,
                 ]);
             }
 
             return $paymentRequest->fresh(['items', 'createdBy', 'approvals']);
         });
+
+        // Sequential notification: notify the checker first; approvers are
+        // notified only after the check step completes.
+        if ($checkerUserId) {
+            $checker = User::find($checkerUserId);
+            if ($checker) {
+                $this->approvalService->notifyCheckRequest($paymentRequest, $checker);
+            }
+
+            return redirect()
+                ->route('supply_chain.payment_requests.show', $paymentRequest)
+                ->with('success', 'PRA ' . $paymentRequest->request_no . ' created and sent to ' . optional($checker)->name . ' for checking.');
+        }
 
         if ($approverUserIds->isNotEmpty()) {
             $approvers = User::whereIn('id', $approverUserIds)->get();
@@ -248,8 +311,9 @@ class PaymentRequestController extends Controller
         $approvalProgress = $paymentRequest->approvalProgress();
         $currentApprovals = $paymentRequest->currentApprovals()->load('approver');
         $approverPool = $this->approverPool();
+        $checkerPool = $this->checkerPool();
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'emailLogs', 'emailDefaults', 'approvalProgress', 'currentApprovals', 'approverPool'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'emailLogs', 'emailDefaults', 'approvalProgress', 'currentApprovals', 'approverPool', 'checkerPool'));
     }
 
     /**
@@ -269,8 +333,9 @@ class PaymentRequestController extends Controller
             ->withQueryString();
 
         $approverPool = $this->approverPool();
+        $checkerPool = $this->checkerPool();
 
-        return view('supply-chain.payment-requests.my-status', compact('paymentRequests', 'approverPool'));
+        return view('supply-chain.payment-requests.my-status', compact('paymentRequests', 'approverPool', 'checkerPool'));
     }
 
     /**
@@ -288,6 +353,7 @@ class PaymentRequestController extends Controller
         }
 
         $validated = $request->validate([
+            'checker_id' => ['nullable', 'integer'],
             'approver_ids' => ['required', 'array', 'min:1'],
             'approver_ids.*' => ['integer'],
             'remarks' => ['nullable', 'string', 'max:2000'],
@@ -301,28 +367,65 @@ class PaymentRequestController extends Controller
             return back()->with('warning', 'Please select at least one active approver.');
         }
 
+        $checkerUserId = $validated['checker_id'] ?? null;
+        if ($checkerUserId) {
+            $checkerUserId = PraApprover::where('is_active', true)
+                ->where('can_check', true)
+                ->where('user_id', (int) $checkerUserId)
+                ->value('user_id');
+        }
+
         $paymentRequest->load('approvals');
         $nextCycle = $paymentRequest->currentCycle() + 1;
 
-        DB::transaction(function () use ($paymentRequest, $approverUserIds, $nextCycle, $validated) {
+        // Refresh the Prepared By snapshot with the creator's current signature.
+        $creatorSignaturePath = auth()->user()?->signature_path;
+
+        DB::transaction(function () use ($paymentRequest, $approverUserIds, $checkerUserId, $nextCycle, $validated, $creatorSignaturePath) {
+            if ($checkerUserId) {
+                PraApproval::create([
+                    'payment_request_id' => $paymentRequest->id,
+                    'approver_id' => $checkerUserId,
+                    'cycle' => $nextCycle,
+                    'stage' => PraApproval::STAGE_CHECK,
+                    'status' => PraApproval::STATUS_PENDING,
+                ]);
+            }
+
             foreach ($approverUserIds as $approverId) {
                 PraApproval::create([
                     'payment_request_id' => $paymentRequest->id,
                     'approver_id' => $approverId,
                     'cycle' => $nextCycle,
+                    'stage' => PraApproval::STAGE_APPROVE,
                     'status' => PraApproval::STATUS_PENDING,
                 ]);
             }
 
             $paymentRequest->update([
-                'status' => PaymentRequest::STATUS_PENDING_APPROVAL,
+                'status' => $checkerUserId ? PaymentRequest::STATUS_PENDING_CHECK : PaymentRequest::STATUS_PENDING_APPROVAL,
+                'checked_by' => null,
+                'checked_at' => null,
                 'approved_by' => null,
                 'approved_at' => null,
+                'prepared_signature_path' => $creatorSignaturePath,
                 'remarks' => $validated['remarks'] ?? $paymentRequest->remarks,
             ]);
         });
 
         $paymentRequest->refresh()->load(['createdBy']);
+
+        if ($checkerUserId) {
+            $checker = User::find($checkerUserId);
+            if ($checker) {
+                $this->approvalService->notifyCheckRequest($paymentRequest, $checker);
+            }
+
+            return redirect()
+                ->route('supply_chain.payment_requests.my_status')
+                ->with('success', 'PRA ' . $paymentRequest->request_no . ' resubmitted to ' . optional($checker)->name . ' for checking.');
+        }
+
         $approvers = User::whereIn('id', $approverUserIds)->get();
         $this->approvalService->notifyApprovalRequest($paymentRequest, $approvers);
 
@@ -430,7 +533,7 @@ class PaymentRequestController extends Controller
      */
     protected function approvalDataFor(PaymentRequest $paymentRequest): array
     {
-        $paymentRequest->loadMissing(['items', 'createdBy', 'checkedBy', 'approvedBy']);
+        $paymentRequest->loadMissing(['items', 'createdBy', 'checkedBy', 'approvedBy', 'approvals.approver']);
         $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
         $summary = $this->summaryFromApprovalRows($approvalRows);
 
@@ -498,7 +601,7 @@ class PaymentRequestController extends Controller
     {
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
 
-        $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy']);
+        $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy', 'approvals.approver']);
         $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
         $summary = $this->summaryFromApprovalRows($approvalRows);
         $fileName = 'PAYMENT_REQUEST_APPROVAL_' . $paymentRequest->request_no;
@@ -1163,16 +1266,39 @@ class PaymentRequestController extends Controller
         $sheet->getStyle('H' . ($tableStart + 1) . ':I' . $rowNo)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
 
         $rowNo += 4;
-        $signatureBlocks = [
-            ['A', 'C', 'Prepared By'],
-            ['E', 'G', 'Checked By'],
-            ['I', 'K', 'Approved By'],
-        ];
+        // Dynamic Prepared / Checked / Approved By signatures for this PRA, with
+        // the static admin signatures as the fallback. Same box layout as before.
+        $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocksFor($paymentRequest, false);
+        $signatureColumns = [['A', 'C'], ['E', 'G'], ['I', 'K']];
 
-        foreach ($signatureBlocks as [$from, $to, $title]) {
+        foreach ($signatureBlocks as $index => $block) {
+            [$from, $to] = $signatureColumns[$index];
+
             $sheet->mergeCells($from . $rowNo . ':' . $to . $rowNo);
+            $sheet->mergeCells($from . ($rowNo + 1) . ':' . $to . ($rowNo + 1));
             $sheet->mergeCells($from . ($rowNo + 2) . ':' . $to . ($rowNo + 2));
-            $sheet->setCellValue($from . $rowNo, $title);
+            $sheet->setCellValue($from . $rowNo, $block['title']);
+
+            // Typed name + date record (kept even when a signature image is shown).
+            $meta = trim(($block['name'] ?? '') . (! empty($block['date']) ? '  —  ' . $block['date'] : ''));
+            if ($meta !== '') {
+                $sheet->setCellValue($from . ($rowNo + 1), $meta);
+            }
+
+            // Embed the signature image, if any, above the signing line.
+            if (! empty($block['path'])) {
+                $absolute = \Illuminate\Support\Facades\Storage::disk('public')->path($block['path']);
+                if (is_file($absolute)) {
+                    $drawing = new \PhpOffice\PhpSpreadsheet\Worksheet\Drawing();
+                    $drawing->setPath($absolute);
+                    $drawing->setHeight(34);
+                    $drawing->setCoordinates($from . ($rowNo + 1));
+                    $drawing->setOffsetX(6);
+                    $drawing->setOffsetY(1);
+                    $drawing->setWorksheet($sheet);
+                }
+            }
+
             $sheet->setCellValue($from . ($rowNo + 2), 'Signature & Date');
             $sheet->getStyle($from . $rowNo . ':' . $to . ($rowNo + 3))->getFont()->getColor()->setARGB('FF000B6F');
             $sheet->getStyle($from . $rowNo . ':' . $to . $rowNo)->getFont()->setBold(true);

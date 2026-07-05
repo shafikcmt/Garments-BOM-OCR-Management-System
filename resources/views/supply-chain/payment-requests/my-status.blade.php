@@ -8,6 +8,7 @@
         'approved' => 'bg-success-subtle text-success',
         'rejected' => 'bg-danger-subtle text-danger',
         'pending_approval' => 'bg-warning-subtle text-warning-emphasis',
+        'pending_check' => 'bg-info-subtle text-info-emphasis',
         'none' => 'bg-secondary-subtle text-secondary',
     ];
     $decisionBadge = [
@@ -82,6 +83,15 @@
                                             @if($approverPool->isEmpty())
                                                 <div class="alert alert-warning small mb-0">No active approvers available. Ask the admin to add approvers.</div>
                                             @else
+                                                @if(($checkerPool ?? collect())->isNotEmpty())
+                                                    <label class="form-label fw-semibold">Send for check to <span class="text-muted small fw-normal">(optional)</span></label>
+                                                    <select name="checker_id" class="form-select mb-3">
+                                                        <option value="">— No checker (send straight to approvers) —</option>
+                                                        @foreach($checkerPool as $checker)
+                                                            <option value="{{ $checker->id }}">{{ $checker->name }} ({{ $checker->email }})</option>
+                                                        @endforeach
+                                                    </select>
+                                                @endif
                                                 <label class="form-label fw-semibold">Send for approval to <span class="text-danger">*</span></label>
                                                 <div class="d-flex flex-column gap-2" style="max-height:240px;overflow-y:auto;">
                                                     @foreach($approverPool as $approver)

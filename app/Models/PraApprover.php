@@ -13,11 +13,13 @@ class PraApprover extends Model
     protected $fillable = [
         'user_id',
         'is_active',
+        'can_check',
         'added_by',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'can_check' => 'boolean',
     ];
 
     public function user()

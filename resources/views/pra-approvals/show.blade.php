@@ -10,8 +10,11 @@
         'rejected' => 'bg-danger-subtle text-danger',
         'pending' => 'bg-warning-subtle text-warning-emphasis',
     ];
-    $canAct = $myApproval && $myApproval->isPending() && $paymentRequest->status === \App\Models\PaymentRequest::STATUS_PENDING_APPROVAL;
+    $canAct = (bool) ($actionable ?? null);
+    $isCheckStage = $canAct && $actionable->isCheckStage();
+    $actionLabel = $isCheckStage ? 'Check & Approve' : 'Approve';
     $requiredDate = data_get($paymentRequest->data, 'payment_required_date');
+    $stageTag = fn ($a) => $a->stage === \App\Models\PraApproval::STAGE_CHECK ? 'Checker' : 'Approver';
 @endphp
 <div class="container-fluid">
     <div class="app-hero-card p-4 mb-4">
@@ -101,12 +104,18 @@
         <div class="col-12 col-xl-4">
             <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
                 <div class="card-body p-4">
-                    <h5 class="mb-3">Approvers ({{ $progress['approved'] }}/{{ $progress['total'] }} approved)</h5>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                        <h5 class="mb-0">Reviewers</h5>
+                        <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">{{ $progress['label'] }}</span>
+                    </div>
                     <ul class="list-unstyled mb-0">
                         @foreach($currentApprovals as $approval)
                             <li class="d-flex justify-content-between align-items-start gap-2 py-2 border-bottom">
                                 <div class="min-w-0">
-                                    <div class="fw-semibold text-slate-900">{{ optional($approval->approver)->name ?? '—' }}</div>
+                                    <div class="fw-semibold text-slate-900">
+                                        {{ optional($approval->approver)->name ?? '—' }}
+                                        <span class="badge bg-light text-muted border ms-1 fw-normal">{{ $stageTag($approval) }}</span>
+                                    </div>
                                     @if($approval->comment)<div class="small text-muted">{{ $approval->comment }}</div>@endif
                                 </div>
                                 <span class="badge rounded-pill {{ $statusBadge[$approval->status] ?? 'bg-secondary-subtle text-secondary' }}">{{ ucfirst($approval->status) }}</span>
@@ -120,13 +129,22 @@
                 <div class="card border-0 shadow-sm" style="border-radius:14px;">
                     <div class="card-body p-4">
                         <h5 class="mb-3">Your Decision</h5>
+                        @if($isCheckStage)
+                            <p class="small text-muted mb-2"><i class="bi bi-shield-check me-1"></i> You are the <strong>Checker</strong>. Once you check &amp; approve, the PRA moves to the approver(s).</p>
+                        @endif
                         <button type="button" class="btn btn-success w-100 mb-2" data-bs-toggle="modal" data-bs-target="#approveModal">
-                            <i class="bi bi-check2-circle me-1"></i> Approve
+                            <i class="bi bi-check2-circle me-1"></i> {{ $actionLabel }}
                         </button>
                         <button type="button" class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#rejectModal">
                             <i class="bi bi-x-circle me-1"></i> Reject
                         </button>
-                        <p class="form-text mb-0 mt-2">All selected approvers must approve before this PRA is finalised. A single rejection rejects the PRA.</p>
+                        <p class="form-text mb-0 mt-2">
+                            @if($isCheckStage)
+                                Your saved signature and today's date will fill the "Checked By" box. A rejection returns the PRA to the creator.
+                            @else
+                                All selected approvers must approve before this PRA is finalised. A single rejection rejects the PRA.
+                            @endif
+                        </p>
                     </div>
                 </div>
             @elseif($myApproval)
@@ -149,17 +167,20 @@
             <form method="POST" action="{{ route('pra_approvals.approve', $paymentRequest) }}">
                 @csrf
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-check2-circle text-success me-1"></i> Confirm Approval</h5>
+                    <h5 class="modal-title"><i class="bi bi-check2-circle text-success me-1"></i> Confirm {{ $actionLabel }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="mb-3">You are approving PRA <strong>{{ $paymentRequest->request_no }}</strong>. This action is recorded against your name.</p>
+                    <p class="mb-3">
+                        You are {{ $isCheckStage ? 'checking &amp; approving' : 'approving' }} PRA <strong>{{ $paymentRequest->request_no }}</strong>.
+                        This action is recorded against your name{{ auth()->user()?->hasSignature() ? ' with your saved signature' : '' }}.
+                    </p>
                     <label class="form-label fw-semibold">Comment <span class="text-muted small">(optional)</span></label>
                     <textarea name="comment" rows="3" class="form-control" maxlength="2000" placeholder="Add a remark (optional)">{{ old('comment') }}</textarea>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Confirm Approve</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Confirm {{ $actionLabel }}</button>
                 </div>
             </form>
         </div>

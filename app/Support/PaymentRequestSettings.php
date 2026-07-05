@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\AppSetting;
+use App\Models\PraApproval;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
@@ -130,6 +131,139 @@ class PaymentRequestSettings
         }
 
         return $blocks;
+    }
+
+    /**
+     * Signature blocks for a specific PRA, populated with the personal signature
+     * of whoever performed each step (Prepared / Checked / Approved) in the
+     * digital flow. Falls back to the static admin-configured signature exactly
+     * as before whenever a PRA has no approval flow, or per-box when a step has
+     * no assigned actor.
+     *
+     * Block shape:
+     *   title, name, designation, date, src (nullable), dynamic (bool)
+     * The view uses `dynamic` to decide between: image, typed name+date, or a
+     * blank manual-signing line.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function signatureBlocksFor(\App\Models\PaymentRequest $pr, bool $embed = false): array
+    {
+        // No approval flow at all -> preserve the exact legacy static behaviour.
+        if ($pr->approvals->isEmpty()) {
+            return array_map(
+                fn (array $block) => self::staticBlock($block['officer'], $block['title'], $embed),
+                self::officerList()
+            );
+        }
+
+        $check = $pr->currentCheckApproval();
+        $approveRows = $pr->currentApproveApprovals();
+        $progress = $pr->approvalProgress();
+
+        // Prepared By -> creator, always.
+        $prepared = self::dynamicBlock(
+            'prepared', self::OFFICERS['prepared'],
+            $pr->createdBy, $pr->created_at, $pr->prepared_signature_path, $embed
+        );
+
+        // Checked By -> checker when the check step is complete; blank line while
+        // a checker is assigned but has not checked; static fallback otherwise.
+        if ($check) {
+            $checked = $check->isApproved()
+                ? self::dynamicBlock('checked', self::OFFICERS['checked'], $check->approver, $check->acted_at, $check->signature_path, $embed)
+                : self::blankBlock('checked', self::OFFICERS['checked']);
+        } else {
+            $checked = self::staticBlock('checked', self::OFFICERS['checked'], $embed);
+        }
+
+        // Approved By -> last approver once fully approved; blank while pending;
+        // static fallback when no approver was ever assigned.
+        if ($approveRows->isNotEmpty()) {
+            if (($progress['state'] ?? null) === \App\Models\PaymentRequest::STATUS_APPROVED) {
+                $last = $approveRows->where('status', PraApproval::STATUS_APPROVED)
+                    ->sortByDesc(fn (PraApproval $a) => optional($a->acted_at)->getTimestamp())
+                    ->first();
+                $approved = self::dynamicBlock('approved', self::OFFICERS['approved'], $last?->approver, $last?->acted_at, $last?->signature_path, $embed);
+            } else {
+                $approved = self::blankBlock('approved', self::OFFICERS['approved']);
+            }
+        } else {
+            $approved = self::staticBlock('approved', self::OFFICERS['approved'], $embed);
+        }
+
+        return [$prepared, $checked, $approved];
+    }
+
+    /**
+     * @return array<int, array{officer:string, title:string}>
+     */
+    protected static function officerList(): array
+    {
+        $list = [];
+        foreach (self::OFFICERS as $officer => $title) {
+            $list[] = ['officer' => $officer, 'title' => $title];
+        }
+
+        return $list;
+    }
+
+    /**
+     * A block populated from the acting user's personal signature/details.
+     */
+    protected static function dynamicBlock(string $officer, string $title, ?\App\Models\User $user, $date, ?string $signaturePath, bool $embed): array
+    {
+        $path = $signaturePath ?: ($user?->signature_path);
+        $show = $path && Storage::disk('public')->exists($path);
+
+        return [
+            'officer' => $officer,
+            'title' => $title,
+            'name' => $user?->name ?? '',
+            'designation' => $user ? $user->departmentLabel() : '',
+            'date' => $date ? \Illuminate\Support\Carbon::parse($date)->format('jS M-Y') : '',
+            'src' => $show ? self::imageSource($path, $embed) : null,
+            'path' => $show ? $path : null,
+            'dynamic' => true,
+        ];
+    }
+
+    /**
+     * A blank block (assigned but not yet signed) — keeps the manual signing line.
+     */
+    protected static function blankBlock(string $officer, string $title): array
+    {
+        return [
+            'officer' => $officer,
+            'title' => $title,
+            'name' => '',
+            'designation' => '',
+            'date' => '',
+            'src' => null,
+            'path' => null,
+            'dynamic' => false,
+        ];
+    }
+
+    /**
+     * A block populated from the static admin-configured officer signature.
+     */
+    protected static function staticBlock(string $officer, string $title, bool $embed): array
+    {
+        $path = self::officerImagePath($officer);
+        $enabled = self::officerEnabled($officer);
+        $show = $enabled && $path && Storage::disk('public')->exists($path);
+
+        return [
+            'officer' => $officer,
+            'title' => $title,
+            'name' => self::officerName($officer),
+            'designation' => self::officerDesignation($officer),
+            'date' => '',
+            'src' => $show ? self::imageSource($path, $embed) : null,
+            'path' => $show ? $path : null,
+            'dynamic' => false,
+        ];
     }
 
     /**

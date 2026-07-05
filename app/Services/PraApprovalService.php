@@ -69,6 +69,48 @@ class PraApprovalService
     }
 
     /**
+     * Notify the designated checker that a PRA is waiting for their check, the
+     * first step of the sequential Check -> Approve flow. Approvers are only
+     * notified after the check is completed.
+     */
+    public function notifyCheckRequest(PaymentRequest $paymentRequest, User $checker): void
+    {
+        $actorId = $paymentRequest->created_by;
+        $reviewUrl = route('pra_approvals.show', $paymentRequest);
+        $creatorName = optional($paymentRequest->createdBy)->name ?? 'A supply chain user';
+
+        AppNotification::create([
+            'user_id' => $checker->id,
+            'actor_id' => $actorId,
+            'type' => 'pra_check_request',
+            'title' => 'PRA Check Request: ' . $paymentRequest->request_no,
+            'message' => $creatorName . ' has requested you to check PRA ' . $paymentRequest->request_no . ' before approval.',
+            'url' => $reviewUrl,
+            'data' => ['payment_request_id' => $paymentRequest->id],
+        ]);
+
+        if (PraApprovalSettings::mailEnabled() && $checker->email) {
+            try {
+                Mail::to($checker->email)->send(new PraApprovalRequestMail([
+                    'request_no' => $paymentRequest->request_no,
+                    'requested_by' => $creatorName,
+                    'buyer' => $paymentRequest->buyer_name,
+                    'supplier' => $paymentRequest->supplier_name,
+                    'season' => $paymentRequest->season_name,
+                    'total_amount' => '$ ' . number_format((float) $paymentRequest->total_pi_amount, 2),
+                    'payment_required_date' => $this->requiredDateLabel($paymentRequest),
+                    'review_url' => $reviewUrl,
+                ]));
+            } catch (\Throwable $e) {
+                Log::error('PRA check request email failed: ' . $e->getMessage(), [
+                    'payment_request_id' => $paymentRequest->id,
+                    'checker_id' => $checker->id,
+                ]);
+            }
+        }
+    }
+
+    /**
      * Notify the PRA creator that the current cycle finished (approved or
      * rejected), with the approver-wise decision breakdown.
      */

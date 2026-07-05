@@ -77,6 +77,17 @@ class PraApproverController extends Controller
         return back()->with('success', 'Approver status updated.');
     }
 
+    /**
+     * Toggle whether this approver may also be selected as the "Checker" in the
+     * sequential Check -> Approve flow. Independent of approve rights.
+     */
+    public function toggleChecker(Request $request, PraApprover $praApprover)
+    {
+        $praApprover->update(['can_check' => $request->boolean('can_check')]);
+
+        return back()->with('success', 'Checker eligibility updated.');
+    }
+
     public function destroy(PraApprover $praApprover)
     {
         $user = $praApprover->user;

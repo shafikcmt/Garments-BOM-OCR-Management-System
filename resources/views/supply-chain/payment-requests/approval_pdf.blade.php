@@ -50,7 +50,7 @@
     $paymentRequiredDate = $summary['earliest_payment_required_date'] ?? null;
     $logoPath = public_path('images/humana-logo.png');
     $logoData = file_exists($logoPath) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath)) : null;
-    $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocks(true);
+    $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocksFor($paymentRequest, true);
 @endphp
 <table class="top">
     <tr>
@@ -145,8 +145,16 @@
                     <div class="sign-meta">
                         @if($sign['name'])<div class="sign-name">{{ $sign['name'] }}</div>@endif
                         @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
-                        <div>Signature &amp; Date</div>
+                        <div>{{ !empty($sign['date']) ? 'Signature & Date: ' . $sign['date'] : 'Signature & Date' }}</div>
                     </div>
+                @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
+                    {{-- Actor known but no signature image uploaded: typed name + date --}}
+                    <div class="sign-text">
+                        @if($sign['name'])<span class="sign-name">{{ $sign['name'] }}</span>@endif
+                        @if($sign['date'])<span> — {{ $sign['date'] }}</span>@endif
+                    </div>
+                    <div class="sign-line"></div>
+                    <div class="sign-meta"><div>Signature &amp; Date</div></div>
                 @else
                     <div class="sign-text">Signature &amp; Date</div>
                     <div class="sign-line"></div>

@@ -20,6 +20,7 @@ class User extends Authenticatable
         'password',
         'status',
         'profile_photo',
+        'signature_path',
         'last_login_at',
     ];
 
@@ -53,6 +54,23 @@ class User extends Authenticatable
     public function avatarUrl(): ?string
     {
         return $this->profile_photo ? Storage::url($this->profile_photo) : null;
+    }
+
+    /**
+     * Public URL of the uploaded signature image, or null when none is set.
+     */
+    public function signatureUrl(): ?string
+    {
+        return $this->signature_path ? Storage::url($this->signature_path) : null;
+    }
+
+    /**
+     * Whether the user has uploaded a personal signature image.
+     */
+    public function hasSignature(): bool
+    {
+        return (bool) $this->signature_path
+            && Storage::disk('public')->exists($this->signature_path);
     }
 
     /**
