@@ -21,6 +21,8 @@ Route::prefix('supply-chain')
         Route::get('/payment-requests/create', [PaymentRequestController::class, 'create'])->name('payment_requests.create');
         Route::get('/payment-requests/preview', [PaymentRequestController::class, 'preview'])->name('payment_requests.preview');
         Route::post('/payment-requests', [PaymentRequestController::class, 'store'])->name('payment_requests.store');
+        Route::get('/payment-requests/my-status', [PaymentRequestController::class, 'myStatus'])->name('payment_requests.my_status');
+        Route::post('/payment-requests/{paymentRequest}/resubmit', [PaymentRequestController::class, 'resubmit'])->name('payment_requests.resubmit');
         Route::get('/payment-requests/{paymentRequest}', [PaymentRequestController::class, 'show'])->name('payment_requests.show');
         Route::get('/payment-requests/{paymentRequest}/download-pdf', [PaymentRequestController::class, 'downloadPdf'])->name('payment_requests.download_pdf');
         Route::get('/payment-requests/{paymentRequest}/download-excel', [PaymentRequestController::class, 'downloadExcel'])->name('payment_requests.download_excel');

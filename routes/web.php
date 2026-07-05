@@ -5,6 +5,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Shared\ExcelFileController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\EmailLogController;
+use App\Http\Controllers\PraApprovalController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -57,6 +58,15 @@ Route::middleware(['auth'])->group(function () {
         ->name('notifications.read-all');
 
     Route::delete('/emails/{emailLog}', [EmailLogController::class, 'destroy'])->name('emails.destroy');
+
+    // PRA digital approval — approver-facing screens (any role, gated by the
+    // approve-pra permission granted through the admin approver pool).
+    Route::middleware('can:approve-pra')->group(function () {
+        Route::get('/pra-approvals', [PraApprovalController::class, 'index'])->name('pra_approvals.index');
+        Route::get('/pra-approvals/{paymentRequest}', [PraApprovalController::class, 'show'])->name('pra_approvals.show');
+        Route::post('/pra-approvals/{paymentRequest}/approve', [PraApprovalController::class, 'approve'])->name('pra_approvals.approve');
+        Route::post('/pra-approvals/{paymentRequest}/reject', [PraApprovalController::class, 'reject'])->name('pra_approvals.reject');
+    });
 });
 
 

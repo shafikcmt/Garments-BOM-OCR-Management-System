@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\PoGenerateControlController;
 use App\Http\Controllers\Admin\AlertSettingController;
 use App\Http\Controllers\Admin\PaymentSettingController;
 use App\Http\Controllers\Admin\EmailTemplateController;
+use App\Http\Controllers\Admin\PraApproverController;
 
 Route::prefix('admin')
     ->middleware(['auth', 'role:admin'])
@@ -54,4 +55,12 @@ Route::prefix('admin')
         Route::put('/email-templates', [EmailTemplateController::class, 'update'])->name('email-templates.update');
 
         Route::get('/workspace', [DashboardController::class, 'workspace'])->name('workspace');
+
+        // PRA approver pool management + approval history + notification toggle
+        Route::get('/pra-approvers', [PraApproverController::class, 'index'])->name('pra-approvers.index');
+        Route::post('/pra-approvers', [PraApproverController::class, 'store'])->name('pra-approvers.store');
+        Route::patch('/pra-approvers/{praApprover}', [PraApproverController::class, 'update'])->name('pra-approvers.update');
+        Route::delete('/pra-approvers/{praApprover}', [PraApproverController::class, 'destroy'])->name('pra-approvers.destroy');
+        Route::put('/pra-approvers/settings', [PraApproverController::class, 'updateSettings'])->name('pra-approvers.settings');
+        Route::get('/pra-approvals/history', [PraApproverController::class, 'history'])->name('pra-approvals.history');
     });

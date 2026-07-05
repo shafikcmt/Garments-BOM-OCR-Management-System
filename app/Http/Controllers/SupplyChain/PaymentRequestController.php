@@ -9,7 +9,11 @@ use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\PaymentRequest;
 use App\Models\PaymentRequestItem;
+use App\Models\PraApproval;
+use App\Models\PraApprover;
+use App\Models\User;
 use App\Services\BookingPoSourceService;
+use App\Services\PraApprovalService;
 use App\Support\PaymentRequestSettings;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -20,8 +24,25 @@ use Illuminate\Support\Str;
 
 class PaymentRequestController extends Controller
 {
-    public function __construct(protected BookingPoSourceService $sourceService)
+    public function __construct(
+        protected BookingPoSourceService $sourceService,
+        protected PraApprovalService $approvalService,
+    ) {
+    }
+
+    /**
+     * Active users in the admin-managed PRA approver pool, for the creator's
+     * "Send for approval to" selection.
+     */
+    protected function approverPool(): \Illuminate\Support\Collection
     {
+        return PraApprover::where('is_active', true)
+            ->with('user')
+            ->get()
+            ->map(fn (PraApprover $approver) => $approver->user)
+            ->filter()
+            ->sortBy('name')
+            ->values();
     }
 
     public function index(Request $request)
@@ -90,8 +111,9 @@ class PaymentRequestController extends Controller
         $summary = $this->summaryFromApprovalRows($approvalRows);
         $isPreview = true;
         $bookingPoIds = $selectedIds->all();
+        $approverPool = $this->approverPool();
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool'));
     }
 
     public function store(Request $request)
@@ -103,7 +125,18 @@ class PaymentRequestController extends Controller
             'booking_po_ids.*' => ['integer', 'exists:booking_pos,id'],
             'payment_required_date' => ['nullable', 'date'],
             'remarks' => ['nullable', 'string', 'max:2000'],
+            'approver_ids' => ['nullable', 'array'],
+            'approver_ids.*' => ['integer'],
         ]);
+
+        // Only users that are currently in the active approver pool may be
+        // selected — anything else is silently dropped.
+        $approverUserIds = collect($validated['approver_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+        $approverUserIds = PraApprover::where('is_active', true)
+            ->whereIn('user_id', $approverUserIds)
+            ->pluck('user_id');
 
         $selectedIds = collect($validated['booking_po_ids'])
             ->map(fn ($id) => (int) $id)
@@ -121,14 +154,14 @@ class PaymentRequestController extends Controller
             return back()->with('warning', 'No eligible PI received / payment pending row was selected. Please check PI Number, PI Status and Payment Status.');
         }
 
-        $paymentRequest = DB::transaction(function () use ($snapshots, $validated, $paymentRequiredDate) {
+        $paymentRequest = DB::transaction(function () use ($snapshots, $validated, $paymentRequiredDate, $approverUserIds) {
             $paymentRequest = PaymentRequest::create([
                 'request_no' => $this->nextRequestNo(),
                 'supplier_name' => $this->uniqueText($snapshots, 'supplier_name'),
                 'buyer_name' => $this->uniqueText($snapshots, 'buyer_name'),
                 'season_name' => $this->uniqueText($snapshots, 'season_name'),
                 'total_pi_amount' => $snapshots->sum(fn (array $row) => (float) ($row['pi_amount'] ?? 0)),
-                'status' => 'draft',
+                'status' => $approverUserIds->isNotEmpty() ? PaymentRequest::STATUS_PENDING_APPROVAL : 'draft',
                 'created_by' => auth()->id(),
                 'remarks' => $validated['remarks'] ?? null,
                 'data' => [
@@ -173,8 +206,27 @@ class PaymentRequestController extends Controller
                 ]);
             }
 
-            return $paymentRequest->fresh(['items', 'createdBy']);
+            // First approval cycle: one pending row per selected approver.
+            foreach ($approverUserIds as $approverId) {
+                PraApproval::create([
+                    'payment_request_id' => $paymentRequest->id,
+                    'approver_id' => $approverId,
+                    'cycle' => 1,
+                    'status' => PraApproval::STATUS_PENDING,
+                ]);
+            }
+
+            return $paymentRequest->fresh(['items', 'createdBy', 'approvals']);
         });
+
+        if ($approverUserIds->isNotEmpty()) {
+            $approvers = User::whereIn('id', $approverUserIds)->get();
+            $this->approvalService->notifyApprovalRequest($paymentRequest, $approvers);
+
+            return redirect()
+                ->route('supply_chain.payment_requests.show', $paymentRequest)
+                ->with('success', 'PRA ' . $paymentRequest->request_no . ' created and sent to ' . $approvers->count() . ' approver(s).');
+        }
 
         return redirect()
             ->route('supply_chain.payment_requests.show', $paymentRequest)
@@ -185,7 +237,7 @@ class PaymentRequestController extends Controller
     {
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
 
-        $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy']);
+        $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy', 'approvals.approver']);
         $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
         $summary = $this->summaryFromApprovalRows($approvalRows);
         $emailLogs = EmailLog::where('payment_request_id', $paymentRequest->id)
@@ -193,8 +245,90 @@ class PaymentRequestController extends Controller
             ->latest('id')
             ->get();
         $emailDefaults = $this->praEmailDefaults($paymentRequest, $summary);
+        $approvalProgress = $paymentRequest->approvalProgress();
+        $currentApprovals = $paymentRequest->currentApprovals()->load('approver');
+        $approverPool = $this->approverPool();
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'emailLogs', 'emailDefaults'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'emailLogs', 'emailDefaults', 'approvalProgress', 'currentApprovals', 'approverPool'));
+    }
+
+    /**
+     * Creator-facing "My PRA Status" list: the PRAs this user created that have
+     * an approval flow, with the current status and approver-wise breakdown.
+     */
+    public function myStatus(Request $request)
+    {
+        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+
+        $paymentRequests = PaymentRequest::query()
+            ->where('created_by', auth()->id())
+            ->whereHas('approvals')
+            ->with(['approvals.approver'])
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        $approverPool = $this->approverPool();
+
+        return view('supply-chain.payment-requests.my-status', compact('paymentRequests', 'approverPool'));
+    }
+
+    /**
+     * Resubmit a rejected PRA for a fresh approval cycle. Old cycle rows stay
+     * as audit history; new pending rows are created for the newly selected
+     * approvers and the status returns to "pending approval".
+     */
+    public function resubmit(Request $request, PaymentRequest $paymentRequest)
+    {
+        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+        abort_if($paymentRequest->created_by !== auth()->id(), 403);
+
+        if ($paymentRequest->status !== PaymentRequest::STATUS_REJECTED) {
+            return back()->with('warning', 'Only a rejected PRA can be resubmitted.');
+        }
+
+        $validated = $request->validate([
+            'approver_ids' => ['required', 'array', 'min:1'],
+            'approver_ids.*' => ['integer'],
+            'remarks' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $approverUserIds = PraApprover::where('is_active', true)
+            ->whereIn('user_id', collect($validated['approver_ids'])->map(fn ($id) => (int) $id)->unique())
+            ->pluck('user_id');
+
+        if ($approverUserIds->isEmpty()) {
+            return back()->with('warning', 'Please select at least one active approver.');
+        }
+
+        $paymentRequest->load('approvals');
+        $nextCycle = $paymentRequest->currentCycle() + 1;
+
+        DB::transaction(function () use ($paymentRequest, $approverUserIds, $nextCycle, $validated) {
+            foreach ($approverUserIds as $approverId) {
+                PraApproval::create([
+                    'payment_request_id' => $paymentRequest->id,
+                    'approver_id' => $approverId,
+                    'cycle' => $nextCycle,
+                    'status' => PraApproval::STATUS_PENDING,
+                ]);
+            }
+
+            $paymentRequest->update([
+                'status' => PaymentRequest::STATUS_PENDING_APPROVAL,
+                'approved_by' => null,
+                'approved_at' => null,
+                'remarks' => $validated['remarks'] ?? $paymentRequest->remarks,
+            ]);
+        });
+
+        $paymentRequest->refresh()->load(['createdBy']);
+        $approvers = User::whereIn('id', $approverUserIds)->get();
+        $this->approvalService->notifyApprovalRequest($paymentRequest, $approvers);
+
+        return redirect()
+            ->route('supply_chain.payment_requests.my_status')
+            ->with('success', 'PRA ' . $paymentRequest->request_no . ' resubmitted to ' . $approvers->count() . ' approver(s).');
     }
 
     public function downloadPdf(PaymentRequest $paymentRequest)

@@ -108,16 +108,9 @@
                             </button>
                         </form>
 
-                        <form method="POST" action="{{ route('supply_chain.payment_requests.store') }}" class="m-0">
-                            @csrf
-                            @foreach($bookingPoIds as $bookingPoId)
-                                <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
-                            @endforeach
-                            <input type="hidden" name="payment_required_date" id="paymentRequiredCreateDate" value="{{ $paymentRequiredInput }}">
-                            <button type="submit" class="btn btn-success pra-toolbar-btn pra-toolbar-btn-create" title="Create the Payment Request Approval">
-                                <i class="bi bi-check2-circle"></i> Create PRA
-                            </button>
-                        </form>
+                        <button type="button" class="btn btn-success pra-toolbar-btn pra-toolbar-btn-create" data-bs-toggle="modal" data-bs-target="#createPraModal" title="Create the Payment Request Approval">
+                            <i class="bi bi-check2-circle"></i> Create PRA
+                        </button>
                     </div>
                 @else
                     <div class="d-flex flex-wrap gap-2">
@@ -241,7 +234,95 @@
             </div>
         </div>
 
+        @if($isPreview)
+            {{-- Create PRA + send for approval --}}
+            <div class="modal fade" id="createPraModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content" style="border-radius:14px;">
+                        <form method="POST" action="{{ route('supply_chain.payment_requests.store') }}">
+                            @csrf
+                            @foreach($bookingPoIds as $bookingPoId)
+                                <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
+                            @endforeach
+                            <input type="hidden" name="payment_required_date" id="paymentRequiredCreateDate" value="{{ $paymentRequiredInput }}">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="bi bi-check2-circle text-success me-1"></i> Create Payment Request Approval</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="small text-muted mb-3">Optionally send this PRA to management approver(s). If none is selected, the PRA is saved without an approval request.</p>
+                                @if(($approverPool ?? collect())->isEmpty())
+                                    <div class="alert alert-info small mb-0">No active approvers configured. The PRA will be created without an approval request.</div>
+                                @else
+                                    <label class="form-label fw-semibold">Send for approval to</label>
+                                    <div class="d-flex flex-column gap-2" style="max-height:240px;overflow-y:auto;">
+                                        @foreach($approverPool as $approver)
+                                            <label class="d-flex align-items-center gap-2 border rounded-3 px-3 py-2 mb-0" style="cursor:pointer;">
+                                                <input type="checkbox" class="form-check-input mt-0" name="approver_ids[]" value="{{ $approver->id }}">
+                                                <span>{{ $approver->name }} <span class="text-muted small">({{ $approver->email }})</span></span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    <div class="form-text">All selected approvers must approve before the PRA is marked as Approved.</div>
+                                @endif
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Create PRA</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         @unless($isPreview)
+            @if(($approvalProgress['has_flow'] ?? false))
+                @php
+                    $stateBadge = [
+                        'approved' => 'bg-success-subtle text-success',
+                        'rejected' => 'bg-danger-subtle text-danger',
+                        'pending_approval' => 'bg-warning-subtle text-warning-emphasis',
+                    ];
+                    $decisionBadge = [
+                        'approved' => 'bg-success-subtle text-success',
+                        'rejected' => 'bg-danger-subtle text-danger',
+                        'pending' => 'bg-warning-subtle text-warning-emphasis',
+                    ];
+                    $isCreator = auth()->id() === $paymentRequest->created_by;
+                @endphp
+                <div class="mx-auto mt-3" style="max-width:1120px;">
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-shield-check me-1"></i> Approval Status</h6>
+                                <span class="badge rounded-pill {{ $stateBadge[$approvalProgress['state']] ?? 'bg-secondary-subtle text-secondary' }}">{{ $approvalProgress['label'] }}</span>
+                            </div>
+                            <div class="row g-2">
+                                @foreach($currentApprovals as $approval)
+                                    <div class="col-12 col-md-6 col-xl-4">
+                                        <div class="d-flex justify-content-between align-items-start gap-2 border rounded-3 px-3 py-2">
+                                            <div class="min-w-0">
+                                                <div class="fw-semibold small text-slate-900">{{ optional($approval->approver)->name ?? '—' }}</div>
+                                                @if($approval->comment)<div class="small text-muted">{{ $approval->comment }}</div>@endif
+                                            </div>
+                                            <span class="badge rounded-pill {{ $decisionBadge[$approval->status] ?? 'bg-secondary-subtle text-secondary' }}">{{ ucfirst($approval->status) }}</span>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                            @if($approvalProgress['state'] === 'rejected' && $isCreator)
+                                <div class="mt-3">
+                                    <a href="{{ route('supply_chain.payment_requests.my_status') }}" class="btn btn-sm btn-primary rounded-pill px-3">
+                                        <i class="bi bi-arrow-repeat me-1"></i> Resubmit from My PRA Status
+                                    </a>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <div class="mx-auto mt-3" style="max-width:1120px;">
                 @if($emailLogs->isEmpty())
                     <div class="card border-0 shadow-sm rounded-3">

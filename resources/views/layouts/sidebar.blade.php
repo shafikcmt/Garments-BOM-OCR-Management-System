@@ -100,6 +100,7 @@
                             <a href="{{ route('admin.alert-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.alert-settings.*') ? 'is-active' : '' }}">Alert Settings</a>
                             <a href="{{ route('admin.payment-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.payment-settings.*') ? 'is-active' : '' }}">PI / PRA Settings</a>
                             <a href="{{ route('admin.email-templates.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.email-templates.*') ? 'is-active' : '' }}">Email Templates</a>
+                            <a href="{{ route('admin.pra-approvers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-approvers.*') || request()->routeIs('admin.pra-approvals.*') ? 'is-active' : '' }}">PRA Approvers</a>
                         </div>
                     </li>
                 </ul>
@@ -224,6 +225,7 @@
                             <span class="sidebar-submenu-rail"></span>
                             <a href="{{ $supplyPaymentUrl }}#pending-pi-payment" data-hash="pending-pi-payment" class="sidebar-sub-link {{ request()->routeIs('supply_chain.payment_requests.index') || request()->routeIs('supply_chain.payment_requests.create') ? 'is-active' : '' }}">Pending PI Payment</a>
                             <a href="{{ $supplyPaymentUrl }}#payment-request-list" data-hash="payment-request-list" class="sidebar-sub-link {{ request()->routeIs('supply_chain.payment_requests.show') ? 'is-active' : '' }}">Payment Request List</a>
+                            <a href="{{ route('supply_chain.payment_requests.my_status') }}" class="sidebar-sub-link {{ request()->routeIs('supply_chain.payment_requests.my_status') ? 'is-active' : '' }}">My PRA Status</a>
                         </div>
                     </li>
                     <li class="sidebar-item">
@@ -237,6 +239,30 @@
                 </ul>
             </div>
             @endrole
+
+            @can('approve-pra')
+                @php
+                    $praPendingCount = \App\Models\PaymentRequest::where('status', 'pending_approval')
+                        ->whereHas('approvals', fn ($q) => $q->where('approver_id', auth()->id())->where('status', 'pending'))
+                        ->count();
+                @endphp
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Approvals</div>
+                    <ul class="sidebar-list">
+                        <li class="sidebar-item">
+                            <a href="{{ route('pra_approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('pra_approvals.*') ? 'is-active' : '' }}">
+                                <span class="sidebar-link-main">
+                                    <span class="sidebar-icon"><i class="bi bi-inbox"></i></span>
+                                    <span class="sidebar-link-text">PRA Approvals</span>
+                                </span>
+                                @if($praPendingCount > 0)
+                                    <span class="badge rounded-pill bg-danger">{{ $praPendingCount > 99 ? '99+' : $praPendingCount }}</span>
+                                @endif
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            @endcan
 
         </div>
     </div>
