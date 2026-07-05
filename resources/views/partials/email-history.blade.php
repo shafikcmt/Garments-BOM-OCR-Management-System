@@ -16,7 +16,12 @@
      *   $dynamicSendUrl   emit each row's document send route so Forward/Reply/
      *                     Edit post to the correct PO/PRA (consolidated page)
      */
-    $emailLogs = collect($emailLogs ?? []);
+    // Keep a paginator intact (the consolidated Sent Emails page passes one);
+    // collect() would flatten it to its meta array and iterate ints. Any other
+    // input (per-record Collection, array, null) is normalised to a Collection.
+    $emailLogs = $emailLogs instanceof \Illuminate\Pagination\AbstractPaginator
+        ? $emailLogs
+        : collect($emailLogs ?? []);
     $composeModalId = $composeModalId ?? 'sendEmailModal';
     $composeEditorId = $composeEditorId ?? 'emailBodyEditor';
     $composeInputId = $composeInputId ?? 'emailBodyInput';
