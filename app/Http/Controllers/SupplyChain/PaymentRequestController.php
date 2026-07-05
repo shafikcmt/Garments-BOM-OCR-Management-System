@@ -14,6 +14,7 @@ use App\Models\PraApprover;
 use App\Models\User;
 use App\Services\BookingPoSourceService;
 use App\Services\PraApprovalService;
+use App\Services\StyleBudgetService;
 use App\Support\PaymentRequestSettings;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -27,6 +28,7 @@ class PaymentRequestController extends Controller
     public function __construct(
         protected BookingPoSourceService $sourceService,
         protected PraApprovalService $approvalService,
+        protected StyleBudgetService $budgetService,
     ) {
     }
 
@@ -129,8 +131,10 @@ class PaymentRequestController extends Controller
         $bookingPoIds = $selectedIds->all();
         $approverPool = $this->approverPool();
         $checkerPool = $this->checkerPool();
+        $budgetCheck = $this->budgetService->evaluate($snapshots);
+        $canOverrideBudget = (bool) auth()->user()?->can('override-style-budget');
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'checkerPool'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'checkerPool', 'budgetCheck', 'canOverrideBudget'));
     }
 
     public function store(Request $request)
@@ -181,12 +185,47 @@ class PaymentRequestController extends Controller
             return back()->with('warning', 'No eligible PI received / payment pending row was selected. Please check PI Number, PI Status and Payment Status.');
         }
 
+        // Style budget guard: hard-block when a style would exceed its budget,
+        // unless an authorised user overrides with a reason (recorded + logged).
+        $overrideMeta = null;
+        $budgetCheck = $this->budgetService->evaluate($snapshots);
+
+        if ($budgetCheck['exceeded']) {
+            $wantsOverride = $request->boolean('budget_override');
+            $canOverride = (bool) auth()->user()?->can('override-style-budget');
+            $reason = trim((string) $request->input('budget_override_reason'));
+            $overLines = collect($budgetCheck['lines'])->where('over', true);
+
+            if (! ($wantsOverride && $canOverride && $reason !== '')) {
+                $detail = $overLines
+                    ->map(fn ($l) => $l['style'] . ' (budget $' . number_format($l['budget'], 2)
+                        . ', would reach $' . number_format($l['projected'], 2)
+                        . ' — over by $' . number_format($l['over_by'], 2) . ')')
+                    ->implode('; ');
+
+                $message = $canOverride
+                    ? 'Style budget exceeded — ' . $detail . '. Tick the override box and give a reason to proceed.'
+                    : 'Style budget exceeded — PRA blocked. ' . $detail . '. Ask an authorised user to override or update the budget.';
+
+                return back()->with('error', $message);
+            }
+
+            $overrideMeta = [
+                'by' => auth()->id(),
+                'by_name' => auth()->user()?->name,
+                'reason' => $reason,
+                'at' => now()->toDateTimeString(),
+                'lines' => $overLines->values()->all(),
+            ];
+            Log::warning('Style budget override on PRA creation', $overrideMeta);
+        }
+
         // Snapshot the creator's personal signature for the Prepared By box, but
         // only when the PRA actually enters an approval flow.
         $hasFlow = $checkerUserId || $approverUserIds->isNotEmpty();
         $creatorSignaturePath = $hasFlow ? (auth()->user()?->signature_path) : null;
 
-        $paymentRequest = DB::transaction(function () use ($snapshots, $validated, $paymentRequiredDate, $approverUserIds, $checkerUserId, $creatorSignaturePath) {
+        $paymentRequest = DB::transaction(function () use ($snapshots, $validated, $paymentRequiredDate, $approverUserIds, $checkerUserId, $creatorSignaturePath, $overrideMeta) {
             $status = $checkerUserId
                 ? PaymentRequest::STATUS_PENDING_CHECK
                 : ($approverUserIds->isNotEmpty() ? PaymentRequest::STATUS_PENDING_APPROVAL : 'draft');
@@ -208,6 +247,7 @@ class PaymentRequestController extends Controller
                     'payment_status_summary' => $snapshots->countBy('payment_status')->all(),
                     'payment_required_date' => $paymentRequiredDate,
                     'source' => 'supply_chain_payment_request',
+                    'budget_override' => $overrideMeta,
                 ],
             ]);
 

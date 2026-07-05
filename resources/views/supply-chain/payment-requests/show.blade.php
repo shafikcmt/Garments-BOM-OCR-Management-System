@@ -4,6 +4,8 @@
 @php
     $approvalRows = collect($approvalRows ?? []);
     $isPreview = (bool) ($isPreview ?? false);
+    $budgetCheck = $budgetCheck ?? ['exceeded' => false, 'lines' => []];
+    $canOverrideBudget = (bool) ($canOverrideBudget ?? false);
     $bookingPoIds = collect($bookingPoIds ?? [])->filter()->unique()->values();
     $list = fn ($values, $fallback = '-') => collect($values ?? [])->map(fn ($v) => trim((string) $v))->filter()->take(5)->implode(', ') ?: $fallback;
     $money = fn ($value) => number_format((float) $value, 2);
@@ -124,6 +126,41 @@
                 @endif
             </div>
         </div>
+
+        @if($isPreview && !empty($budgetCheck['lines']))
+            @php $money2 = fn ($v) => number_format((float) $v, 2); @endphp
+            <div class="mx-auto mb-3" style="max-width:1120px;">
+                @if($budgetCheck['exceeded'])
+                    <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-0">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="bi bi-exclamation-octagon-fill fs-5"></i>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold mb-1">Style budget exceeded — creating this PRA is blocked.</div>
+                                <ul class="mb-0 ps-3 small">
+                                    @foreach(collect($budgetCheck['lines'])->where('over', true) as $line)
+                                        <li>
+                                            <strong>{{ $line['style'] }}</strong>: budget ${{ $money2($line['budget']) }},
+                                            already committed ${{ $money2($line['consumed']) }},
+                                            this PRA adds ${{ $money2($line['new']) }}
+                                            → total ${{ $money2($line['projected']) }}
+                                            (<span class="fw-bold">over by ${{ $money2($line['over_by']) }}</span>).
+                                        </li>
+                                    @endforeach
+                                </ul>
+                                @unless($canOverrideBudget)
+                                    <div class="small mt-1">Ask an authorised user to override, or update the style budget.</div>
+                                @endunless
+                            </div>
+                        </div>
+                    </div>
+                @else
+                    <div class="alert alert-success border-0 shadow-sm rounded-3 mb-0 py-2 small">
+                        <i class="bi bi-check-circle me-1"></i> Within style budget for all
+                        {{ collect($budgetCheck['lines'])->count() }} budgeted style(s).
+                    </div>
+                @endif
+            </div>
+        @endif
 
         <div class="pra-sheet mx-auto">
             <div class="row g-0 align-items-start mb-3">
@@ -250,6 +287,22 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+                                @if($budgetCheck['exceeded'])
+                                    <div class="alert alert-danger small">
+                                        <div class="fw-bold mb-1"><i class="bi bi-exclamation-octagon me-1"></i> Style budget exceeded</div>
+                                        <div>Over budget for: {{ collect($budgetCheck['lines'])->where('over', true)->pluck('style')->implode(', ') }}.</div>
+                                    </div>
+                                    @if($canOverrideBudget)
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" name="budget_override" value="1" id="budgetOverrideChk">
+                                            <label class="form-check-label fw-semibold" for="budgetOverrideChk">Override the budget block (authorised)</label>
+                                        </div>
+                                        <label class="form-label fw-semibold small">Override reason <span class="text-danger">*</span></label>
+                                        <textarea name="budget_override_reason" rows="2" class="form-control mb-3" maxlength="1000" placeholder="Why is exceeding the budget justified?">{{ old('budget_override_reason') }}</textarea>
+                                    @else
+                                        <p class="small text-danger mb-3">You are not authorised to override. Ask an authorised user or update the style budget.</p>
+                                    @endif
+                                @endif
                                 <p class="small text-muted mb-3">Optionally route this PRA for checking and approval. If nothing is selected, the PRA is saved without an approval request.</p>
                                 @if(($approverPool ?? collect())->isEmpty())
                                     <div class="alert alert-info small mb-0">No active approvers configured. The PRA will be created without an approval request.</div>
@@ -279,7 +332,7 @@
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Create PRA</button>
+                                <button type="submit" class="btn btn-success" {{ ($budgetCheck['exceeded'] && !$canOverrideBudget) ? 'disabled' : '' }}><i class="bi bi-check2-circle me-1"></i> Create PRA</button>
                             </div>
                         </form>
                     </div>

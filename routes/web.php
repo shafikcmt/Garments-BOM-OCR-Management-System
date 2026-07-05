@@ -6,6 +6,7 @@ use App\Http\Controllers\Shared\ExcelFileController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\EmailLogController;
 use App\Http\Controllers\PraApprovalController;
+use App\Http\Controllers\StyleBudgetController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -72,6 +73,14 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/pra-approvals/{paymentRequest}', [PraApprovalController::class, 'show'])->name('pra_approvals.show');
         Route::post('/pra-approvals/{paymentRequest}/approve', [PraApprovalController::class, 'approve'])->name('pra_approvals.approve');
         Route::post('/pra-approvals/{paymentRequest}/reject', [PraApprovalController::class, 'reject'])->name('pra_approvals.reject');
+    });
+
+    // Style-wise budgets — set/edit by admin + merchandising (manage-style-budgets).
+    Route::middleware('can:manage-style-budgets')->group(function () {
+        Route::get('/style-budgets', [StyleBudgetController::class, 'index'])->name('style-budgets.index');
+        Route::post('/style-budgets', [StyleBudgetController::class, 'store'])->name('style-budgets.store');
+        Route::patch('/style-budgets/{styleBudget}', [StyleBudgetController::class, 'update'])->name('style-budgets.update');
+        Route::delete('/style-budgets/{styleBudget}', [StyleBudgetController::class, 'destroy'])->name('style-budgets.destroy');
     });
 });
 

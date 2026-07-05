@@ -287,6 +287,22 @@
                 </div>
             @endcan
 
+            @can('manage-style-budgets')
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Planning</div>
+                    <ul class="sidebar-list">
+                        <li class="sidebar-item">
+                            <a href="{{ route('style-budgets.index') }}" class="sidebar-nav-link {{ request()->routeIs('style-budgets.*') ? 'is-active' : '' }}">
+                                <span class="sidebar-link-main">
+                                    <span class="sidebar-icon"><i class="bi bi-bar-chart"></i></span>
+                                    <span class="sidebar-link-text">Style Budgets</span>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            @endcan
+
         </div>
     </div>
 </nav>
