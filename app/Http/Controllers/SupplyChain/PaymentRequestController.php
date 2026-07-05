@@ -651,6 +651,10 @@ class PaymentRequestController extends Controller
 
     protected function pendingPaymentRows(Request $request): array
     {
+        // POs already covered by an existing, non-rejected PRA must not appear as
+        // "pending" again — otherwise the same PO can be sent for approval twice.
+        $consumed = $this->poKeysWithActivePra();
+
         $baseRows = BookingPo::query()
             ->with(['excelFile.uploader', 'excelRow.cells.header', 'generatedBy'])
             ->whereNotNull('generated_at')
@@ -659,6 +663,7 @@ class PaymentRequestController extends Controller
             ->get()
             ->map(fn (BookingPo $bookingPo) => $this->sourceService->paymentSnapshot($bookingPo))
             ->filter(fn (array $row) => (bool) ($row['eligible_for_payment_request'] ?? false))
+            ->reject(fn (array $row) => $this->isCoveredByActivePra($row, $consumed))
             ->values();
 
         $filterOptions = $this->filterOptions($baseRows);
@@ -682,6 +687,54 @@ class PaymentRequestController extends Controller
         );
 
         return [$pendingRows, $filterOptions, $kpis, $activeFilters];
+    }
+
+    /**
+     * Build a lookup of PO identifiers already consumed by a live PRA (any
+     * status except rejected). A rejected PRA frees its PO to be raised again.
+     * Keyed both by booking_po_id and by normalised po_no so a PO is matched
+     * whichever identifier the pending snapshot carries.
+     *
+     * @return array{po: array<string, true>, booking: array<int, true>}
+     */
+    protected function poKeysWithActivePra(): array
+    {
+        $items = PaymentRequestItem::query()
+            ->join('payment_requests', 'payment_requests.id', '=', 'payment_request_items.payment_request_id')
+            ->where('payment_requests.status', '!=', PaymentRequest::STATUS_REJECTED)
+            ->get(['payment_request_items.po_no', 'payment_request_items.booking_po_id']);
+
+        $po = [];
+        $booking = [];
+
+        foreach ($items as $item) {
+            $poNo = Str::lower(trim((string) $item->po_no));
+            if ($poNo !== '') {
+                $po[$poNo] = true;
+            }
+            if ($item->booking_po_id) {
+                $booking[(int) $item->booking_po_id] = true;
+            }
+        }
+
+        return ['po' => $po, 'booking' => $booking];
+    }
+
+    /**
+     * Whether a pending snapshot row is already covered by a live PRA.
+     *
+     * @param array{po: array<string, true>, booking: array<int, true>} $consumed
+     */
+    protected function isCoveredByActivePra(array $row, array $consumed): bool
+    {
+        $bookingId = $row['booking_po_id'] ?? null;
+        if ($bookingId && isset($consumed['booking'][(int) $bookingId])) {
+            return true;
+        }
+
+        $poNo = Str::lower(trim((string) ($row['po_no'] ?? '')));
+
+        return $poNo !== '' && isset($consumed['po'][$poNo]);
     }
 
     protected function applyFilters($rows, Request $request): \Illuminate\Support\Collection

@@ -64,6 +64,16 @@
         ['label' => 'PCD Required', 'name' => 'pcd_required'],
         ['label' => 'Payment Required Date', 'name' => 'payment_required_date'],
     ];
+
+    // Colour-coded status badges for the Payment Request List.
+    $statusBadge = [
+        'draft' => 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle',
+        'pending_check' => 'bg-info-subtle text-info-emphasis border border-info-subtle',
+        'pending_approval' => 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
+        'approved' => 'bg-success-subtle text-success-emphasis border border-success-subtle',
+        'rejected' => 'bg-danger-subtle text-danger-emphasis border border-danger-subtle',
+    ];
+    $statusLabel = fn ($status) => \Illuminate\Support\Str::headline((string) $status);
 @endphp
 
 <div class="container-fluid py-2">
@@ -253,8 +263,8 @@
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4" id="pending-pi-payment">
         <div class="card-header bg-white border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
-                <h6 class="fw-bold mb-0">Pending PI Payment</h6>
-                <div class="small text-muted">Click Preview to review the payment format, then click Create to generate a Payment Request Approval for the selected PO.</div>
+                <h6 class="fw-bold mb-0">Pending PI Payment <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle ms-1">{{ $pendingRows->total() }}</span></h6>
+                <div class="small text-muted">POs already sent for approval are hidden here. Click Preview to review the format, then Create the Payment Request Approval.</div>
             </div>
         </div>
         <div class="payment-request-table-wrap">
@@ -343,7 +353,7 @@
 
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden" id="payment-request-list">
         <div class="card-header bg-white border-0 py-3">
-            <h6 class="fw-bold mb-0">Payment Request List</h6>
+            <h6 class="fw-bold mb-0">Payment Request List <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle ms-1">{{ $paymentRequests->total() }}</span></h6>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
@@ -368,13 +378,21 @@
                             <td>{{ $paymentRequest->buyer_name ?: '-' }}</td>
                             <td>{{ $paymentRequest->season_name ?: '-' }}</td>
                             <td class="text-end fw-bold">{{ number_format((float) $paymentRequest->total_pi_amount, 2) }}</td>
-                            <td><span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle">{{ ucfirst($paymentRequest->status) }}</span></td>
+                            <td><span class="badge rounded-pill {{ $statusBadge[$paymentRequest->status] ?? 'bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle' }}">{{ $statusLabel($paymentRequest->status) }}</span></td>
                             <td>{{ optional($paymentRequest->createdBy)->name ?: '-' }}</td>
                             <td>{{ optional($paymentRequest->created_at)->format('Y-m-d H:i') }}</td>
-                            <td class="text-end text-nowrap">
-                                <a href="{{ route('supply_chain.payment_requests.show', $paymentRequest) }}" class="btn btn-sm btn-outline-primary rounded-pill">View</a>
-                                <a href="{{ route('supply_chain.payment_requests.download_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-danger rounded-pill">PDF Preview</a>
-                                <a href="{{ route('supply_chain.payment_requests.download_excel', $paymentRequest) }}" class="btn btn-sm btn-outline-success rounded-pill">Excel</a>
+                            <td class="text-end">
+                                <div class="d-inline-flex gap-1 justify-content-end flex-nowrap">
+                                    <a href="{{ route('supply_chain.payment_requests.show', $paymentRequest) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" title="View this PRA">
+                                        <i class="bi bi-eye me-1"></i>View
+                                    </a>
+                                    <a href="{{ route('supply_chain.payment_requests.download_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-danger rounded-pill px-3" title="Open PDF preview">
+                                        <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+                                    </a>
+                                    <a href="{{ route('supply_chain.payment_requests.download_excel', $paymentRequest) }}" class="btn btn-sm btn-outline-success rounded-pill px-3" title="Download Excel">
+                                        <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                     @empty
