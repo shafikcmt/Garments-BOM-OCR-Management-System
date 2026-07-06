@@ -154,6 +154,25 @@ class PaymentRequestController extends Controller
             return back()->with('warning', 'No eligible PI received / payment pending row was selected. Please check PI Number, PI Status and Payment Status.');
         }
 
+        // Safety guard against duplicate PRAs (race condition / direct request):
+        // block any selected PO/PI already covered by a live (non-rejected) PRA.
+        $activeKeySet = $this->activePraKeys()->flip();
+        $duplicates = $snapshots
+            ->filter(function (array $row) use ($activeKeySet) {
+                $key = $this->praKey($row['po_no'] ?? null, $row['pi_number'] ?? null);
+
+                return $key !== null && $activeKeySet->has($key);
+            })
+            ->map(fn (array $row) => trim(($row['po_no'] ?? '-') . ' / ' . ($row['pi_number'] ?? '-')))
+            ->unique()
+            ->values();
+
+        if ($duplicates->isNotEmpty()) {
+            return back()->with('warning', 'A Payment Request Approval already exists for: '
+                . $duplicates->take(10)->implode(', ')
+                . '. These PO/PI cannot be used to create another PRA.');
+        }
+
         $paymentRequest = DB::transaction(function () use ($snapshots, $validated, $paymentRequiredDate, $approverUserIds) {
             $paymentRequest = PaymentRequest::create([
                 'request_no' => $this->nextRequestNo(),
@@ -546,8 +565,42 @@ class PaymentRequestController extends Controller
             ->values();
     }
 
+    /**
+     * Normalised dedup key for a PO No. + PI No. combination. Returns null when
+     * both are empty (such rows can never be matched to an existing PRA).
+     */
+    protected function praKey($poNo, $piNumber): ?string
+    {
+        $po = Str::lower(trim((string) $poNo));
+        $pi = Str::lower(trim((string) $piNumber));
+
+        if ($po === '' && $pi === '') {
+            return null;
+        }
+
+        return $po . '|' . $pi;
+    }
+
+    /**
+     * PO No. + PI No. keys already covered by a live (non-rejected) PRA. A
+     * rejected PRA frees its PO/PI so it can reappear in the pending list.
+     */
+    protected function activePraKeys(): \Illuminate\Support\Collection
+    {
+        return PaymentRequestItem::query()
+            ->join('payment_requests', 'payment_requests.id', '=', 'payment_request_items.payment_request_id')
+            ->where('payment_requests.status', '!=', PaymentRequest::STATUS_REJECTED)
+            ->get(['payment_request_items.po_no', 'payment_request_items.pi_number'])
+            ->map(fn (PaymentRequestItem $item) => $this->praKey($item->po_no, $item->pi_number))
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
     protected function pendingPaymentRows(Request $request): array
     {
+        $activeKeySet = $this->activePraKeys()->flip();
+
         $baseRows = BookingPo::query()
             ->with(['excelFile.uploader', 'excelRow.cells.header', 'generatedBy'])
             ->whereNotNull('generated_at')
@@ -556,6 +609,13 @@ class PaymentRequestController extends Controller
             ->get()
             ->map(fn (BookingPo $bookingPo) => $this->sourceService->paymentSnapshot($bookingPo))
             ->filter(fn (array $row) => (bool) ($row['eligible_for_payment_request'] ?? false))
+            // Exclude any PO/PI already covered by a live (non-rejected) PRA so
+            // the same PO/PI cannot be picked again for a duplicate PRA.
+            ->reject(function (array $row) use ($activeKeySet) {
+                $key = $this->praKey($row['po_no'] ?? null, $row['pi_number'] ?? null);
+
+                return $key !== null && $activeKeySet->has($key);
+            })
             ->values();
 
         $filterOptions = $this->filterOptions($baseRows);
