@@ -69,7 +69,7 @@
     .pra-sign-meta .pra-sign-name { font-weight:800; }
     @media print {
         body { background:#fff !important; }
-        .pra-toolbar, .sidebar, nav, header { display:none !important; }
+        .pra-toolbar, .sidebar, nav, header, .pra-no-print { display:none !important; }
         .content-wrapper, main, .pra-wrap { margin:0 !important; padding:0 !important; background:#fff !important; }
         .pra-sheet { min-width:0; width:100%; box-shadow:none; border:0; padding:12px; }
         .table-responsive { overflow:visible !important; }
@@ -291,7 +291,7 @@
                     ];
                     $isCreator = auth()->id() === $paymentRequest->created_by;
                 @endphp
-                <div class="mx-auto mt-3" style="max-width:1120px;">
+                <div class="mx-auto mt-3 pra-no-print" style="max-width:1120px;">
                     <div class="card border-0 shadow-sm rounded-3">
                         <div class="card-body p-4">
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -323,7 +323,7 @@
                 </div>
             @endif
 
-            <div class="mx-auto mt-3" style="max-width:1120px;">
+            <div class="mx-auto mt-3 pra-no-print" style="max-width:1120px;">
                 @if($emailLogs->isEmpty())
                     <div class="card border-0 shadow-sm rounded-3">
                         <div class="card-body p-4">
