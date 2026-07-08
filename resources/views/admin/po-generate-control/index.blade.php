@@ -581,7 +581,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         Showing <strong>{{ $pendingRows->firstItem() }}</strong> to <strong>{{ $pendingRows->lastItem() }}</strong> of <strong>{{ $pendingRows->total() }}</strong> pending results
                     </div>
                     <div class="po-pager-actions">
-                        <a class="po-pager-btn {{ $pendingRows->onFirstPage() ? 'disabled' : '' }}" href="{{ $pendingRows->previousPageUrl() ?: '#' }}" aria-label="Previous pending page"><i class="bi bi-chevron-left"></i></a>
+                        <a class="po-pager-btn {{ $pendingRows->onFirstPage() ? 'disabled' : '' }}" href="{{ $pendingRows->previousPageUrl() ?: '#' }}" aria-label="Previous pending page" title="Previous page"><i class="bi bi-chevron-left"></i></a>
                         @if($pendingStart > 1)
                             <a class="po-pager-btn" href="{{ $pendingRows->url(1) }}">1</a>
                             @if($pendingStart > 2)<span class="po-pager-dot">...</span>@endif
@@ -593,7 +593,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             @if($pendingEnd < $pendingLast - 1)<span class="po-pager-dot">...</span>@endif
                             <a class="po-pager-btn" href="{{ $pendingRows->url($pendingLast) }}">{{ $pendingLast }}</a>
                         @endif
-                        <a class="po-pager-btn {{ $pendingRows->hasMorePages() ? '' : 'disabled' }}" href="{{ $pendingRows->nextPageUrl() ?: '#' }}" aria-label="Next pending page"><i class="bi bi-chevron-right"></i></a>
+                        <a class="po-pager-btn {{ $pendingRows->hasMorePages() ? '' : 'disabled' }}" href="{{ $pendingRows->nextPageUrl() ?: '#' }}" aria-label="Next pending page" title="Next page"><i class="bi bi-chevron-right"></i></a>
                     </div>
                 </div>
             @else
@@ -1023,7 +1023,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         Showing <strong>{{ $bookingPos->firstItem() }}</strong> to <strong>{{ $bookingPos->lastItem() }}</strong> of <strong>{{ $bookingPos->total() }}</strong> generated PO results
                     </div>
                     <div class="po-pager-actions">
-                        <a class="po-pager-btn {{ $bookingPos->onFirstPage() ? 'disabled' : '' }}" href="{{ $bookingPos->previousPageUrl() ?: '#' }}" aria-label="Previous generated page"><i class="bi bi-chevron-left"></i></a>
+                        <a class="po-pager-btn {{ $bookingPos->onFirstPage() ? 'disabled' : '' }}" href="{{ $bookingPos->previousPageUrl() ?: '#' }}" aria-label="Previous generated page" title="Previous page"><i class="bi bi-chevron-left"></i></a>
                         @if($generatedStart > 1)
                             <a class="po-pager-btn" href="{{ $bookingPos->url(1) }}">1</a>
                             @if($generatedStart > 2)<span class="po-pager-dot">...</span>@endif
@@ -1035,7 +1035,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             @if($generatedEnd < $generatedLast - 1)<span class="po-pager-dot">...</span>@endif
                             <a class="po-pager-btn" href="{{ $bookingPos->url($generatedLast) }}">{{ $generatedLast }}</a>
                         @endif
-                        <a class="po-pager-btn {{ $bookingPos->hasMorePages() ? '' : 'disabled' }}" href="{{ $bookingPos->nextPageUrl() ?: '#' }}" aria-label="Next generated page"><i class="bi bi-chevron-right"></i></a>
+                        <a class="po-pager-btn {{ $bookingPos->hasMorePages() ? '' : 'disabled' }}" href="{{ $bookingPos->nextPageUrl() ?: '#' }}" aria-label="Next generated page" title="Next page"><i class="bi bi-chevron-right"></i></a>
                     </div>
                 </div>
             @else

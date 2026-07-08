@@ -21,7 +21,7 @@
                     <span class="sidebar-brand-subtitle">Management System</span>
                 </span>
             </a>
-            <button type="button" class="btn btn-sm d-lg-none sidebar-close-btn" id="sidebarClose" aria-label="Close sidebar">
+            <button type="button" class="btn btn-sm d-lg-none sidebar-close-btn" id="sidebarClose" aria-label="Close sidebar" title="Close menu">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>

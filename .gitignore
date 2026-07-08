@@ -36,3 +36,4 @@ bootstrap/cache/*
 public/build/
 public/storage/
 .claude/settings.local.json
+.claude/

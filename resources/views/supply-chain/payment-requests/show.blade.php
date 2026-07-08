@@ -13,6 +13,7 @@
         $paymentRequiredDate = $snapshotRequiredDate ? \Illuminate\Support\Carbon::parse($snapshotRequiredDate) : null;
     }
     $paymentRequiredInput = $paymentRequiredInput ?? ($paymentRequiredDate ? optional($paymentRequiredDate)->format('Y-m-d') : \App\Support\PaymentRequestSettings::defaultPaymentRequiredDate()->toDateString());
+    $budgetBlock = collect($budgetBlock ?? []);
     $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocks(false);
     $logoPath = public_path('images/humana-logo.png');
     $logoData = null;
@@ -95,22 +96,20 @@
 
                 @if($isPreview)
                     <div class="pra-date-panel">
-                        <form method="GET" action="{{ route('supply_chain.payment_requests.preview') }}" class="d-flex flex-wrap align-items-end gap-2 m-0">
-                            @foreach($bookingPoIds as $bookingPoId)
-                                <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
-                            @endforeach
-                            <div>
-                                <label for="paymentRequiredPreviewDate">Payment Require Date</label>
-                                <input type="date" name="payment_required_date" id="paymentRequiredPreviewDate" value="{{ $paymentRequiredInput }}" class="form-control form-control-sm" required>
-                            </div>
-                            <button type="submit" class="btn btn-outline-primary pra-toolbar-btn pra-toolbar-btn-update" title="Update the Payment Require Date and refresh the preview">
-                                <i class="bi bi-arrow-repeat"></i> Update Date
-                            </button>
-                        </form>
+                        <div>
+                            <label for="paymentRequiredPreviewDate">Payment Require Date</label>
+                            <input type="date" id="paymentRequiredPreviewDate" value="{{ $paymentRequiredInput }}" class="form-control form-control-sm" required>
+                        </div>
 
-                        <button type="button" class="btn btn-success pra-toolbar-btn pra-toolbar-btn-create" data-bs-toggle="modal" data-bs-target="#createPraModal" title="Create the Payment Request Approval">
-                            <i class="bi bi-check2-circle"></i> Create PRA
-                        </button>
+                        @if($budgetBlock->isNotEmpty())
+                            <button type="button" class="btn btn-danger pra-toolbar-btn pra-toolbar-btn-create" data-bs-toggle="modal" data-bs-target="#createPraModal" title="Budget exceeded — see details">
+                                <i class="bi bi-slash-circle"></i> Budget Exceeded
+                            </button>
+                        @else
+                            <button type="button" class="btn btn-success pra-toolbar-btn pra-toolbar-btn-create" data-bs-toggle="modal" data-bs-target="#createPraModal" title="Create the Payment Request Approval">
+                                <i class="bi bi-check2-circle"></i> Create PRA
+                            </button>
+                        @endif
                     </div>
                 @else
                     <div class="d-flex flex-wrap gap-2">
@@ -250,25 +249,46 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
-                                <p class="small text-muted mb-3">Optionally send this PRA to management approver(s). If none is selected, the PRA is saved without an approval request.</p>
-                                @if(($approverPool ?? collect())->isEmpty())
-                                    <div class="alert alert-info small mb-0">No active approvers configured. The PRA will be created without an approval request.</div>
-                                @else
-                                    <label class="form-label fw-semibold">Send for approval to</label>
-                                    <div class="d-flex flex-column gap-2" style="max-height:240px;overflow-y:auto;">
-                                        @foreach($approverPool as $approver)
-                                            <label class="d-flex align-items-center gap-2 border rounded-3 px-3 py-2 mb-0" style="cursor:pointer;">
-                                                <input type="checkbox" class="form-check-input mt-0" name="approver_ids[]" value="{{ $approver->id }}">
-                                                <span>{{ $approver->name }} <span class="text-muted small">({{ $approver->email }})</span></span>
-                                            </label>
-                                        @endforeach
+                                @if($budgetBlock->isNotEmpty())
+                                    <div class="alert alert-danger small mb-3">
+                                        <div class="fw-bold mb-1"><i class="bi bi-slash-circle me-1"></i> Cannot create PRA — Budget exceeded</div>
+                                        <div class="mb-2">PI Amount is higher than the allocated Budget for the following style(s)/PO(s). Reduce the amount or revise the budget before creating this PRA.</div>
+                                        <ul class="mb-0 ps-3">
+                                            @foreach($budgetBlock as $line)
+                                                <li>
+                                                    <strong>{{ $line['style'] ?: $line['po_no'] }}</strong>:
+                                                    Allocated Budget ${{ number_format((float) $line['budget'], 2) }},
+                                                    PI Amount ${{ number_format((float) $line['pi_amount'], 2) }},
+                                                    <span class="fw-bold">Over by ${{ number_format((float) $line['over_by'], 2) }}</span>.
+                                                </li>
+                                            @endforeach
+                                        </ul>
                                     </div>
-                                    <div class="form-text">All selected approvers must approve before the PRA is marked as Approved.</div>
+                                @else
+                                    <p class="small text-muted mb-3">Optionally send this PRA to management approver(s). If none is selected, the PRA is saved without an approval request.</p>
+                                    @if(($approverPool ?? collect())->isEmpty())
+                                        <div class="alert alert-info small mb-0">No active approvers configured. The PRA will be created without an approval request.</div>
+                                    @else
+                                        <label class="form-label fw-semibold">Send for approval to</label>
+                                        <div class="d-flex flex-column gap-2" style="max-height:240px;overflow-y:auto;">
+                                            @foreach($approverPool as $approver)
+                                                <label class="d-flex align-items-center gap-2 border rounded-3 px-3 py-2 mb-0" style="cursor:pointer;">
+                                                    <input type="checkbox" class="form-check-input mt-0" name="approver_ids[]" value="{{ $approver->id }}">
+                                                    <span>{{ $approver->name }} <span class="text-muted small">({{ $approver->email }})</span></span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                        <div class="form-text">All selected approvers must approve before the PRA is marked as Approved.</div>
+                                    @endif
                                 @endif
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Create PRA</button>
+                                @if($budgetBlock->isNotEmpty())
+                                    <button type="button" class="btn btn-danger" disabled title="Budget exceeded for this style/PO"><i class="bi bi-slash-circle me-1"></i> Create Blocked</button>
+                                @else
+                                    <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Create PRA</button>
+                                @endif
                             </div>
                         </form>
                     </div>
@@ -423,9 +443,19 @@
         const createDate = document.getElementById('paymentRequiredCreateDate');
 
         if (previewDate && createDate) {
-            previewDate.addEventListener('change', function () {
-                createDate.value = previewDate.value;
-            });
+            // Keep the Create form's date in sync with the picker so whatever
+            // date the user selects is used directly on "Create PRA" — no
+            // separate apply/update step needed.
+            const syncDate = function () { createDate.value = previewDate.value; };
+            previewDate.addEventListener('change', syncDate);
+            previewDate.addEventListener('input', syncDate);
+            syncDate();
+
+            // Final safety: re-sync when the Create modal opens.
+            const createModal = document.getElementById('createPraModal');
+            if (createModal) {
+                createModal.addEventListener('show.bs.modal', syncDate);
+            }
         }
     });
 </script>

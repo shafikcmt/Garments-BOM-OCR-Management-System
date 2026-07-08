@@ -97,10 +97,15 @@
                 <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">PO Count</div><div style="font-size:1.15rem;font-weight:800;color:#0f172a;letter-spacing:-.03em;">{{ $kpis['total_po_count'] ?? 0 }}</div></div>
             </div>
         </div>
-        <div class="card border-0 shadow-sm flex-fill" style="border-radius:12px;min-width:200px;">
+        @php
+            $totalBudget = (float) ($kpis['total_budget'] ?? 0);
+            $totalSavings = (float) ($kpis['total_savings'] ?? 0);
+            $kpiOverBudget = $totalBudget > 0 && $totalSavings < 0;
+        @endphp
+        <div class="card border-0 shadow-sm flex-fill" style="border-radius:12px;min-width:200px;{{ $kpiOverBudget ? 'background:#fff5f5;box-shadow:0 0 0 1px #fecaca inset;' : '' }}">
             <div class="card-body p-3 d-flex align-items-center gap-3">
-                <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="width:36px;height:36px;background:#fef9ec;color:#b45309;font-size:16px;"><i class="bi bi-bar-chart"></i></div>
-                <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">Budget / Savings</div><div style="font-size:1rem;font-weight:800;color:#0f172a;letter-spacing:-.03em;">{{ number_format((float) ($kpis['total_budget'] ?? 0), 2) }} <span style="color:#cbd5e1;">/</span> {{ number_format((float) ($kpis['total_savings'] ?? 0), 2) }}</div></div>
+                <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="width:36px;height:36px;background:{{ $kpiOverBudget ? '#fff1f2' : '#fef9ec' }};color:{{ $kpiOverBudget ? '#e11d48' : '#b45309' }};font-size:16px;"><i class="bi {{ $kpiOverBudget ? 'bi-exclamation-triangle-fill' : 'bi-bar-chart' }}"></i></div>
+                <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">Budget / Savings @if($kpiOverBudget)<span class="text-danger">· Over budget</span>@endif</div><div style="font-size:1rem;font-weight:800;color:{{ $kpiOverBudget ? '#e11d48' : '#0f172a' }};letter-spacing:-.03em;">{{ number_format($totalBudget, 2) }} <span style="color:#cbd5e1;">/</span> {{ number_format($totalSavings, 2) }}</div></div>
             </div>
         </div>
         <div class="card border-0 shadow-sm flex-fill" style="border-radius:12px;min-width:180px;">
@@ -305,9 +310,25 @@
                             <td title="{{ $row['contract_shipment'] ?: '-' }}">{{ $row['contract_shipment'] ?: '-' }}</td>
                             <td title="{{ $row['committed_ex_mill'] ?: '-' }}">{{ $row['committed_ex_mill'] ?: '-' }}</td>
                             <td class="comments-cell" title="{{ $row['remarks'] ?: '(blank)' }}">{{ $row['remarks'] ?: '(blank)' }}</td>
-                            <td class="text-end fw-bold" title="{{ number_format((float) ($row['pi_amount'] ?? 0), 2) }}">{{ number_format((float) ($row['pi_amount'] ?? 0), 2) }}</td>
+                            @php
+                                $rowBudget = (float) ($row['budget'] ?? 0);
+                                $rowPi = (float) ($row['pi_amount'] ?? 0);
+                                $rowOverBudget = $rowBudget > 0 && $rowPi > $rowBudget;
+                                $rowOverBy = $rowOverBudget ? $rowPi - $rowBudget : 0;
+                            @endphp
+                            <td class="text-end fw-bold" title="{{ number_format($rowPi, 2) }}{{ $rowOverBudget ? ' — Over budget by ' . number_format($rowOverBy, 2) . ' (Budget ' . number_format($rowBudget, 2) . ')' : '' }}">
+                                {{ number_format($rowPi, 2) }}
+                                @if($rowOverBudget)
+                                    <span class="badge rounded-pill text-bg-danger ms-1" style="font-size:.5rem;padding:.18em .4em;" title="PI Amount exceeds allocated Budget ({{ number_format($rowBudget, 2) }}) by {{ number_format($rowOverBy, 2) }}"><i class="bi bi-exclamation-triangle-fill"></i></span>
+                                @endif
+                            </td>
                             <td class="text-end">
-                                <form method="GET" action="{{ route('supply_chain.payment_requests.preview') }}" class="m-0 d-inline-block">
+                                <form method="GET" action="{{ route('supply_chain.payment_requests.preview') }}" class="m-0 d-inline-block pra-preview-form"
+                                      data-over-budget="{{ $rowOverBudget ? '1' : '0' }}"
+                                      data-po="{{ $row['po_no'] ?: '-' }}"
+                                      data-budget="{{ number_format($rowBudget, 2, '.', '') }}"
+                                      data-pi="{{ number_format($rowPi, 2, '.', '') }}"
+                                      data-over="{{ number_format($rowOverBy, 2, '.', '') }}">
                                     <input type="hidden" name="booking_po_ids[]" value="{{ $row['booking_po_id'] }}">
                                     <button type="submit" class="btn btn-sm btn-primary rounded-pill row-create-btn" title="Preview payment request approval for this PO">
                                         <i class="bi bi-eye"></i>
@@ -388,4 +409,66 @@
         </div>
     </div>
 </div>
+
+{{-- Over-budget confirmation (non-blocking): shown only when a PO's PI Amount exceeds its allocated Budget. --}}
+<div class="modal fade" id="overBudgetModal" tabindex="-1" aria-labelledby="overBudgetModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:14px;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title text-danger" id="overBudgetModalLabel"><i class="bi bi-exclamation-triangle-fill me-2"></i>Budget Exceeded</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">This PO's PI Amount is higher than its allocated Budget. You can still continue and create the PRA for approval.</p>
+                <div class="border rounded-3 p-3" style="background:#fff8f8;">
+                    <div class="d-flex justify-content-between py-1"><span class="text-muted">PO No.</span><span class="fw-bold" id="obPo">-</span></div>
+                    <div class="d-flex justify-content-between py-1"><span class="text-muted">Allocated Budget</span><span class="fw-semibold">$ <span id="obBudget">0.00</span></span></div>
+                    <div class="d-flex justify-content-between py-1"><span class="text-muted">PI Amount</span><span class="fw-semibold">$ <span id="obPi">0.00</span></span></div>
+                    <div class="d-flex justify-content-between py-1 border-top mt-1 pt-2"><span class="fw-bold text-danger">Over by</span><span class="fw-bold text-danger">$ <span id="obOver">0.00</span></span></div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="overBudgetContinue"><i class="bi bi-arrow-right-circle me-1"></i>Continue Anyway</button>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+@section('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const modalEl = document.getElementById('overBudgetModal');
+        if (!modalEl || !window.bootstrap) return;
+
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        let pendingForm = null;
+
+        const fmt = (value) => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        document.querySelectorAll('.pra-preview-form').forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                // Within-budget rows submit normally — no interruption.
+                if (form.dataset.overBudget !== '1') return;
+
+                event.preventDefault();
+                pendingForm = form;
+                document.getElementById('obPo').textContent = form.dataset.po || '-';
+                document.getElementById('obBudget').textContent = fmt(form.dataset.budget);
+                document.getElementById('obPi').textContent = fmt(form.dataset.pi);
+                document.getElementById('obOver').textContent = fmt(form.dataset.over);
+                modal.show();
+            });
+        });
+
+        document.getElementById('overBudgetContinue').addEventListener('click', function () {
+            if (!pendingForm) return;
+            const form = pendingForm;
+            pendingForm = null;
+            modal.hide();
+            form.submit(); // native submit bypasses the listener above — proceeds to Preview
+        });
+    });
+</script>
 @endsection

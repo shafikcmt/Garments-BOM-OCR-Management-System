@@ -46,13 +46,13 @@
                     <label class="form-label small fw-semibold mb-1">To date</label>
                     <input type="date" name="date_to" class="form-control form-control-sm" value="{{ $filters['date_to'] ?? '' }}">
                 </div>
-                <div class="col-12 col-md-3">
+                <div class="col-12 col-md-2">
                     <label class="form-label small fw-semibold mb-1">Search</label>
                     <input type="text" name="search" class="form-control form-control-sm" value="{{ $filters['search'] ?? '' }}" placeholder="Ref no, subject or recipient">
                 </div>
-                <div class="col-12 col-md-1 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary btn-sm w-100" title="Apply filters"><i class="bi bi-funnel"></i></button>
-                    <a href="{{ route('supply_chain.sent_emails.index') }}" class="btn btn-outline-secondary btn-sm w-100" title="Reset filters"><i class="bi bi-x-lg"></i></a>
+                <div class="col-12 col-md-2 d-flex gap-2 align-items-end">
+                    <button type="submit" class="btn btn-primary btn-sm w-100" title="Apply filters"><i class="bi bi-funnel me-1"></i>Filter</button>
+                    <a href="{{ route('supply_chain.sent_emails.index') }}" class="btn btn-outline-secondary btn-sm w-100" title="Reset filters"><i class="bi bi-x-lg me-1"></i>Reset</a>
                 </div>
             </form>
         </div>

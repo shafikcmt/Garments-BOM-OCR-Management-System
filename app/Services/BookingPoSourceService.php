@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Mail\PiMissingAlertMail;
 use App\Models\AppNotification;
 use App\Models\BookingPo;
+use App\Models\ExcelCell;
 use App\Models\ExcelHeader;
 use App\Models\ExcelRow;
 use App\Models\User;
@@ -17,6 +18,8 @@ use Illuminate\Support\Facades\Mail;
 class BookingPoSourceService
 {
     protected array $headerIdCache = [];
+
+    protected ?Collection $poNumberHeaderIdsCache = null;
 
     public function sourceValueForBookingPo(BookingPo $bookingPo, string $group): ?string
     {
@@ -136,7 +139,6 @@ class BookingPoSourceService
         $piAmount = $sourcePiAmount ?? ($piRate * ($materialsOrdered ?? 0));
         $budget = $this->numericValue($this->sourceValueForBookingPo($bookingPo, 'budget'));
         $sourceSavings = $this->numericValue($this->sourceValueForBookingPo($bookingPo, 'savings'));
-        $savings = $sourceSavings ?? ($budget !== null ? ($budget - $piAmount) : null);
 
         $paymentRequiredDate = $this->paymentRequiredDateForBookingPo($bookingPo);
         $contractShipment = $this->dateValue($this->sourceValueForBookingPo($bookingPo, 'contract_shipment'));
@@ -155,6 +157,50 @@ class BookingPoSourceService
             $shipmentMonth = $this->shipmentMonthFromDate($contractShipment ?? $committedExMill ?? $committedEtd);
         }
 
+        // A generated PO can span several worksheet rows (multiple styles/lines)
+        // that all share the same PO number, but only the primary row owns a
+        // BookingPo record. Aggregate every sibling row that carries this same
+        // PO number so PI Amount, Budget, Savings and Qty reflect the WHOLE PO
+        // (matching the Booking Format total) instead of only the primary line.
+        // Single-row bookings have no siblings, so their output is unchanged.
+        $style = $this->sourceValueForBookingPo($bookingPo, 'style') ?: $bookingPo->style_name;
+        $sapCode = $this->sourceValueForBookingPo($bookingPo, 'sap_code') ?: $bookingPo->supplier_article;
+        $materialType = $this->sourceValueForBookingPo($bookingPo, 'material_type') ?: $bookingPo->item_type;
+        $materialDescription = $this->sourceValueForBookingPo($bookingPo, 'material_description') ?: $bookingPo->description ?: $bookingPo->item_name;
+
+        foreach ($this->siblingSourceRows($bookingPo) as $siblingRow) {
+            $rowMaterials = $this->numericValue(
+                $this->sourceValueForRow($siblingRow, 'materials_ordered')
+                ?? $this->sourceValueForRow($siblingRow, 'qty')
+            );
+            $rowRate = $this->numericValue($this->sourceValueForRow($siblingRow, 'pi_rate')) ?? 0.0;
+            $rowPiAmount = $this->numericValue($this->sourceValueForRow($siblingRow, 'pi_amount'))
+                ?? ($rowRate * ($rowMaterials ?? 0));
+            $piAmount += $rowPiAmount;
+
+            $rowBudget = $this->numericValue($this->sourceValueForRow($siblingRow, 'budget'));
+            if ($rowBudget !== null) {
+                $budget = ($budget ?? 0) + $rowBudget;
+            }
+
+            $rowSavings = $this->numericValue($this->sourceValueForRow($siblingRow, 'savings'));
+            if ($rowSavings !== null) {
+                $sourceSavings = ($sourceSavings ?? 0) + $rowSavings;
+            }
+
+            if ($rowMaterials !== null) {
+                $materialsOrdered = ($materialsOrdered ?? 0) + $rowMaterials;
+            }
+
+            $piNumber = $this->joinDistinct([$piNumber, $this->sourceValueForRow($siblingRow, 'pi_number')]) ?: $piNumber;
+            $style = $this->joinDistinct([$style, $this->sourceValueForRow($siblingRow, 'style')]) ?: $style;
+            $sapCode = $this->joinDistinct([$sapCode, $this->sourceValueForRow($siblingRow, 'sap_code')]) ?: $sapCode;
+            $materialType = $this->joinDistinct([$materialType, $this->sourceValueForRow($siblingRow, 'material_type')]) ?: $materialType;
+            $materialDescription = $this->joinDistinct([$materialDescription, $this->sourceValueForRow($siblingRow, 'material_description')]) ?: $materialDescription;
+        }
+
+        $savings = $sourceSavings ?? ($budget !== null ? ($budget - $piAmount) : null);
+
         $snapshot = [
             'booking_po_id' => $bookingPo->id,
             'excel_file_id' => $bookingPo->excel_file_id,
@@ -165,12 +211,12 @@ class BookingPoSourceService
             'buyer_name' => $this->sourceValueForBookingPo($bookingPo, 'buyer') ?: $bookingPo->buyer_name,
             'season_name' => $this->sourceValueForBookingPo($bookingPo, 'season') ?: $bookingPo->season_name,
             'shipment_month' => $shipmentMonth,
-            'style_name' => $this->sourceValueForBookingPo($bookingPo, 'style') ?: $bookingPo->style_name,
+            'style_name' => $style,
             'contract_shipment' => $this->formatDate($contractShipment),
             'final_status' => $this->sourceValueForBookingPo($bookingPo, 'final_status'),
-            'material_type' => $this->sourceValueForBookingPo($bookingPo, 'material_type') ?: $bookingPo->item_type,
-            'material_description' => $this->sourceValueForBookingPo($bookingPo, 'material_description') ?: $bookingPo->description ?: $bookingPo->item_name,
-            'sap_code' => $this->sourceValueForBookingPo($bookingPo, 'sap_code') ?: $bookingPo->supplier_article,
+            'material_type' => $materialType,
+            'material_description' => $materialDescription,
+            'sap_code' => $sapCode,
             'material_color' => $this->sourceValueForBookingPo($bookingPo, 'material_color') ?: $bookingPo->color,
             'size' => $this->sourceValueForBookingPo($bookingPo, 'size') ?: $bookingPo->size_width,
             'qty' => $materialsOrdered ?? $this->numericValue($bookingPo->qty),
@@ -484,6 +530,86 @@ class BookingPoSourceService
         return ! in_array($status, ['pmt_done', 'paid', 'payment_done', 'done', 'completed', 'complete'], true);
     }
 
+    /**
+     * All worksheet rows that share this BookingPo's PO number, excluding the
+     * BookingPo's own primary row. These are the extra booking lines (other
+     * styles/materials) that were merged into the same PO at generation time
+     * but never received their own BookingPo record. Returns an empty
+     * collection for single-row bookings or a not-yet-generated PO number.
+     */
+    protected function siblingSourceRows(BookingPo $bookingPo): Collection
+    {
+        $bookingPo->loadMissing('excelRow');
+        $primaryRowId = $bookingPo->excel_row_id;
+        $poNo = trim((string) $bookingPo->po_no);
+
+        if ($poNo === '' || ! $this->hasRealPoNumber($poNo) || ! $bookingPo->excel_file_id) {
+            return collect();
+        }
+
+        $headerIds = $this->poNumberHeaderIds();
+        if ($headerIds->isEmpty()) {
+            return collect();
+        }
+
+        $rowIds = ExcelCell::query()
+            ->whereIn('header_id', $headerIds->all())
+            ->whereRaw('TRIM(`value`) = ?', [$poNo])
+            ->pluck('row_id')
+            ->reject(fn ($id) => (int) $id === (int) $primaryRowId)
+            ->unique()
+            ->values();
+
+        if ($rowIds->isEmpty()) {
+            return collect();
+        }
+
+        return ExcelRow::query()
+            ->whereIn('id', $rowIds->all())
+            ->where('excel_file_id', $bookingPo->excel_file_id)
+            ->with('cells.header')
+            ->orderBy('row_number')
+            ->get();
+    }
+
+    /**
+     * Header ids whose key/name matches a PO-number alias, resolved once per
+     * request. Used to locate every worksheet row carrying a given PO number.
+     */
+    protected function poNumberHeaderIds(): Collection
+    {
+        if ($this->poNumberHeaderIdsCache !== null) {
+            return $this->poNumberHeaderIdsCache;
+        }
+
+        $aliases = collect($this->headerAliases('po_no'))
+            ->map(fn ($alias) => $this->normalize($alias))
+            ->filter()
+            ->unique();
+
+        return $this->poNumberHeaderIdsCache = ExcelHeader::query()
+            ->get(['id', 'header_key', 'header_name'])
+            ->filter(fn ($header) => $aliases->contains($this->normalize($header->header_key))
+                || $aliases->contains($this->normalize($header->header_name)))
+            ->pluck('id')
+            ->values();
+    }
+
+    /**
+     * Comma-join distinct, non-blank values (case-insensitive). Returns null
+     * when nothing is left, so callers can fall back to the original value.
+     */
+    protected function joinDistinct(array $values): ?string
+    {
+        $joined = collect($values)
+            ->map(fn ($value) => trim((string) $value))
+            ->reject(fn ($value) => $value === '')
+            ->unique(fn ($value) => mb_strtolower($value))
+            ->values();
+
+        return $joined->isEmpty() ? null : $joined->implode(', ');
+    }
+
     protected function fallbackValueFromBookingPo(BookingPo $bookingPo, string $group): ?string
     {
         return match ($group) {
@@ -589,7 +715,7 @@ class BookingPoSourceService
             'committed_etd' => str_contains($header, 'committed_etd') || str_contains($header, 'commited_etd'),
             'committed_eta' => str_contains($header, 'committed_eta'),
             'committed_ex_mill' => str_contains($header, 'committed_ex_mill') || str_contains($header, 'committed_x_fty') || str_contains($header, 'committed_ex_fty') || str_contains($header, 'committed_exmill'),
-            'budget' => str_contains($header, 'budget'),
+            'budget' => str_contains($header, 'budget') || str_contains($header, 'buget'),
             'savings' => str_contains($header, 'saving'),
             'comments' => $header === 'comments' || str_contains($header, 'comments'),
             'remarks' => str_contains($header, 'remarks') || str_contains($header, 'comments'),
@@ -632,8 +758,8 @@ class BookingPoSourceService
             'committed_etd' => ['committed_etd', 'commited_etd', 'Committed ETD', 'Commited ETD'],
             'committed_eta' => ['committed_eta', 'Committed ETA'],
             'committed_ex_mill' => ['committed_ex_mill', 'committed_x_fty_date', 'committed_ex_fty_date', 'committed_x_fty', 'committed_ex_fty', 'Committed Ex Mill', 'Committed Ex-Mill'],
-            'budget' => ['budget', 'Budget'],
-            'savings' => ['savings', 'saving', 'Savings'],
+            'budget' => ['budget', 'buget', 'budget_amount', 'buget_amount', 'Budget', 'Buget', 'Budget Amount', 'Buget Amount'],
+            'savings' => ['savings', 'saving', 'savings_amount', 'saving_amount', 'Savings', 'Savings Amount'],
             'comments' => ['comments', 'Comments'],
             'remarks' => ['remarks', 'comments', 'merchant_remarks', 'supply_chain_remarks', 'Supply Chain Remarks', 'Comments'],
             default => [],

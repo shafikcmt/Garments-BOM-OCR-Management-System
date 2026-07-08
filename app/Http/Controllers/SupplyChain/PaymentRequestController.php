@@ -112,8 +112,44 @@ class PaymentRequestController extends Controller
         $isPreview = true;
         $bookingPoIds = $selectedIds->all();
         $approverPool = $this->approverPool();
+        $budgetBlock = $this->overBudgetLines($snapshots);
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'budgetBlock'));
+    }
+
+    /**
+     * Selected snapshot lines whose PI Amount exceeds a real (non-zero)
+     * allocated Budget. Reuses the budget/pi_amount already computed on each
+     * snapshot — no separate recalculation. Scoped per PO/style so lines that
+     * are within budget (or have no budget set) are never flagged.
+     *
+     * @return \Illuminate\Support\Collection<int, array>
+     */
+    protected function overBudgetLines($snapshots): \Illuminate\Support\Collection
+    {
+        return collect($snapshots)
+            ->filter(function (array $row) {
+                $budget = (float) ($row['budget'] ?? 0);
+                $piAmount = (float) ($row['pi_amount'] ?? 0);
+
+                return $budget > 0 && $piAmount > $budget;
+            })
+            ->map(function (array $row) {
+                $budget = (float) ($row['budget'] ?? 0);
+                $piAmount = (float) ($row['pi_amount'] ?? 0);
+                $style = trim((string) ($row['style_name'] ?? ''));
+                $poNo = trim((string) ($row['po_no'] ?? ''));
+
+                return [
+                    'style' => $style ?: '-',
+                    'po_no' => $poNo ?: '-',
+                    'label' => $style !== '' ? $style : ($poNo !== '' ? $poNo : '-'),
+                    'budget' => $budget,
+                    'pi_amount' => $piAmount,
+                    'over_by' => $piAmount - $budget,
+                ];
+            })
+            ->values();
     }
 
     public function store(Request $request)
@@ -152,6 +188,23 @@ class PaymentRequestController extends Controller
 
         if ($snapshots->isEmpty()) {
             return back()->with('warning', 'No eligible PI received / payment pending row was selected. Please check PI Number, PI Status and Payment Status.');
+        }
+
+        // Hard block: a style/PO whose PI Amount exceeds its allocated Budget
+        // cannot be turned into a PRA. Scoped to the offending line(s) only —
+        // within-budget selections are unaffected. Backend guard mirrors the UI
+        // block so a bypassed frontend still cannot create an over-budget PRA.
+        $budgetBlock = $this->overBudgetLines($snapshots);
+        if ($budgetBlock->isNotEmpty()) {
+            $detail = $budgetBlock->map(fn (array $line) => sprintf(
+                '%s (Budget $%s, PI $%s, over by $%s)',
+                $line['label'],
+                number_format($line['budget'], 2),
+                number_format($line['pi_amount'], 2),
+                number_format($line['over_by'], 2)
+            ))->implode('; ');
+
+            return back()->with('error', 'Cannot create PRA — Budget exceeded for: ' . $detail . '. Review the allocated budget before creating this PRA.');
         }
 
         // Safety guard against duplicate PRAs (race condition / direct request):

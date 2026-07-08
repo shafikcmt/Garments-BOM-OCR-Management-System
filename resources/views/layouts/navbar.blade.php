@@ -1,6 +1,6 @@
 <header class="header">
     <div class="d-flex align-items-center gap-3 min-w-0">
-        <button class="app-icon-btn d-lg-none" id="sidebarToggle" type="button" aria-label="Open sidebar">
+        <button class="app-icon-btn d-lg-none" id="sidebarToggle" type="button" aria-label="Open sidebar" title="Open menu">
             <i class="bi bi-list fs-5"></i>
         </button>
 

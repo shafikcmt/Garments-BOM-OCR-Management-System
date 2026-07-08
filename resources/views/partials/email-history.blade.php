@@ -112,19 +112,19 @@
                                 <div class="btn-group btn-group-sm" role="group">
                                     <button type="button" class="btn btn-outline-secondary email-action" title="View full email"
                                             data-email-action="view" data-body-id="{{ $bodyId }}" @if($dynamicSendUrl) data-send-url="{{ $sendUrl }}" @endif @foreach($rowData as $k => $v) data-{{ $k }}="{{ $v }}" @endforeach>
-                                        <i class="bi bi-eye"></i><span class="d-none d-xl-inline ms-1">View</span>
+                                        <i class="bi bi-eye"></i><span class="d-none d-lg-inline ms-1">View</span>
                                     </button>
                                     <button type="button" class="btn btn-outline-secondary email-action" title="Duplicate and resend"
                                             data-email-action="edit" data-body-id="{{ $bodyId }}" @if($dynamicSendUrl) data-send-url="{{ $sendUrl }}" @endif @foreach($rowData as $k => $v) data-{{ $k }}="{{ $v }}" @endforeach>
-                                        <i class="bi bi-pencil"></i><span class="d-none d-xl-inline ms-1">Edit</span>
+                                        <i class="bi bi-pencil"></i><span class="d-none d-lg-inline ms-1">Edit</span>
                                     </button>
                                     <button type="button" class="btn btn-outline-secondary email-action" title="Forward to a new recipient"
                                             data-email-action="forward" data-body-id="{{ $bodyId }}" @if($dynamicSendUrl) data-send-url="{{ $sendUrl }}" @endif @foreach($rowData as $k => $v) data-{{ $k }}="{{ $v }}" @endforeach>
-                                        <i class="bi bi-arrow-right-circle"></i><span class="d-none d-xl-inline ms-1">Forward</span>
+                                        <i class="bi bi-arrow-right-circle"></i><span class="d-none d-lg-inline ms-1">Forward</span>
                                     </button>
                                     <button type="button" class="btn btn-outline-secondary email-action" title="Reply to the same recipient"
                                             data-email-action="reply" data-body-id="{{ $bodyId }}" @if($dynamicSendUrl) data-send-url="{{ $sendUrl }}" @endif @foreach($rowData as $k => $v) data-{{ $k }}="{{ $v }}" @endforeach>
-                                        <i class="bi bi-reply"></i><span class="d-none d-xl-inline ms-1">Reply</span>
+                                        <i class="bi bi-reply"></i><span class="d-none d-lg-inline ms-1">Reply</span>
                                     </button>
                                     @if($log->canBeDeletedBy(auth()->user()))
                                         <form method="POST" action="{{ route('emails.destroy', $log) }}" class="d-inline"
@@ -132,7 +132,7 @@
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-outline-danger" title="Remove from history">
-                                                <i class="bi bi-trash"></i><span class="d-none d-xl-inline ms-1">Delete</span>
+                                                <i class="bi bi-trash"></i><span class="d-none d-lg-inline ms-1">Delete</span>
                                             </button>
                                         </form>
                                     @endif

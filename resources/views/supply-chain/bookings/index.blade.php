@@ -145,10 +145,15 @@
     }
     .booking-search-field { position: relative; }
     .booking-search-field .form-control { padding-left: 46px; }
+    /* Anchor the icon to the input (last child) and centre it on the 38px
+       field: bottom = (38 - 18) / 2 = 10px. line-height:1 keeps the glyph box
+       from adding stray vertical space. Bottom-anchoring stays centred even if
+       the label wraps to two lines on small screens. */
     .booking-search-icon {
         position: absolute;
         left: 16px;
-        bottom: 14px;
+        bottom: 10px;
+        line-height: 1;
         color: #64748b;
         font-size: 18px;
         pointer-events: none;
@@ -191,7 +196,13 @@
         border-color: #818cf8;
         box-shadow: 0 0 0 .22rem rgba(99, 102, 241, .13);
     }
+    /* The filter card and the table card below are sibling stacking contexts
+       (each .booking-card uses backdrop-filter). Lift the filter card so its
+       open dropdowns (IHOD, Vendor, etc.) paint above the table card instead
+       of being clipped behind it. */
+    .booking-filter-card { position: relative; z-index: 30; }
     .booking-filter .ts-dropdown {
+        z-index: 40;
         border: 1px solid #e2e8f0;
         border-radius: 12px;
         box-shadow: 0 18px 44px rgba(15, 23, 42, .14);
@@ -608,7 +619,7 @@
         </div>
     </div>
 
-    <div class="card booking-card mb-4">
+    <div class="card booking-card booking-filter-card mb-4">
         <div class="card-header py-3">
             <h6 class="mb-0 fw-bold booking-section-title"><span class="booking-title-icon"><i class="bi bi-funnel"></i></span>Filter pending booking data</h6>
         </div>
