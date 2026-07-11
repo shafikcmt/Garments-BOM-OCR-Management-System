@@ -61,6 +61,48 @@ class ProfileController extends Controller
     }
 
     /**
+     * Upload or replace the user's personal signature image. Used to auto-fill
+     * the Prepared / Checked / Approved By boxes on PRA documents. Mirrors the
+     * admin PI/PRA signature upload rules (PNG/JPG, max 2 MB).
+     */
+    public function updateSignature(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'signature' => ['required', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
+        ], [
+            'signature.required' => 'Please choose a signature image to upload.',
+            'signature.max' => 'The signature image must not be larger than 2 MB.',
+        ]);
+
+        $user = $request->user();
+
+        if ($user->signature_path) {
+            Storage::disk('public')->delete($user->signature_path);
+        }
+
+        $user->signature_path = $request->file('signature')->store('signatures', 'public');
+        $user->save();
+
+        return Redirect::route('profile.edit')->with('status', 'signature-updated');
+    }
+
+    /**
+     * Remove the user's uploaded signature image.
+     */
+    public function destroySignature(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        if ($user->signature_path) {
+            Storage::disk('public')->delete($user->signature_path);
+            $user->signature_path = null;
+            $user->save();
+        }
+
+        return Redirect::route('profile.edit')->with('status', 'signature-removed');
+    }
+
+    /**
      * Delete the user's account.
      */
     public function destroy(Request $request): RedirectResponse

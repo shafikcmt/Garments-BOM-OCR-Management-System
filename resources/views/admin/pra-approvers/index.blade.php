@@ -90,6 +90,7 @@
                                     <th>Approver</th>
                                     <th>Added By</th>
                                     <th class="text-center">Status</th>
+                                    <th class="text-center">Checker</th>
                                     <th class="text-end">Action</th>
                                 </tr>
                             </thead>
@@ -111,6 +112,17 @@
                                                 </button>
                                             </form>
                                         </td>
+                                        <td class="text-center">
+                                            <form method="POST" action="{{ route('admin.pra-approvers.checker', $approver) }}" class="d-inline">
+                                                @csrf
+                                                @method('PATCH')
+                                                <input type="hidden" name="can_check" value="{{ $approver->can_check ? 0 : 1 }}">
+                                                <button type="submit" class="btn btn-sm {{ $approver->can_check ? 'btn-info text-white' : 'btn-outline-secondary' }} rounded-pill px-3"
+                                                        title="Whether this user can be selected as the Checker">
+                                                    {{ $approver->can_check ? 'Checker' : 'Not a checker' }}
+                                                </button>
+                                            </form>
+                                        </td>
                                         <td class="text-end">
                                             <form method="POST" action="{{ route('admin.pra-approvers.destroy', $approver) }}" class="d-inline"
                                                   onsubmit="return confirm('Remove this approver from the pool? Existing approval history stays intact.');">
@@ -123,7 +135,7 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="4" class="text-center text-muted py-5">No approvers yet. Add a user from the pool on the left.</td></tr>
+                                    <tr><td colspan="5" class="text-center text-muted py-5">No approvers yet. Add a user from the pool on the left.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>

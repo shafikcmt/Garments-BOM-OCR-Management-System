@@ -43,6 +43,17 @@
     @if(session('status') === 'password-updated')
         <div class="alert alert-success border-0 shadow-sm rounded-3">Password changed successfully.</div>
     @endif
+    @if(session('status') === 'signature-updated')
+        <div class="alert alert-success border-0 shadow-sm rounded-3">Signature saved successfully.</div>
+    @endif
+    @if(session('status') === 'signature-removed')
+        <div class="alert alert-success border-0 shadow-sm rounded-3">Signature removed.</div>
+    @endif
+    @if($errors->any())
+        <div class="alert alert-danger border-0 shadow-sm rounded-3">
+            <ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+        </div>
+    @endif
 
     <div class="row g-4">
         {{-- Card 1: Profile Information --}}
@@ -150,6 +161,60 @@
 
                         <button type="submit" class="btn btn-outline-primary px-4"><i class="bi bi-shield-lock me-1"></i>Update Password</button>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        {{-- Card 3: My Signature --}}
+        <div class="col-12">
+            @php $signatureUrl = $user->signatureUrl(); @endphp
+            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+                <div class="card-body p-4">
+                    <div class="row g-4 align-items-start">
+                        <div class="col-12 col-lg-7">
+                            <h5 class="mb-1">My Signature</h5>
+                            <p class="text-muted small mb-3">
+                                Upload your signature to auto-fill the Prepared / Checked / Approved By box on
+                                Payment Request Approval (PRA) documents you prepare, check or approve.
+                                A transparent PNG works best.
+                            </p>
+
+                            <form method="POST" action="{{ route('profile.signature.update') }}" enctype="multipart/form-data">
+                                @csrf
+                                <label class="form-label fw-semibold">Signature Image</label>
+                                <input type="file" name="signature" accept="image/png,image/jpeg"
+                                       class="form-control @error('signature') is-invalid @enderror" required>
+                                <div class="form-text">PNG or JPG. Max 2 MB. Transparent PNG recommended.</div>
+                                @error('signature')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                <button type="submit" class="btn btn-primary px-4 mt-3">
+                                    <i class="bi bi-upload me-1"></i>{{ $signatureUrl ? 'Update Signature' : 'Upload Signature' }}
+                                </button>
+                            </form>
+                        </div>
+                        <div class="col-12 col-lg-5">
+                            <label class="form-label fw-semibold text-muted">Current Signature</label>
+                            @if($signatureUrl)
+                                <div class="border rounded-3 p-3 bg-white d-flex align-items-center justify-content-center"
+                                     style="min-height:120px;">
+                                    <img src="{{ $signatureUrl }}" alt="My signature"
+                                         style="max-height:100px;max-width:100%;object-fit:contain;">
+                                </div>
+                                <form method="POST" action="{{ route('profile.signature.destroy') }}" class="mt-2"
+                                      onsubmit="return confirm('Remove your saved signature?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                                        <i class="bi bi-trash me-1"></i> Remove Signature
+                                    </button>
+                                </form>
+                            @else
+                                <div class="border rounded-3 p-3 bg-light d-flex align-items-center justify-content-center text-muted small"
+                                     style="min-height:120px;">
+                                    No signature uploaded yet.
+                                </div>
+                            @endif
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

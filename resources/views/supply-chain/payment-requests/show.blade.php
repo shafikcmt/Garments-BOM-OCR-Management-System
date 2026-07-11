@@ -4,6 +4,8 @@
 @php
     $approvalRows = collect($approvalRows ?? []);
     $isPreview = (bool) ($isPreview ?? false);
+    $budgetCheck = $budgetCheck ?? ['exceeded' => false, 'lines' => []];
+    $canOverrideBudget = (bool) ($canOverrideBudget ?? false);
     $bookingPoIds = collect($bookingPoIds ?? [])->filter()->unique()->values();
     $list = fn ($values, $fallback = '-') => collect($values ?? [])->map(fn ($v) => trim((string) $v))->filter()->take(5)->implode(', ') ?: $fallback;
     $money = fn ($value) => number_format((float) $value, 2);
@@ -123,6 +125,41 @@
                 @endif
             </div>
         </div>
+
+        @if($isPreview && !empty($budgetCheck['lines']))
+            @php $money2 = fn ($v) => number_format((float) $v, 2); @endphp
+            <div class="mx-auto mb-3" style="max-width:1120px;">
+                @if($budgetCheck['exceeded'])
+                    <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-0">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="bi bi-exclamation-octagon-fill fs-5"></i>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold mb-1">Style budget exceeded — creating this PRA is blocked.</div>
+                                <ul class="mb-0 ps-3 small">
+                                    @foreach(collect($budgetCheck['lines'])->where('over', true) as $line)
+                                        <li>
+                                            <strong>{{ $line['style'] }}</strong>: budget ${{ $money2($line['budget']) }},
+                                            already committed ${{ $money2($line['consumed']) }},
+                                            this PRA adds ${{ $money2($line['new']) }}
+                                            → total ${{ $money2($line['projected']) }}
+                                            (<span class="fw-bold">over by ${{ $money2($line['over_by']) }}</span>).
+                                        </li>
+                                    @endforeach
+                                </ul>
+                                @unless($canOverrideBudget)
+                                    <div class="small mt-1">Ask an authorised user to override, or update the style budget.</div>
+                                @endunless
+                            </div>
+                        </div>
+                    </div>
+                @else
+                    <div class="alert alert-success border-0 shadow-sm rounded-3 mb-0 py-2 small">
+                        <i class="bi bi-check-circle me-1"></i> Within style budget for all
+                        {{ collect($budgetCheck['lines'])->count() }} budgeted style(s).
+                    </div>
+                @endif
+            </div>
+        @endif
 
         <div class="pra-sheet mx-auto">
             <div class="row g-0 align-items-start mb-3">
@@ -249,6 +286,7 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
+<<<<<<< HEAD
                                 @if($budgetBlock->isNotEmpty())
                                     <div class="alert alert-danger small mb-3">
                                         <div class="fw-bold mb-1"><i class="bi bi-slash-circle me-1"></i> Cannot create PRA — Budget exceeded</div>
@@ -263,6 +301,47 @@
                                                 </li>
                                             @endforeach
                                         </ul>
+=======
+                                @if($budgetCheck['exceeded'])
+                                    <div class="alert alert-danger small">
+                                        <div class="fw-bold mb-1"><i class="bi bi-exclamation-octagon me-1"></i> Style budget exceeded</div>
+                                        <div>Over budget for: {{ collect($budgetCheck['lines'])->where('over', true)->pluck('style')->implode(', ') }}.</div>
+                                    </div>
+                                    @if($canOverrideBudget)
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" name="budget_override" value="1" id="budgetOverrideChk">
+                                            <label class="form-check-label fw-semibold" for="budgetOverrideChk">Override the budget block (authorised)</label>
+                                        </div>
+                                        <label class="form-label fw-semibold small">Override reason <span class="text-danger">*</span></label>
+                                        <textarea name="budget_override_reason" rows="2" class="form-control mb-3" maxlength="1000" placeholder="Why is exceeding the budget justified?">{{ old('budget_override_reason') }}</textarea>
+                                    @else
+                                        <p class="small text-danger mb-3">You are not authorised to override. Ask an authorised user or update the style budget.</p>
+                                    @endif
+                                @endif
+                                <p class="small text-muted mb-3">Optionally route this PRA for checking and approval. If nothing is selected, the PRA is saved without an approval request.</p>
+                                @if(($approverPool ?? collect())->isEmpty())
+                                    <div class="alert alert-info small mb-0">No active approvers configured. The PRA will be created without an approval request.</div>
+                                @else
+                                    @if(($checkerPool ?? collect())->isNotEmpty())
+                                        <label class="form-label fw-semibold">Send for check to <span class="text-muted small fw-normal">(optional)</span></label>
+                                        <select name="checker_id" class="form-select mb-1">
+                                            <option value="">— No checker (send straight to approvers) —</option>
+                                            @foreach($checkerPool as $checker)
+                                                <option value="{{ $checker->id }}">{{ $checker->name }} ({{ $checker->email }})</option>
+                                            @endforeach
+                                        </select>
+                                        <div class="form-text mb-3">The checker reviews first. Approvers are notified only after the check is complete.</div>
+                                    @endif
+
+                                    <label class="form-label fw-semibold">Send for approval to</label>
+                                    <div class="d-flex flex-column gap-2" style="max-height:200px;overflow-y:auto;">
+                                        @foreach($approverPool as $approver)
+                                            <label class="d-flex align-items-center gap-2 border rounded-3 px-3 py-2 mb-0" style="cursor:pointer;">
+                                                <input type="checkbox" class="form-check-input mt-0" name="approver_ids[]" value="{{ $approver->id }}">
+                                                <span>{{ $approver->name }} <span class="text-muted small">({{ $approver->email }})</span></span>
+                                            </label>
+                                        @endforeach
+>>>>>>> worktree-pra-multi-approval-signatures
                                     </div>
                                 @else
                                     <p class="small text-muted mb-3">Optionally send this PRA to management approver(s). If none is selected, the PRA is saved without an approval request.</p>
@@ -284,11 +363,15 @@
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+<<<<<<< HEAD
                                 @if($budgetBlock->isNotEmpty())
                                     <button type="button" class="btn btn-danger" disabled title="Budget exceeded for this style/PO"><i class="bi bi-slash-circle me-1"></i> Create Blocked</button>
                                 @else
                                     <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Create PRA</button>
                                 @endif
+=======
+                                <button type="submit" class="btn btn-success" {{ ($budgetCheck['exceeded'] && !$canOverrideBudget) ? 'disabled' : '' }}><i class="bi bi-check2-circle me-1"></i> Create PRA</button>
+>>>>>>> worktree-pra-multi-approval-signatures
                             </div>
                         </form>
                     </div>
@@ -303,6 +386,7 @@
                         'approved' => 'bg-success-subtle text-success',
                         'rejected' => 'bg-danger-subtle text-danger',
                         'pending_approval' => 'bg-warning-subtle text-warning-emphasis',
+                        'pending_check' => 'bg-info-subtle text-info-emphasis',
                     ];
                     $decisionBadge = [
                         'approved' => 'bg-success-subtle text-success',
@@ -323,7 +407,10 @@
                                     <div class="col-12 col-md-6 col-xl-4">
                                         <div class="d-flex justify-content-between align-items-start gap-2 border rounded-3 px-3 py-2">
                                             <div class="min-w-0">
-                                                <div class="fw-semibold small text-slate-900">{{ optional($approval->approver)->name ?? '—' }}</div>
+                                                <div class="fw-semibold small text-slate-900">
+                                                    {{ optional($approval->approver)->name ?? '—' }}
+                                                    <span class="badge bg-light text-muted border ms-1 fw-normal">{{ $approval->stage === \App\Models\PraApproval::STAGE_CHECK ? 'Checker' : 'Approver' }}</span>
+                                                </div>
                                                 @if($approval->comment)<div class="small text-muted">{{ $approval->comment }}</div>@endif
                                             </div>
                                             <span class="badge rounded-pill {{ $decisionBadge[$approval->status] ?? 'bg-secondary-subtle text-secondary' }}">{{ ucfirst($approval->status) }}</span>

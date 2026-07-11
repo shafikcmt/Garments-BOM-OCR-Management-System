@@ -258,9 +258,16 @@
 
             @can('approve-pra')
                 @php
-                    $praPendingCount = \App\Models\PaymentRequest::where('status', 'pending_approval')
-                        ->whereHas('approvals', fn ($q) => $q->where('approver_id', auth()->id())->where('status', 'pending'))
-                        ->count();
+                    $praUid = auth()->id();
+                    $praPendingCount = \App\Models\PaymentRequest::where(function ($q) use ($praUid) {
+                            $q->where(function ($qq) use ($praUid) {
+                                $qq->where('status', 'pending_check')
+                                   ->whereHas('approvals', fn ($a) => $a->where('approver_id', $praUid)->where('stage', 'check')->where('status', 'pending'));
+                            })->orWhere(function ($qq) use ($praUid) {
+                                $qq->where('status', 'pending_approval')
+                                   ->whereHas('approvals', fn ($a) => $a->where('approver_id', $praUid)->where('stage', 'approve')->where('status', 'pending'));
+                            });
+                        })->count();
                 @endphp
                 <div class="sidebar-section">
                     <div class="sidebar-section-label">Approvals</div>
@@ -274,6 +281,22 @@
                                 @if($praPendingCount > 0)
                                     <span class="badge rounded-pill bg-danger">{{ $praPendingCount > 99 ? '99+' : $praPendingCount }}</span>
                                 @endif
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            @endcan
+
+            @can('manage-style-budgets')
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Planning</div>
+                    <ul class="sidebar-list">
+                        <li class="sidebar-item">
+                            <a href="{{ route('style-budgets.index') }}" class="sidebar-nav-link {{ request()->routeIs('style-budgets.*') ? 'is-active' : '' }}">
+                                <span class="sidebar-link-main">
+                                    <span class="sidebar-icon"><i class="bi bi-bar-chart"></i></span>
+                                    <span class="sidebar-link-text">Style Budgets</span>
+                                </span>
                             </a>
                         </li>
                     </ul>
