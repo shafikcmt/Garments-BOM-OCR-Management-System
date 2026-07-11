@@ -67,6 +67,30 @@ class BookingPo extends Model
         return (bool) ($data['needs_regenerate'] ?? false);
     }
 
+    /**
+     * Denormalized identity payload copied onto Store stock event rows
+     * (material_receivings / bulk_issues / movements / requisitions). Read-only
+     * helper — does not affect booking generation.
+     *
+     * @return array<string, mixed>
+     */
+    public function toStockPayload(): array
+    {
+        return [
+            'excel_file_id' => $this->excel_file_id,
+            'excel_row_id' => $this->excel_row_id,
+            'booking_po_id' => $this->id,
+            'po_no' => $this->po_no,
+            'buyer_name' => $this->buyer_name,
+            'season_name' => $this->season_name,
+            'style_name' => $this->style_name,
+            'material_description' => $this->item_name ?: $this->description,
+            'material_color' => $this->color,
+            'size' => $this->size_width,
+            'uom' => $this->uom,
+        ];
+    }
+
     public function excelFile()
     {
         return $this->belongsTo(ExcelFile::class);

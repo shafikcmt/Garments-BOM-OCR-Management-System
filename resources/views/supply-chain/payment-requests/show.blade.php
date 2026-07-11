@@ -286,22 +286,6 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
-<<<<<<< HEAD
-                                @if($budgetBlock->isNotEmpty())
-                                    <div class="alert alert-danger small mb-3">
-                                        <div class="fw-bold mb-1"><i class="bi bi-slash-circle me-1"></i> Cannot create PRA — Budget exceeded</div>
-                                        <div class="mb-2">PI Amount is higher than the allocated Budget for the following style(s)/PO(s). Reduce the amount or revise the budget before creating this PRA.</div>
-                                        <ul class="mb-0 ps-3">
-                                            @foreach($budgetBlock as $line)
-                                                <li>
-                                                    <strong>{{ $line['style'] ?: $line['po_no'] }}</strong>:
-                                                    Allocated Budget ${{ number_format((float) $line['budget'], 2) }},
-                                                    PI Amount ${{ number_format((float) $line['pi_amount'], 2) }},
-                                                    <span class="fw-bold">Over by ${{ number_format((float) $line['over_by'], 2) }}</span>.
-                                                </li>
-                                            @endforeach
-                                        </ul>
-=======
                                 @if($budgetCheck['exceeded'])
                                     <div class="alert alert-danger small">
                                         <div class="fw-bold mb-1"><i class="bi bi-exclamation-octagon me-1"></i> Style budget exceeded</div>
@@ -341,37 +325,13 @@
                                                 <span>{{ $approver->name }} <span class="text-muted small">({{ $approver->email }})</span></span>
                                             </label>
                                         @endforeach
->>>>>>> worktree-pra-multi-approval-signatures
                                     </div>
-                                @else
-                                    <p class="small text-muted mb-3">Optionally send this PRA to management approver(s). If none is selected, the PRA is saved without an approval request.</p>
-                                    @if(($approverPool ?? collect())->isEmpty())
-                                        <div class="alert alert-info small mb-0">No active approvers configured. The PRA will be created without an approval request.</div>
-                                    @else
-                                        <label class="form-label fw-semibold">Send for approval to</label>
-                                        <div class="d-flex flex-column gap-2" style="max-height:240px;overflow-y:auto;">
-                                            @foreach($approverPool as $approver)
-                                                <label class="d-flex align-items-center gap-2 border rounded-3 px-3 py-2 mb-0" style="cursor:pointer;">
-                                                    <input type="checkbox" class="form-check-input mt-0" name="approver_ids[]" value="{{ $approver->id }}">
-                                                    <span>{{ $approver->name }} <span class="text-muted small">({{ $approver->email }})</span></span>
-                                                </label>
-                                            @endforeach
-                                        </div>
-                                        <div class="form-text">All selected approvers must approve before the PRA is marked as Approved.</div>
-                                    @endif
+                                    <div class="form-text">All selected approvers must approve before the PRA is marked as Approved.</div>
                                 @endif
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-<<<<<<< HEAD
-                                @if($budgetBlock->isNotEmpty())
-                                    <button type="button" class="btn btn-danger" disabled title="Budget exceeded for this style/PO"><i class="bi bi-slash-circle me-1"></i> Create Blocked</button>
-                                @else
-                                    <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Create PRA</button>
-                                @endif
-=======
                                 <button type="submit" class="btn btn-success" {{ ($budgetCheck['exceeded'] && !$canOverrideBudget) ? 'disabled' : '' }}><i class="bi bi-check2-circle me-1"></i> Create PRA</button>
->>>>>>> worktree-pra-multi-approval-signatures
                             </div>
                         </form>
                     </div>

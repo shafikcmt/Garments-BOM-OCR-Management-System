@@ -130,52 +130,11 @@ class PaymentRequestController extends Controller
         $isPreview = true;
         $bookingPoIds = $selectedIds->all();
         $approverPool = $this->approverPool();
-<<<<<<< HEAD
-        $budgetBlock = $this->overBudgetLines($snapshots);
-
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'budgetBlock'));
-    }
-
-    /**
-     * Selected snapshot lines whose PI Amount exceeds a real (non-zero)
-     * allocated Budget. Reuses the budget/pi_amount already computed on each
-     * snapshot — no separate recalculation. Scoped per PO/style so lines that
-     * are within budget (or have no budget set) are never flagged.
-     *
-     * @return \Illuminate\Support\Collection<int, array>
-     */
-    protected function overBudgetLines($snapshots): \Illuminate\Support\Collection
-    {
-        return collect($snapshots)
-            ->filter(function (array $row) {
-                $budget = (float) ($row['budget'] ?? 0);
-                $piAmount = (float) ($row['pi_amount'] ?? 0);
-
-                return $budget > 0 && $piAmount > $budget;
-            })
-            ->map(function (array $row) {
-                $budget = (float) ($row['budget'] ?? 0);
-                $piAmount = (float) ($row['pi_amount'] ?? 0);
-                $style = trim((string) ($row['style_name'] ?? ''));
-                $poNo = trim((string) ($row['po_no'] ?? ''));
-
-                return [
-                    'style' => $style ?: '-',
-                    'po_no' => $poNo ?: '-',
-                    'label' => $style !== '' ? $style : ($poNo !== '' ? $poNo : '-'),
-                    'budget' => $budget,
-                    'pi_amount' => $piAmount,
-                    'over_by' => $piAmount - $budget,
-                ];
-            })
-            ->values();
-=======
         $checkerPool = $this->checkerPool();
         $budgetCheck = $this->budgetService->evaluate($snapshots);
         $canOverrideBudget = (bool) auth()->user()?->can('override-style-budget');
 
         return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'checkerPool', 'budgetCheck', 'canOverrideBudget'));
->>>>>>> worktree-pra-multi-approval-signatures
     }
 
     public function store(Request $request)
@@ -226,45 +185,6 @@ class PaymentRequestController extends Controller
             return back()->with('warning', 'No eligible PI received / payment pending row was selected. Please check PI Number, PI Status and Payment Status.');
         }
 
-<<<<<<< HEAD
-        // Hard block: a style/PO whose PI Amount exceeds its allocated Budget
-        // cannot be turned into a PRA. Scoped to the offending line(s) only —
-        // within-budget selections are unaffected. Backend guard mirrors the UI
-        // block so a bypassed frontend still cannot create an over-budget PRA.
-        $budgetBlock = $this->overBudgetLines($snapshots);
-        if ($budgetBlock->isNotEmpty()) {
-            $detail = $budgetBlock->map(fn (array $line) => sprintf(
-                '%s (Budget $%s, PI $%s, over by $%s)',
-                $line['label'],
-                number_format($line['budget'], 2),
-                number_format($line['pi_amount'], 2),
-                number_format($line['over_by'], 2)
-            ))->implode('; ');
-
-            return back()->with('error', 'Cannot create PRA — Budget exceeded for: ' . $detail . '. Review the allocated budget before creating this PRA.');
-        }
-
-        // Safety guard against duplicate PRAs (race condition / direct request):
-        // block any selected PO/PI already covered by a live (non-rejected) PRA.
-        $activeKeySet = $this->activePraKeys()->flip();
-        $duplicates = $snapshots
-            ->filter(function (array $row) use ($activeKeySet) {
-                $key = $this->praKey($row['po_no'] ?? null, $row['pi_number'] ?? null);
-
-                return $key !== null && $activeKeySet->has($key);
-            })
-            ->map(fn (array $row) => trim(($row['po_no'] ?? '-') . ' / ' . ($row['pi_number'] ?? '-')))
-            ->unique()
-            ->values();
-
-        if ($duplicates->isNotEmpty()) {
-            return back()->with('warning', 'A Payment Request Approval already exists for: '
-                . $duplicates->take(10)->implode(', ')
-                . '. These PO/PI cannot be used to create another PRA.');
-        }
-
-        $paymentRequest = DB::transaction(function () use ($snapshots, $validated, $paymentRequiredDate, $approverUserIds) {
-=======
         // Style budget guard: hard-block when a style would exceed its budget,
         // unless an authorised user overrides with a reason (recorded + logged).
         $overrideMeta = null;
@@ -300,6 +220,25 @@ class PaymentRequestController extends Controller
             Log::warning('Style budget override on PRA creation', $overrideMeta);
         }
 
+        // Safety guard against duplicate PRAs (race condition / direct request):
+        // block any selected PO/PI already covered by a live (non-rejected) PRA.
+        $activeKeySet = $this->activePraKeys()->flip();
+        $duplicates = $snapshots
+            ->filter(function (array $row) use ($activeKeySet) {
+                $key = $this->praKey($row['po_no'] ?? null, $row['pi_number'] ?? null);
+
+                return $key !== null && $activeKeySet->has($key);
+            })
+            ->map(fn (array $row) => trim(($row['po_no'] ?? '-') . ' / ' . ($row['pi_number'] ?? '-')))
+            ->unique()
+            ->values();
+
+        if ($duplicates->isNotEmpty()) {
+            return back()->with('warning', 'A Payment Request Approval already exists for: '
+                . $duplicates->take(10)->implode(', ')
+                . '. These PO/PI cannot be used to create another PRA.');
+        }
+
         // Snapshot the creator's personal signature for the Prepared By box, but
         // only when the PRA actually enters an approval flow.
         $hasFlow = $checkerUserId || $approverUserIds->isNotEmpty();
@@ -310,7 +249,6 @@ class PaymentRequestController extends Controller
                 ? PaymentRequest::STATUS_PENDING_CHECK
                 : ($approverUserIds->isNotEmpty() ? PaymentRequest::STATUS_PENDING_APPROVAL : 'draft');
 
->>>>>>> worktree-pra-multi-approval-signatures
             $paymentRequest = PaymentRequest::create([
                 'request_no' => $this->nextRequestNo(),
                 'supplier_name' => $this->uniqueText($snapshots, 'supplier_name'),
@@ -804,13 +742,9 @@ class PaymentRequestController extends Controller
 
     protected function pendingPaymentRows(Request $request): array
     {
-<<<<<<< HEAD
-        $activeKeySet = $this->activePraKeys()->flip();
-=======
         // POs already covered by an existing, non-rejected PRA must not appear as
         // "pending" again — otherwise the same PO can be sent for approval twice.
         $consumed = $this->poKeysWithActivePra();
->>>>>>> worktree-pra-multi-approval-signatures
 
         $baseRows = BookingPo::query()
             ->with(['excelFile.uploader', 'excelRow.cells.header', 'generatedBy'])
@@ -820,17 +754,7 @@ class PaymentRequestController extends Controller
             ->get()
             ->map(fn (BookingPo $bookingPo) => $this->sourceService->paymentSnapshot($bookingPo))
             ->filter(fn (array $row) => (bool) ($row['eligible_for_payment_request'] ?? false))
-<<<<<<< HEAD
-            // Exclude any PO/PI already covered by a live (non-rejected) PRA so
-            // the same PO/PI cannot be picked again for a duplicate PRA.
-            ->reject(function (array $row) use ($activeKeySet) {
-                $key = $this->praKey($row['po_no'] ?? null, $row['pi_number'] ?? null);
-
-                return $key !== null && $activeKeySet->has($key);
-            })
-=======
             ->reject(fn (array $row) => $this->isCoveredByActivePra($row, $consumed))
->>>>>>> worktree-pra-multi-approval-signatures
             ->values();
 
         $filterOptions = $this->filterOptions($baseRows);
