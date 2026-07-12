@@ -77,4 +77,9 @@ class MaterialRequisition extends Model
     {
         return $this->hasMany(MaterialBulkIssue::class);
     }
+
+    public function items()
+    {
+        return $this->hasMany(MaterialRequisitionItem::class);
+    }
 }
