@@ -85,6 +85,12 @@ class BookingPo extends Model
             'season_name' => $this->season_name,
             'style_name' => $this->style_name,
             'material_description' => $this->item_name ?: $this->description,
+            // SAP Code is not a booking_pos column — it lives in the BOM row cell
+            // (Merchant-owned header). Resolve it via the shared source service so
+            // every stock event row (receiving/issue/movement/requisition) carries
+            // it instead of always ending up null. Falls back to supplier_article.
+            'sap_code' => app(\App\Services\BookingPoSourceService::class)
+                ->sourceValueForBookingPo($this, 'sap_code'),
             'material_color' => $this->color,
             'size' => $this->size_width,
             'uom' => $this->uom,

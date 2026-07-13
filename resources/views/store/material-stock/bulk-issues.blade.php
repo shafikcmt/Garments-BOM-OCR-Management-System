@@ -31,10 +31,10 @@
                     @if($bookingPos->isEmpty())
                         <p class="text-muted small">No Booking POs available to issue against.</p>
                     @else
-                    <form method="POST" action="{{ route('store.material.bulk-issues.store') }}">
+                    <form method="POST" action="{{ route('store.material.bulk-issues.store') }}" id="biForm">
                         @csrf
                         <label class="form-label fw-semibold">Booking PO / Material <span class="text-danger">*</span></label>
-                        <select name="booking_po_id" class="form-select mb-3" required>
+                        <select name="booking_po_id" id="biPo" class="form-select mb-2" required>
                             <option value="">Select PO…</option>
                             @foreach($bookingPos as $po)
                                 <option value="{{ $po->id }}" {{ old('booking_po_id')==$po->id?'selected':'' }}>
@@ -42,6 +42,9 @@
                                 </option>
                             @endforeach
                         </select>
+                        <div id="biStockRow" class="small mb-3 d-none">
+                            <span class="badge bg-success-subtle text-success"><i class="bi bi-box-seam me-1"></i>Available (Running) stock: <span id="biRunning" class="fw-bold">0</span></span>
+                        </div>
 
                         @if($requisitions->isNotEmpty())
                             <label class="form-label fw-semibold">Fulfil Requisition <span class="text-muted small">(optional)</span></label>
@@ -59,12 +62,15 @@
                         </div>
 
                         <div class="row g-2 mb-3">
-                            <div class="col-6"><label class="form-label fw-semibold text-success">Bulk Qty</label><input type="number" step="0.0001" min="0" name="bulk_qty" value="{{ old('bulk_qty') }}" class="form-control"></div>
-                            <div class="col-6"><label class="form-label fw-semibold text-primary">Sample Qty</label><input type="number" step="0.0001" min="0" name="sample_qty" value="{{ old('sample_qty') }}" class="form-control"></div>
+                            <div class="col-6"><label class="form-label fw-semibold text-success">Bulk Qty</label><input type="number" step="0.0001" min="0" name="bulk_qty" id="biBulk" value="{{ old('bulk_qty') }}" class="form-control bi-qty"><div class="form-text text-primary d-none" id="biBulkHint"><i class="bi bi-magic me-1"></i>from GMTS Order Qty · editable</div></div>
+                            <div class="col-6"><label class="form-label fw-semibold text-primary">Sample Qty</label><input type="number" step="0.0001" min="0" name="sample_qty" id="biSample" value="{{ old('sample_qty') }}" class="form-control bi-qty"></div>
                         </div>
                         <div class="row g-2 mb-3">
-                            <div class="col-6"><label class="form-label fw-semibold text-warning">Liability Qty</label><input type="number" step="0.0001" min="0" name="liability_qty" value="{{ old('liability_qty') }}" class="form-control"></div>
-                            <div class="col-6"><label class="form-label fw-semibold text-danger">Dead Qty</label><input type="number" step="0.0001" min="0" name="dead_qty" value="{{ old('dead_qty') }}" class="form-control"></div>
+                            <div class="col-6"><label class="form-label fw-semibold text-warning">Liability Qty</label><input type="number" step="0.0001" min="0" name="liability_qty" id="biLiability" value="{{ old('liability_qty') }}" class="form-control bi-qty"></div>
+                            <div class="col-6"><label class="form-label fw-semibold text-danger">Dead Qty</label><input type="number" step="0.0001" min="0" name="dead_qty" id="biDead" value="{{ old('dead_qty') }}" class="form-control bi-qty"></div>
+                        </div>
+                        <div class="alert alert-warning py-2 px-3 small d-none" id="biOverWarn">
+                            <i class="bi bi-exclamation-triangle me-1"></i><span id="biOverText"></span>
                         </div>
                         <label class="form-label fw-semibold">Remarks</label>
                         <textarea name="remarks" rows="2" class="form-control mb-3" maxlength="1000">{{ old('remarks') }}</textarea>
@@ -120,4 +126,81 @@
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        const prefill = @json($prefill);
+        const po = document.getElementById('biPo');
+        if (!po) return;
+
+        const stockRow = document.getElementById('biStockRow');
+        const runningEl = document.getElementById('biRunning');
+        const bulk = document.getElementById('biBulk');
+        const bulkHint = document.getElementById('biBulkHint');
+        const overWarn = document.getElementById('biOverWarn');
+        const overText = document.getElementById('biOverText');
+        const form = document.getElementById('biForm');
+        const qtyEls = Array.from(document.querySelectorAll('.bi-qty'));
+
+        function currentRunning() {
+            const d = prefill[po.value];
+            return d ? Number(d.running) || 0 : 0;
+        }
+
+        function fmt(n) {
+            return (Math.round(n * 10000) / 10000).toString();
+        }
+
+        function onPoChange() {
+            const d = prefill[po.value] || {};
+
+            if (po.value && d.running !== undefined) {
+                runningEl.textContent = fmt(Number(d.running) || 0);
+                stockRow.classList.remove('d-none');
+            } else {
+                stockRow.classList.add('d-none');
+            }
+
+            // Suggest bulk_qty from GMTS Order Qty only when Bulk is still empty.
+            if (d.gmts_order_qty && !bulk.value) {
+                bulk.value = d.gmts_order_qty;
+                bulkHint.classList.remove('d-none');
+            }
+            checkOver();
+        }
+
+        function total() {
+            return qtyEls.reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
+        }
+
+        function checkOver() {
+            const running = currentRunning();
+            const t = total();
+            if (po.value && t > running + 1e-9) {
+                overText.textContent = 'This issue (' + fmt(t) + ') exceeds current available stock ('
+                    + fmt(running) + '). You can still proceed if this is intentional.';
+                overWarn.classList.remove('d-none');
+                return true;
+            }
+            overWarn.classList.add('d-none');
+            return false;
+        }
+
+        po.addEventListener('change', onPoChange);
+        qtyEls.forEach(el => el.addEventListener('input', checkOver));
+
+        // Soft confirm on submit — never a hard block.
+        form.addEventListener('submit', function (e) {
+            if (checkOver()) {
+                const running = currentRunning();
+                if (!window.confirm('This issue exceeds available stock (' + fmt(running)
+                    + '). Proceed anyway?')) {
+                    e.preventDefault();
+                }
+            }
+        });
+
+        if (po.value) onPoChange();
+    })();
+</script>
 @endsection

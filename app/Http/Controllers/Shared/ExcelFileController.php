@@ -9,6 +9,8 @@ use App\Models\ExcelCell;
 use App\Models\ExcelFile;
 use App\Models\ExcelHeader;
 use App\Models\ExcelRow;
+use App\Models\MaterialStockLedger;
+use App\Services\HeaderAliasResolver;
 use Carbon\Carbon;
 use DateTimeInterface;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
@@ -215,6 +217,23 @@ class ExcelFileController extends Controller
         $batchId = (string) Str::uuid();
         $changedCells = [];
 
+        // These Store cells are now auto-filled from the Material Stock Ledger and
+        // are read-only. The workspace UI already renders them as read-only, so a
+        // POST containing one means a bypassed frontend — reject it with a clear
+        // message (the update loop below never persists non-editable cells anyway).
+        $ledgerSyncedHeaderIds = $this->ledgerSyncedStoreHeaderIds();
+        $attemptedSyncedWrite = false;
+        if (! empty($ledgerSyncedHeaderIds) && $user->hasRole('store')) {
+            foreach ((array) $request->input('cells', []) as $rowCells) {
+                foreach ((array) $rowCells as $headerId => $value) {
+                    if (isset($ledgerSyncedHeaderIds[(int) $headerId]) && trim((string) $value) !== '') {
+                        $attemptedSyncedWrite = true;
+                        break 2;
+                    }
+                }
+            }
+        }
+
         $editableHeaderIds = ExcelHeader::where('is_active', true)
             ->get()
             ->filter(fn ($header) => $this->canEditHeader($header, $roleIds))
@@ -334,6 +353,10 @@ class ExcelFileController extends Controller
 
         if ($lockedRowIds->isNotEmpty()) {
             $redirect->with('warning', $lockedRowIds->count() . ' locked PO row(s) were skipped. Unlock the PO in Admin PO Control or change the lock scope before editing.');
+        }
+
+        if ($attemptedSyncedWrite) {
+            $redirect->with('warning', 'This field is calculated automatically from Store stock records (Material Stock Ledger) and cannot be edited here. Record the value as a Receiving or Issue in the Store module instead.');
         }
 
         return $redirect;
@@ -616,6 +639,18 @@ class ExcelFileController extends Controller
             ->orderBy('row_number')
             ->get();
 
+        // Rows that have a Material Stock Ledger entry yield their overlapping
+        // Store cells to the ledger (single source of truth): recalc stops
+        // writing its Excel-formula value for those cells so the auto-synced
+        // ledger figure survives. Disabled -> legacy Excel-formula behaviour.
+        $ledgerSyncEnabled = (bool) config('stock.sync_workspace_cells', true);
+        $ledgerRowIds = $ledgerSyncEnabled
+            ? MaterialStockLedger::whereIn('excel_row_id', $rows->pluck('id')->all())
+                ->pluck('excel_row_id')
+                ->map(fn ($id) => (int) $id)
+                ->flip()
+            : collect();
+
         $praByPi = $this->praDatesByPiNumber($excelFile);
         $previousFormulaKey = null;
 
@@ -623,6 +658,10 @@ class ExcelFileController extends Controller
             if ($exceptRowIds->has((int) $row->id)) {
                 continue;
             }
+
+            // When true, the ledger owns Liability / Dead Stock / Liability Value
+            // / Invoiced Amount (Store) for this row — do not overwrite them here.
+            $yieldsToLedger = $ledgerSyncEnabled && $ledgerRowIds->has((int) $row->id);
 
             $cellMap = [];
             foreach ($row->cells as $cell) {
@@ -871,22 +910,30 @@ class ExcelFileController extends Controller
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['final_status'], $finalStatus, $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['pcd_as_per_committed_inhouse', 'rm_inh_as_per_committed_inhouse'], $this->fmtDate($pcdAsPerCommittedInhouse), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['invoiced_amount_scm', 'invoiced_amount'], $this->fmtNum($invoicedAmountScm), $userId);
-            $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['invoiced_amount_store'], $this->fmtNum($invoicedAmountStore), $userId);
+            if (! $yieldsToLedger) {
+                $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['invoiced_amount_store'], $this->fmtNum($invoicedAmountStore), $userId);
+            }
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['gmnts_po_number', 'gmts_po_number'], $gmntsPoNumber, $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['gmts_order_qty', 'gmts_order_quantity', 'gmts_order_qty_store'], $this->fmtNum($gmtsOrderQty), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['production_cons_incl_wastage', 'production_consumption_including_wastage', 'prod_yy_wastage'], $this->fmtNum($productionConsInclWastage), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['requirement'], $this->fmtNum($requirement), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['excess_shortage', 'excess_shortage_qty'], $this->fmtNum($excessShortage), $userId);
-            $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['liability', 'liability_qty'], $this->fmtNum($liabilityQty), $userId);
+            if (! $yieldsToLedger) {
+                $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['liability', 'liability_qty'], $this->fmtNum($liabilityQty), $userId);
+            }
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['buyer_liability'], $this->fmtNum($buyerLiability), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['buyer_liability_value'], $this->fmtNum($buyerLiabilityValue), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['liability_based_on_receiving'], $this->fmtNum($liabilityBasedOnReceiving), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['short_excess_issued'], $this->fmtNum($shortExcessIssued), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['return_back_to_stores'], $this->fmtNum($returnBackToStores), $userId);
-            $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['dead_stock_quantity'], $this->fmtNum($deadStockQuantity), $userId);
+            if (! $yieldsToLedger) {
+                $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['dead_stock_quantity'], $this->fmtNum($deadStockQuantity), $userId);
+            }
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['material_cost_value', 'material_issue_value'], $this->fmtNum($materialCostValue), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['dead_stock_value'], $this->fmtNum($deadStockValue), $userId);
-            $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['liability_stock_value'], $this->fmtNum($liabilityStockValue), $userId);
+            if (! $yieldsToLedger) {
+                $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['liability_stock_value'], $this->fmtNum($liabilityStockValue), $userId);
+            }
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['short_excess_value', 'short_and_excess_value'], $this->fmtNum($shortExcessValue), $userId);
 
             $previousFormulaKey = $formulaKey;
@@ -931,67 +978,51 @@ class ExcelFileController extends Controller
         return $lookup;
     }
 
+    private ?HeaderAliasResolver $aliasResolver = null;
+
+    /**
+     * Shared header alias/normalisation service (single source of the alias map,
+     * used by this controller and the ledger→cell sync).
+     */
+    private function aliasResolver(): HeaderAliasResolver
+    {
+        return $this->aliasResolver ??= app(HeaderAliasResolver::class);
+    }
+
     private function normalizeHeaderKey($value): ?string
     {
-        if ($value === null) {
-            return null;
-        }
-
-        $value = strtolower(trim((string) $value));
-        $value = str_replace(['&', '+'], ' and ', $value);
-        $value = str_replace(["'", '’'], '', $value);
-        $value = preg_replace('/[^a-z0-9]+/', '_', $value);
-        $value = preg_replace('/_+/', '_', $value);
-
-        return trim($value, '_');
+        return $this->aliasResolver()->normalize($value);
     }
 
     private function headerAliases(): array
     {
-        return [
-            'po_no' => ['material po number', 'material po no', 'material purchase order', 'material purchase order number'],
-            'po_date' => ['po date', 'material po date', 'material purchase order date'],
-            'style_name' => ['style', 'buyer name'],
-            'contract_number' => ['initial contract number', 'contract number', 'gmnts po number', 'gmts po number', 'po number'],
-            'contract_shipment_date' => ['contract shipment date', 'initial contract shipment date', 'po shipment date'],
-            'bom_quantity' => ['bom quantity', 'bom qty', 'bom qnty'],
-            'customer_contract_quantity' => ['customer contract quantity', 'customer contract qty', 'customer po quantity', 'order qty', 'gmts order qty', 'gmts order quantity'],
-            'booking_consumption_from_cad' => ['booking consumption from cad', 'booking consumption', 'cad consumption', 'booking cons from cad'],
-            'initial_consumption' => ['booking consumption from cad', 'initial consumption', 'booking yy', 'consumption'],
-            'costing_yy_in_sms' => ['costing yy in sms', 'costing yy', 'yy in sms', 'costing yy sms'],
-            'wastage_for_ordering_percent' => ['% wastage for ordering', 'waste %', 'wastage %'],
-            'consumption_incl_yy' => ['consumption based on which materials order including yy', 'consumption including yy', 'consumption incl yy', 'yy + waste %'],
-            'short_excess_ordered' => ['(short)/excess ordered', '(short) / excess ordered', 'short excess ordered'],
-            'payment_reqd_date' => ["payment req'd date", 'payment reqd date', 'payment required date'],
-            'pi_summary_submission_date' => ['pi summary submission date', 'pi summary submission'],
-            'pmt_doc_no' => ['pmt doc no', 'payment doc no', 'payment reference number', 'payment ref no'],
-            'committed_ex_mill' => ['committed ex mill', 'committed x-fty date', 'committed x fty date', 'committed ex-fty date', 'committed ex fty date'],
-            'bl_awb_no' => ['bl / awb no', 'bl awb no', 'bl no', 'awb no'],
-            'committed_etd' => ['committed etd', 'commited etd'],
-            'committed_eta' => ['committed eta', 'committed e.t.a', 'committed arrival date'],
-            'committed_inhouse' => ['committed inhouse', 'committed in house', 'committed in-house'],
-            'actual_inhouse' => ['actual inhouse', 'actual in-house'],
-            'pcd_as_per_committed_inhouse' => ['pcd as per committed inhouse', 'rm inh as per committed inhouse'],
-            'invoiced_qty_scm' => ['invoiced qty(scm)', 'invoiced qty scm', 'invoiced qty'],
-            'invoiced_rate_scm' => ['invoiced rate(scm)', 'invoiced rate scm', 'invoiced rate'],
-            'invoiced_amount_scm' => ['invoiced amount(scm)', 'invoiced amount scm', 'invoiced amount'],
-            'invoiced_qty_store' => ['invoiced qty(store)', 'invoiced qty store'],
-            'invoiced_rate_store' => ['invoiced rate(store)', 'invoiced rate store'],
-            'invoiced_amount_store' => ['invoiced amount(store)', 'invoiced amount store'],
-            'receipt_qty' => ['receipt qty', 'in-house / receipt qty', 'in house receipt qty'],
-            'gmnts_po_number' => ['gmnts po number', 'gmts po number', 'gmt po number'],
-            'gmts_order_qty' => ['gmts order qty', 'gmts order quantity', 'gmt order qty', 'customer contract quantity', 'customer contract qty'],
-            'production_wastage_percent' => ['production wastage %', 'prod. wastage %', 'prod wastage %'],
-            'production_cons_incl_wastage' => ['production consumption including wastage', 'production cons including wastage', 'prod. yy + wastage', 'prod yy waste'],
-            'excess_shortage' => ['excess / (shortage)', 'excess shortage', '(short) / excess in-house qty'],
-            'buyer_liability' => ['buyer liability'],
-            'buyer_liability_value' => ['buyer liability value'],
-            'liability_based_on_receiving' => ['liability based on receiving'],
-            'short_excess_issued' => ['(short)/ excess issued', '(short) / excess issued', 'short excess issued'],
-            'material_cost_value' => ['material cost value'],
-            'dead_stock_value' => ['dead stock value'],
-            'short_excess_value' => ['short & excess value', 'short and excess value'],
-        ];
+        return $this->aliasResolver()->aliases();
+    }
+
+    /**
+     * Store-owned header ids that the Material Stock Ledger now auto-fills. These
+     * are read-only for Store; a manual write attempt is reported clearly. Empty
+     * when the sync is disabled via config.
+     *
+     * @return array<int, true>
+     */
+    private function ledgerSyncedStoreHeaderIds(): array
+    {
+        if (! (bool) config('stock.sync_workspace_cells', true)) {
+            return [];
+        }
+
+        $storeRoleId = Role::where('name', 'store')->value('id');
+        $resolver = $this->aliasResolver();
+
+        $ids = [];
+        foreach ((array) config('stock.ledger_owned_store_header_keys', []) as $canonical) {
+            foreach ($resolver->headerIdsForCanonical($canonical, $storeRoleId ? (int) $storeRoleId : null) as $id) {
+                $ids[(int) $id] = true;
+            }
+        }
+
+        return $ids;
     }
 
     private function setCalcAny(int $rowId, array &$cellMap, array $headerIdByKey, array $headerKeys, $value, int $userId): void

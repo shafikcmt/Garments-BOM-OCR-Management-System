@@ -51,6 +51,108 @@
             <div class="app-stat-card p-3 h-100">
                 <div class="app-stat-label">Pending Requisitions</div>
                 <div class="fw-bold fs-4 text-slate-900">{{ $stats['pending_requisitions'] }}</div>
+                <div class="small text-muted">Awaiting approval</div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Requisition flow — tracking only (does not move stock) --}}
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3">
+            <div class="app-stat-card p-3 h-100">
+                <div class="app-stat-label">Pending Issue</div>
+                <div class="fw-bold fs-4 text-warning">{{ $fmt($stats['pending_req_qty']) }}</div>
+                <div class="small text-muted">{{ $stats['pending_req_lines'] }} line(s) required &gt; issued</div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="app-stat-card p-3 h-100">
+                <div class="app-stat-label">Pending Receive</div>
+                <div class="fw-bold fs-4 text-info">{{ $fmt($stats['pending_recv_qty']) }}</div>
+                <div class="small text-muted">{{ $stats['pending_recv_lines'] }} line(s) issued &gt; received</div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Live stock levels + recent movement (read-only) --}}
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-xl-6">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="app-stat-icon"><i class="bi bi-boxes"></i></span>
+                            <h5 class="mb-0">Current Stock by Item</h5>
+                        </div>
+                        <a href="{{ route('store.stock.items.index') }}" class="btn btn-sm btn-outline-secondary">Items</a>
+                    </div>
+                    @if($stockLevels->isEmpty())
+                        <p class="text-muted small mb-0">No stock items yet. Add items under General Stock → Items.</p>
+                    @else
+                    <div class="table-responsive" style="max-height:320px;overflow-y:auto;">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="text-muted small text-uppercase">
+                                <tr><th>Item</th><th class="text-end">Current</th><th></th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach($stockLevels->take(12) as $s)
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold small">{{ $s['name'] }}</div>
+                                            @if($s['code'])<div class="text-muted" style="font-size:.72rem;">{{ $s['code'] }}</div>@endif
+                                        </td>
+                                        <td class="text-end fw-bold {{ $s['low'] ? 'text-danger' : 'text-slate-900' }}">
+                                            {{ $fmt($s['current']) }}<span class="text-muted fw-normal small"> {{ $s['uom'] }}</span>
+                                        </td>
+                                        <td class="text-end" style="width:96px;">
+                                            @if($s['low'])<span class="badge bg-danger-subtle text-danger"><i class="bi bi-cart-plus me-1"></i>Re-order</span>@endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @if($stockLevels->count() > 12)<div class="small text-muted mt-2">Showing 12 of {{ $stockLevels->count() }} items (lowest stock first).</div>@endif
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-6">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="app-stat-icon"><i class="bi bi-clock-history"></i></span>
+                        <h5 class="mb-0">Recent Issue / Receive Activity</h5>
+                    </div>
+                    @if($recentActivity->isEmpty())
+                        <p class="text-muted small mb-0">No stock movement recorded yet.</p>
+                    @else
+                    <div class="table-responsive" style="max-height:320px;overflow-y:auto;">
+                        <table class="table table-sm align-middle mb-0">
+                            <tbody>
+                                @foreach($recentActivity as $a)
+                                    @php $in = $a['direction'] === 'in'; @endphp
+                                    <tr>
+                                        <td style="width:74px;">
+                                            <span class="badge bg-{{ $in ? 'success' : 'warning' }}-subtle text-{{ $in ? 'success' : 'warning' }}">
+                                                <i class="bi bi-arrow-{{ $in ? 'down' : 'up' }}-circle me-1"></i>{{ $in ? 'In' : 'Out' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold small text-truncate" style="max-width:260px;">{{ $a['label'] }}</div>
+                                            <div class="text-muted" style="font-size:.72rem;">{{ $a['module'] }} · {{ optional($a['date'])->format('d-M-Y') }}</div>
+                                        </td>
+                                        <td class="text-end fw-bold {{ $in ? 'text-success' : 'text-warning' }}">
+                                            {{ ($in ? '+' : '−') . $fmt($a['qty']) }}<span class="text-muted fw-normal small"> {{ $a['uom'] }}</span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @endif
+                </div>
             </div>
         </div>
     </div>

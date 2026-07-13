@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Store;
 
 use App\Http\Controllers\Controller;
 use App\Models\BookingPo;
+use App\Models\ExcelCell;
 use App\Models\MaterialBulkIssue;
 use App\Models\MaterialRequisition;
+use App\Models\MaterialStockLedger;
+use App\Services\HeaderAliasResolver;
 use Illuminate\Http\Request;
+use Spatie\Permission\Models\Role;
 
 /**
  * Buyer/Style Stock (module B) — production issue (Excel "Bulk Issuing" sheet).
@@ -31,7 +35,56 @@ class MaterialBulkIssueController extends Controller
             MaterialRequisition::STATUS_APPROVED,
         ])->latest('id')->get();
 
-        return view('store.material-stock.bulk-issues', compact('issues', 'bookingPos', 'requisitions'));
+        // Per-PO helper data: current available (running) stock from the ledger,
+        // and a suggested bulk_qty default from the BOM row's GMTS Order Qty.
+        $prefill = $this->bookingPoPrefill($bookingPos);
+
+        return view('store.material-stock.bulk-issues', compact('issues', 'bookingPos', 'requisitions', 'prefill'));
+    }
+
+    /**
+     * Per booking_po_id: running_closing_qty (available stock, summed across
+     * sizes from material_stock_ledgers) + suggested bulk_qty default from the
+     * Store-owned GMTS Order Qty BOM cell.
+     *
+     * @return array<int, array{running: float, gmts_order_qty: ?string}>
+     */
+    private function bookingPoPrefill($bookingPos): array
+    {
+        $rowIds = $bookingPos->pluck('excel_row_id')->filter()->unique()->values();
+        if ($rowIds->isEmpty()) {
+            return [];
+        }
+
+        // Available stock per BOM row (all sizes) from the cached ledger.
+        $running = MaterialStockLedger::whereIn('excel_row_id', $rowIds->all())
+            ->get(['excel_row_id', 'running_closing_qty'])
+            ->groupBy('excel_row_id')
+            ->map(fn ($group) => (float) $group->sum('running_closing_qty'));
+
+        // GMTS Order Qty is Store-owned; resolve its exact header id (filtered to
+        // the store role) to avoid matching the customer-contract alias.
+        $storeRoleId = Role::where('name', 'store')->value('id');
+        $gmtsId = app(HeaderAliasResolver::class)
+            ->resolveHeaderId('gmts_order_qty', $storeRoleId ? (int) $storeRoleId : null);
+
+        $gmts = $gmtsId
+            ? ExcelCell::whereIn('row_id', $rowIds->all())
+                ->where('header_id', $gmtsId)
+                ->get(['row_id', 'value'])
+                ->mapWithKeys(fn ($cell) => [(int) $cell->row_id => trim((string) $cell->value)])
+            : collect();
+
+        $prefill = [];
+        foreach ($bookingPos as $po) {
+            $g = $gmts->get($po->excel_row_id);
+            $prefill[$po->id] = [
+                'running' => (float) ($running->get($po->excel_row_id) ?? 0),
+                'gmts_order_qty' => ($g !== null && $g !== '') ? $g : null,
+            ];
+        }
+
+        return $prefill;
     }
 
     public function store(Request $request)
