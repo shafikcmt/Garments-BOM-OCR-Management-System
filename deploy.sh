@@ -9,6 +9,14 @@ DB_CONTAINER="garments_ocr_db_3002"
 DB_NAME="garments_ocr"
 DB_USER="garments_ocr"
 
+if [ -z "$DEPLOY_SH_COPIED" ]; then
+  TMP_COPY="/tmp/garments_ocr_deploy_running.sh"
+  cp "$0" "$TMP_COPY"
+  chmod +x "$TMP_COPY"
+  export DEPLOY_SH_COPIED=1
+  exec "$TMP_COPY" "$@"
+fi
+
 cd "$PROJECT_DIR"
 
 echo "===================================="
@@ -25,6 +33,22 @@ fi
 if [ ! -f "docker-compose.yml" ]; then
   echo "ERROR: docker-compose.yml missing. Deployment stopped."
   exit 1
+fi
+
+echo "Checking for local changes before hard reset..."
+if [ -n "$(git status --porcelain)" ]; then
+  echo "----------------------------------------------------"
+  echo " WARNING: Local changes detected in $PROJECT_DIR"
+  echo " 'git reset --hard' will DISCARD any changes to"
+  echo " tracked files. Untracked files are kept, but"
+  echo " tracked-file edits will be lost permanently."
+  echo "----------------------------------------------------"
+  git status --short
+  read -p "Continue anyway? Type 'yes' to proceed: " CONFIRM
+  if [ "$CONFIRM" != "yes" ]; then
+    echo "Deployment cancelled by user."
+    exit 1
+  fi
 fi
 
 echo "Pulling latest code..."
@@ -88,8 +112,15 @@ docker compose exec -T app php artisan route:cache
 docker compose exec -T app php artisan view:cache
 
 echo "Fixing permissions..."
-sudo chown -R hapl:www-data storage bootstrap/cache public/build 2>/dev/null || true
-sudo chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+if sudo -n true 2>/dev/null; then
+  sudo chown -R hapl:www-data storage bootstrap/cache public/build 2>/dev/null || true
+  sudo chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+else
+  echo "WARNING: passwordless sudo not available. Skipping permission fix."
+  echo "Run manually if needed:"
+  echo "  sudo chown -R hapl:www-data storage bootstrap/cache public/build"
+  echo "  sudo chmod -R 775 storage bootstrap/cache"
+fi
 
 echo "Keeping latest 7 DB backups only..."
 ls -1t storage/app/backups/db/*.sql 2>/dev/null | tail -n +8 | xargs -r rm -f

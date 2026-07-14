@@ -554,7 +554,7 @@ class BookingPoSourceService
 
         $rowIds = ExcelCell::query()
             ->whereIn('header_id', $headerIds->all())
-            ->whereRaw('TRIM(`value`) = ?', [$poNo])
+            ->whereRaw('TRIM(value) = ?', [$poNo])
             ->pluck('row_id')
             ->reject(fn ($id) => (int) $id === (int) $primaryRowId)
             ->unique()
