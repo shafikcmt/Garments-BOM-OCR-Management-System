@@ -1,20 +1,23 @@
 /* Design tokens — the single source of truth for colour and radius.
  *
- * Phase 1 only DEFINES the palette; nothing consumes it yet, so the UI is
- * pixel-identical to before. Phase 2 binds these to Bootstrap's own --bs-*
- * variables (Bootstrap 5.3 is themeable through CSS variables, so no fork or
- * recompile is needed) and replaces the border-radius values hardcoded across
- * the views. Keeping the two steps apart means any visual regression in
- * Phase 2 is unambiguously caused by the palette, not by the build change.
+ * The palette is defined once as --gx-* and then bound to Bootstrap's own
+ * theme variables, so Bootstrap is re-skinned without forking or recompiling
+ * it. This file loads after Bootstrap's CDN stylesheet, so the overrides at
+ * the bottom win on cascade order at equal specificity.
+ *
+ * The scale steps (-600, -700, -bg, -border) are Tailwind's own ramp for each
+ * hue, which is where the base palette comes from. They are written as literal
+ * hex rather than derived with color-mix() so the result is identical on older
+ * browsers still in use on the factory floor.
  */
 
 :root {
-    /* Brand palette */
-    --gx-primary: #0F172A;      /* Slate 900  — professional dark  */
-    --gx-secondary: #3B82F6;    /* Blue 500   — trust / technology */
+    /* --- Brand palette ---------------------------------------------------- */
+    --gx-primary: #0F172A;      /* Slate 900   — professional dark  */
+    --gx-secondary: #3B82F6;    /* Blue 500    — trust / technology */
     --gx-accent: #10B981;       /* Emerald 500 — success / approval */
-    --gx-warning: #F59E0B;      /* Amber 500  — pending / review   */
-    --gx-danger: #EF4444;       /* Red 500    — errors / rejection */
+    --gx-warning: #F59E0B;      /* Amber 500   — pending / review   */
+    --gx-danger: #EF4444;       /* Red 500     — errors / rejection */
 
     /* Surfaces and text */
     --gx-bg: #F8FAFC;           /* Slate 50 */
@@ -22,9 +25,138 @@
     --gx-text: #1E293B;         /* Slate 800 */
     --gx-text-muted: #64748B;   /* Slate 500 */
 
-    /* Shape — Phase 2 replaces the border-radius:14px hardcoded 61 times
-       across the views with these. */
+    /* Hover / active / tint steps for each hue */
+    --gx-secondary-600: #2563EB;  --gx-secondary-700: #1D4ED8;
+    --gx-secondary-bg: #DBEAFE;   --gx-secondary-border: #BFDBFE;
+
+    --gx-accent-600: #059669;     --gx-accent-700: #047857;
+    --gx-accent-bg: #D1FAE5;      --gx-accent-border: #A7F3D0;
+
+    --gx-warning-600: #D97706;    --gx-warning-700: #B45309;
+    --gx-warning-bg: #FEF3C7;     --gx-warning-border: #FDE68A;
+
+    --gx-danger-600: #DC2626;     --gx-danger-700: #B91C1C;
+    --gx-danger-bg: #FEE2E2;      --gx-danger-border: #FECACA;
+
+    /* Shape. Views still hardcode several different radii; Phase 3 folds
+       those into components as they are extracted. */
     --gx-radius: 14px;
     --gx-radius-sm: 10px;
     --gx-radius-pill: 999px;
+
+    /* --- Bootstrap binding ------------------------------------------------
+     * Utilities that read a variable (.text-*, .bg-*-subtle, .alert-*,
+     * .text-bg-*) pick these up automatically. The -rgb triplets are required
+     * because Bootstrap composes those utilities with rgba().
+     */
+    --bs-primary: var(--gx-secondary);
+    --bs-primary-rgb: 59, 130, 246;
+    --bs-primary-bg-subtle: var(--gx-secondary-bg);
+    --bs-primary-border-subtle: var(--gx-secondary-border);
+    --bs-primary-text-emphasis: var(--gx-secondary-700);
+
+    --bs-success: var(--gx-accent);
+    --bs-success-rgb: 16, 185, 129;
+    --bs-success-bg-subtle: var(--gx-accent-bg);
+    --bs-success-border-subtle: var(--gx-accent-border);
+    --bs-success-text-emphasis: var(--gx-accent-700);
+
+    --bs-warning: var(--gx-warning);
+    --bs-warning-rgb: 245, 158, 11;
+    --bs-warning-bg-subtle: var(--gx-warning-bg);
+    --bs-warning-border-subtle: var(--gx-warning-border);
+    --bs-warning-text-emphasis: var(--gx-warning-700);
+
+    --bs-danger: var(--gx-danger);
+    --bs-danger-rgb: 239, 68, 68;
+    --bs-danger-bg-subtle: var(--gx-danger-bg);
+    --bs-danger-border-subtle: var(--gx-danger-border);
+    --bs-danger-text-emphasis: var(--gx-danger-700);
+
+    --bs-body-bg: var(--gx-bg);
+    --bs-body-color: var(--gx-text);
+    --bs-secondary-color: var(--gx-text-muted);
+}
+
+/* --- Buttons -------------------------------------------------------------
+ * Bootstrap compiles .btn-* from Sass with literal hex (`--bs-btn-bg:#0d6efd`)
+ * rather than reading --bs-primary, so the variables above do NOT reach them.
+ * Each variant used in the app is therefore rebound explicitly.
+ */
+.btn-primary {
+    --bs-btn-bg: var(--gx-secondary);
+    --bs-btn-border-color: var(--gx-secondary);
+    --bs-btn-hover-bg: var(--gx-secondary-600);
+    --bs-btn-hover-border-color: var(--gx-secondary-600);
+    --bs-btn-active-bg: var(--gx-secondary-700);
+    --bs-btn-active-border-color: var(--gx-secondary-700);
+    --bs-btn-disabled-bg: var(--gx-secondary);
+    --bs-btn-disabled-border-color: var(--gx-secondary);
+    --bs-btn-focus-shadow-rgb: 59, 130, 246;
+}
+
+.btn-outline-primary {
+    --bs-btn-color: var(--gx-secondary);
+    --bs-btn-border-color: var(--gx-secondary);
+    --bs-btn-hover-bg: var(--gx-secondary);
+    --bs-btn-hover-border-color: var(--gx-secondary);
+    --bs-btn-active-bg: var(--gx-secondary-600);
+    --bs-btn-active-border-color: var(--gx-secondary-600);
+    --bs-btn-disabled-color: var(--gx-secondary);
+    --bs-btn-disabled-border-color: var(--gx-secondary);
+    --bs-btn-focus-shadow-rgb: 59, 130, 246;
+}
+
+.btn-success {
+    --bs-btn-bg: var(--gx-accent);
+    --bs-btn-border-color: var(--gx-accent);
+    --bs-btn-hover-bg: var(--gx-accent-600);
+    --bs-btn-hover-border-color: var(--gx-accent-600);
+    --bs-btn-active-bg: var(--gx-accent-700);
+    --bs-btn-active-border-color: var(--gx-accent-700);
+    --bs-btn-disabled-bg: var(--gx-accent);
+    --bs-btn-disabled-border-color: var(--gx-accent);
+    --bs-btn-focus-shadow-rgb: 16, 185, 129;
+}
+
+.btn-danger {
+    --bs-btn-bg: var(--gx-danger);
+    --bs-btn-border-color: var(--gx-danger);
+    --bs-btn-hover-bg: var(--gx-danger-600);
+    --bs-btn-hover-border-color: var(--gx-danger-600);
+    --bs-btn-active-bg: var(--gx-danger-700);
+    --bs-btn-active-border-color: var(--gx-danger-700);
+    --bs-btn-disabled-bg: var(--gx-danger);
+    --bs-btn-disabled-border-color: var(--gx-danger);
+    --bs-btn-focus-shadow-rgb: 239, 68, 68;
+}
+
+.btn-outline-danger {
+    --bs-btn-color: var(--gx-danger);
+    --bs-btn-border-color: var(--gx-danger);
+    --bs-btn-hover-bg: var(--gx-danger);
+    --bs-btn-hover-border-color: var(--gx-danger);
+    --bs-btn-active-bg: var(--gx-danger-600);
+    --bs-btn-active-border-color: var(--gx-danger-600);
+    --bs-btn-disabled-color: var(--gx-danger);
+    --bs-btn-disabled-border-color: var(--gx-danger);
+    --bs-btn-focus-shadow-rgb: 239, 68, 68;
+}
+
+/* Amber is too light for white text — Bootstrap ships this variant with dark
+   text for the same reason. */
+.btn-warning {
+    --bs-btn-color: var(--gx-primary);
+    --bs-btn-bg: var(--gx-warning);
+    --bs-btn-border-color: var(--gx-warning);
+    --bs-btn-hover-color: var(--gx-primary);
+    --bs-btn-hover-bg: var(--gx-warning-600);
+    --bs-btn-hover-border-color: var(--gx-warning-600);
+    --bs-btn-active-color: var(--gx-primary);
+    --bs-btn-active-bg: var(--gx-warning-700);
+    --bs-btn-active-border-color: var(--gx-warning-700);
+    --bs-btn-disabled-color: var(--gx-primary);
+    --bs-btn-disabled-bg: var(--gx-warning);
+    --bs-btn-disabled-border-color: var(--gx-warning);
+    --bs-btn-focus-shadow-rgb: 245, 158, 11;
 }
