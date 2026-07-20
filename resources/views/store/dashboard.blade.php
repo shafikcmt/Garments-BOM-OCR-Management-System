@@ -77,7 +77,7 @@
     {{-- Live stock levels + recent movement (read-only) --}}
     <div class="row g-4 mb-4">
         <div class="col-12 col-xl-6">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div class="d-flex align-items-center gap-2">
@@ -119,7 +119,7 @@
         </div>
 
         <div class="col-12 col-xl-6">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center gap-2 mb-3">
                         <span class="app-stat-icon"><i class="bi bi-clock-history"></i></span>
@@ -160,7 +160,7 @@
     <div class="row g-4">
         {{-- General Stock module --}}
         <div class="col-12 col-xl-6">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center gap-2 mb-3">
                         <span class="app-stat-icon"><i class="bi bi-box-seam"></i></span>
@@ -179,7 +179,7 @@
 
         {{-- Buyer/Style Stock module --}}
         <div class="col-12 col-xl-6">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center gap-2 mb-3">
                         <span class="app-stat-icon"><i class="bi bi-clipboard-data"></i></span>
@@ -198,7 +198,7 @@
 
         {{-- Reports — read-only summaries built from the existing movement data --}}
         <div class="col-12">
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center gap-2 mb-3">
                         <span class="app-stat-icon"><i class="bi bi-file-earmark-bar-graph"></i></span>

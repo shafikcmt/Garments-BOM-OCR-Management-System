@@ -36,7 +36,7 @@
         <div class="row g-4">
             {{-- Payment Require Date --}}
             <div class="col-12">
-                <div class="card border-0 shadow-sm" style="border-radius:14px;">
+                <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                     <div class="card-body p-4">
                         <h5 class="mb-1">Payment Require Date</h5>
                         <p class="text-muted small mb-3">
@@ -58,7 +58,7 @@
 
             {{-- Signatures --}}
             <div class="col-12">
-                <div class="card border-0 shadow-sm" style="border-radius:14px;">
+                <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                     <div class="card-body p-4">
                         <h5 class="mb-1">Digital Signatures</h5>
                         <p class="text-muted small mb-4">

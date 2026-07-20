@@ -26,7 +26,7 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm" style="border-radius:14px;">
+    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
         <div class="card-body p-4">
             <div class="table-responsive">
                 <table class="table align-middle mb-0">

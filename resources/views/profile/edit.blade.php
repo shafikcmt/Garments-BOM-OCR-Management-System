@@ -58,7 +58,7 @@
     <div class="row g-4">
         {{-- Card 1: Profile Information --}}
         <div class="col-12 col-xl-7">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-1">Profile Information</h5>
                     <p class="text-muted small mb-4">Update your name, email and profile photo.</p>
@@ -129,7 +129,7 @@
 
         {{-- Card 2: Change Password --}}
         <div class="col-12 col-xl-5">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-1">Change Password</h5>
                     <p class="text-muted small mb-4">Use a strong password you don't use elsewhere.</p>
@@ -168,7 +168,7 @@
         {{-- Card 3: My Signature --}}
         <div class="col-12">
             @php $signatureUrl = $user->signatureUrl(); @endphp
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <div class="row g-4 align-items-start">
                         <div class="col-12 col-lg-7">

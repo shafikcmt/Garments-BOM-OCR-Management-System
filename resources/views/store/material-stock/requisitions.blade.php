@@ -20,7 +20,7 @@
 
     @include('store._flash')
 
-    <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--gx-radius);">
         <div class="card-body p-4">
             <h5 class="mb-3">New Requisition</h5>
             @if($poGroups->isEmpty())
@@ -101,7 +101,7 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm" style="border-radius:14px;">
+    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
         <div class="card-body p-4">
             <h5 class="mb-3">Requisitions <span class="badge bg-primary-subtle text-primary ms-1">{{ $requisitions->total() }}</span></h5>
             <div class="table-responsive">

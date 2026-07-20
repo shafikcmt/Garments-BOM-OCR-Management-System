@@ -274,7 +274,7 @@
             {{-- Create PRA + send for approval --}}
             <div class="modal fade" id="createPraModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content" style="border-radius:14px;">
+                    <div class="modal-content" style="border-radius:var(--gx-radius);">
                         <form method="POST" action="{{ route('supply_chain.payment_requests.store') }}">
                             @csrf
                             @foreach($bookingPoIds as $bookingPoId)
@@ -415,7 +415,7 @@
 @unless($isPreview)
 <div class="modal fade" id="sendEmailModal" tabindex="-1" aria-labelledby="sendEmailModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:14px;overflow:hidden;">
+        <div class="modal-content" style="border-radius:var(--gx-radius);overflow:hidden;">
             <form method="POST" action="{{ route('supply_chain.payment_requests.email', $paymentRequest) }}"
                   style="display:flex;flex-direction:column;min-height:0;overflow:hidden;">
                 @csrf

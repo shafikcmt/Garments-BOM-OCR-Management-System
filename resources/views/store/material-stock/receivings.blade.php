@@ -22,7 +22,7 @@
 
     @include('store._flash')
 
-    <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--gx-radius);">
         <div class="card-body p-4">
             <h5 class="mb-3">Record Receiving</h5>
             @if(! $hasBookingPos)
@@ -197,7 +197,7 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm" style="border-radius:14px;">
+    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
         <div class="card-body p-4">
             <h5 class="mb-3">Receiving History <span class="badge bg-primary-subtle text-primary ms-1">{{ $receivings->total() }}</span></h5>
             <div class="table-responsive">
@@ -248,7 +248,7 @@
      style can carry one item or several, which a flat list made hard to read. --}}
 <div class="modal fade" id="rcvItemsModal" tabindex="-1" aria-labelledby="rcvItemsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:14px;">
+        <div class="modal-content" style="border-radius:var(--gx-radius);">
             <div class="modal-header">
                 <div>
                     <h5 class="modal-title mb-0" id="rcvItemsModalLabel">Select Items</h5>

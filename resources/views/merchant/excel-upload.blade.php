@@ -156,7 +156,7 @@
         align-items: center;
         gap: 10px;
         padding: 10px 12px;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         background: #f8fafc;
         border: 1px solid #e9eef5;
         font-size: 0.94rem;

@@ -67,7 +67,7 @@
 
 <div class="modal fade" id="bookingEmailModal" tabindex="-1" aria-labelledby="bookingEmailModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:14px;overflow:hidden;">
+        <div class="modal-content" style="border-radius:var(--gx-radius);overflow:hidden;">
             <form method="POST" action="{{ route('supply_chain.bookings.email', $bookingPo) }}"
                   style="display:flex;flex-direction:column;min-height:0;overflow:hidden;">
                 @csrf

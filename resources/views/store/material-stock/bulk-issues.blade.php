@@ -25,7 +25,7 @@
 
     <div class="row g-4">
         <div class="col-12 col-xl-5">
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-3">Record Bulk Issue</h5>
                     @if($bookingPos->isEmpty())
@@ -83,7 +83,7 @@
         </div>
 
         <div class="col-12 col-xl-7">
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-3">Bulk Issue History <span class="badge bg-primary-subtle text-primary ms-1">{{ $issues->total() }}</span></h5>
                     <div class="table-responsive">

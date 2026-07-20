@@ -19,7 +19,7 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm" style="border-radius:14px;max-width:560px;">
+    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);max-width:560px;">
         <div class="card-body p-4">
             <form action="{{ route('admin.roles.store') }}" method="POST">
                 @csrf

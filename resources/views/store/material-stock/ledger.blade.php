@@ -35,7 +35,7 @@
         <div class="col-6 col-xl-3"><div class="app-stat-card p-3 h-100"><div class="app-stat-label">Total Value</div><div class="fw-bold fs-4">{{ number_format($totals['value'], 2) }}</div></div></div>
     </div>
 
-    <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;">
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:var(--gx-radius);">
         <div class="card-body p-3">
             <form method="GET" class="row g-2 align-items-end">
                 <div class="col-12 col-md-3">
@@ -58,7 +58,7 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm" style="border-radius:14px;">
+    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table align-middle mb-0">
@@ -99,7 +99,7 @@
                             {{-- Liability reuse modal --}}
                             <div class="modal fade" id="liab{{ $l->id }}" tabindex="-1" aria-hidden="true">
                                 <div class="modal-dialog modal-dialog-centered">
-                                    <div class="modal-content" style="border-radius:14px;">
+                                    <div class="modal-content" style="border-radius:var(--gx-radius);">
                                         <form method="POST" action="{{ route('store.material.ledger.liability', $l) }}">
                                             @csrf
                                             <div class="modal-header"><h5 class="modal-title text-warning">Liability Movement</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -123,7 +123,7 @@
                             {{-- Dead reuse modal --}}
                             <div class="modal fade" id="dead{{ $l->id }}" tabindex="-1" aria-hidden="true">
                                 <div class="modal-dialog modal-dialog-centered">
-                                    <div class="modal-content" style="border-radius:14px;">
+                                    <div class="modal-content" style="border-radius:var(--gx-radius);">
                                         <form method="POST" action="{{ route('store.material.ledger.dead', $l) }}">
                                             @csrf
                                             <div class="modal-header"><h5 class="modal-title text-danger">Dead Movement</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>

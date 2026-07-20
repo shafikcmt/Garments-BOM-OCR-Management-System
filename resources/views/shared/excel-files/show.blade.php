@@ -371,7 +371,7 @@
 
     .excel-work-card {
         border: 1px solid #e8edf4;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
         overflow: hidden;
         background: #fff;

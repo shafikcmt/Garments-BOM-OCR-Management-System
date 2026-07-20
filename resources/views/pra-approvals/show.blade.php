@@ -45,7 +45,7 @@
     <div class="row g-4">
         <div class="col-12 col-xl-8">
             {{-- PRA summary --}}
-            <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                         <h5 class="mb-0">Request Details</h5>
@@ -70,7 +70,7 @@
             </div>
 
             {{-- Line items --}}
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-3">Items ({{ $paymentRequest->items->count() }})</h5>
                     <div class="table-responsive">
@@ -102,7 +102,7 @@
 
         {{-- Decision panel --}}
         <div class="col-12 col-xl-4">
-            <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                         <h5 class="mb-0">Reviewers</h5>
@@ -126,7 +126,7 @@
             </div>
 
             @if($canAct)
-                <div class="card border-0 shadow-sm" style="border-radius:14px;">
+                <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                     <div class="card-body p-4">
                         <h5 class="mb-3">Your Decision</h5>
                         @if($isCheckStage)
@@ -148,7 +148,7 @@
                     </div>
                 </div>
             @elseif($myApproval)
-                <div class="card border-0 shadow-sm" style="border-radius:14px;">
+                <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                     <div class="card-body p-4 text-center">
                         <span class="badge rounded-pill {{ $statusBadge[$myApproval->status] ?? 'bg-secondary-subtle text-secondary' }} mb-2">You: {{ ucfirst($myApproval->status) }}</span>
                         <p class="text-muted small mb-0">No further action is required from you.</p>
@@ -163,7 +163,7 @@
 {{-- Approve modal --}}
 <div class="modal fade" id="approveModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius:14px;">
+        <div class="modal-content" style="border-radius:var(--gx-radius);">
             <form method="POST" action="{{ route('pra_approvals.approve', $paymentRequest) }}">
                 @csrf
                 <div class="modal-header">
@@ -190,7 +190,7 @@
 {{-- Reject modal --}}
 <div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius:14px;">
+        <div class="modal-content" style="border-radius:var(--gx-radius);">
             <form method="POST" action="{{ route('pra_approvals.reject', $paymentRequest) }}">
                 @csrf
                 <div class="modal-header">

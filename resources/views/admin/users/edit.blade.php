@@ -46,7 +46,7 @@
     <div class="row g-4">
         {{-- Card 1: Profile Info (Admin Editable) --}}
         <div class="col-12 col-xl-7">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-1">Profile Information</h5>
                     <p class="text-muted small mb-4">Update name, email, role, status and photo.</p>
@@ -126,7 +126,7 @@
 
         <div class="col-12 col-xl-5">
             {{-- Card 2: Password Control --}}
-            <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-1">Password Control</h5>
                     <p class="text-muted small mb-4">Set a new password directly, or email a reset link.</p>
@@ -159,7 +159,7 @@
             </div>
 
             {{-- Card 3: Account Info (Read-only) --}}
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-3">Account Info</h5>
                     <dl class="row mb-0 small">

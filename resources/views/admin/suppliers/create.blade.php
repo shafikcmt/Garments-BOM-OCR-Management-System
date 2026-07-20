@@ -20,7 +20,7 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm" style="border-radius:14px;">
+    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
         <div class="card-body p-4">
             <form action="{{ route('admin.suppliers.store') }}" method="POST">
                 @csrf

@@ -25,7 +25,7 @@
 
     <div class="row g-4">
         <div class="col-12 col-xl-4">
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-3">Add Item</h5>
                     <form method="POST" action="{{ route('store.stock.items.store') }}">
@@ -67,7 +67,7 @@
         </div>
 
         <div class="col-12 col-xl-8">
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-3">Items <span class="badge bg-primary-subtle text-primary ms-1">{{ $items->total() }}</span></h5>
                     <div class="table-responsive">
@@ -114,7 +114,7 @@
                                     </tr>
                                     <div class="modal fade" id="editItem{{ $item->id }}" tabindex="-1" aria-hidden="true">
                                         <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content" style="border-radius:14px;">
+                                            <div class="modal-content" style="border-radius:var(--gx-radius);">
                                                 <form method="POST" action="{{ route('store.stock.items.update', $item) }}">
                                                     @csrf @method('PUT')
                                                     <div class="modal-header"><h5 class="modal-title">Edit Item</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>

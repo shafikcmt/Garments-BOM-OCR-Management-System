@@ -34,7 +34,7 @@
     <div class="row g-4">
         {{-- Add approver + settings --}}
         <div class="col-12 col-xl-4">
-            <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-1">Add Approver</h5>
                     <p class="text-muted small mb-3">Add a user to the PRA approver pool. Only pooled users can be selected by creators to approve a PRA.</p>
@@ -58,7 +58,7 @@
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-1">Notification Settings</h5>
                     <p class="text-muted small mb-3">Dashboard notifications are always on. Email can be turned off here.</p>
@@ -79,7 +79,7 @@
 
         {{-- Approver pool table --}}
         <div class="col-12 col-xl-8">
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-3">Approver Pool <span class="badge bg-primary-subtle text-primary ms-1">{{ $approvers->count() }}</span></h5>
 

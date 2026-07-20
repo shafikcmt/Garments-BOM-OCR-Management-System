@@ -151,7 +151,7 @@
 {{-- Read-only View modal --}}
 <div class="modal fade" id="emailViewModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:14px;overflow:hidden;">
+        <div class="modal-content" style="border-radius:var(--gx-radius);overflow:hidden;">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="bi bi-envelope-open me-1"></i> Email Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

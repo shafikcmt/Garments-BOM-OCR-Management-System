@@ -19,7 +19,7 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm" style="border-radius:14px;max-width:640px;">
+    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);max-width:640px;">
         <div class="card-body p-4">
             <form method="POST" action="{{ route('admin.users.store') }}">
                 @csrf

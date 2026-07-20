@@ -28,7 +28,7 @@
     <div class="row g-4">
         {{-- Add / update budget --}}
         <div class="col-12 col-xl-4">
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-1">Set Budget</h5>
                     <p class="text-muted small mb-3">A style with a budget is checked when a PRA is created. Leave Buyer / Season blank for a budget that applies to the style everywhere.</p>
@@ -73,7 +73,7 @@
 
         {{-- Budget list --}}
         <div class="col-12 col-xl-8">
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-3">Configured Budgets <span class="badge bg-primary-subtle text-primary ms-1">{{ $budgets->total() }}</span></h5>
                     <div class="table-responsive">
@@ -117,7 +117,7 @@
                                     {{-- Edit modal --}}
                                     <div class="modal fade" id="editBudget{{ $budget->id }}" tabindex="-1" aria-hidden="true">
                                         <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content" style="border-radius:14px;">
+                                            <div class="modal-content" style="border-radius:var(--gx-radius);">
                                                 <form method="POST" action="{{ route('style-budgets.update', $budget) }}">
                                                     @csrf
                                                     @method('PATCH')

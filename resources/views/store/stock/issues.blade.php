@@ -21,7 +21,7 @@
 
     <div class="row g-4">
         <div class="col-12 col-xl-4">
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-3">Record Issue</h5>
                     <form method="POST" action="{{ route('store.stock.issues.store') }}">
@@ -63,7 +63,7 @@
         </div>
 
         <div class="col-12 col-xl-8">
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-3">Issue History <span class="badge bg-primary-subtle text-primary ms-1">{{ $issues->total() }}</span></h5>
                     <div class="table-responsive">

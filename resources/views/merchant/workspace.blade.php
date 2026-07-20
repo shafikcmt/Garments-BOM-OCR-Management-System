@@ -14,14 +14,14 @@
 <style>
     .merchant-workspace-page .workspace-hero {
         border: 1px solid #e9eef6;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
         background: linear-gradient(180deg, #ffffff, #fbfdff);
     }
 
     .merchant-workspace-page .workspace-card {
         border: 1px solid #e9eef6;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
     }
 

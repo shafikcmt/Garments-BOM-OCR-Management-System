@@ -30,7 +30,7 @@
     @include('store._flash')
 
     {{-- Single filter panel: report type + buyer + style + material + date range --}}
-    <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;">
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:var(--gx-radius);">
         <div class="card-body p-3">
             <form method="GET" action="{{ route('store.reports.index') }}" class="row g-2 align-items-end">
                 <div class="col-12 col-md-6 col-xl-2">
@@ -83,8 +83,8 @@
         <div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle me-1"></i>{{ $message }}</div>
     @enderror
 
-    <div class="card border-0 shadow-sm" style="border-radius:14px;">
-        <div class="card-header bg-white border-0 pt-3 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2" style="border-radius:14px 14px 0 0;">
+    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
+        <div class="card-header bg-white border-0 pt-3 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2" style="border-radius:var(--gx-radius) 14px 0 0;">
             <div>
                 <div class="fw-semibold">{{ $reportTypes[$type] }} Report</div>
                 <div class="text-muted small">{{ $rows->count() }} {{ Str::plural(Str::lower($groupHeading), $rows->count()) }}</div>

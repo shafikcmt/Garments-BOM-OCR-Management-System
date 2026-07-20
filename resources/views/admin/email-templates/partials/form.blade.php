@@ -6,7 +6,7 @@
 
     <div class="row g-4">
         <div class="col-12 col-xl-8">
-            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-1">{{ $heading }}</h5>
                     <p class="text-muted small mb-3">{{ $description }}</p>
@@ -44,7 +44,7 @@
         </div>
 
         <div class="col-12 col-xl-4">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h6 class="fw-bold mb-2">Available placeholders</h6>
                     <p class="text-muted small mb-3">These are replaced with the document's actual data when the email form opens.</p>

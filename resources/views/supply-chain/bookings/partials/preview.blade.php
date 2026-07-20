@@ -276,7 +276,7 @@
         max-width: 100%;
         margin: 0 auto 12px;
         border: 1px solid #cbd5e1;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         background: #ffffff;
         padding: 14px;
         box-shadow: 0 14px 32px rgba(15, 23, 42, .08);
@@ -299,7 +299,7 @@
         max-width: 100%;
         margin: 0 auto 12px;
         border: 1px solid #fecaca;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         background: linear-gradient(135deg, #fff7f7 0%, #ffffff 100%);
         padding: 12px;
         box-shadow: 0 14px 30px rgba(185, 28, 28, .08);
@@ -308,7 +308,7 @@
     .booking-format-preview-box .booking-change-table { margin-bottom: 0; }
     .booking-format-preview-box .booking-change-table th { font-size: 10px; color: #7f1d1d; text-transform: uppercase; letter-spacing: .05em; }
     .booking-format-preview-box .booking-change-table td { font-size: 11px; color: #334155; vertical-align: top; }
-    .booking-format-preview-box .booking-history-mini { width: 198mm; max-width:100%; margin: 0 auto 12px; border: 1px solid #e2e8f0; border-radius: 14px; background:#fff; padding: 10px 12px; }
+    .booking-format-preview-box .booking-history-mini { width: 198mm; max-width:100%; margin: 0 auto 12px; border: 1px solid #e2e8f0; border-radius:var(--gx-radius); background:#fff; padding: 10px 12px; }
     .booking-format-preview-box .booking-history-mini .history-line { color:#64748b; font-size:11px; }
     @media (max-width: 767px) {
         .booking-format-preview-box { padding: 6px; }

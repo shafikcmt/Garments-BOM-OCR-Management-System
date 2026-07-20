@@ -37,7 +37,7 @@
         <div class="row g-4">
             {{-- Alert Days --}}
             <div class="col-12 col-xl-6">
-                <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+                <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
                     <div class="card-body p-4">
                         <h5 class="mb-1">Alert Timing</h5>
                         <p class="text-muted small mb-3">When should the system flag a PO as PI-missing?</p>
@@ -55,7 +55,7 @@
 
             {{-- Department Visibility --}}
             <div class="col-12 col-xl-6">
-                <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+                <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
                     <div class="card-body p-4">
                         <h5 class="mb-1">Department Visibility</h5>
                         <p class="text-muted small mb-3">Only selected departments will receive this alert in their notification panel.</p>
@@ -79,7 +79,7 @@
 
             {{-- Mail Notification --}}
             <div class="col-12">
-                <div class="card border-0 shadow-sm" style="border-radius:14px;">
+                <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                     <div class="card-body p-4">
                         <h5 class="mb-1">Mail Notification</h5>
                         <p class="text-muted small mb-3">Optionally send the PI missing alert by email.</p>

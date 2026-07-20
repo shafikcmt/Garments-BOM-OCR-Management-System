@@ -166,7 +166,7 @@
     .excel-file-name-box {
         margin-top: 14px;
         padding: 10px 12px;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         border: 1px solid #dbeafe;
         background: linear-gradient(180deg, #eff6ff 0%, #f8fbff 100%);
         color: #1d4ed8;
@@ -188,7 +188,7 @@
         align-items: center;
         gap: 10px;
         padding: 10px 12px;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         color: #475569;
         background: #f8fafc;
         border: 1px solid #e8eef4;

@@ -55,7 +55,7 @@
         @endif
     @endforeach
 
-    <div class="card border-0 shadow-sm" style="border-radius:14px;">
+    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 pra-status-table">
                 <thead class="table-light">
@@ -159,7 +159,7 @@
     @if($pr->approvalProgress()['state'] === 'rejected')
         <div class="modal fade" id="resubmitModal{{ $pr->id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content" style="border-radius:14px;">
+                <div class="modal-content" style="border-radius:var(--gx-radius);">
                     <form method="POST" action="{{ route('supply_chain.payment_requests.resubmit', $pr) }}">
                         @csrf
                         <div class="modal-header">

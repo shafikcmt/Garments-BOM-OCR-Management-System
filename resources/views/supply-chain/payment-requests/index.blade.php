@@ -126,7 +126,7 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm mb-3" style="border-radius:14px;overflow:hidden;">
+    <div class="card border-0 shadow-sm mb-3" style="border-radius:var(--gx-radius);overflow:hidden;">
         <form method="GET" action="{{ route('supply_chain.payment_requests.index') }}">
             <div class="d-flex flex-wrap align-items-center gap-2 p-3 border-bottom" style="background:#f8fafc;">
                 <span class="fw-bold text-slate-900 me-1" style="font-size:13px;white-space:nowrap;">Filters</span>
@@ -431,7 +431,7 @@
 {{-- Over-budget confirmation (non-blocking): shown only when a PO's PI Amount exceeds its allocated Budget. --}}
 <div class="modal fade" id="overBudgetModal" tabindex="-1" aria-labelledby="overBudgetModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius:14px;">
+        <div class="modal-content" style="border-radius:var(--gx-radius);">
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title text-danger" id="overBudgetModalLabel"><i class="bi bi-exclamation-triangle-fill me-2"></i>Budget Exceeded</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

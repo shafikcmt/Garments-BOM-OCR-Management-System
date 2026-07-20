@@ -28,7 +28,7 @@
         <div class="alert alert-warning border-0 shadow-sm rounded-3"><i class="bi bi-exclamation-triangle me-1"></i>{{ $reorderCount }} item(s) at or below re-order level.</div>
     @endif
 
-    <div class="card border-0 shadow-sm" style="border-radius:14px;">
+    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
         <div class="card-body p-4">
             <div class="table-responsive">
                 <table class="table align-middle mb-0">

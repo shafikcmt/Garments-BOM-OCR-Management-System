@@ -84,7 +84,7 @@
     .booking-stat-icon {
         width: 38px;
         height: 38px;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -161,7 +161,7 @@
     .booking-primary-btn,
     .btn-generate {
         border: 0;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         background: linear-gradient(135deg, #4f46e5, #312e81);
         color: #fff;
         font-weight: 900;
@@ -171,7 +171,7 @@
     .booking-primary-btn:hover,
     .btn-generate:hover { color: #fff; background: linear-gradient(135deg, #4338ca, #1e1b4b); transform: translateY(-1px); }
     .btn-soft-reset {
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         min-height: 42px;
         border-color: #d8e0ea;
         color: #475569;
@@ -465,7 +465,7 @@
         min-height: 36px;
         padding: 0 14px;
         font-size: 13px;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         color: #475569;
         font-size: 14px;
         font-weight: 800;
@@ -503,7 +503,7 @@
     .po-control-icon {
         width: 38px;
         height: 38px;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         display:inline-flex;
         align-items:center;
         justify-content:center;
@@ -540,7 +540,7 @@
     .po-change-warning { color:#b91c1c; background:#fef2f2; border-color:#fecaca; }
     .po-change-card {
         border:1px solid #e2e8f0;
-        border-radius:14px;
+        border-radius:var(--gx-radius);
         background:#fff;
         padding:10px;
         margin-top:8px;

@@ -25,7 +25,7 @@
     .header-page .page-hero {
         background: linear-gradient(135deg, #f8fbff 0%, #eef4ff 100%);
         border: 1px solid #e4ecfb;
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         padding: 18px 20px;
         box-shadow: 0 8px 22px rgba(40, 72, 145, 0.07);
     }
@@ -46,7 +46,7 @@
     .header-page .stat-card {
         background: var(--soft-card);
         border: 1px solid var(--soft-border);
-        border-radius: 14px;
+        border-radius:var(--gx-radius);
         padding: 14px 16px;
         box-shadow: 0 6px 18px rgba(31, 42, 68, 0.04);
         height: 100%;
