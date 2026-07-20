@@ -4,133 +4,112 @@
 
 @section('content')
 <div class="container-fluid">
-    <div class="app-hero-card p-4 p-lg-5 mb-4">
-        <div class="app-hero-layout d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="app-hero-main d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:54px;height:54px;border-radius:18px;font-size:23px;"><i class="bi bi-speedometer2"></i></span>
-                <div>
-                    <div class="app-hero-eyebrow">Admin Control Center</div>
-                    <h2 class="app-hero-title">Welcome, {{ auth()->user()->name }}</h2>
-                    <p class="app-hero-copy mb-0">Manage users, roles, booking settings and excel header access from one clean workspace.</p>
-                </div>
-            </div>
-            <a href="{{ route('admin.workspace') }}" class="app-hero-action btn btn-primary px-4 d-inline-flex align-items-center gap-2">
-                <i class="bi bi-grid me-1"></i>Open Workspace
+    <x-page-header icon="sliders" eyebrow="Admin"
+                   title="Welcome, {{ auth()->user()->name }}"
+                   copy="Users, roles, workspace columns and vendor master.">
+        <x-slot:actions>
+            <a href="{{ route('admin.users.index') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-people"></i>Users &amp; Roles
             </a>
+            <a href="{{ route('admin.workspace') }}" class="btn btn-outline-secondary">Workspace</a>
+        </x-slot:actions>
+    </x-page-header>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:0ms"
+                icon="people" tone="primary" label="Users"
+                :value="$totalUsers" :href="route('admin.users.index')" />
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:100ms"
+                icon="shield-check" tone="success" label="Active users"
+                :value="$activeUsers" />
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:200ms"
+                icon="columns-gap" tone="primary" label="Workspace columns"
+                :value="$totalHeaders" :href="route('admin.headers.index')" />
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:300ms"
+                icon="truck" tone="warning" label="Vendors"
+                :value="$totalSuppliers" :href="route('admin.suppliers.index')" />
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-xl-5">
+            {{-- Column ownership decides who is responsible for which part of
+                 the BOM, so it is the closest thing admin has to a workload
+                 distribution across departments. --}}
+            <x-card class="gx-fade-in h-100" style="--gx-delay:400ms" title="Workspace columns by owner role">
+                <x-donut-chart caption="Columns" :total="$totalHeaders" :segments="collect($ownership)->map(fn ($row, $i) => [
+                    'label' => \Illuminate\Support\Str::headline($row['role']),
+                    'value' => $row['fields'],
+                    'tone' => ['primary', 'success', 'warning', 'danger'][$i % 4],
+                ])->all()" />
+            </x-card>
+        </div>
+
+        <div class="col-12 col-xl-7">
+            <x-card class="gx-fade-in h-100" style="--gx-delay:500ms">
+                <x-slot:title>
+                    Booking POs generated — last 6 months
+                    @if($delta !== null)
+                        <span class="badge {{ $delta >= 0 ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger' }} ms-1">
+                            {{ $delta >= 0 ? '+' : '' }}{{ $delta }}% vs last month
+                        </span>
+                    @endif
+                </x-slot:title>
+                <x-area-chart :series="$trend" tone="primary" label="Booking POs generated per month" />
+            </x-card>
         </div>
     </div>
 
     <div class="row g-3 mb-4">
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="d-flex align-items-center justify-content-between gap-3">
-                    <div><div class="app-stat-label">Total Users</div><div class="app-stat-value">{{ $totalUsers }}</div></div>
-                    <span class="app-stat-icon"><i class="bi bi-people"></i></span>
-                </div>
-            </div>
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:600ms"
+                icon="person-badge" tone="primary" label="Roles" :value="$totalRoles"
+                :href="route('admin.roles.index')" />
         </div>
-
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="d-flex align-items-center justify-content-between gap-3">
-                    <div><div class="app-stat-label">Active Users</div><div class="app-stat-value">{{ $activeUsers }}</div></div>
-                    <span class="app-stat-icon"><i class="bi bi-person-check"></i></span>
-                </div>
-            </div>
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:650ms"
+                icon="upload" tone="success" label="Merchant-uploadable columns"
+                :value="$merchantUploadHeaders" />
         </div>
-
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="d-flex align-items-center justify-content-between gap-3">
-                    <div><div class="app-stat-label">Total Roles</div><div class="app-stat-value">{{ $totalRoles }}</div></div>
-                    <span class="app-stat-icon"><i class="bi bi-person-badge"></i></span>
-                </div>
-            </div>
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:700ms"
+                icon="journal-text" tone="primary" label="Booking instructions"
+                :value="$totalBookingInstructions" :href="route('admin.booking-instructions.index')" />
         </div>
-
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="d-flex align-items-center justify-content-between gap-3">
-                    <div>
-                        <div class="app-stat-label">Excel Headers</div>
-                        <div class="app-stat-value">{{ $totalHeaders }}</div>
-                        <div class="text-muted small">Merchant enabled: {{ $merchantUploadHeaders }}</div>
-                    </div>
-                    <span class="app-stat-icon"><i class="bi bi-file-earmark-spreadsheet"></i></span>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="d-flex align-items-center justify-content-between gap-3">
-                    <div>
-                        <div class="app-stat-label">Booking Instructions</div>
-                        <div class="app-stat-value">{{ $totalBookingInstructions ?? 0 }}</div>
-                        <div class="text-muted small">Default: {{ $defaultBookingInstructions ?? 0 }}</div>
-                    </div>
-                    <span class="app-stat-icon"><i class="bi bi-card-checklist"></i></span>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="d-flex align-items-center justify-content-between gap-3">
-                    <div>
-                        <div class="app-stat-label">Generated PO</div>
-                        <div class="app-stat-value">{{ $totalGeneratedPos ?? 0 }}</div>
-                        <div class="text-muted small">Admin controlled</div>
-                    </div>
-                    <span class="app-stat-icon"><i class="bi bi-file-earmark-check"></i></span>
-                </div>
-            </div>
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:750ms"
+                icon="clipboard-check" tone="success" label="Booking POs generated"
+                :value="$totalGeneratedPos" />
         </div>
     </div>
 
     <div class="row g-3">
-        <div class="col-12 col-md-6 col-xl-4">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body d-flex flex-column">
-                    <span class="app-stat-icon mb-3"><i class="bi bi-people"></i></span>
-                    <h5 class="fw-bold">User Control</h5>
-                    <p class="text-muted flex-grow-1">Create users, assign roles and manage active status.</p>
-                    <a href="{{ route('admin.users.index') }}" class="btn btn-primary">Manage Users</a>
-                </div>
-            </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <x-quick-action class="gx-fade-in" style="--gx-delay:800ms" icon="person-plus" tone="primary"
+                title="Add User" description="Create an account and assign a role"
+                :href="route('admin.users.create')" />
         </div>
-
-        <div class="col-12 col-md-6 col-xl-4">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body d-flex flex-column">
-                    <span class="app-stat-icon mb-3"><i class="bi bi-person-badge"></i></span>
-                    <h5 class="fw-bold">Role Control</h5>
-                    <p class="text-muted flex-grow-1">Create roles and keep permission groups organized.</p>
-                    <a href="{{ route('admin.roles.index') }}" class="btn btn-primary">Manage Roles</a>
-                </div>
-            </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <x-quick-action class="gx-fade-in" style="--gx-delay:850ms" icon="columns-gap" tone="success"
+                title="Workspace Columns" description="Ownership and field rules"
+                :href="route('admin.headers.index')" />
         </div>
-
-        <div class="col-12 col-md-6 col-xl-4">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body d-flex flex-column">
-                    <span class="app-stat-icon mb-3"><i class="bi bi-file-earmark-spreadsheet"></i></span>
-                    <h5 class="fw-bold">Excel Header Control</h5>
-                    <p class="text-muted flex-grow-1">Control excel headers and merchant upload fields.</p>
-                    <a href="{{ route('admin.headers.index') }}" class="btn btn-primary">Manage Headers</a>
-                </div>
-            </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <x-quick-action class="gx-fade-in" style="--gx-delay:900ms" icon="truck" tone="warning"
+                title="Vendors" description="Supplier master data"
+                :href="route('admin.suppliers.index')" />
         </div>
-
-        <div class="col-12 col-md-6 col-xl-4">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body d-flex flex-column">
-                    <span class="app-stat-icon mb-3"><i class="bi bi-shield-lock"></i></span>
-                    <h5 class="fw-bold">PO Generate Control</h5>
-                    <p class="text-muted flex-grow-1">Control generated PO, re-generated PO, and before/after source changes.</p>
-                    <a href="{{ route('admin.po-generate-control.index') }}" class="btn btn-primary">Manage PO Control</a>
-                </div>
-            </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <x-quick-action class="gx-fade-in" style="--gx-delay:950ms" icon="check2-square" tone="primary"
+                title="PRA Approvers" description="Approval pool and cycles"
+                :href="route('admin.pra-approvers.index')" />
         </div>
     </div>
 </div>

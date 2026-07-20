@@ -4,55 +4,66 @@
 
 @section('content')
 <div class="container-fluid">
-    <div class="app-hero-card p-4 p-lg-5 mb-4">
-        <div class="app-hero-layout d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="app-hero-main d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:52px;height:52px;border-radius:18px;font-size:22px;"><i class="bi bi-briefcase"></i></span>
-                <div>
-                    <div class="app-hero-eyebrow">Commercial</div>
-                    <h2 class="app-hero-title">Welcome, {{ auth()->user()->name }}</h2>
-                    <p class="app-hero-copy mb-0">Work with commercial documents and OCR updates.</p>
-                </div>
-            </div>
-            <a href="{{ route('commercial.workspace') }}" class="app-hero-action btn btn-primary px-4 d-inline-flex align-items-center gap-2">
-                <i class="bi bi-box-arrow-up-right"></i>Open Workspace
+    <x-page-header icon="briefcase" eyebrow="Commercial"
+                   title="Welcome, {{ auth()->user()->name }}"
+                   copy="Your share of the BOM workspace and what is still outstanding.">
+        <x-slot:actions>
+            <a href="{{ route('commercial.workspace') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-grid-3x3-gap"></i>Open Workspace
             </a>
+        </x-slot:actions>
+    </x-page-header>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:0ms"
+                icon="columns-gap" tone="primary" label="Columns you own"
+                :value="$workspace['fields']" />
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:100ms"
+                icon="list-ul" tone="primary" label="BOM lines"
+                :value="$stats['rows']" :spark="collect($trend)->pluck('value')->all()" />
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:200ms"
+                icon="check2-square" tone="success" label="Fields filled"
+                :value="$workspace['filled']" />
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:300ms"
+                icon="hourglass-split" tone="danger" label="Still to fill"
+                :value="$workspace['pending']" />
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-xl-5">
+            <x-card class="gx-fade-in h-100" style="--gx-delay:400ms" title="Your share of the BOM">
+                <x-workspace-progress :workspace="$workspace" />
+            </x-card>
+        </div>
+
+        <div class="col-12 col-xl-7">
+            <x-card class="gx-fade-in h-100" style="--gx-delay:500ms">
+                <x-slot:title>
+                    BOM lines added — last 6 months
+                    @if($delta !== null)
+                        <span class="badge {{ $delta >= 0 ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger' }} ms-1">
+                            {{ $delta >= 0 ? '+' : '' }}{{ $delta }}% vs last month
+                        </span>
+                    @endif
+                </x-slot:title>
+                <x-area-chart :series="$trend" tone="primary" label="BOM lines added per month" />
+            </x-card>
         </div>
     </div>
 
     <div class="row g-3">
-        <div class="col-12 col-md-6 col-xl-4">
-            <div class="app-stat-card p-3 h-100">
-                <div class="d-flex align-items-center gap-3">
-                    <span class="app-stat-icon"><i class="bi bi-shield-check"></i></span>
-                    <div>
-                        <div class="app-stat-label">Access</div>
-                        <div class="fw-bold text-slate-900">Role-based workspace</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-md-6 col-xl-4">
-            <div class="app-stat-card p-3 h-100">
-                <div class="d-flex align-items-center gap-3">
-                    <span class="app-stat-icon"><i class="bi bi-file-earmark-text"></i></span>
-                    <div>
-                        <div class="app-stat-label">OCR</div>
-                        <div class="fw-bold text-slate-900">Document workflow</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-md-6 col-xl-4">
-            <div class="app-stat-card p-3 h-100">
-                <div class="d-flex align-items-center gap-3">
-                    <span class="app-stat-icon"><i class="bi bi-lightning-charge"></i></span>
-                    <div>
-                        <div class="app-stat-label">Status</div>
-                        <div class="fw-bold text-slate-900">Ready to work</div>
-                    </div>
-                </div>
-            </div>
+        <div class="col-12">
+            <x-quick-action class="gx-fade-in" style="--gx-delay:600ms" icon="grid-3x3-gap" tone="primary"
+                title="BOM Workspace" description="Fill in the columns you own"
+                :href="route('commercial.workspace')" />
         </div>
     </div>
 </div>

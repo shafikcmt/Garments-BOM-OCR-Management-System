@@ -68,7 +68,17 @@ class DashboardController extends Controller
 
         $recentActivity = $this->recentActivity();
 
-        return view('store.dashboard', compact('stats', 'stockLevels', 'recentActivity'));
+        $metrics = app(\App\Services\DashboardMetricsService::class);
+        $trend = $metrics->monthlyTrend(MaterialReceiving::query(), 6, 'receive_date');
+        $delta = $metrics->deltaFor($trend);
+
+        return view('store.dashboard', compact(
+            'stats',
+            'stockLevels',
+            'recentActivity',
+            'trend',
+            'delta'
+        ));
     }
 
     /**

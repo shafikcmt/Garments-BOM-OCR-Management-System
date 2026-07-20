@@ -26,6 +26,15 @@ class DashboardController extends Controller
         $defaultBookingInstructions = BookingInstruction::where('is_default', true)->count();
         $totalGeneratedPos = BookingPo::count();
 
+        $metrics = app(\App\Services\DashboardMetricsService::class);
+
+        // Which role owns how much of the sheet — the admin view of the same
+        // ownership the other dashboards report on for themselves.
+        $ownership = $metrics->workspaceOwnershipBreakdown();
+
+        $trend = $metrics->monthlyTrend(BookingPo::query());
+        $delta = $metrics->deltaFor($trend);
+
         return view('admin.dashboard', compact(
             'totalUsers',
             'activeUsers',
@@ -37,6 +46,9 @@ class DashboardController extends Controller
             'totalBookingInstructions',
             'defaultBookingInstructions',
             'totalGeneratedPos',
+            'ownership',
+            'trend',
+            'delta',
         ));
     }
 

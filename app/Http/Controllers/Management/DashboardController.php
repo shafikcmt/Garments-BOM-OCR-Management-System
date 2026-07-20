@@ -47,14 +47,9 @@ class DashboardController extends Controller
         $stats['draft'] = PaymentRequest::where('status', 'draft')->count();
         $stats['total'] = PaymentRequest::count();
 
-        $trend = $this->monthlyTrend();
-
-        // Month-on-month change, only where last month actually had something to
-        // compare against — a percentage against zero is noise, and this screen
-        // is read by people making decisions on it.
-        $thisMonth = end($trend)['value'];
-        $lastMonth = count($trend) > 1 ? $trend[count($trend) - 2]['value'] : 0;
-        $delta = $lastMonth > 0 ? round((($thisMonth - $lastMonth) / $lastMonth) * 100) : null;
+        $metrics = app(\App\Services\DashboardMetricsService::class);
+        $trend = $metrics->monthlyTrend(PaymentRequest::query());
+        $delta = $metrics->deltaFor($trend);
 
         return view('management.dashboard', compact(
             'stats',
@@ -63,32 +58,5 @@ class DashboardController extends Controller
             'trend',
             'delta'
         ));
-    }
-
-    /**
-     * PRAs raised per month for the last six months, oldest first, including
-     * months with none so the shape of the trend is honest.
-     *
-     * @return array<int, array{label: string, value: int}>
-     */
-    private function monthlyTrend(int $months = 6): array
-    {
-        $start = now()->startOfMonth()->subMonths($months - 1);
-
-        $counts = PaymentRequest::where('created_at', '>=', $start)
-            ->get(['created_at'])
-            ->groupBy(fn ($pr) => $pr->created_at->format('Y-m'))
-            ->map->count();
-
-        $trend = [];
-        for ($i = 0; $i < $months; $i++) {
-            $month = $start->copy()->addMonths($i);
-            $trend[] = [
-                'label' => $month->format('M'),
-                'value' => (int) ($counts[$month->format('Y-m')] ?? 0),
-            ];
-        }
-
-        return $trend;
     }
 }

@@ -2,216 +2,154 @@
 
 @section('title', 'Store Dashboard')
 
-@php
-    $fmt = fn($v) => rtrim(rtrim(number_format((float) $v, 4), '0'), '.');
-@endphp
-
 @section('content')
+@php
+    $fmt = fn ($v) => rtrim(rtrim(number_format((float) $v, 2), '0'), '.');
+@endphp
 <div class="container-fluid">
-    <div class="app-hero-card p-4 p-lg-5 mb-4">
-        <div class="app-hero-layout d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="app-hero-main d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:52px;height:52px;border-radius:18px;font-size:22px;"><i class="bi bi-shop"></i></span>
-                <div>
-                    <div class="app-hero-eyebrow">Store</div>
-                    <h2 class="app-hero-title">Welcome, {{ auth()->user()->name }}</h2>
-                    <p class="app-hero-copy mb-0">General stock and buyer/style material stock in one place.</p>
-                </div>
-            </div>
-            <a href="{{ route('store.workspace') }}" class="app-hero-action btn btn-primary px-4 d-inline-flex align-items-center gap-2">
-                <i class="bi bi-box-arrow-up-right"></i>Open Workspace
+    <x-page-header icon="box-seam" eyebrow="Store"
+                   title="Welcome, {{ auth()->user()->name }}"
+                   copy="Stock position, movement and what needs attention.">
+        <x-slot:actions>
+            <a href="{{ route('store.material.receivings.index') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-box-arrow-in-down"></i>Receiving
             </a>
-        </div>
-    </div>
+            <a href="{{ route('store.reports.index') }}" class="btn btn-outline-secondary">Reports</a>
+        </x-slot:actions>
+    </x-page-header>
 
-    {{-- Quick stats --}}
+    @include('store._flash')
+
     <div class="row g-3 mb-4">
-        <div class="col-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="app-stat-label">Stock Items</div>
-                <div class="fw-bold fs-4 text-slate-900">{{ $stats['stock_items'] }}</div>
-                @if($stats['reorder_count'] > 0)<div class="small text-danger"><i class="bi bi-cart-plus me-1"></i>{{ $stats['reorder_count'] }} to re-order</div>@endif
-            </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:0ms"
+                icon="stack" tone="primary" label="Material lines tracked"
+                :value="$stats['material_lines']"
+                :spark="collect($trend)->pluck('value')->all()"
+                :href="route('store.material.ledger')" />
         </div>
-        <div class="col-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="app-stat-label">Material Lines</div>
-                <div class="fw-bold fs-4 text-slate-900">{{ $stats['material_lines'] }}</div>
-                <div class="small text-muted">Running: {{ $fmt($stats['running_qty']) }}</div>
-            </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:100ms"
+                icon="check2-circle" tone="success" label="Running closing qty"
+                :value="$fmt($stats['running_qty'])" />
         </div>
-        <div class="col-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="app-stat-label">Liability / Dead</div>
-                <div class="fw-bold fs-4"><span class="text-warning">{{ $fmt($stats['liability_qty']) }}</span> / <span class="text-danger">{{ $fmt($stats['dead_qty']) }}</span></div>
-                <div class="small text-muted">Reusable stock</div>
-            </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:200ms"
+                icon="hourglass-split" tone="warning" label="Pending requisitions"
+                :value="$stats['pending_requisitions']"
+                :href="route('store.material.requisitions.index')" />
         </div>
-        <div class="col-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="app-stat-label">Pending Requisitions</div>
-                <div class="fw-bold fs-4 text-slate-900">{{ $stats['pending_requisitions'] }}</div>
-                <div class="small text-muted">Awaiting approval</div>
-            </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:300ms"
+                icon="exclamation-triangle" tone="danger" label="Items at re-order level"
+                :value="$stats['reorder_count']"
+                :href="route('store.stock.items.index')" />
         </div>
     </div>
 
-    {{-- Requisition flow — tracking only (does not move stock) --}}
     <div class="row g-3 mb-4">
-        <div class="col-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="app-stat-label">Pending Issue</div>
-                <div class="fw-bold fs-4 text-warning">{{ $fmt($stats['pending_req_qty']) }}</div>
-                <div class="small text-muted">{{ $stats['pending_req_lines'] }} line(s) required &gt; issued</div>
-            </div>
+        <div class="col-12 col-xl-5">
+            {{-- Running / Liability / Dead is the split Store actually manages:
+                 liability and dead can still be transferred back to bulk. --}}
+            <x-card class="gx-fade-in h-100" style="--gx-delay:400ms" title="Closing stock split">
+                <x-donut-chart caption="Total qty"
+                    :total="$fmt($stats['running_qty'] + $stats['liability_qty'] + $stats['dead_qty'])"
+                    :segments="[
+                        ['label' => 'Running', 'value' => $stats['running_qty'], 'tone' => 'success'],
+                        ['label' => 'Liability', 'value' => $stats['liability_qty'], 'tone' => 'warning'],
+                        ['label' => 'Dead', 'value' => $stats['dead_qty'], 'tone' => 'danger'],
+                    ]" />
+                <a href="{{ route('store.material.ledger') }}" class="btn btn-sm btn-outline-primary mt-3">Closing stock report</a>
+            </x-card>
         </div>
-        <div class="col-6 col-xl-3">
-            <div class="app-stat-card p-3 h-100">
-                <div class="app-stat-label">Pending Receive</div>
-                <div class="fw-bold fs-4 text-info">{{ $fmt($stats['pending_recv_qty']) }}</div>
-                <div class="small text-muted">{{ $stats['pending_recv_lines'] }} line(s) issued &gt; received</div>
-            </div>
+
+        <div class="col-12 col-xl-7">
+            <x-card class="gx-fade-in h-100" style="--gx-delay:500ms">
+                <x-slot:title>
+                    Receivings — last 6 months
+                    @if($delta !== null)
+                        <span class="badge {{ $delta >= 0 ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger' }} ms-1">
+                            {{ $delta >= 0 ? '+' : '' }}{{ $delta }}% vs last month
+                        </span>
+                    @endif
+                </x-slot:title>
+                <x-area-chart :series="$trend" tone="success" label="Material receivings per month" />
+            </x-card>
         </div>
     </div>
 
-    {{-- Live stock levels + recent movement (read-only) --}}
-    <div class="row g-4 mb-4">
-        <div class="col-12 col-xl-6">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="app-stat-icon"><i class="bi bi-boxes"></i></span>
-                            <h5 class="mb-0">Current Stock by Item</h5>
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-xl-7">
+            <x-card class="gx-fade-in h-100" style="--gx-delay:600ms">
+                <x-slot:title>Recent stock movement</x-slot:title>
+                <x-slot:actions>
+                    <a href="{{ route('store.material.ledger') }}" class="btn btn-sm btn-outline-secondary">View all</a>
+                </x-slot:actions>
+
+                @php
+                    $movementItems = collect($recentActivity)->map(fn ($row) => [
+                        'tone' => $row['direction'] === 'in' ? 'success' : 'warning',
+                        'icon' => $row['direction'] === 'in' ? 'box-arrow-in-down' : 'box-arrow-up',
+                        'title' => $row['label'],
+                        'description' => ($row['direction'] === 'in' ? 'Received ' : 'Issued ')
+                            .$fmt($row['qty']).' '.($row['uom'] ?: ''),
+                        'meta' => $row['module'].' · '.optional($row['date'])->diffForHumans(),
+                    ])->all();
+                @endphp
+
+                <x-timeline :items="$movementItems" />
+            </x-card>
+        </div>
+
+        <div class="col-12 col-xl-5">
+            <x-card class="gx-fade-in h-100" style="--gx-delay:700ms" title="Needs attention">
+                @php $lowStock = collect($stockLevels)->where('low', true)->take(6); @endphp
+
+                @forelse($lowStock as $item)
+                    <div class="d-flex align-items-center justify-content-between gap-2 py-2 border-bottom">
+                        <div class="min-w-0">
+                            <div class="fw-semibold text-truncate">{{ $item['name'] }}</div>
+                            <div class="small text-muted">{{ $item['code'] }}</div>
                         </div>
-                        <a href="{{ route('store.stock.items.index') }}" class="btn btn-sm btn-outline-secondary">Items</a>
+                        <div class="text-end">
+                            <div class="fw-bold text-danger">{{ $fmt($item['current']) }} {{ $item['uom'] }}</div>
+                            <div class="small text-muted">re-order at {{ $fmt($item['threshold']) }}</div>
+                        </div>
                     </div>
-                    @if($stockLevels->isEmpty())
-                        <p class="text-muted small mb-0">No stock items yet. Add items under General Stock → Items.</p>
-                    @else
-                    <div class="table-responsive" style="max-height:320px;overflow-y:auto;">
-                        <table class="table table-sm align-middle mb-0">
-                            <thead class="text-muted small text-uppercase">
-                                <tr><th>Item</th><th class="text-end">Current</th><th></th></tr>
-                            </thead>
-                            <tbody>
-                                @foreach($stockLevels->take(12) as $s)
-                                    <tr>
-                                        <td>
-                                            <div class="fw-semibold small">{{ $s['name'] }}</div>
-                                            @if($s['code'])<div class="text-muted" style="font-size:.72rem;">{{ $s['code'] }}</div>@endif
-                                        </td>
-                                        <td class="text-end fw-bold {{ $s['low'] ? 'text-danger' : 'text-slate-900' }}">
-                                            {{ $fmt($s['current']) }}<span class="text-muted fw-normal small"> {{ $s['uom'] }}</span>
-                                        </td>
-                                        <td class="text-end" style="width:96px;">
-                                            @if($s['low'])<span class="badge bg-danger-subtle text-danger"><i class="bi bi-cart-plus me-1"></i>Re-order</span>@endif
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                    @if($stockLevels->count() > 12)<div class="small text-muted mt-2">Showing 12 of {{ $stockLevels->count() }} items (lowest stock first).</div>@endif
-                    @endif
-                </div>
-            </div>
-        </div>
+                @empty
+                    <p class="text-muted small mb-0">Nothing is at its re-order level.</p>
+                @endforelse
 
-        <div class="col-12 col-xl-6">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center gap-2 mb-3">
-                        <span class="app-stat-icon"><i class="bi bi-clock-history"></i></span>
-                        <h5 class="mb-0">Recent Issue / Receive Activity</h5>
+                @if($stats['pending_req_lines'] > 0)
+                    <div class="alert alert-warning mt-3 mb-0 py-2 small">
+                        {{ $stats['pending_req_lines'] }} requisition line(s) not fully issued
+                        ({{ $fmt($stats['pending_req_qty']) }} qty outstanding).
                     </div>
-                    @if($recentActivity->isEmpty())
-                        <p class="text-muted small mb-0">No stock movement recorded yet.</p>
-                    @else
-                    <div class="table-responsive" style="max-height:320px;overflow-y:auto;">
-                        <table class="table table-sm align-middle mb-0">
-                            <tbody>
-                                @foreach($recentActivity as $a)
-                                    @php $in = $a['direction'] === 'in'; @endphp
-                                    <tr>
-                                        <td style="width:74px;">
-                                            <span class="badge bg-{{ $in ? 'success' : 'warning' }}-subtle text-{{ $in ? 'success' : 'warning' }}">
-                                                <i class="bi bi-arrow-{{ $in ? 'down' : 'up' }}-circle me-1"></i>{{ $in ? 'In' : 'Out' }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="fw-semibold small text-truncate" style="max-width:260px;">{{ $a['label'] }}</div>
-                                            <div class="text-muted" style="font-size:.72rem;">{{ $a['module'] }} · {{ optional($a['date'])->format('d-M-Y') }}</div>
-                                        </td>
-                                        <td class="text-end fw-bold {{ $in ? 'text-success' : 'text-warning' }}">
-                                            {{ ($in ? '+' : '−') . $fmt($a['qty']) }}<span class="text-muted fw-normal small"> {{ $a['uom'] }}</span>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                    @endif
-                </div>
-            </div>
+                @endif
+            </x-card>
         </div>
     </div>
 
-    <div class="row g-4">
-        {{-- General Stock module --}}
-        <div class="col-12 col-xl-6">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center gap-2 mb-3">
-                        <span class="app-stat-icon"><i class="bi bi-box-seam"></i></span>
-                        <h5 class="mb-0">General Stock</h5>
-                    </div>
-                    <p class="text-muted small">Consumables and non-BOM items. Purchase → Consumption → Monthly closing with re-order alerts.</p>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="{{ route('store.stock.ledger') }}" class="btn btn-primary btn-sm"><i class="bi bi-journal-text me-1"></i>Monthly Ledger</a>
-                        <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary btn-sm">Items</a>
-                        <a href="{{ route('store.stock.purchases.index') }}" class="btn btn-outline-secondary btn-sm">Purchases</a>
-                        <a href="{{ route('store.stock.issues.index') }}" class="btn btn-outline-secondary btn-sm">Issues</a>
-                    </div>
-                </div>
-            </div>
+    <div class="row g-3">
+        <div class="col-12 col-md-6 col-xl-3">
+            <x-quick-action class="gx-fade-in" style="--gx-delay:800ms" icon="box-arrow-in-down" tone="success"
+                title="Receiving" description="Record material in"
+                :href="route('store.material.receivings.index')" />
         </div>
-
-        {{-- Buyer/Style Stock module --}}
-        <div class="col-12 col-xl-6">
-            <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center gap-2 mb-3">
-                        <span class="app-stat-icon"><i class="bi bi-clipboard-data"></i></span>
-                        <h5 class="mb-0">Buyer / Style Stock</h5>
-                    </div>
-                    <p class="text-muted small">BOM/PO-linked fabric &amp; trims. Receiving → Bulk Issue (bulk/sample/liability/dead) → Closing Stock with reuse.</p>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="{{ route('store.material.ledger') }}" class="btn btn-primary btn-sm"><i class="bi bi-clipboard-data me-1"></i>Closing Stock</a>
-                        <a href="{{ route('store.material.receivings.index') }}" class="btn btn-outline-secondary btn-sm">Receiving</a>
-                        <a href="{{ route('store.material.bulk-issues.index') }}" class="btn btn-outline-secondary btn-sm">Bulk Issue</a>
-                        <a href="{{ route('store.material.requisitions.index') }}" class="btn btn-outline-secondary btn-sm">Requisitions</a>
-                    </div>
-                </div>
-            </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <x-quick-action class="gx-fade-in" style="--gx-delay:850ms" icon="box-arrow-up" tone="warning"
+                title="Bulk Issue" description="Issue to production"
+                :href="route('store.material.bulk-issues.index')" />
         </div>
-
-        {{-- Reports — read-only summaries built from the existing movement data --}}
-        <div class="col-12">
-            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
-                <div class="card-body p-4">
-                    <div class="d-flex align-items-center gap-2 mb-3">
-                        <span class="app-stat-icon"><i class="bi bi-file-earmark-bar-graph"></i></span>
-                        <h5 class="mb-0">Reports</h5>
-                    </div>
-                    <p class="text-muted small">Receive and issue summary from three angles, with period movement and current ledger balance side by side. Filter by buyer, style, material or date range, then export to PDF or Excel.</p>
-                    <div class="d-flex flex-wrap gap-2">
-                        <a href="{{ route('store.reports.index', ['type' => 'style']) }}" class="btn btn-primary btn-sm"><i class="bi bi-tags me-1"></i>Style-wise</a>
-                        <a href="{{ route('store.reports.index', ['type' => 'buyer']) }}" class="btn btn-outline-secondary btn-sm">Buyer-wise</a>
-                        <a href="{{ route('store.reports.index', ['type' => 'material']) }}" class="btn btn-outline-secondary btn-sm">Material-wise</a>
-                    </div>
-                </div>
-            </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <x-quick-action class="gx-fade-in" style="--gx-delay:900ms" icon="clipboard-data" tone="primary"
+                title="Closing Stock" description="Running / liability / dead"
+                :href="route('store.material.ledger')" />
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <x-quick-action class="gx-fade-in" style="--gx-delay:950ms" icon="file-earmark-bar-graph" tone="primary"
+                title="Reports" description="Export PDF or Excel"
+                :href="route('store.reports.index')" />
         </div>
     </div>
 </div>
