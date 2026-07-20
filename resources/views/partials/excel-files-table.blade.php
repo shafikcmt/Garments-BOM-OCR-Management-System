@@ -4,44 +4,80 @@
     $authUser = auth()->user();
     $canLockFiles = $authUser?->hasRole('admin');
     $canDeleteFiles = $authUser?->hasRole('admin') || $authUser?->hasRole('merchant');
+
+    // Resolved by ExcelFileSummaryService in the controller. Falling back to
+    // resolving it here would reintroduce the cell-hydration cost this replaced,
+    // so an unset value simply shows blanks.
+    $fileSummaries = $fileSummaries ?? [];
+
+    $statusOptions = collect($files)->pluck('status')->filter()->unique()->sort()->values();
 @endphp
 
-<div class="card shadow-sm border-0">
-    <div class="card-body table-responsive">
-        <table class="table table-bordered align-middle mb-0">
+<div class="card shadow-sm border-0 gx-card" data-file-table>
+    <div class="card-body">
+        {{-- Filtering runs in the browser over rows already on the page, which
+             suits a list this size and keeps the lock/permission logic below
+             server-rendered. --}}
+        <div class="row g-2 align-items-end mb-3">
+            <div class="col-12 col-lg-5">
+                <label class="form-label small fw-semibold mb-1" for="fileSearch">Search</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="search" id="fileSearch" class="form-control" data-file-search
+                           placeholder="Buyer, season, style or contract…" autocomplete="off">
+                </div>
+            </div>
+
+            <div class="col-6 col-lg-3">
+                <label class="form-label small fw-semibold mb-1" for="fileStatus">Status</label>
+                <select id="fileStatus" class="form-select" data-file-status>
+                    <option value="">All statuses</option>
+                    @foreach($statusOptions as $option)
+                        <option value="{{ strtolower($option) }}">{{ ucfirst($option) }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="col-6 col-lg-4 d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary" data-file-clear>Clear</button>
+                <button type="button" class="btn btn-outline-primary" data-file-export disabled>
+                    <i class="bi bi-download me-1"></i>Export <span data-file-export-count></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2 d-none" data-file-chips></div>
+
+        <div class="small text-muted mb-2" data-file-count aria-live="polite"></div>
+
+        <div class="table-responsive gx-table-scroll">
+        <table class="table table-bordered align-middle mb-0 gx-file-table">
             <thead>
                 <tr>
+                    <th style="width:38px;">
+                        <input type="checkbox" class="form-check-input" data-file-select-all
+                               aria-label="Select all files">
+                    </th>
                     <th>#</th>
-                    <th>Buyer Name</th>
-                    <th>Season Name</th>
-                    <th>Style Name</th>
-                    <th>Contract Number</th>
-                    <th>Contract Shipment Date</th>
-                    <th>Status</th>
+                    <th><button type="button" class="gx-sort" data-sort="1">Buyer Name <i class="bi bi-arrow-down-up"></i></button></th>
+                    <th><button type="button" class="gx-sort" data-sort="2">Season Name <i class="bi bi-arrow-down-up"></i></button></th>
+                    <th><button type="button" class="gx-sort" data-sort="3">Style Name <i class="bi bi-arrow-down-up"></i></button></th>
+                    <th><button type="button" class="gx-sort" data-sort="4">Contract Number <i class="bi bi-arrow-down-up"></i></button></th>
+                    <th><button type="button" class="gx-sort" data-sort="5">Contract Shipment Date <i class="bi bi-arrow-down-up"></i></button></th>
+                    <th><button type="button" class="gx-sort" data-sort="6">Status <i class="bi bi-arrow-down-up"></i></button></th>
                     <th width="280">Action</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($files as $file)
                     @php
-                        $summary = [
+                        $summary = ($fileSummaries[$file->id] ?? []) + [
                             'Buyer Name' => '',
                             'Season Name' => '',
                             'Style Name' => '',
                             'Contract Number' => '',
                             'Contract Shipment Date' => '',
                         ];
-
-                        $firstRow = $file->rows->sortBy('row_number')->first();
-
-                        if ($firstRow) {
-                            foreach ($firstRow->cells as $cell) {
-                                $headerName = optional($cell->header)->header_name;
-                                if (array_key_exists($headerName, $summary) && $summary[$headerName] === '') {
-                                    $summary[$headerName] = $cell->value ?? '';
-                                }
-                            }
-                        }
 
                         $status = strtolower($file->status ?? 'pending');
                         $isFileLocked = (bool) ($file->is_locked ?? false);
@@ -66,7 +102,16 @@
                             };
                     @endphp
 
-                    <tr class="{{ $isLockedForCurrentUser ? 'table-warning' : '' }}">
+                    <tr class="{{ $isLockedForCurrentUser ? 'table-warning' : '' }}"
+                        data-file-row
+                        data-status="{{ $status }}"
+                        data-search="{{ strtolower(collect($summary)->filter()->implode(' ')) }}">
+                        <td>
+                            <input type="checkbox" class="form-check-input" data-file-check
+                                   value="{{ $file->id }}"
+                                   data-export="{{ collect([$summary['Buyer Name'], $summary['Season Name'], $summary['Style Name'], $summary['Contract Number'], $summary['Contract Shipment Date'], $status])->implode('|') }}"
+                                   aria-label="Select this file">
+                        </td>
                         <td>{{ $loop->iteration }}</td>
                         <td>{{ $summary['Buyer Name'] ?: '-' }}</td>
                         <td>{{ $summary['Season Name'] ?: '-' }}</td>
@@ -134,11 +179,31 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center">No uploaded files found.</td>
+                        <td colspan="9">
+                            <div class="text-center text-muted py-5">
+                                <i class="bi bi-inbox d-block mb-2" style="font-size:32px;"></i>
+                                <div class="fw-semibold mb-1">No BOM files yet</div>
+                                <p class="small mb-3">Upload a merchant input file to start the workspace.</p>
+                                @if(auth()->user()?->hasRole('merchant'))
+                                    <a href="{{ route('merchant.workspace') }}" class="btn btn-primary btn-sm">
+                                        <i class="bi bi-upload me-1"></i>Upload your first BOM
+                                    </a>
+                                @endif
+                            </div>
+                        </td>
                     </tr>
                 @endforelse
+
+                {{-- Shown when a filter matches nothing; the empty row above is
+                     for when there is genuinely no data at all. --}}
+                <tr class="d-none" data-file-no-match>
+                    <td colspan="9" class="text-center text-muted py-4">
+                        No file matches the current filters.
+                    </td>
+                </tr>
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 

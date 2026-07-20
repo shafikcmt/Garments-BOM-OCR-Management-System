@@ -125,3 +125,55 @@
     .gx-progress-indeterminate { animation: none; background: var(--gx-secondary); }
     .gx-dropzone.is-dragging { transform: none; }
 }
+
+/* --- Workspace file list -------------------------------------------------- */
+
+/* Header stays put while a long list scrolls. */
+.gx-table-scroll { max-height: 62vh; overflow: auto; }
+.gx-file-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--gx-card);
+}
+
+.gx-file-table tbody tr:hover { background: var(--gx-secondary-bg); }
+
+.gx-sort {
+    border: 0;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+.gx-sort i { font-size: 11px; opacity: .35; }
+.gx-sort:hover i { opacity: .7; }
+.gx-sort.is-asc i, .gx-sort.is-desc i { opacity: 1; color: var(--gx-secondary); }
+.gx-sort.is-asc i::before { content: "\F235"; }
+.gx-sort.is-desc i::before { content: "\F229"; }
+
+.gx-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px 4px 10px;
+    border-radius: var(--gx-radius-pill);
+    background: var(--gx-secondary-bg);
+    color: var(--gx-secondary-700);
+    font-size: 12px;
+    font-weight: 600;
+}
+.gx-chip button {
+    border: 0;
+    background: none;
+    color: inherit;
+    line-height: 1;
+    font-size: 15px;
+    cursor: pointer;
+    padding: 0 4px;
+}

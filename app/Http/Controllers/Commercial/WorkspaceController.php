@@ -9,10 +9,12 @@ class WorkspaceController extends Controller
 {
     public function index()
     {
-        $files = ExcelFile::with(['uploader', 'rows.cells.header'])
+        $files = ExcelFile::with(['uploader'])
             ->latest()
             ->get();
 
-        return view('commercial.workspace', compact('files'));
+        $fileSummaries = app(\App\Services\ExcelFileSummaryService::class)->for($files);
+
+        return view('commercial.workspace', compact('files', 'fileSummaries'));
     }
 }

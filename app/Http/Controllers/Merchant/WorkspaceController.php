@@ -11,9 +11,11 @@ class WorkspaceController extends Controller
 {
     public function index()
     {
-        $files = ExcelFile::with(['uploader', 'rows.cells.header'])
+        $files = ExcelFile::with(['uploader'])
             ->latest()
             ->get();
+
+        $fileSummaries = app(\App\Services\ExcelFileSummaryService::class)->for($files);
 
         $merchantRoleId = Role::where('name', 'merchant')->value('id');
 
@@ -28,6 +30,6 @@ class WorkspaceController extends Controller
                 ->get()
             : collect();
 
-        return view('merchant.workspace', compact('files', 'merchantInputHeaders'));
+        return view('merchant.workspace', compact('files', 'merchantInputHeaders', 'fileSummaries'));
     }
 }
