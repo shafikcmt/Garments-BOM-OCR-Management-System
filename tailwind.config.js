@@ -9,10 +9,20 @@ export default {
         './resources/views/**/*.blade.php',
     ],
 
+    // Bootstrap owns the base layer on every screen. Tailwind's preflight
+    // would reset it and break the whole UI, so it stays off — this mirrors
+    // the `corePlugins: { preflight: false }` the CDN build used before the
+    // stylesheet moved into Vite.
+    corePlugins: {
+        preflight: false,
+    },
+
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                // Inter is what the layouts actually load (fonts.bunny.net)
+                // and what body falls back to in app.css.
+                sans: ['Inter', ...defaultTheme.fontFamily.sans],
             },
         },
     },

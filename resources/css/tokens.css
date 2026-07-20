@@ -1,0 +1,30 @@
+/* Design tokens — the single source of truth for colour and radius.
+ *
+ * Phase 1 only DEFINES the palette; nothing consumes it yet, so the UI is
+ * pixel-identical to before. Phase 2 binds these to Bootstrap's own --bs-*
+ * variables (Bootstrap 5.3 is themeable through CSS variables, so no fork or
+ * recompile is needed) and replaces the border-radius values hardcoded across
+ * the views. Keeping the two steps apart means any visual regression in
+ * Phase 2 is unambiguously caused by the palette, not by the build change.
+ */
+
+:root {
+    /* Brand palette */
+    --gx-primary: #0F172A;      /* Slate 900  — professional dark  */
+    --gx-secondary: #3B82F6;    /* Blue 500   — trust / technology */
+    --gx-accent: #10B981;       /* Emerald 500 — success / approval */
+    --gx-warning: #F59E0B;      /* Amber 500  — pending / review   */
+    --gx-danger: #EF4444;       /* Red 500    — errors / rejection */
+
+    /* Surfaces and text */
+    --gx-bg: #F8FAFC;           /* Slate 50 */
+    --gx-card: #FFFFFF;
+    --gx-text: #1E293B;         /* Slate 800 */
+    --gx-text-muted: #64748B;   /* Slate 500 */
+
+    /* Shape — Phase 2 replaces the border-radius:14px hardcoded 61 times
+       across the views with these. */
+    --gx-radius: 14px;
+    --gx-radius-sm: 10px;
+    --gx-radius-pill: 999px;
+}

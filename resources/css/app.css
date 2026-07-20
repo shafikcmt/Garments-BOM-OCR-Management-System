@@ -1,3 +1,24 @@
+/* Vite entry point.
+ *
+ * Everything the browser needs is bundled from here. All @import rules must
+ * precede the @tailwind directives, so Tailwind's utilities are emitted last
+ * and keep the highest precedence among these layers.
+ *
+ * Bootstrap itself is still delivered from its CDN in the layouts and loads
+ * BEFORE this bundle, so the component styles below win over Bootstrap's
+ * defaults exactly as they did when they lived in the layout's <style> tag.
+ */
+
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+@import './tokens.css';
+@import './components.css';
+
+/* preflight is disabled in tailwind.config.js — it would reset Bootstrap's
+   base styles and break every existing screen. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
     color-scheme: light;
 }
