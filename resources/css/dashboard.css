@@ -1,0 +1,253 @@
+/* Dashboard components — stat tiles, charts, timeline, action tiles.
+ *
+ * Charts are inline SVG rather than a charting library: no new dependency, and
+ * they read the palette tokens directly so they stay in step with the theme.
+ */
+
+/* Tone map — the one place a semantic tone binds to a palette colour. */
+.gx-tone-primary { --gx-tone: var(--gx-secondary); --gx-tone-bg: var(--gx-secondary-bg); }
+.gx-tone-success { --gx-tone: var(--gx-accent);    --gx-tone-bg: var(--gx-accent-bg); }
+.gx-tone-warning { --gx-tone: var(--gx-warning);   --gx-tone-bg: var(--gx-warning-bg); }
+.gx-tone-danger  { --gx-tone: var(--gx-danger);    --gx-tone-bg: var(--gx-danger-bg); }
+
+/* --- Stat card ----------------------------------------------------------- */
+.gx-stat {
+    --gx-tone: var(--gx-secondary);
+    --gx-tone-bg: var(--gx-secondary-bg);
+    display: block;
+    position: relative;
+    padding: 18px 18px 14px;
+    border-radius: var(--gx-radius);
+    background: var(--gx-card);
+    border: 1px solid #e8eef6;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, .05);
+    text-decoration: none;
+    color: inherit;
+    overflow: hidden;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.gx-stat--success { --gx-tone: var(--gx-accent);  --gx-tone-bg: var(--gx-accent-bg); }
+.gx-stat--warning { --gx-tone: var(--gx-warning); --gx-tone-bg: var(--gx-warning-bg); }
+.gx-stat--danger  { --gx-tone: var(--gx-danger);  --gx-tone-bg: var(--gx-danger-bg); }
+
+a.gx-stat:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(15, 23, 42, .10); }
+
+.gx-stat-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.gx-stat-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gx-tone-bg);
+    color: var(--gx-tone);
+    font-size: 19px;
+}
+
+.gx-stat-delta {
+    display: inline-flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 8px 3px 4px;
+    border-radius: var(--gx-radius-pill);
+}
+
+.gx-stat-delta.is-up   { color: var(--gx-accent-700); background: var(--gx-accent-bg); }
+.gx-stat-delta.is-down { color: var(--gx-danger-700); background: var(--gx-danger-bg); }
+
+.gx-stat-value {
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -.02em;
+    color: var(--gx-primary);
+}
+
+.gx-stat-label { font-size: 13px; font-weight: 600; color: var(--gx-text-muted); margin-top: 4px; }
+.gx-stat-sub   { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+/* --- Sparkline ----------------------------------------------------------- */
+.gx-spark { display: block; width: 100%; height: 28px; margin-top: 10px; overflow: visible; }
+.gx-spark-line { fill: none; stroke: var(--gx-tone, var(--gx-secondary)); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.gx-spark-fill { fill: var(--gx-tone-bg, var(--gx-secondary-bg)); opacity: .7; }
+.gx-spark--success { --gx-tone: var(--gx-accent);  --gx-tone-bg: var(--gx-accent-bg); }
+.gx-spark--warning { --gx-tone: var(--gx-warning); --gx-tone-bg: var(--gx-warning-bg); }
+.gx-spark--danger  { --gx-tone: var(--gx-danger);  --gx-tone-bg: var(--gx-danger-bg); }
+
+/* --- Donut --------------------------------------------------------------- */
+.gx-donut-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; }
+.gx-donut { position: relative; width: 168px; flex: 0 0 168px; }
+.gx-donut svg { width: 100%; height: auto; transform: rotate(-90deg); }
+.gx-donut-track { fill: none; stroke: #eef2f7; stroke-width: 16; }
+
+.gx-donut-slice {
+    fill: none;
+    stroke: var(--gx-tone, var(--gx-secondary));
+    stroke-width: 16;
+    stroke-linecap: butt;
+    animation: gxDonutIn .7s ease both;
+    animation-delay: var(--gx-delay, 0ms);
+}
+
+@keyframes gxDonutIn {
+    from { opacity: 0; stroke-width: 6; }
+    to   { opacity: 1; stroke-width: 16; }
+}
+
+.gx-donut-centre {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.gx-donut-total { font-size: 26px; font-weight: 700; color: var(--gx-primary); line-height: 1; }
+.gx-donut-caption {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gx-text-muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-top: 3px;
+}
+
+.gx-legend { list-style: none; margin: 0; padding: 0; flex: 1 1 200px; min-width: 190px; }
+.gx-legend li { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+.gx-legend-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--gx-tone, var(--gx-secondary)); flex: 0 0 10px; }
+.gx-legend-label { flex: 1 1 auto; color: var(--gx-text); font-weight: 500; }
+.gx-legend-value { font-weight: 700; color: var(--gx-primary); }
+.gx-legend-pct { color: var(--gx-text-muted); font-size: 12px; min-width: 42px; text-align: right; }
+
+/* --- Area chart ---------------------------------------------------------- */
+.gx-area { --gx-tone: var(--gx-secondary); }
+.gx-area-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.gx-area-line {
+    fill: none;
+    stroke: var(--gx-tone);
+    stroke-width: 2.5;
+    vector-effect: non-scaling-stroke;
+    stroke-linejoin: round;
+}
+.gx-area-stop-a { stop-color: var(--gx-tone); stop-opacity: .28; }
+.gx-area-stop-b { stop-color: var(--gx-tone); stop-opacity: .02; }
+.gx-area-dot {
+    fill: #fff;
+    stroke: var(--gx-tone);
+    stroke-width: 2.5;
+    vector-effect: non-scaling-stroke;
+    transition: r .15s ease;
+}
+.gx-area-dot:hover { r: 6; }
+.gx-area-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--gx-text-muted); }
+
+/* --- Timeline ------------------------------------------------------------ */
+.gx-timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+.gx-timeline-item { position: relative; display: flex; gap: 12px; padding: 0 0 18px 0; }
+
+.gx-timeline-item::before {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: 32px;
+    bottom: 0;
+    width: 2px;
+    background: #eef2f7;
+}
+
+.gx-timeline-item:last-child::before { display: none; }
+
+.gx-timeline-marker {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border-radius: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gx-tone-bg, var(--gx-secondary-bg));
+    color: var(--gx-tone, var(--gx-secondary));
+    font-size: 14px;
+    z-index: 1;
+}
+
+.gx-timeline-body { min-width: 0; padding-top: 3px; }
+.gx-timeline-title { font-size: 13px; font-weight: 600; color: var(--gx-text); }
+.gx-timeline-desc { font-size: 12px; color: var(--gx-text-muted); margin-top: 2px; }
+.gx-timeline-meta { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+
+/* --- Quick action tile --------------------------------------------------- */
+.gx-action {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    border-radius: var(--gx-radius);
+    background: var(--gx-card);
+    border: 1px solid #e8eef6;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+    text-decoration: none;
+    color: inherit;
+    height: 100%;
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.gx-action:hover {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 20px 44px rgba(15, 23, 42, .11);
+    border-color: var(--gx-tone, var(--gx-secondary));
+    color: inherit;
+}
+
+.gx-action-icon {
+    width: 46px;
+    height: 46px;
+    flex: 0 0 46px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gx-tone-bg, var(--gx-secondary-bg));
+    color: var(--gx-tone, var(--gx-secondary));
+    font-size: 20px;
+}
+
+.gx-action-body { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.gx-action-title { font-weight: 600; font-size: 14px; color: var(--gx-text); }
+.gx-action-desc { font-size: 12px; color: var(--gx-text-muted); }
+.gx-action-arrow { color: #cbd5e1; transition: transform .2s ease, color .2s ease; }
+.gx-action:hover .gx-action-arrow { transform: translateX(3px); color: var(--gx-tone, var(--gx-secondary)); }
+
+/* --- Staggered entrance -------------------------------------------------- */
+.gx-fade-in { animation: gxFadeIn .45s ease both; animation-delay: var(--gx-delay, 0ms); }
+
+@keyframes gxFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Motion here is decoration — the content must never depend on it. */
+@media (prefers-reduced-motion: reduce) {
+    .gx-fade-in,
+    .gx-donut-slice { animation: none !important; }
+
+    .gx-stat,
+    .gx-action,
+    .gx-action-arrow,
+    .gx-area-dot { transition: none !important; }
+
+    a.gx-stat:hover,
+    .gx-action:hover { transform: none; }
+}
