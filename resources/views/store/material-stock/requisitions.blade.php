@@ -4,6 +4,12 @@
 
 @section('content')
 <div class="container-fluid">
+    <x-breadcrumb :items="[
+        ['label' => 'Store', 'url' => route('store.dashboard')],
+        ['label' => 'Buyer / Style Stock'],
+        ['label' => 'Requisitions'],
+    ]" />
+
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-3">

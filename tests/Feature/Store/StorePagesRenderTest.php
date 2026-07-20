@@ -58,11 +58,23 @@ it('renders the shared layout chrome', function () {
         ->assertSee('v'.config('app.version'), false);
 });
 
-it('shows a breadcrumb trail with the current page marked', function () {
-    $this->actingAs(storePageUser())
-        ->get(route('store.material.ledger'))
-        ->assertOk()
-        ->assertSee('gx-breadcrumb', false)
+/**
+ * Every Store screen except the dashboard carries a trail. The dashboard is
+ * the root of that trail, so a breadcrumb there would only ever say "Store".
+ */
+it('shows a breadcrumb trail with the current page marked', function (string $routeName) {
+    $response = $this->actingAs(storePageUser())
+        ->get(route($routeName))
+        ->assertOk();
+
+    if ($routeName === 'store.dashboard') {
+        $response->assertDontSee('gx-breadcrumb', false);
+
+        return;
+    }
+
+    $response->assertSee('gx-breadcrumb', false)
         ->assertSee('aria-current="page"', false)
-        ->assertSee('Closing Stock');
-});
+        // The trail always starts at Store and links back to the dashboard.
+        ->assertSee(route('store.dashboard'), false);
+})->with('store pages');

@@ -170,6 +170,11 @@
 @endphp
 
 <div class="container-fluid supplier-page">
+    <x-breadcrumb :items="[
+        ['label' => 'Admin', 'url' => route('admin.dashboard')],
+        ['label' => 'Vendors'],
+    ]" />
+
     <div class="supplier-hero mb-3">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-3">

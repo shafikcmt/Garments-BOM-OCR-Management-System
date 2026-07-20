@@ -369,6 +369,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
 @section('content')
 <div class="container-fluid po-control-page">
+    <x-breadcrumb :items="[
+        ['label' => 'Admin', 'url' => route('admin.dashboard')],
+        ['label' => 'PO Generate Control'],
+    ]" />
+
     <div class="po-control-hero p-4 p-lg-5 mb-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-3">

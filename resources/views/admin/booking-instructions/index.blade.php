@@ -8,6 +8,12 @@
         <div class="alert alert-success border-0 shadow-sm rounded-4">{{ session('success') }}</div>
     @endif
 
+    <x-breadcrumb :items="[
+        ['label' => 'Admin', 'url' => route('admin.dashboard')],
+        ['label' => 'Booking Setup'],
+        ['label' => 'Booking Instructions'],
+    ]" />
+
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
             <div class="d-flex align-items-center gap-3">

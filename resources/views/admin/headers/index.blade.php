@@ -386,6 +386,11 @@
 </style>
 
 <div class="container-fluid py-2 px-2 px-md-3 header-page">
+    <x-breadcrumb :items="[
+        ['label' => 'Admin', 'url' => route('admin.dashboard')],
+        ['label' => 'Excel Headers'],
+    ]" />
+
     <div class="page-hero mb-3">
         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
             <div>

@@ -12,6 +12,11 @@
         <div class="alert alert-warning rounded-4 border-0 shadow-sm">{{ session('warning') }}</div>
     @endif
 
+    <x-breadcrumb :items="[
+        ['label' => 'Account', 'url' => route('account.dashboard')],
+        ['label' => 'Workspace'],
+    ]" />
+
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center gap-3">
             <span class="app-stat-icon" style="width:48px;height:48px;border-radius:17px;font-size:20px;"><i class="bi bi-cash-stack"></i></span>

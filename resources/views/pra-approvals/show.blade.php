@@ -17,6 +17,11 @@
     $stageTag = fn ($a) => $a->stage === \App\Models\PraApproval::STAGE_CHECK ? 'Checker' : 'Approver';
 @endphp
 <div class="container-fluid">
+    <x-breadcrumb :items="[
+        ['label' => 'PRA Approvals'],
+        ['label' => 'Review'],
+    ]" />
+
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
             <div class="d-flex align-items-center gap-3">
