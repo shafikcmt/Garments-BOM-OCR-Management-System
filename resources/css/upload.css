@@ -177,3 +177,50 @@
     cursor: pointer;
     padding: 0 4px;
 }
+
+/* --- File change history -------------------------------------------------- */
+.gx-activity {
+    border: 1px solid #e8eef6;
+    border-radius: var(--gx-radius-sm);
+    background: var(--gx-card);
+    padding: 12px 14px;
+}
+
+.gx-activity-scroll { max-height: 320px; overflow: auto; }
+
+.gx-activity thead th {
+    position: sticky;
+    top: 0;
+    background: var(--gx-card);
+    z-index: 1;
+}
+
+/* --- Print ----------------------------------------------------------------
+ * A BOM sheet gets printed and carried onto the floor, so the chrome around
+ * it should not come with it.
+ */
+@media print {
+    .sidebar,
+    .header,
+    .app-sidebar-backdrop,
+    .gx-footer,
+    .skip-link,
+    .d-print-none,
+    .table-toolbar .btn,
+    .pagination { display: none !important; }
+
+    .content { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+
+    body { background: #fff !important; }
+
+    .card, .excel-work-card, .gx-card {
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+        break-inside: avoid;
+    }
+
+    /* Collapsed history should print if the user opened it. */
+    .collapse.show { display: block !important; }
+
+    a[href]::after { content: ""; }
+}

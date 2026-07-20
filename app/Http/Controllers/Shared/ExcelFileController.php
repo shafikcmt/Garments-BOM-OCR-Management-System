@@ -152,10 +152,23 @@ class ExcelFileController extends Controller
             ])
             ->all();
 
+        // Every cell edit has been logged since the workspace was built, but
+        // nothing ever displayed it. With six departments editing the same
+        // sheet, "who changed this?" is the question that actually gets asked.
+        $activityLog = ActivityLog::with(['user', 'header'])
+            ->where('excel_file_id', $excelFile->id)
+            ->latest('id')
+            ->limit(50)
+            ->get();
+
+        $activityTotal = ActivityLog::where('excel_file_id', $excelFile->id)->count();
+
         return view('shared.excel-files.show', compact(
             'excelFile',
             'headers',
             'rows',
+            'activityLog',
+            'activityTotal',
             'editableHeaderIds',
             'calculatedHeaderKeys',
             'calculatedHeaderIds',
@@ -415,6 +428,31 @@ class ExcelFileController extends Controller
         return redirect()
             ->route('uploaded-files.show', $excelFile->id)
             ->with('success', 'New row added successfully.');
+    }
+
+    /**
+     * Download the file exactly as it was uploaded.
+     *
+     * The original has always been kept on disk but there was no way to get it
+     * back — useful when someone needs to check what was actually submitted
+     * against what the workspace now holds.
+     */
+    public function download(ExcelFile $excelFile)
+    {
+        // Same visibility rule as viewing the workspace: if you can open the
+        // file you can take a copy of what it came from.
+        if ($excelFile->isLockedForUser(auth()->user()) && ! auth()->user()->hasRole('admin')) {
+            abort(403, 'This file is locked for you.');
+        }
+
+        if (empty($excelFile->file_path) || ! Storage::exists($excelFile->file_path)) {
+            return back()->with('warning', 'The original file is no longer stored on the server.');
+        }
+
+        return Storage::download(
+            $excelFile->file_path,
+            $excelFile->original_file_name ?: $excelFile->file_name
+        );
     }
 
     public function destroy(ExcelFile $excelFile)

@@ -880,8 +880,26 @@
                     <span class="order-meta-chip order-meta-chip-locked"><i class="bi bi-lock-fill me-1"></i>{{ $fileLockInfo['summary'] ?? $excelFile->lockScopeLabel() }}</span>
                 @endif
             </div>
-            <div class="d-flex gap-2 flex-shrink-0">
+            <div class="d-flex gap-2 flex-shrink-0 d-print-none">
                 <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"><i class="bi bi-arrow-left"></i><span class="ms-1">Back</span></a>
+
+                <a href="{{ route('uploaded-files.download', $excelFile->id) }}"
+                   class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
+                   title="Download the file exactly as it was uploaded">
+                    <i class="bi bi-download"></i><span class="ms-1">Original</span>
+                </a>
+
+                <button type="button" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
+                        onclick="window.print()"><i class="bi bi-printer"></i><span class="ms-1">Print</span></button>
+
+                @if(($activityTotal ?? 0) > 0)
+                    <button type="button" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
+                            data-bs-toggle="collapse" data-bs-target="#fileActivityLog"
+                            aria-expanded="false" aria-controls="fileActivityLog">
+                        <i class="bi bi-clock-history"></i><span class="ms-1">History ({{ $activityTotal }})</span>
+                    </button>
+                @endif
+
                 @if($canDeleteFile ?? false)
                     <button type="submit" form="delete-file-form" class="btn btn-outline-danger btn-sm" style="min-height:32px;font-size:12px;" onclick="return confirm('Are you sure you want to delete this file?');"><i class="bi bi-trash"></i><span class="ms-1">Delete</span></button>
                 @endif
@@ -895,6 +913,57 @@
                 </div>
             @endforeach
         </div>
+
+        {{-- Every cell edit has been recorded since the workspace was built.
+             Six departments write to the same sheet, so this answers the
+             question that follows a surprising value: who changed it. --}}
+        @if(($activityTotal ?? 0) > 0)
+            <div class="collapse mt-3" id="fileActivityLog">
+                <div class="gx-activity">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="fw-semibold" style="font-size:13px;">Change history</span>
+                        <span class="text-muted" style="font-size:11px;">
+                            Showing the latest {{ min(50, $activityTotal) }} of {{ number_format($activityTotal) }}
+                        </span>
+                    </div>
+
+                    <div class="gx-activity-scroll">
+                        <table class="table table-sm mb-0" style="font-size:12px;">
+                            <thead>
+                                <tr class="text-muted text-uppercase" style="font-size:10px;">
+                                    <th>When</th><th>Who</th><th>Field</th><th>Change</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($activityLog as $entry)
+                                    @php
+                                        $isEdit = in_array($entry->action, ['updated', 'created'], true);
+                                        $from = trim((string) $entry->old_value);
+                                        $to = trim((string) $entry->new_value);
+                                    @endphp
+                                    <tr>
+                                        <td class="text-nowrap text-muted">{{ $entry->created_at?->diffForHumans() }}</td>
+                                        <td class="text-nowrap">{{ $entry->user->name ?? 'System' }}</td>
+                                        <td>{{ $entry->header->header_name ?? ucfirst(str_replace('_', ' ', $entry->action)) }}</td>
+                                        <td>
+                                            @if($isEdit)
+                                                @if($from !== '')
+                                                    <span class="text-danger text-decoration-line-through">{{ Str::limit($from, 28) }}</span>
+                                                    <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                                                @endif
+                                                <span class="text-success fw-semibold">{{ $to !== '' ? Str::limit($to, 28) : '(cleared)' }}</span>
+                                            @else
+                                                <span class="badge bg-secondary-subtle text-secondary">{{ str_replace('_', ' ', $entry->action) }}</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
 
     <form method="POST" action="{{ route('uploaded-files.update', $excelFile->id) }}{{ $updateQueryString ? '?' . $updateQueryString : '' }}" id="excelFileForm">
