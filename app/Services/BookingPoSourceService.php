@@ -531,6 +531,35 @@ class BookingPoSourceService
     }
 
     /**
+     * Every worksheet line belonging to this PO: the BookingPo's own primary row
+     * plus the sibling rows that share its PO number, ordered as they appear in
+     * the sheet.
+     *
+     * One PO number routinely covers several styles/materials, but only the
+     * primary line owns a BookingPo record — so callers that need to present or
+     * receive against "all items under this PO" (Store's Material Receiving)
+     * must work from ExcelRow, not from booking_pos. Item-level values are then
+     * read per row via sourceValueForRow().
+     *
+     * @return Collection<int, ExcelRow>
+     */
+    public function itemRowsForBookingPo(BookingPo $bookingPo): Collection
+    {
+        $bookingPo->loadMissing('excelRow.cells.header');
+
+        $rows = collect();
+
+        if ($bookingPo->excelRow) {
+            $rows->push($bookingPo->excelRow);
+        }
+
+        return $rows->merge($this->siblingSourceRows($bookingPo))
+            ->unique('id')
+            ->sortBy('row_number')
+            ->values();
+    }
+
+    /**
      * All worksheet rows that share this BookingPo's PO number, excluding the
      * BookingPo's own primary row. These are the extra booking lines (other
      * styles/materials) that were merged into the same PO at generation time
@@ -620,9 +649,14 @@ class BookingPoSourceService
             'style' => $bookingPo->style_name,
             'material_type' => $bookingPo->item_type,
             'material_description', 'item' => $bookingPo->description ?: $bookingPo->item_name,
+            'material_name' => $bookingPo->item_name ?: $bookingPo->description,
             'sap_code' => $bookingPo->supplier_article,
-            'material_color', 'color' => $bookingPo->color,
+            'art_no' => $bookingPo->supplier_article,
+            // No dedicated GMTS-colour column on booking_pos — the material
+            // colour is the closest available value.
+            'material_color', 'color', 'gmts_color' => $bookingPo->color,
             'size' => $bookingPo->size_width,
+            'uom' => $bookingPo->uom,
             'qty', 'materials_ordered' => $bookingPo->qty !== null ? (string) $bookingPo->qty : null,
             'remarks' => $bookingPo->remarks,
             default => null,
@@ -695,8 +729,13 @@ class BookingPoSourceService
             'material_type' => str_contains($header, 'material_type') || str_contains($header, 'item_type'),
             'material_description' => str_contains($header, 'material_description') || $header === 'description' || str_contains($header, 'description'),
             'sap_code' => str_contains($header, 'sap_code'),
+            'material_name' => str_contains($header, 'material_name') || str_contains($header, 'item_name'),
+            'art_no' => str_contains($header, 'art_no') || str_contains($header, 'article_no') || str_contains($header, 'artical_no') || str_contains($header, 'supplier_article'),
+            // Garment colour only — must not swallow a plain "Material Color" header.
+            'gmts_color' => str_contains($header, 'gmts_color') || str_contains($header, 'gmts_colour') || str_contains($header, 'garments_color') || str_contains($header, 'garment_color'),
             'material_color' => str_contains($header, 'material_color') || str_contains($header, 'gmts_color') || str_contains($header, 'color') || str_contains($header, 'colour'),
             'size' => (str_contains($header, 'size') || str_contains($header, 'gmts_size')) && ! str_contains($header, 'width') && ! str_contains($header, 'size_width'),
+            'uom' => $header === 'uom' || $header === 'unit' || str_contains($header, 'unit_of_measure'),
             'materials_ordered' => str_contains($header, 'materials_ordered') || str_contains($header, 'material_ordered') || str_contains($header, 'materials_to_be_ordered'),
             'qty' => str_contains($header, 'qty') || str_contains($header, 'quantity'),
             'pi_number' => str_contains($header, 'pi_number') || str_contains($header, 'vendor_pi_number'),
@@ -737,9 +776,18 @@ class BookingPoSourceService
             'material_type' => ['material_type', 'item_type', 'material_category', 'Material Type', 'Item Type'],
             'item' => ['material_type', 'item_name', 'item', 'material_description', 'description'],
             'material_description' => ['material_description', 'description', 'Material Description', 'Description'],
+            'material_name' => ['material_name', 'item_name', 'material', 'Material Name', 'Item Name'],
             'sap_code' => ['sap_code', 'supplier_article', 'SAP Code'],
             'material_color' => ['material_color', 'gmts_color_name', 'gmts_colour_name', 'color', 'colour', 'Material Color'],
+            // Garment (GMTS) colour, kept separate from the material's own colour —
+            // the Receiving sheet carries both columns side by side.
+            'gmts_color' => ['gmts_color_name', 'gmts_colour_name', 'gmts_color', 'gmts_colour', 'garments_color', 'garments_colour', 'garment_color', 'GMTS Color Name', 'Garments Color'],
+            'art_no' => ['art_no', 'article_no', 'artical_no', 'art_number', 'article_number', 'supplier_article', 'supplier_article_no', 'Art. No', 'Art No', 'Article No'],
             'size' => ['size', 'item_size', 'material_size', 'gmts_size', 'Size', 'Item Size', 'Material Size'],
+            // No UOM column exists in the current workbooks — these aliases are
+            // here so a future file that carries one resolves per row; until
+            // then it falls back to the booking_pos.uom column.
+            'uom' => ['uom', 'unit', 'unit_of_measure', 'unit_of_measurement', 'UOM', 'Unit'],
             'qty' => ['materials_to_be_ordered', 'material_to_be_ordered', 'materials_ordered', 'material_ordered', 'materials_to_be_order', 'booking_qty', 'booking_quantity', 'qty'],
             'materials_ordered' => ['materials_ordered', 'material_ordered', 'materials_to_be_ordered', 'material_to_be_ordered', 'materials_order_qty', 'material_order_qty', 'Materials Ordered'],
             'pi_number' => ['material_pi_number', 'pi_number', 'vendor_pi_number', 'Material PI Number', 'PI Number', 'Vendor PI Number'],

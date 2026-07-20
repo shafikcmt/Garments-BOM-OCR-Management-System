@@ -21,8 +21,12 @@ class MaterialReceiving extends Model
         'po_no',
         'buyer_name',
         'season_name',
+        'supplier_name',
         'style_name',
+        'material_name',
         'material_description',
+        'gmts_color_name',
+        'art_no',
         'sap_code',
         'material_color',
         'size',
@@ -32,15 +36,22 @@ class MaterialReceiving extends Model
         'receive_date',
         'source_type',
         'qty',
+        'invoice_qty',
+        'internal_po_qty',
         'unit_price',
+        'invoice_value',
         'remarks',
         'created_by',
     ];
 
     protected $casts = [
         'receive_date' => 'date',
+        // qty = Physical Rcv Qty (the figure the stock ledger consumes).
         'qty' => 'decimal:4',
+        'invoice_qty' => 'decimal:4',
+        'internal_po_qty' => 'decimal:4',
         'unit_price' => 'decimal:4',
+        'invoice_value' => 'decimal:4',
     ];
 
     public function excelFile()

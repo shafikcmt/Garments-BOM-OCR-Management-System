@@ -58,6 +58,10 @@ Route::prefix('store')
             Route::post('/ledger/{ledger}/dead-movement', [MaterialStockLedgerController::class, 'storeDeadMovement'])->name('ledger.dead');
 
             Route::get('/receivings', [MaterialReceivingController::class, 'index'])->name('receivings.index');
+            // Auto-fill lookup for the Record Receiving form's PO dropdown.
+            Route::get('/receivings/po-details/{bookingPo}', [MaterialReceivingController::class, 'poDetails'])->name('receivings.po-details');
+            // Every material line under one PO, for the item picker.
+            Route::get('/receivings/po-items/{bookingPo}', [MaterialReceivingController::class, 'poItems'])->name('receivings.po-items');
             Route::post('/receivings', [MaterialReceivingController::class, 'store'])->name('receivings.store');
             Route::delete('/receivings/{materialReceiving}', [MaterialReceivingController::class, 'destroy'])->name('receivings.destroy');
 
