@@ -96,22 +96,27 @@
                         </a>
                     </div>
 
-                    <form method="POST" action="{{ route('merchant.excel.store') }}" enctype="multipart/form-data">
-                        @csrf
+                    @error('file')
+                        <div class="alert alert-danger py-2 small">{{ $message }}</div>
+                    @enderror
 
-                        <div class="mb-3">
-                            <label class="form-label">Select Excel File</label>
-                            <input type="file" name="file" class="form-control" accept=".xlsx,.xls,.csv" required>
-                            <small class="text-muted">Only merchant input headers are accepted. Formula fields calculate automatically.</small>
-                        </div>
-
-                        <div class="mb-3">
+                    {{-- The limit shown is the real PHP ceiling, so the number
+                         cannot drift away from what the server will accept. --}}
+                    <x-file-upload
+                        :action="route('merchant.excel.store')"
+                        name="file"
+                        accept=".xlsx,.xls,.csv"
+                        :max-mb="(int) min(
+                            (int) filter_var(ini_get('upload_max_filesize'), FILTER_SANITIZE_NUMBER_INT),
+                            (int) filter_var(ini_get('post_max_size'), FILTER_SANITIZE_NUMBER_INT)
+                        )"
+                        hint="Excel or CSV — merchant input headers only">
+                        <div class="mt-3">
                             <label class="form-label">Remarks</label>
                             <input type="text" name="remarks" class="form-control" placeholder="Optional remarks" value="{{ old('remarks') }}">
+                            <small class="text-muted">Formula fields are calculated automatically after upload.</small>
                         </div>
-
-                        <button type="submit" class="btn btn-primary">Upload File</button>
-                    </form>
+                    </x-file-upload>
                 </div>
             </div>
         </div>

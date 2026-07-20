@@ -1,0 +1,127 @@
+/* Drag-and-drop upload zone.
+ *
+ * The zone is a <label> wrapping a visually-hidden file input, so it is
+ * focusable and operable by keyboard with no extra scripting.
+ */
+
+.gx-dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 36px 24px;
+    text-align: center;
+    cursor: pointer;
+    border: 2px dashed #cbd5e1;
+    border-radius: var(--gx-radius);
+    background: var(--gx-bg);
+    transition: border-color .2s ease, background .2s ease, transform .2s ease;
+}
+
+.gx-dropzone:hover { border-color: var(--gx-secondary); background: #fff; }
+
+/* Focus lands on the hidden input, so the ring has to be drawn on the zone. */
+.gx-dropzone:focus-within {
+    outline: 2px solid var(--gx-secondary);
+    outline-offset: 2px;
+    border-color: var(--gx-secondary);
+}
+
+.gx-dropzone.is-dragging {
+    border-color: var(--gx-secondary);
+    border-style: solid;
+    background: linear-gradient(135deg, var(--gx-secondary-bg) 0%, #ffffff 100%);
+    transform: scale(1.005);
+}
+
+.gx-dropzone.has-file { padding: 22px; }
+
+.gx-dropzone-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gx-secondary-bg);
+    color: var(--gx-secondary);
+    font-size: 24px;
+}
+
+.gx-dropzone.is-dragging .gx-dropzone-icon { background: var(--gx-secondary); color: #fff; }
+
+.gx-dropzone-title { font-weight: 600; color: var(--gx-text); font-size: 15px; }
+.gx-dropzone-hint { font-size: 12px; color: var(--gx-text-muted); }
+
+.gx-dropzone-formats { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 4px; }
+
+.gx-format-pill {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 3px 8px;
+    border-radius: var(--gx-radius-pill);
+    background: #eef2f7;
+    color: var(--gx-text-muted);
+}
+
+/* --- Selected file card --------------------------------------------------- */
+.gx-upload-file {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+    padding: 12px 14px;
+    border: 1px solid #e8eef6;
+    border-radius: var(--gx-radius-sm);
+    background: var(--gx-card);
+}
+
+.gx-upload-file-icon {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gx-accent-bg);
+    color: var(--gx-accent-700);
+    font-size: 18px;
+}
+
+.gx-upload-file-body { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; gap: 2px; }
+.gx-upload-file-name { font-weight: 600; font-size: 13px; color: var(--gx-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gx-upload-file-meta { font-size: 11px; color: var(--gx-text-muted); }
+
+.gx-upload-progress { height: 6px; margin-top: 6px; border-radius: var(--gx-radius-pill); background: #eef2f7; }
+.gx-upload-progress .progress-bar { background: var(--gx-secondary); transition: width .15s linear; }
+
+/* Bytes are all sent and the server is working, with nothing to measure —
+   a moving stripe says "busy" without claiming a percentage. */
+.gx-progress-indeterminate {
+    width: 100% !important;
+    background-image: linear-gradient(
+        90deg,
+        var(--gx-secondary-bg) 0%,
+        var(--gx-secondary) 50%,
+        var(--gx-secondary-bg) 100%
+    );
+    background-size: 200% 100%;
+    animation: gxIndeterminate 1.2s linear infinite;
+}
+
+@keyframes gxIndeterminate {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gx-dropzone,
+    .gx-upload-progress .progress-bar { transition: none !important; }
+    .gx-progress-indeterminate { animation: none; background: var(--gx-secondary); }
+    .gx-dropzone.is-dragging { transform: none; }
+}
