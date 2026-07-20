@@ -60,6 +60,8 @@ Route::prefix('store')
             Route::get('/receivings', [MaterialReceivingController::class, 'index'])->name('receivings.index');
             // Auto-fill lookup for the Record Receiving form's PO dropdown.
             Route::get('/receivings/po-details/{bookingPo}', [MaterialReceivingController::class, 'poDetails'])->name('receivings.po-details');
+            // PO lookup by PO No / SAP Code / PI No.
+            Route::get('/receivings/po-search', [MaterialReceivingController::class, 'poSearch'])->name('receivings.po-search');
             // Every material line under one PO, for the item picker.
             Route::get('/receivings/po-items/{bookingPo}', [MaterialReceivingController::class, 'poItems'])->name('receivings.po-items');
             Route::post('/receivings', [MaterialReceivingController::class, 'store'])->name('receivings.store');

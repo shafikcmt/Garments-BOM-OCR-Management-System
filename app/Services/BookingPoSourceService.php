@@ -21,6 +21,9 @@ class BookingPoSourceService
 
     protected ?Collection $poNumberHeaderIdsCache = null;
 
+    /** @var array<string, Collection<int, int>> */
+    protected array $headerIdsByGroup = [];
+
     public function sourceValueForBookingPo(BookingPo $bookingPo, string $group): ?string
     {
         $bookingPo->loadMissing(['excelRow.cells.header']);
@@ -607,21 +610,120 @@ class BookingPoSourceService
      */
     protected function poNumberHeaderIds(): Collection
     {
-        if ($this->poNumberHeaderIdsCache !== null) {
-            return $this->poNumberHeaderIdsCache;
+        return $this->poNumberHeaderIdsCache ??= $this->headerIdsForGroup('po_no');
+    }
+
+    /**
+     * Header ids whose key/name matches any alias of the given group, resolved
+     * once per request per group.
+     */
+    protected function headerIdsForGroup(string $group): Collection
+    {
+        if (isset($this->headerIdsByGroup[$group])) {
+            return $this->headerIdsByGroup[$group];
         }
 
-        $aliases = collect($this->headerAliases('po_no'))
+        $aliases = collect($this->headerAliases($group))
             ->map(fn ($alias) => $this->normalize($alias))
             ->filter()
             ->unique();
 
-        return $this->poNumberHeaderIdsCache = ExcelHeader::query()
+        if ($aliases->isEmpty()) {
+            return $this->headerIdsByGroup[$group] = collect();
+        }
+
+        return $this->headerIdsByGroup[$group] = ExcelHeader::query()
             ->get(['id', 'header_key', 'header_name'])
             ->filter(fn ($header) => $aliases->contains($this->normalize($header->header_key))
                 || $aliases->contains($this->normalize($header->header_name)))
             ->pluck('id')
             ->values();
+    }
+
+    /**
+     * Booking POs reachable by a partial, case-insensitive search on one field.
+     *
+     * Store knows a delivery by different handles depending on the paperwork in
+     * front of them — the PO number, the vendor's PI number, or the SAP code of
+     * the material. All three resolve to the same booking record here.
+     *
+     * PO number is a booking_pos column, so it matches directly. SAP code and PI
+     * number live in the BOM cells, so the match runs over ExcelCell and is then
+     * mapped back to the owning PO — either because the matched row IS a PO's
+     * primary row, or because it carries that PO's number (a sibling line).
+     *
+     * A value may legitimately reach more than one PO (one SAP code can appear
+     * under several POs), so this returns a list and the caller decides.
+     *
+     * @return Collection<int, BookingPo>
+     */
+    public function bookingPosMatching(string $group, string $term, int $limit = 50): Collection
+    {
+        $term = trim($term);
+
+        if ($term === '') {
+            return collect();
+        }
+
+        $like = '%'.mb_strtolower($term).'%';
+
+        if ($group === 'po_no') {
+            return BookingPo::query()
+                ->whereRaw('LOWER(po_no) LIKE ?', [$like])
+                ->orderByDesc('id')
+                ->limit($limit)
+                ->get();
+        }
+
+        $headerIds = $this->headerIdsForGroup($group);
+
+        $rowIds = $headerIds->isEmpty() ? collect() : ExcelCell::query()
+            ->whereIn('header_id', $headerIds->all())
+            ->whereRaw('LOWER(TRIM(value)) LIKE ?', [$like])
+            ->pluck('row_id')
+            ->unique()
+            ->values();
+
+        // PO numbers carried by the matched rows — this is what links a sibling
+        // line back to the PO that owns it.
+        $poNos = $rowIds->isEmpty() ? collect() : ExcelCell::query()
+            ->whereIn('row_id', $rowIds->all())
+            ->whereIn('header_id', $this->poNumberHeaderIds()->all())
+            ->pluck('value')
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $query = BookingPo::query();
+        $matched = false;
+
+        if ($rowIds->isNotEmpty()) {
+            $query->whereIn('excel_row_id', $rowIds->all());
+            $matched = true;
+        }
+
+        if ($poNos->isNotEmpty()) {
+            $matched
+                ? $query->orWhereIn('po_no', $poNos->all())
+                : $query->whereIn('po_no', $poNos->all());
+            $matched = true;
+        }
+
+        // SAP code also has a dedicated booking_pos column, so a primary line
+        // still matches when its BOM cell is blank.
+        if ($group === 'sap_code') {
+            $matched
+                ? $query->orWhereRaw('LOWER(supplier_article) LIKE ?', [$like])
+                : $query->whereRaw('LOWER(supplier_article) LIKE ?', [$like]);
+            $matched = true;
+        }
+
+        if (! $matched) {
+            return collect();
+        }
+
+        return $query->orderByDesc('id')->limit($limit)->get();
     }
 
     /**

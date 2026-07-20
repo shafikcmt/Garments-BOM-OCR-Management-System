@@ -24,15 +24,12 @@ class MaterialReceivingController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        // PO-level selector. po_no is unique per booking_pos row, so one option
-        // per record already IS one option per PO — the individual materials
-        // under it are worksheet lines, loaded on demand by poItems().
-        $bookingPos = BookingPo::with('excelFile')
-            ->orderByDesc('id')
-            ->take(1000)
-            ->get();
+        // POs are now found through the PO No / SAP Code / PI No search rather
+        // than a preloaded dropdown, so the page only needs to know whether any
+        // exist at all.
+        $hasBookingPos = BookingPo::query()->exists();
 
-        return view('store.material-stock.receivings', compact('receivings', 'bookingPos'));
+        return view('store.material-stock.receivings', compact('receivings', 'hasBookingPos'));
     }
 
     /**
@@ -104,6 +101,40 @@ class MaterialReceivingController extends Controller
         }
 
         return response()->json($this->autoFields($bookingPo));
+    }
+
+    /**
+     * Booking POs matching a search on PO No, SAP Code or PI No.
+     *
+     * All three handles resolve to the same booking record. A value can reach
+     * more than one PO (a SAP code may appear under several), so the caller gets
+     * the full list and picks — a receiving still belongs to exactly one PO.
+     */
+    public function poSearch(Request $request)
+    {
+        $validated = $request->validate([
+            'type' => ['required', 'in:po_no,sap_code,pi_number'],
+            'term' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $term = trim((string) ($validated['term'] ?? ''));
+        $source = app(\App\Services\BookingPoSourceService::class);
+
+        // An empty PO search lists the recent POs so the field stays browsable
+        // rather than forcing Store to know a number up front.
+        $matches = ($term === '' && $validated['type'] === 'po_no')
+            ? BookingPo::query()->orderByDesc('id')->limit(50)->get()
+            : $source->bookingPosMatching($validated['type'], $term);
+
+        return response()->json([
+            'results' => $matches->map(fn (BookingPo $po) => [
+                'id' => $po->id,
+                'po_no' => $po->po_no,
+                'buyer_name' => $po->buyer_name,
+                'season_name' => $po->season_name,
+                'vendor_name' => $po->vendor_name,
+            ])->values(),
+        ]);
     }
 
     /**

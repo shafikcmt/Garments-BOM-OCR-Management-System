@@ -25,47 +25,171 @@
     <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
         <div class="card-body p-4">
             <h5 class="mb-3">Record Receiving</h5>
-            @if($bookingPos->isEmpty())
+            @if(! $hasBookingPos)
                 <p class="text-muted small mb-0">No Booking POs available to receive against.</p>
             @else
             <form method="POST" action="{{ route('store.material.receivings.store') }}" id="rcvForm">
                 @csrf
+                <input type="hidden" name="booking_po_id" id="rcvPoId" value="{{ old('booking_po_id') }}">
 
-                {{-- PO-level selector. The individual materials under the PO are
-                     picked in the modal, because one PO covers several
-                     styles/materials that live as separate BOM lines. --}}
+                {{-- Step 1 — find the PO. Store may know the delivery by its PO
+                     number, the vendor's PI number, or the material's SAP code;
+                     all three resolve to the same booking record. --}}
                 <div class="row g-3 align-items-end mb-3">
-                    <div class="col-12 col-lg-8">
-                        <label class="form-label fw-semibold">Booking PO Number <span class="text-danger">*</span></label>
-                        <select name="booking_po_id" id="rcvPo" class="form-select" required>
-                            <option value="">Select PO…</option>
-                            @foreach($bookingPos as $po)
-                                <option value="{{ $po->id }}" {{ old('booking_po_id')==$po->id?'selected':'' }}>
-                                    {{ collect([$po->po_no, $po->buyer_name, $po->season_name, $po->vendor_name])->filter()->implode(' · ') }}
-                                </option>
-                            @endforeach
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">Search by</label>
+                        <select class="form-select" id="rcvFilterType">
+                            <option value="po_no" selected>PO Number</option>
+                            <option value="sap_code">SAP Code</option>
+                            <option value="pi_number">PI Number</option>
                         </select>
                     </div>
-                    <div class="col-12 col-lg-4">
-                        <button type="button" class="btn btn-outline-primary w-100" id="rcvPickBtn" disabled
-                                data-bs-toggle="modal" data-bs-target="#rcvItemsModal">
-                            <i class="bi bi-list-check me-1"></i>Select Items
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold" id="rcvSearchLabel">PO Number</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" class="form-control" id="rcvSearch" autocomplete="off"
+                                   placeholder="Type to search, or leave blank to list recent POs">
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-3">
+                        <button type="button" class="btn btn-outline-secondary w-100" id="rcvFindBtn">
+                            <i class="bi bi-arrow-right-circle me-1"></i>Find PO
                         </button>
                     </div>
                 </div>
 
-                @error('rows')<div class="alert alert-danger py-2 small">{{ $message }}</div>@enderror
-
-                <div id="rcvEmpty" class="border rounded-3 bg-body-secondary text-center text-muted py-5 mb-3">
-                    <i class="bi bi-inbox d-block mb-2" style="font-size:24px;"></i>
-                    Select a PO, then choose the items received in this delivery.
+                {{-- A search may match more than one PO (one SAP code can appear
+                     under several), so the PO is always confirmed explicitly. --}}
+                <div id="rcvResults" class="mb-3 d-none">
+                    <div class="small text-muted mb-2" id="rcvResultsHint"></div>
+                    <div class="list-group" id="rcvResultsList"></div>
                 </div>
 
-                <div id="rcvRows"></div>
+                <div id="rcvSelectedPo" class="d-none border rounded-3 bg-body-secondary p-3 mb-3">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div>
+                            <div class="small text-uppercase text-muted fw-semibold">Selected PO</div>
+                            <div class="fw-semibold" id="rcvSelectedPoNo">—</div>
+                            <div class="small text-muted" id="rcvSelectedPoMeta">—</div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-secondary" id="rcvChangePo">Change PO</button>
+                            <button type="button" class="btn btn-primary" id="rcvPickBtn"
+                                    data-bs-toggle="modal" data-bs-target="#rcvItemsModal">
+                                <i class="bi bi-list-check me-1"></i>Select Items
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
-                <div class="d-flex justify-content-between align-items-center mt-3 d-none" id="rcvActions">
-                    <span class="text-muted small"><span id="rcvCount">0</span> item(s) — one GRN will be generated per item.</span>
-                    <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i>Save Receivings</button>
+                @if($errors->has('rows') || $errors->hasAny(['rows.*.qty', 'rows.*.receive_date', 'rows.*.excel_row_id']))
+                    <div class="alert alert-danger py-2">
+                        <div class="fw-semibold small mb-1">Please correct the following:</div>
+                        <ul class="small mb-0 ps-3">
+                            @foreach($errors->all() as $message)<li>{{ $message }}</li>@endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                <div id="rcvEmpty" class="border rounded-3 bg-body-secondary text-center text-muted py-5">
+                    <i class="bi bi-inbox d-block mb-2" style="font-size:24px;"></i>
+                    Find a PO, then choose the styles and items received in this delivery.
+                </div>
+
+                {{-- Shared header. These describe the delivery as a whole, or are
+                     PO-level identity that is identical on every line, so they are
+                     entered once instead of being repeated per row. Their values
+                     are mirrored into hidden per-row inputs on submit, so the
+                     server still receives (and validates) one complete row each. --}}
+                <div id="rcvShared" class="d-none">
+                    <div class="border rounded-3 bg-body-secondary p-3 mb-3">
+                        <div class="small fw-semibold text-uppercase text-muted mb-2">
+                            <i class="bi bi-magic me-1"></i>PO Details <span class="text-muted">— read-only</span>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small text-muted mb-1">Supplier Name</label>
+                                <input type="text" id="shSupplier" class="form-control-plaintext form-control-sm border rounded px-2 bg-light text-muted" value="—" readonly tabindex="-1">
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small text-muted mb-1">Buyer Name</label>
+                                <input type="text" id="shBuyer" class="form-control-plaintext form-control-sm border rounded px-2 bg-light text-muted" value="—" readonly tabindex="-1">
+                            </div>
+                            <div class="col-6 col-lg-2">
+                                <label class="form-label small text-muted mb-1">Booking Season</label>
+                                <input type="text" id="shSeason" class="form-control-plaintext form-control-sm border rounded px-2 bg-light text-muted" value="—" readonly tabindex="-1">
+                            </div>
+                            <div class="col-6 col-lg-2">
+                                <label class="form-label small text-muted mb-1">PO Number</label>
+                                <input type="text" id="shPoNo" class="form-control-plaintext form-control-sm border rounded px-2 bg-light text-muted" value="—" readonly tabindex="-1">
+                            </div>
+                            <div class="col-6 col-lg-2">
+                                <label class="form-label small text-muted mb-1">Unit</label>
+                                <input type="text" id="shUom" class="form-control-plaintext form-control-sm border rounded px-2 bg-light text-muted" value="—" readonly tabindex="-1">
+                            </div>
+                        </div>
+
+                        <div class="small fw-semibold text-uppercase text-muted mb-2">
+                            <i class="bi bi-truck me-1"></i>Delivery Details <span class="text-muted">— applies to every item below</span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label fw-semibold">Receive Date <span class="text-danger">*</span></label>
+                                <input type="date" id="shReceiveDate" data-shared="receive_date" value="{{ now()->toDateString() }}" class="form-control" required>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label fw-semibold">Invoice No</label>
+                                <input type="text" id="shInvoiceNo" data-shared="invoice_no" class="form-control" maxlength="100">
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label fw-semibold">Source</label>
+                                <select id="shSourceType" data-shared="source_type" class="form-select">
+                                    <option value="booking" selected>Booking-wise</option>
+                                    <option value="internal_po">Internal PO-wise</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label fw-semibold">GRN No</label>
+                                <input type="text" class="form-control bg-light text-muted" value="Auto-generated" readonly disabled>
+                                <div class="form-text text-muted"><i class="bi bi-magic me-1"></i>One GRN per item, on save</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Remarks</label>
+                                <textarea id="shRemarks" data-shared="remarks" rows="2" class="form-control" maxlength="1000"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Only the columns that genuinely differ per material line. --}}
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0" id="rcvTable">
+                            <thead>
+                                <tr class="text-muted small text-uppercase">
+                                    <th>Style</th><th>Material Name</th><th>Description</th>
+                                    <th>GMTS Color</th><th>Art. No</th><th>SAP Code</th>
+                                    <th>Mat. Color</th><th>Size</th>
+                                    <th class="text-end">Internal PO Qty</th>
+                                    <th style="min-width:110px;">Invoice Qty</th>
+                                    <th style="min-width:130px;">Physical Rcv Qty <span class="text-danger">*</span></th>
+                                    <th style="min-width:110px;">Unit Price</th>
+                                    <th class="text-end">Invoice Value</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="rcvRows"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <span class="text-muted small"><span id="rcvCount">0</span> item(s) — one GRN will be generated per item.</span>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#rcvItemsModal">
+                                <i class="bi bi-plus-lg me-1"></i>Add More Items
+                            </button>
+                            <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i>Save Receivings</button>
+                        </div>
+                    </div>
                 </div>
             </form>
             @endif
@@ -119,7 +243,8 @@
     </div>
 </div>
 
-{{-- Item picker. Lists every material line under the selected PO. --}}
+{{-- Two-level item picker: Style first, then the item(s) under each style. A
+     style can carry one item or several, which a flat list made hard to read. --}}
 <div class="modal fade" id="rcvItemsModal" tabindex="-1" aria-labelledby="rcvItemsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content" style="border-radius:14px;">
@@ -130,39 +255,71 @@
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
+
             <div class="modal-body">
+                <ol class="breadcrumb small mb-3">
+                    <li class="breadcrumb-item" id="rcvCrumb1"><span class="fw-semibold">1. Choose Style</span></li>
+                    <li class="breadcrumb-item text-muted" id="rcvCrumb2">2. Choose Items</li>
+                </ol>
+
                 <div id="rcvModalLoading" class="text-center text-muted py-5">
                     <div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading items…
                 </div>
                 <div id="rcvModalError" class="alert alert-warning d-none mb-0"></div>
-                <div id="rcvModalWrap" class="table-responsive d-none" style="max-height:55vh;">
-                    <table class="table table-sm table-hover align-middle mb-0">
-                        <thead class="sticky-top bg-body">
-                            <tr class="text-muted small text-uppercase">
-                                <th style="width:38px;">
-                                    <input type="checkbox" class="form-check-input" id="rcvCheckAll"
-                                           title="Select all available items" aria-label="Select all available items">
-                                </th>
-                                <th>Style Number</th>
-                                <th>Material Name</th>
-                                <th>Material Description</th>
-                                <th>GMTS Color</th>
-                                <th>Art. No</th>
-                                <th>SAP Code</th>
-                                <th>Material Color</th>
-                                <th>Size</th>
-                                <th>Unit</th>
-                                <th class="text-end">Internal PO Qty</th>
-                            </tr>
-                        </thead>
-                        <tbody id="rcvModalBody"></tbody>
-                    </table>
+
+                {{-- Level 1: styles --}}
+                <div id="rcvStep1" class="d-none">
+                    <div class="table-responsive" style="max-height:50vh;">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="sticky-top bg-body">
+                                <tr class="text-muted small text-uppercase">
+                                    <th style="width:38px;">
+                                        <input type="checkbox" class="form-check-input" id="rcvStyleAll"
+                                               title="Select all styles" aria-label="Select all styles">
+                                    </th>
+                                    <th>Style Number</th>
+                                    <th class="text-end">Items under this style</th>
+                                    <th class="text-end">Already added</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rcvStyleBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {{-- Level 2: items within the chosen styles --}}
+                <div id="rcvStep2" class="d-none">
+                    <div class="table-responsive" style="max-height:50vh;">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="sticky-top bg-body">
+                                <tr class="text-muted small text-uppercase">
+                                    <th style="width:38px;">
+                                        <input type="checkbox" class="form-check-input" id="rcvItemAll"
+                                               title="Select all available items" aria-label="Select all available items">
+                                    </th>
+                                    <th>Material Name</th>
+                                    <th>Material Description</th>
+                                    <th>GMTS Color</th>
+                                    <th>Art. No</th>
+                                    <th>SAP Code</th>
+                                    <th>Material Color</th>
+                                    <th>Size</th>
+                                    <th>Unit</th>
+                                    <th class="text-end">Internal PO Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rcvItemBody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+
             <div class="modal-footer">
                 <span class="me-auto small text-muted"><span id="rcvSelCount">0</span> selected</span>
+                <button type="button" class="btn btn-outline-secondary d-none" id="rcvBackBtn"><i class="bi bi-arrow-left me-1"></i>Back to Styles</button>
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="rcvAddSelected"><i class="bi bi-plus-lg me-1"></i>Add Selected</button>
+                <button type="button" class="btn btn-primary" id="rcvNextBtn">Next: Choose Items<i class="bi bi-arrow-right ms-1"></i></button>
+                <button type="button" class="btn btn-primary d-none" id="rcvAddSelected"><i class="bi bi-plus-lg me-1"></i>Add Selected</button>
             </div>
         </div>
     </div>
@@ -170,40 +327,45 @@
 
 <script>
     (function () {
-        const po = document.getElementById('rcvPo');
-        if (!po) return;
+        const form = document.getElementById('rcvForm');
+        if (!form) return;
 
-        const pickBtn = document.getElementById('rcvPickBtn');
-        const rowsWrap = document.getElementById('rcvRows');
+        const poIdEl = document.getElementById('rcvPoId');
+        const filterType = document.getElementById('rcvFilterType');
+        const searchEl = document.getElementById('rcvSearch');
+        const searchLabel = document.getElementById('rcvSearchLabel');
+        const findBtn = document.getElementById('rcvFindBtn');
+        const resultsWrap = document.getElementById('rcvResults');
+        const resultsList = document.getElementById('rcvResultsList');
+        const resultsHint = document.getElementById('rcvResultsHint');
+        const selectedWrap = document.getElementById('rcvSelectedPo');
+        const sharedWrap = document.getElementById('rcvShared');
         const emptyBox = document.getElementById('rcvEmpty');
-        const actions = document.getElementById('rcvActions');
+        const rowsWrap = document.getElementById('rcvRows');
         const countEl = document.getElementById('rcvCount');
+
         const modalEl = document.getElementById('rcvItemsModal');
-        const modalBody = document.getElementById('rcvModalBody');
-        const modalWrap = document.getElementById('rcvModalWrap');
+        const step1 = document.getElementById('rcvStep1');
+        const step2 = document.getElementById('rcvStep2');
+        const styleBody = document.getElementById('rcvStyleBody');
+        const itemBody = document.getElementById('rcvItemBody');
+        const styleAll = document.getElementById('rcvStyleAll');
+        const itemAll = document.getElementById('rcvItemAll');
+        const backBtn = document.getElementById('rcvBackBtn');
+        const nextBtn = document.getElementById('rcvNextBtn');
+        const addBtn = document.getElementById('rcvAddSelected');
+        const selCount = document.getElementById('rcvSelCount');
         const modalLoading = document.getElementById('rcvModalLoading');
         const modalError = document.getElementById('rcvModalError');
         const modalPo = document.getElementById('rcvModalPo');
-        const checkAll = document.getElementById('rcvCheckAll');
-        const selCount = document.getElementById('rcvSelCount');
+        const crumb1 = document.getElementById('rcvCrumb1');
+        const crumb2 = document.getElementById('rcvCrumb2');
 
+        const SEARCH_URL = @json(route('store.material.receivings.po-search'));
         const ITEMS_URL = @json(route('store.material.receivings.po-items', ['bookingPo' => '__ID__']));
         const TODAY = @json(now()->toDateString());
 
-        // Read-only identity shown on each row, in Receiving-sheet order.
-        const AUTO_FIELDS = [
-            ['supplier_name', 'Supplier Name'], ['season_name', 'Booking Season'],
-            ['buyer_name', 'Buyer Name'], ['style_name', 'Style Number'],
-            ['po_no', 'PO Number'], ['gmts_color_name', 'GMTS Color Name'],
-            ['material_name', 'Material Name'], ['material_description', 'Material Description'],
-            ['art_no', 'Art. No'], ['sap_code', 'SAP Code'],
-            ['material_color', 'Material Color'], ['size', 'Size'],
-            ['uom', 'Unit'], ['internal_po_qty', 'Internal PO Qty'],
-        ];
-
-        let items = [];          // items of the currently loaded PO
-        let loadedPoId = null;   // which PO `items` belongs to
-        let uid = 0;             // row name index (gaps are fine for rows.*)
+        const LABELS = { po_no: 'PO Number', sap_code: 'SAP Code', pi_number: 'PI Number' };
 
         // esc() normalises a value for logic; h() escapes it for HTML/attribute
         // interpolation. BOM values come from uploaded workbooks, so anything
@@ -214,26 +376,107 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         const dash = (v) => esc(v) === '' ? '—' : h(v);
 
-        function addedRowIds() {
-            return Array.from(rowsWrap.querySelectorAll('[data-row-id]'))
-                .map(el => String(el.dataset.rowId));
+        let items = [];         // every line under the loaded PO
+        let loadedPoId = null;
+        let uid = 0;
+
+        const addedRowIds = () => Array.from(rowsWrap.querySelectorAll('[data-row-id]'))
+            .map(el => String(el.dataset.rowId));
+
+        // --- PO search --------------------------------------------------------
+        filterType.addEventListener('change', function () {
+            searchLabel.textContent = LABELS[filterType.value];
+            searchEl.placeholder = filterType.value === 'po_no'
+                ? 'Type to search, or leave blank to list recent POs'
+                : 'Type the ' + LABELS[filterType.value];
+            searchEl.value = '';
+            resultsWrap.classList.add('d-none');
+        });
+
+        searchEl.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); runSearch(); }
+        });
+        findBtn.addEventListener('click', runSearch);
+
+        function runSearch() {
+            const type = filterType.value;
+            const term = searchEl.value.trim();
+
+            resultsWrap.classList.remove('d-none');
+            resultsHint.textContent = 'Searching…';
+            resultsList.innerHTML = '';
+
+            const url = SEARCH_URL + '?type=' + encodeURIComponent(type) + '&term=' + encodeURIComponent(term);
+
+            fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                .then(data => renderResults(data.results || [], type, term))
+                .catch(() => {
+                    resultsHint.textContent = '';
+                    resultsList.innerHTML =
+                        '<div class="list-group-item text-muted">Could not run the search. Please try again.</div>';
+                });
         }
 
-        function refreshState() {
-            const n = rowsWrap.children.length;
-            countEl.textContent = n;
-            emptyBox.classList.toggle('d-none', n > 0);
-            actions.classList.toggle('d-none', n === 0);
+        function renderResults(results, type, term) {
+            if (!results.length) {
+                resultsHint.textContent = '';
+                resultsList.innerHTML = '<div class="list-group-item text-muted">No PO found for this ' +
+                    h(LABELS[type]) + (term ? ' (“' + h(term) + '”)' : '') + '.</div>';
+                return;
+            }
+
+            resultsHint.textContent = results.length === 1
+                ? '1 matching PO — selected automatically.'
+                : results.length + ' POs match. Choose the one you are receiving against.';
+
+            resultsList.innerHTML = results.map(r =>
+                '<button type="button" class="list-group-item list-group-item-action rcv-result"' +
+                    ' data-id="' + h(r.id) + '" data-po="' + h(r.po_no) + '"' +
+                    ' data-meta="' + h([r.buyer_name, r.season_name, r.vendor_name].filter(Boolean).join(' · ')) + '">' +
+                    '<span class="fw-semibold">' + dash(r.po_no) + '</span>' +
+                    '<span class="small text-muted ms-2">' +
+                        dash([r.buyer_name, r.season_name, r.vendor_name].filter(Boolean).join(' · ')) +
+                    '</span>' +
+                '</button>').join('');
+
+            if (results.length === 1) selectPo(resultsList.querySelector('.rcv-result'));
         }
 
-        // --- Item picker ------------------------------------------------------
+        resultsList.addEventListener('click', function (e) {
+            const btn = e.target.closest('.rcv-result');
+            if (btn) selectPo(btn);
+        });
+
+        function selectPo(btn) {
+            const newId = btn.dataset.id;
+
+            if (rowsWrap.children.length && String(newId) !== String(poIdEl.value)) {
+                if (!confirm('Changing the PO will clear the items already added. Continue?')) return;
+                rowsWrap.innerHTML = '';
+            }
+
+            poIdEl.value = newId;
+            document.getElementById('rcvSelectedPoNo').textContent = btn.dataset.po || '—';
+            document.getElementById('rcvSelectedPoMeta').textContent = btn.dataset.meta || '—';
+            selectedWrap.classList.remove('d-none');
+            resultsWrap.classList.add('d-none');
+            refreshState();
+        }
+
+        document.getElementById('rcvChangePo').addEventListener('click', function () {
+            resultsWrap.classList.remove('d-none');
+            runSearch();
+        });
+
+        // --- Modal: styles then items ----------------------------------------
         function loadItems() {
             modalLoading.classList.remove('d-none');
-            modalWrap.classList.add('d-none');
+            step1.classList.add('d-none');
+            step2.classList.add('d-none');
             modalError.classList.add('d-none');
-            modalBody.innerHTML = '';
 
-            const poId = po.value;
+            const poId = poIdEl.value;
 
             return fetch(ITEMS_URL.replace('__ID__', encodeURIComponent(poId)), {
                 headers: { 'Accept': 'application/json' },
@@ -241,12 +484,12 @@
             })
                 .then(r => r.ok ? r.json() : Promise.reject(r.status))
                 .then(data => {
-                    // Ignore a stale response if the PO changed meanwhile.
-                    if (po.value !== poId) return;
+                    if (poIdEl.value !== poId) return;   // PO changed meanwhile
                     items = data.items || [];
                     loadedPoId = poId;
-                    modalPo.textContent = 'PO ' + dash(data.po_no) + ' · ' + items.length + ' item(s)';
-                    renderItems();
+                    modalPo.textContent = 'PO ' + (esc(data.po_no) || '—') +
+                        ' · ' + styleNames().length + ' style(s) · ' + items.length + ' item(s)';
+                    showStep(1);
                 })
                 .catch(status => {
                     modalLoading.classList.add('d-none');
@@ -257,232 +500,268 @@
                 });
         }
 
+        const styleKey = (item) => esc(item.style_name) === '' ? '—' : esc(item.style_name);
+        const styleNames = () => [...new Set(items.map(styleKey))];
+
+        function showStep(step) {
+            modalLoading.classList.add('d-none');
+            step1.classList.toggle('d-none', step !== 1);
+            step2.classList.toggle('d-none', step !== 2);
+            backBtn.classList.toggle('d-none', step !== 2);
+            nextBtn.classList.toggle('d-none', step !== 1);
+            addBtn.classList.toggle('d-none', step !== 2);
+            crumb1.classList.toggle('text-muted', step !== 1);
+            crumb2.classList.toggle('text-muted', step !== 2);
+            crumb1.innerHTML = step === 1 ? '<span class="fw-semibold">1. Choose Style</span>' : '1. Choose Style';
+            crumb2.innerHTML = step === 2 ? '<span class="fw-semibold">2. Choose Items</span>' : '2. Choose Items';
+
+            if (step === 1) renderStyles(); else renderItems();
+        }
+
+        function renderStyles() {
+            const already = addedRowIds();
+            styleBody.innerHTML = styleNames().map((name, i) => {
+                const under = items.filter(it => styleKey(it) === name);
+                const addedCount = under.filter(it => already.includes(String(it.excel_row_id))).length;
+                const allAdded = addedCount === under.length;
+                const cbId = 'rcvStyle' + i;
+
+                return '<tr' + (allAdded ? ' class="opacity-50"' : '') + '>' +
+                    '<td><input type="checkbox" class="form-check-input rcv-style-cb" id="' + cbId + '"' +
+                        ' value="' + h(name) + '"' + (allAdded ? ' disabled title="Every item under this style is already added"' : '') +
+                        ' aria-label="Select this style"></td>' +
+                    '<td><label for="' + cbId + '" class="mb-0 fw-semibold" style="cursor:pointer;">' + dash(name) + '</label></td>' +
+                    '<td class="text-end small">' + under.length + '</td>' +
+                    '<td class="text-end small text-muted">' + addedCount + ' / ' + under.length + '</td>' +
+                '</tr>';
+            }).join('');
+
+            updateSelCount();
+        }
+
+        function chosenStyles() {
+            return Array.from(styleBody.querySelectorAll('.rcv-style-cb:checked')).map(cb => cb.value);
+        }
+
         function renderItems() {
             const already = addedRowIds();
-            modalBody.innerHTML = '';
+            const styles = chosenStyles();
+            let html = '';
 
-            items.forEach((item, i) => {
-                const isAdded = already.includes(String(item.excel_row_id));
-                const tr = document.createElement('tr');
-                const cbId = 'rcvItem' + i;
+            styles.forEach(name => {
+                const under = items.filter(it => styleKey(it) === name);
+                html += '<tr class="table-light"><td colspan="10" class="fw-semibold small">' +
+                            '<i class="bi bi-tag me-1"></i>Style ' + dash(name) +
+                            ' <span class="text-muted fw-normal">· ' + under.length + ' item(s)</span>' +
+                        '</td></tr>';
 
-                tr.innerHTML =
-                    '<td><input type="checkbox" class="form-check-input rcv-item-cb" id="' + cbId + '"' +
-                        ' value="' + h(item.excel_row_id) + '"' +
-                        (isAdded ? ' checked disabled title="Already added below"' : '') +
-                        ' aria-label="Select this material line"></td>' +
-                    '<td><label for="' + cbId + '" class="mb-0 fw-semibold" style="cursor:pointer;">' + dash(item.style_name) + '</label></td>' +
-                    '<td class="small">' + dash(item.material_name) + '</td>' +
-                    '<td class="small">' + dash(item.material_description) + '</td>' +
-                    '<td class="small">' + dash(item.gmts_color_name) + '</td>' +
-                    '<td class="small">' + dash(item.art_no) + '</td>' +
-                    '<td class="small">' + dash(item.sap_code) + '</td>' +
-                    '<td class="small">' + dash(item.material_color) + '</td>' +
-                    '<td class="small">' + dash(item.size) + '</td>' +
-                    '<td class="small">' + dash(item.uom) + '</td>' +
-                    '<td class="small text-end">' + dash(item.internal_po_qty) + '</td>';
+                under.forEach((item, i) => {
+                    const isAdded = already.includes(String(item.excel_row_id));
+                    const cbId = 'rcvItem' + h(name).replace(/\W/g, '') + i;
 
-                if (isAdded) {
-                    tr.classList.add('opacity-50');
-                }
-                modalBody.appendChild(tr);
+                    html += '<tr' + (isAdded ? ' class="opacity-50"' : '') + '>' +
+                        '<td><input type="checkbox" class="form-check-input rcv-item-cb" id="' + cbId + '"' +
+                            ' value="' + h(item.excel_row_id) + '"' +
+                            (isAdded ? ' checked disabled title="Already added below"' : '') +
+                            ' aria-label="Select this material line"></td>' +
+                        '<td class="small"><label for="' + cbId + '" class="mb-0" style="cursor:pointer;">' + dash(item.material_name) + '</label></td>' +
+                        '<td class="small">' + dash(item.material_description) + '</td>' +
+                        '<td class="small">' + dash(item.gmts_color_name) + '</td>' +
+                        '<td class="small">' + dash(item.art_no) + '</td>' +
+                        '<td class="small">' + dash(item.sap_code) + '</td>' +
+                        '<td class="small">' + dash(item.material_color) + '</td>' +
+                        '<td class="small">' + dash(item.size) + '</td>' +
+                        '<td class="small">' + dash(item.uom) + '</td>' +
+                        '<td class="small text-end">' + dash(item.internal_po_qty) + '</td>' +
+                    '</tr>';
+                });
             });
 
-            modalLoading.classList.add('d-none');
-            modalWrap.classList.remove('d-none');
+            itemBody.innerHTML = html;
             updateSelCount();
         }
 
-        function selectableBoxes() {
-            return Array.from(modalBody.querySelectorAll('.rcv-item-cb:not(:disabled)'));
-        }
+        const activeBoxes = () => Array.from(
+            (step1.classList.contains('d-none') ? itemBody : styleBody)
+                .querySelectorAll(step1.classList.contains('d-none') ? '.rcv-item-cb:not(:disabled)' : '.rcv-style-cb:not(:disabled)')
+        );
 
         function updateSelCount() {
-            selCount.textContent = selectableBoxes().filter(cb => cb.checked).length;
-            const boxes = selectableBoxes();
-            checkAll.disabled = boxes.length === 0;
-            checkAll.checked = boxes.length > 0 && boxes.every(cb => cb.checked);
+            const boxes = activeBoxes();
+            const checked = boxes.filter(cb => cb.checked);
+            selCount.textContent = checked.length;
+            nextBtn.disabled = step1.classList.contains('d-none') ? false : checked.length === 0;
+            addBtn.disabled = checked.length === 0;
+
+            const master = step1.classList.contains('d-none') ? itemAll : styleAll;
+            master.disabled = boxes.length === 0;
+            master.checked = boxes.length > 0 && boxes.every(cb => cb.checked);
         }
 
-        checkAll.addEventListener('change', function () {
-            selectableBoxes().forEach(cb => { cb.checked = checkAll.checked; });
-            updateSelCount();
+        [[styleAll, styleBody], [itemAll, itemBody]].forEach(([master, body]) => {
+            master.addEventListener('change', function () {
+                activeBoxes().forEach(cb => { cb.checked = master.checked; });
+                updateSelCount();
+            });
+            body.addEventListener('change', function (e) {
+                if (e.target.classList.contains('rcv-style-cb') || e.target.classList.contains('rcv-item-cb')) {
+                    updateSelCount();
+                }
+            });
         });
 
-        modalBody.addEventListener('change', function (e) {
-            if (e.target.classList.contains('rcv-item-cb')) updateSelCount();
-        });
+        nextBtn.addEventListener('click', () => showStep(2));
+        backBtn.addEventListener('click', () => showStep(1));
 
         modalEl.addEventListener('show.bs.modal', function () {
-            // Re-fetch only when the PO changed; otherwise just refresh which
-            // lines are already added so existing rows stay untouched.
-            if (loadedPoId === po.value) {
-                renderItems();
-            } else {
-                loadItems();
-            }
+            if (loadedPoId === poIdEl.value) showStep(1); else loadItems();
         });
 
-        document.getElementById('rcvAddSelected').addEventListener('click', function () {
-            const chosen = selectableBoxes().filter(cb => cb.checked).map(cb => cb.value);
-            chosen.forEach(rowId => {
-                const item = items.find(it => String(it.excel_row_id) === String(rowId));
+        addBtn.addEventListener('click', function () {
+            activeBoxes().filter(cb => cb.checked).forEach(cb => {
+                const item = items.find(it => String(it.excel_row_id) === String(cb.value));
                 if (item) addRow(item);
             });
             refreshState();
             bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         });
 
-        // --- Rows -------------------------------------------------------------
-        // New rows inherit Receive Date / Invoice No from the row above, so a
-        // multi-item delivery is entered once and only adjusted where it differs
-        // (e.g. a partial shipment on one line).
-        function lastRowValue(field) {
-            const rows = rowsWrap.children;
-            if (!rows.length) return null;
-            const el = rows[rows.length - 1].querySelector('[data-field="' + field + '"]');
-            return el ? el.value : null;
-        }
-
+        // --- Entry rows -------------------------------------------------------
         function addRow(item, preset) {
             preset = preset || {};
             const i = uid++;
             const n = (field) => 'rows[' + i + '][' + field + ']';
+            const unitPrice = preset.unit_price !== undefined ? preset.unit_price : esc(item.suggested_unit_price);
 
-            const receiveDate = preset.receive_date || lastRowValue('receive_date') || TODAY;
-            const invoiceNo = preset.invoice_no !== undefined
-                ? preset.invoice_no
-                : (lastRowValue('invoice_no') || esc(item.suggested_invoice_no));
-            const unitPrice = preset.unit_price !== undefined
-                ? preset.unit_price
-                : esc(item.suggested_unit_price);
+            const tr = document.createElement('tr');
+            tr.dataset.rowId = item.excel_row_id;
+            tr.innerHTML =
+                '<td class="small fw-semibold">' + dash(item.style_name) +
+                    '<input type="hidden" name="' + n('excel_row_id') + '" value="' + h(item.excel_row_id) + '">' +
+                    // Shared header values are mirrored here on submit so the
+                    // server still receives one complete row per item.
+                    '<input type="hidden" name="' + n('receive_date') + '" data-mirror="receive_date">' +
+                    '<input type="hidden" name="' + n('invoice_no') + '" data-mirror="invoice_no">' +
+                    '<input type="hidden" name="' + n('source_type') + '" data-mirror="source_type">' +
+                    '<input type="hidden" name="' + n('remarks') + '" data-mirror="remarks">' +
+                '</td>' +
+                '<td class="small">' + dash(item.material_name) + '</td>' +
+                '<td class="small">' + dash(item.material_description) + '</td>' +
+                '<td class="small">' + dash(item.gmts_color_name) + '</td>' +
+                '<td class="small">' + dash(item.art_no) + '</td>' +
+                '<td class="small">' + dash(item.sap_code) + '</td>' +
+                '<td class="small">' + dash(item.material_color) + '</td>' +
+                '<td class="small">' + dash(item.size) + '</td>' +
+                '<td class="small text-end">' + dash(item.internal_po_qty) + '</td>' +
+                '<td><input type="number" step="0.0001" min="0" name="' + n('invoice_qty') + '" data-field="invoice_qty"' +
+                    ' value="' + h(preset.invoice_qty) + '" class="form-control form-control-sm"></td>' +
+                '<td><input type="number" step="0.0001" min="0" name="' + n('qty') + '"' +
+                    ' value="' + h(preset.qty) + '" class="form-control form-control-sm" required></td>' +
+                '<td><input type="number" step="0.0001" min="0" name="' + n('unit_price') + '" data-field="unit_price"' +
+                    ' value="' + h(unitPrice) + '" class="form-control form-control-sm"></td>' +
+                '<td class="text-end small text-muted" data-field="invoice_value">—</td>' +
+                '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger rcv-remove"' +
+                    ' title="Remove this item" aria-label="Remove this item"><i class="bi bi-trash"></i></button></td>';
 
-            const auto = AUTO_FIELDS.map(([key, label]) =>
-                '<div class="col-6 col-md-4 col-xl-3">' +
-                    '<label class="form-label small text-muted mb-1">' + label + '</label>' +
-                    '<input type="text" class="form-control-plaintext form-control-sm border rounded px-2 bg-light text-muted"' +
-                           ' value="' + dash(item[key]) + '" readonly tabindex="-1">' +
-                '</div>').join('');
-
-            const row = document.createElement('div');
-            row.className = 'border rounded-3 p-3 mb-3';
-            row.dataset.rowId = item.excel_row_id;
-            row.innerHTML =
-                '<input type="hidden" name="' + n('excel_row_id') + '" value="' + h(item.excel_row_id) + '">' +
-                '<div class="d-flex align-items-start justify-content-between gap-3 mb-3">' +
-                    '<div>' +
-                        '<span class="badge bg-primary-subtle text-primary mb-1">' + dash(item.style_name) + '</span>' +
-                        '<div class="fw-semibold">' + dash(item.material_description) + '</div>' +
-                        '<div class="small text-muted">' + [dash(item.material_color), dash(item.size)].join(' · ') + '</div>' +
-                    '</div>' +
-                    '<button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 rcv-remove"' +
-                            ' title="Remove this item"><i class="bi bi-trash me-1"></i>Remove</button>' +
-                '</div>' +
-                '<div class="border rounded-3 bg-body-secondary p-3 mb-3">' +
-                    '<div class="d-flex align-items-center justify-content-between mb-2">' +
-                        '<span class="small fw-semibold text-uppercase text-muted"><i class="bi bi-magic me-1"></i>Auto-filled from BOM / PO</span>' +
-                        '<span class="small text-muted">Read-only</span>' +
-                    '</div>' +
-                    '<div class="row g-3">' + auto + '</div>' +
-                '</div>' +
-                '<div class="row g-3">' +
-                    '<div class="col-12 col-sm-6 col-lg-3">' +
-                        '<label class="form-label fw-semibold">Source</label>' +
-                        '<select name="' + n('source_type') + '" class="form-select">' +
-                            '<option value="booking"' + (preset.source_type === 'internal_po' ? '' : ' selected') + '>Booking-wise</option>' +
-                            '<option value="internal_po"' + (preset.source_type === 'internal_po' ? ' selected' : '') + '>Internal PO-wise</option>' +
-                        '</select>' +
-                    '</div>' +
-                    '<div class="col-12 col-sm-6 col-lg-3">' +
-                        '<label class="form-label fw-semibold">Receive Date <span class="text-danger">*</span></label>' +
-                        '<input type="date" name="' + n('receive_date') + '" data-field="receive_date" value="' + h(receiveDate) + '" class="form-control" required>' +
-                    '</div>' +
-                    '<div class="col-12 col-sm-6 col-lg-3">' +
-                        '<label class="form-label fw-semibold">GRN No</label>' +
-                        '<input type="text" class="form-control bg-light text-muted" value="Auto-generated" readonly disabled>' +
-                        '<div class="form-text text-muted"><i class="bi bi-magic me-1"></i>Auto-generated on save</div>' +
-                    '</div>' +
-                    '<div class="col-12 col-sm-6 col-lg-3">' +
-                        '<label class="form-label fw-semibold">Invoice No</label>' +
-                        '<input name="' + n('invoice_no') + '" data-field="invoice_no" value="' + h(invoiceNo) + '" class="form-control">' +
-                    '</div>' +
-                    '<div class="col-12 col-sm-6 col-lg-3">' +
-                        '<label class="form-label fw-semibold">Invoice Qty</label>' +
-                        '<input type="number" step="0.0001" min="0" name="' + n('invoice_qty') + '" data-field="invoice_qty" value="' + h(preset.invoice_qty) + '" class="form-control">' +
-                    '</div>' +
-                    '<div class="col-12 col-sm-6 col-lg-3">' +
-                        '<label class="form-label fw-semibold">Physical Rcv Qty <span class="text-danger">*</span></label>' +
-                        '<input type="number" step="0.0001" min="0" name="' + n('qty') + '" value="' + h(preset.qty) + '" class="form-control" required>' +
-                    '</div>' +
-                    '<div class="col-12 col-sm-6 col-lg-3">' +
-                        '<label class="form-label fw-semibold">Unit Price</label>' +
-                        '<input type="number" step="0.0001" min="0" name="' + n('unit_price') + '" data-field="unit_price" value="' + h(unitPrice) + '" class="form-control">' +
-                    '</div>' +
-                    '<div class="col-12 col-sm-6 col-lg-3">' +
-                        '<label class="form-label fw-semibold">Invoice Value</label>' +
-                        '<input type="text" data-field="invoice_value" class="form-control bg-light text-muted" value="" placeholder="—" readonly tabindex="-1">' +
-                        '<div class="form-text text-muted">Invoice Qty × Unit Price</div>' +
-                    '</div>' +
-                    '<div class="col-12">' +
-                        '<label class="form-label fw-semibold">Remarks</label>' +
-                        '<textarea name="' + n('remarks') + '" rows="2" class="form-control" maxlength="1000">' + h(preset.remarks) + '</textarea>' +
-                    '</div>' +
-                '</div>';
-
-            rowsWrap.appendChild(row);
-            recalcRow(row);
-            return row;
+            rowsWrap.appendChild(tr);
+            recalcRow(tr);
+            return tr;
         }
 
         // Display only; the server recomputes this on save.
-        function recalcRow(row) {
-            const qty = parseFloat(row.querySelector('[data-field="invoice_qty"]').value);
-            const price = parseFloat(row.querySelector('[data-field="unit_price"]').value);
-            row.querySelector('[data-field="invoice_value"]').value =
-                (isNaN(qty) || isNaN(price)) ? '' : (qty * price).toFixed(4);
+        function recalcRow(tr) {
+            const qty = parseFloat(tr.querySelector('[data-field="invoice_qty"]').value);
+            const price = parseFloat(tr.querySelector('[data-field="unit_price"]').value);
+            tr.querySelector('[data-field="invoice_value"]').textContent =
+                (isNaN(qty) || isNaN(price)) ? '—' : (qty * price).toFixed(4);
         }
 
         rowsWrap.addEventListener('input', function (e) {
             const field = e.target.dataset.field;
-            if (field === 'invoice_qty' || field === 'unit_price') {
-                recalcRow(e.target.closest('[data-row-id]'));
-            }
+            if (field === 'invoice_qty' || field === 'unit_price') recalcRow(e.target.closest('tr'));
         });
 
         rowsWrap.addEventListener('click', function (e) {
             const btn = e.target.closest('.rcv-remove');
             if (!btn) return;
-            btn.closest('[data-row-id]').remove();
+            btn.closest('tr').remove();
             refreshState();
         });
 
-        // --- PO selection -----------------------------------------------------
-        po.addEventListener('change', function () {
-            if (rowsWrap.children.length && loadedPoId !== po.value) {
-                if (!confirm('Changing the PO will clear the items already added. Continue?')) {
-                    po.value = loadedPoId;
-                    return;
-                }
-                rowsWrap.innerHTML = '';
-                refreshState();
-            }
-            pickBtn.disabled = !po.value;
-        });
+        // Copy the shared header values into every row's hidden inputs.
+        function syncShared() {
+            document.querySelectorAll('[data-shared]').forEach(src => {
+                const field = src.dataset.shared;
+                rowsWrap.querySelectorAll('[data-mirror="' + field + '"]').forEach(dst => {
+                    dst.value = src.value;
+                });
+            });
+        }
 
-        pickBtn.disabled = !po.value;
+        document.querySelectorAll('[data-shared]').forEach(el => {
+            el.addEventListener('input', syncShared);
+            el.addEventListener('change', syncShared);
+        });
+        form.addEventListener('submit', syncShared);
+
+        function refreshState() {
+            const n = rowsWrap.children.length;
+            countEl.textContent = n;
+            sharedWrap.classList.toggle('d-none', n === 0);
+            emptyBox.classList.toggle('d-none', n > 0);
+
+            if (n > 0) {
+                // PO-level identity is identical on every line, so it is read
+                // from the first row's item and shown once.
+                const first = items.find(it => String(it.excel_row_id) === String(rowsWrap.children[0].dataset.rowId));
+                if (first) {
+                    document.getElementById('shSupplier').value = esc(first.supplier_name) || '—';
+                    document.getElementById('shBuyer').value = esc(first.buyer_name) || '—';
+                    document.getElementById('shSeason').value = esc(first.season_name) || '—';
+                    document.getElementById('shPoNo').value = esc(first.po_no) || '—';
+                    document.getElementById('shUom').value = esc(first.uom) || '—';
+                }
+                if (!document.getElementById('shInvoiceNo').value && first && first.suggested_invoice_no) {
+                    document.getElementById('shInvoiceNo').value = first.suggested_invoice_no;
+                }
+            }
+
+            syncShared();
+        }
+
         refreshState();
 
-        // Rebuild the rows after a validation-error redirect so nothing typed is
-        // lost (qty is required, so this path is hit in normal use).
+        // Rebuild after a validation-error redirect so nothing typed is lost.
         const oldRows = @json(old('rows', []));
-        if (po.value && Object.keys(oldRows).length) {
+        const oldPoId = @json(old('booking_po_id'));
+        if (oldPoId && Object.keys(oldRows).length) {
+            const list = Object.values(oldRows);
+            poIdEl.value = oldPoId;
             loadItems().then(() => {
-                Object.values(oldRows).forEach(old => {
+                const shared = list[0] || {};
+                if (shared.receive_date) document.getElementById('shReceiveDate').value = shared.receive_date;
+                if (shared.invoice_no) document.getElementById('shInvoiceNo').value = shared.invoice_no;
+                if (shared.source_type) document.getElementById('shSourceType').value = shared.source_type;
+                if (shared.remarks) document.getElementById('shRemarks').value = shared.remarks;
+
+                list.forEach(old => {
                     const item = items.find(it => String(it.excel_row_id) === String(old.excel_row_id));
                     if (item) addRow(item, old);
                 });
+
+                const first = items[0];
+                if (first) {
+                    document.getElementById('rcvSelectedPoNo').textContent = esc(first.po_no) || '—';
+                    document.getElementById('rcvSelectedPoMeta').textContent =
+                        [first.buyer_name, first.season_name, first.supplier_name].filter(Boolean).join(' · ') || '—';
+                    selectedWrap.classList.remove('d-none');
+                }
                 refreshState();
             });
+        } else {
+            // Nothing selected yet — list the recent POs so the field stays as
+            // browsable as the old dropdown was.
+            runSearch();
         }
     })();
 </script>
