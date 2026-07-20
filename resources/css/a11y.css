@@ -84,3 +84,107 @@
     .gx-donut-slice,
     .gx-area-line { forced-color-adjust: none; }
 }
+
+/* --- Error pages ----------------------------------------------------------
+ * Self-contained: these render without the app shell, so they carry their own
+ * layout rather than relying on anything the sidebar or header provides.
+ */
+.gx-error-body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background:
+        radial-gradient(circle at left top, rgba(96, 165, 250, .12), transparent 26%),
+        radial-gradient(circle at right top, rgba(99, 102, 241, .10), transparent 22%),
+        linear-gradient(180deg, #f8fbff 0%, #f3f6fb 100%);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--gx-text, #1E293B);
+}
+
+.gx-error { width: 100%; max-width: 560px; }
+
+.gx-error-card {
+    background: #fff;
+    border: 1px solid #e8eef6;
+    border-radius: var(--gx-radius, 14px);
+    box-shadow: 0 24px 60px rgba(15, 23, 42, .08);
+    padding: 36px 32px;
+    text-align: center;
+}
+
+.gx-error-code {
+    font-size: 56px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -.03em;
+}
+
+.gx-error-code.is-neutral { color: #94a3b8; }
+.gx-error-code.is-warning { color: var(--gx-warning-700, #B45309); }
+.gx-error-code.is-danger { color: var(--gx-danger-700, #B91C1C); }
+
+.gx-error-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 12px 0 8px;
+    color: var(--gx-primary, #0F172A);
+}
+
+.gx-error-text { font-size: 14px; color: var(--gx-text-muted, #64748B); margin: 0; }
+
+.gx-error-detail {
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: var(--gx-radius-sm, 10px);
+    background: #f8fafc;
+    border: 1px solid #eef2f7;
+    font-size: 13px;
+    color: var(--gx-text-muted, #64748B);
+    text-align: left;
+}
+
+.gx-error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 22px;
+}
+
+.gx-error-signed { margin: 18px 0 0; font-size: 11.5px; color: #94a3b8; }
+
+/* --- Scrollbars -----------------------------------------------------------
+ * The sidebar already had a custom one; this brings the rest of the app's
+ * scroll areas in line instead of mixing two styles on one screen.
+ */
+.gx-table-scroll::-webkit-scrollbar,
+.gx-activity-scroll::-webkit-scrollbar,
+.table-responsive::-webkit-scrollbar,
+.modal-body::-webkit-scrollbar { width: 10px; height: 10px; }
+
+.gx-table-scroll::-webkit-scrollbar-track,
+.gx-activity-scroll::-webkit-scrollbar-track,
+.table-responsive::-webkit-scrollbar-track,
+.modal-body::-webkit-scrollbar-track { background: transparent; }
+
+.gx-table-scroll::-webkit-scrollbar-thumb,
+.gx-activity-scroll::-webkit-scrollbar-thumb,
+.table-responsive::-webkit-scrollbar-thumb,
+.modal-body::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: var(--gx-radius-pill, 999px);
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+.gx-table-scroll::-webkit-scrollbar-thumb:hover,
+.table-responsive::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
+
+/* Firefox equivalent. */
+.gx-table-scroll,
+.gx-activity-scroll,
+.table-responsive,
+.modal-body { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }

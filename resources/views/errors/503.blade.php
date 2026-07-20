@@ -1,0 +1,5 @@
+@extends('errors.layout')
+@section('code', '503')
+@section('tone', 'is-warning')
+@section('title', 'The system is being updated')
+@section('message', 'This is a short maintenance window. Try again in a few minutes.')
