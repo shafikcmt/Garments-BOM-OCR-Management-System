@@ -4,6 +4,7 @@ import { initCountUp } from './modules/count-up';
 import { initFileUpload } from './modules/file-upload';
 import { initFileTable } from './modules/file-table';
 import { initUserTable } from './modules/user-table';
+import { initSubmitButtons } from './modules/submit-button';
 
 import Alpine from 'alpinejs';
 
@@ -22,3 +23,4 @@ document.addEventListener('DOMContentLoaded', initFileUpload);
 // Workspace file list: search, filter, sort, select, export.
 document.addEventListener('DOMContentLoaded', initFileTable);
 document.addEventListener('DOMContentLoaded', initUserTable);
+document.addEventListener('DOMContentLoaded', initSubmitButtons);

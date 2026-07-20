@@ -14,6 +14,7 @@
 @import './components.css';
 @import './dashboard.css';
 @import './upload.css';
+@import './forms.css';
 
 /* preflight is disabled in tailwind.config.js — it would reset Bootstrap's
    base styles and break every existing screen. */
