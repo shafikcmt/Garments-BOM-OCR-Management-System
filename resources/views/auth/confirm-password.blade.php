@@ -1,6 +1,6 @@
 <x-guest-layout>
     <div class="user-icon">
-        <i class="bi bi-shield-lock-fill"></i>
+        <i class="bi bi-shield-lock-fill" aria-hidden="true"></i>
     </div>
     <div class="brand">Humana Apparels Pvt. Ltd</div>
     <div class="login-subtitle">Confirm your password to continue.</div>
@@ -18,7 +18,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-check2-circle me-1"></i> Confirm
+            <i class="bi bi-check2-circle me-1" aria-hidden="true"></i> Confirm
         </button>
     </form>
 </x-guest-layout>

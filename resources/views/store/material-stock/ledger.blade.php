@@ -17,8 +17,8 @@
     <x-page-header icon="clipboard-data" eyebrow="Buyer / Style Stock" title="Closing Stock Report"
                    copy="Running / Liability / Dead — Liability & Dead can be reused (transfer to bulk).">
         <x-slot:actions>
-            <a href="{{ route('store.material.receivings.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-in-down me-1"></i>Receiving</a>
-            <a href="{{ route('store.material.bulk-issues.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-up me-1"></i>Bulk Issue</a>
+            <a href="{{ route('store.material.receivings.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-in-down me-1" aria-hidden="true"></i>Receiving</a>
+            <a href="{{ route('store.material.bulk-issues.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Bulk Issue</a>
         </x-slot:actions>
     </x-page-header>
 
@@ -47,7 +47,7 @@
                 <input name="q" value="{{ request('q') }}" class="form-control" placeholder="Type to search…">
             </div>
             <div class="col-12 col-md-2 d-flex gap-2">
-                <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel me-1"></i>Filter</button>
+                <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
                 <a href="{{ route('store.material.ledger') }}" class="btn btn-outline-secondary">Reset</a>
             </div>
         </form>

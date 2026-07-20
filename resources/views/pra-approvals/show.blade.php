@@ -25,7 +25,7 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-file-earmark-check"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Approvals / Review</div>
                     <h3 class="app-hero-title mb-0">{{ $paymentRequest->request_no }}</h3>
@@ -135,13 +135,13 @@
                     <div class="card-body p-4">
                         <h5 class="mb-3">Your Decision</h5>
                         @if($isCheckStage)
-                            <p class="small text-muted mb-2"><i class="bi bi-shield-check me-1"></i> You are the <strong>Checker</strong>. Once you check &amp; approve, the PRA moves to the approver(s).</p>
+                            <p class="small text-muted mb-2"><i class="bi bi-shield-check me-1" aria-hidden="true"></i> You are the <strong>Checker</strong>. Once you check &amp; approve, the PRA moves to the approver(s).</p>
                         @endif
                         <button type="button" class="btn btn-success w-100 mb-2" data-bs-toggle="modal" data-bs-target="#approveModal">
-                            <i class="bi bi-check2-circle me-1"></i> {{ $actionLabel }}
+                            <i class="bi bi-check2-circle me-1" aria-hidden="true"></i> {{ $actionLabel }}
                         </button>
                         <button type="button" class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#rejectModal">
-                            <i class="bi bi-x-circle me-1"></i> Reject
+                            <i class="bi bi-x-circle me-1" aria-hidden="true"></i> Reject
                         </button>
                         <p class="form-text mb-0 mt-2">
                             @if($isCheckStage)
@@ -172,7 +172,7 @@
             <form method="POST" action="{{ route('pra_approvals.approve', $paymentRequest) }}">
                 @csrf
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-check2-circle text-success me-1"></i> Confirm {{ $actionLabel }}</h5>
+                    <h5 class="modal-title"><i class="bi bi-check2-circle text-success me-1" aria-hidden="true"></i> Confirm {{ $actionLabel }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -185,7 +185,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Confirm {{ $actionLabel }}</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i> Confirm {{ $actionLabel }}</button>
                 </div>
             </form>
         </div>
@@ -199,7 +199,7 @@
             <form method="POST" action="{{ route('pra_approvals.reject', $paymentRequest) }}">
                 @csrf
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-x-circle text-danger me-1"></i> Confirm Rejection</h5>
+                    <h5 class="modal-title"><i class="bi bi-x-circle text-danger me-1" aria-hidden="true"></i> Confirm Rejection</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -209,7 +209,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger"><i class="bi bi-x-circle me-1"></i> Confirm Reject</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-x-circle me-1" aria-hidden="true"></i> Confirm Reject</button>
                 </div>
             </form>
         </div>

@@ -15,9 +15,9 @@
         @if($pendingRows->hasPages())
             <div class="page-group">
                 @if($pendingRows->onFirstPage())
-                    <span class="page-num disabled"><i class="bi bi-chevron-left me-1"></i> Prev</span>
+                    <span class="page-num disabled"><i class="bi bi-chevron-left me-1" aria-hidden="true"></i> Prev</span>
                 @else
-                    <a href="{{ $pendingRows->previousPageUrl() }}" rel="prev"><i class="bi bi-chevron-left me-1"></i> Prev</a>
+                    <a href="{{ $pendingRows->previousPageUrl() }}" rel="prev"><i class="bi bi-chevron-left me-1" aria-hidden="true"></i> Prev</a>
                 @endif
 
                 @if($start > 1)
@@ -43,9 +43,9 @@
                 @endif
 
                 @if($pendingRows->hasMorePages())
-                    <a href="{{ $pendingRows->nextPageUrl() }}" rel="next">Next <i class="bi bi-chevron-right ms-1"></i></a>
+                    <a href="{{ $pendingRows->nextPageUrl() }}" rel="next">Next <i class="bi bi-chevron-right ms-1" aria-hidden="true"></i></a>
                 @else
-                    <span class="page-num disabled">Next <i class="bi bi-chevron-right ms-1"></i></span>
+                    <span class="page-num disabled">Next <i class="bi bi-chevron-right ms-1" aria-hidden="true"></i></span>
                 @endif
             </div>
         @endif

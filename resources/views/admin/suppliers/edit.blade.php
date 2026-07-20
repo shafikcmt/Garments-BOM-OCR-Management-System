@@ -14,14 +14,14 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-buildings"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-buildings" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Admin / Vendors</div>
                     <h3 class="app-hero-title mb-0">Edit Vendor</h3>
                 </div>
             </div>
             <a href="{{ route('admin.suppliers.index') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-arrow-left"></i> Back to Vendors
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to Vendors
             </a>
         </div>
     </div>
@@ -34,7 +34,7 @@
                 @include('admin.suppliers._form', ['supplier' => $supplier])
                 <div class="mt-4 d-flex gap-2">
                     <button type="submit" class="btn btn-primary px-4">
-                        <i class="bi bi-save me-1"></i> Update Vendor
+                        <i class="bi bi-save me-1" aria-hidden="true"></i> Update Vendor
                     </button>
                     <a href="{{ route('admin.suppliers.index') }}" class="btn btn-outline-secondary">Cancel</a>
                 </div>

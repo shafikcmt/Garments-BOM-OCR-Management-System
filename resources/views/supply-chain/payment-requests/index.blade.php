@@ -83,7 +83,7 @@
             <h5 class="fw-bold mb-0" style="letter-spacing:-.02em;">Payment Request Approval</h5>
         </div>
         <a href="#payment-request-list" class="btn btn-outline-primary btn-sm" style="min-height:32px;">
-            <i class="bi bi-list-check me-1"></i>Request List
+            <i class="bi bi-list-check me-1" aria-hidden="true"></i>Request List
         </a>
     </div>
 
@@ -97,13 +97,13 @@
     <div class="d-flex flex-wrap gap-2 mb-3">
         <div class="card border-0 shadow-sm flex-fill" style="border-radius:12px;min-width:160px;">
             <div class="card-body p-3 d-flex align-items-center gap-3">
-                <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="width:36px;height:36px;background:#eff6ff;color:#2563eb;font-size:16px;"><i class="bi bi-currency-dollar"></i></div>
+                <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="width:36px;height:36px;background:#eff6ff;color:#2563eb;font-size:16px;"><i class="bi bi-currency-dollar" aria-hidden="true"></i></div>
                 <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">PI Amount</div><div style="font-size:1.15rem;font-weight:800;color:#0f172a;letter-spacing:-.03em;">{{ number_format((float) ($kpis['total_pi_amount'] ?? 0), 2) }}</div></div>
             </div>
         </div>
         <div class="card border-0 shadow-sm flex-fill" style="border-radius:12px;min-width:140px;">
             <div class="card-body p-3 d-flex align-items-center gap-3">
-                <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="width:36px;height:36px;background:#f0fdf4;color:#15803d;font-size:16px;"><i class="bi bi-file-earmark-check"></i></div>
+                <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="width:36px;height:36px;background:#f0fdf4;color:#15803d;font-size:16px;"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></div>
                 <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">PO Count</div><div style="font-size:1.15rem;font-weight:800;color:#0f172a;letter-spacing:-.03em;">{{ $kpis['total_po_count'] ?? 0 }}</div></div>
             </div>
         </div>
@@ -120,7 +120,7 @@
         </div>
         <div class="card border-0 shadow-sm flex-fill" style="border-radius:12px;min-width:180px;">
             <div class="card-body p-3 d-flex align-items-center gap-3">
-                <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="width:36px;height:36px;background:#fff1f2;color:#e11d48;font-size:16px;"><i class="bi bi-calendar-check"></i></div>
+                <div class="d-flex align-items-center justify-content-center rounded-3 flex-shrink-0" style="width:36px;height:36px;background:#fff1f2;color:#e11d48;font-size:16px;"><i class="bi bi-calendar-check" aria-hidden="true"></i></div>
                 <div><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;">Earliest Pay. Required</div><div style="font-size:1rem;font-weight:800;color:#0f172a;letter-spacing:-.03em;">{{ $kpis['earliest_payment_required_date'] ?: '—' }}</div></div>
             </div>
         </div>
@@ -134,10 +134,10 @@
                     <span class="badge rounded-pill text-bg-primary">{{ count($activeFilters) }} active</span>
                 @endif
                 <div class="ms-auto d-flex gap-2 flex-wrap align-items-center">
-                    <button type="submit" class="btn btn-primary btn-sm px-3" style="min-height:32px;"><i class="bi bi-funnel me-1"></i>Apply</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-3" style="min-height:32px;"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
                     <a href="{{ route('supply_chain.payment_requests.index') }}" class="btn btn-outline-secondary btn-sm" style="min-height:32px;">Reset</a>
                     <button type="button" class="btn btn-outline-secondary btn-sm" style="min-height:32px;" data-bs-toggle="collapse" data-bs-target="#advancedFilters" aria-expanded="false">
-                        <i class="bi bi-sliders me-1"></i>Advanced
+                        <i class="bi bi-sliders me-1" aria-hidden="true"></i>Advanced
                     </button>
                 </div>
             </div>
@@ -329,7 +329,7 @@
                             <td class="text-end fw-bold" title="{{ number_format($rowPi, 2) }}{{ $rowOverBudget ? ' — Over budget by ' . number_format($rowOverBy, 2) . ' (Budget ' . number_format($rowBudget, 2) . ')' : '' }}">
                                 {{ number_format($rowPi, 2) }}
                                 @if($rowOverBudget)
-                                    <span class="badge rounded-pill text-bg-danger ms-1" style="font-size:.5rem;padding:.18em .4em;" title="PI Amount exceeds allocated Budget ({{ number_format($rowBudget, 2) }}) by {{ number_format($rowOverBy, 2) }}"><i class="bi bi-exclamation-triangle-fill"></i></span>
+                                    <span class="badge rounded-pill text-bg-danger ms-1" style="font-size:.5rem;padding:.18em .4em;" title="PI Amount exceeds allocated Budget ({{ number_format($rowBudget, 2) }}) by {{ number_format($rowOverBy, 2) }}"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
                                 @endif
                             </td>
                             <td class="text-end">
@@ -341,7 +341,7 @@
                                       data-over="{{ number_format($rowOverBy, 2, '.', '') }}">
                                     <input type="hidden" name="booking_po_ids[]" value="{{ $row['booking_po_id'] }}">
                                     <button type="submit" class="btn btn-sm btn-primary rounded-pill row-create-btn" title="Preview payment request approval for this PO">
-                                        <i class="bi bi-eye"></i>
+                                        <i class="bi bi-eye" aria-hidden="true"></i>
                                         <span class="ms-1">Preview</span>
                                     </button>
                                 </form>
@@ -350,7 +350,7 @@
                     @empty
                         <tr>
                             <td colspan="12" class="text-center py-5 text-muted">
-                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                <i class="bi bi-inbox fs-1 d-block mb-2" aria-hidden="true"></i>
                                 No pending PI payment rows found. Verify PI Number, Payment Status, and Payment Doc No headers in the workspace.
                             </td>
                         </tr>
@@ -405,13 +405,13 @@
                             <td class="text-end">
                                 <div class="d-inline-flex gap-1 justify-content-end flex-nowrap">
                                     <a href="{{ route('supply_chain.payment_requests.show', $paymentRequest) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" title="View this PRA">
-                                        <i class="bi bi-eye me-1"></i>View
+                                        <i class="bi bi-eye me-1" aria-hidden="true"></i>View
                                     </a>
                                     <a href="{{ route('supply_chain.payment_requests.download_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-danger rounded-pill px-3" title="Open PDF preview">
-                                        <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+                                        <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF
                                     </a>
                                     <a href="{{ route('supply_chain.payment_requests.download_excel', $paymentRequest) }}" class="btn btn-sm btn-outline-success rounded-pill px-3" title="Download Excel">
-                                        <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                                        <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel
                                     </a>
                                 </div>
                             </td>
@@ -433,7 +433,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius:var(--gx-radius);">
             <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title text-danger" id="overBudgetModalLabel"><i class="bi bi-exclamation-triangle-fill me-2"></i>Budget Exceeded</h5>
+                <h5 class="modal-title text-danger" id="overBudgetModalLabel"><i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>Budget Exceeded</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -447,7 +447,7 @@
             </div>
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="overBudgetContinue"><i class="bi bi-arrow-right-circle me-1"></i>Continue Anyway</button>
+                <button type="button" class="btn btn-danger" id="overBudgetContinue"><i class="bi bi-arrow-right-circle me-1" aria-hidden="true"></i>Continue Anyway</button>
             </div>
         </div>
     </div>

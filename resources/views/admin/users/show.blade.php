@@ -36,8 +36,8 @@
                 </div>
             </div>
             <div class="d-flex gap-2">
-                <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-primary d-inline-flex align-items-center gap-2"><i class="bi bi-pencil-square"></i> Edit</a>
-                <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2"><i class="bi bi-arrow-left"></i> Back</a>
+                <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-primary d-inline-flex align-items-center gap-2"><i class="bi bi-pencil-square" aria-hidden="true"></i> Edit</a>
+                <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</a>
             </div>
         </div>
     </div>

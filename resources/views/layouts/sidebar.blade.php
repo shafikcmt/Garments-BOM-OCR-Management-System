@@ -15,14 +15,14 @@
     <div class="sidebar-inner">
         <div class="sidebar-logo">
             <a href="{{ url('/dashboard') }}" class="sidebar-brand-link">
-                <span class="brand-mark"><i class="bi bi-grid-1x2-fill"></i></span>
+                <span class="brand-mark"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i></span>
                 <span class="min-w-0">
                     <span class="sidebar-brand-title">HAPL OCR</span>
                     <span class="sidebar-brand-subtitle">Management System</span>
                 </span>
             </a>
             <button type="button" class="btn btn-sm d-lg-none sidebar-close-btn" id="sidebarClose" aria-label="Close sidebar" title="Close menu">
-                <i class="bi bi-x-lg"></i>
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
             </button>
         </div>
 
@@ -34,7 +34,7 @@
                     <li class="sidebar-item">
                         <a href="{{ route('admin.dashboard') }}" class="sidebar-nav-link {{ $isAdminDashboard ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Dashboard</span>
                             </span>
                         </a>
@@ -43,10 +43,10 @@
                     <li class="sidebar-group {{ $isAdminWorkspace ? 'is-open' : '' }}">
                         <button type="button" class="sidebar-group-button {{ $isAdminWorkspace ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminWorkspace ? 'true' : 'false' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-grid"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-grid" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Workspace</span>
                             </span>
-                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
                         </button>
                         <div class="sidebar-submenu {{ $isAdminWorkspace ? 'is-open' : '' }}">
                             <span class="sidebar-submenu-rail"></span>
@@ -58,10 +58,10 @@
                     <li class="sidebar-group {{ $isAdminUserRole ? 'is-open' : '' }}">
                         <button type="button" class="sidebar-group-button {{ $isAdminUserRole ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminUserRole ? 'true' : 'false' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-people"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Users &amp; Roles</span>
                             </span>
-                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
                         </button>
                         <div class="sidebar-submenu {{ $isAdminUserRole ? 'is-open' : '' }}">
                             <span class="sidebar-submenu-rail"></span>
@@ -73,10 +73,10 @@
                     <li class="sidebar-group {{ $isAdminBookingSettings ? 'is-open' : '' }}">
                         <button type="button" class="sidebar-group-button {{ $isAdminBookingSettings ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminBookingSettings ? 'true' : 'false' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-sliders"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-sliders" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Booking Setup</span>
                             </span>
-                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
                         </button>
                         <div class="sidebar-submenu {{ $isAdminBookingSettings ? 'is-open' : '' }}">
                             <span class="sidebar-submenu-rail"></span>
@@ -90,10 +90,10 @@
                     <li class="sidebar-group {{ $isAdminSettings ? 'is-open' : '' }}">
                         <button type="button" class="sidebar-group-button {{ $isAdminSettings ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminSettings ? 'true' : 'false' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-gear"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-gear" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Settings</span>
                             </span>
-                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
                         </button>
                         <div class="sidebar-submenu {{ $isAdminSettings ? 'is-open' : '' }}">
                             <span class="sidebar-submenu-rail"></span>
@@ -113,17 +113,17 @@
                 <ul class="sidebar-list">
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.dashboard') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span><span class="sidebar-link-text">Dashboard</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span><span class="sidebar-link-text">Dashboard</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph"></i></span><span class="sidebar-link-text">Store Reports</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Store Reports</span></span>
                         </a>
                     </li>
                 </ul>
@@ -136,12 +136,12 @@
                 <ul class="sidebar-list">
                     <li class="sidebar-item">
                         <a href="{{ route('account.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('account.dashboard') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span><span class="sidebar-link-text">Dashboard</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span><span class="sidebar-link-text">Dashboard</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('account.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('account.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
                         </a>
                     </li>
                 </ul>
@@ -154,12 +154,12 @@
                 <ul class="sidebar-list">
                     <li class="sidebar-item">
                         <a href="{{ route('commercial.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.dashboard') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span><span class="sidebar-link-text">Dashboard</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span><span class="sidebar-link-text">Dashboard</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('commercial.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
                         </a>
                     </li>
                 </ul>
@@ -172,17 +172,17 @@
                 <ul class="sidebar-list">
                     <li class="sidebar-item">
                         <a href="{{ route('store.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('store.dashboard') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span><span class="sidebar-link-text">Dashboard</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span><span class="sidebar-link-text">Dashboard</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('store.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph"></i></span><span class="sidebar-link-text">Reports</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Reports</span></span>
                         </a>
                     </li>
                 </ul>
@@ -192,22 +192,22 @@
                 <ul class="sidebar-list">
                     <li class="sidebar-item">
                         <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-journal-text"></i></span><span class="sidebar-link-text">Monthly Ledger</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Monthly Ledger</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.stock.items.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-seam"></i></span><span class="sidebar-link-text">Items</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span><span class="sidebar-link-text">Items</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck"></i></span><span class="sidebar-link-text">Purchases</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span class="sidebar-link-text">Purchases</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.stock.issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-up"></i></span><span class="sidebar-link-text">Issues</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span><span class="sidebar-link-text">Issues</span></span>
                         </a>
                     </li>
                 </ul>
@@ -217,22 +217,22 @@
                 <ul class="sidebar-list">
                     <li class="sidebar-item">
                         <a href="{{ route('store.material.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.ledger') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clipboard-data"></i></span><span class="sidebar-link-text">Closing Stock</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clipboard-data" aria-hidden="true"></i></span><span class="sidebar-link-text">Closing Stock</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.material.receivings.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.receivings.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-in-down"></i></span><span class="sidebar-link-text">Receiving</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></span><span class="sidebar-link-text">Receiving</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.material.bulk-issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.bulk-issues.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-up"></i></span><span class="sidebar-link-text">Bulk Issuing</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span><span class="sidebar-link-text">Bulk Issuing</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.material.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.requisitions.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-list-check"></i></span><span class="sidebar-link-text">Requisitions</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Requisitions</span></span>
                         </a>
                     </li>
                 </ul>
@@ -246,7 +246,7 @@
                     <li class="sidebar-item">
                         <a href="{{ route('supply_chain.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.dashboard') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Dashboard</span>
                             </span>
                         </a>
@@ -254,7 +254,7 @@
                     <li class="sidebar-item">
                         <a href="{{ route('supply_chain.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-columns-gap"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-columns-gap" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Workspace</span>
                             </span>
                         </a>
@@ -262,10 +262,10 @@
                     <li class="sidebar-group {{ $isSupplyBooking ? 'is-open' : '' }}">
                         <button type="button" class="sidebar-group-button {{ $isSupplyBooking ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isSupplyBooking ? 'true' : 'false' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-file-earmark-plus"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-file-earmark-plus" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">PO Generate</span>
                             </span>
-                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
                         </button>
                         <div class="sidebar-submenu {{ $isSupplyBooking ? 'is-open' : '' }}">
                             <span class="sidebar-submenu-rail"></span>
@@ -276,10 +276,10 @@
                     <li class="sidebar-group {{ $isSupplyPayment ? 'is-open' : '' }}">
                         <button type="button" class="sidebar-group-button {{ $isSupplyPayment ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isSupplyPayment ? 'true' : 'false' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-cash-coin"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-cash-coin" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Payment Request</span>
                             </span>
-                            <span class="sidebar-chevron"><i class="bi bi-chevron-down"></i></span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
                         </button>
                         <div class="sidebar-submenu {{ $isSupplyPayment ? 'is-open' : '' }}">
                             <span class="sidebar-submenu-rail"></span>
@@ -291,7 +291,7 @@
                     <li class="sidebar-item">
                         <a href="{{ route('supply_chain.sent_emails.index') }}" class="sidebar-nav-link {{ $isSupplyEmails ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-envelope-paper"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-envelope-paper" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Sent Emails</span>
                             </span>
                         </a>
@@ -307,7 +307,7 @@
                     <li class="sidebar-item">
                         <a href="{{ route('management.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('management.dashboard') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Dashboard</span>
                             </span>
                         </a>
@@ -315,7 +315,7 @@
                     <li class="sidebar-item">
                         <a href="{{ route('store.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph"></i></span>
+                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Store Reports</span>
                             </span>
                         </a>
@@ -343,7 +343,7 @@
                         <li class="sidebar-item">
                             <a href="{{ route('pra_approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('pra_approvals.*') ? 'is-active' : '' }}">
                                 <span class="sidebar-link-main">
-                                    <span class="sidebar-icon"><i class="bi bi-inbox"></i></span>
+                                    <span class="sidebar-icon"><i class="bi bi-inbox" aria-hidden="true"></i></span>
                                     <span class="sidebar-link-text">PRA Approvals</span>
                                 </span>
                                 @if($praPendingCount > 0)
@@ -362,7 +362,7 @@
                         <li class="sidebar-item">
                             <a href="{{ route('style-budgets.index') }}" class="sidebar-nav-link {{ request()->routeIs('style-budgets.*') ? 'is-active' : '' }}">
                                 <span class="sidebar-link-main">
-                                    <span class="sidebar-icon"><i class="bi bi-bar-chart"></i></span>
+                                    <span class="sidebar-icon"><i class="bi bi-bar-chart" aria-hidden="true"></i></span>
                                     <span class="sidebar-link-text">Style Budgets</span>
                                 </span>
                             </a>

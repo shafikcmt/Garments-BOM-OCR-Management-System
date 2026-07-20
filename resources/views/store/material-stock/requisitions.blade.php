@@ -13,14 +13,14 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-list-check"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-list-check" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Buyer / Style Stock</div>
                     <h3 class="app-hero-title mb-0">Requisitions</h3>
                     <p class="app-hero-copy mb-0">Request → Approve → fulfilled by a Bulk Issue.</p>
                 </div>
             </div>
-            <a href="{{ route('store.material.bulk-issues.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-up me-1"></i>Bulk Issue</a>
+            <a href="{{ route('store.material.bulk-issues.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Bulk Issue</a>
         </div>
     </div>
 
@@ -100,7 +100,7 @@
                 </div>
 
                 <div class="mt-3 text-end">
-                    <button type="submit" class="btn btn-primary" id="submitBtn" disabled><i class="bi bi-plus-lg me-1"></i>Create Requisition</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn" disabled><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Create Requisition</button>
                 </div>
             </form>
             @endif
@@ -135,13 +135,13 @@
                                     @if($req->status === 'pending')
                                         <form method="POST" action="{{ route('store.material.requisitions.approve', $req) }}" class="d-inline">
                                             @csrf @method('PATCH')
-                                            <button class="btn btn-sm btn-outline-success rounded-pill px-3"><i class="bi bi-check2 me-1"></i>Approve</button>
+                                            <button class="btn btn-sm btn-outline-success rounded-pill px-3"><i class="bi bi-check2 me-1" aria-hidden="true"></i>Approve</button>
                                         </form>
                                     @endif
                                     @if($req->status !== 'issued')
                                         <form method="POST" action="{{ route('store.material.requisitions.destroy', $req) }}" class="d-inline" onsubmit="return confirm('Remove this requisition?');">
                                             @csrf @method('DELETE')
-                                            <button class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash"></i></button>
+                                            <button class="btn btn-sm btn-outline-danger rounded-pill px-3" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                         </form>
                                     @endif
                                 </td>

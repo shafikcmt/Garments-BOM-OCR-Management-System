@@ -83,11 +83,33 @@
  * rather than reading --bs-primary, so the variables above do NOT reach them.
  * Each variant used in the app is therefore rebound explicitly.
  */
+/* --- Contrast ------------------------------------------------------------
+ * Measured against WCAG AA (4.5:1 for normal text). The base palette is a
+ * 500-weight ramp, which is fine for fills but too light to carry white text
+ * or to be used as text on a pale tint:
+ *
+ *   white on #3B82F6 ....... 3.68:1   white on #10B981 ....... 2.54:1
+ *   white on #EF4444 ....... 3.76:1   white on #F59E0B ....... 2.15:1
+ *   #10B981 on #D1FAE5 ..... 2.24:1   #3B82F6 on #FFFFFF ..... 3.68:1
+ *
+ * So solid buttons take the darker step, and anything used AS TEXT takes the
+ * 700 emphasis colour. The 500s stay for fills, borders and icon tints, which
+ * are not text and only need 3:1.
+ */
+
+/* Bootstrap's .text-* utilities resolve to the base colour, which is what put
+   .text-success on .bg-success-subtle at 2.24:1 — the badge pattern used all
+   over this app. Pointing them at the emphasis colour fixes every one. */
+.text-primary { color: var(--gx-secondary-700) !important; }
+.text-success { color: var(--gx-accent-700) !important; }
+.text-danger  { color: var(--gx-danger-700) !important; }
+.text-warning { color: var(--gx-warning-700) !important; }
+
 .btn-primary {
-    --bs-btn-bg: var(--gx-secondary);
-    --bs-btn-border-color: var(--gx-secondary);
-    --bs-btn-hover-bg: var(--gx-secondary-600);
-    --bs-btn-hover-border-color: var(--gx-secondary-600);
+    --bs-btn-bg: var(--gx-secondary-600);
+    --bs-btn-border-color: var(--gx-secondary-600);
+    --bs-btn-hover-bg: var(--gx-secondary-700);
+    --bs-btn-hover-border-color: var(--gx-secondary-700);
     --bs-btn-active-bg: var(--gx-secondary-700);
     --bs-btn-active-border-color: var(--gx-secondary-700);
     --bs-btn-disabled-bg: var(--gx-secondary);
@@ -96,20 +118,22 @@
 }
 
 .btn-outline-primary {
-    --bs-btn-color: var(--gx-secondary);
+    /* Rendered as text on white, so it needs the 700 (6.7:1). */
+    --bs-btn-color: var(--gx-secondary-700);
     --bs-btn-border-color: var(--gx-secondary);
     --bs-btn-hover-bg: var(--gx-secondary);
     --bs-btn-hover-border-color: var(--gx-secondary);
     --bs-btn-active-bg: var(--gx-secondary-600);
     --bs-btn-active-border-color: var(--gx-secondary-600);
-    --bs-btn-disabled-color: var(--gx-secondary);
+    --bs-btn-disabled-color: var(--gx-secondary-700);
     --bs-btn-disabled-border-color: var(--gx-secondary);
     --bs-btn-focus-shadow-rgb: 59, 130, 246;
 }
 
 .btn-success {
-    --bs-btn-bg: var(--gx-accent);
-    --bs-btn-border-color: var(--gx-accent);
+    /* emerald-600 is 3.77:1 against white; the 700 reaches 5.48:1. */
+    --bs-btn-bg: var(--gx-accent-700);
+    --bs-btn-border-color: var(--gx-accent-700);
     --bs-btn-hover-bg: var(--gx-accent-600);
     --bs-btn-hover-border-color: var(--gx-accent-600);
     --bs-btn-active-bg: var(--gx-accent-700);
@@ -120,8 +144,8 @@
 }
 
 .btn-danger {
-    --bs-btn-bg: var(--gx-danger);
-    --bs-btn-border-color: var(--gx-danger);
+    --bs-btn-bg: var(--gx-danger-600);
+    --bs-btn-border-color: var(--gx-danger-600);
     --bs-btn-hover-bg: var(--gx-danger-600);
     --bs-btn-hover-border-color: var(--gx-danger-600);
     --bs-btn-active-bg: var(--gx-danger-700);
@@ -132,13 +156,13 @@
 }
 
 .btn-outline-danger {
-    --bs-btn-color: var(--gx-danger);
+    --bs-btn-color: var(--gx-danger-700);
     --bs-btn-border-color: var(--gx-danger);
     --bs-btn-hover-bg: var(--gx-danger);
     --bs-btn-hover-border-color: var(--gx-danger);
     --bs-btn-active-bg: var(--gx-danger-600);
     --bs-btn-active-border-color: var(--gx-danger-600);
-    --bs-btn-disabled-color: var(--gx-danger);
+    --bs-btn-disabled-color: var(--gx-danger-700);
     --bs-btn-disabled-border-color: var(--gx-danger);
     --bs-btn-focus-shadow-rgb: 239, 68, 68;
 }

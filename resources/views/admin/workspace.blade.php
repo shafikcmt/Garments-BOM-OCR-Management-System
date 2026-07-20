@@ -19,7 +19,7 @@
 
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center gap-3">
-            <span class="app-stat-icon" style="width:48px;height:48px;border-radius:17px;font-size:20px;"><i class="bi bi-sliders"></i></span>
+            <span class="app-stat-icon" style="width:48px;height:48px;border-radius:17px;font-size:20px;"><i class="bi bi-sliders" aria-hidden="true"></i></span>
             <div>
                 <div class="app-hero-eyebrow">Workspace</div>
                 <h3 class="app-hero-title mb-1">Workspace Control</h3>
@@ -30,7 +30,7 @@
 
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item">
-            <button class="nav-link active" type="button"><i class="bi bi-folder2-open me-1"></i>Uploaded Files</button>
+            <button class="nav-link active" type="button"><i class="bi bi-folder2-open me-1" aria-hidden="true"></i>Uploaded Files</button>
         </li>
     </ul>
 

@@ -842,7 +842,7 @@
 
     @if($isFileLockedForUser ?? false)
         <div class="alert alert-warning py-2 px-3 mb-3 rounded-3">
-            <div class="fw-bold"><i class="bi bi-lock-fill me-1"></i>This workspace file is locked for your user or role.</div>
+            <div class="fw-bold"><i class="bi bi-lock-fill me-1" aria-hidden="true"></i>This workspace file is locked for your user or role.</div>
             <div class="small">You can view this file, but you cannot edit, update, paste changes, or add rows until admin unlocks it for you.</div>
             @if(!empty($fileLockInfo['reason'] ?? ''))
                 <div class="small mt-1"><strong>Reason:</strong> {{ $fileLockInfo['reason'] }}</div>
@@ -877,31 +877,31 @@
                 <span class="order-meta-chip order-meta-chip-rows"><span class="order-meta-chip-label">Rows</span><span class="order-meta-chip-value">{{ $excelFile->total_rows }}</span></span>
                 <span class="order-meta-chip order-meta-chip-status"><span class="order-meta-chip-label">Status</span><span class="order-meta-chip-value">{{ ucfirst($excelFile->status ?? 'pending') }}</span></span>
                 @if($excelFile->is_locked)
-                    <span class="order-meta-chip order-meta-chip-locked"><i class="bi bi-lock-fill me-1"></i>{{ $fileLockInfo['summary'] ?? $excelFile->lockScopeLabel() }}</span>
+                    <span class="order-meta-chip order-meta-chip-locked"><i class="bi bi-lock-fill me-1" aria-hidden="true"></i>{{ $fileLockInfo['summary'] ?? $excelFile->lockScopeLabel() }}</span>
                 @endif
             </div>
             <div class="d-flex gap-2 flex-shrink-0 d-print-none">
-                <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"><i class="bi bi-arrow-left"></i><span class="ms-1">Back</span></a>
+                <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"><i class="bi bi-arrow-left" aria-hidden="true"></i><span class="ms-1">Back</span></a>
 
                 <a href="{{ route('uploaded-files.download', $excelFile->id) }}"
                    class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
                    title="Download the file exactly as it was uploaded">
-                    <i class="bi bi-download"></i><span class="ms-1">Original</span>
+                    <i class="bi bi-download" aria-hidden="true"></i><span class="ms-1">Original</span>
                 </a>
 
                 <button type="button" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
-                        onclick="window.print()"><i class="bi bi-printer"></i><span class="ms-1">Print</span></button>
+                        onclick="window.print()"><i class="bi bi-printer" aria-hidden="true"></i><span class="ms-1">Print</span></button>
 
                 @if(($activityTotal ?? 0) > 0)
                     <button type="button" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
                             data-bs-toggle="collapse" data-bs-target="#fileActivityLog"
                             aria-expanded="false" aria-controls="fileActivityLog">
-                        <i class="bi bi-clock-history"></i><span class="ms-1">History ({{ $activityTotal }})</span>
+                        <i class="bi bi-clock-history" aria-hidden="true"></i><span class="ms-1">History ({{ $activityTotal }})</span>
                     </button>
                 @endif
 
                 @if($canDeleteFile ?? false)
-                    <button type="submit" form="delete-file-form" class="btn btn-outline-danger btn-sm" style="min-height:32px;font-size:12px;" onclick="return confirm('Are you sure you want to delete this file?');"><i class="bi bi-trash"></i><span class="ms-1">Delete</span></button>
+                    <button type="submit" form="delete-file-form" class="btn btn-outline-danger btn-sm" style="min-height:32px;font-size:12px;" onclick="return confirm('Are you sure you want to delete this file?');"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                 @endif
             </div>
         </div>
@@ -949,7 +949,7 @@
                                             @if($isEdit)
                                                 @if($from !== '')
                                                     <span class="text-danger text-decoration-line-through">{{ Str::limit($from, 28) }}</span>
-                                                    <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                                                    <i class="bi bi-arrow-right mx-1 text-muted" aria-hidden="true"></i>
                                                 @endif
                                                 <span class="text-success fw-semibold">{{ $to !== '' ? Str::limit($to, 28) : '(cleared)' }}</span>
                                             @else
@@ -1113,12 +1113,12 @@
                                     {{ $row->row_number }}
                                     @if($isFileLockedForUser ?? false)
                                         <div class="file-row-lock-badge" title="This workspace file is locked by admin">
-                                            <i class="bi bi-lock-fill"></i> File Locked
+                                            <i class="bi bi-lock-fill" aria-hidden="true"></i> File Locked
                                         </div>
                                     @endif
                                     @if($isPoRowLocked)
                                         <div class="po-row-lock-badge" title="PO {{ $rowLockedInfo['po_no'] ?? '' }} locked{{ !empty($rowLockedInfo['reason'] ?? '') ? ': ' . $rowLockedInfo['reason'] : '' }}">
-                                            <i class="bi bi-lock-fill"></i> PO Locked
+                                            <i class="bi bi-lock-fill" aria-hidden="true"></i> PO Locked
                                         </div>
                                     @endif
                                 </td>

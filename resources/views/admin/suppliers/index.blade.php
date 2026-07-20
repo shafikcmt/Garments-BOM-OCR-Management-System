@@ -178,7 +178,7 @@
     <div class="supplier-hero mb-3">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-3">
-                <span class="supplier-hero-icon"><i class="bi bi-buildings"></i></span>
+                <span class="supplier-hero-icon"><i class="bi bi-buildings" aria-hidden="true"></i></span>
                 <div>
                     <div class="supplier-eyebrow">Booking Setup</div>
                     <h3 class="supplier-title">Vendor / Supplier Control</h3>
@@ -186,7 +186,7 @@
                 </div>
             </div>
             <a href="{{ route('admin.suppliers.create') }}" class="btn btn-primary px-4 d-inline-flex align-items-center gap-2">
-                <i class="bi bi-plus-circle"></i> Add Vendor
+                <i class="bi bi-plus-circle" aria-hidden="true"></i> Add Vendor
             </a>
         </div>
     </div>
@@ -226,7 +226,7 @@
                     <div class="small text-muted">Search by supplier name, code, contact, email, address, item type, incoterm or ship mode.</div>
                 </div>
                 <div class="supplier-search" style="min-width:min(100%, 420px);">
-                    <i class="bi bi-search"></i>
+                    <i class="bi bi-search" aria-hidden="true"></i>
                     <input type="text" class="form-control" id="supplierTableSearch" placeholder="Search vendors...">
                 </div>
             </div>
@@ -281,12 +281,12 @@
                             <td>
                                 <div class="fw-semibold text-slate-900">{{ $supplier->contact_person ?? '-' }}</div>
                                 @if($supplier->phone)
-                                    <div class="supplier-sub"><i class="bi bi-telephone me-1"></i>{{ $supplier->phone }}</div>
+                                    <div class="supplier-sub"><i class="bi bi-telephone me-1" aria-hidden="true"></i>{{ $supplier->phone }}</div>
                                 @endif
                             </td>
                             <td>
                                 @if($supplier->email)
-                                    <span class="d-inline-flex align-items-center gap-1"><i class="bi bi-envelope text-primary"></i>{{ $supplier->email }}</span>
+                                    <span class="d-inline-flex align-items-center gap-1"><i class="bi bi-envelope text-primary" aria-hidden="true"></i>{{ $supplier->email }}</span>
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif
@@ -297,22 +297,22 @@
                             <td>{{ $supplier->ship_mode ?? '-' }}</td>
                             <td>
                                 @if($supplier->is_active)
-                                    <span class="supplier-status-badge supplier-status-active"><i class="bi bi-check-circle me-1"></i>Active</span>
+                                    <span class="supplier-status-badge supplier-status-active"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>Active</span>
                                 @else
-                                    <span class="supplier-status-badge supplier-status-inactive"><i class="bi bi-x-circle me-1"></i>Inactive</span>
+                                    <span class="supplier-status-badge supplier-status-inactive"><i class="bi bi-x-circle me-1" aria-hidden="true"></i>Inactive</span>
                                 @endif
                             </td>
                             <td>
                                 <div class="d-flex justify-content-center gap-2">
                                     <a href="{{ route('admin.suppliers.edit', $supplier) }}" class="btn supplier-action-btn supplier-action-edit" title="Edit vendor">
-                                        <i class="bi bi-pencil-square"></i><span class="ms-1">Edit</span>
+                                        <i class="bi bi-pencil-square" aria-hidden="true"></i><span class="ms-1">Edit</span>
                                     </a>
 
                                     <form action="{{ route('admin.suppliers.destroy', $supplier) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this vendor?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn supplier-action-btn supplier-action-delete" title="Delete vendor">
-                                            <i class="bi bi-trash3"></i><span class="ms-1">Delete</span>
+                                            <i class="bi bi-trash3" aria-hidden="true"></i><span class="ms-1">Delete</span>
                                         </button>
                                     </form>
                                 </div>
@@ -324,7 +324,7 @@
                                 <div class="supplier-empty">
                                     <div>
                                         <span class="d-inline-flex align-items-center justify-content-center rounded-5 bg-light border mb-3" style="width:76px;height:76px;">
-                                            <i class="bi bi-inbox fs-1 text-slate-400"></i>
+                                            <i class="bi bi-inbox fs-1 text-slate-400" aria-hidden="true"></i>
                                         </span>
                                         <div class="fw-bold text-slate-900">No vendor found</div>
                                         <div class="small text-muted">Create a vendor to start booking setup.</div>
@@ -338,7 +338,7 @@
                             <div class="supplier-empty">
                                 <div>
                                     <span class="d-inline-flex align-items-center justify-content-center rounded-5 bg-light border mb-3" style="width:76px;height:76px;">
-                                        <i class="bi bi-search fs-1 text-slate-400"></i>
+                                        <i class="bi bi-search fs-1 text-slate-400" aria-hidden="true"></i>
                                     </span>
                                     <div class="fw-bold text-slate-900">No matching vendor found</div>
                                     <div class="small text-muted">Try another keyword.</div>

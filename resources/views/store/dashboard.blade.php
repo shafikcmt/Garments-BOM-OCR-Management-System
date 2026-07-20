@@ -12,7 +12,7 @@
                    copy="Stock position, movement and what needs attention.">
         <x-slot:actions>
             <a href="{{ route('store.material.receivings.index') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-box-arrow-in-down"></i>Receiving
+                <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>Receiving
             </a>
             <a href="{{ route('store.reports.index') }}" class="btn btn-outline-secondary">Reports</a>
         </x-slot:actions>

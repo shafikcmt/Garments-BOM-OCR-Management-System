@@ -12,7 +12,7 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-file-earmark-bar-graph"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Store</div>
                     <h3 class="app-hero-title mb-0">Stock Reports</h3>
@@ -22,10 +22,10 @@
             @if($canDownload)
                 <div class="d-flex gap-2">
                     <a href="{{ route('store.reports.pdf', request()->query()) }}" class="btn btn-outline-danger">
-                        <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+                        <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF
                     </a>
                     <a href="{{ route('store.reports.excel', request()->query()) }}" class="btn btn-outline-success">
-                        <i class="bi bi-file-earmark-excel me-1"></i>Excel
+                        <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel
                     </a>
                 </div>
             @endif
@@ -77,7 +77,7 @@
                     <input type="date" name="date_to" value="{{ $filters['date_to'] }}" class="form-control">
                 </div>
                 <div class="col-12 col-xl-2 d-flex gap-2">
-                    <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel me-1"></i>Apply</button>
+                    <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
                     <a href="{{ route('store.reports.index') }}" class="btn btn-outline-secondary">Reset</a>
                 </div>
             </form>
@@ -85,7 +85,7 @@
     </div>
 
     @error('date_to')
-        <div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle me-1"></i>{{ $message }}</div>
+        <div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ $message }}</div>
     @enderror
 
     <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
@@ -95,7 +95,7 @@
                 <div class="text-muted small">{{ $rows->count() }} {{ Str::plural(Str::lower($groupHeading), $rows->count()) }}</div>
             </div>
             <div class="text-muted small">
-                <i class="bi bi-info-circle me-1"></i>Period Movement follows the date filter. Current Stock Balance is the lifetime ledger closing and ignores it.
+                <i class="bi bi-info-circle me-1" aria-hidden="true"></i>Period Movement follows the date filter. Current Stock Balance is the lifetime ledger closing and ignores it.
             </div>
         </div>
         <div class="card-body p-0">

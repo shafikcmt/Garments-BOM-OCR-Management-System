@@ -11,7 +11,7 @@
 
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center gap-3">
-            <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-inbox"></i></span>
+            <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-inbox" aria-hidden="true"></i></span>
             <div>
                 <div class="app-hero-eyebrow">Approvals</div>
                 <h3 class="app-hero-title mb-0">Pending PRA Approvals</h3>
@@ -53,13 +53,13 @@
                                 <td class="text-center"><span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">{{ $progress['label'] }}</span></td>
                                 <td class="text-end">
                                     <a href="{{ route('pra_approvals.show', $pr) }}" class="btn btn-sm btn-primary rounded-pill px-3">
-                                        <i class="bi bi-eye me-1"></i> Review
+                                        <i class="bi bi-eye me-1" aria-hidden="true"></i> Review
                                     </a>
                                 </td>
                             </tr>
                         @empty
                             <tr><td colspan="6" class="text-center text-muted py-5">
-                                <i class="bi bi-check2-circle fs-3 d-block mb-2 text-success"></i>
+                                <i class="bi bi-check2-circle fs-3 d-block mb-2 text-success" aria-hidden="true"></i>
                                 No PRA is waiting for your approval.
                             </td></tr>
                         @endforelse

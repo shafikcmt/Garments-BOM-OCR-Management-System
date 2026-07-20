@@ -90,7 +90,7 @@
             <td colspan="3" class="signature">
                 <strong>{{ $sign['title'] }}</strong><br>
                 @if($sign['src'])
-                    <img src="{{ $sign['src'] }}" style="max-height:40px;"><br>
+                    <img src="{{ $sign['src'] }}" alt="Signature of {{ $sign['name'] ?? 'approver' }}" style="max-height:40px;"><br>
                     {{ $sign['name'] }}{{ !empty($sign['date']) ? ' — ' . $sign['date'] : '' }}<br>Signature &amp; Date
                 @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
                     <br>{{ $sign['name'] }}{{ !empty($sign['date']) ? ' — ' . $sign['date'] : '' }}<br>Signature &amp; Date

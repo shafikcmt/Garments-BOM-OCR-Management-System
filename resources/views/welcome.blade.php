@@ -1,7 +1,7 @@
 <x-guest-layout>
     <!-- User Icon + Brand -->
     <div class="user-icon">
-        <i class="bi bi-person-fill"></i>
+        <i class="bi bi-person-fill" aria-hidden="true"></i>
     </div>
     <div class="brand">Humana Apparels Pvt. Ltd</div>
     <div class="login-subtitle">OCR Management System</div>

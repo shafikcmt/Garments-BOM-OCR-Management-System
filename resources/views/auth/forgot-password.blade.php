@@ -1,6 +1,6 @@
 <x-guest-layout>
     <div class="user-icon">
-        <i class="bi bi-envelope-lock-fill"></i>
+        <i class="bi bi-envelope-lock-fill" aria-hidden="true"></i>
     </div>
     <div class="brand">Humana Apparels Pvt. Ltd</div>
     <div class="login-subtitle">Enter your email to receive a password reset link.</div>
@@ -20,7 +20,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-send me-1"></i> Send Reset Link
+            <i class="bi bi-send me-1" aria-hidden="true"></i> Send Reset Link
         </button>
 
         <div class="text-center mt-3">

@@ -1,6 +1,6 @@
 <x-guest-layout>
     <div class="user-icon">
-        <i class="bi bi-envelope-check-fill"></i>
+        <i class="bi bi-envelope-check-fill" aria-hidden="true"></i>
     </div>
     <div class="brand">Humana Apparels Pvt. Ltd</div>
     <div class="login-subtitle">Verify your email address to continue.</div>
@@ -18,7 +18,7 @@
     <form method="POST" action="{{ route('verification.send') }}">
         @csrf
         <button type="submit" class="btn btn-primary w-100 mb-2">
-            <i class="bi bi-send me-1"></i> Resend Verification Email
+            <i class="bi bi-send me-1" aria-hidden="true"></i> Resend Verification Email
         </button>
     </form>
 

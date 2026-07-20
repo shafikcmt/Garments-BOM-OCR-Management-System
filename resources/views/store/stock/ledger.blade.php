@@ -13,7 +13,7 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-journal-text"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">General Stock</div>
                     <h3 class="app-hero-title mb-0">Monthly Stock Ledger</h3>
@@ -25,13 +25,13 @@
                     <label class="form-label fw-semibold small mb-1">Month</label>
                     <input type="month" name="month" value="{{ $month }}" class="form-control">
                 </div>
-                <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1"></i>View</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>View</button>
             </form>
         </div>
     </div>
 
     @if($reorderCount > 0)
-        <div class="alert alert-warning border-0 shadow-sm rounded-3"><i class="bi bi-exclamation-triangle me-1"></i>{{ $reorderCount }} item(s) at or below re-order level.</div>
+        <div class="alert alert-warning border-0 shadow-sm rounded-3"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ $reorderCount }} item(s) at or below re-order level.</div>
     @endif
 
     <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
@@ -61,7 +61,7 @@
                                 <td class="text-end small text-muted">{{ $r['reorder_level'] !== null ? rtrim(rtrim(number_format($r['reorder_level'], 4), '0'), '.') : '—' }}</td>
                                 <td>
                                     @if($r['needs_reorder'])
-                                        <span class="badge bg-danger-subtle text-danger"><i class="bi bi-cart-plus me-1"></i>Re-order</span>
+                                        <span class="badge bg-danger-subtle text-danger"><i class="bi bi-cart-plus me-1" aria-hidden="true"></i>Re-order</span>
                                     @else
                                         <span class="badge bg-success-subtle text-success">OK</span>
                                     @endif

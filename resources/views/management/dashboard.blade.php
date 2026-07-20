@@ -9,7 +9,7 @@
                    copy="Payment Request Approvals — current position and recent activity.">
         <x-slot:actions>
             <a href="{{ route('pra_approvals.index') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-inbox"></i>Pending PRA Approvals
+                <i class="bi bi-inbox" aria-hidden="true"></i>Pending PRA Approvals
             </a>
         </x-slot:actions>
     </x-page-header>

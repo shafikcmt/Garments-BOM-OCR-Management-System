@@ -91,7 +91,7 @@
                 <div class="d-flex flex-wrap align-items-center gap-2">
                     <a href="{{ route('supply_chain.payment_requests.index') }}" class="pra-back-btn">← Back</a>
                     @if($isPreview)
-                        <span class="pra-preview-badge"><i class="bi bi-eye"></i> Preview Mode</span>
+                        <span class="pra-preview-badge"><i class="bi bi-eye" aria-hidden="true"></i> Preview Mode</span>
                         <span class="pra-preview-help">Review the Payment Required Date, then click Create PRA to generate the approval.</span>
                     @endif
                 </div>
@@ -105,11 +105,11 @@
 
                         @if($budgetBlock->isNotEmpty())
                             <button type="button" class="btn btn-danger pra-toolbar-btn pra-toolbar-btn-create" data-bs-toggle="modal" data-bs-target="#createPraModal" title="Budget exceeded — see details">
-                                <i class="bi bi-slash-circle"></i> Budget Exceeded
+                                <i class="bi bi-slash-circle" aria-hidden="true"></i> Budget Exceeded
                             </button>
                         @else
                             <button type="button" class="btn btn-success pra-toolbar-btn pra-toolbar-btn-create" data-bs-toggle="modal" data-bs-target="#createPraModal" title="Create the Payment Request Approval">
-                                <i class="bi bi-check2-circle"></i> Create PRA
+                                <i class="bi bi-check2-circle" aria-hidden="true"></i> Create PRA
                             </button>
                         @endif
                     </div>
@@ -119,7 +119,7 @@
                         <a href="{{ route('supply_chain.payment_requests.download_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-outline-danger rounded-pill">PDF Preview</a>
                         <a href="{{ route('supply_chain.payment_requests.download_excel', $paymentRequest) }}" class="btn btn-success rounded-pill">Excel Download</a>
                         <button type="button" class="btn btn-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#sendEmailModal" title="Email this PRA as a PDF attachment">
-                            <i class="bi bi-envelope me-1"></i> Send Email
+                            <i class="bi bi-envelope me-1" aria-hidden="true"></i> Send Email
                         </button>
                     </div>
                 @endif
@@ -132,7 +132,7 @@
                 @if($budgetCheck['exceeded'])
                     <div class="alert alert-danger border-0 shadow-sm rounded-3 mb-0">
                         <div class="d-flex align-items-start gap-2">
-                            <i class="bi bi-exclamation-octagon-fill fs-5"></i>
+                            <i class="bi bi-exclamation-octagon-fill fs-5" aria-hidden="true"></i>
                             <div class="flex-grow-1">
                                 <div class="fw-bold mb-1">Style budget exceeded — creating this PRA is blocked.</div>
                                 <ul class="mb-0 ps-3 small">
@@ -154,7 +154,7 @@
                     </div>
                 @else
                     <div class="alert alert-success border-0 shadow-sm rounded-3 mb-0 py-2 small">
-                        <i class="bi bi-check-circle me-1"></i> Within style budget for all
+                        <i class="bi bi-check-circle me-1" aria-hidden="true"></i> Within style budget for all
                         {{ collect($budgetCheck['lines'])->count() }} budgeted style(s).
                     </div>
                 @endif
@@ -282,13 +282,13 @@
                             @endforeach
                             <input type="hidden" name="payment_required_date" id="paymentRequiredCreateDate" value="{{ $paymentRequiredInput }}">
                             <div class="modal-header">
-                                <h5 class="modal-title"><i class="bi bi-check2-circle text-success me-1"></i> Create Payment Request Approval</h5>
+                                <h5 class="modal-title"><i class="bi bi-check2-circle text-success me-1" aria-hidden="true"></i> Create Payment Request Approval</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 @if($budgetCheck['exceeded'])
                                     <div class="alert alert-danger small">
-                                        <div class="fw-bold mb-1"><i class="bi bi-exclamation-octagon me-1"></i> Style budget exceeded</div>
+                                        <div class="fw-bold mb-1"><i class="bi bi-exclamation-octagon me-1" aria-hidden="true"></i> Style budget exceeded</div>
                                         <div>Over budget for: {{ collect($budgetCheck['lines'])->where('over', true)->pluck('style')->implode(', ') }}.</div>
                                     </div>
                                     @if($canOverrideBudget)
@@ -331,7 +331,7 @@
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-success" {{ ($budgetCheck['exceeded'] && !$canOverrideBudget) ? 'disabled' : '' }}><i class="bi bi-check2-circle me-1"></i> Create PRA</button>
+                                <button type="submit" class="btn btn-success" {{ ($budgetCheck['exceeded'] && !$canOverrideBudget) ? 'disabled' : '' }}><i class="bi bi-check2-circle me-1" aria-hidden="true"></i> Create PRA</button>
                             </div>
                         </form>
                     </div>
@@ -359,7 +359,7 @@
                     <div class="card border-0 shadow-sm rounded-3">
                         <div class="card-body p-4">
                             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                                <h6 class="fw-bold mb-0"><i class="bi bi-shield-check me-1"></i> Approval Status</h6>
+                                <h6 class="fw-bold mb-0"><i class="bi bi-shield-check me-1" aria-hidden="true"></i> Approval Status</h6>
                                 <span class="badge rounded-pill {{ $stateBadge[$approvalProgress['state']] ?? 'bg-secondary-subtle text-secondary' }}">{{ $approvalProgress['label'] }}</span>
                             </div>
                             <div class="row g-2">
@@ -381,7 +381,7 @@
                             @if($approvalProgress['state'] === 'rejected' && $isCreator)
                                 <div class="mt-3">
                                     <a href="{{ route('supply_chain.payment_requests.my_status') }}" class="btn btn-sm btn-primary rounded-pill px-3">
-                                        <i class="bi bi-arrow-repeat me-1"></i> Resubmit from My PRA Status
+                                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Resubmit from My PRA Status
                                     </a>
                                 </div>
                             @endif
@@ -394,7 +394,7 @@
                 @if($emailLogs->isEmpty())
                     <div class="card border-0 shadow-sm rounded-3">
                         <div class="card-body p-4">
-                            <h6 class="fw-bold mb-2"><i class="bi bi-clock-history me-1"></i> Sent Emails</h6>
+                            <h6 class="fw-bold mb-2"><i class="bi bi-clock-history me-1" aria-hidden="true"></i> Sent Emails</h6>
                             <p class="text-muted small mb-0">No emails have been sent for this PRA yet.</p>
                         </div>
                     </div>
@@ -420,12 +420,12 @@
                   style="display:flex;flex-direction:column;min-height:0;overflow:hidden;">
                 @csrf
                 <div class="modal-header">
-                    <h5 class="modal-title" id="sendEmailModalLabel"><i class="bi bi-envelope me-1"></i> Send Payment Request Approval</h5>
+                    <h5 class="modal-title" id="sendEmailModalLabel"><i class="bi bi-envelope me-1" aria-hidden="true"></i> Send Payment Request Approval</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body" style="flex:1 1 auto;overflow-y:auto;min-height:0;">
                     <div class="alert alert-info border-0 small py-2">
-                        <i class="bi bi-paperclip me-1"></i> The official PRA PDF (<strong>{{ $paymentRequest->request_no }}</strong>) will be attached automatically.
+                        <i class="bi bi-paperclip me-1" aria-hidden="true"></i> The official PRA PDF (<strong>{{ $paymentRequest->request_no }}</strong>) will be attached automatically.
                     </div>
 
                     <div class="mb-3">
@@ -459,10 +459,10 @@
                         <label class="form-label fw-semibold">Message <span class="text-danger">*</span></label>
                         <div class="btn-toolbar mb-2" role="toolbar" aria-label="Formatting">
                             <div class="btn-group btn-group-sm" role="group">
-                                <button type="button" class="btn btn-light border" data-rt-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="bold" title="Bold"><i class="bi bi-type-bold" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="italic" title="Italic"><i class="bi bi-type-italic" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="underline" title="Underline"><i class="bi bi-type-underline" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
                             </div>
                         </div>
                         <div id="emailBodyEditor" class="form-control" contenteditable="true"
@@ -473,7 +473,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i> Send</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1" aria-hidden="true"></i> Send</button>
                 </div>
             </form>
         </div>

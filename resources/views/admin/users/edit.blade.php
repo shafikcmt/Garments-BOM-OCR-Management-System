@@ -31,7 +31,7 @@
                 </div>
             </div>
             <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-arrow-left"></i> Back to Users
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to Users
             </a>
         </div>
     </div>
@@ -45,7 +45,7 @@
 
     @if($isSelf)
         <div class="alert alert-info border-0 shadow-sm rounded-3">
-            <i class="bi bi-info-circle me-1"></i>You are editing your own account. Your role and status are locked to prevent accidental self-lockout.
+            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>You are editing your own account. Your role and status are locked to prevent accidental self-lockout.
         </div>
     @endif
 
@@ -124,7 +124,7 @@
                             @endif
                         </div>
 
-                        <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1"></i>Save Profile</button>
+                        <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1" aria-hidden="true"></i>Save Profile</button>
                     </form>
                 </div>
             </div>
@@ -150,7 +150,7 @@
                             <label class="form-label fw-semibold">Confirm New Password</label>
                             <input type="password" name="new_password_confirmation" autocomplete="new-password" class="form-control">
                         </div>
-                        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-key me-1"></i>Set Password</button>
+                        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-key me-1" aria-hidden="true"></i>Set Password</button>
                     </form>
 
                     <hr>
@@ -159,7 +159,7 @@
                           onsubmit="return confirm('Send a password reset email to {{ $user->email }}?');">
                         @csrf
                         <p class="small text-muted mb-2">Send a self-service reset link to the user's email.</p>
-                        <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-envelope me-1"></i>Send Password Reset Email</button>
+                        <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-envelope me-1" aria-hidden="true"></i>Send Password Reset Email</button>
                     </form>
                 </div>
             </div>

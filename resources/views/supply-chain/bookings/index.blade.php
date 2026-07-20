@@ -592,7 +592,7 @@
 <div class="booking-page p-2 p-md-3"><div class="booking-shell">
     <div class="booking-hero mb-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div class="d-flex align-items-center gap-3 booking-hero-copy">
-            <span class="booking-hero-icon"><i class="bi bi-file-earmark-text"></i></span>
+            <span class="booking-hero-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
             <div>
                 <div class="small opacity-60" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;">Supply Chain</div>
                 <h4 class="fw-bold">PO Generation</h4>
@@ -600,11 +600,11 @@
         </div>
         <div class="booking-hero-stats d-flex gap-3 flex-wrap">
             <span class="booking-stat">
-                <span class="booking-stat-icon"><i class="bi bi-clipboard-check"></i></span>
+                <span class="booking-stat-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
                 <span><span class="booking-stat-label">Pending Preview</span><span class="booking-stat-value" id="pendingTotal">{{ $pendingRows->total() }}</span></span>
             </span>
             <span class="booking-stat">
-                <span class="booking-stat-icon"><i class="bi bi-file-earmark-check"></i></span>
+                <span class="booking-stat-icon"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></span>
                 <span><span class="booking-stat-label">Generated PO List</span><span class="booking-stat-value" id="recentTotal">{{ $generatedPoCount }}</span></span>
             </span>
         </div>
@@ -614,14 +614,14 @@
 
     <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
         <div class="booking-view-switch" id="bookingViewSwitch">
-            <a href="#pending-generated-po" class="booking-view-btn is-active" data-booking-tab="pending-generated-po"><i class="bi bi-list-check"></i>Pending Preview</a>
-            <a href="#recent-generated-po" class="booking-view-btn" data-booking-tab="recent-generated-po"><i class="bi bi-file-earmark-check"></i>Generated PO</a>
+            <a href="#pending-generated-po" class="booking-view-btn is-active" data-booking-tab="pending-generated-po"><i class="bi bi-list-check" aria-hidden="true"></i>Pending Preview</a>
+            <a href="#recent-generated-po" class="booking-view-btn" data-booking-tab="recent-generated-po"><i class="bi bi-file-earmark-check" aria-hidden="true"></i>Generated PO</a>
         </div>
     </div>
 
     <div class="card booking-card booking-filter-card mb-4">
         <div class="card-header py-3">
-            <h6 class="mb-0 fw-bold booking-section-title"><span class="booking-title-icon"><i class="bi bi-funnel"></i></span>Filter pending booking data</h6>
+            <h6 class="mb-0 fw-bold booking-section-title"><span class="booking-title-icon"><i class="bi bi-funnel" aria-hidden="true"></i></span>Filter pending booking data</h6>
         </div>
         <div class="card-body">
             <form method="GET" action="{{ route('supply_chain.bookings.index') }}" class="booking-filter" id="bookingFilterForm">
@@ -673,12 +673,12 @@
                     </div>
                     <div class="col-md-6 booking-search-field">
                         <label class="form-label">Quick keyword search</label>
-                        <i class="bi bi-search booking-search-icon"></i>
+                        <i class="bi bi-search booking-search-icon" aria-hidden="true"></i>
                         <input type="text" name="keyword" value="{{ $selectedKeyword }}" class="form-control booking-auto-filter-text" placeholder="Search buyer / season / vendor / item / style / PO keyword...">
                     </div>
                     <div class="col-md-3 d-grid d-md-flex gap-2">
-                        <button type="submit" class="btn booking-primary-btn flex-fill" title="Apply filter"><i class="bi bi-search me-1"></i>Search</button>
-                        <button type="button" class="btn btn-soft-reset" id="bookingFilterReset"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset</button>
+                        <button type="submit" class="btn booking-primary-btn flex-fill" title="Apply filter"><i class="bi bi-search me-1" aria-hidden="true"></i>Search</button>
+                        <button type="button" class="btn btn-soft-reset" id="bookingFilterReset"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset</button>
                     </div>
                 </div>
             </form>
@@ -688,7 +688,7 @@
     <section id="pending-generated-po" class="booking-tab-panel" data-booking-panel="pending-generated-po">
     <div class="card booking-card mb-4">
         <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h6 class="mb-0 fw-bold booking-section-title"><span class="booking-title-icon"><i class="bi bi-list-check"></i></span>Pending PO Generate Orders</h6>
+            <h6 class="mb-0 fw-bold booking-section-title"><span class="booking-title-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span>Pending PO Generate Orders</h6>
             <small class="text-muted">Select orders to preview booking format first; generate PO only from the preview bottom button.</small>
         </div>
         <div class="booking-toolbar p-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -699,7 +699,7 @@
                 <span class="small text-muted"><span id="bookingSelectedCount">0</span> selected</span>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <button type="button" class="btn booking-primary-btn btn-sm" id="bulkPreviewBtn"><i class="bi bi-eye me-1"></i>Preview Selected</button>
+                <button type="button" class="btn booking-primary-btn btn-sm" id="bulkPreviewBtn"><i class="bi bi-eye me-1" aria-hidden="true"></i>Preview Selected</button>
             </div>
         </div>
         <div class="card-body p-0 booking-table-wrap">
@@ -735,19 +735,19 @@
             <div class="modal-content border-0">
                 <div class="modal-header bg-white border-bottom">
                     <div class="booking-preview-title-wrap">
-                        <h6 class="modal-title fw-bold mb-0" id="bookingPreviewTitle"><i class="bi bi-file-earmark-richtext me-2 text-primary"></i>Booking Format Preview</h6>
+                        <h6 class="modal-title fw-bold mb-0" id="bookingPreviewTitle"><i class="bi bi-file-earmark-richtext me-2 text-primary" aria-hidden="true"></i>Booking Format Preview</h6>
                         <small class="text-muted d-block">Review the booking format carefully, then generate PO.</small>
                         <div class="booking-preview-steps" aria-label="Booking steps">
-                            <span class="bp-step is-active"><i class="bi bi-eye"></i>Preview</span>
-                            <i class="bi bi-arrow-right bp-step-arrow"></i>
-                            <span class="bp-step"><i class="bi bi-check2-circle"></i>Generate PO</span>
+                            <span class="bp-step is-active"><i class="bi bi-eye" aria-hidden="true"></i>Preview</span>
+                            <i class="bi bi-arrow-right bp-step-arrow" aria-hidden="true"></i>
+                            <span class="bp-step"><i class="bi bi-check2-circle" aria-hidden="true"></i>Generate PO</span>
                         </div>
                     </div>
                     <div class="booking-preview-header-tools no-print" aria-label="Booking preview zoom controls">
-                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomOut" title="Zoom out" aria-label="Zoom out"><i class="bi bi-zoom-out"></i></button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomOut" title="Zoom out" aria-label="Zoom out"><i class="bi bi-zoom-out" aria-hidden="true"></i></button>
                         <span class="booking-preview-zoom-value" id="bookingPreviewZoomValue">100%</span>
-                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomIn" title="Zoom in" aria-label="Zoom in"><i class="bi bi-zoom-in"></i></button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomReset" title="Reset zoom" aria-label="Reset zoom"><i class="bi bi-arrow-counterclockwise"></i></button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomIn" title="Zoom in" aria-label="Zoom in"><i class="bi bi-zoom-in" aria-hidden="true"></i></button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomReset" title="Reset zoom" aria-label="Reset zoom"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
                     </div>
                     <button type="button" class="btn-close ms-1" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -755,7 +755,7 @@
 
                 <div class="booking-confirm-overlay" id="bookingGenerateConfirm" hidden>
                     <div class="booking-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="bookingConfirmTitle" aria-describedby="bookingConfirmMessage">
-                        <div class="booking-confirm-icon"><i class="bi bi-patch-question"></i></div>
+                        <div class="booking-confirm-icon"><i class="bi bi-patch-question" aria-hidden="true"></i></div>
                         <h5 class="booking-confirm-title" id="bookingConfirmTitle">Generate PO?</h5>
                         <p class="booking-confirm-message" id="bookingConfirmMessage">After generating PO, the order will be completed automatically. Please confirm that all booking details are correct.</p>
                         <div class="booking-confirm-actions">
@@ -772,7 +772,7 @@
     <div class="card booking-card generated-po-card">
         <div class="card-header py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
-                <h6 class="mb-0 fw-bold booking-section-title"><span class="booking-title-icon"><i class="bi bi-file-earmark-check"></i></span>Generated PO List</h6>
+                <h6 class="mb-0 fw-bold booking-section-title"><span class="booking-title-icon"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></span>Generated PO List</h6>
                 <small class="text-muted">Supply-chain users can only view, print and download generated PO. Admin controls re-generate and change history separately.</small>
             </div>
             <span class="badge rounded-pill text-bg-primary px-3 py-2">{{ $generatedPoCount }} PO</span>
@@ -782,12 +782,12 @@
                 <div class="col-lg-8">
                     <label class="form-label mb-1 fw-bold small text-muted">Search generated PO</label>
                     <div class="po-control-search">
-                        <i class="bi bi-search"></i>
+                        <i class="bi bi-search" aria-hidden="true"></i>
                         <input type="text" id="poControlSearch" class="form-control" placeholder="Search PO no, buyer, season, vendor, style or item...">
                     </div>
                 </div>
                 <div class="col-lg-4 d-grid d-lg-flex justify-content-lg-end">
-                    <button type="button" class="btn btn-soft-reset" id="poControlSearchClear"><i class="bi bi-arrow-counterclockwise me-1"></i>Clear Search</button>
+                    <button type="button" class="btn btn-soft-reset" id="poControlSearchClear"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Clear Search</button>
                 </div>
             </div>
         </div>
@@ -826,9 +826,9 @@
                             @endphp
                             <tr class="po-control-row" data-status="{{ $statusTokens }}" data-search="{{ $searchText }}">
                                 <td>
-                                    <span class="po-pill"><i class="bi bi-upc-scan"></i>{{ $po->po_no }}</span>
+                                    <span class="po-pill"><i class="bi bi-upc-scan" aria-hidden="true"></i>{{ $po->po_no }}</span>
                                     @if($revisionNo > 0)
-                                        <span class="revision-mini-pill mt-1"><i class="bi bi-arrow-repeat"></i>R-{{ $revisionNo }}</span>
+                                        <span class="revision-mini-pill mt-1"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>R-{{ $revisionNo }}</span>
                                     @endif
                                 </td>
                                 <td>
@@ -842,15 +842,15 @@
                                 </td>
                                 <td class="text-end fw-bold">{{ $po->qty !== null && $po->qty !== '' ? $po->qty : '-' }}</td>
                                 <td>
-                                    <span class="po-status-pill po-status-generated"><i class="bi bi-check2-circle"></i>Generated</span>
+                                    <span class="po-status-pill po-status-generated"><i class="bi bi-check2-circle" aria-hidden="true"></i>Generated</span>
                                     <div class="small text-muted mt-1">{{ optional($po->generated_at)->format('d M Y, h:i A') ?: '-' }}</div>
                                 </td>
                                 <td class="text-center">
                                     <div class="generated-po-actions">
-                                        <a href="{{ route('supply_chain.bookings.show', $po) }}" class="generated-po-action" title="View"><i class="bi bi-eye"></i><span>View</span></a>
-                                        <a href="{{ route('supply_chain.bookings.print', $po) }}" target="_blank" class="generated-po-action" title="Print"><i class="bi bi-printer"></i><span>Print</span></a>
-                                        <a href="{{ route('supply_chain.bookings.download', $po) }}" target="_blank" class="generated-po-action" title="Download PDF"><i class="bi bi-filetype-pdf"></i><span>PDF</span></a>
-                                        <a href="{{ route('supply_chain.bookings.download_excel', $po) }}" target="_blank" class="generated-po-action" title="Download Excel"><i class="bi bi-file-earmark-excel"></i><span>Excel</span></a>
+                                        <a href="{{ route('supply_chain.bookings.show', $po) }}" class="generated-po-action" title="View"><i class="bi bi-eye" aria-hidden="true"></i><span>View</span></a>
+                                        <a href="{{ route('supply_chain.bookings.print', $po) }}" target="_blank" class="generated-po-action" title="Print"><i class="bi bi-printer" aria-hidden="true"></i><span>Print</span></a>
+                                        <a href="{{ route('supply_chain.bookings.download', $po) }}" target="_blank" class="generated-po-action" title="Download PDF"><i class="bi bi-filetype-pdf" aria-hidden="true"></i><span>PDF</span></a>
+                                        <a href="{{ route('supply_chain.bookings.download_excel', $po) }}" target="_blank" class="generated-po-action" title="Download Excel"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i><span>Excel</span></a>
                                     </div>
                                 </td>
                             </tr>
@@ -859,7 +859,7 @@
                                 <td colspan="7">
                                     <div class="po-control-empty">
                                         <div>
-                                            <span class="d-inline-flex align-items-center justify-content-center rounded-5 bg-light border mb-3" style="width:78px;height:78px;"><i class="bi bi-inbox fs-1 text-slate-300"></i></span>
+                                            <span class="d-inline-flex align-items-center justify-content-center rounded-5 bg-light border mb-3" style="width:78px;height:78px;"><i class="bi bi-inbox fs-1 text-slate-300" aria-hidden="true"></i></span>
                                             <div class="fw-bold text-slate-900">No PO generated yet</div>
                                             <div class="small text-muted">Generated PO will appear here for view, print and download.</div>
                                         </div>
@@ -871,7 +871,7 @@
                             <td colspan="7">
                                 <div class="po-control-empty">
                                     <div>
-                                        <span class="d-inline-flex align-items-center justify-content-center rounded-5 bg-light border mb-3" style="width:78px;height:78px;"><i class="bi bi-search fs-1 text-slate-300"></i></span>
+                                        <span class="d-inline-flex align-items-center justify-content-center rounded-5 bg-light border mb-3" style="width:78px;height:78px;"><i class="bi bi-search fs-1 text-slate-300" aria-hidden="true"></i></span>
                                         <div class="fw-bold text-slate-900">No matching PO found</div>
                                         <div class="small text-muted">Try another PO number, buyer, vendor, style or item.</div>
                                     </div>
@@ -1326,8 +1326,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const panel = box?.querySelector('.booking-preview-edit-panel');
             panel?.classList.toggle('d-none');
             editToggle.innerHTML = panel && !panel.classList.contains('d-none')
-                ? '<i class="bi bi-eye me-1"></i>Hide Edit'
-                : '<i class="bi bi-pencil-square me-1"></i>Edit Preview';
+                ? '<i class="bi bi-eye me-1" aria-hidden="true"></i>Hide Edit'
+                : '<i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit Preview';
             return;
         }
 
@@ -1338,7 +1338,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (list) {
                 const row = document.createElement('div');
                 row.className = 'booking-preview-note-row';
-                row.innerHTML = '<textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea><button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg"></i><span class="ms-1">Remove</span></button>';
+                row.innerHTML = '<textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea><button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>';
                 list.appendChild(row);
             }
             return;

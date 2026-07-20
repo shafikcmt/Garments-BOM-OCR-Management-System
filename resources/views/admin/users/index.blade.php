@@ -14,7 +14,7 @@
         <x-slot:actions>
             <a href="{{ route('admin.roles.index') }}" class="btn btn-outline-secondary">Roles</a>
             <a href="{{ route('admin.users.create') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-person-plus"></i>Add User
+                <i class="bi bi-person-plus" aria-hidden="true"></i>Add User
             </a>
         </x-slot:actions>
     </x-page-header>
@@ -50,7 +50,7 @@
             <div class="col-12 col-lg-5">
                 <label class="form-label small fw-semibold mb-1" for="userSearch">Search</label>
                 <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
                     <input type="search" id="userSearch" class="form-control" data-user-search
                            placeholder="Name or email…" autocomplete="off">
                 </div>
@@ -134,12 +134,12 @@
                                 @endif
                             </td>
                             <td class="text-end text-nowrap">
-                                <a href="{{ route('admin.users.show', $user) }}" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i></a>
-                                <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+                                <a href="{{ route('admin.users.show', $user) }}" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye" aria-hidden="true"></i></a>
+                                <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil" aria-hidden="true"></i></a>
 
                                 <button type="button" class="btn btn-sm btn-outline-warning" title="Reset password"
                                         data-bs-toggle="modal" data-bs-target="#resetPw{{ $user->id }}">
-                                    <i class="bi bi-key"></i>
+                                    <i class="bi bi-key" aria-hidden="true"></i>
                                 </button>
 
                                 @if($user->id !== auth()->id())
@@ -147,7 +147,7 @@
                                           data-delete-user="{{ $user->id }}"
                                           onsubmit="return confirm('Delete {{ $user->name }}? This cannot be undone.');">
                                         @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                     </form>
                                 @endif
                             </td>

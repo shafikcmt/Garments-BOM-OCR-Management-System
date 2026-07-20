@@ -6,7 +6,7 @@
 <div class="container-fluid py-3">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
-            <h4 class="mb-1 fw-bold text-primary"><i class="bi bi-envelope-paper me-1"></i> Sent Emails</h4>
+            <h4 class="mb-1 fw-bold text-primary"><i class="bi bi-envelope-paper me-1" aria-hidden="true"></i> Sent Emails</h4>
             <div class="small text-muted">All PO Booking and Payment Request emails sent from the system.</div>
         </div>
     </div>
@@ -51,8 +51,8 @@
                     <input type="text" name="search" class="form-control form-control-sm" value="{{ $filters['search'] ?? '' }}" placeholder="Ref no, subject or recipient">
                 </div>
                 <div class="col-12 col-md-2 d-flex gap-2 align-items-end">
-                    <button type="submit" class="btn btn-primary btn-sm w-100" title="Apply filters"><i class="bi bi-funnel me-1"></i>Filter</button>
-                    <a href="{{ route('supply_chain.sent_emails.index') }}" class="btn btn-outline-secondary btn-sm w-100" title="Reset filters"><i class="bi bi-x-lg me-1"></i>Reset</a>
+                    <button type="submit" class="btn btn-primary btn-sm w-100" title="Apply filters"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
+                    <a href="{{ route('supply_chain.sent_emails.index') }}" class="btn btn-outline-secondary btn-sm w-100" title="Reset filters"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Reset</a>
                 </div>
             </form>
         </div>
@@ -61,7 +61,7 @@
     @if($emailLogs->total() === 0)
         <div class="card border-0 shadow-sm rounded-3">
             <div class="card-body p-4 text-center text-muted">
-                <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                <i class="bi bi-inbox fs-3 d-block mb-2" aria-hidden="true"></i>
                 No sent emails found for the selected filters.
             </div>
         </div>
@@ -91,12 +91,12 @@
             <form method="POST" action="" style="display:flex;flex-direction:column;min-height:0;overflow:hidden;">
                 @csrf
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-envelope me-1"></i> Compose Email</h5>
+                    <h5 class="modal-title"><i class="bi bi-envelope me-1" aria-hidden="true"></i> Compose Email</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body" style="flex:1 1 auto;overflow-y:auto;min-height:0;">
                     <div class="alert alert-info border-0 small py-2">
-                        <i class="bi bi-paperclip me-1"></i> The related document PDF will be attached automatically.
+                        <i class="bi bi-paperclip me-1" aria-hidden="true"></i> The related document PDF will be attached automatically.
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">From</label>
@@ -120,10 +120,10 @@
                         <label class="form-label fw-semibold">Message <span class="text-danger">*</span></label>
                         <div class="btn-toolbar mb-2" role="toolbar" aria-label="Formatting">
                             <div class="btn-group btn-group-sm" role="group">
-                                <button type="button" class="btn btn-light border" data-rt-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="bold" title="Bold"><i class="bi bi-type-bold" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="italic" title="Italic"><i class="bi bi-type-italic" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="underline" title="Underline"><i class="bi bi-type-underline" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
                             </div>
                         </div>
                         <div id="consolidatedEmailBodyEditor" class="form-control" contenteditable="true"
@@ -133,7 +133,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i> Send</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1" aria-hidden="true"></i> Send</button>
                 </div>
             </form>
         </div>

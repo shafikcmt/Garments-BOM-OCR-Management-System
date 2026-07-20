@@ -9,7 +9,7 @@
                    copy="Booking POs, payment requests and your share of the BOM.">
         <x-slot:actions>
             <a href="{{ route('supply_chain.bookings.index') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-clipboard-plus"></i>PO Generate
+                <i class="bi bi-clipboard-plus" aria-hidden="true"></i>PO Generate
             </a>
             <a href="{{ route('supply_chain.workspace') }}" class="btn btn-outline-secondary">Workspace</a>
         </x-slot:actions>

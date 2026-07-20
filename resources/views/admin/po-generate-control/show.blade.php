@@ -69,27 +69,27 @@
                     <div class="small text-muted">Admin can edit, lock, authorize Supply Chain users, delete and check before/after changes. Default PO generate/re-generate owner is Supply Chain only.</div>
                     <div class="d-flex gap-2 flex-wrap mt-2">
                         @if($poLocked)
-                            <span class="po-control-chip locked"><i class="bi bi-lock-fill"></i>Locked</span>
+                            <span class="po-control-chip locked"><i class="bi bi-lock-fill" aria-hidden="true"></i>Locked</span>
                         @else
-                            <span class="po-control-chip open"><i class="bi bi-unlock"></i>Open</span>
+                            <span class="po-control-chip open"><i class="bi bi-unlock" aria-hidden="true"></i>Open</span>
                         @endif
-                        <span class="po-control-chip permission"><i class="bi bi-person-gear"></i>{{ $poPermissionText }}</span>
+                        <span class="po-control-chip permission"><i class="bi bi-person-gear" aria-hidden="true"></i>{{ $poPermissionText }}</span>
                         @if($poLocked)
-                            <span class="po-control-chip locked"><i class="bi bi-people-fill"></i>{{ $poLockScopeText }}</span>
+                            <span class="po-control-chip locked"><i class="bi bi-people-fill" aria-hidden="true"></i>{{ $poLockScopeText }}</span>
                         @endif
                     </div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap justify-content-end">
-                    <a href="{{ route('admin.po-generate-control.index') }}" class="btn btn-outline-secondary btn-sm rounded-pill fw-bold"><i class="bi bi-arrow-left me-1"></i>Back</a>
-                    <button type="button" class="btn btn-primary btn-sm fw-bold rounded-pill booking-show-edit-start" data-url="{{ route('admin.po-generate-control.edit_preview', $bookingPo) }}" {{ $poLocked ? 'disabled' : '' }} title="{{ $poLocked ? 'Unlock this PO first' : 'Edit PO' }}"><i class="bi bi-pencil-square me-1"></i>Edit PO</button>
-                    <button type="button" class="btn btn-warning btn-sm fw-bold rounded-pill booking-show-regenerate-start" data-url="{{ route('admin.po-generate-control.regenerate_preview', $bookingPo) }}" {{ $poLocked ? 'disabled' : '' }} title="{{ $poLocked ? 'Unlock this PO first' : 'Re-generate PO' }}"><i class="bi bi-arrow-repeat me-1"></i>Re-generate PO</button>
-                    <a href="{{ route('admin.po-generate-control.print', $bookingPo) }}" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill fw-bold"><i class="bi bi-printer me-1"></i>Print</a>
-                    <a href="{{ route('admin.po-generate-control.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm rounded-pill fw-bold"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
-                    <a href="{{ route('admin.po-generate-control.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm rounded-pill fw-bold"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+                    <a href="{{ route('admin.po-generate-control.index') }}" class="btn btn-outline-secondary btn-sm rounded-pill fw-bold"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back</a>
+                    <button type="button" class="btn btn-primary btn-sm fw-bold rounded-pill booking-show-edit-start" data-url="{{ route('admin.po-generate-control.edit_preview', $bookingPo) }}" {{ $poLocked ? 'disabled' : '' }} title="{{ $poLocked ? 'Unlock this PO first' : 'Edit PO' }}"><i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit PO</button>
+                    <button type="button" class="btn btn-warning btn-sm fw-bold rounded-pill booking-show-regenerate-start" data-url="{{ route('admin.po-generate-control.regenerate_preview', $bookingPo) }}" {{ $poLocked ? 'disabled' : '' }} title="{{ $poLocked ? 'Unlock this PO first' : 'Re-generate PO' }}"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Re-generate PO</button>
+                    <a href="{{ route('admin.po-generate-control.print', $bookingPo) }}" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill fw-bold"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print</a>
+                    <a href="{{ route('admin.po-generate-control.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm rounded-pill fw-bold"><i class="bi bi-filetype-pdf me-1" aria-hidden="true"></i>PDF</a>
+                    <a href="{{ route('admin.po-generate-control.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm rounded-pill fw-bold"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel</a>
                     <form method="POST" action="{{ route('admin.po-generate-control.destroy', $bookingPo) }}" onsubmit="return confirm('Delete PO {{ $bookingPo->po_no }}? This will remove only the generated PO number and move source rows back to Pending PO.');">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill fw-bold"><i class="bi bi-trash me-1"></i>Delete</button>
+                        <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill fw-bold"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                     </form>
                 </div>
             </div>
@@ -102,10 +102,10 @@
                 <input type="hidden" name="locked" value="0">
                 <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
                     <div>
-                        <h5 class="fw-bold mb-1"><i class="bi bi-shield-check text-primary me-1"></i>Admin Access Control</h5>
+                        <h5 class="fw-bold mb-1"><i class="bi bi-shield-check text-primary me-1" aria-hidden="true"></i>Admin Access Control</h5>
                         <div class="small text-muted">Manage PO lock, edit permission, active Supply Chain authorized users and admin notes from this panel.</div>
                     </div>
-                    <button type="submit" class="btn btn-primary rounded-pill fw-bold px-4"><i class="bi bi-check2-circle me-1"></i>Save Control</button>
+                    <button type="submit" class="btn btn-primary rounded-pill fw-bold px-4"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Save Control</button>
                 </div>
                 <div class="row g-3">
                     <div class="col-md-4">
@@ -297,8 +297,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const panel = box?.querySelector('.booking-preview-edit-panel');
             panel?.classList.toggle('d-none');
             editToggle.innerHTML = panel && !panel.classList.contains('d-none')
-                ? '<i class="bi bi-eye me-1"></i>Hide Edit'
-                : '<i class="bi bi-pencil-square me-1"></i>Edit Preview';
+                ? '<i class="bi bi-eye me-1" aria-hidden="true"></i>Hide Edit'
+                : '<i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit Preview';
             return;
         }
 
@@ -309,7 +309,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (list) {
                 const row = document.createElement('div');
                 row.className = 'booking-preview-note-row';
-                row.innerHTML = '<textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea><button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg"></i><span class="ms-1">Remove</span></button>';
+                row.innerHTML = '<textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea><button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>';
                 list.appendChild(row);
             }
             return;

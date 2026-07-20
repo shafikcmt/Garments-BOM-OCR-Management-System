@@ -6,7 +6,7 @@
 <div class="container-fluid">
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center gap-3">
-            <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-bar-chart"></i></span>
+            <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-bar-chart" aria-hidden="true"></i></span>
             <div>
                 <div class="app-hero-eyebrow">Merchandising / Admin</div>
                 <h3 class="app-hero-title mb-0">Style Budgets</h3>
@@ -64,7 +64,7 @@
                         <label class="form-label fw-semibold">Note <span class="text-muted small">(optional)</span></label>
                         <textarea name="note" rows="2" class="form-control mb-3" maxlength="1000">{{ old('note') }}</textarea>
 
-                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-save me-1"></i> Save Budget</button>
+                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-save me-1" aria-hidden="true"></i> Save Budget</button>
                         <div class="form-text">Saving the same Style + Buyer + Season updates the existing budget.</div>
                     </form>
                 </div>
@@ -103,13 +103,13 @@
                                         <td class="text-end text-nowrap">
                                             <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3"
                                                     data-bs-toggle="modal" data-bs-target="#editBudget{{ $budget->id }}">
-                                                <i class="bi bi-pencil me-1"></i> Edit
+                                                <i class="bi bi-pencil me-1" aria-hidden="true"></i> Edit
                                             </button>
                                             <form method="POST" action="{{ route('style-budgets.destroy', $budget) }}" class="d-inline"
                                                   onsubmit="return confirm('Remove this style budget?');">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash"></i></button>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                             </form>
                                         </td>
                                     </tr>
@@ -122,7 +122,7 @@
                                                     @csrf
                                                     @method('PATCH')
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title"><i class="bi bi-pencil me-1"></i> Edit Style Budget</h5>
+                                                        <h5 class="modal-title"><i class="bi bi-pencil me-1" aria-hidden="true"></i> Edit Style Budget</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                                     </div>
                                                     <div class="modal-body">
@@ -145,7 +145,7 @@
                                                     </div>
                                                     <div class="modal-footer">
                                                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                                                        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Update</button>
+                                                        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1" aria-hidden="true"></i> Update</button>
                                                     </div>
                                                 </form>
                                             </div>

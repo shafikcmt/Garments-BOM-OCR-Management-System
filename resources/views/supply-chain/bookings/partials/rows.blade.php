@@ -41,19 +41,19 @@
         <td class="text-center action-cell">
             @if($isApplied)
                 <div class="d-inline-flex align-items-center justify-content-center gap-2 booking-action-wrap">
-                    <span class="po-mini-pill" title="{{ $po->po_no }}"><i class="bi bi-upc-scan"></i>{{ $po->po_no }}</span>
+                    <span class="po-mini-pill" title="{{ $po->po_no }}"><i class="bi bi-upc-scan" aria-hidden="true"></i>{{ $po->po_no }}</span>
                     @if($revisionNo > 0)
                         <span class="revision-mini-pill">R{{ $revisionNo }}</span>
                     @endif
                     <div class="dropdown">
                         <button class="btn booking-kebab-btn btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="More actions">
-                            <i class="bi bi-three-dots-vertical"></i><span class="ms-1">Actions</span>
+                            <i class="bi bi-three-dots-vertical" aria-hidden="true"></i><span class="ms-1">Actions</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end booking-action-dropdown">
-                            <li><a href="{{ route('supply_chain.bookings.show', $po) }}" class="dropdown-item"><i class="bi bi-eye me-2"></i>View booking</a></li>
-                            <li><a href="{{ route('supply_chain.bookings.print', $po) }}" target="_blank" class="dropdown-item"><i class="bi bi-printer me-2"></i>Print</a></li>
-                            <li><a href="{{ route('supply_chain.bookings.download', $po) }}" target="_blank" class="dropdown-item"><i class="bi bi-filetype-pdf me-2"></i>Download PDF</a></li>
-                            <li><a href="{{ route('supply_chain.bookings.download_excel', $po) }}" target="_blank" class="dropdown-item"><i class="bi bi-file-earmark-excel me-2"></i>Download Excel</a></li>
+                            <li><a href="{{ route('supply_chain.bookings.show', $po) }}" class="dropdown-item"><i class="bi bi-eye me-2" aria-hidden="true"></i>View booking</a></li>
+                            <li><a href="{{ route('supply_chain.bookings.print', $po) }}" target="_blank" class="dropdown-item"><i class="bi bi-printer me-2" aria-hidden="true"></i>Print</a></li>
+                            <li><a href="{{ route('supply_chain.bookings.download', $po) }}" target="_blank" class="dropdown-item"><i class="bi bi-filetype-pdf me-2" aria-hidden="true"></i>Download PDF</a></li>
+                            <li><a href="{{ route('supply_chain.bookings.download_excel', $po) }}" target="_blank" class="dropdown-item"><i class="bi bi-file-earmark-excel me-2" aria-hidden="true"></i>Download Excel</a></li>
                         </ul>
                     </div>
                 </div>
@@ -62,7 +62,7 @@
                     <button type="button"
                             class="btn preview-outline-btn btn-sm preview-single-btn"
                             data-url="{{ route('supply_chain.bookings.preview', $row) }}">
-                        <i class="bi bi-eye me-1"></i>Preview
+                        <i class="bi bi-eye me-1" aria-hidden="true"></i>Preview
                     </button>
                 </div>
             @endif
@@ -74,7 +74,7 @@
             <div class="booking-empty text-center text-muted">
                 <div>
                     <span class="d-inline-flex align-items-center justify-content-center rounded-5 bg-light border mb-3" style="width:78px;height:78px;">
-                        <i class="bi bi-inbox fs-1 text-slate-300"></i>
+                        <i class="bi bi-inbox fs-1 text-slate-300" aria-hidden="true"></i>
                     </span>
                     <div class="fw-bold text-slate-700">No pending order found</div>
                     <div class="small text-muted">Try changing filter options or keyword search.</div>

@@ -119,9 +119,9 @@
                                        value="{{ optional($user->created_at)->format('d M Y') ?? '—' }}" readonly>
                             </div>
                         </div>
-                        <p class="text-muted small mb-3"><i class="bi bi-info-circle me-1"></i>Role, Department and Status are managed by the administrator.</p>
+                        <p class="text-muted small mb-3"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Role, Department and Status are managed by the administrator.</p>
 
-                        <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1"></i>Save Profile</button>
+                        <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1" aria-hidden="true"></i>Save Profile</button>
                     </form>
                 </div>
             </div>
@@ -159,7 +159,7 @@
                                    class="form-control">
                         </div>
 
-                        <button type="submit" class="btn btn-outline-primary px-4"><i class="bi bi-shield-lock me-1"></i>Update Password</button>
+                        <button type="submit" class="btn btn-outline-primary px-4"><i class="bi bi-shield-lock me-1" aria-hidden="true"></i>Update Password</button>
                     </form>
                 </div>
             </div>
@@ -187,7 +187,7 @@
                                 <div class="form-text">PNG or JPG. Max 2 MB. Transparent PNG recommended.</div>
                                 @error('signature')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                                 <button type="submit" class="btn btn-primary px-4 mt-3">
-                                    <i class="bi bi-upload me-1"></i>{{ $signatureUrl ? 'Update Signature' : 'Upload Signature' }}
+                                    <i class="bi bi-upload me-1" aria-hidden="true"></i>{{ $signatureUrl ? 'Update Signature' : 'Upload Signature' }}
                                 </button>
                             </form>
                         </div>
@@ -204,7 +204,7 @@
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">
-                                        <i class="bi bi-trash me-1"></i> Remove Signature
+                                        <i class="bi bi-trash me-1" aria-hidden="true"></i> Remove Signature
                                     </button>
                                 </form>
                             @else

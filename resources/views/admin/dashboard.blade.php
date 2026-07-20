@@ -9,7 +9,7 @@
                    copy="Users, roles, workspace columns and vendor master.">
         <x-slot:actions>
             <a href="{{ route('admin.users.index') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-people"></i>Users &amp; Roles
+                <i class="bi bi-people" aria-hidden="true"></i>Users &amp; Roles
             </a>
             <a href="{{ route('admin.workspace') }}" class="btn btn-outline-secondary">Workspace</a>
         </x-slot:actions>

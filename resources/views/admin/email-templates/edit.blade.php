@@ -12,7 +12,7 @@
 
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center gap-3">
-            <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-envelope-paper"></i></span>
+            <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-envelope-paper" aria-hidden="true"></i></span>
             <div>
                 <div class="app-hero-eyebrow">Admin / Settings</div>
                 <h3 class="app-hero-title mb-0">Email Templates</h3>

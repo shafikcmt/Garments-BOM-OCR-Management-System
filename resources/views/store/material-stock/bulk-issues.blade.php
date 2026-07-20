@@ -13,7 +13,7 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-box-arrow-up"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Buyer / Style Stock</div>
                     <h3 class="app-hero-title mb-0">Bulk Issuing</h3>
@@ -21,8 +21,8 @@
                 </div>
             </div>
             <div class="d-flex gap-2">
-                <a href="{{ route('store.material.receivings.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-in-down me-1"></i>Receiving</a>
-                <a href="{{ route('store.material.ledger') }}" class="btn btn-outline-secondary"><i class="bi bi-clipboard-data me-1"></i>Closing Stock</a>
+                <a href="{{ route('store.material.receivings.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-in-down me-1" aria-hidden="true"></i>Receiving</a>
+                <a href="{{ route('store.material.ledger') }}" class="btn btn-outline-secondary"><i class="bi bi-clipboard-data me-1" aria-hidden="true"></i>Closing Stock</a>
             </div>
         </div>
     </div>
@@ -49,7 +49,7 @@
                             @endforeach
                         </select>
                         <div id="biStockRow" class="small mb-3 d-none">
-                            <span class="badge bg-success-subtle text-success"><i class="bi bi-box-seam me-1"></i>Available (Running) stock: <span id="biRunning" class="fw-bold">0</span></span>
+                            <span class="badge bg-success-subtle text-success"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Available (Running) stock: <span id="biRunning" class="fw-bold">0</span></span>
                         </div>
 
                         @if($requisitions->isNotEmpty())
@@ -68,7 +68,7 @@
                         </div>
 
                         <div class="row g-2 mb-3">
-                            <div class="col-6"><label class="form-label fw-semibold text-success">Bulk Qty</label><input type="number" step="0.0001" min="0" name="bulk_qty" id="biBulk" value="{{ old('bulk_qty') }}" class="form-control bi-qty"><div class="form-text text-primary d-none" id="biBulkHint"><i class="bi bi-magic me-1"></i>from GMTS Order Qty · editable</div></div>
+                            <div class="col-6"><label class="form-label fw-semibold text-success">Bulk Qty</label><input type="number" step="0.0001" min="0" name="bulk_qty" id="biBulk" value="{{ old('bulk_qty') }}" class="form-control bi-qty"><div class="form-text text-primary d-none" id="biBulkHint"><i class="bi bi-magic me-1" aria-hidden="true"></i>from GMTS Order Qty · editable</div></div>
                             <div class="col-6"><label class="form-label fw-semibold text-primary">Sample Qty</label><input type="number" step="0.0001" min="0" name="sample_qty" id="biSample" value="{{ old('sample_qty') }}" class="form-control bi-qty"></div>
                         </div>
                         <div class="row g-2 mb-3">
@@ -76,11 +76,11 @@
                             <div class="col-6"><label class="form-label fw-semibold text-danger">Dead Qty</label><input type="number" step="0.0001" min="0" name="dead_qty" id="biDead" value="{{ old('dead_qty') }}" class="form-control bi-qty"></div>
                         </div>
                         <div class="alert alert-warning py-2 px-3 small d-none" id="biOverWarn">
-                            <i class="bi bi-exclamation-triangle me-1"></i><span id="biOverText"></span>
+                            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i><span id="biOverText"></span>
                         </div>
                         <label class="form-label fw-semibold">Remarks</label>
                         <textarea name="remarks" rows="2" class="form-control mb-3" maxlength="1000">{{ old('remarks') }}</textarea>
-                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Add Bulk Issue</button>
+                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Bulk Issue</button>
                         <div class="form-text">Enter at least one of the four quantities. Liability &amp; Dead can later be reused (transfer to bulk) on the Closing Stock page.</div>
                     </form>
                     @endif
@@ -116,7 +116,7 @@
                                         <td class="text-end">
                                             <form method="POST" action="{{ route('store.material.bulk-issues.destroy', $i) }}" onsubmit="return confirm('Remove this bulk issue? Closing stock will update.');">
                                                 @csrf @method('DELETE')
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash"></i></button>
+                                                <button class="btn btn-sm btn-outline-danger rounded-pill px-3" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                             </form>
                                         </td>
                                     </tr>

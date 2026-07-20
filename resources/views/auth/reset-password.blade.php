@@ -1,6 +1,6 @@
 <x-guest-layout>
     <div class="user-icon">
-        <i class="bi bi-key-fill"></i>
+        <i class="bi bi-key-fill" aria-hidden="true"></i>
     </div>
     <div class="brand">Humana Apparels Pvt. Ltd</div>
     <div class="login-subtitle">Set a new password for your account.</div>
@@ -28,7 +28,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-check2-circle me-1"></i> Reset Password
+            <i class="bi bi-check2-circle me-1" aria-hidden="true"></i> Reset Password
         </button>
     </form>
 </x-guest-layout>

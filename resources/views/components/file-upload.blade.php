@@ -31,7 +31,7 @@
         <input type="file" name="{{ $name }}" accept="{{ $accept }}" required
                class="visually-hidden" data-upload-input>
 
-        <span class="gx-dropzone-icon" aria-hidden="true"><i class="bi bi-cloud-arrow-up"></i></span>
+        <span class="gx-dropzone-icon" aria-hidden="true"><i class="bi bi-cloud-arrow-up" aria-hidden="true"></i></span>
 
         <span class="gx-dropzone-title">Drag a file here, or click to browse</span>
 
@@ -50,7 +50,7 @@
 
     {{-- Selected file card, populated by the script. --}}
     <div class="gx-upload-file d-none" data-upload-file>
-        <span class="gx-upload-file-icon" aria-hidden="true"><i class="bi bi-file-earmark-spreadsheet"></i></span>
+        <span class="gx-upload-file-icon" aria-hidden="true"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i></span>
         <span class="gx-upload-file-body">
             <span class="gx-upload-file-name" data-upload-name></span>
             <span class="gx-upload-file-meta" data-upload-meta></span>
@@ -64,7 +64,7 @@
 
         <button type="button" class="btn btn-sm btn-outline-danger gx-upload-remove"
                 data-upload-remove aria-label="Remove selected file">
-            <i class="bi bi-x-lg"></i>
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
         </button>
     </div>
 
@@ -74,7 +74,7 @@
 
     <div class="d-flex align-items-center gap-2 mt-3">
         <button type="submit" class="btn btn-primary px-4" data-upload-submit>
-            <span data-upload-submit-label><i class="bi bi-upload me-1"></i>Upload File</span>
+            <span data-upload-submit-label><i class="bi bi-upload me-1" aria-hidden="true"></i>Upload File</span>
         </button>
         <span class="small text-muted d-none" data-upload-status aria-live="polite"></span>
     </div>

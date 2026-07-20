@@ -13,15 +13,15 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-box-arrow-in-down"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Buyer / Style Stock</div>
                     <h3 class="app-hero-title mb-0">Material Receiving</h3>
                 </div>
             </div>
             <div class="d-flex gap-2">
-                <a href="{{ route('store.material.ledger') }}" class="btn btn-outline-secondary"><i class="bi bi-clipboard-data me-1"></i>Closing Stock</a>
-                <a href="{{ route('store.material.bulk-issues.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-up me-1"></i>Bulk Issue</a>
+                <a href="{{ route('store.material.ledger') }}" class="btn btn-outline-secondary"><i class="bi bi-clipboard-data me-1" aria-hidden="true"></i>Closing Stock</a>
+                <a href="{{ route('store.material.bulk-issues.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Bulk Issue</a>
             </div>
         </div>
     </div>
@@ -58,7 +58,7 @@
                              confirmed by picking from the list. --}}
                         <div class="position-relative" id="rcvSearchWrap">
                             <div class="input-group">
-                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
                                 <input type="text" class="form-control" id="rcvSearch" autocomplete="off"
                                        role="combobox" aria-expanded="false" aria-autocomplete="list"
                                        aria-controls="rcvResultsList"
@@ -84,7 +84,7 @@
                             <button type="button" class="btn btn-outline-secondary" id="rcvChangePo">Change PO</button>
                             <button type="button" class="btn btn-primary" id="rcvPickBtn"
                                     data-bs-toggle="modal" data-bs-target="#rcvItemsModal">
-                                <i class="bi bi-list-check me-1"></i>Select Items
+                                <i class="bi bi-list-check me-1" aria-hidden="true"></i>Select Items
                             </button>
                         </div>
                     </div>
@@ -112,7 +112,7 @@
                 <div id="rcvShared" class="d-none">
                     <div class="border rounded-3 bg-body-secondary p-3 mb-3">
                         <div class="small fw-semibold text-uppercase text-muted mb-2">
-                            <i class="bi bi-magic me-1"></i>PO Details <span class="text-muted">— read-only</span>
+                            <i class="bi bi-magic me-1" aria-hidden="true"></i>PO Details <span class="text-muted">— read-only</span>
                         </div>
                         <div class="row g-3 mb-3">
                             <div class="col-6 col-lg-3">
@@ -138,7 +138,7 @@
                         </div>
 
                         <div class="small fw-semibold text-uppercase text-muted mb-2">
-                            <i class="bi bi-truck me-1"></i>Delivery Details <span class="text-muted">— applies to every item below</span>
+                            <i class="bi bi-truck me-1" aria-hidden="true"></i>Delivery Details <span class="text-muted">— applies to every item below</span>
                         </div>
                         <div class="row g-3">
                             <div class="col-12 col-sm-6 col-lg-3">
@@ -159,7 +159,7 @@
                             <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label fw-semibold">GRN No</label>
                                 <input type="text" class="form-control bg-light text-muted" value="Auto-generated" readonly disabled>
-                                <div class="form-text text-muted"><i class="bi bi-magic me-1"></i>One GRN per item, on save</div>
+                                <div class="form-text text-muted"><i class="bi bi-magic me-1" aria-hidden="true"></i>One GRN per item, on save</div>
                             </div>
                             <div class="col-12">
                                 <label class="form-label fw-semibold">Remarks</label>
@@ -192,9 +192,9 @@
                         <span class="text-muted small"><span id="rcvCount">0</span> item(s) — one GRN will be generated per item.</span>
                         <div class="d-flex gap-2">
                             <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#rcvItemsModal">
-                                <i class="bi bi-plus-lg me-1"></i>Add More Items
+                                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add More Items
                             </button>
-                            <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1"></i>Save Receivings</button>
+                            <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Save Receivings</button>
                         </div>
                     </div>
                 </div>
@@ -235,7 +235,7 @@
                                 <td class="text-end">
                                     <form method="POST" action="{{ route('store.material.receivings.destroy', $r) }}" onsubmit="return confirm('Remove this receiving? Closing stock will update.');">
                                         @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger rounded-pill px-3" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                     </form>
                                 </td>
                             </tr>
@@ -323,10 +323,10 @@
 
             <div class="modal-footer">
                 <span class="me-auto small text-muted"><span id="rcvSelCount">0</span> selected</span>
-                <button type="button" class="btn btn-outline-secondary d-none" id="rcvBackBtn"><i class="bi bi-arrow-left me-1"></i>Back to Styles</button>
+                <button type="button" class="btn btn-outline-secondary d-none" id="rcvBackBtn"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Styles</button>
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="rcvNextBtn">Next: Choose Items<i class="bi bi-arrow-right ms-1"></i></button>
-                <button type="button" class="btn btn-primary d-none" id="rcvAddSelected"><i class="bi bi-plus-lg me-1"></i>Add Selected</button>
+                <button type="button" class="btn btn-primary" id="rcvNextBtn">Next: Choose Items<i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></button>
+                <button type="button" class="btn btn-primary d-none" id="rcvAddSelected"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Selected</button>
             </div>
         </div>
     </div>
@@ -637,7 +637,7 @@
             styles.forEach(name => {
                 const under = items.filter(it => styleKey(it) === name);
                 html += '<tr class="table-light"><td colspan="10" class="fw-semibold small">' +
-                            '<i class="bi bi-tag me-1"></i>Style ' + dash(name) +
+                            '<i class="bi bi-tag me-1" aria-hidden="true"></i>Style ' + dash(name) +
                             ' <span class="text-muted fw-normal">· ' + under.length + ' item(s)</span>' +
                         '</td></tr>';
 
@@ -747,7 +747,7 @@
                     ' value="' + h(unitPrice) + '" class="form-control form-control-sm"></td>' +
                 '<td class="text-end small text-muted" data-field="invoice_value">—</td>' +
                 '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger rcv-remove"' +
-                    ' title="Remove this item" aria-label="Remove this item"><i class="bi bi-trash"></i></button></td>';
+                    ' title="Remove this item" aria-label="Remove this item"><i class="bi bi-trash" aria-hidden="true"></i></button></td>';
 
             rowsWrap.appendChild(tr);
             recalcRow(tr);

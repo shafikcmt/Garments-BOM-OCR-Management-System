@@ -47,7 +47,7 @@
 
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center gap-3">
-            <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-list-check"></i></span>
+            <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-list-check" aria-hidden="true"></i></span>
             <div>
                 <div class="app-hero-eyebrow">Payment Request</div>
                 <h3 class="app-hero-title mb-0">My PRA Status</h3>
@@ -82,7 +82,7 @@
                         <tr>
                             <td class="text-center">
                                 <button type="button" class="pra-toggle" data-bs-toggle="collapse" data-bs-target="#praDetail{{ $pr->id }}" aria-expanded="false" aria-controls="praDetail{{ $pr->id }}" title="Show approver details">
-                                    <i class="bi bi-chevron-right"></i>
+                                    <i class="bi bi-chevron-right" aria-hidden="true"></i>
                                 </button>
                             </td>
                             <td>
@@ -112,7 +112,7 @@
                             <td class="text-end text-nowrap">
                                 @if($progress['state'] === 'rejected')
                                     <button type="button" class="btn btn-sm btn-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#resubmitModal{{ $pr->id }}">
-                                        <i class="bi bi-arrow-repeat me-1"></i> Resubmit
+                                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Resubmit
                                     </button>
                                 @else
                                     <a href="{{ route('supply_chain.payment_requests.show', $pr) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">View</a>
@@ -146,7 +146,7 @@
                     @empty
                         <tr>
                             <td colspan="8" class="text-center py-5 text-muted">
-                                <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                                <i class="bi bi-inbox fs-3 d-block mb-2" aria-hidden="true"></i>
                                 You have not sent any PRA for approval yet.
                             </td>
                         </tr>
@@ -169,7 +169,7 @@
                     <form method="POST" action="{{ route('supply_chain.payment_requests.resubmit', $pr) }}">
                         @csrf
                         <div class="modal-header">
-                            <h5 class="modal-title"><i class="bi bi-arrow-repeat me-1"></i> Resubmit {{ $pr->request_no }}</h5>
+                            <h5 class="modal-title"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Resubmit {{ $pr->request_no }}</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
@@ -202,7 +202,7 @@
                         <div class="modal-footer">
                             <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
                             <button type="submit" class="btn btn-primary" {{ $approverPool->isEmpty() ? 'disabled' : '' }}>
-                                <i class="bi bi-send me-1"></i> Resubmit
+                                <i class="bi bi-send me-1" aria-hidden="true"></i> Resubmit
                             </button>
                         </div>
                     </form>

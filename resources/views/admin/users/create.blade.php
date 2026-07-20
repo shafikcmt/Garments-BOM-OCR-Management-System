@@ -13,14 +13,14 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-person-plus"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-person-plus" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Admin / Users</div>
                     <h3 class="app-hero-title mb-0">Create User</h3>
                 </div>
             </div>
             <a href="{{ route('admin.users.index') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-arrow-left"></i> Back to Users
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to Users
             </a>
         </div>
     </div>

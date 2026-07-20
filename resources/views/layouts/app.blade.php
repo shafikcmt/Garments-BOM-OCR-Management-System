@@ -32,7 +32,7 @@
         <div class="app-flash-wrapper">
             @if(session('success'))
                 <div class="app-flash-alert app-flash-success" role="alert">
-                    <div class="app-flash-icon"><i class="bi bi-check-lg"></i></div>
+                    <div class="app-flash-icon"><i class="bi bi-check-lg" aria-hidden="true"></i></div>
                     <div class="app-flash-content">
                         <h6 class="app-flash-title">Success</h6>
                         <p class="app-flash-text">{!! session('success') !!}</p>
@@ -44,7 +44,7 @@
 
             @if(session('error'))
                 <div class="app-flash-alert app-flash-error" role="alert">
-                    <div class="app-flash-icon"><i class="bi bi-exclamation-lg"></i></div>
+                    <div class="app-flash-icon"><i class="bi bi-exclamation-lg" aria-hidden="true"></i></div>
                     <div class="app-flash-content">
                         <h6 class="app-flash-title">Error</h6>
                         <p class="app-flash-text">{!! session('error') !!}</p>
@@ -56,7 +56,7 @@
 
             @if(session('import_errors'))
                 <div class="app-flash-alert app-flash-error" role="alert">
-                    <div class="app-flash-icon"><i class="bi bi-exclamation-lg"></i></div>
+                    <div class="app-flash-icon"><i class="bi bi-exclamation-lg" aria-hidden="true"></i></div>
                     <div class="app-flash-content">
                         <h6 class="app-flash-title">Import Error</h6>
                         <div class="app-flash-text">

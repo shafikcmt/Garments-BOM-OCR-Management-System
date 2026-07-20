@@ -322,17 +322,17 @@
 @endif
     @if($batchMode)
         <div class="bf-batch-banner no-print" role="status">
-            <span class="bf-batch-count"><i class="bi bi-collection me-1"></i>Selected Orders: {{ $selectedOrderCount ?? count($batchRowIds) }}</span>
-            <span class="bf-batch-note"><i class="bi bi-info-circle me-1"></i>One PO number will be generated for all selected orders.</span>
+            <span class="bf-batch-count"><i class="bi bi-collection me-1" aria-hidden="true"></i>Selected Orders: {{ $selectedOrderCount ?? count($batchRowIds) }}</span>
+            <span class="bf-batch-note"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>One PO number will be generated for all selected orders.</span>
         </div>
     @endif
     @if($canEditThisPreview)
         <div class="bf-action-bar no-print">
             <button type="button" class="btn btn-outline-primary btn-sm booking-preview-edit-toggle">
                 @if($editPanelOpen)
-                    <i class="bi bi-eye me-1"></i>Hide Edit
+                    <i class="bi bi-eye me-1" aria-hidden="true"></i>Hide Edit
                 @else
-                    <i class="bi bi-pencil-square me-1"></i>Edit Preview
+                    <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit Preview
                 @endif
             </button>
         </div>
@@ -342,7 +342,7 @@
         <div class="booking-change-control-panel no-print">
             <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
                 <div>
-                    <h6 class="mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Source data changed after PO generation</h6>
+                    <h6 class="mb-1"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Source data changed after PO generation</h6>
                     <div class="small text-muted">Check before/after values, then re-generate PO if the latest data should update this booking.</div>
                 </div>
                 <span class="badge rounded-pill text-bg-danger">{{ $sourceChanges->count() }} field(s)</span>
@@ -366,7 +366,7 @@
 
     @if($canControlPo && ! $previewMode && $generationHistory->isNotEmpty())
         <div class="booking-history-mini no-print">
-            <div class="fw-bold text-slate-900"><i class="bi bi-clock-history me-1 text-primary"></i>PO control history</div>
+            <div class="fw-bold text-slate-900"><i class="bi bi-clock-history me-1 text-primary" aria-hidden="true"></i>PO control history</div>
             @foreach($generationHistory->take(3) as $entry)
                 <div class="history-line">{{ ucfirst(str_replace('_', ' ', $entry['action'] ?? 'generated')) }} @if(($entry['revision_no'] ?? 0) > 0) · R-{{ $entry['revision_no'] }}@endif · {{ $entry['changed_by_name'] ?? 'System' }} · {{ $entry['changed_at'] ?? '-' }} @if(! empty($entry['changes'])) · {{ count($entry['changes']) }} edited field(s) @endif</div>
             @endforeach
@@ -377,7 +377,7 @@
         <div class="booking-preview-edit-panel no-print {{ $editPanelOpen ? '' : 'd-none' }}">
             <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
                 <div>
-                    <h6 class="mb-1 fw-bold"><i class="bi bi-pencil-square me-1 text-primary"></i>{{ $adminEditMode ? 'Edit PO Control Data' : ($regenerateMode ? 'Edit Before PO Re-generate' : 'Edit Vendor Details & Instructions') }}</h6>
+                    <h6 class="mb-1 fw-bold"><i class="bi bi-pencil-square me-1 text-primary" aria-hidden="true"></i>{{ $adminEditMode ? 'Edit PO Control Data' : ($regenerateMode ? 'Edit Before PO Re-generate' : 'Edit Vendor Details & Instructions') }}</h6>
                     <div class="small text-muted">
                         @if($adminEditMode)
                             Admin edit mode: update PO data, delivery details, item values, and instructions without changing the PO number.
@@ -505,16 +505,16 @@
                         @forelse($notes as $note)
                             <div class="booking-preview-note-row">
                                 <textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text">{{ $note }}</textarea>
-                                <button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg"></i><span class="ms-1">Remove</span></button>
+                                <button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>
                             </div>
                         @empty
                             <div class="booking-preview-note-row">
                                 <textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea>
-                                <button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg"></i><span class="ms-1">Remove</span></button>
+                                <button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>
                             </div>
                         @endforelse
                     </div>
-                    <button type="button" class="btn btn-outline-primary btn-sm booking-preview-add-note"><i class="bi bi-plus-lg me-1"></i>Add Instruction Line</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm booking-preview-add-note"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Instruction Line</button>
                 </div>
                 <div class="col-12">
                     <label class="form-label">New Instruction</label>
@@ -665,12 +665,12 @@
         @endphp
         <div class="bf-action-footer no-print">
             <div class="bf-action-footer-help">
-                <i class="bi bi-info-circle"></i>
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
                 <span>{{ $footerHelp }}</span>
             </div>
             <div class="bf-action-footer-buttons">
                 <button type="button" class="btn bf-btn-cancel booking-preview-cancel" data-bs-dismiss="modal" aria-label="Close preview">
-                    <i class="bi bi-x-lg me-1"></i>Cancel
+                    <i class="bi bi-x-lg me-1" aria-hidden="true"></i>Cancel
                 </button>
                 <button type="button"
                         class="btn bf-btn-generate preview-generate-po-btn"

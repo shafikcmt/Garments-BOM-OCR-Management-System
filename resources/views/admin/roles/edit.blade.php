@@ -13,14 +13,14 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-shield-lock"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-shield-lock" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Admin / Roles</div>
                     <h3 class="app-hero-title mb-0">Edit Role</h3>
                 </div>
             </div>
             <a href="{{ route('admin.roles.index') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-arrow-left"></i> Back to Roles
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to Roles
             </a>
         </div>
     </div>

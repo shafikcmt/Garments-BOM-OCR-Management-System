@@ -359,8 +359,8 @@ document.addEventListener('DOMContentLoaded', function () {
             this.setAttribute('aria-expanded', String(!isOpen));
             this.setAttribute('title', !isOpen ? 'Hide history' : 'Show history');
             this.innerHTML = !isOpen
-                ? '<i class="bi bi-eye-slash"></i><span class="visually-hidden">Hide history</span>'
-                : '<i class="bi bi-clock-history"></i><span class="visually-hidden">History</span>';
+                ? '<i class="bi bi-eye-slash" aria-hidden="true"></i><span class="visually-hidden">Hide history</span>'
+                : '<i class="bi bi-clock-history" aria-hidden="true"></i><span class="visually-hidden">History</span>';
         });
     });
 });
@@ -377,7 +377,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="po-control-hero p-4 p-lg-5 mb-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-3">
-                <span class="po-control-icon"><i class="bi bi-shield-lock"></i></span>
+                <span class="po-control-icon"><i class="bi bi-shield-lock" aria-hidden="true"></i></span>
                 <div>
                     <div class="po-control-eyebrow">Admin Only</div>
                     <h2 class="po-control-title mb-1">PO Generate Control</h2>
@@ -385,7 +385,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             </div>
             <a href="{{ route('admin.dashboard') }}" class="btn btn-outline-primary rounded-pill fw-bold px-4">
-                <i class="bi bi-arrow-left me-1"></i>Admin Dashboard
+                <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Admin Dashboard
             </a>
         </div>
     </div>
@@ -395,7 +395,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="po-stat-card p-3">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="po-stat-label">Total Generated PO</div><div class="po-stat-value">{{ $stats['total'] ?? 0 }}</div></div>
-                    <span class="po-control-icon"><i class="bi bi-file-earmark-check"></i></span>
+                    <span class="po-control-icon"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
@@ -403,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="po-stat-card p-3">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="po-stat-label">Pending PO</div><div class="po-stat-value">{{ $stats['pending'] ?? 0 }}</div></div>
-                    <span class="po-control-icon"><i class="bi bi-hourglass-split"></i></span>
+                    <span class="po-control-icon"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="po-stat-card p-3">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="po-stat-label">Re-generated PO</div><div class="po-stat-value">{{ $stats['regenerated'] ?? 0 }}</div></div>
-                    <span class="po-control-icon"><i class="bi bi-arrow-repeat"></i></span>
+                    <span class="po-control-icon"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
@@ -419,7 +419,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="po-stat-card p-3">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="po-stat-label">Locked PO</div><div class="po-stat-value">{{ $stats['locked'] ?? 0 }}</div></div>
-                    <span class="po-control-icon"><i class="bi bi-lock"></i></span>
+                    <span class="po-control-icon"><i class="bi bi-lock" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
@@ -427,14 +427,14 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="po-stat-card p-3">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="po-stat-label">Supply Chain Authorized</div><div class="po-stat-value">{{ $stats['authorized'] ?? 0 }}</div></div>
-                    <span class="po-control-icon"><i class="bi bi-person-check"></i></span>
+                    <span class="po-control-icon"><i class="bi bi-person-check" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="po-control-hint p-3 mb-4 d-flex align-items-start gap-2">
-        <i class="bi bi-info-circle-fill mt-1"></i>
+        <i class="bi bi-info-circle-fill mt-1" aria-hidden="true"></i>
         <div class="small fw-semibold">
             Admin controls are saved inside each PO: lock/unlock, edit permission mode, Supply Chain authorized users and control notes. Default PO generate/re-generate owner is Supply Chain only. Locked PO cannot be edited or re-generated until admin unlocks it.
         </div>
@@ -469,8 +469,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 <input type="text" name="vendor" value="{{ request('vendor') }}" class="form-control" placeholder="Vendor" list="poVendorOptions" autocomplete="off">
             </div>
             <div class="col-lg-2 d-flex gap-2">
-                <button class="btn btn-primary rounded-pill fw-bold flex-fill" type="submit" title="Filter"><i class="bi bi-funnel me-1"></i>Filter</button>
-                <a href="{{ ($activePoPage ?? 'generated') === 'pending' ? route('admin.po-generate-control.pending') : route('admin.po-generate-control.generated') }}" class="btn btn-outline-secondary rounded-pill fw-bold" title="Reset"><i class="bi bi-arrow-clockwise me-1"></i>Reset</a>
+                <button class="btn btn-primary rounded-pill fw-bold flex-fill" type="submit" title="Filter"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
+                <a href="{{ ($activePoPage ?? 'generated') === 'pending' ? route('admin.po-generate-control.pending') : route('admin.po-generate-control.generated') }}" class="btn btn-outline-secondary rounded-pill fw-bold" title="Reset"><i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>Reset</a>
             </div>
         </div>
     </form>
@@ -494,7 +494,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="po-section-tabs mb-4">
         <a href="{{ $pendingTabUrl }}" class="po-section-tab {{ ($activePoPage ?? 'generated') === 'pending' ? 'active' : '' }}">
             <div class="d-flex align-items-center gap-3">
-                <span class="po-section-tab-icon"><i class="bi bi-hourglass-split"></i></span>
+                <span class="po-section-tab-icon"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span>
                 <div>
                     <div class="fw-bold">Pending PO Information</div>
                     <div class="small text-muted">Supply Chain pending generate list</div>
@@ -504,7 +504,7 @@ document.addEventListener('DOMContentLoaded', function () {
         </a>
         <a href="{{ $generatedTabUrl }}" class="po-section-tab {{ ($activePoPage ?? 'generated') === 'generated' ? 'active' : '' }}">
             <div class="d-flex align-items-center gap-3">
-                <span class="po-section-tab-icon"><i class="bi bi-shield-check"></i></span>
+                <span class="po-section-tab-icon"><i class="bi bi-shield-check" aria-hidden="true"></i></span>
                 <div>
                     <div class="fw-bold">Generated / Re-generated Control</div>
                     <div class="small text-muted">Admin lock, permission and audit control</div>
@@ -522,7 +522,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="small text-muted">Rows/groups still waiting for Supply Chain PO generate. Buyer and vendor filters also apply here.</div>
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span class="po-owner-pill"><i class="bi bi-person-check"></i>Generate owner: Supply Chain</span>
+                <span class="po-owner-pill"><i class="bi bi-person-check" aria-hidden="true"></i>Generate owner: Supply Chain</span>
                 <span class="badge rounded-pill text-bg-warning px-3 py-2">{{ $pendingRows->total() }} pending</span>
             </div>
         </div>
@@ -549,7 +549,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             @endphp
                             <tr class="po-pending-row">
                                 <td>
-                                    <span class="po-pending-pill"><i class="bi bi-hourglass-split"></i>Pending</span>
+                                    <span class="po-pending-pill"><i class="bi bi-hourglass-split" aria-hidden="true"></i>Pending</span>
                                     <div class="small text-muted mt-1">Row #{{ $pendingRow->row_number ?? $pendingRow->id }} @if($groupCount > 1) · {{ $groupCount }} rows @endif</div>
                                 </td>
                                 <td>
@@ -566,7 +566,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 </td>
                                 <td class="text-end fw-bold">{{ $qtyTotal !== null && $qtyTotal !== '' ? $qtyTotal : '-' }}</td>
                                 <td>
-                                    <span class="po-owner-pill"><i class="bi bi-person-check"></i>Supply Chain</span>
+                                    <span class="po-owner-pill"><i class="bi bi-person-check" aria-hidden="true"></i>Supply Chain</span>
                                     <div class="small text-muted mt-1">Can generate PO</div>
                                 </td>
                             </tr>
@@ -586,7 +586,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         Showing <strong>{{ $pendingRows->firstItem() }}</strong> to <strong>{{ $pendingRows->lastItem() }}</strong> of <strong>{{ $pendingRows->total() }}</strong> pending results
                     </div>
                     <div class="po-pager-actions">
-                        <a class="po-pager-btn {{ $pendingRows->onFirstPage() ? 'disabled' : '' }}" href="{{ $pendingRows->previousPageUrl() ?: '#' }}" aria-label="Previous pending page" title="Previous page"><i class="bi bi-chevron-left"></i></a>
+                        <a class="po-pager-btn {{ $pendingRows->onFirstPage() ? 'disabled' : '' }}" href="{{ $pendingRows->previousPageUrl() ?: '#' }}" aria-label="Previous pending page" title="Previous page"><i class="bi bi-chevron-left" aria-hidden="true"></i></a>
                         @if($pendingStart > 1)
                             <a class="po-pager-btn" href="{{ $pendingRows->url(1) }}">1</a>
                             @if($pendingStart > 2)<span class="po-pager-dot">...</span>@endif
@@ -598,7 +598,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             @if($pendingEnd < $pendingLast - 1)<span class="po-pager-dot">...</span>@endif
                             <a class="po-pager-btn" href="{{ $pendingRows->url($pendingLast) }}">{{ $pendingLast }}</a>
                         @endif
-                        <a class="po-pager-btn {{ $pendingRows->hasMorePages() ? '' : 'disabled' }}" href="{{ $pendingRows->nextPageUrl() ?: '#' }}" aria-label="Next pending page" title="Next page"><i class="bi bi-chevron-right"></i></a>
+                        <a class="po-pager-btn {{ $pendingRows->hasMorePages() ? '' : 'disabled' }}" href="{{ $pendingRows->nextPageUrl() ?: '#' }}" aria-label="Next pending page" title="Next page"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
                     </div>
                 </div>
             @else
@@ -606,7 +606,7 @@ document.addEventListener('DOMContentLoaded', function () {
             @endif
         @else
             <div class="p-4 text-center text-muted">
-                <span class="po-control-icon mb-2"><i class="bi bi-check2-circle"></i></span>
+                <span class="po-control-icon mb-2"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
                 <div class="fw-bold text-slate-900">No pending PO found</div>
                 <div class="small">Pending rows will appear here before Supply Chain generates PO.</div>
             </div>
@@ -696,7 +696,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             @endphp
                             <tr class="po-row-main">
                                 <td>
-                                    <span class="po-no-pill"><i class="bi bi-upc-scan"></i>{{ $bookingPo->po_no }}</span>
+                                    <span class="po-no-pill"><i class="bi bi-upc-scan" aria-hidden="true"></i>{{ $bookingPo->po_no }}</span>
                                     @if($revisionNo > 0)
                                         <div class="small text-warning-emphasis fw-bold mt-1">Revision R-{{ $revisionNo }}</div>
                                     @endif
@@ -716,17 +716,17 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <td class="text-end fw-bold">{{ $bookingPo->qty !== null ? $bookingPo->qty : '-' }}</td>
                                 <td>
                                     @if($revisionNo > 0)
-                                        <span class="po-state-pill regenerated"><i class="bi bi-arrow-repeat"></i>Re-generated</span>
+                                        <span class="po-state-pill regenerated"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>Re-generated</span>
                                     @else
-                                        <span class="po-state-pill generated"><i class="bi bi-check2-circle"></i>Generated</span>
+                                        <span class="po-state-pill generated"><i class="bi bi-check2-circle" aria-hidden="true"></i>Generated</span>
                                     @endif
                                     <div class="small text-muted mt-1">{{ optional($bookingPo->generated_at)->format('d M Y h:i A') ?: '-' }}</div>
                                 </td>
                                 <td>
                                     @if($needsRegenerate)
-                                        <span class="po-change-pill"><i class="bi bi-exclamation-triangle"></i>{{ $sourceChanges->count() }} Changed</span>
+                                        <span class="po-change-pill"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>{{ $sourceChanges->count() }} Changed</span>
                                     @else
-                                        <span class="po-change-pill clean"><i class="bi bi-shield-check"></i>Clean</span>
+                                        <span class="po-change-pill clean"><i class="bi bi-shield-check" aria-hidden="true"></i>Clean</span>
                                     @endif
                                     @if($latestHistory)
                                         <div class="small text-muted mt-1">Last: {{ ucfirst(str_replace('_', ' ', $latestHistory['action'] ?? 'generated')) }}</div>
@@ -735,11 +735,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <td>
                                     <div class="d-flex flex-column gap-1 align-items-start">
                                         @if($isLocked)
-                                            <span class="po-control-chip locked"><i class="bi bi-lock-fill"></i>Locked</span>
+                                            <span class="po-control-chip locked"><i class="bi bi-lock-fill" aria-hidden="true"></i>Locked</span>
                                         @else
-                                            <span class="po-control-chip open"><i class="bi bi-unlock"></i>Open</span>
+                                            <span class="po-control-chip open"><i class="bi bi-unlock" aria-hidden="true"></i>Open</span>
                                         @endif
-                                        <span class="po-control-chip permission"><i class="bi bi-person-gear"></i>{{ $permissionText }}</span>
+                                        <span class="po-control-chip permission"><i class="bi bi-person-gear" aria-hidden="true"></i>{{ $permissionText }}</span>
                                         @if($isLocked)
                                             <div class="small text-danger fw-bold">{{ $lockScopeText }}</div>
                                         @endif
@@ -753,16 +753,16 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <td class="text-end">
                                     <div class="po-action-stack">
                                         <a href="{{ route('admin.po-generate-control.show', $bookingPo) }}" class="btn btn-primary btn-sm po-icon-btn" title="Open PO control">
-                                            <i class="bi bi-box-arrow-up-right"></i><span>Open</span>
+                                            <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span>Open</span>
                                         </a>
                                         <button class="btn btn-outline-primary btn-sm po-icon-btn" type="button" data-bs-toggle="modal" data-bs-target="#poAccessModal{{ $bookingPo->id }}" title="Control, permission and history">
-                                            <i class="bi bi-sliders2"></i><span>Control</span>
+                                            <i class="bi bi-sliders2" aria-hidden="true"></i><span>Control</span>
                                         </button>
                                         <form method="POST" action="{{ route('admin.po-generate-control.destroy', $bookingPo) }}" class="d-inline" onsubmit="return confirm('Delete PO {{ $bookingPo->po_no }}? This will remove only the generated PO number and move source rows back to Pending PO.');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-outline-danger btn-sm po-icon-btn" title="Delete PO">
-                                                <i class="bi bi-trash3"></i><span>Delete</span>
+                                                <i class="bi bi-trash3" aria-hidden="true"></i><span>Delete</span>
                                             </button>
                                         </form>
                                     </div>
@@ -774,7 +774,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                         <div class="row g-3">
                                             <div class="col-lg-7">
                                                 <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-                                                    <h6 class="fw-bold mb-0"><i class="bi bi-arrow-left-right me-1 text-danger"></i>Source Data Before / After</h6>
+                                                    <h6 class="fw-bold mb-0"><i class="bi bi-arrow-left-right me-1 text-danger" aria-hidden="true"></i>Source Data Before / After</h6>
                                                     <span class="badge rounded-pill text-bg-light border">{{ $sourceChanges->count() }} change(s)</span>
                                                 </div>
                                                 @if($sourceChanges->isNotEmpty())
@@ -793,11 +793,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                                         </table>
                                                     </div>
                                                 @else
-                                                    <div class="alert alert-success rounded-4 mb-0"><i class="bi bi-check2-circle me-1"></i>No source data change found after generation.</div>
+                                                    <div class="alert alert-success rounded-4 mb-0"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>No source data change found after generation.</div>
                                                 @endif
                                             </div>
                                             <div class="col-lg-5">
-                                                <h6 class="fw-bold mb-2"><i class="bi bi-clock-history me-1 text-primary"></i>Generation / Admin History</h6>
+                                                <h6 class="fw-bold mb-2"><i class="bi bi-clock-history me-1 text-primary" aria-hidden="true"></i>Generation / Admin History</h6>
                                                 @forelse($history->take(4) as $entry)
                                                     <div class="po-history-line">
                                                         <div class="fw-bold text-slate-900">{{ ucfirst(str_replace('_', ' ', $entry['action'] ?? 'generated')) }} @if(($entry['revision_no'] ?? 0) > 0)<span class="text-warning-emphasis">R-{{ $entry['revision_no'] }}</span>@endif</div>
@@ -812,7 +812,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                                                 @foreach($controlHistory->take(3) as $adminEntry)
                                                     <div class="po-history-line border-primary-subtle">
-                                                        <div class="fw-bold text-primary"><i class="bi bi-shield-check me-1"></i>{{ ucfirst(str_replace('_', ' ', $adminEntry['action'] ?? 'control')) }}</div>
+                                                        <div class="fw-bold text-primary"><i class="bi bi-shield-check me-1" aria-hidden="true"></i>{{ ucfirst(str_replace('_', ' ', $adminEntry['action'] ?? 'control')) }}</div>
                                                         <div class="small text-muted">{{ $adminEntry['changed_by_name'] ?? 'Admin' }} - {{ $adminEntry['changed_at'] ?? '-' }}</div>
                                                     </div>
                                                 @endforeach
@@ -955,7 +955,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                         </div>
                                         <div class="row g-3">
                                             <div class="col-lg-7">
-                                                <div class="fw-bold mb-2"><i class="bi bi-arrow-left-right me-1 text-danger"></i>Source Data Before / After</div>
+                                                <div class="fw-bold mb-2"><i class="bi bi-arrow-left-right me-1 text-danger" aria-hidden="true"></i>Source Data Before / After</div>
                                                 @if($modalSourceChanges->isNotEmpty())
                                                     <div class="table-responsive">
                                                         <table class="table table-sm po-change-table">
@@ -972,11 +972,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                                         </table>
                                                     </div>
                                                 @else
-                                                    <div class="alert alert-success rounded-4 mb-0"><i class="bi bi-check2-circle me-1"></i>No source data change found after generation.</div>
+                                                    <div class="alert alert-success rounded-4 mb-0"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>No source data change found after generation.</div>
                                                 @endif
                                             </div>
                                             <div class="col-lg-5">
-                                                <div class="fw-bold mb-2"><i class="bi bi-clock-history me-1 text-primary"></i>Generation / Admin History</div>
+                                                <div class="fw-bold mb-2"><i class="bi bi-clock-history me-1 text-primary" aria-hidden="true"></i>Generation / Admin History</div>
                                                 @forelse($modalHistory->take(4) as $entry)
                                                     <div class="po-history-line">
                                                         <div class="fw-bold text-slate-900">{{ ucfirst(str_replace('_', ' ', $entry['action'] ?? 'generated')) }} @if(($entry['revision_no'] ?? 0) > 0)<span class="text-warning-emphasis">R-{{ $entry['revision_no'] }}</span>@endif</div>
@@ -991,7 +991,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                                                 @foreach($modalControlHistory->take(3) as $adminEntry)
                                                     <div class="po-history-line border-primary-subtle">
-                                                        <div class="fw-bold text-primary"><i class="bi bi-shield-check me-1"></i>{{ ucfirst(str_replace('_', ' ', $adminEntry['action'] ?? 'control')) }}</div>
+                                                        <div class="fw-bold text-primary"><i class="bi bi-shield-check me-1" aria-hidden="true"></i>{{ ucfirst(str_replace('_', ' ', $adminEntry['action'] ?? 'control')) }}</div>
                                                         <div class="small text-muted">{{ $adminEntry['changed_by_name'] ?? 'Admin' }} - {{ $adminEntry['changed_at'] ?? '-' }}</div>
                                                     </div>
                                                 @endforeach
@@ -1004,11 +1004,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <form method="POST" action="{{ route('admin.po-generate-control.destroy', $modalPo) }}" onsubmit="return confirm('Delete PO {{ $modalPo->po_no }}? This will remove only the generated PO number and move source rows back to Pending PO.');">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn btn-outline-danger rounded-pill fw-bold"><i class="bi bi-trash me-1"></i>Delete PO</button>
+                                    <button type="submit" class="btn btn-outline-danger rounded-pill fw-bold"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete PO</button>
                                 </form>
                                 <div class="d-flex gap-2">
                                     <button type="button" class="btn btn-outline-secondary rounded-pill fw-bold" data-bs-dismiss="modal">Close</button>
-                                    <button type="submit" form="poAccessForm{{ $modalPo->id }}" class="btn btn-primary rounded-pill fw-bold px-4"><i class="bi bi-check2-circle me-1"></i>Save Control</button>
+                                    <button type="submit" form="poAccessForm{{ $modalPo->id }}" class="btn btn-primary rounded-pill fw-bold px-4"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Save Control</button>
                                 </div>
                             </div>
                         </div>
@@ -1028,7 +1028,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         Showing <strong>{{ $bookingPos->firstItem() }}</strong> to <strong>{{ $bookingPos->lastItem() }}</strong> of <strong>{{ $bookingPos->total() }}</strong> generated PO results
                     </div>
                     <div class="po-pager-actions">
-                        <a class="po-pager-btn {{ $bookingPos->onFirstPage() ? 'disabled' : '' }}" href="{{ $bookingPos->previousPageUrl() ?: '#' }}" aria-label="Previous generated page" title="Previous page"><i class="bi bi-chevron-left"></i></a>
+                        <a class="po-pager-btn {{ $bookingPos->onFirstPage() ? 'disabled' : '' }}" href="{{ $bookingPos->previousPageUrl() ?: '#' }}" aria-label="Previous generated page" title="Previous page"><i class="bi bi-chevron-left" aria-hidden="true"></i></a>
                         @if($generatedStart > 1)
                             <a class="po-pager-btn" href="{{ $bookingPos->url(1) }}">1</a>
                             @if($generatedStart > 2)<span class="po-pager-dot">...</span>@endif
@@ -1040,7 +1040,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             @if($generatedEnd < $generatedLast - 1)<span class="po-pager-dot">...</span>@endif
                             <a class="po-pager-btn" href="{{ $bookingPos->url($generatedLast) }}">{{ $generatedLast }}</a>
                         @endif
-                        <a class="po-pager-btn {{ $bookingPos->hasMorePages() ? '' : 'disabled' }}" href="{{ $bookingPos->nextPageUrl() ?: '#' }}" aria-label="Next generated page" title="Next page"><i class="bi bi-chevron-right"></i></a>
+                        <a class="po-pager-btn {{ $bookingPos->hasMorePages() ? '' : 'disabled' }}" href="{{ $bookingPos->nextPageUrl() ?: '#' }}" aria-label="Next generated page" title="Next page"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
                     </div>
                 </div>
             @else
@@ -1049,7 +1049,7 @@ document.addEventListener('DOMContentLoaded', function () {
         @else
             <div class="po-empty-state text-center">
                 <div>
-                    <span class="po-control-icon mb-3"><i class="bi bi-inbox"></i></span>
+                    <span class="po-control-icon mb-3"><i class="bi bi-inbox" aria-hidden="true"></i></span>
                     <div class="fw-bold text-slate-900">No PO found</div>
                     <div class="small text-muted">Change filters or generate a PO first.</div>
                 </div>

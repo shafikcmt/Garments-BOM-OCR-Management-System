@@ -34,7 +34,7 @@
 <div class="card border-0 shadow-sm rounded-3 mb-3" id="emailHistoryCard">
     @unless($showType)
     <div class="card-header bg-white border-0 pt-3 pb-0 d-flex align-items-center gap-2">
-        <i class="bi bi-envelope-paper text-primary"></i>
+        <i class="bi bi-envelope-paper text-primary" aria-hidden="true"></i>
         <h6 class="mb-0 fw-bold">Sent Emails <span class="text-muted fw-normal">({{ $emailLogs->count() }})</span></h6>
     </div>
     @endunless
@@ -107,24 +107,24 @@
                                     <span class="badge bg-danger-subtle text-danger border border-danger-subtle" title="{{ $log->error }}">Failed</span>
                                 @endif
                             </td>
-                            <td class="text-nowrap"><i class="bi bi-file-earmark-pdf text-danger me-1"></i><span class="small">{{ $rowAttachment }}</span></td>
+                            <td class="text-nowrap"><i class="bi bi-file-earmark-pdf text-danger me-1" aria-hidden="true"></i><span class="small">{{ $rowAttachment }}</span></td>
                             <td class="text-end text-nowrap">
                                 <div class="btn-group btn-group-sm" role="group">
                                     <button type="button" class="btn btn-outline-secondary email-action" title="View full email"
                                             data-email-action="view" data-body-id="{{ $bodyId }}" @if($dynamicSendUrl) data-send-url="{{ $sendUrl }}" @endif @foreach($rowData as $k => $v) data-{{ $k }}="{{ $v }}" @endforeach>
-                                        <i class="bi bi-eye"></i><span class="d-none d-lg-inline ms-1">View</span>
+                                        <i class="bi bi-eye" aria-hidden="true"></i><span class="d-none d-lg-inline ms-1">View</span>
                                     </button>
                                     <button type="button" class="btn btn-outline-secondary email-action" title="Duplicate and resend"
                                             data-email-action="edit" data-body-id="{{ $bodyId }}" @if($dynamicSendUrl) data-send-url="{{ $sendUrl }}" @endif @foreach($rowData as $k => $v) data-{{ $k }}="{{ $v }}" @endforeach>
-                                        <i class="bi bi-pencil"></i><span class="d-none d-lg-inline ms-1">Edit</span>
+                                        <i class="bi bi-pencil" aria-hidden="true"></i><span class="d-none d-lg-inline ms-1">Edit</span>
                                     </button>
                                     <button type="button" class="btn btn-outline-secondary email-action" title="Forward to a new recipient"
                                             data-email-action="forward" data-body-id="{{ $bodyId }}" @if($dynamicSendUrl) data-send-url="{{ $sendUrl }}" @endif @foreach($rowData as $k => $v) data-{{ $k }}="{{ $v }}" @endforeach>
-                                        <i class="bi bi-arrow-right-circle"></i><span class="d-none d-lg-inline ms-1">Forward</span>
+                                        <i class="bi bi-arrow-right-circle" aria-hidden="true"></i><span class="d-none d-lg-inline ms-1">Forward</span>
                                     </button>
                                     <button type="button" class="btn btn-outline-secondary email-action" title="Reply to the same recipient"
                                             data-email-action="reply" data-body-id="{{ $bodyId }}" @if($dynamicSendUrl) data-send-url="{{ $sendUrl }}" @endif @foreach($rowData as $k => $v) data-{{ $k }}="{{ $v }}" @endforeach>
-                                        <i class="bi bi-reply"></i><span class="d-none d-lg-inline ms-1">Reply</span>
+                                        <i class="bi bi-reply" aria-hidden="true"></i><span class="d-none d-lg-inline ms-1">Reply</span>
                                     </button>
                                     @if($log->canBeDeletedBy(auth()->user()))
                                         <form method="POST" action="{{ route('emails.destroy', $log) }}" class="d-inline"
@@ -132,7 +132,7 @@
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-outline-danger" title="Remove from history">
-                                                <i class="bi bi-trash"></i><span class="d-none d-lg-inline ms-1">Delete</span>
+                                                <i class="bi bi-trash" aria-hidden="true"></i><span class="d-none d-lg-inline ms-1">Delete</span>
                                             </button>
                                         </form>
                                     @endif
@@ -153,7 +153,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content" style="border-radius:var(--gx-radius);overflow:hidden;">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-envelope-open me-1"></i> Email Details</h5>
+                <h5 class="modal-title"><i class="bi bi-envelope-open me-1" aria-hidden="true"></i> Email Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">

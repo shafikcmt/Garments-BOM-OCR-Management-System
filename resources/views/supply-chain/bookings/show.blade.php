@@ -28,11 +28,11 @@
                 <div class="small text-muted">PO {{ $bookingPo->po_no }}@if($revisionNo > 0) · R-{{ $revisionNo }}@endif. Generated PO is read-only.</div>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <a href="{{ route('supply_chain.bookings.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
-                <a href="{{ route('supply_chain.bookings.print', $bookingPo) }}" target="_blank" class="btn btn-outline-primary btn-sm"><i class="bi bi-printer me-1"></i>Print</a>
-                <a href="{{ route('supply_chain.bookings.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-pdf me-1"></i>Download PDF</a>
-                <a href="{{ route('supply_chain.bookings.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1"></i>Export Excel</a>
-                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#bookingEmailModal" title="Email this PO Booking to the supplier as a PDF attachment"><i class="bi bi-envelope me-1"></i>Email to Supplier</button>
+                <a href="{{ route('supply_chain.bookings.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back</a>
+                <a href="{{ route('supply_chain.bookings.print', $bookingPo) }}" target="_blank" class="btn btn-outline-primary btn-sm"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print</a>
+                <a href="{{ route('supply_chain.bookings.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-pdf me-1" aria-hidden="true"></i>Download PDF</a>
+                <a href="{{ route('supply_chain.bookings.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Export Excel</a>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#bookingEmailModal" title="Email this PO Booking to the supplier as a PDF attachment"><i class="bi bi-envelope me-1" aria-hidden="true"></i>Email to Supplier</button>
             </div>
         </div>
 
@@ -72,12 +72,12 @@
                   style="display:flex;flex-direction:column;min-height:0;overflow:hidden;">
                 @csrf
                 <div class="modal-header">
-                    <h5 class="modal-title" id="bookingEmailModalLabel"><i class="bi bi-envelope me-1"></i> Email PO Booking to Supplier</h5>
+                    <h5 class="modal-title" id="bookingEmailModalLabel"><i class="bi bi-envelope me-1" aria-hidden="true"></i> Email PO Booking to Supplier</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body" style="flex:1 1 auto;overflow-y:auto;min-height:0;">
                     <div class="alert alert-info border-0 small py-2">
-                        <i class="bi bi-paperclip me-1"></i> The PO Booking PDF (<strong>{{ $bookingPo->po_no }}</strong>) will be attached automatically.
+                        <i class="bi bi-paperclip me-1" aria-hidden="true"></i> The PO Booking PDF (<strong>{{ $bookingPo->po_no }}</strong>) will be attached automatically.
                     </div>
 
                     <div class="mb-3">
@@ -111,10 +111,10 @@
                         <label class="form-label fw-semibold">Message <span class="text-danger">*</span></label>
                         <div class="btn-toolbar mb-2" role="toolbar" aria-label="Formatting">
                             <div class="btn-group btn-group-sm" role="group">
-                                <button type="button" class="btn btn-light border" data-rt-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="bold" title="Bold"><i class="bi bi-type-bold" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="italic" title="Italic"><i class="bi bi-type-italic" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="underline" title="Underline"><i class="bi bi-type-underline" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
                             </div>
                         </div>
                         <div id="bookingEmailBodyEditor" class="form-control" contenteditable="true"
@@ -125,7 +125,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i> Send</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1" aria-hidden="true"></i> Send</button>
                 </div>
             </form>
         </div>

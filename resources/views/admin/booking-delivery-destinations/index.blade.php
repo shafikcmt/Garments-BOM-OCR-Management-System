@@ -17,14 +17,14 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-geo-alt"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-geo-alt" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Admin / Booking Setup</div>
                     <h3 class="app-hero-title mb-0">Delivery Destinations</h3>
                 </div>
             </div>
             <a href="{{ route('admin.booking-delivery-destinations.create') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-plus-lg"></i> Add Destination
+                <i class="bi bi-plus-lg" aria-hidden="true"></i> Add Destination
             </a>
         </div>
     </div>
@@ -58,11 +58,11 @@
                             </td>
                             <td>
                                 <div class="d-flex gap-2">
-                                    <a href="{{ route('admin.booking-delivery-destinations.edit', $destination) }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil-square"></i><span class="ms-1">Edit</span></a>
+                                    <a href="{{ route('admin.booking-delivery-destinations.edit', $destination) }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil-square" aria-hidden="true"></i><span class="ms-1">Edit</span></a>
                                     <form action="{{ route('admin.booking-delivery-destinations.destroy', $destination) }}" method="POST" onsubmit="return confirm('Delete this destination?');">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i><span class="ms-1">Delete</span></button>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
                                     </form>
                                 </div>
                             </td>

@@ -62,6 +62,6 @@
     </div>
 
     <div class="mt-4">
-        <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1"></i>Save Template</button>
+        <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1" aria-hidden="true"></i>Save Template</button>
     </div>
 </form>

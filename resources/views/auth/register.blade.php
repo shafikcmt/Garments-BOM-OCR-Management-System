@@ -1,6 +1,6 @@
 <x-guest-layout>
     <div class="user-icon">
-        <i class="bi bi-person-plus-fill"></i>
+        <i class="bi bi-person-plus-fill" aria-hidden="true"></i>
     </div>
     <div class="brand">Humana Apparels Pvt. Ltd</div>
     <div class="login-subtitle">Create a new account.</div>
@@ -33,7 +33,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary w-100 mb-2">
-            <i class="bi bi-person-check me-1"></i> Register
+            <i class="bi bi-person-check me-1" aria-hidden="true"></i> Register
         </button>
 
         <div class="text-center small">

@@ -22,7 +22,7 @@
             <div class="col-12 col-lg-5">
                 <label class="form-label small fw-semibold mb-1" for="fileSearch">Search</label>
                 <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
                     <input type="search" id="fileSearch" class="form-control" data-file-search
                            placeholder="Buyer, season, style or contract…" autocomplete="off">
                 </div>
@@ -41,7 +41,7 @@
             <div class="col-6 col-lg-4 d-flex gap-2">
                 <button type="button" class="btn btn-outline-secondary" data-file-clear>Clear</button>
                 <button type="button" class="btn btn-outline-primary" data-file-export disabled>
-                    <i class="bi bi-download me-1"></i>Export <span data-file-export-count></span>
+                    <i class="bi bi-download me-1" aria-hidden="true"></i>Export <span data-file-export-count></span>
                 </button>
             </div>
         </div>
@@ -59,12 +59,12 @@
                                aria-label="Select all files">
                     </th>
                     <th>#</th>
-                    <th><button type="button" class="gx-sort" data-sort="1">Buyer Name <i class="bi bi-arrow-down-up"></i></button></th>
-                    <th><button type="button" class="gx-sort" data-sort="2">Season Name <i class="bi bi-arrow-down-up"></i></button></th>
-                    <th><button type="button" class="gx-sort" data-sort="3">Style Name <i class="bi bi-arrow-down-up"></i></button></th>
-                    <th><button type="button" class="gx-sort" data-sort="4">Contract Number <i class="bi bi-arrow-down-up"></i></button></th>
-                    <th><button type="button" class="gx-sort" data-sort="5">Contract Shipment Date <i class="bi bi-arrow-down-up"></i></button></th>
-                    <th><button type="button" class="gx-sort" data-sort="6">Status <i class="bi bi-arrow-down-up"></i></button></th>
+                    <th><button type="button" class="gx-sort" data-sort="1">Buyer Name <i class="bi bi-arrow-down-up" aria-hidden="true"></i></button></th>
+                    <th><button type="button" class="gx-sort" data-sort="2">Season Name <i class="bi bi-arrow-down-up" aria-hidden="true"></i></button></th>
+                    <th><button type="button" class="gx-sort" data-sort="3">Style Name <i class="bi bi-arrow-down-up" aria-hidden="true"></i></button></th>
+                    <th><button type="button" class="gx-sort" data-sort="4">Contract Number <i class="bi bi-arrow-down-up" aria-hidden="true"></i></button></th>
+                    <th><button type="button" class="gx-sort" data-sort="5">Contract Shipment Date <i class="bi bi-arrow-down-up" aria-hidden="true"></i></button></th>
+                    <th><button type="button" class="gx-sort" data-sort="6">Status <i class="bi bi-arrow-down-up" aria-hidden="true"></i></button></th>
                     <th width="280">Action</th>
                 </tr>
             </thead>
@@ -126,7 +126,7 @@
 
                                 @if($isFileLocked)
                                     <span class="badge bg-danger-subtle text-danger border border-danger-subtle" title="{{ $file->lock_reason ?: 'Locked by admin' }}">
-                                        <i class="bi bi-lock-fill me-1"></i>{{ $file->lockScopeLabel() }} lock
+                                        <i class="bi bi-lock-fill me-1" aria-hidden="true"></i>{{ $file->lockScopeLabel() }} lock
                                     </span>
                                     @if($isLockedForCurrentUser)
                                         <small class="text-danger fw-semibold">Read only for you</small>
@@ -186,7 +186,7 @@
                                 <p class="small mb-3">Upload a merchant input file to start the workspace.</p>
                                 @if(auth()->user()?->hasRole('merchant'))
                                     <a href="{{ route('merchant.workspace') }}" class="btn btn-primary btn-sm">
-                                        <i class="bi bi-upload me-1"></i>Upload your first BOM
+                                        <i class="bi bi-upload me-1" aria-hidden="true"></i>Upload your first BOM
                                     </a>
                                 @endif
                             </div>

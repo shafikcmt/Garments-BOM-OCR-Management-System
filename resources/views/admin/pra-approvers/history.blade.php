@@ -20,14 +20,14 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-clock-history"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Admin / PRA Approval</div>
                     <h3 class="app-hero-title mb-0">Approval History</h3>
                 </div>
             </div>
             <a href="{{ route('admin.pra-approvers.index') }}" class="btn btn-outline-primary rounded-3">
-                <i class="bi bi-person-check me-1"></i> Manage Approvers
+                <i class="bi bi-person-check me-1" aria-hidden="true"></i> Manage Approvers
             </a>
         </div>
     </div>

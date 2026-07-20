@@ -1,6 +1,6 @@
 <x-guest-layout>
     <div class="user-icon">
-        <i class="bi bi-person-check-fill"></i>
+        <i class="bi bi-person-check-fill" aria-hidden="true"></i>
     </div>
     <div class="brand">Humana Apparels Pvt. Ltd</div>
     <div class="login-subtitle">Sign in to the OCR Management System</div>
@@ -39,7 +39,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-box-arrow-in-right me-1"></i> Login
+            <i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i> Login
         </button>
 
         <div class="text-center mt-4 small text-slate-500">

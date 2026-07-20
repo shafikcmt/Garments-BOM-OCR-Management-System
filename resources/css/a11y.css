@@ -1,0 +1,86 @@
+/* Accessibility and touch-target rules.
+ *
+ * Applied globally rather than per-component so a screen added later inherits
+ * them without anyone remembering to.
+ */
+
+/* --- Touch targets --------------------------------------------------------
+ * WCAG 2.1 AA (2.5.5) asks for 44x44 CSS px. Scoped to coarse pointers so a
+ * mouse user keeps the current compact density — the action columns in these
+ * tables are already tight, and enlarging every button on desktop would push
+ * them out of the viewport.
+ */
+@media (pointer: coarse) {
+    .btn,
+    .form-check-input,
+    .page-link,
+    .app-icon-btn,
+    .dropdown-item,
+    .sidebar-nav-link,
+    .gx-sort {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    .btn-sm {
+        min-height: 44px;
+        padding-inline: 12px;
+    }
+
+    /* Adjacent icon buttons need space between them, or a fingertip hits both. */
+    td .btn + .btn,
+    td .btn + form,
+    td form + form { margin-left: 6px; }
+
+    .form-control,
+    .form-select { min-height: 44px; }
+}
+
+/* --- Text scaling ---------------------------------------------------------
+ * WCAG 1.4.4 requires text to survive 200% zoom. Fixed px heights on rows are
+ * what usually breaks it, so the tall scroll areas become viewport-relative
+ * instead of absolute.
+ */
+@media (max-width: 640px) {
+    .gx-table-scroll { max-height: none; }
+    .gx-donut-wrap { justify-content: center; }
+    .gx-donut { flex: 0 0 140px; width: 140px; }
+
+    /* Stat figures shrink slightly so a long number does not overflow its
+       tile on a narrow screen. */
+    .gx-stat-value { font-size: 26px; }
+    .gx-area-axis { font-size: 10px; }
+
+    /* Page headers stack rather than squeezing the action buttons. */
+    .app-hero-card .d-flex.flex-wrap { gap: 12px; }
+}
+
+/* Wide data tables scroll inside their own container on every screen, so the
+   page body never scrolls sideways. */
+.table-responsive { -webkit-overflow-scrolling: touch; }
+
+/* --- Screen-reader-only live regions -------------------------------------- */
+.visually-hidden-focusable:not(:focus):not(:focus-within) {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+/* --- Forced colours (Windows high contrast) -------------------------------
+ * Backgrounds are dropped in this mode, so anything that conveys meaning
+ * through fill alone needs a border to survive.
+ */
+@media (forced-colors: active) {
+    .badge,
+    .gx-badge,
+    .gx-stat,
+    .gx-action,
+    .gx-card,
+    .card { border: 1px solid currentColor; }
+
+    .gx-donut-slice,
+    .gx-area-line { forced-color-adjust: none; }
+}

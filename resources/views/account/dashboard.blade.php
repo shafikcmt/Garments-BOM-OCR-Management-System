@@ -9,7 +9,7 @@
                    copy="Payment request position and your share of the BOM workspace.">
         <x-slot:actions>
             <a href="{{ route('account.workspace') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-grid-3x3-gap"></i>Open Workspace
+                <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>Open Workspace
             </a>
         </x-slot:actions>
     </x-page-header>

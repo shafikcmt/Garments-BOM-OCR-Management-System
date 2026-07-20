@@ -1,7 +1,7 @@
 <header class="header">
     <div class="d-flex align-items-center gap-3 min-w-0">
         <button class="app-icon-btn d-lg-none" id="sidebarToggle" type="button" aria-label="Open sidebar" title="Open menu">
-            <i class="bi bi-list fs-5"></i>
+            <i class="bi bi-list fs-5" aria-hidden="true"></i>
         </button>
 
         <div class="min-w-0">
@@ -31,8 +31,14 @@
         @endphp
 
         <div class="dropdown">
-            <button class="app-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications">
-                <i class="bi bi-bell fs-6"></i>
+            {{-- title alone is a weak accessible name — not announced reliably
+                 and invisible on touch — so the count goes in an explicit
+                 label, which also tells a screen-reader user how many are
+                 waiting without opening the menu. --}}
+            <button class="app-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                    title="Notifications"
+                    aria-label="Notifications{{ $unreadNotificationCount > 0 ? ', '.$unreadNotificationCount.' unread' : '' }}">
+                <i class="bi bi-bell fs-6" aria-hidden="true"></i>
                 @if($unreadNotificationCount > 0)
                     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger shadow-sm">
                         {{ $unreadNotificationCount > 99 ? '99+' : $unreadNotificationCount }}
@@ -79,7 +85,7 @@
                     </a>
                 @empty
                     <div class="p-4 text-center text-muted small">
-                        <i class="bi bi-bell-slash fs-3 d-block mb-2 text-slate-400"></i>
+                        <i class="bi bi-bell-slash fs-3 d-block mb-2 text-slate-400" aria-hidden="true"></i>
                         No notifications
                     </div>
                 @endforelse
@@ -128,13 +134,13 @@
                 </div>
 
                 <a href="{{ route('profile.edit') }}" class="dropdown-item">
-                    <i class="bi bi-person me-2 text-primary"></i> Profile settings
+                    <i class="bi bi-person me-2 text-primary" aria-hidden="true"></i> Profile settings
                 </a>
 
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button type="submit" class="dropdown-item text-danger w-100 text-start">
-                        <i class="bi bi-box-arrow-right me-2"></i> Logout
+                        <i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i> Logout
                     </button>
                 </form>
             </div>

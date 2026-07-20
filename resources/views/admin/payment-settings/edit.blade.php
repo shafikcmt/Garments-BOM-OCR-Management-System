@@ -13,7 +13,7 @@
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-file-earmark-check"></i></span>
+                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">Admin / Settings</div>
                     <h3 class="app-hero-title mb-0">PI / PRA Settings</h3>
@@ -135,7 +135,7 @@
         </div>
 
         <div class="mt-4">
-            <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1"></i>Save Settings</button>
+            <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1" aria-hidden="true"></i>Save Settings</button>
         </div>
     </form>
 </div>
