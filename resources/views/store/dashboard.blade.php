@@ -195,6 +195,24 @@
                 </div>
             </div>
         </div>
+
+        {{-- Reports — read-only summaries built from the existing movement data --}}
+        <div class="col-12">
+            <div class="card border-0 shadow-sm" style="border-radius:14px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="app-stat-icon"><i class="bi bi-file-earmark-bar-graph"></i></span>
+                        <h5 class="mb-0">Reports</h5>
+                    </div>
+                    <p class="text-muted small">Receive and issue summary from three angles, with period movement and current ledger balance side by side. Filter by buyer, style, material or date range, then export to PDF or Excel.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="{{ route('store.reports.index', ['type' => 'style']) }}" class="btn btn-primary btn-sm"><i class="bi bi-tags me-1"></i>Style-wise</a>
+                        <a href="{{ route('store.reports.index', ['type' => 'buyer']) }}" class="btn btn-outline-secondary btn-sm">Buyer-wise</a>
+                        <a href="{{ route('store.reports.index', ['type' => 'material']) }}" class="btn btn-outline-secondary btn-sm">Material-wise</a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 @endsection

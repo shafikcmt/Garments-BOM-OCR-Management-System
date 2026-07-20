@@ -11,6 +11,20 @@ use App\Http\Controllers\Store\MaterialReceivingController;
 use App\Http\Controllers\Store\MaterialBulkIssueController;
 use App\Http\Controllers\Store\MaterialRequisitionController;
 use App\Http\Controllers\Store\MaterialStockLedgerController;
+use App\Http\Controllers\Store\ReportController;
+
+// Store reports — read-only summaries. Kept in their own group because they are
+// shared with Admin / Management (full access) and Merchant (preview only, the
+// download routes re-check the role in ReportController). The main store group
+// below keeps its original store-only access.
+Route::prefix('store/reports')
+    ->middleware(['auth', 'role:store,admin,management,merchant'])
+    ->name('store.reports.')
+    ->group(function () {
+        Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('/pdf', [ReportController::class, 'pdf'])->name('pdf');
+        Route::get('/excel', [ReportController::class, 'excel'])->name('excel');
+    });
 
 Route::prefix('store')
     ->middleware(['auth', 'role:store'])

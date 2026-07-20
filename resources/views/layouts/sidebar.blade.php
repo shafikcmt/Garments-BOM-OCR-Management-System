@@ -121,6 +121,11 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse"></i></span><span class="sidebar-link-text">Workspace</span></span>
                         </a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph"></i></span><span class="sidebar-link-text">Store Reports</span></span>
+                        </a>
+                    </li>
                 </ul>
             </div>
             @endrole
@@ -173,6 +178,11 @@
                     <li class="sidebar-item">
                         <a href="{{ route('store.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('store.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph"></i></span><span class="sidebar-link-text">Reports</span></span>
                         </a>
                     </li>
                 </ul>
@@ -299,6 +309,14 @@
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-speedometer2"></i></span>
                                 <span class="sidebar-link-text">Dashboard</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph"></i></span>
+                                <span class="sidebar-link-text">Store Reports</span>
                             </span>
                         </a>
                     </li>
