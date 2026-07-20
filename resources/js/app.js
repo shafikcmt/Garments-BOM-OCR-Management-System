@@ -3,6 +3,7 @@ import './bootstrap';
 import { initCountUp } from './modules/count-up';
 import { initFileUpload } from './modules/file-upload';
 import { initFileTable } from './modules/file-table';
+import { initUserTable } from './modules/user-table';
 
 import Alpine from 'alpinejs';
 
@@ -20,3 +21,4 @@ document.addEventListener('DOMContentLoaded', initFileUpload);
 
 // Workspace file list: search, filter, sort, select, export.
 document.addEventListener('DOMContentLoaded', initFileTable);
+document.addEventListener('DOMContentLoaded', initUserTable);

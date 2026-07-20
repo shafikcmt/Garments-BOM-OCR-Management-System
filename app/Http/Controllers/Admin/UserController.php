@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Carbon\Carbon;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
@@ -14,8 +17,49 @@ class UserController extends Controller
 {
     public function index()
     {
-        $users = User::latest()->get();
-        return view('admin.users.index', compact('users'));
+        $users = User::with('roles')->latest()->get();
+
+        $stats = [
+            'total' => $users->count(),
+            'active' => $users->where('status', 1)->count(),
+            'inactive' => $users->where('status', '!=', 1)->count(),
+            'admins' => $users->filter(fn ($u) => $u->hasRole('admin'))->count(),
+            'never_signed_in' => $users->whereNull('last_login_at')->count(),
+        ];
+
+        $roleCounts = Role::withCount('users')->orderBy('name')->get();
+
+        // Permissions are seeded and gate real features through @can(), but no
+        // screen has ever shown them — an admin had to read the database to
+        // find out who can do what. Read-only for now: editing this changes
+        // access control for everyone.
+        $permissionMatrix = [
+            'roles' => Role::with('permissions')->orderBy('name')->get(),
+            'permissions' => Permission::orderBy('name')->get(),
+        ];
+
+        // Current sessions rather than a login history — there is no history
+        // table, but the database session driver records who is signed in,
+        // from where, and on what.
+        $sessions = collect();
+
+        if (config('session.driver') === 'database') {
+            $sessions = DB::table(config('session.table', 'sessions'))
+                ->whereNotNull('user_id')
+                ->orderByDesc('last_activity')
+                ->limit(25)
+                ->get()
+                ->map(fn ($s) => [
+                    'user' => $users->firstWhere('id', $s->user_id),
+                    'ip' => $s->ip_address,
+                    'agent' => $s->user_agent,
+                    'last_activity' => $s->last_activity ? Carbon::createFromTimestamp($s->last_activity) : null,
+                ])
+                ->filter(fn ($s) => $s['user'] !== null)
+                ->values();
+        }
+
+        return view('admin.users.index', compact('users', 'stats', 'roleCounts', 'permissionMatrix', 'sessions'));
     }
 
     public function create()
