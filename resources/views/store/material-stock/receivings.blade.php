@@ -44,26 +44,27 @@
                             <option value="pi_number">PI Number</option>
                         </select>
                     </div>
-                    <div class="col-12 col-lg-6">
+                    <div class="col-12 col-lg-9">
                         <label class="form-label fw-semibold" id="rcvSearchLabel">PO Number</label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-search"></i></span>
-                            <input type="text" class="form-control" id="rcvSearch" autocomplete="off"
-                                   placeholder="Type to search, or leave blank to list recent POs">
+                        {{-- Suggestions drop over the page rather than pushing it
+                             down, and a search may match more than one PO (one SAP
+                             code can appear under several), so the PO is always
+                             confirmed by picking from the list. --}}
+                        <div class="position-relative" id="rcvSearchWrap">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control" id="rcvSearch" autocomplete="off"
+                                       role="combobox" aria-expanded="false" aria-autocomplete="list"
+                                       aria-controls="rcvResultsList"
+                                       placeholder="Start typing a PO Number…">
+                            </div>
+                            <div id="rcvResults" class="d-none position-absolute w-100 mt-1 bg-body border rounded-3 shadow"
+                                 style="z-index:1056; max-height:320px; overflow-y:auto;">
+                                <div class="small text-muted px-3 py-2 border-bottom" id="rcvResultsHint"></div>
+                                <div class="list-group list-group-flush" id="rcvResultsList" role="listbox"></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-12 col-lg-3">
-                        <button type="button" class="btn btn-outline-secondary w-100" id="rcvFindBtn">
-                            <i class="bi bi-arrow-right-circle me-1"></i>Find PO
-                        </button>
-                    </div>
-                </div>
-
-                {{-- A search may match more than one PO (one SAP code can appear
-                     under several), so the PO is always confirmed explicitly. --}}
-                <div id="rcvResults" class="mb-3 d-none">
-                    <div class="small text-muted mb-2" id="rcvResultsHint"></div>
-                    <div class="list-group" id="rcvResultsList"></div>
                 </div>
 
                 <div id="rcvSelectedPo" class="d-none border rounded-3 bg-body-secondary p-3 mb-3">
@@ -334,7 +335,6 @@
         const filterType = document.getElementById('rcvFilterType');
         const searchEl = document.getElementById('rcvSearch');
         const searchLabel = document.getElementById('rcvSearchLabel');
-        const findBtn = document.getElementById('rcvFindBtn');
         const resultsWrap = document.getElementById('rcvResults');
         const resultsList = document.getElementById('rcvResultsList');
         const resultsHint = document.getElementById('rcvResultsHint');
@@ -386,23 +386,62 @@
         // --- PO search --------------------------------------------------------
         filterType.addEventListener('change', function () {
             searchLabel.textContent = LABELS[filterType.value];
-            searchEl.placeholder = filterType.value === 'po_no'
-                ? 'Type to search, or leave blank to list recent POs'
-                : 'Type the ' + LABELS[filterType.value];
+            searchEl.placeholder = 'Start typing a ' + LABELS[filterType.value] + '…';
             searchEl.value = '';
-            resultsWrap.classList.add('d-none');
+            closeSuggest();
         });
 
-        searchEl.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') { e.preventDefault(); runSearch(); }
+        // Typeahead. Nothing is fetched until the user actually types, and the
+        // request is debounced so a burst of keystrokes makes one call — same
+        // clearTimeout/setTimeout idiom used by the booking list filters.
+        const MIN_CHARS = 2;
+        const DEBOUNCE_MS = 300;
+        let searchTimer = null;
+        let searchTicket = 0;
+        let activeIndex = -1;
+
+        function closeSuggest() {
+            resultsWrap.classList.add('d-none');
+            searchEl.setAttribute('aria-expanded', 'false');
+            activeIndex = -1;
+        }
+
+        function openSuggest() {
+            resultsWrap.classList.remove('d-none');
+            searchEl.setAttribute('aria-expanded', 'true');
+        }
+
+        searchEl.addEventListener('input', function () {
+            clearTimeout(searchTimer);
+            const term = searchEl.value.trim();
+
+            // Clearing the box returns to the empty state; nothing is listed
+            // until there is something to search for.
+            if (term.length < MIN_CHARS) {
+                searchTicket++;   // discard any reply still in flight
+                closeSuggest();
+                return;
+            }
+
+            searchTimer = setTimeout(runSearch, DEBOUNCE_MS);
         });
-        findBtn.addEventListener('click', runSearch);
+
+        searchEl.addEventListener('focus', function () {
+            if (searchEl.value.trim().length >= MIN_CHARS && resultsList.children.length) openSuggest();
+        });
 
         function runSearch() {
             const type = filterType.value;
             const term = searchEl.value.trim();
 
-            resultsWrap.classList.remove('d-none');
+            if (term.length < MIN_CHARS) {
+                closeSuggest();
+                return;
+            }
+
+            const ticket = ++searchTicket;
+
+            openSuggest();
             resultsHint.textContent = 'Searching…';
             resultsList.innerHTML = '';
 
@@ -410,8 +449,13 @@
 
             fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
                 .then(r => r.ok ? r.json() : Promise.reject(r.status))
-                .then(data => renderResults(data.results || [], type, term))
+                .then(data => {
+                    // Ignore a slow reply that a newer keystroke has superseded.
+                    if (ticket !== searchTicket) return;
+                    renderResults(data.results || [], type, term);
+                })
                 .catch(() => {
+                    if (ticket !== searchTicket) return;
                     resultsHint.textContent = '';
                     resultsList.innerHTML =
                         '<div class="list-group-item text-muted">Could not run the search. Please try again.</div>';
@@ -419,6 +463,8 @@
         }
 
         function renderResults(results, type, term) {
+            activeIndex = -1;
+
             if (!results.length) {
                 resultsHint.textContent = '';
                 resultsList.innerHTML = '<div class="list-group-item text-muted">No PO found for this ' +
@@ -427,11 +473,11 @@
             }
 
             resultsHint.textContent = results.length === 1
-                ? '1 matching PO — selected automatically.'
-                : results.length + ' POs match. Choose the one you are receiving against.';
+                ? '1 matching PO'
+                : results.length + ' POs match — keep typing to narrow, or choose one.';
 
             resultsList.innerHTML = results.map(r =>
-                '<button type="button" class="list-group-item list-group-item-action rcv-result"' +
+                '<button type="button" class="list-group-item list-group-item-action rcv-result" role="option"' +
                     ' data-id="' + h(r.id) + '" data-po="' + h(r.po_no) + '"' +
                     ' data-meta="' + h([r.buyer_name, r.season_name, r.vendor_name].filter(Boolean).join(' · ')) + '">' +
                     '<span class="fw-semibold">' + dash(r.po_no) + '</span>' +
@@ -439,9 +485,41 @@
                         dash([r.buyer_name, r.season_name, r.vendor_name].filter(Boolean).join(' · ')) +
                     '</span>' +
                 '</button>').join('');
-
-            if (results.length === 1) selectPo(resultsList.querySelector('.rcv-result'));
         }
+
+        // --- Keyboard navigation ---------------------------------------------
+        const options = () => Array.from(resultsList.querySelectorAll('.rcv-result'));
+
+        function highlight(index) {
+            const list = options();
+            if (!list.length) return;
+
+            activeIndex = (index + list.length) % list.length;
+            list.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+            list[activeIndex].scrollIntoView({ block: 'nearest' });
+        }
+
+        searchEl.addEventListener('keydown', function (e) {
+            const open = !resultsWrap.classList.contains('d-none');
+
+            if (e.key === 'Escape') { closeSuggest(); return; }
+
+            if (e.key === 'ArrowDown' && open) { e.preventDefault(); highlight(activeIndex + 1); return; }
+            if (e.key === 'ArrowUp' && open) { e.preventDefault(); highlight(activeIndex - 1); return; }
+
+            if (e.key === 'Enter') {
+                // Never submit the form from the search box.
+                e.preventDefault();
+                const list = options();
+                if (!open || !list.length) return;
+                selectPo(activeIndex >= 0 ? list[activeIndex] : list[0]);
+            }
+        });
+
+        // Clicking anywhere else dismisses the suggestions.
+        document.addEventListener('click', function (e) {
+            if (!document.getElementById('rcvSearchWrap').contains(e.target)) closeSuggest();
+        });
 
         resultsList.addEventListener('click', function (e) {
             const btn = e.target.closest('.rcv-result');
@@ -460,13 +538,15 @@
             document.getElementById('rcvSelectedPoNo').textContent = btn.dataset.po || '—';
             document.getElementById('rcvSelectedPoMeta').textContent = btn.dataset.meta || '—';
             selectedWrap.classList.remove('d-none');
-            resultsWrap.classList.add('d-none');
+            searchEl.value = '';
+            closeSuggest();
             refreshState();
         }
 
         document.getElementById('rcvChangePo').addEventListener('click', function () {
-            resultsWrap.classList.remove('d-none');
-            runSearch();
+            searchEl.value = '';
+            closeSuggest();
+            searchEl.focus();
         });
 
         // --- Modal: styles then items ----------------------------------------
@@ -758,10 +838,6 @@
                 }
                 refreshState();
             });
-        } else {
-            // Nothing selected yet — list the recent POs so the field stays as
-            // browsable as the old dropdown was.
-            runSearch();
         }
     })();
 </script>
