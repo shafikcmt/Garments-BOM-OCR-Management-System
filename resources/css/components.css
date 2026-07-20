@@ -879,3 +879,22 @@ a { text-decoration: none; }
     .card:not(.booking-card) .card-body { padding: 1rem; }
 }
 
+
+/* --- Shared Blade components ---------------------------------------------
+ * Backs resources/views/components/card.blade.php and page-header.blade.php.
+ * These absorb values that used to be written as inline styles in every view,
+ * so the radius now follows the --gx-radius token in one place.
+ */
+
+.gx-card {
+    border-radius: var(--gx-radius);
+}
+
+/* Was `style="width:46px;height:46px;border-radius:15px;font-size:20px;"`,
+   repeated on 31 hero icons. */
+.gx-hero-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 15px;
+    font-size: 20px;
+}
