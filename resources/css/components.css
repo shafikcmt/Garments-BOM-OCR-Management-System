@@ -533,7 +533,7 @@ a { text-decoration: none; }
 
 @media (max-width: 991.98px) {
     :root { --app-sidebar: 272px; --app-header: 70px; }
-    .sidebar { transform: translateX(-105%); transition: transform .26s ease; }
+    .sidebar { transform: translateX(-105%); transition: transform .3s ease; }
     .sidebar.show { transform: translateX(0); }
     .header { left: 0; width: 100%; padding: 0 16px; }
     .content { margin-left: 0; padding: 16px; }
@@ -897,4 +897,110 @@ a { text-decoration: none; }
     height: 46px;
     border-radius: 15px;
     font-size: 20px;
+}
+
+/* --- Accessibility -------------------------------------------------------
+ * The UI was operable by mouse only in a few places. These make the same
+ * actions reachable by keyboard without changing how anything looks to a
+ * mouse user.
+ */
+
+/* Skip straight to the page content, past the sidebar's ~30 nav links.
+   Visible only while focused. */
+.skip-link {
+    position: absolute;
+    left: 12px;
+    top: -60px;
+    z-index: 2000;
+    padding: 10px 16px;
+    border-radius: var(--gx-radius-sm);
+    background: var(--gx-primary);
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+    transition: top .2s ease;
+}
+
+.skip-link:focus {
+    top: 12px;
+    color: #fff;
+}
+
+/* A visible focus ring. :focus-visible keeps it off for mouse clicks, so
+   this costs the pointer experience nothing. */
+a:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+.form-control:focus-visible,
+.form-select:focus-visible,
+.dropdown-item:focus-visible,
+.sidebar-nav-link:focus-visible,
+.app-icon-btn:focus-visible {
+    outline: 2px solid var(--gx-secondary);
+    outline-offset: 2px;
+    border-radius: var(--gx-radius-sm);
+}
+
+/* The profile menu used to open on :hover alone, which left it unreachable
+   by keyboard — and Logout lives inside it. :focus-within opens it when the
+   avatar button or anything inside receives focus. */
+.profile-wrapper:focus-within .profile-card {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* Respect a reduced-motion preference for the sidebar and header. */
+@media (prefers-reduced-motion: reduce) {
+    .sidebar,
+    .profile-card,
+    .skip-link {
+        transition: none !important;
+    }
+}
+
+/* --- Breadcrumb ---------------------------------------------------------- */
+.gx-breadcrumb {
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+.gx-breadcrumb ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.gx-breadcrumb a {
+    color: var(--gx-text-muted);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.gx-breadcrumb a:hover { color: var(--gx-secondary); }
+
+.gx-breadcrumb li[aria-current="page"] {
+    color: var(--gx-text);
+    font-weight: 600;
+}
+
+.gx-breadcrumb .gx-breadcrumb-sep {
+    color: #cbd5e1;
+    user-select: none;
+}
+
+/* --- Footer -------------------------------------------------------------- */
+.gx-footer {
+    padding: 18px 16px 24px;
+    color: var(--gx-text-muted);
+    font-size: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
 }

@@ -39,3 +39,30 @@ it('renders without error', function (string $routeName) {
         ->get(route($routeName))
         ->assertOk();
 })->with('store pages');
+
+/**
+ * Layout chrome. The skip link and the account menu's role badge exist for
+ * keyboard and screen-reader users, who will not be the ones to notice if a
+ * refactor drops them — so they are asserted rather than eyeballed.
+ */
+it('renders the shared layout chrome', function () {
+    $response = $this->actingAs(storePageUser())
+        ->get(route('store.material.ledger'))
+        ->assertOk();
+
+    // Keyboard users must be able to jump past the sidebar's nav links.
+    $response->assertSee('Skip to main content')
+        ->assertSee('id="main-content"', false);
+
+    $response->assertSee('All rights reserved', false)
+        ->assertSee('v'.config('app.version'), false);
+});
+
+it('shows a breadcrumb trail with the current page marked', function () {
+    $this->actingAs(storePageUser())
+        ->get(route('store.material.ledger'))
+        ->assertOk()
+        ->assertSee('gx-breadcrumb', false)
+        ->assertSee('aria-current="page"', false)
+        ->assertSee('Closing Stock');
+});

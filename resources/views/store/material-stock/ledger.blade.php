@@ -8,6 +8,12 @@
 
 @section('content')
 <div class="container-fluid">
+    <x-breadcrumb :items="[
+        ['label' => 'Store', 'url' => route('store.dashboard')],
+        ['label' => 'Buyer / Style Stock'],
+        ['label' => 'Closing Stock'],
+    ]" />
+
     <x-page-header icon="clipboard-data" eyebrow="Buyer / Style Stock" title="Closing Stock Report"
                    copy="Running / Liability / Dead — Liability & Dead can be reused (transfer to bulk).">
         <x-slot:actions>

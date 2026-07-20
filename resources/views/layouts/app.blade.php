@@ -19,12 +19,16 @@
     @yield('styles')
 </head>
 <body>
+    {{-- First thing a keyboard user reaches, so they can jump past the
+         sidebar's nav links instead of tabbing through all of them. --}}
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
     <div class="app-sidebar-backdrop" id="sidebarBackdrop"></div>
 
     @include('layouts.sidebar')
     @include('layouts.navbar')
 
-    <main class="content">
+    <main class="content" id="main-content" tabindex="-1">
         <div class="app-flash-wrapper">
             @if(session('success'))
                 <div class="app-flash-alert app-flash-success" role="alert">
@@ -70,6 +74,8 @@
         </div>
 
         @yield('content')
+
+        @include('layouts.footer')
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

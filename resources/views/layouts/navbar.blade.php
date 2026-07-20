@@ -86,9 +86,20 @@
             </div>
         </div>
 
-        @php $navAvatarUrl = auth()->user()->avatarUrl(); @endphp
+        @php
+            $navAvatarUrl = auth()->user()->avatarUrl();
+            // Role drives what this user can see, so it is worth surfacing —
+            // it also makes "why can't I see X?" support questions quicker.
+            $navRole = auth()->user()->getRoleNames()->map(
+                fn ($role) => \Illuminate\Support\Str::headline($role)
+            )->implode(', ');
+        @endphp
         <div class="profile-wrapper">
-            <button type="button" class="d-flex align-items-center gap-2 border-0 bg-transparent p-0">
+            {{-- Opens on hover for pointer users and on focus for keyboard
+                 users (see .profile-wrapper:focus-within) — Logout lives in
+                 here, so it must be reachable without a mouse. --}}
+            <button type="button" class="d-flex align-items-center gap-2 border-0 bg-transparent p-0"
+                    aria-haspopup="menu" aria-label="Account menu for {{ auth()->user()->name }}">
                 @if($navAvatarUrl)
                     <img src="{{ $navAvatarUrl }}" class="profile-img" alt="{{ auth()->user()->name }}">
                 @else
@@ -110,6 +121,9 @@
                     <div class="min-w-0">
                         <strong class="d-block text-truncate">{{ auth()->user()->name }}</strong>
                         <p class="mb-0 text-muted small text-truncate">{{ auth()->user()->email }}</p>
+                        @if($navRole !== '')
+                            <span class="badge bg-primary-subtle text-primary mt-1">{{ $navRole }}</span>
+                        @endif
                     </div>
                 </div>
 
