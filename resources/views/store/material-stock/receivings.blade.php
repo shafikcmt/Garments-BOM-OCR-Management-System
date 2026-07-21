@@ -2,6 +2,63 @@
 
 @section('title', 'Material Stock — Receiving')
 
+{{-- Scoped to this page only. Everything below leans on the existing --gx-*
+     tokens (slate/blue/emerald) rather than introducing a second palette, so
+     Receiving stays consistent with the rest of Store. --}}
+@section('styles')
+<style>
+    /* Spinner and clear button ride inside the search field, so neither one
+       changes the input-group's width when it appears. */
+    .rcv-search .rcv-search-status {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 5;
+        display: flex;
+        align-items: center;
+    }
+    .rcv-search .form-control { padding-right: 2.25rem; }
+    .rcv-search .btn-close { font-size: .7rem; opacity: .5; transition: opacity 150ms ease; }
+    .rcv-search .btn-close:hover { opacity: 1; }
+
+    .rcv-empty {
+        border: 1px dashed var(--bs-border-color, #E2E8F0);
+        border-radius: var(--gx-radius);
+        background: var(--gx-bg, #F8FAFC);
+        color: var(--gx-primary, #0F172A);
+    }
+    .rcv-empty .bi { color: #CBD5E1; }
+
+    .rcv-history thead th {
+        background: var(--gx-bg, #F8FAFC);
+        font-size: .75rem;
+        font-weight: 600;
+        letter-spacing: .02em;
+        color: var(--gx-text-muted, #64748B);
+        border-bottom: 1px solid var(--bs-border-color, #E2E8F0);
+    }
+    .rcv-history tbody tr { transition: background-color 150ms ease; }
+    .rcv-history tbody tr:hover { background: var(--gx-bg, #F8FAFC); }
+
+    /* Ghost delete: quiet until hovered, so a table of many rows is not a wall
+       of red outlines. */
+    .rcv-ghost-danger {
+        border: 0;
+        color: var(--gx-text-muted, #64748B);
+        background: transparent;
+        border-radius: var(--gx-radius-sm, 10px);
+        transition: background-color 150ms ease, color 150ms ease;
+    }
+    .rcv-ghost-danger:hover,
+    .rcv-ghost-danger:focus-visible {
+        background: var(--gx-danger-bg, #FEE2E2);
+        color: var(--gx-danger-700, #B91C1C);
+    }
+    .rcv-ghost-danger:active { transform: scale(.95); }
+</style>
+@endsection
+
 @section('content')
 <div class="container-fluid">
     <x-breadcrumb :items="[
@@ -39,15 +96,17 @@
                 <input type="hidden" name="booking_po_id" id="rcvPoId" value="{{ old('booking_po_id') }}">
 
                 {{-- Step 1 — find the PO. Store may know the delivery by its PO
-                     number, the vendor's PI number, or the material's SAP code;
-                     all three resolve to the same booking record. --}}
+                     number, the vendor's PI number, the material's SAP code, or
+                     the invoice it arrived against; all four resolve to the same
+                     booking record. --}}
                 <div class="row g-3 align-items-end mb-3">
                     <div class="col-12 col-lg-3">
-                        <label class="form-label fw-semibold">Search by</label>
+                        <label class="form-label fw-semibold" for="rcvFilterType">Search by</label>
                         <select class="form-select" id="rcvFilterType">
                             <option value="po_no" selected>PO Number</option>
                             <option value="sap_code">SAP Code</option>
                             <option value="pi_number">PI Number</option>
+                            <option value="invoice_no">Invoice No</option>
                         </select>
                     </div>
                     <div class="col-12 col-lg-9">
@@ -56,13 +115,19 @@
                              down, and a search may match more than one PO (one SAP
                              code can appear under several), so the PO is always
                              confirmed by picking from the list. --}}
-                        <div class="position-relative" id="rcvSearchWrap">
+                        <div class="position-relative rcv-search" id="rcvSearchWrap">
                             <div class="input-group">
                                 <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
                                 <input type="text" class="form-control" id="rcvSearch" autocomplete="off"
                                        role="combobox" aria-expanded="false" aria-autocomplete="list"
                                        aria-controls="rcvResultsList"
                                        placeholder="Start typing a PO Number…">
+                                {{-- Spinner and clear share the same slot inside the
+                                     field; only one is ever shown at a time. --}}
+                                <span class="rcv-search-status">
+                                    <span class="spinner-border spinner-border-sm text-primary d-none" id="rcvSearchSpinner" role="status" aria-hidden="true"></span>
+                                    <button type="button" class="btn-close d-none" id="rcvSearchClear" aria-label="Clear search"></button>
+                                </span>
                             </div>
                             <div id="rcvResults" class="d-none position-absolute w-100 mt-1 bg-body border rounded-3 shadow"
                                  style="z-index:1056; max-height:320px; overflow-y:auto;">
@@ -99,9 +164,10 @@
                     </div>
                 @endif
 
-                <div id="rcvEmpty" class="border rounded-3 bg-body-secondary text-center text-muted py-5">
-                    <i class="bi bi-inbox d-block mb-2" style="font-size:24px;"></i>
-                    Find a PO, then choose the styles and items received in this delivery.
+                <div id="rcvEmpty" class="rcv-empty text-center py-5">
+                    <i class="bi bi-box-seam" style="font-size:48px;" aria-hidden="true"></i>
+                    <div class="fw-semibold mt-3">Search to Begin</div>
+                    <div class="small text-muted">Select a filter type and start typing to find purchase orders.</div>
                 </div>
 
                 {{-- Shared header. These describe the delivery as a whole, or are
@@ -207,7 +273,7 @@
         <div class="card-body p-4">
             <h5 class="mb-3">Receiving History <span class="badge bg-primary-subtle text-primary ms-1">{{ $receivings->total() }}</span></h5>
             <div class="table-responsive">
-                <table class="table align-middle mb-0">
+                <table class="table align-middle mb-0 rcv-history">
                     <thead>
                         <tr class="text-muted small text-uppercase">
                             <th>Date</th><th>GRN No</th><th>PO / Material</th><th>Source</th><th class="text-end">Inv Qty</th><th class="text-end">Rcv Qty</th><th class="text-end">Price</th><th class="text-end">Action</th>
@@ -225,7 +291,16 @@
                                     <div class="fw-semibold">{{ $r->po_no }} · {{ $r->material_description }}</div>
                                     <div class="small text-muted">{{ collect([$r->buyer_name.' / '.$r->style_name, $r->material_color, $r->size])->filter()->implode(' · ') }}</div>
                                 </td>
-                                <td><span class="badge bg-info-subtle text-info">{{ $r->source_type=='internal_po' ? 'Internal PO' : 'Booking' }}</span></td>
+                                {{-- Booking vs Internal PO read as two different
+                                     routes into stock, so they get two tones
+                                     rather than one shared badge colour. --}}
+                                <td>
+                                    @if($r->source_type == 'internal_po')
+                                        <span class="badge bg-success-subtle text-success-emphasis">Internal PO</span>
+                                    @else
+                                        <span class="badge bg-primary-subtle text-primary-emphasis">Booking</span>
+                                    @endif
+                                </td>
                                 <td class="text-end small">{{ $r->invoice_qty !== null ? rtrim(rtrim(number_format((float)$r->invoice_qty, 4), '0'), '.') : '—' }}</td>
                                 <td class="text-end fw-bold">{{ rtrim(rtrim(number_format((float)$r->qty, 4), '0'), '.') }}</td>
                                 <td class="text-end small">
@@ -235,7 +310,7 @@
                                 <td class="text-end">
                                     <form method="POST" action="{{ route('store.material.receivings.destroy', $r) }}" onsubmit="return confirm('Remove this receiving? Closing stock will update.');">
                                         @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger rounded-pill px-3" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                        <button class="btn btn-sm rcv-ghost-danger" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                     </form>
                                 </td>
                             </tr>
@@ -344,6 +419,8 @@
         const resultsWrap = document.getElementById('rcvResults');
         const resultsList = document.getElementById('rcvResultsList');
         const resultsHint = document.getElementById('rcvResultsHint');
+        const searchSpinner = document.getElementById('rcvSearchSpinner');
+        const searchClear = document.getElementById('rcvSearchClear');
         const selectedWrap = document.getElementById('rcvSelectedPo');
         const sharedWrap = document.getElementById('rcvShared');
         const emptyBox = document.getElementById('rcvEmpty');
@@ -371,7 +448,7 @@
         const ITEMS_URL = @json(route('store.material.receivings.po-items', ['bookingPo' => '__ID__']));
         const TODAY = @json(now()->toDateString());
 
-        const LABELS = { po_no: 'PO Number', sap_code: 'SAP Code', pi_number: 'PI Number' };
+        const LABELS = { po_no: 'PO Number', sap_code: 'SAP Code', pi_number: 'PI Number', invoice_no: 'Invoice No' };
 
         // esc() normalises a value for logic; h() escapes it for HTML/attribute
         // interpolation. BOM values come from uploaded workbooks, so anything
@@ -390,11 +467,17 @@
             .map(el => String(el.dataset.rowId));
 
         // --- PO search --------------------------------------------------------
+        // "an Invoice No" vs "a PO Number" — the article follows the label so the
+        // placeholder reads correctly for every filter type.
+        const article = (label) => (/^[AEIOU]/i.test(label) ? 'an ' : 'a ');
+
         filterType.addEventListener('change', function () {
-            searchLabel.textContent = LABELS[filterType.value];
-            searchEl.placeholder = 'Start typing a ' + LABELS[filterType.value] + '…';
+            const label = LABELS[filterType.value];
+            searchLabel.textContent = label;
+            searchEl.placeholder = 'Start typing ' + article(label) + label + '…';
             searchEl.value = '';
             closeSuggest();
+            syncSearchStatus();
         });
 
         // Typeahead. Nothing is fetched until the user actually types, and the
@@ -417,6 +500,16 @@
             searchEl.setAttribute('aria-expanded', 'true');
         }
 
+        // The spinner replaces the clear button while a lookup is in flight, so
+        // the two never occupy the slot at the same time.
+        let searching = false;
+
+        function syncSearchStatus() {
+            const hasText = searchEl.value !== '';
+            searchSpinner.classList.toggle('d-none', !searching);
+            searchClear.classList.toggle('d-none', searching || !hasText);
+        }
+
         searchEl.addEventListener('input', function () {
             clearTimeout(searchTimer);
             const term = searchEl.value.trim();
@@ -425,11 +518,24 @@
             // until there is something to search for.
             if (term.length < MIN_CHARS) {
                 searchTicket++;   // discard any reply still in flight
+                searching = false;
+                syncSearchStatus();
                 closeSuggest();
                 return;
             }
 
+            syncSearchStatus();
             searchTimer = setTimeout(runSearch, DEBOUNCE_MS);
+        });
+
+        searchClear.addEventListener('click', function () {
+            clearTimeout(searchTimer);
+            searchTicket++;
+            searching = false;
+            searchEl.value = '';
+            syncSearchStatus();
+            closeSuggest();
+            searchEl.focus();
         });
 
         searchEl.addEventListener('focus', function () {
@@ -447,6 +553,8 @@
 
             const ticket = ++searchTicket;
 
+            searching = true;
+            syncSearchStatus();
             openSuggest();
             resultsHint.textContent = 'Searching…';
             resultsList.innerHTML = '';
@@ -458,10 +566,14 @@
                 .then(data => {
                     // Ignore a slow reply that a newer keystroke has superseded.
                     if (ticket !== searchTicket) return;
+                    searching = false;
+                    syncSearchStatus();
                     renderResults(data.results || [], type, term);
                 })
                 .catch(() => {
                     if (ticket !== searchTicket) return;
+                    searching = false;
+                    syncSearchStatus();
                     resultsHint.textContent = '';
                     resultsList.innerHTML =
                         '<div class="list-group-item text-muted">Could not run the search. Please try again.</div>';
@@ -473,8 +585,13 @@
 
             if (!results.length) {
                 resultsHint.textContent = '';
-                resultsList.innerHTML = '<div class="list-group-item text-muted">No PO found for this ' +
-                    h(LABELS[type]) + (term ? ' (“' + h(term) + '”)' : '') + '.</div>';
+                // Headline first, then which filter and term were actually used —
+                // Store usually just mistyped one of the two.
+                resultsList.innerHTML = '<div class="list-group-item">' +
+                    '<div class="fw-semibold">No matching records found</div>' +
+                    '<div class="small text-muted">Nothing matched this ' + h(LABELS[type]) +
+                    (term ? ' (“' + h(term) + '”)' : '') + '.</div>' +
+                '</div>';
                 return;
             }
 
@@ -545,12 +662,14 @@
             document.getElementById('rcvSelectedPoMeta').textContent = btn.dataset.meta || '—';
             selectedWrap.classList.remove('d-none');
             searchEl.value = '';
+            syncSearchStatus();
             closeSuggest();
             refreshState();
         }
 
         document.getElementById('rcvChangePo').addEventListener('click', function () {
             searchEl.value = '';
+            syncSearchStatus();
             closeSuggest();
             searchEl.focus();
         });

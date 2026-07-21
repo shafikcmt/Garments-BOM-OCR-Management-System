@@ -893,6 +893,10 @@ class BookingPoSourceService
             'qty' => ['materials_to_be_ordered', 'material_to_be_ordered', 'materials_ordered', 'material_ordered', 'materials_to_be_order', 'booking_qty', 'booking_quantity', 'qty'],
             'materials_ordered' => ['materials_ordered', 'material_ordered', 'materials_to_be_ordered', 'material_to_be_ordered', 'materials_order_qty', 'material_order_qty', 'Materials Ordered'],
             'pi_number' => ['material_pi_number', 'pi_number', 'vendor_pi_number', 'Material PI Number', 'PI Number', 'Vendor PI Number'],
+            // Both departments' invoice columns are searched: Store knows a
+            // delivery by whichever invoice number reached it, and SCM and
+            // Commercial each record their own on the same BOM line.
+            'invoice_no' => ['invoice_number_scm', 'invoice_number_commercial', 'invoice_number', 'invoice_no', 'Invoice Number(SCM)', 'Invoice Number(Commercial)', 'Invoice Number', 'Invoice No'],
             'pi_status' => ['pi_status', 'PI Status'],
             'pi_rate' => ['pi_rate', 'invoiced_rate_scm', 'invoiced_rate', 'PI Rate', 'Invoiced Rate(SCM)', 'Invoiced Rate'],
             'pi_amount' => ['pi_amount', 'PI Amount'],

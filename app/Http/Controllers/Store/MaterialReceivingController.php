@@ -104,16 +104,16 @@ class MaterialReceivingController extends Controller
     }
 
     /**
-     * Booking POs matching a search on PO No, SAP Code or PI No.
+     * Booking POs matching a search on PO No, SAP Code, PI No or Invoice No.
      *
-     * All three handles resolve to the same booking record. A value can reach
+     * All four handles resolve to the same booking record. A value can reach
      * more than one PO (a SAP code may appear under several), so the caller gets
      * the full list and picks — a receiving still belongs to exactly one PO.
      */
     public function poSearch(Request $request)
     {
         $validated = $request->validate([
-            'type' => ['required', 'in:po_no,sap_code,pi_number'],
+            'type' => ['required', 'in:po_no,sap_code,pi_number,invoice_no'],
             'term' => ['nullable', 'string', 'max:100'],
         ]);
 
