@@ -7,6 +7,22 @@
      Receiving stays consistent with the rest of Store. --}}
 @section('styles')
 <style>
+    /* Page-scoped aliases onto the existing --gx-* palette. Declared here so the
+       rules below read as one system without redefining the global theme. */
+    #rcvReceiving, #rcvItemsModal {
+        --rcv-primary: var(--gx-secondary-600, #2563EB);
+        --rcv-border: var(--bs-border-color, #E2E8F0);
+        --rcv-text: var(--gx-primary, #0F172A);
+        --rcv-text-2: var(--gx-text-muted, #64748B);
+        --rcv-text-3: #94A3B8;
+        --rcv-surface: #F1F5F9;
+        --rcv-radius-sm: 6px;
+        --rcv-radius-md: 8px;
+        --rcv-radius-lg: 12px;
+        --rcv-shadow-dropdown: 0 4px 6px -1px rgba(0,0,0,.05), 0 2px 4px -2px rgba(0,0,0,.03);
+        --rcv-transition: 150ms cubic-bezier(.4, 0, .2, 1);
+    }
+
     /* Spinner and clear button ride inside the search field, so neither one
        changes the input-group's width when it appears. */
     .rcv-search .rcv-search-status {
@@ -22,13 +38,253 @@
     .rcv-search .btn-close { font-size: .7rem; opacity: .5; transition: opacity 150ms ease; }
     .rcv-search .btn-close:hover { opacity: 1; }
 
-    .rcv-empty {
-        border: 1px dashed var(--bs-border-color, #E2E8F0);
-        border-radius: var(--gx-radius);
-        background: var(--gx-bg, #F8FAFC);
-        color: var(--gx-primary, #0F172A);
+    /* Compact inline hint — one line, no card, no reserved height. It fades
+       rather than unmounting, so the row below never jumps as the menu opens. */
+    .rcv-hint {
+        font-size: .875rem;
+        color: var(--rcv-text-3);
+        padding: .25rem .125rem;
+        opacity: 1;
+        transition: opacity var(--rcv-transition);
     }
-    .rcv-empty .bi { color: #CBD5E1; }
+    .rcv-hint .bi { font-size: 14px; }
+    .rcv-hint.is-faded { opacity: 0; }
+
+    .rcv-menu {
+        z-index: 1056;
+        overflow: hidden;
+        border-radius: var(--rcv-radius-lg) !important;
+        box-shadow: var(--rcv-shadow-dropdown) !important;
+    }
+    .rcv-menu-scroll {
+        max-height: 280px;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+    }
+    .rcv-menu-label {
+        font-size: .6875rem;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #94A3B8;
+        padding: .5rem .75rem;
+        border-bottom: 1px solid var(--bs-border-color, #E2E8F0);
+    }
+
+    /* Two-line option. The left border is always present but transparent, so
+       highlighting one does not shift the text by 2px. */
+    .rcv-option {
+        border: 0;
+        border-left: 2px solid transparent;
+        padding: .5rem .75rem;
+        cursor: pointer;
+        transition: background-color 150ms ease, border-color 150ms ease;
+    }
+    .rcv-option:hover { background: var(--gx-bg, #F8FAFC); }
+    .rcv-option.active {
+        background: var(--gx-secondary-bg, #DBEAFE);
+        border-left-color: var(--gx-secondary, #3B82F6);
+    }
+    .rcv-option-primary {
+        font-weight: 500;
+        color: var(--gx-primary, #0F172A);
+        line-height: 1.35;
+    }
+    .rcv-option-meta {
+        font-size: .75rem;
+        color: var(--gx-text-muted, #64748B);
+        line-height: 1.35;
+    }
+
+    /* Selected value as a removable chip, so the search row stays a search row
+       instead of turning into a second panel. */
+    .rcv-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        background: var(--gx-secondary-bg, #DBEAFE);
+        color: var(--gx-secondary-700, #1D4ED8);
+        border-radius: var(--rcv-radius-md);
+        padding: .3rem .4rem .3rem .7rem;
+        font-weight: 500;
+        font-size: .875rem;
+        max-width: 100%;
+    }
+    .rcv-chip-x {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        line-height: 1;
+        padding: .15rem .3rem;
+        border-radius: var(--rcv-radius-sm);
+        opacity: .65;
+        transition: opacity var(--rcv-transition), background-color var(--rcv-transition);
+    }
+    .rcv-chip-x:hover, .rcv-chip-x:focus-visible { opacity: 1; background: rgba(255,255,255,.6); }
+
+    /* Summary bar: one row of figures describing the whole PO. */
+    .rcv-summary {
+        background: var(--rcv-surface);
+        border: 1px solid var(--rcv-border);
+        border-radius: var(--rcv-radius-lg);
+    }
+    .rcv-summary-cell { min-width: 0; }
+    .rcv-summary-label {
+        font-size: .6875rem;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--rcv-text-3);
+        margin-bottom: .15rem;
+    }
+    .rcv-summary-value {
+        font-weight: 600;
+        color: var(--rcv-text);
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+
+    /* Already-received figures are reference data, not inputs — kept visually
+       quieter than the qty fields Store actually types into. */
+    .rcv-prior { color: var(--rcv-text-2); font-variant-numeric: tabular-nums; }
+    .rcv-prior-none { color: var(--rcv-text-3); }
+
+    /* --- Item picker modal ------------------------------------------------ */
+
+    /* Stepper: numbered dots joined by a rule, current one filled. */
+    .rcv-steps {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .rcv-step {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        color: var(--rcv-text-3);
+        font-size: .875rem;
+        transition: color var(--rcv-transition);
+    }
+    /* The connector belongs to the step that follows it. */
+    .rcv-step + .rcv-step::before {
+        content: '';
+        width: 2.5rem;
+        height: 1px;
+        background: var(--rcv-border);
+        margin-right: .25rem;
+    }
+    .rcv-step-dot {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .8125rem;
+        font-weight: 600;
+        background: var(--rcv-surface);
+        color: var(--rcv-text-3);
+        border: 1px solid var(--rcv-border);
+        transition: background-color var(--rcv-transition), color var(--rcv-transition), border-color var(--rcv-transition);
+    }
+    .rcv-step.is-current { color: var(--rcv-text); font-weight: 600; }
+    .rcv-step.is-current .rcv-step-dot {
+        background: var(--rcv-primary);
+        border-color: var(--rcv-primary);
+        color: #fff;
+    }
+    /* A finished step keeps its colour but gives the fill back to the current one. */
+    .rcv-step.is-done { color: var(--rcv-text-2); }
+    .rcv-step.is-done .rcv-step-dot {
+        background: var(--gx-secondary-bg, #DBEAFE);
+        border-color: var(--gx-secondary-border, #BFDBFE);
+        color: var(--gx-secondary-700, #1D4ED8);
+    }
+
+    .rcv-pick {
+        max-height: 52vh;
+        border: 1px solid var(--rcv-border);
+        border-radius: var(--rcv-radius-lg);
+    }
+    .rcv-pick thead th {
+        background: var(--rcv-surface);
+        font-size: .6875rem;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        font-weight: 600;
+        color: var(--rcv-text-2);
+        border-bottom: 1px solid var(--rcv-border);
+        white-space: nowrap;
+    }
+
+    /* Whole row is the hit target, so the checkbox stops being the only way in. */
+    .rcv-pick tbody tr.rcv-row {
+        cursor: pointer;
+        transition: background-color var(--rcv-transition);
+    }
+    .rcv-pick tbody tr.rcv-row:hover { background: var(--rcv-surface); }
+    .rcv-pick tbody tr.rcv-row.is-checked { background: var(--gx-secondary-bg, #DBEAFE); }
+    /* Already added: visible for reference, but not selectable again. */
+    .rcv-pick tbody tr.is-added {
+        cursor: default;
+        background: transparent;
+        color: var(--rcv-text-3);
+    }
+    .rcv-pick tbody tr.is-added:hover { background: transparent; }
+
+    /* Deliberately not sticky — the thead already occupies top:0, and a second
+       sticky layer underneath it overlaps rather than stacking. */
+    .rcv-group-row td {
+        background: var(--rcv-surface);
+        font-weight: 600;
+        font-size: .8125rem;
+        color: var(--rcv-text-2);
+        border-top: 1px solid var(--rcv-border);
+    }
+
+    .rcv-cell-primary { color: var(--rcv-text); line-height: 1.35; }
+    .rcv-cell-sub { font-size: .75rem; color: var(--rcv-text-2); line-height: 1.35; }
+    .rcv-pick tbody tr.is-added .rcv-cell-primary { color: var(--rcv-text-3); }
+
+    /* Status column reads as a state, not a fraction. */
+    .rcv-state { display: inline-flex; align-items: center; gap: .4rem; font-size: .75rem; }
+    .rcv-state-bar {
+        width: 46px;
+        height: 4px;
+        border-radius: 999px;
+        background: var(--rcv-border);
+        overflow: hidden;
+        flex: none;
+    }
+    .rcv-state-fill { display: block; height: 100%; background: var(--gx-accent, #10B981); }
+
+    .rcv-modal-footer {
+        background: var(--rcv-surface);
+        border-top: 1px solid var(--rcv-border);
+        gap: .5rem;
+    }
+    .rcv-selcount {
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        font-size: .8125rem;
+        color: var(--rcv-text-2);
+    }
+    .rcv-selcount-badge {
+        min-width: 1.5rem;
+        padding: .1rem .4rem;
+        border-radius: var(--rcv-radius-sm);
+        background: var(--rcv-border);
+        color: var(--rcv-text);
+        font-weight: 600;
+        text-align: center;
+        transition: background-color var(--rcv-transition), color var(--rcv-transition);
+    }
+    .rcv-selcount.is-active .rcv-selcount-badge {
+        background: var(--rcv-primary);
+        color: #fff;
+    }
 
     .rcv-history thead th {
         background: var(--gx-bg, #F8FAFC);
@@ -60,7 +316,7 @@
 @endsection
 
 @section('content')
-<div class="container-fluid">
+<div class="container-fluid" id="rcvReceiving">
     <x-breadcrumb :items="[
         ['label' => 'Store', 'url' => route('store.dashboard')],
         ['label' => 'Buyer / Style Stock'],
@@ -121,7 +377,7 @@
                                 <input type="text" class="form-control" id="rcvSearch" autocomplete="off"
                                        role="combobox" aria-expanded="false" aria-autocomplete="list"
                                        aria-controls="rcvResultsList"
-                                       placeholder="Start typing a PO Number…">
+                                       placeholder="Click or type to see available PO Numbers…">
                                 {{-- Spinner and clear share the same slot inside the
                                      field; only one is ever shown at a time. --}}
                                 <span class="rcv-search-status">
@@ -129,28 +385,59 @@
                                     <button type="button" class="btn-close d-none" id="rcvSearchClear" aria-label="Clear search"></button>
                                 </span>
                             </div>
-                            <div id="rcvResults" class="d-none position-absolute w-100 mt-1 bg-body border rounded-3 shadow"
-                                 style="z-index:1056; max-height:320px; overflow-y:auto;">
-                                <div class="small text-muted px-3 py-2 border-bottom" id="rcvResultsHint"></div>
-                                <div class="list-group list-group-flush" id="rcvResultsList" role="listbox"></div>
+                            <div id="rcvResults" class="rcv-menu d-none position-absolute w-100 mt-1 bg-body border rounded-3 shadow">
+                                <div class="rcv-menu-label" id="rcvResultsHint"></div>
+                                {{-- Only the options scroll; the label above stays put. --}}
+                                <div class="list-group list-group-flush rcv-menu-scroll" id="rcvResultsList" role="listbox"></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div id="rcvSelectedPo" class="d-none border rounded-3 bg-body-secondary p-3 mb-3">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-                        <div>
-                            <div class="small text-uppercase text-muted fw-semibold">Selected PO</div>
-                            <div class="fw-semibold" id="rcvSelectedPoNo">—</div>
-                            <div class="small text-muted" id="rcvSelectedPoMeta">—</div>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-outline-secondary" id="rcvChangePo">Change PO</button>
+                {{-- Once a PO is chosen the search row keeps its place and the
+                     selection sits beside it as a chip; removing the chip goes
+                     straight back to browsing. --}}
+                <div id="rcvSelectedPo" class="d-none mb-3">
+                    <div class="rcv-summary p-3">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                            <span class="rcv-chip">
+                                <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                                <span id="rcvSelectedPoNo">—</span>
+                                <button type="button" class="rcv-chip-x" id="rcvClearPo"
+                                        title="Clear selection" aria-label="Clear selected PO">
+                                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                                </button>
+                            </span>
                             <button type="button" class="btn btn-primary" id="rcvPickBtn"
                                     data-bs-toggle="modal" data-bs-target="#rcvItemsModal">
                                 <i class="bi bi-list-check me-1" aria-hidden="true"></i>Select Items
                             </button>
+                        </div>
+
+                        {{-- Figures describe the whole PO. Ordered/pending come
+                             from the BOM's own ordered qty, so a line that never
+                             carried one reads "—" rather than a wrong total. --}}
+                        <div class="row g-3">
+                            <div class="col-6 col-lg-3 rcv-summary-cell">
+                                <div class="rcv-summary-label">Buyer</div>
+                                <div class="rcv-summary-value" id="rcvSumBuyer">—</div>
+                            </div>
+                            <div class="col-6 col-lg-3 rcv-summary-cell">
+                                <div class="rcv-summary-label">Supplier</div>
+                                <div class="rcv-summary-value" id="rcvSumSupplier">—</div>
+                            </div>
+                            <div class="col-4 col-lg-2 rcv-summary-cell">
+                                <div class="rcv-summary-label">Ordered Qty</div>
+                                <div class="rcv-summary-value" id="rcvSumOrdered">—</div>
+                            </div>
+                            <div class="col-4 col-lg-2 rcv-summary-cell">
+                                <div class="rcv-summary-label">Pending Qty</div>
+                                <div class="rcv-summary-value" id="rcvSumPending">—</div>
+                            </div>
+                            <div class="col-4 col-lg-2 rcv-summary-cell">
+                                <div class="rcv-summary-label">Status</div>
+                                <div id="rcvSumStatus"><span class="badge bg-secondary-subtle text-secondary-emphasis">—</span></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -164,10 +451,11 @@
                     </div>
                 @endif
 
-                <div id="rcvEmpty" class="rcv-empty text-center py-5">
-                    <i class="bi bi-box-seam" style="font-size:48px;" aria-hidden="true"></i>
-                    <div class="fw-semibold mt-3">Search to Begin</div>
-                    <div class="small text-muted">Select a filter type and start typing to find purchase orders.</div>
+                {{-- One quiet line instead of a full-height placeholder card —
+                     it says what to do without pushing the form off-screen. --}}
+                <div id="rcvEmpty" class="rcv-hint d-flex align-items-center gap-2">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <span>Click or type to see available <span id="rcvHintType">PO Number</span>s</span>
                 </div>
 
                 {{-- Shared header. These describe the delivery as a whole, or are
@@ -215,17 +503,25 @@
                                 <label class="form-label fw-semibold">Invoice No</label>
                                 <input type="text" id="shInvoiceNo" data-shared="invoice_no" class="form-control" maxlength="100">
                             </div>
-                            <div class="col-12 col-sm-6 col-lg-3">
+                            <div class="col-12 col-sm-6 col-lg-2">
                                 <label class="form-label fw-semibold">Source</label>
                                 <select id="shSourceType" data-shared="source_type" class="form-select">
                                     <option value="booking" selected>Booking-wise</option>
                                     <option value="internal_po">Internal PO-wise</option>
                                 </select>
                             </div>
-                            <div class="col-12 col-sm-6 col-lg-3">
+                            <div class="col-12 col-sm-6 col-lg-2">
                                 <label class="form-label fw-semibold">GRN No</label>
                                 <input type="text" class="form-control bg-light text-muted" value="Auto-generated" readonly disabled>
                                 <div class="form-text text-muted"><i class="bi bi-magic me-1" aria-hidden="true"></i>One GRN per item, on save</div>
+                            </div>
+                            {{-- The date the GRN itself is booked. Left blank it
+                                 follows Receive Date, which is what the server
+                                 stores when nothing is entered here. --}}
+                            <div class="col-12 col-sm-6 col-lg-2">
+                                <label class="form-label fw-semibold" for="shGrnDate">GRN Date</label>
+                                <input type="date" id="shGrnDate" data-shared="grn_date" value="{{ now()->toDateString() }}" class="form-control">
+                                <div class="form-text text-muted">Defaults to Receive Date</div>
                             </div>
                             <div class="col-12">
                                 <label class="form-label fw-semibold">Remarks</label>
@@ -243,6 +539,9 @@
                                     <th>GMTS Color</th><th>Art. No</th><th>SAP Code</th>
                                     <th>Mat. Color</th><th>Size</th>
                                     <th class="text-end">Internal PO Qty</th>
+                                    {{-- What earlier GRNs already booked against this
+                                         line — reference only, never submitted. --}}
+                                    <th class="text-end">Already Rcvd</th>
                                     <th style="min-width:110px;">Invoice Qty</th>
                                     <th style="min-width:130px;">Physical Rcv Qty <span class="text-danger">*</span></th>
                                     <th style="min-width:110px;">Unit Price</th>
@@ -254,8 +553,15 @@
                         </table>
                     </div>
 
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                        <span class="text-muted small"><span id="rcvCount">0</span> item(s) — one GRN will be generated per item.</span>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
+                        <div class="small">
+                            <span class="text-muted"><span id="rcvCount">0</span> item(s) — one GRN will be generated per item.</span>
+                            {{-- Preview only; the server recomputes every value on
+                                 save, so this never decides what is stored. --}}
+                            <span class="ms-2">Total Invoice Value:
+                                <span class="fw-semibold" id="rcvTotalValue">—</span>
+                            </span>
+                        </div>
                         <div class="d-flex gap-2">
                             <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#rcvItemsModal">
                                 <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add More Items
@@ -285,6 +591,11 @@
                                 <td class="small">{{ optional($r->receive_date)->format('d-M-Y') ?? '—' }}</td>
                                 <td class="small">
                                     <span class="fw-semibold text-nowrap d-block">{{ $r->grn_no ?: '—' }}</span>
+                                    {{-- Only worth showing when it differs from the
+                                         Date column already on the left. --}}
+                                    @if($r->grn_date && optional($r->receive_date)->toDateString() !== $r->grn_date->toDateString())
+                                        <span class="text-muted d-block">GRN dt: {{ $r->grn_date->format('d-M-Y') }}</span>
+                                    @endif
                                     @if($r->invoice_no)<span class="text-muted">Inv: {{ $r->invoice_no }}</span>@endif
                                 </td>
                                 <td>
@@ -339,9 +650,17 @@
             </div>
 
             <div class="modal-body">
-                <ol class="breadcrumb small mb-3">
-                    <li class="breadcrumb-item" id="rcvCrumb1"><span class="fw-semibold">1. Choose Style</span></li>
-                    <li class="breadcrumb-item text-muted" id="rcvCrumb2">2. Choose Items</li>
+                {{-- Visual stepper. The numbers carry the state, so the label
+                     underneath never has to say "you are here". --}}
+                <ol class="rcv-steps mb-4" id="rcvSteps">
+                    <li class="rcv-step is-current" id="rcvCrumb1">
+                        <span class="rcv-step-dot">1</span>
+                        <span class="rcv-step-text">Choose Style</span>
+                    </li>
+                    <li class="rcv-step" id="rcvCrumb2">
+                        <span class="rcv-step-dot">2</span>
+                        <span class="rcv-step-text">Choose Items</span>
+                    </li>
                 </ol>
 
                 <div id="rcvModalLoading" class="text-center text-muted py-5">
@@ -351,17 +670,17 @@
 
                 {{-- Level 1: styles --}}
                 <div id="rcvStep1" class="d-none">
-                    <div class="table-responsive" style="max-height:50vh;">
-                        <table class="table table-sm table-hover align-middle mb-0">
-                            <thead class="sticky-top bg-body">
-                                <tr class="text-muted small text-uppercase">
-                                    <th style="width:38px;">
+                    <div class="rcv-pick table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="sticky-top">
+                                <tr>
+                                    <th style="width:42px;">
                                         <input type="checkbox" class="form-check-input" id="rcvStyleAll"
                                                title="Select all styles" aria-label="Select all styles">
                                     </th>
                                     <th>Style Number</th>
-                                    <th class="text-end">Items under this style</th>
-                                    <th class="text-end">Already added</th>
+                                    <th style="width:120px;" class="text-end">Items</th>
+                                    <th style="width:190px;">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="rcvStyleBody"></tbody>
@@ -369,25 +688,23 @@
                     </div>
                 </div>
 
-                {{-- Level 2: items within the chosen styles --}}
+                {{-- Level 2: items within the chosen styles. The identity columns
+                     are paired into two-line cells — the same nine values, but
+                     six columns instead of ten so nothing is squeezed. --}}
                 <div id="rcvStep2" class="d-none">
-                    <div class="table-responsive" style="max-height:50vh;">
-                        <table class="table table-sm table-hover align-middle mb-0">
-                            <thead class="sticky-top bg-body">
-                                <tr class="text-muted small text-uppercase">
-                                    <th style="width:38px;">
+                    <div class="rcv-pick table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="sticky-top">
+                                <tr>
+                                    <th style="width:42px;">
                                         <input type="checkbox" class="form-check-input" id="rcvItemAll"
                                                title="Select all available items" aria-label="Select all available items">
                                     </th>
-                                    <th>Material Name</th>
-                                    <th>Material Description</th>
-                                    <th>GMTS Color</th>
-                                    <th>Art. No</th>
-                                    <th>SAP Code</th>
-                                    <th>Material Color</th>
-                                    <th>Size</th>
-                                    <th>Unit</th>
-                                    <th class="text-end">Internal PO Qty</th>
+                                    <th>Material</th>
+                                    <th>Art. No / SAP Code</th>
+                                    <th>Colour / Size</th>
+                                    <th style="width:70px;">Unit</th>
+                                    <th style="width:110px;" class="text-end">Internal PO Qty</th>
                                 </tr>
                             </thead>
                             <tbody id="rcvItemBody"></tbody>
@@ -396,9 +713,15 @@
                 </div>
             </div>
 
-            <div class="modal-footer">
-                <span class="me-auto small text-muted"><span id="rcvSelCount">0</span> selected</span>
-                <button type="button" class="btn btn-outline-secondary d-none" id="rcvBackBtn"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Styles</button>
+            {{-- The count sits in the bar as a live badge rather than loose text,
+                 so the footer reads as part of the picker instead of a separate
+                 strip of buttons. --}}
+            <div class="modal-footer rcv-modal-footer">
+                <span class="rcv-selcount me-auto" id="rcvSelCountWrap">
+                    <span class="rcv-selcount-badge" id="rcvSelCount">0</span>
+                    <span id="rcvSelCountLabel">selected</span>
+                </span>
+                <button type="button" class="btn btn-outline-secondary d-none" id="rcvBackBtn"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back</button>
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="rcvNextBtn">Next: Choose Items<i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></button>
                 <button type="button" class="btn btn-primary d-none" id="rcvAddSelected"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Selected</button>
@@ -459,6 +782,13 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         const dash = (v) => esc(v) === '' ? '—' : h(v);
 
+        // Quantities are stored to 4dp but rarely use them; drop trailing zeros
+        // so "104.0000" reads as "104".
+        const trimNum = (n) => {
+            if (!isFinite(n)) return '—';
+            return String(parseFloat(Number(n).toFixed(4)));
+        };
+
         let items = [];         // every line under the loaded PO
         let loadedPoId = null;
         let uid = 0;
@@ -471,33 +801,37 @@
         // placeholder reads correctly for every filter type.
         const article = (label) => (/^[AEIOU]/i.test(label) ? 'an ' : 'a ');
 
+        const hintType = document.getElementById('rcvHintType');
+
         filterType.addEventListener('change', function () {
             const label = LABELS[filterType.value];
             searchLabel.textContent = label;
-            searchEl.placeholder = 'Start typing ' + article(label) + label + '…';
+            searchEl.placeholder = 'Click or type to see available ' + label + 's…';
+            hintType.textContent = label;
             searchEl.value = '';
             closeSuggest();
             syncSearchStatus();
         });
 
-        // Typeahead. Nothing is fetched until the user actually types, and the
-        // request is debounced so a burst of keystrokes makes one call — same
-        // clearTimeout/setTimeout idiom used by the booking list filters.
-        const MIN_CHARS = 2;
         const DEBOUNCE_MS = 300;
+        const BLUR_CLOSE_MS = 200;
         let searchTimer = null;
         let searchTicket = 0;
         let activeIndex = -1;
 
+        // The hint duplicates what the open menu is already showing, so it fades
+        // out while the menu is up and returns only if nothing was selected.
         function closeSuggest() {
             resultsWrap.classList.add('d-none');
             searchEl.setAttribute('aria-expanded', 'false');
             activeIndex = -1;
+            emptyBox.classList.remove('is-faded');
         }
 
         function openSuggest() {
             resultsWrap.classList.remove('d-none');
             searchEl.setAttribute('aria-expanded', 'true');
+            emptyBox.classList.add('is-faded');
         }
 
         // The spinner replaces the clear button while a lookup is in flight, so
@@ -510,21 +844,111 @@
             searchClear.classList.toggle('d-none', searching || !hasText);
         }
 
+        // Browse list per filter type, fetched once and kept for the page's life.
+        // `complete` means the server sent the whole dataset, so typing can be
+        // filtered here instead of going back for every keystroke.
+        const browseCache = {};
+        // Focus and click both open the menu, so the in-flight promise is shared
+        // rather than the request being made twice before the cache fills.
+        const browseInFlight = {};
+
+        function loadBrowse(type) {
+            if (browseCache[type]) return Promise.resolve(browseCache[type]);
+            if (browseInFlight[type]) return browseInFlight[type];
+
+            const url = SEARCH_URL + '?type=' + encodeURIComponent(type);
+
+            browseInFlight[type] = fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                .then(data => {
+                    browseCache[type] = {
+                        results: data.results || [],
+                        complete: !!data.complete,
+                    };
+                    return browseCache[type];
+                })
+                .finally(() => { delete browseInFlight[type]; });
+
+            return browseInFlight[type];
+        }
+
+        // Opening the field shows what exists — no typing required.
+        function showBrowse() {
+            const type = filterType.value;
+            const ticket = ++searchTicket;
+            const cached = browseCache[type];
+
+            openSuggest();
+
+            if (!cached) {
+                searching = true;
+                syncSearchStatus();
+                resultsHint.textContent = 'Loading…';
+                resultsList.innerHTML = '';
+            }
+
+            return loadBrowse(type)
+                .then(data => {
+                    if (ticket !== searchTicket) return;   // superseded meanwhile
+                    searching = false;
+                    syncSearchStatus();
+                    renderResults(filterLocally(data.results, searchEl.value.trim()), type, searchEl.value.trim(), data);
+                })
+                .catch(() => {
+                    if (ticket !== searchTicket) return;
+                    searching = false;
+                    syncSearchStatus();
+                    showListError();
+                });
+        }
+
+        // Substring match across the value and its PO/buyer meta, so typing a
+        // buyer name narrows the list too.
+        function filterLocally(results, term) {
+            const needle = term.toLowerCase();
+            if (needle === '') return results;
+
+            return results.filter(r =>
+                [r.value, r.po_no, r.buyer_name, r.season_name, r.vendor_name]
+                    .some(field => esc(field).toLowerCase().includes(needle))
+            );
+        }
+
+        function showListError() {
+            resultsHint.textContent = '';
+            resultsList.innerHTML =
+                '<div class="list-group-item text-muted">Could not load the list. Please try again.</div>';
+        }
+
+        searchEl.addEventListener('focus', showBrowse);
+        searchEl.addEventListener('click', showBrowse);
+
         searchEl.addEventListener('input', function () {
             clearTimeout(searchTimer);
             const term = searchEl.value.trim();
+            const type = filterType.value;
+            const cached = browseCache[type];
 
-            // Clearing the box returns to the empty state; nothing is listed
-            // until there is something to search for.
-            if (term.length < MIN_CHARS) {
-                searchTicket++;   // discard any reply still in flight
+            syncSearchStatus();
+
+            // Whole dataset already in hand — filter it here, no request, no
+            // debounce, no minimum length.
+            if (cached && cached.complete) {
+                searchTicket++;
                 searching = false;
                 syncSearchStatus();
-                closeSuggest();
+                openSuggest();
+                renderResults(filterLocally(cached.results, term), type, term, cached);
                 return;
             }
 
-            syncSearchStatus();
+            // Dataset was capped, so the server has to do the narrowing. An empty
+            // box falls back to the browse list.
+            if (term === '') {
+                showBrowse();
+                return;
+            }
+
             searchTimer = setTimeout(runSearch, DEBOUNCE_MS);
         });
 
@@ -534,23 +958,28 @@
             searching = false;
             searchEl.value = '';
             syncSearchStatus();
-            closeSuggest();
+            showBrowse();
             searchEl.focus();
         });
 
-        searchEl.addEventListener('focus', function () {
-            if (searchEl.value.trim().length >= MIN_CHARS && resultsList.children.length) openSuggest();
+        // Closing is delayed so a click landing on an option still registers as
+        // a selection rather than being cancelled by the blur.
+        let blurTimer = null;
+
+        searchEl.addEventListener('blur', function () {
+            clearTimeout(blurTimer);
+            blurTimer = setTimeout(closeSuggest, BLUR_CLOSE_MS);
+        });
+
+        // Keep the menu open when the pointer is heading for an option.
+        resultsWrap.addEventListener('mousedown', function (e) {
+            e.preventDefault();          // never steal focus from the input
+            clearTimeout(blurTimer);
         });
 
         function runSearch() {
             const type = filterType.value;
             const term = searchEl.value.trim();
-
-            if (term.length < MIN_CHARS) {
-                closeSuggest();
-                return;
-            }
-
             const ticket = ++searchTicket;
 
             searching = true;
@@ -568,50 +997,56 @@
                     if (ticket !== searchTicket) return;
                     searching = false;
                     syncSearchStatus();
-                    renderResults(data.results || [], type, term);
+                    renderResults(data.results || [], type, term, data);
                 })
                 .catch(() => {
                     if (ticket !== searchTicket) return;
                     searching = false;
                     syncSearchStatus();
-                    resultsHint.textContent = '';
-                    resultsList.innerHTML =
-                        '<div class="list-group-item text-muted">Could not run the search. Please try again.</div>';
+                    showListError();
                 });
         }
 
-        function renderResults(results, type, term) {
+        function renderResults(results, type, term, source) {
             activeIndex = -1;
 
             if (!results.length) {
                 resultsHint.textContent = '';
-                // Headline first, then which filter and term were actually used —
-                // Store usually just mistyped one of the two.
-                resultsList.innerHTML = '<div class="list-group-item">' +
-                    '<div class="fw-semibold">No matching records found</div>' +
-                    '<div class="small text-muted">Nothing matched this ' + h(LABELS[type]) +
-                    (term ? ' (“' + h(term) + '”)' : '') + '.</div>' +
+                resultsList.innerHTML = '<div class="list-group-item text-center text-muted py-3">' +
+                    '<i class="bi bi-inbox d-block mb-1" style="font-size:18px;opacity:.5;" aria-hidden="true"></i>' +
+                    '<div class="small">No matching records' +
+                        (term ? ' for “' + h(term) + '”' : '') + '</div>' +
                 '</div>';
                 return;
             }
 
-            resultsHint.textContent = results.length === 1
-                ? '1 matching PO'
-                : results.length + ' POs match — keep typing to narrow, or choose one.';
+            // Browsing the untouched list is labelled by what it is; anything
+            // narrowed is labelled by how much is left.
+            const browsing = term === '' && source && source.complete;
+            resultsHint.textContent = browsing
+                ? 'All ' + LABELS[type] + 's (' + results.length + ')'
+                : results.length + (results.length === 1 ? ' match' : ' matches');
 
-            resultsList.innerHTML = results.map(r =>
-                '<button type="button" class="list-group-item list-group-item-action rcv-result" role="option"' +
+            resultsList.innerHTML = results.map(r => {
+                // The PO number is already the primary line when browsing by PO,
+                // so it is not repeated in the meta.
+                const meta = [
+                    type === 'po_no' ? null : r.po_no,
+                    r.buyer_name,
+                    r.vendor_name,
+                ].filter(Boolean).join(' · ');
+
+                return '<div class="list-group-item rcv-option" role="option" tabindex="-1"' +
                     ' data-id="' + h(r.id) + '" data-po="' + h(r.po_no) + '"' +
                     ' data-meta="' + h([r.buyer_name, r.season_name, r.vendor_name].filter(Boolean).join(' · ')) + '">' +
-                    '<span class="fw-semibold">' + dash(r.po_no) + '</span>' +
-                    '<span class="small text-muted ms-2">' +
-                        dash([r.buyer_name, r.season_name, r.vendor_name].filter(Boolean).join(' · ')) +
-                    '</span>' +
-                '</button>').join('');
+                    '<div class="rcv-option-primary">' + dash(r.value || r.po_no) + '</div>' +
+                    '<div class="rcv-option-meta">' + dash(meta) + '</div>' +
+                '</div>';
+            }).join('');
         }
 
         // --- Keyboard navigation ---------------------------------------------
-        const options = () => Array.from(resultsList.querySelectorAll('.rcv-result'));
+        const options = () => Array.from(resultsList.querySelectorAll('.rcv-option'));
 
         function highlight(index) {
             const list = options();
@@ -645,8 +1080,8 @@
         });
 
         resultsList.addEventListener('click', function (e) {
-            const btn = e.target.closest('.rcv-result');
-            if (btn) selectPo(btn);
+            const option = e.target.closest('.rcv-option');
+            if (option) selectPo(option);
         });
 
         function selectPo(btn) {
@@ -659,20 +1094,102 @@
 
             poIdEl.value = newId;
             document.getElementById('rcvSelectedPoNo').textContent = btn.dataset.po || '—';
-            document.getElementById('rcvSelectedPoMeta').textContent = btn.dataset.meta || '—';
             selectedWrap.classList.remove('d-none');
             searchEl.value = '';
             syncSearchStatus();
             closeSuggest();
+            loadSummary(newId);
             refreshState();
         }
 
-        document.getElementById('rcvChangePo').addEventListener('click', function () {
+        // Removing the chip clears the selection and reopens the browse list,
+        // rather than leaving an empty box to type into again.
+        document.getElementById('rcvClearPo').addEventListener('click', function () {
+            if (rowsWrap.children.length &&
+                !confirm('Clearing the PO will remove the items already added. Continue?')) return;
+
+            rowsWrap.innerHTML = '';
+            poIdEl.value = '';
+            selectedWrap.classList.add('d-none');
+            items = [];
+            loadedPoId = null;
             searchEl.value = '';
             syncSearchStatus();
-            closeSuggest();
+            refreshState();
             searchEl.focus();
+            showBrowse();
         });
+
+        // --- Summary bar ------------------------------------------------------
+        // Reuses the item feed the picker already loads, so opening a PO costs
+        // one request whether or not the modal is opened afterwards.
+        function loadSummary(poId) {
+            setSummary(null);
+
+            fetch(ITEMS_URL.replace('__ID__', encodeURIComponent(poId)), {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin'
+            })
+                .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                .then(data => {
+                    if (String(poIdEl.value) !== String(poId)) return;   // changed meanwhile
+                    items = data.items || [];
+                    loadedPoId = poId;
+                    setSummary(items);
+                })
+                .catch(() => {
+                    if (String(poIdEl.value) === String(poId)) setSummary(null);
+                });
+        }
+
+        function setSummary(list) {
+            const buyer = document.getElementById('rcvSumBuyer');
+            const supplier = document.getElementById('rcvSumSupplier');
+            const ordered = document.getElementById('rcvSumOrdered');
+            const pending = document.getElementById('rcvSumPending');
+            const status = document.getElementById('rcvSumStatus');
+
+            if (!list || !list.length) {
+                [buyer, supplier, ordered, pending].forEach(el => { el.textContent = '—'; });
+                status.innerHTML = '<span class="badge bg-secondary-subtle text-secondary-emphasis">—</span>';
+                return;
+            }
+
+            buyer.textContent = esc(list[0].buyer_name) || '—';
+            supplier.textContent = esc(list[0].supplier_name) || '—';
+
+            // Only lines that actually carry an ordered qty are totalled. If none
+            // do, the figures stay "—" instead of implying a zero-qty order.
+            const known = list.filter(it => !isNaN(parseFloat(it.internal_po_qty)));
+            const totalOrdered = known.reduce((sum, it) => sum + parseFloat(it.internal_po_qty), 0);
+            const totalReceived = list.reduce((sum, it) => sum + (parseFloat(it.received_qty) || 0), 0);
+
+            if (!known.length) {
+                ordered.textContent = '—';
+                pending.textContent = '—';
+                status.innerHTML = '<span class="badge bg-secondary-subtle text-secondary-emphasis">Qty not set</span>';
+                return;
+            }
+
+            const outstanding = totalOrdered - totalReceived;
+
+            // Some BOM lines carry no ordered qty at all. The total is still the
+            // best available figure, but it is marked so nobody reads a partial
+            // sum as the full order.
+            const partial = known.length < list.length;
+            ordered.textContent = trimNum(totalOrdered) + (partial ? ' *' : '');
+            ordered.title = partial
+                ? (list.length - known.length) + ' of ' + list.length +
+                  ' item(s) have no ordered qty in the BOM, so this total covers only the rest.'
+                : '';
+            pending.textContent = trimNum(Math.max(outstanding, 0));
+
+            status.innerHTML = totalReceived <= 0
+                ? '<span class="badge bg-secondary-subtle text-secondary-emphasis">Not received</span>'
+                : (outstanding > 0
+                    ? '<span class="badge bg-warning-subtle text-warning-emphasis">Partial</span>'
+                    : '<span class="badge bg-success-subtle text-success-emphasis">Complete</span>');
+        }
 
         // --- Modal: styles then items ----------------------------------------
         function loadItems() {
@@ -715,12 +1232,31 @@
             backBtn.classList.toggle('d-none', step !== 2);
             nextBtn.classList.toggle('d-none', step !== 1);
             addBtn.classList.toggle('d-none', step !== 2);
-            crumb1.classList.toggle('text-muted', step !== 1);
-            crumb2.classList.toggle('text-muted', step !== 2);
-            crumb1.innerHTML = step === 1 ? '<span class="fw-semibold">1. Choose Style</span>' : '1. Choose Style';
-            crumb2.innerHTML = step === 2 ? '<span class="fw-semibold">2. Choose Items</span>' : '2. Choose Items';
+            crumb1.classList.toggle('is-current', step === 1);
+            crumb1.classList.toggle('is-done', step === 2);
+            crumb2.classList.toggle('is-current', step === 2);
 
             if (step === 1) renderStyles(); else renderItems();
+        }
+
+        // "Added" as a state with a progress bar, rather than a bare "2 / 5" the
+        // reader has to interpret.
+        function addedState(addedCount, total) {
+            if (addedCount === 0) {
+                return '<span class="rcv-state text-muted">' +
+                    '<span class="rcv-state-bar"><span class="rcv-state-fill" style="width:0"></span></span>' +
+                    'Not added yet</span>';
+            }
+
+            if (addedCount >= total) {
+                return '<span class="rcv-state" style="color:var(--gx-accent-700,#047857);">' +
+                    '<i class="bi bi-check-circle-fill" aria-hidden="true"></i>All added</span>';
+            }
+
+            const pct = Math.round((addedCount / total) * 100);
+            return '<span class="rcv-state text-muted">' +
+                '<span class="rcv-state-bar"><span class="rcv-state-fill" style="width:' + pct + '%"></span></span>' +
+                addedCount + ' of ' + total + ' added</span>';
         }
 
         function renderStyles() {
@@ -731,13 +1267,13 @@
                 const allAdded = addedCount === under.length;
                 const cbId = 'rcvStyle' + i;
 
-                return '<tr' + (allAdded ? ' class="opacity-50"' : '') + '>' +
+                return '<tr class="' + (allAdded ? 'is-added' : 'rcv-row') + '">' +
                     '<td><input type="checkbox" class="form-check-input rcv-style-cb" id="' + cbId + '"' +
                         ' value="' + h(name) + '"' + (allAdded ? ' disabled title="Every item under this style is already added"' : '') +
-                        ' aria-label="Select this style"></td>' +
-                    '<td><label for="' + cbId + '" class="mb-0 fw-semibold" style="cursor:pointer;">' + dash(name) + '</label></td>' +
+                        ' aria-label="Select style ' + h(name) + '"></td>' +
+                    '<td class="rcv-cell-primary fw-semibold">' + dash(name) + '</td>' +
                     '<td class="text-end small">' + under.length + '</td>' +
-                    '<td class="text-end small text-muted">' + addedCount + ' / ' + under.length + '</td>' +
+                    '<td>' + addedState(addedCount, under.length) + '</td>' +
                 '</tr>';
             }).join('');
 
@@ -753,29 +1289,41 @@
             const styles = chosenStyles();
             let html = '';
 
+            // Pairs a value with its label, dropping the pair entirely when the
+            // value is blank so empty BOM cells do not print stray labels.
+            const sub = (label, value) => esc(value) === '' ? '' : label + ' ' + h(value);
+            const joinSub = (parts) => parts.filter(Boolean).join(' · ') || '—';
+
             styles.forEach(name => {
                 const under = items.filter(it => styleKey(it) === name);
-                html += '<tr class="table-light"><td colspan="10" class="fw-semibold small">' +
+                html += '<tr class="rcv-group-row"><td colspan="6">' +
                             '<i class="bi bi-tag me-1" aria-hidden="true"></i>Style ' + dash(name) +
-                            ' <span class="text-muted fw-normal">· ' + under.length + ' item(s)</span>' +
+                            ' <span class="fw-normal">· ' + under.length + ' item(s)</span>' +
                         '</td></tr>';
 
                 under.forEach((item, i) => {
                     const isAdded = already.includes(String(item.excel_row_id));
                     const cbId = 'rcvItem' + h(name).replace(/\W/g, '') + i;
 
-                    html += '<tr' + (isAdded ? ' class="opacity-50"' : '') + '>' +
+                    html += '<tr class="' + (isAdded ? 'is-added' : 'rcv-row') + '">' +
                         '<td><input type="checkbox" class="form-check-input rcv-item-cb" id="' + cbId + '"' +
                             ' value="' + h(item.excel_row_id) + '"' +
                             (isAdded ? ' checked disabled title="Already added below"' : '') +
-                            ' aria-label="Select this material line"></td>' +
-                        '<td class="small"><label for="' + cbId + '" class="mb-0" style="cursor:pointer;">' + dash(item.material_name) + '</label></td>' +
-                        '<td class="small">' + dash(item.material_description) + '</td>' +
-                        '<td class="small">' + dash(item.gmts_color_name) + '</td>' +
-                        '<td class="small">' + dash(item.art_no) + '</td>' +
-                        '<td class="small">' + dash(item.sap_code) + '</td>' +
-                        '<td class="small">' + dash(item.material_color) + '</td>' +
-                        '<td class="small">' + dash(item.size) + '</td>' +
+                            ' aria-label="Select material line ' + h(item.material_name) + '"></td>' +
+
+                        '<td><div class="rcv-cell-primary">' + dash(item.material_name) + '</div>' +
+                            '<div class="rcv-cell-sub">' + dash(item.material_description) + '</div></td>' +
+
+                        '<td><div class="rcv-cell-primary small">' + dash(item.art_no) + '</div>' +
+                            '<div class="rcv-cell-sub">' + (esc(item.sap_code) === '' ? '—' : 'SAP ' + h(item.sap_code)) + '</div></td>' +
+
+                        // GMTS colour is the garment's, material colour is the
+                        // trim's — labelled so the two are never confused.
+                        '<td><div class="rcv-cell-primary small">' +
+                                joinSub([sub('GMTS', item.gmts_color_name), sub('Mat', item.material_color)]) +
+                            '</div>' +
+                            '<div class="rcv-cell-sub">' + (esc(item.size) === '' ? '—' : 'Size ' + h(item.size)) + '</div></td>' +
+
                         '<td class="small">' + dash(item.uom) + '</td>' +
                         '<td class="small text-end">' + dash(item.internal_po_qty) + '</td>' +
                     '</tr>';
@@ -791,16 +1339,32 @@
                 .querySelectorAll(step1.classList.contains('d-none') ? '.rcv-item-cb:not(:disabled)' : '.rcv-style-cb:not(:disabled)')
         );
 
+        const selCountWrap = document.getElementById('rcvSelCountWrap');
+        const selCountLabel = document.getElementById('rcvSelCountLabel');
+
         function updateSelCount() {
             const boxes = activeBoxes();
             const checked = boxes.filter(cb => cb.checked);
+            const onItems = step1.classList.contains('d-none');
+
             selCount.textContent = checked.length;
-            nextBtn.disabled = step1.classList.contains('d-none') ? false : checked.length === 0;
+            selCountLabel.textContent = onItems
+                ? (checked.length === 1 ? 'item selected' : 'items selected')
+                : (checked.length === 1 ? 'style selected' : 'styles selected');
+            selCountWrap.classList.toggle('is-active', checked.length > 0);
+
+            nextBtn.disabled = onItems ? false : checked.length === 0;
             addBtn.disabled = checked.length === 0;
 
-            const master = step1.classList.contains('d-none') ? itemAll : styleAll;
+            const master = onItems ? itemAll : styleAll;
             master.disabled = boxes.length === 0;
             master.checked = boxes.length > 0 && boxes.every(cb => cb.checked);
+
+            // Keep the row tint in step with its checkbox.
+            boxes.forEach(cb => {
+                const tr = cb.closest('tr');
+                if (tr) tr.classList.toggle('is-checked', cb.checked);
+            });
         }
 
         [[styleAll, styleBody], [itemAll, itemBody]].forEach(([master, body]) => {
@@ -812,6 +1376,20 @@
                 if (e.target.classList.contains('rcv-style-cb') || e.target.classList.contains('rcv-item-cb')) {
                     updateSelCount();
                 }
+            });
+
+            // Clicking anywhere on a selectable row toggles it, so the checkbox
+            // is an affordance rather than the only target. Clicks on the box
+            // itself are left alone or they would toggle twice.
+            body.addEventListener('click', function (e) {
+                const tr = e.target.closest('tr.rcv-row');
+                if (!tr || e.target.matches('input[type="checkbox"]')) return;
+
+                const cb = tr.querySelector('input[type="checkbox"]:not(:disabled)');
+                if (!cb) return;
+
+                cb.checked = !cb.checked;
+                updateSelCount();
             });
         });
 
@@ -837,6 +1415,7 @@
             const i = uid++;
             const n = (field) => 'rows[' + i + '][' + field + ']';
             const unitPrice = preset.unit_price !== undefined ? preset.unit_price : esc(item.suggested_unit_price);
+            const received = parseFloat(item.received_qty) || 0;
 
             const tr = document.createElement('tr');
             tr.dataset.rowId = item.excel_row_id;
@@ -846,6 +1425,7 @@
                     // Shared header values are mirrored here on submit so the
                     // server still receives one complete row per item.
                     '<input type="hidden" name="' + n('receive_date') + '" data-mirror="receive_date">' +
+                    '<input type="hidden" name="' + n('grn_date') + '" data-mirror="grn_date">' +
                     '<input type="hidden" name="' + n('invoice_no') + '" data-mirror="invoice_no">' +
                     '<input type="hidden" name="' + n('source_type') + '" data-mirror="source_type">' +
                     '<input type="hidden" name="' + n('remarks') + '" data-mirror="remarks">' +
@@ -858,6 +1438,8 @@
                 '<td class="small">' + dash(item.material_color) + '</td>' +
                 '<td class="small">' + dash(item.size) + '</td>' +
                 '<td class="small text-end">' + dash(item.internal_po_qty) + '</td>' +
+                '<td class="small text-end rcv-prior' + (received > 0 ? '' : ' rcv-prior-none') + '">' +
+                    (received > 0 ? h(trimNum(received)) : '—') + '</td>' +
                 '<td><input type="number" step="0.0001" min="0" name="' + n('invoice_qty') + '" data-field="invoice_qty"' +
                     ' value="' + h(preset.invoice_qty) + '" class="form-control form-control-sm"></td>' +
                 '<td><input type="number" step="0.0001" min="0" name="' + n('qty') + '"' +
@@ -879,6 +1461,23 @@
             const price = parseFloat(tr.querySelector('[data-field="unit_price"]').value);
             tr.querySelector('[data-field="invoice_value"]').textContent =
                 (isNaN(qty) || isNaN(price)) ? '—' : (qty * price).toFixed(4);
+            recalcTotal();
+        }
+
+        // Sum of the rows that have both an invoice qty and a rate. Rows missing
+        // either contribute nothing rather than being counted as zero.
+        function recalcTotal() {
+            const totalEl = document.getElementById('rcvTotalValue');
+            let total = 0;
+            let counted = 0;
+
+            Array.from(rowsWrap.querySelectorAll('tr')).forEach(tr => {
+                const qty = parseFloat(tr.querySelector('[data-field="invoice_qty"]').value);
+                const price = parseFloat(tr.querySelector('[data-field="unit_price"]').value);
+                if (!isNaN(qty) && !isNaN(price)) { total += qty * price; counted++; }
+            });
+
+            totalEl.textContent = counted === 0 ? '—' : total.toFixed(2);
         }
 
         rowsWrap.addEventListener('input', function (e) {
@@ -913,7 +1512,10 @@
             const n = rowsWrap.children.length;
             countEl.textContent = n;
             sharedWrap.classList.toggle('d-none', n === 0);
-            emptyBox.classList.toggle('d-none', n > 0);
+            // The hint only has a job while nothing is chosen yet — once a PO is
+            // selected the card above it says what to do next.
+            emptyBox.classList.toggle('d-none', n > 0 || poIdEl.value !== '');
+            recalcTotal();
 
             if (n > 0) {
                 // PO-level identity is identical on every line, so it is read
@@ -945,6 +1547,7 @@
             loadItems().then(() => {
                 const shared = list[0] || {};
                 if (shared.receive_date) document.getElementById('shReceiveDate').value = shared.receive_date;
+                if (shared.grn_date) document.getElementById('shGrnDate').value = shared.grn_date;
                 if (shared.invoice_no) document.getElementById('shInvoiceNo').value = shared.invoice_no;
                 if (shared.source_type) document.getElementById('shSourceType').value = shared.source_type;
                 if (shared.remarks) document.getElementById('shRemarks').value = shared.remarks;
@@ -957,9 +1560,10 @@
                 const first = items[0];
                 if (first) {
                     document.getElementById('rcvSelectedPoNo').textContent = esc(first.po_no) || '—';
-                    document.getElementById('rcvSelectedPoMeta').textContent =
-                        [first.buyer_name, first.season_name, first.supplier_name].filter(Boolean).join(' · ') || '—';
                     selectedWrap.classList.remove('d-none');
+                    // items is already populated by loadItems() above, so the
+                    // summary is filled from it rather than re-fetched.
+                    setSummary(items);
                 }
                 refreshState();
             });

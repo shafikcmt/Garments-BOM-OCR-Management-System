@@ -34,6 +34,7 @@ class MaterialReceiving extends Model
         'grn_no',
         'invoice_no',
         'receive_date',
+        'grn_date',
         'source_type',
         'qty',
         'invoice_qty',
@@ -46,6 +47,7 @@ class MaterialReceiving extends Model
 
     protected $casts = [
         'receive_date' => 'date',
+        'grn_date' => 'date',
         // qty = Physical Rcv Qty (the figure the stock ledger consumes).
         'qty' => 'decimal:4',
         'invoice_qty' => 'decimal:4',

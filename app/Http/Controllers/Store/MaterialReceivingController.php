@@ -16,6 +16,12 @@ use Illuminate\Http\Request;
  */
 class MaterialReceivingController extends Controller
 {
+    /**
+     * How many browse options the search field will list before it stops being
+     * a complete picture and typing has to reach the server instead.
+     */
+    private const BROWSE_LIMIT = 500;
+
     public function index(Request $request)
     {
         $receivings = MaterialReceiving::with('createdBy')
@@ -91,6 +97,33 @@ class MaterialReceivingController extends Controller
     }
 
     /**
+     * Physical qty already received against each worksheet row by earlier GRNs,
+     * summed in one grouped query rather than per row.
+     *
+     * Keyed on excel_row_id because that is what a receiving is booked against —
+     * the same key the stock ledger uses.
+     *
+     * @param  \Illuminate\Support\Collection<int, int>  $rowIds
+     * @return array<int, float>
+     */
+    private function receivedQtyByRow($rowIds): array
+    {
+        $rowIds = collect($rowIds)->filter()->unique()->values();
+
+        if ($rowIds->isEmpty()) {
+            return [];
+        }
+
+        return MaterialReceiving::query()
+            ->whereIn('excel_row_id', $rowIds->all())
+            ->groupBy('excel_row_id')
+            ->selectRaw('excel_row_id, SUM(qty) AS total')
+            ->pluck('total', 'excel_row_id')
+            ->map(fn ($total) => (float) $total)
+            ->all();
+    }
+
+    /**
      * Auto-fill payload for one Booking PO, used by the form's PO dropdown.
      * Same resolver the save path uses, so what Store sees is what gets stored.
      */
@@ -120,15 +153,37 @@ class MaterialReceivingController extends Controller
         $term = trim((string) ($validated['term'] ?? ''));
         $source = app(\App\Services\BookingPoSourceService::class);
 
-        // An empty PO search lists the recent POs so the field stays browsable
-        // rather than forcing Store to know a number up front.
-        $matches = ($term === '' && $validated['type'] === 'po_no')
-            ? BookingPo::query()->orderByDesc('id')->limit(50)->get()
-            : $source->bookingPosMatching($validated['type'], $term);
+        // Empty term = browse. Every filter type is now listable, so opening the
+        // field shows what exists instead of demanding a number up front.
+        if ($term === '') {
+            $options = $source->browseOptionsForGroup($validated['type'], self::BROWSE_LIMIT);
+
+            return response()->json([
+                // Whether the browse list is the whole dataset. When it is, the
+                // browser filters it locally and stops calling back on every
+                // keystroke; when it was capped, typing falls through to the
+                // search below so nothing becomes unreachable.
+                'complete' => $options->count() < self::BROWSE_LIMIT,
+                'results' => $options->map(fn (array $option) => [
+                    'id' => $option['po']->id,
+                    'value' => $option['value'],
+                    'po_no' => $option['po']->po_no,
+                    'buyer_name' => $option['po']->buyer_name,
+                    'season_name' => $option['po']->season_name,
+                    'vendor_name' => $option['po']->vendor_name,
+                ])->values(),
+            ]);
+        }
+
+        $matches = $source->bookingPosMatching($validated['type'], $term);
 
         return response()->json([
+            'complete' => false,
             'results' => $matches->map(fn (BookingPo $po) => [
                 'id' => $po->id,
+                // The typed path matches POs rather than individual cell values,
+                // so the PO number is the only handle it can label a row with.
+                'value' => $po->po_no,
                 'po_no' => $po->po_no,
                 'buyer_name' => $po->buyer_name,
                 'season_name' => $po->season_name,
@@ -154,8 +209,9 @@ class MaterialReceivingController extends Controller
 
         $rows = app(\App\Services\BookingPoSourceService::class)->itemRowsForBookingPo($bookingPo);
         $prefill = $this->rowPrefill($rows->pluck('id'));
+        $alreadyReceived = $this->receivedQtyByRow($rows->pluck('id'));
 
-        $items = $rows->map(function ($row) use ($bookingPo, $prefill) {
+        $items = $rows->map(function ($row) use ($bookingPo, $prefill, $alreadyReceived) {
             $suggested = $prefill[$row->id] ?? [];
 
             return array_merge($this->autoFieldsForRow($bookingPo, $row), [
@@ -163,6 +219,9 @@ class MaterialReceivingController extends Controller
                 // entered on this BOM line — Store may override either.
                 'suggested_invoice_no' => $suggested['invoice_no'] ?? null,
                 'suggested_unit_price' => $suggested['unit_price'] ?? null,
+                // What earlier GRNs already booked against this line, so Store
+                // can see how much of the order is still outstanding.
+                'received_qty' => $alreadyReceived[$row->id] ?? 0.0,
             ]);
         })->values();
 
@@ -274,6 +333,8 @@ class MaterialReceivingController extends Controller
             'rows.*.excel_row_id' => ['required', 'integer'],
             'rows.*.invoice_no' => ['nullable', 'string', 'max:100'],
             'rows.*.receive_date' => ['required', 'date'],
+            // Optional: left blank it follows the receive date below.
+            'rows.*.grn_date' => ['nullable', 'date'],
             'rows.*.source_type' => ['required', 'in:booking,internal_po'],
             // qty = Physical Rcv Qty; it alone drives the stock ledger.
             'rows.*.qty' => ['required', 'numeric', 'min:0.0001'],
@@ -328,6 +389,9 @@ class MaterialReceivingController extends Controller
                     [
                         'invoice_no' => $row['invoice_no'] ?? null,
                         'receive_date' => $row['receive_date'],
+                        // Defaults to the receive date so a GRN always carries a
+                        // date, whether or not Store set one explicitly.
+                        'grn_date' => $row['grn_date'] ?? $row['receive_date'],
                         'source_type' => $row['source_type'],
                         'qty' => $row['qty'],
                         'invoice_qty' => $invoiceQty,

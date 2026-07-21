@@ -641,6 +641,91 @@ class BookingPoSourceService
     }
 
     /**
+     * The browsable list of values behind one search field, newest first, so
+     * Store can open the dropdown and pick rather than having to already know a
+     * number.
+     *
+     * Returns values, not POs. A PO carries several material lines and each line
+     * has its own SAP code / PI number / invoice number, so "every SAP Code"
+     * genuinely means every distinct cell value — listing one per PO would hide
+     * most of them. Each entry keeps the PO that owns it, which is what actually
+     * gets selected.
+     *
+     * $limit caps the PO-facing result, not the scan: the cell query is widened
+     * because several rows of one PO collapse into far fewer distinct values.
+     *
+     * @return Collection<int, array{value: string, po: BookingPo}>
+     */
+    public function browseOptionsForGroup(string $group, int $limit = 200): Collection
+    {
+        // PO number is a booking_pos column, so it needs none of the cell
+        // mapping below.
+        if ($group === 'po_no') {
+            return BookingPo::query()
+                ->orderByDesc('id')
+                ->limit($limit)
+                ->get()
+                ->map(fn (BookingPo $po) => ['value' => (string) $po->po_no, 'po' => $po])
+                ->values();
+        }
+
+        $headerIds = $this->headerIdsForGroup($group);
+
+        if ($headerIds->isEmpty()) {
+            return collect();
+        }
+
+        $cells = ExcelCell::query()
+            ->whereIn('header_id', $headerIds->all())
+            ->whereRaw("TRIM(COALESCE(value, '')) <> ''")
+            ->orderByDesc('row_id')
+            ->limit($limit * 5)
+            ->get(['row_id', 'value']);
+
+        if ($cells->isEmpty()) {
+            return collect();
+        }
+
+        $rowIds = $cells->pluck('row_id')->unique()->values();
+
+        // Same two routes back to a PO that bookingPosMatching() uses: the row is
+        // a PO's own primary row, or it is a sibling line carrying that PO's
+        // number. Resolved in bulk rather than per row.
+        $poByRow = BookingPo::query()
+            ->whereIn('excel_row_id', $rowIds->all())
+            ->get()
+            ->keyBy('excel_row_id');
+
+        $poNoByRow = ExcelCell::query()
+            ->whereIn('row_id', $rowIds->all())
+            ->whereIn('header_id', $this->poNumberHeaderIds()->all())
+            ->get(['row_id', 'value'])
+            ->mapWithKeys(fn ($cell) => [$cell->row_id => trim((string) $cell->value)])
+            ->filter(fn ($poNo) => $poNo !== '');
+
+        $poByNo = $poNoByRow->isEmpty() ? collect() : BookingPo::query()
+            ->whereIn('po_no', $poNoByRow->values()->unique()->all())
+            ->get()
+            ->keyBy('po_no');
+
+        return $cells
+            ->map(function ($cell) use ($poByRow, $poNoByRow, $poByNo) {
+                $po = $poByRow->get($cell->row_id)
+                    ?? $poByNo->get($poNoByRow->get($cell->row_id));
+
+                // A value whose row belongs to no generated PO is not yet
+                // receivable, so it is left out rather than shown as unselectable.
+                return $po ? ['value' => trim((string) $cell->value), 'po' => $po] : null;
+            })
+            ->filter()
+            // The same value under two different POs stays as two entries — they
+            // are genuinely different choices.
+            ->unique(fn (array $option) => $option['value'].'|'.$option['po']->id)
+            ->take($limit)
+            ->values();
+    }
+
+    /**
      * Booking POs reachable by a partial, case-insensitive search on one field.
      *
      * Store knows a delivery by different handles depending on the paperwork in

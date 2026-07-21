@@ -291,3 +291,44 @@ it('applies the shared header values to every saved row', function () {
         ->and((float) $saved[1]->invoice_value)->toBe(20.0)
         ->and($saved->pluck('grn_no')->unique())->toHaveCount(2);
 });
+
+it('stores GRN Date when given and falls back to the receive date when not', function () {
+    ['po' => $po, 'rows' => $rows] = poWithLines('PO-0013', ['Thread Tex 40', 'Zipper']);
+
+    $this->actingAs(storeUser())
+        ->post(route('store.material.receivings.store'), [
+            'booking_po_id' => $po->id,
+            'rows' => [
+                // Booked a day after the goods actually landed.
+                ['excel_row_id' => $rows[0]->id, 'qty' => 10, 'receive_date' => '2026-07-05', 'grn_date' => '2026-07-06', 'source_type' => 'booking'],
+                // No GRN date entered at all.
+                ['excel_row_id' => $rows[1]->id, 'qty' => 4, 'receive_date' => '2026-07-05', 'source_type' => 'booking'],
+            ],
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $saved = MaterialReceiving::orderBy('id')->get();
+
+    expect($saved[0]->grn_date->format('Y-m-d'))->toBe('2026-07-06')
+        ->and($saved[1]->grn_date->format('Y-m-d'))->toBe('2026-07-05');
+
+    // The GRN number's year segment still comes from the receive date, so
+    // numbering is unaffected by the new field.
+    expect($saved[0]->grn_no)->toContain('-2026-');
+});
+
+it('rejects an invalid GRN Date', function () {
+    ['po' => $po, 'rows' => $rows] = poWithLines('PO-0014', ['Thread Tex 40']);
+
+    $this->actingAs(storeUser())
+        ->post(route('store.material.receivings.store'), [
+            'booking_po_id' => $po->id,
+            'rows' => [
+                ['excel_row_id' => $rows[0]->id, 'qty' => 10, 'receive_date' => '2026-07-05', 'grn_date' => 'not-a-date', 'source_type' => 'booking'],
+            ],
+        ])
+        ->assertSessionHasErrors('rows.0.grn_date');
+
+    expect(MaterialReceiving::count())->toBe(0);
+});
