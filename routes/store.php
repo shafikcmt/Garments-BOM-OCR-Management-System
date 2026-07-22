@@ -91,6 +91,11 @@ Route::prefix('store/material-stock')
         Route::get('/bulk-issues', [MaterialBulkIssueController::class, 'index'])->name('bulk-issues.index');
         // Auto-fill lookup for the Record Bulk Issue form's PO/Material summary.
         Route::get('/bulk-issues/po-details/{bookingPo}', [MaterialBulkIssueController::class, 'poDetails'])->name('bulk-issues.po-details');
+        // Item picker cascade: PO/PI/Invoice lookup, then the lines under one PO.
+        // Bulk Issuing keeps its own pair rather than borrowing Receiving's,
+        // which is store-only and would 403 for Admin / Management here.
+        Route::get('/bulk-issues/po-search', [MaterialBulkIssueController::class, 'poSearch'])->name('bulk-issues.po-search');
+        Route::get('/bulk-issues/po-items/{bookingPo}', [MaterialBulkIssueController::class, 'poItems'])->name('bulk-issues.po-items');
         Route::post('/bulk-issues', [MaterialBulkIssueController::class, 'store'])->name('bulk-issues.store');
         // Selection actions — static paths, declared before the {id} wildcard.
         Route::post('/bulk-issues/bulk-destroy', [MaterialBulkIssueController::class, 'bulkDestroy'])->name('bulk-issues.bulk-destroy');
