@@ -5,6 +5,7 @@ import { initFileUpload } from './modules/file-upload';
 import { initFileTable } from './modules/file-table';
 import { initUserTable } from './modules/user-table';
 import { initSubmitButtons } from './modules/submit-button';
+import { initBulkIssueTable } from './modules/bulk-issue-table';
 
 import Alpine from 'alpinejs';
 
@@ -24,3 +25,6 @@ document.addEventListener('DOMContentLoaded', initFileUpload);
 document.addEventListener('DOMContentLoaded', initFileTable);
 document.addEventListener('DOMContentLoaded', initUserTable);
 document.addEventListener('DOMContentLoaded', initSubmitButtons);
+
+// Bulk Issue history: server-driven tabs/search/sort, bulk actions, slide-in.
+document.addEventListener('DOMContentLoaded', initBulkIssueTable);
