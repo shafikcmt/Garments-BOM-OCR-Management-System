@@ -4,6 +4,9 @@
     $isAdminUserRole = request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*');
     $isAdminBookingSettings = request()->routeIs('admin.suppliers.*') || request()->routeIs('admin.booking-delivery-destinations.*') || request()->routeIs('admin.booking-instructions.*') || request()->routeIs('admin.po-generate-control.*');
     $isAdminSettings = request()->routeIs('admin.alert-settings.*') || request()->routeIs('admin.payment-settings.*') || request()->routeIs('admin.email-templates.*');
+    // Store screens Admin shares with the store role (Bulk Issuing corrections,
+    // reports). Store's own sidebar block lists these separately.
+    $isAdminStore = request()->routeIs('store.material.bulk-issues.*') || request()->routeIs('store.reports.*');
     $isSupplyBooking = request()->routeIs('supply_chain.bookings.*');
     $isSupplyPayment = request()->routeIs('supply_chain.payment_requests.*');
     $isSupplyEmails = request()->routeIs('supply_chain.sent_emails.*');
@@ -38,6 +41,21 @@
                                 <span class="sidebar-link-text">Dashboard</span>
                             </span>
                         </a>
+                    </li>
+
+                    <li class="sidebar-group {{ $isAdminStore ? 'is-open' : '' }}">
+                        <button type="button" class="sidebar-group-button {{ $isAdminStore ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminStore ? 'true' : 'false' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Store</span>
+                            </span>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+                        </button>
+                        <div class="sidebar-submenu {{ $isAdminStore ? 'is-open' : '' }}">
+                            <span class="sidebar-submenu-rail"></span>
+                            <a href="{{ route('store.material.bulk-issues.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.material.bulk-issues.*') ? 'is-active' : '' }}">Bulk Issuing</a>
+                            <a href="{{ route('store.reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">Store Reports</a>
+                        </div>
                     </li>
 
                     <li class="sidebar-group {{ $isAdminWorkspace ? 'is-open' : '' }}">
@@ -317,6 +335,16 @@
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Store Reports</span>
+                            </span>
+                        </a>
+                    </li>
+                    {{-- Management records no issues; the link is here so they can
+                         review and correct what Store recorded. --}}
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.material.bulk-issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.bulk-issues.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Bulk Issuing</span>
                             </span>
                         </a>
                     </li>

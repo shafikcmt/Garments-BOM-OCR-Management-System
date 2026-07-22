@@ -78,6 +78,10 @@ class RolePermissionSeeder extends Seeder
                 'shipments.view',
                 'reports.view',
                 'approve-pra',
+                // Correction rights over store records the store role lacks.
+                'store.view',
+                'store.edit',
+                'store.delete',
             ],
         ];
 

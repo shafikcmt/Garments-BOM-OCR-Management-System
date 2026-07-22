@@ -39,7 +39,7 @@ export function initBulkIssueTable() {
     if (!container) return;
 
     const state = Object.assign({ page: 1 }, cfg.state);
-    const TAB_LABELS = { all: 'All Issues', today: 'Today', week: 'This Week', month: 'This Month' };
+    const can = cfg.can || {};
 
     // --- Server fetch + swap ---------------------------------------------------
     let fetchTicket = 0;
@@ -148,9 +148,11 @@ export function initBulkIssueTable() {
     // --- Filter chips ----------------------------------------------------------
     function renderChips() {
         if (!chipsWrap) return;
+        // Only filters BEYOND the active tab get a chip. The tab itself is
+        // already visible as the selected tab, so repeating it as a "This Month ×"
+        // chip would be the same filter shown twice.
         const chips = [];
         if (state.q) chips.push(['q', 'Search: "' + state.q + '"']);
-        if (state.tab && state.tab !== 'all') chips.push(['tab', TAB_LABELS[state.tab] || state.tab]);
 
         if (!chips.length) { chipsWrap.innerHTML = ''; return; }
 
@@ -164,8 +166,9 @@ export function initBulkIssueTable() {
             const btn = e.target.closest('[data-chip-clear]');
             if (!btn) return;
             const key = btn.getAttribute('data-chip-clear');
+            // Chips cover the extra filters only, so clearing them leaves the
+            // active tab alone — the tab is its own visible control.
             if (key === 'q' || key === 'all') { state.q = ''; if (searchInput) searchInput.value = ''; }
-            if (key === 'tab' || key === 'all') state.tab = 'all';
             state.page = 1;
             load();
         });
@@ -268,6 +271,11 @@ export function initBulkIssueTable() {
         win.print();
     }
 
+    function clearSelection() {
+        container.querySelectorAll('.bi-row-check:checked').forEach((c) => { c.checked = false; });
+        updateSelection();
+    }
+
     if (bulkBar) {
         bulkBar.addEventListener('click', (e) => {
             const btn = e.target.closest('[data-bi-action]');
@@ -277,13 +285,28 @@ export function initBulkIssueTable() {
             if (action === 'excel') submitBulk(cfg.routes.exportExcel);
             else if (action === 'pdf') submitBulk(cfg.routes.exportPdf);
             else if (action === 'print') printSelection();
+            else if (action === 'cancel') clearSelection();
             else if (action === 'delete') {
+                // The button is not rendered without the permission; this second
+                // check keeps a stale DOM from firing a request the server would
+                // reject anyway.
+                if (!can.delete) return;
                 if (window.confirm('Delete ' + count + ' selected bulk issue(s)? Closing stock will update. This cannot be undone.')) {
                     submitBulk(cfg.routes.bulkDestroy, 'DELETE');
                 }
             }
         });
     }
+
+    // Escape clears an active selection — the keyboard equivalent of Cancel.
+    // Skipped while the slide-in panel is open, where Escape already means
+    // "close the panel".
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const panelEl = document.getElementById('biPanel');
+        if (panelEl && panelEl.classList.contains('show')) return;
+        if (selectedIds().length) clearSelection();
+    });
 
     // --- Create / Edit slide-in panel -----------------------------------------
     initPanel(cfg);
@@ -360,12 +383,21 @@ function initPanel(cfg) {
     }
     qtyEls.forEach((el) => el.addEventListener('input', checkOver));
 
+    /**
+     * Fill Issue No with the actual generated number rather than a placeholder,
+     * so the user sees the value that will be saved. It stays fully editable —
+     * the italic/muted styling drops the moment they type.
+     */
     function suggestIssueNo() {
-        if (issueNoEl && !issueNoEl.value) {
-            const d = new Date();
-            const ymd = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
-            issueNoEl.value = 'BI-' + ymd + '-' + String(Math.floor(1000 + Math.random() * 9000));
-        }
+        if (!issueNoEl || issueNoEl.value) return;
+        const d = new Date();
+        const ymd = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+        issueNoEl.value = 'BI-' + ymd + '-' + String(Math.floor(1000 + Math.random() * 9000));
+        issueNoEl.classList.add('bi-suggested');
+    }
+
+    if (issueNoEl) {
+        issueNoEl.addEventListener('input', () => issueNoEl.classList.remove('bi-suggested'));
     }
 
     // --- PO picker (client-side over options) ---------------------------------
@@ -454,10 +486,19 @@ function initPanel(cfg) {
         title.textContent = 'New Bulk Issue';
         saveLabel.textContent = 'Save';
         if (issueDateEl) issueDateEl.value = new Date().toISOString().slice(0, 10);
+        if (issueNoEl) issueNoEl.classList.remove('bi-suggested');
     }
 
     const newBtn = document.getElementById('biNewBtn');
-    if (newBtn) newBtn.addEventListener('click', () => { resetForm(); panel.show(); });
+    if (newBtn) {
+        newBtn.addEventListener('click', () => {
+            resetForm();
+            // Suggest up front so the field shows a real number on open, not
+            // only after a PO is picked.
+            suggestIssueNo();
+            panel.show();
+        });
+    }
 
     // Delegated edit buttons in the (swappable) table.
     document.getElementById('biTableContainer').addEventListener('click', (e) => {

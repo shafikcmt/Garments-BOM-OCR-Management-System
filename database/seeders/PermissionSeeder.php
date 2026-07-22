@@ -50,6 +50,11 @@ class PermissionSeeder extends Seeder
             'store.issue',
             'store.return',
             'store.adjust',
+            // Correcting an already-recorded issue. Not granted to the store
+            // role: every edit/delete recomputes closing stock, so corrections
+            // stay with Admin / Management.
+            'store.edit',
+            'store.delete',
 
             // ===== USERS & ROLES =====
             'users.view',

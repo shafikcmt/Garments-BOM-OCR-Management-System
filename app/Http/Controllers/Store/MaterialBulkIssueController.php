@@ -52,8 +52,19 @@ class MaterialBulkIssueController extends Controller
 
         // AJAX partial swap: the table body + pagination only, so search/sort/tab
         // never trigger a full-page reload.
+        // Who may do what, resolved once and shared with both the full page and
+        // the AJAX partial so a swapped table keeps the same gating.
+        $user = $request->user();
+        $canCreate = $user?->can('store.issue') ?? false;
+        $canEdit = $user?->can('store.edit') ?? false;
+        $canDelete = $user?->can('store.delete') ?? false;
+
+        // AJAX partial swap: the table body + pagination only, so search/sort/tab
+        // never trigger a full-page reload.
         if ($request->boolean('partial')) {
-            return view('store.material-stock._bulk-issues-table', compact('issues', 'counts', 'tab', 'q', 'sort', 'dir', 'perPage'));
+            return view('store.material-stock._bulk-issues-table', compact(
+                'issues', 'counts', 'tab', 'q', 'sort', 'dir', 'perPage', 'canEdit', 'canDelete'
+            ));
         }
 
         $bookingPos = BookingPo::with('excelFile')->orderByDesc('id')->take(1000)->get();
@@ -74,7 +85,8 @@ class MaterialBulkIssueController extends Controller
 
         return view('store.material-stock.bulk-issues', compact(
             'issues', 'counts', 'tab', 'q', 'sort', 'dir', 'perPage',
-            'bookingPos', 'requisitions', 'prefill', 'sections'
+            'bookingPos', 'requisitions', 'prefill', 'sections',
+            'canCreate', 'canEdit', 'canDelete'
         ));
     }
 
@@ -195,6 +207,10 @@ class MaterialBulkIssueController extends Controller
 
     public function store(Request $request)
     {
+        // Admin / Management can reach this page to review and correct, but only
+        // roles holding store.issue actually record new issues.
+        $this->authorizeCorrection('store.issue');
+
         $validated = $request->validate([
             'booking_po_id' => ['required', 'exists:booking_pos,id'],
             'material_requisition_id' => ['nullable', 'exists:material_requisitions,id'],
@@ -295,6 +311,8 @@ class MaterialBulkIssueController extends Controller
      */
     public function update(Request $request, MaterialBulkIssue $materialBulkIssue)
     {
+        $this->authorizeCorrection('store.edit');
+
         $validated = $this->validateIssue($request);
 
         $quantities = $this->quantities($validated);
@@ -326,9 +344,31 @@ class MaterialBulkIssueController extends Controller
 
     public function destroy(MaterialBulkIssue $materialBulkIssue)
     {
+        $this->authorizeCorrection('store.delete');
+
         $materialBulkIssue->delete();
 
         return back()->with('success', 'Bulk issue removed. Closing stock updated.');
+    }
+
+    /**
+     * Guard for the correction actions (edit / delete). Hiding the buttons in
+     * the view is presentation only — this is what actually stops a hand-crafted
+     * request from a role without the permission.
+     */
+    private function authorizeCorrection(string $permission): void
+    {
+        $messages = [
+            'store.issue' => 'You do not have permission to record a bulk issue.',
+            'store.edit' => 'You do not have permission to edit a recorded bulk issue.',
+            'store.delete' => 'You do not have permission to delete a recorded bulk issue.',
+        ];
+
+        abort_unless(
+            auth()->user()?->can($permission) ?? false,
+            403,
+            $messages[$permission] ?? 'You do not have permission for this action.',
+        );
     }
 
     /**
@@ -337,6 +377,8 @@ class MaterialBulkIssueController extends Controller
      */
     public function bulkDestroy(Request $request)
     {
+        $this->authorizeCorrection('store.delete');
+
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer', 'exists:material_bulk_issues,id'],

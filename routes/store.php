@@ -67,22 +67,37 @@ Route::prefix('store')
             Route::post('/receivings', [MaterialReceivingController::class, 'store'])->name('receivings.store');
             Route::delete('/receivings/{materialReceiving}', [MaterialReceivingController::class, 'destroy'])->name('receivings.destroy');
 
-            Route::get('/bulk-issues', [MaterialBulkIssueController::class, 'index'])->name('bulk-issues.index');
-            // Auto-fill lookup for the Record Bulk Issue form's PO/Material summary.
-            Route::get('/bulk-issues/po-details/{bookingPo}', [MaterialBulkIssueController::class, 'poDetails'])->name('bulk-issues.po-details');
-            Route::post('/bulk-issues', [MaterialBulkIssueController::class, 'store'])->name('bulk-issues.store');
-            // Selection actions — static paths, declared before the {id} wildcard.
-            Route::post('/bulk-issues/bulk-destroy', [MaterialBulkIssueController::class, 'bulkDestroy'])->name('bulk-issues.bulk-destroy');
-            Route::post('/bulk-issues/export/excel', [MaterialBulkIssueController::class, 'exportExcel'])->name('bulk-issues.export.excel');
-            Route::post('/bulk-issues/export/pdf', [MaterialBulkIssueController::class, 'exportPdf'])->name('bulk-issues.export.pdf');
-            // Single-record read (edit prefill) + update.
-            Route::get('/bulk-issues/{materialBulkIssue}', [MaterialBulkIssueController::class, 'show'])->name('bulk-issues.show');
-            Route::put('/bulk-issues/{materialBulkIssue}', [MaterialBulkIssueController::class, 'update'])->name('bulk-issues.update');
-            Route::delete('/bulk-issues/{materialBulkIssue}', [MaterialBulkIssueController::class, 'destroy'])->name('bulk-issues.destroy');
+            // NOTE: bulk-issue routes live in their own group below — they are
+            // shared with Admin / Management, who hold the correction rights the
+            // store role does not.
 
             Route::get('/requisitions', [MaterialRequisitionController::class, 'index'])->name('requisitions.index');
             Route::post('/requisitions', [MaterialRequisitionController::class, 'store'])->name('requisitions.store');
             Route::patch('/requisitions/{materialRequisition}/approve', [MaterialRequisitionController::class, 'approve'])->name('requisitions.approve');
             Route::delete('/requisitions/{materialRequisition}', [MaterialRequisitionController::class, 'destroy'])->name('requisitions.destroy');
         });
+    });
+
+// Bulk Issuing — same URLs and route names as before, lifted out of the
+// store-only group because Admin / Management need access too: a Store user
+// records an issue but may not edit or delete it afterwards (every change
+// recomputes closing stock), so corrections belong to Admin / Management.
+// Access here is role-based; the edit/delete actions themselves are gated on
+// the store.edit / store.delete permissions inside the controller and views.
+Route::prefix('store/material-stock')
+    ->middleware(['auth', 'role:store,admin,management'])
+    ->name('store.material.')
+    ->group(function () {
+        Route::get('/bulk-issues', [MaterialBulkIssueController::class, 'index'])->name('bulk-issues.index');
+        // Auto-fill lookup for the Record Bulk Issue form's PO/Material summary.
+        Route::get('/bulk-issues/po-details/{bookingPo}', [MaterialBulkIssueController::class, 'poDetails'])->name('bulk-issues.po-details');
+        Route::post('/bulk-issues', [MaterialBulkIssueController::class, 'store'])->name('bulk-issues.store');
+        // Selection actions — static paths, declared before the {id} wildcard.
+        Route::post('/bulk-issues/bulk-destroy', [MaterialBulkIssueController::class, 'bulkDestroy'])->name('bulk-issues.bulk-destroy');
+        Route::post('/bulk-issues/export/excel', [MaterialBulkIssueController::class, 'exportExcel'])->name('bulk-issues.export.excel');
+        Route::post('/bulk-issues/export/pdf', [MaterialBulkIssueController::class, 'exportPdf'])->name('bulk-issues.export.pdf');
+        // Single-record read (edit prefill) + update.
+        Route::get('/bulk-issues/{materialBulkIssue}', [MaterialBulkIssueController::class, 'show'])->name('bulk-issues.show');
+        Route::put('/bulk-issues/{materialBulkIssue}', [MaterialBulkIssueController::class, 'update'])->name('bulk-issues.update');
+        Route::delete('/bulk-issues/{materialBulkIssue}', [MaterialBulkIssueController::class, 'destroy'])->name('bulk-issues.destroy');
     });

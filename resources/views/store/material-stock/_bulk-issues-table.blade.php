@@ -3,15 +3,40 @@
      this block. Expects: $issues, $counts, $tab, $q, $sort, $dir, $perPage. --}}
 @php
     $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 4), '0'), '.');
-    // Arrow for a sortable header: only the active column shows direction.
+    // Arrow for a sortable header: dimmed ⇅ when inactive, coloured ↑/↓ when this
+    // column drives the sort. Rendered right beside the label so the pairing reads.
     $arrow = function (string $col) use ($sort, $dir) {
-        if ($sort !== $col) return '<i class="bi bi-arrow-down-up opacity-50" aria-hidden="true"></i>';
+        if ($sort !== $col) return '<i class="bi bi-arrow-down-up text-muted opacity-50" aria-hidden="true"></i>';
         return $dir === 'asc'
-            ? '<i class="bi bi-arrow-up" aria-hidden="true"></i>'
-            : '<i class="bi bi-arrow-down" aria-hidden="true"></i>';
+            ? '<i class="bi bi-arrow-up text-primary" aria-hidden="true"></i>'
+            : '<i class="bi bi-arrow-down text-primary" aria-hidden="true"></i>';
     };
     $from = $issues->total() ? ($issues->firstItem() ?? 0) : 0;
     $to = $issues->total() ? ($issues->lastItem() ?? 0) : 0;
+
+    // Department (Indent Section) colour set — deliberately DISTINCT from the
+    // Bulk/Sample/Liability/Dead issue-type colours (green/blue/amber/red) so a
+    // section badge never reads as a quantity type. [bg, text].
+    $sectionColors = [
+        'Cutting' => ['#EEF2FF', '#4338CA'],
+        'Sewing' => ['#ECFEFF', '#0E7490'],
+        'Finishing' => ['#F0FDFA', '#0F766E'],
+        'Sample' => ['#F5F3FF', '#6D28D9'],
+        'Embroidery' => ['#FDF4FF', '#A21CAF'],
+        'Printing' => ['#FFF7ED', '#C2410C'],
+        'Washing' => ['#F8FAFC', '#475569'],
+        'Store' => ['#F1F5F9', '#334155'],
+    ];
+    $sectionStyle = fn ($s) => isset($sectionColors[$s])
+        ? 'background:'.$sectionColors[$s][0].';color:'.$sectionColors[$s][1].';'
+        : 'background:#F1F5F9;color:#475569;';
+
+    // Correction rights. Defaulted so the partial still renders if it is ever
+    // included without them (read-only is the safe fallback).
+    $canEdit = $canEdit ?? false;
+    $canDelete = $canDelete ?? false;
+    $showActions = $canEdit || $canDelete;
+    $colSpan = $showActions ? 8 : 7;
 @endphp
 
 {{-- Tab counts travel with the partial so an AJAX swap can refresh the badges. --}}
@@ -38,7 +63,7 @@
                 <th class="text-end">Sample</th>
                 <th class="text-end">Liab.</th>
                 <th class="text-end">Dead</th>
-                <th class="text-end">Action</th>
+                @if($showActions)<th class="text-end">Action</th>@endif
             </tr>
         </thead>
         <tbody>
@@ -52,26 +77,32 @@
                         <div class="fw-semibold">{{ $i->po_no }} · {{ $i->material_name ?: $i->material_description }}</div>
                         <div class="small text-muted">{{ collect([$i->buyer_name, $i->style_name, $i->material_color, $i->size])->filter()->implode(' · ') }}</div>
                         @if($i->indent_section)
-                            <span class="badge bg-secondary-subtle text-secondary-emphasis mt-1"><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>{{ $i->indent_section }}</span>
+                            <span class="badge bi-section-badge mt-1" style="{{ $sectionStyle($i->indent_section) }}"><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>{{ $i->indent_section }}</span>
                         @endif
                     </td>
                     <td class="text-end text-success" data-label="Bulk">{{ $num($i->bulk_qty) }}</td>
                     <td class="text-end text-primary" data-label="Sample">{{ $num($i->sample_qty) }}</td>
                     <td class="text-end text-warning" data-label="Liability">{{ $num($i->liability_qty) }}</td>
                     <td class="text-end text-danger" data-label="Dead">{{ $num($i->dead_qty) }}</td>
-                    <td class="text-end" data-label="Action">
-                        <div class="d-inline-flex gap-1">
-                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2" data-bi-edit="{{ $i->id }}" aria-label="Edit this entry" title="Edit"><i class="bi bi-pencil" aria-hidden="true"></i></button>
-                            <form method="POST" action="{{ route('store.material.bulk-issues.destroy', $i) }}" onsubmit="return confirm('Remove this bulk issue? Closing stock will update.');">
-                                @csrf @method('DELETE')
-                                <button class="btn btn-sm btn-outline-danger rounded-pill px-2" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
-                            </form>
-                        </div>
-                    </td>
+                    @if($showActions)
+                        <td class="text-end" data-label="Action">
+                            <div class="d-inline-flex gap-1">
+                                @if($canEdit)
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2" data-bi-edit="{{ $i->id }}" aria-label="Edit this entry" title="Edit"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                                @endif
+                                @if($canDelete)
+                                    <form method="POST" action="{{ route('store.material.bulk-issues.destroy', $i) }}" onsubmit="return confirm('Remove this bulk issue? Closing stock will update.');">
+                                        @csrf @method('DELETE')
+                                        <button class="btn btn-sm btn-outline-danger rounded-pill px-2" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                    </form>
+                                @endif
+                            </div>
+                        </td>
+                    @endif
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8" class="text-center text-muted py-5">
+                    <td colspan="{{ $colSpan }}" class="text-center text-muted py-5">
                         <i class="bi bi-inbox d-block mb-2" style="font-size:26px;opacity:.4;" aria-hidden="true"></i>
                         @if($q !== '' || $tab !== 'all')
                             No bulk issues match this view.

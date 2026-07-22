@@ -30,12 +30,24 @@
     #biSummaryGrid .bi-sum-label { font-size: .6875rem; text-transform: uppercase; letter-spacing: .04em; color: #94A3B8; margin-bottom: .1rem; }
     #biSummaryGrid .bi-sum-value { font-weight: 600; color: var(--gx-primary, #0F172A); line-height: 1.3; overflow-wrap: anywhere; }
 
-    /* Colour-coded quantity cards. */
-    .bi-qty-card { border: 1px solid var(--bs-border-color, #E2E8F0); border-radius: 12px; padding: .85rem; }
+    /* Colour-coded quantity cards. Compact padding + a tight label so all four
+       fit without the form feeling stretched. */
+    .bi-qty-card { border: 1px solid var(--bs-border-color, #E2E8F0); border-radius: 10px; padding: .5rem .6rem; }
     .bi-qty-card.bulk { border-color: #A7F3D0; } .bi-qty-card.sample { border-color: #BFDBFE; }
     .bi-qty-card.liability { border-color: #FDE68A; } .bi-qty-card.dead { border-color: #FECACA; }
+    .bi-qty-grid .bi-qty-card .form-label { font-size: .78rem; margin-bottom: .25rem; }
 
-    /* Sticky bulk-action bar. */
+    /* Auto-suggested value: reads as a suggestion until the user edits it. */
+    .bi-suggested { font-style: italic; color: var(--gx-text-muted, #64748B); }
+
+    /* History table: row hover + department badge. */
+    .bi-history-table tbody tr { transition: background-color .15s ease; }
+    .bi-history-table tbody tr:hover { background: var(--gx-bg, #F8FAFC); }
+    .bi-history-table tbody tr:has(.bi-row-check:checked) { background: var(--gx-secondary-bg, #DBEAFE); }
+    .bi-section-badge { font-weight: 600; letter-spacing: .01em; }
+
+    /* Sticky bulk-action bar. Docks to the bottom of the viewport while the
+       selection lasts, so the actions stay reachable on a long list. */
     .bi-bulkbar {
         position: sticky; bottom: 1rem; z-index: 30; border: 1px solid var(--gx-secondary-border, #BFDBFE);
         background: #fff; border-radius: 12px; box-shadow: 0 8px 24px -8px rgba(15,23,42,.25);
@@ -79,7 +91,7 @@
                 </div>
             </div>
             <div class="d-flex gap-2">
-                @if(!$bookingPos->isEmpty())
+                @if(!$bookingPos->isEmpty() && $canCreate)
                     <button type="button" class="btn btn-primary" id="biNewBtn"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>New Bulk Issue</button>
                 @endif
                 <a href="{{ route('store.material.receivings.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-in-down me-1" aria-hidden="true"></i>Receiving</a>
@@ -120,17 +132,6 @@
                 </div>
             </div>
 
-            {{-- Sticky selection bar (hidden until ≥1 selected) --}}
-            <div class="bi-bulkbar d-none p-2 px-3 mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2" id="biBulkBar">
-                <span class="fw-semibold"><i class="bi bi-check2-square me-1 text-primary" aria-hidden="true"></i>Selected: <span id="biSelCount">0</span> item(s)</span>
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-success" data-bi-action="excel"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Export Excel</button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" data-bi-action="pdf"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Export PDF</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bi-action="print"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print</button>
-                    <button type="button" class="btn btn-sm btn-danger" data-bi-action="delete"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
-                </div>
-            </div>
-
             {{-- Table (AJAX-swapped) + skeleton --}}
             <div id="biSkeleton" class="d-none">
                 <div class="d-flex flex-column gap-2">
@@ -140,12 +141,29 @@
             <div id="biTableContainer" aria-live="polite">
                 @include('store.material-stock._bulk-issues-table')
             </div>
+
+            {{-- Sticky selection bar. Sits after the table so sticky-bottom docks
+                 it against the viewport while the list scrolls above it. Hidden
+                 until at least one row is selected. --}}
+            <div class="bi-bulkbar d-none p-2 px-3 mt-3 d-flex flex-wrap align-items-center justify-content-between gap-2" id="biBulkBar" role="region" aria-label="Actions for selected rows">
+                <span class="fw-semibold"><i class="bi bi-check2-square me-1 text-primary" aria-hidden="true"></i>Selected: <span id="biSelCount">0</span> item(s)</span>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-success" data-bi-action="excel"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Export Excel</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-bi-action="pdf"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Export PDF</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bi-action="print"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print Selected</button>
+                    @if($canDelete)
+                        <button type="button" class="btn btn-sm btn-danger" data-bi-action="delete"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete Selected</button>
+                    @endif
+                    <button type="button" class="btn btn-sm btn-link text-decoration-none" data-bi-action="cancel"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Cancel Selection</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-{{-- Slide-in create / edit panel ------------------------------------------- --}}
-@if(!$bookingPos->isEmpty())
+{{-- Slide-in create / edit panel. Rendered for anyone who can record a new
+     issue OR correct an existing one — Management holds edit but not create. --}}
+@if(!$bookingPos->isEmpty() && ($canCreate || $canEdit))
 <div class="offcanvas offcanvas-end bi-offcanvas" tabindex="-1" id="biPanel" aria-labelledby="biPanelTitle">
     <div class="offcanvas-header border-bottom">
         <h5 class="offcanvas-title" id="biPanelTitle">New Bulk Issue</h5>
@@ -218,15 +236,22 @@
                 <div class="col-6"><label class="form-label fw-semibold">Indent Person</label><input name="indent_person" id="biPerson" class="form-control" maxlength="100"></div>
                 <div class="col-6"><label class="form-label fw-semibold">Requisition No</label><input name="requisition_number" id="biReqNo" class="form-control" maxlength="100"></div>
                 <div class="col-6"><label class="form-label fw-semibold">Issue Date <span class="text-danger">*</span></label><input type="date" name="issue_date" id="biIssueDate" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" class="form-control" required></div>
-                <div class="col-12"><label class="form-label fw-semibold">Issue No</label><input name="issue_no" id="biIssueNo" class="form-control" placeholder="Auto"><div class="form-text"><i class="bi bi-magic me-1" aria-hidden="true"></i>Auto-suggested · editable</div></div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Issue No</label>
+                    {{-- Pre-filled with the generated number. bi-suggested renders it
+                         lighter/italic until the user types, so it reads as a
+                         suggestion rather than a value they entered. --}}
+                    <input name="issue_no" id="biIssueNo" class="form-control bi-suggested" autocomplete="off">
+                    <div class="form-text"><i class="bi bi-magic me-1" aria-hidden="true"></i>Auto-suggested · editable</div>
+                </div>
             </div>
 
             <h6 class="text-uppercase text-muted fw-semibold small mb-2"><i class="bi bi-rulers me-1" aria-hidden="true"></i>Issue Quantities</h6>
-            <div class="row g-2 mb-3">
-                <div class="col-6"><div class="bi-qty-card bulk"><label class="form-label fw-semibold text-success">🟢 Bulk</label><input type="number" step="0.0001" min="0" name="bulk_qty" id="biBulk" placeholder="0" class="form-control bi-qty"></div></div>
-                <div class="col-6"><div class="bi-qty-card sample"><label class="form-label fw-semibold text-primary">🔵 Sample</label><input type="number" step="0.0001" min="0" name="sample_qty" id="biSample" placeholder="0" class="form-control bi-qty"></div></div>
-                <div class="col-6"><div class="bi-qty-card liability"><label class="form-label fw-semibold text-warning">🟠 Liability</label><input type="number" step="0.0001" min="0" name="liability_qty" id="biLiability" placeholder="0" class="form-control bi-qty"></div></div>
-                <div class="col-6"><div class="bi-qty-card dead"><label class="form-label fw-semibold text-danger">🔴 Dead</label><input type="number" step="0.0001" min="0" name="dead_qty" id="biDead" placeholder="0" class="form-control bi-qty"></div></div>
+            <div class="row g-2 mb-3 bi-qty-grid">
+                <div class="col-6"><div class="bi-qty-card bulk"><label class="form-label fw-semibold text-success" for="biBulk">🟢 Bulk</label><input type="number" step="0.0001" min="0" name="bulk_qty" id="biBulk" placeholder="0" class="form-control form-control-sm bi-qty"></div></div>
+                <div class="col-6"><div class="bi-qty-card sample"><label class="form-label fw-semibold text-primary" for="biSample">🔵 Sample</label><input type="number" step="0.0001" min="0" name="sample_qty" id="biSample" placeholder="0" class="form-control form-control-sm bi-qty"></div></div>
+                <div class="col-6"><div class="bi-qty-card liability"><label class="form-label fw-semibold text-warning" for="biLiability">🟠 Liability</label><input type="number" step="0.0001" min="0" name="liability_qty" id="biLiability" placeholder="0" class="form-control form-control-sm bi-qty"></div></div>
+                <div class="col-6"><div class="bi-qty-card dead"><label class="form-label fw-semibold text-danger" for="biDead">🔴 Dead</label><input type="number" step="0.0001" min="0" name="dead_qty" id="biDead" placeholder="0" class="form-control form-control-sm bi-qty"></div></div>
             </div>
             <div class="alert alert-warning py-2 px-3 small d-none" id="biOverWarn"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i><span id="biOverText"></span></div>
 
@@ -261,6 +286,9 @@
         'options' => $poOptions,
         'prefill' => $prefill,
         'state' => ['tab' => $tab, 'q' => $q, 'sort' => $sort, 'dir' => $dir, 'perPage' => $perPage],
+        // Mirrors the server-side gate so the JS never fires an action the user
+        // is not allowed to take. The controller re-checks regardless.
+        'can' => ['create' => $canCreate, 'edit' => $canEdit, 'delete' => $canDelete],
         'routes' => [
             'index' => route('store.material.bulk-issues.index'),
             'store' => route('store.material.bulk-issues.store'),
