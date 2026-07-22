@@ -51,4 +51,26 @@ return [
         'invoiced_amount_store',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Indent Sections (Bulk Issuing)
+    |--------------------------------------------------------------------------
+    |
+    | Production sections a Bulk Issue can be indented for. There is no section
+    | master table, so the standard garments sections live here — edit this list
+    | to add/remove one without a migration. Used only to populate the "Indent
+    | Section" dropdown; the value stored is the free string itself.
+    |
+    */
+    'indent_sections' => [
+        'Cutting',
+        'Sewing',
+        'Finishing',
+        'Sample',
+        'Embroidery',
+        'Printing',
+        'Washing',
+        'Store',
+    ],
+
 ];

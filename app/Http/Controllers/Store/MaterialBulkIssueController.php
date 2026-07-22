@@ -39,7 +39,11 @@ class MaterialBulkIssueController extends Controller
         // and a suggested bulk_qty default from the BOM row's GMTS Order Qty.
         $prefill = $this->bookingPoPrefill($bookingPos);
 
-        return view('store.material-stock.bulk-issues', compact('issues', 'bookingPos', 'requisitions', 'prefill'));
+        // Standard production sections for the Indent Section dropdown (no master
+        // table exists — see config/stock.php).
+        $sections = config('stock.indent_sections', []);
+
+        return view('store.material-stock.bulk-issues', compact('issues', 'bookingPos', 'requisitions', 'prefill', 'sections'));
     }
 
     /**
@@ -87,11 +91,50 @@ class MaterialBulkIssueController extends Controller
         return $prefill;
     }
 
+    /**
+     * Read-only PO / Material identity for one Booking PO, shown in the form's
+     * summary card after a PO is chosen. Resolved through the same source
+     * service the save path uses, so what Store sees is exactly what gets
+     * stored — nothing here is typed by hand.
+     */
+    public function poDetails(BookingPo $bookingPo)
+    {
+        if ($bookingPo->excelFile && $bookingPo->excelFile->isLockedForUser(auth()->user())) {
+            return response()->json(['locked' => true], 423);
+        }
+
+        return response()->json($this->identityFor($bookingPo));
+    }
+
+    /**
+     * Denormalized identity copied onto the issue row (and shown read-only on the
+     * form). toStockPayload() already carries buyer/season/style/PO/description/
+     * SAP/colour/size/uom; the three below are the Excel "Bulk Issuing" columns
+     * that live on the BOM row and are resolved the same way Receiving resolves
+     * them.
+     *
+     * @return array<string, mixed>
+     */
+    private function identityFor(BookingPo $po): array
+    {
+        $source = app(\App\Services\BookingPoSourceService::class);
+
+        return array_merge($po->toStockPayload(), [
+            'material_name' => $source->sourceValueForBookingPo($po, 'material_name'),
+            'gmts_color_name' => $source->sourceValueForBookingPo($po, 'gmts_color'),
+            'art_no' => $source->sourceValueForBookingPo($po, 'art_no'),
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
             'booking_po_id' => ['required', 'exists:booking_pos,id'],
             'material_requisition_id' => ['nullable', 'exists:material_requisitions,id'],
+            // Indent header (Excel "Bulk Issuing" register). All optional.
+            'indent_section' => ['nullable', 'string', 'max:100'],
+            'indent_person' => ['nullable', 'string', 'max:100'],
+            'requisition_number' => ['nullable', 'string', 'max:100'],
             'issue_no' => ['nullable', 'string', 'max:100'],
             'issue_date' => ['required', 'date'],
             'bulk_qty' => ['nullable', 'numeric', 'min:0'],
@@ -117,9 +160,12 @@ class MaterialBulkIssueController extends Controller
         }
 
         MaterialBulkIssue::create(array_merge(
-            $po->toStockPayload(),
+            $this->identityFor($po),
             [
                 'material_requisition_id' => $validated['material_requisition_id'] ?? null,
+                'indent_section' => $validated['indent_section'] ?? null,
+                'indent_person' => $validated['indent_person'] ?? null,
+                'requisition_number' => $validated['requisition_number'] ?? null,
                 'issue_no' => $validated['issue_no'] ?? null,
                 'issue_date' => $validated['issue_date'],
                 'bulk_qty' => $bulk,

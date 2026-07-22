@@ -2,6 +2,31 @@
 
 @section('title', 'Material Stock — Bulk Issue')
 
+{{-- Page-scoped helpers for the read-only PO / Material summary. Leans on the
+     existing --gx-* tokens so Bulk Issue reads as one system with Receiving. --}}
+@section('styles')
+<style>
+    #biSummary {
+        background: #F1F5F9;
+        border: 1px solid var(--bs-border-color, #E2E8F0);
+        border-radius: var(--gx-radius-sm, 12px);
+    }
+    #biSummary .bi-sum-label {
+        font-size: .6875rem;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: #94A3B8;
+        margin-bottom: .1rem;
+    }
+    #biSummary .bi-sum-value {
+        font-weight: 600;
+        color: var(--gx-primary, #0F172A);
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+</style>
+@endsection
+
 @section('content')
 <div class="container-fluid">
     <x-breadcrumb :items="[
@@ -52,6 +77,28 @@
                             <span class="badge bg-success-subtle text-success"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Available (Running) stock: <span id="biRunning" class="fw-bold">0</span></span>
                         </div>
 
+                        {{-- Read-only identity from the selected PO / BOM row. Auto-filled,
+                             never typed — same values that get stored on the issue. --}}
+                        <div id="biSummary" class="p-3 mb-3 d-none">
+                            <div class="small fw-semibold text-uppercase text-muted mb-2">
+                                <i class="bi bi-magic me-1" aria-hidden="true"></i>PO / Material Summary <span class="text-muted">— read-only</span>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-6"><div class="bi-sum-label">Buyer</div><div class="bi-sum-value" id="biSumBuyer">—</div></div>
+                                <div class="col-6"><div class="bi-sum-label">Season</div><div class="bi-sum-value" id="biSumSeason">—</div></div>
+                                <div class="col-6"><div class="bi-sum-label">Style No</div><div class="bi-sum-value" id="biSumStyle">—</div></div>
+                                <div class="col-6"><div class="bi-sum-label">PO Number</div><div class="bi-sum-value" id="biSumPo">—</div></div>
+                                <div class="col-6"><div class="bi-sum-label">Material Name</div><div class="bi-sum-value" id="biSumMaterialName">—</div></div>
+                                <div class="col-6"><div class="bi-sum-label">Description</div><div class="bi-sum-value" id="biSumDesc">—</div></div>
+                                <div class="col-6"><div class="bi-sum-label">GMTS Color</div><div class="bi-sum-value" id="biSumGmtsColor">—</div></div>
+                                <div class="col-6"><div class="bi-sum-label">Art. No</div><div class="bi-sum-value" id="biSumArtNo">—</div></div>
+                                <div class="col-6"><div class="bi-sum-label">SAP Code</div><div class="bi-sum-value" id="biSumSap">—</div></div>
+                                <div class="col-6"><div class="bi-sum-label">Material Color</div><div class="bi-sum-value" id="biSumMatColor">—</div></div>
+                                <div class="col-6"><div class="bi-sum-label">Size</div><div class="bi-sum-value" id="biSumSize">—</div></div>
+                                <div class="col-6"><div class="bi-sum-label">Unit</div><div class="bi-sum-value" id="biSumUom">—</div></div>
+                            </div>
+                        </div>
+
                         @if($requisitions->isNotEmpty())
                             <label class="form-label fw-semibold">Fulfil Requisition <span class="text-muted small">(optional)</span></label>
                             <select name="material_requisition_id" class="form-select mb-3">
@@ -61,6 +108,34 @@
                                 @endforeach
                             </select>
                         @endif
+
+                        {{-- Indent header (Excel "Bulk Issuing" register). Season is
+                             shown read-only above (it follows the PO), so it is not
+                             repeated here as a manual field. --}}
+                        <div class="border rounded-3 bg-body-secondary p-3 mb-3">
+                            <div class="small fw-semibold text-uppercase text-muted mb-2">
+                                <i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>Indent Info
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-12 col-sm-4">
+                                    <label class="form-label fw-semibold">Indent Section</label>
+                                    <select name="indent_section" class="form-select">
+                                        <option value="">Select…</option>
+                                        @foreach($sections as $section)
+                                            <option value="{{ $section }}" {{ old('indent_section')==$section?'selected':'' }}>{{ $section }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div class="col-12 col-sm-4">
+                                    <label class="form-label fw-semibold">Indent Person</label>
+                                    <input name="indent_person" value="{{ old('indent_person') }}" class="form-control" maxlength="100">
+                                </div>
+                                <div class="col-12 col-sm-4">
+                                    <label class="form-label fw-semibold">Requisition No</label>
+                                    <input name="requisition_number" value="{{ old('requisition_number') }}" class="form-control" maxlength="100">
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="row g-2 mb-3">
                             <div class="col-6"><label class="form-label fw-semibold">Issue No</label><input name="issue_no" value="{{ old('issue_no') }}" class="form-control"></div>
@@ -106,8 +181,13 @@
                                     <tr>
                                         <td class="small">{{ optional($i->issue_date)->format('d-M-Y') ?? '—' }}</td>
                                         <td>
-                                            <div class="fw-semibold">{{ $i->po_no }} · {{ $i->material_description }}</div>
-                                            <div class="small text-muted">{{ collect([$i->style_name, $i->material_color, $i->size])->filter()->implode(' · ') }}</div>
+                                            <div class="fw-semibold">{{ $i->po_no }} · {{ $i->material_name ?: $i->material_description }}</div>
+                                            {{-- Buyer / Style / colour / size on one quiet line; Section
+                                                 as a chip so it reads as an attribute, not free text. --}}
+                                            <div class="small text-muted">{{ collect([$i->buyer_name, $i->style_name, $i->material_color, $i->size])->filter()->implode(' · ') }}</div>
+                                            @if($i->indent_section)
+                                                <span class="badge bg-secondary-subtle text-secondary-emphasis mt-1"><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>{{ $i->indent_section }}</span>
+                                            @endif
                                         </td>
                                         <td class="text-end text-success">{{ rtrim(rtrim(number_format((float)$i->bulk_qty, 4), '0'), '.') }}</td>
                                         <td class="text-end text-primary">{{ rtrim(rtrim(number_format((float)$i->sample_qty, 4), '0'), '.') }}</td>
@@ -148,6 +228,55 @@
         const form = document.getElementById('biForm');
         const qtyEls = Array.from(document.querySelectorAll('.bi-qty'));
 
+        // --- Read-only PO / Material summary ---------------------------------
+        const summary = document.getElementById('biSummary');
+        const DETAILS_URL = @json(route('store.material.bulk-issues.po-details', ['bookingPo' => '__ID__']));
+        // Map response keys -> summary element ids.
+        const SUM_FIELDS = {
+            buyer_name: 'biSumBuyer',
+            season_name: 'biSumSeason',
+            style_name: 'biSumStyle',
+            po_no: 'biSumPo',
+            material_name: 'biSumMaterialName',
+            material_description: 'biSumDesc',
+            gmts_color_name: 'biSumGmtsColor',
+            art_no: 'biSumArtNo',
+            sap_code: 'biSumSap',
+            material_color: 'biSumMatColor',
+            size: 'biSumSize',
+            uom: 'biSumUom',
+        };
+        let summaryTicket = 0;
+
+        function setSummary(data) {
+            Object.keys(SUM_FIELDS).forEach(function (key) {
+                const el = document.getElementById(SUM_FIELDS[key]);
+                if (!el) return;
+                const v = data ? data[key] : null;
+                el.textContent = (v === null || v === undefined || String(v).trim() === '') ? '—' : String(v);
+            });
+        }
+
+        function loadSummary(poId) {
+            const ticket = ++summaryTicket;
+            summary.classList.remove('d-none');
+            setSummary(null);
+
+            fetch(DETAILS_URL.replace('__ID__', encodeURIComponent(poId)), {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin'
+            })
+                .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                .then(data => {
+                    if (ticket !== summaryTicket || String(po.value) !== String(poId)) return;
+                    setSummary(data);
+                })
+                .catch(() => {
+                    if (ticket !== summaryTicket) return;
+                    setSummary(null);   // leave the card visible with dashes
+                });
+        }
+
         function currentRunning() {
             const d = prefill[po.value];
             return d ? Number(d.running) || 0 : 0;
@@ -165,6 +294,13 @@
                 stockRow.classList.remove('d-none');
             } else {
                 stockRow.classList.add('d-none');
+            }
+
+            if (po.value) {
+                loadSummary(po.value);
+            } else {
+                summary.classList.add('d-none');
+                summaryTicket++;
             }
 
             // Suggest bulk_qty from GMTS Order Qty only when Bulk is still empty.
