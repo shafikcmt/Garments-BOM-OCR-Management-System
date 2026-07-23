@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ExcelRow;
 use App\Models\PaymentRequest;
 use App\Services\DashboardMetricsService;
+use App\Services\DepartmentActivityService;
 
 /**
  * Accounts works inside the shared BOM workspace and against the payment
@@ -16,7 +17,11 @@ class DashboardController extends Controller
 {
     public function index(DashboardMetricsService $metrics)
     {
-        $workspace = $metrics->workspaceCompletionFor('account');
+        // Required-column progress for this department only, from the same
+        // service the Admin Dashboard reads — so a department and admin
+        // never see two different numbers for the same work.
+        $activity = app(DepartmentActivityService::class);
+        $workspace = $activity->forRole('account') ?? $activity->emptyProgressFor('account');
 
         $trend = $metrics->monthlyTrend(PaymentRequest::query());
         $delta = $metrics->deltaFor($trend);

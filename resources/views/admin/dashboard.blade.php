@@ -67,6 +67,90 @@
         </div>
     </div>
 
+    {{-- Department progress. The donut above says who OWNS what; this says who
+         has actually DONE it. Scoped to one order or across all of them by the
+         selector, so the same table answers both questions. --}}
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <x-card class="gx-fade-in" style="--gx-delay:550ms">
+                <x-slot:title>Department progress on required columns</x-slot:title>
+
+                <form method="GET" class="row g-2 align-items-end mb-3">
+                    <div class="col-12 col-md-6 col-lg-5">
+                        <label class="form-label fw-semibold small mb-1" for="dashWorkspace">Order / Workspace</label>
+                        <select name="workspace" id="dashWorkspace" class="form-select">
+                            <option value="">All workspaces</option>
+                            @foreach($workspaceOptions as $option)
+                                <option value="{{ $option->id }}" {{ ($selectedWorkspace?->id === $option->id) ? 'selected' : '' }}>
+                                    {{ $option->original_file_name }}@if($option->upload_batch_no) · {{ $option->upload_batch_no }}@endif
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6 col-lg-4 d-flex gap-2">
+                        <button class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Show Progress</button>
+                        <a href="{{ route('admin.dashboard') }}" class="btn btn-outline-secondary">Reset</a>
+                    </div>
+                </form>
+
+                @if(empty($departmentActivity))
+                    <p class="text-muted small mb-0">No required columns are configured yet, so there is nothing to track.</p>
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr class="text-muted small text-uppercase">
+                                    <th>Department</th>
+                                    <th>Status</th>
+                                    <th>Required Columns</th>
+                                    <th style="min-width:160px;">Progress</th>
+                                    <th>Last Worked On</th>
+                                    <th>Last Sign-in</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($departmentActivity as $dept)
+                                    @php $status = $dept['status']; @endphp
+                                    <tr>
+                                        <td class="fw-semibold">{{ $dept['label'] }}</td>
+                                        <td>
+                                            <span class="badge {{ \App\Services\DepartmentActivityService::statusTone($status) }}">
+                                                {{ \App\Services\DepartmentActivityService::statusLabel($status) }}
+                                            </span>
+                                        </td>
+                                        <td class="small">
+                                            {{ $dept['columns_started'] }}/{{ $dept['required_columns'] }} filled
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <div class="progress flex-grow-1" style="height:6px;" role="img"
+                                                     aria-label="{{ $dept['label'] }} is {{ $dept['percent'] }} percent complete">
+                                                    <div class="progress-bar {{ $status === 'completed' ? 'bg-success' : 'bg-primary' }}"
+                                                         style="width: {{ min(100, $dept['percent']) }}%;"></div>
+                                                </div>
+                                                <span class="small text-muted text-nowrap">{{ $dept['percent'] }}%</span>
+                                            </div>
+                                        </td>
+                                        <td class="small text-muted">
+                                            {{ $dept['last_activity'] ? \Illuminate\Support\Carbon::parse($dept['last_activity'])->diffForHumans() : 'Never' }}
+                                        </td>
+                                        <td class="small text-muted">
+                                            {{ $dept['last_sign_in'] ? \Illuminate\Support\Carbon::parse($dept['last_sign_in'])->diffForHumans() : 'Never' }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="form-text mt-2 mb-0">
+                        Progress counts values entered in each department's own required columns.
+                        “Last sign-in” is the most recent login by anyone in that department, across the whole system.
+                    </p>
+                @endif
+            </x-card>
+        </div>
+    </div>
+
     <div class="row g-3 mb-4">
         <div class="col-12 col-sm-6 col-xl-3">
             <x-stat-card class="gx-fade-in h-100" style="--gx-delay:600ms"

@@ -24,6 +24,7 @@ class MaterialStockLedger extends Model
         'material_description',
         'sap_code',
         'material_color',
+        'gmts_color_name',
         'uom',
         'booking_receive_qty',
         'internal_po_receive_qty',

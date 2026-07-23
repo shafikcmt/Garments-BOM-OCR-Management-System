@@ -26,6 +26,18 @@ class MaterialStockLedgerController extends Controller
         if ($style = $request->input('style')) {
             $query->where('style_name', $style);
         }
+        // Structured filters, ANDed with the Buyer/Style dropdowns and the free
+        // text box above. Each is an exact match on a denormalized identity
+        // column the ledger already carries.
+        if ($season = $request->input('season')) {
+            $query->where('season_name', $season);
+        }
+        if ($poNo = $request->input('po_no')) {
+            $query->where('po_no', $poNo);
+        }
+        if ($gmtsColor = $request->input('gmts_color')) {
+            $query->where('gmts_color_name', $gmtsColor);
+        }
         if ($search = $request->input('q')) {
             $query->where(function ($q) use ($search) {
                 $q->where('material_description', 'like', "%{$search}%")
@@ -41,8 +53,13 @@ class MaterialStockLedgerController extends Controller
             ->paginate(30)
             ->withQueryString();
 
+        // Options come from the ledger itself, so a dropdown never offers a value
+        // that would return an empty report.
         $buyers = MaterialStockLedger::whereNotNull('buyer_name')->distinct()->orderBy('buyer_name')->pluck('buyer_name');
         $styles = MaterialStockLedger::whereNotNull('style_name')->distinct()->orderBy('style_name')->pluck('style_name');
+        $seasons = $this->filterOptions('season_name');
+        $poNos = $this->filterOptions('po_no');
+        $gmtsColors = $this->filterOptions('gmts_color_name');
 
         // Totals for the summary cards.
         $totals = [
@@ -52,7 +69,28 @@ class MaterialStockLedgerController extends Controller
             'value' => (float) MaterialStockLedger::sum('total_value'),
         ];
 
-        return view('store.material-stock.ledger', compact('ledgers', 'buyers', 'styles', 'totals'));
+        return view('store.material-stock.ledger', compact(
+            'ledgers', 'buyers', 'styles', 'seasons', 'poNos', 'gmtsColors', 'totals'
+        ));
+    }
+
+    /**
+     * Distinct non-blank values of one ledger column, for a filter dropdown.
+     * Trimmed and de-duplicated in PHP so values that differ only by padding do
+     * not appear twice in the list.
+     *
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    private function filterOptions(string $column): \Illuminate\Support\Collection
+    {
+        return MaterialStockLedger::whereNotNull($column)
+            ->distinct()
+            ->orderBy($column)
+            ->pluck($column)
+            ->map(fn ($value) => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->values();
     }
 
     /**

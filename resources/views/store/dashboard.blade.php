@@ -47,6 +47,18 @@
         </div>
     </div>
 
+    {{-- Store's own required BOM columns. Only this department's figures — the
+         all-department table stays on the Admin Dashboard. --}}
+    @if(($workspace['required_columns'] ?? 0) > 0)
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-xl-5">
+                <x-card class="gx-fade-in h-100" style="--gx-delay:350ms" title="Your share of the BOM">
+                    <x-workspace-progress :workspace="$workspace" />
+                </x-card>
+            </div>
+        </div>
+    @endif
+
     <div class="row g-3 mb-4">
         <div class="col-12 col-xl-5">
             {{-- Running / Liability / Dead is the split Store actually manages:

@@ -14,15 +14,24 @@ use Spatie\Permission\Models\Role;
  * so it is safe to run against a live database — it cannot strip a permission an
  * admin assigned by hand through the Roles screen.
  *
- * Business rule: a Store user records a bulk issue but may not edit or delete it
- * afterwards, because every change recomputes closing stock. Corrections are an
- * Admin / Management responsibility.
+ * Business rule: a Store user records a movement but may not edit or delete it
+ * afterwards, because every change recomputes closing stock that other
+ * departments and management read. Corrections are an Admin / Management
+ * responsibility.
+ *
+ * These two permissions now gate every store correction action, not only Bulk
+ * Issuing: Receiving History, Material Requisitions, and the General Stock
+ * Items / Purchases / Issues screens all check them via
+ * AuthorizesStoreCorrections.
  */
 class StoreIssueControlPermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        $permissions = ['store.edit', 'store.delete'];
+        // store.view is granted below but was never created here, so on a
+        // database that did not already carry it the seeder aborted with
+        // PermissionDoesNotExist before granting anything at all.
+        $permissions = ['store.view', 'store.edit', 'store.delete'];
 
         foreach ($permissions as $name) {
             Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);

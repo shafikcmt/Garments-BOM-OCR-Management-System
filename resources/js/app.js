@@ -8,8 +8,12 @@ import { initSubmitButtons } from './modules/submit-button';
 import { initBulkIssueTable } from './modules/bulk-issue-table';
 
 import Alpine from 'alpinejs';
+import { registerBulkIssueWizard } from './modules/bulk-issue-wizard';
 
 window.Alpine = Alpine;
+
+// Components must be registered before start() or their x-data never resolves.
+registerBulkIssueWizard(Alpine);
 
 Alpine.start();
 

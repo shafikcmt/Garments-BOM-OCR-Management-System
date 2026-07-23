@@ -72,10 +72,16 @@ class DashboardController extends Controller
         $trend = $metrics->monthlyTrend(MaterialReceiving::query(), 6, 'receive_date');
         $delta = $metrics->deltaFor($trend);
 
+        // Store's own share of the BOM workspace, from the same service the
+        // Admin Dashboard reads — scoped to this department only.
+        $activity = app(\App\Services\DepartmentActivityService::class);
+        $workspace = $activity->forRole('store') ?? $activity->emptyProgressFor('store');
+
         return view('store.dashboard', compact(
             'stats',
             'stockLevels',
             'recentActivity',
+            'workspace',
             'trend',
             'delta'
         ));

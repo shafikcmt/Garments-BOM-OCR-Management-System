@@ -14,6 +14,12 @@ class MaterialReceiving extends Model
     public const SOURCE_BOOKING = 'booking';
     public const SOURCE_INTERNAL_PO = 'internal_po';
 
+    // Whether this receiving is attached to a PO yet. NULL is the ordinary case:
+    // recorded against a Booking PO from the start. Kept separate from
+    // source_type, which the stock ledger reads to split Booking vs Internal.
+    public const MATCH_INDEPENDENT = 'independent';
+    public const MATCH_LINKED = 'linked';
+
     protected $fillable = [
         'excel_file_id',
         'excel_row_id',
@@ -36,6 +42,9 @@ class MaterialReceiving extends Model
         'receive_date',
         'grn_date',
         'source_type',
+        'match_status',
+        'matched_at',
+        'matched_by',
         'qty',
         'invoice_qty',
         'internal_po_qty',
@@ -48,6 +57,7 @@ class MaterialReceiving extends Model
     protected $casts = [
         'receive_date' => 'date',
         'grn_date' => 'date',
+        'matched_at' => 'datetime',
         // qty = Physical Rcv Qty (the figure the stock ledger consumes).
         'qty' => 'decimal:4',
         'invoice_qty' => 'decimal:4',
@@ -74,5 +84,16 @@ class MaterialReceiving extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function matchedBy()
+    {
+        return $this->belongsTo(User::class, 'matched_by');
+    }
+
+    /** Arrived, but not yet attached to a PO — so it does not move stock yet. */
+    public function isIndependent(): bool
+    {
+        return $this->match_status === self::MATCH_INDEPENDENT;
     }
 }

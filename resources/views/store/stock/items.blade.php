@@ -110,14 +110,28 @@
                                                 <span class="badge bg-secondary-subtle text-secondary">Inactive</span>
                                             @endif
                                         </td>
+                                        {{-- Edit and Delete are Admin / Management rights
+                                             (store.edit / store.delete); both controller
+                                             methods enforce the same check server-side. --}}
                                         <td class="text-end text-nowrap">
-                                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#editItem{{ $item->id }}"><i class="bi bi-pencil" aria-hidden="true"></i></button>
-                                            <form method="POST" action="{{ route('store.stock.items.destroy', $item) }}" class="d-inline" onsubmit="return confirm('Remove this item?');">
-                                                @csrf @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
-                                            </form>
+                                            @if($canEdit)
+                                                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#editItem{{ $item->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
+                                            @endif
+                                            @if($canDelete)
+                                                <form method="POST" action="{{ route('store.stock.items.destroy', $item) }}" class="d-inline" onsubmit="return confirm('Remove this item?');">
+                                                    @csrf @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                                </form>
+                                            @endif
+                                            @if(! $canEdit && ! $canDelete)
+                                                <span class="text-muted small">—</span>
+                                            @endif
                                         </td>
                                     </tr>
+                                    {{-- The edit form itself is not rendered for a role
+                                         that cannot submit it, so the markup carries no
+                                         action a non-admin could replay. --}}
+                                    @if($canEdit)
                                     <div class="modal fade" id="editItem{{ $item->id }}" tabindex="-1" aria-hidden="true">
                                         <div class="modal-dialog modal-dialog-centered">
                                             <div class="modal-content" style="border-radius:var(--gx-radius);">
@@ -151,6 +165,7 @@
                                             </div>
                                         </div>
                                     </div>
+                                    @endif
                                 @empty
                                     <tr><td colspan="6" class="text-center text-muted py-5">No stock items yet. Add one on the left.</td></tr>
                                 @endforelse

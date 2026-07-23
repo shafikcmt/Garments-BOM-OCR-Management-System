@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Store;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Models\StockItem;
 use Illuminate\Http\Request;
 
@@ -12,6 +13,8 @@ use Illuminate\Http\Request;
  */
 class StockItemController extends Controller
 {
+    use AuthorizesStoreCorrections;
+
     public function index(Request $request)
     {
         $items = StockItem::query()
@@ -21,7 +24,9 @@ class StockItemController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return view('store.stock.items', compact('items'));
+        ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
+
+        return view('store.stock.items', compact('items', 'canEdit', 'canDelete'));
     }
 
     public function store(Request $request)
@@ -36,6 +41,8 @@ class StockItemController extends Controller
 
     public function update(Request $request, StockItem $stockItem)
     {
+        $this->authorizeStoreEdit('stock item');
+
         $stockItem->update($this->validated($request));
 
         return back()->with('success', 'Stock item updated.');
@@ -43,6 +50,8 @@ class StockItemController extends Controller
 
     public function destroy(StockItem $stockItem)
     {
+        $this->authorizeStoreDelete('stock item');
+
         if ($stockItem->purchases()->exists() || $stockItem->issues()->exists()) {
             return back()->with('warning', 'Cannot delete: this item already has purchase or issue records. Mark it inactive instead.');
         }

@@ -7,12 +7,17 @@ use App\Models\BookingPo;
 use App\Models\EmailLog;
 use App\Models\PaymentRequest;
 use App\Services\DashboardMetricsService;
+use App\Services\DepartmentActivityService;
 
 class DashboardController extends Controller
 {
     public function index(DashboardMetricsService $metrics)
     {
-        $workspace = $metrics->workspaceCompletionFor('supply_chain');
+        // Required-column progress for this department only, from the same
+        // service the Admin Dashboard reads — so a department and admin
+        // never see two different numbers for the same work.
+        $activity = app(DepartmentActivityService::class);
+        $workspace = $activity->forRole('supply_chain') ?? $activity->emptyProgressFor('supply_chain');
 
         $trend = $metrics->monthlyTrend(BookingPo::query());
         $delta = $metrics->deltaFor($trend);

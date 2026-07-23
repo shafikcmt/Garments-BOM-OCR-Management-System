@@ -90,11 +90,18 @@
                                         <td class="small">{{ $i->requisition_no ?: '—' }}</td>
                                         <td class="text-end fw-bold">{{ rtrim(rtrim(number_format((float)$i->qty, 4), '0'), '.') }}</td>
                                         <td class="small text-muted">{{ $i->issued_to ?: '—' }}</td>
+                                        {{-- Delete is an Admin / Management right
+                                             (store.delete); the controller enforces
+                                             the same check server-side. --}}
                                         <td class="text-end">
-                                            <form method="POST" action="{{ route('store.stock.issues.destroy', $i) }}" onsubmit="return confirm('Remove this issue?');">
-                                                @csrf @method('DELETE')
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill px-3" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
-                                            </form>
+                                            @if($canDelete)
+                                                <form method="POST" action="{{ route('store.stock.issues.destroy', $i) }}" onsubmit="return confirm('Remove this issue?');">
+                                                    @csrf @method('DELETE')
+                                                    <button class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                                </form>
+                                            @else
+                                                <span class="text-muted small">—</span>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty

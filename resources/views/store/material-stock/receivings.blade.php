@@ -352,20 +352,27 @@
                 <input type="hidden" name="booking_po_id" id="rcvPoId" value="{{ old('booking_po_id') }}">
 
                 {{-- Step 1 — find the PO. Store may know the delivery by its PO
-                     number, the vendor's PI number, the material's SAP code, or
-                     the invoice it arrived against; all four resolve to the same
-                     booking record. --}}
+                     number, the vendor's PI number, or the invoice it arrived
+                     against; all three resolve to the same booking record.
+
+                     SAP Code was removed as a handle: it identifies a material,
+                     not the paperwork a delivery arrives under, so it fanned out
+                     to POs unrelated to the shipment. "Independent" is the way
+                     in when none of the three match anything yet. --}}
                 <div class="row g-3 align-items-end mb-3">
                     <div class="col-12 col-lg-3">
                         <label class="form-label fw-semibold" for="rcvFilterType">Search by</label>
                         <select class="form-select" id="rcvFilterType">
                             <option value="po_no" selected>PO Number</option>
-                            <option value="sap_code">SAP Code</option>
                             <option value="pi_number">PI Number</option>
                             <option value="invoice_no">Invoice No</option>
+                            {{-- A failed Independent save must come back to the
+                                 Independent form, not drop the user into the PO
+                                 search with their entry gone. --}}
+                            <option value="independent" @selected($errors->hasAny(['style_name', 'material_name', 'qty']))>Independent</option>
                         </select>
                     </div>
-                    <div class="col-12 col-lg-9">
+                    <div class="col-12 col-lg-9" id="rcvPoSearchCol">
                         <label class="form-label fw-semibold" id="rcvSearchLabel">PO Number</label>
                         {{-- Suggestions drop over the page rather than pushing it
                              down, and a search may match more than one PO (one SAP
@@ -571,6 +578,169 @@
                     </div>
                 </div>
             </form>
+
+            {{-- Independent entry — material that physically arrived but whose
+                 paperwork matches no PO, PI or Invoice yet.
+
+                 A separate form rather than a mode of the one above: that one is
+                 built entirely around a Booking PO (auto-filled identity, the
+                 item picker, per-line BOM rows), none of which exists here. The
+                 fields Store fills are the same ones, just typed instead of
+                 resolved. --}}
+            <div id="rcvIndependent" class="d-none">
+                <form method="POST" action="{{ route('store.material.receivings.independent') }}" id="rcvIndForm">
+                    @csrf
+                    <input type="hidden" name="buyer_name" id="rcvIndBuyer" value="{{ old('buyer_name') }}">
+                    <input type="hidden" name="season_name" id="rcvIndSeason" value="{{ old('season_name') }}">
+                    <input type="hidden" name="style_name" id="rcvIndStyle" value="{{ old('style_name') }}">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="rcvIndSearch">Style <span class="text-danger">*</span></label>
+                        <div class="position-relative rcv-search" id="rcvIndSearchWrap">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+                                <input type="text" class="form-control" id="rcvIndSearch" autocomplete="off"
+                                       role="combobox" aria-expanded="false" aria-autocomplete="list"
+                                       aria-controls="rcvIndResultsList"
+                                       placeholder="Click or type to see available styles…">
+                            </div>
+                            <div id="rcvIndResults" class="rcv-menu d-none position-absolute w-100 mt-1 bg-body border rounded-3 shadow">
+                                <div class="rcv-menu-label" id="rcvIndResultsHint"></div>
+                                <div class="list-group list-group-flush rcv-menu-scroll" id="rcvIndResultsList" role="listbox"></div>
+                            </div>
+                        </div>
+                        <div class="form-text">Pick the style this material belongs to. The PO can be attached later.</div>
+                    </div>
+
+                    {{-- Everything below stays out of reach until a style is
+                         chosen, so the form cannot be filled against nothing. --}}
+                    <div id="rcvIndBody" class="d-none">
+                        <div class="rcv-summary p-3 mb-3">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                                <span class="rcv-chip">
+                                    <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                                    <span id="rcvIndChip">—</span>
+                                    <button type="button" class="rcv-chip-x" id="rcvIndClear" title="Choose a different style" aria-label="Choose a different style">
+                                        <i class="bi bi-x-lg" aria-hidden="true"></i>
+                                    </button>
+                                </span>
+                                <span class="badge bg-warning-subtle text-warning-emphasis">
+                                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Not linked to a PO
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning py-2 px-3 small" role="alert">
+                            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                            This entry is recorded for the record only. It does not change closing stock until it is linked to a PO from Receiving History.
+                        </div>
+
+                        <div class="small fw-semibold text-uppercase text-muted mb-2">
+                            <i class="bi bi-box-seam me-1" aria-hidden="true"></i>Material
+                        </div>
+                        {{-- Each field stays an ordinary text input — same name,
+                             same value, nothing about the submission changes. A
+                             suggestion list is attached on top, offering what the
+                             chosen style already carries on its BOM so Store picks
+                             a known material name instead of retyping it from
+                             memory. Typing something new is always allowed: this
+                             flow exists precisely for what the system does not
+                             recognise yet. --}}
+                        <div class="row g-3 mb-3" id="rcvIndMaterialGrid">
+                            @php
+                                $bomFields = [
+                                    ['key' => 'material_name', 'name' => 'material_name', 'id' => 'rcvIndMaterialName', 'label' => 'Material Name', 'required' => true, 'max' => 255, 'col' => 'col-12 col-lg-4'],
+                                    ['key' => 'material_description', 'name' => 'material_description', 'id' => 'rcvIndDescription', 'label' => 'Description', 'required' => false, 'max' => 1000, 'col' => 'col-12 col-lg-4'],
+                                    ['key' => 'supplier_name', 'name' => 'supplier_name', 'id' => 'rcvIndSupplier', 'label' => 'Supplier', 'required' => false, 'max' => 255, 'col' => 'col-12 col-lg-4'],
+                                    ['key' => 'material_color', 'name' => 'material_color', 'id' => 'rcvIndColor', 'label' => 'Material Colour', 'required' => false, 'max' => 255, 'col' => 'col-6 col-lg-4'],
+                                    ['key' => 'size', 'name' => 'size', 'id' => 'rcvIndSize', 'label' => 'Size', 'required' => false, 'max' => 255, 'col' => 'col-6 col-lg-4'],
+                                    ['key' => 'uom', 'name' => 'uom', 'id' => 'rcvIndUom', 'label' => 'Unit', 'required' => false, 'max' => 50, 'col' => 'col-6 col-lg-4'],
+                                ];
+                            @endphp
+
+                            @foreach($bomFields as $field)
+                                <div class="{{ $field['col'] }}">
+                                    <label class="form-label fw-semibold" for="{{ $field['id'] }}">
+                                        {{ $field['label'] }}
+                                        @if($field['required'])<span class="text-danger">*</span>@endif
+                                    </label>
+                                    {{-- Plain position-relative, not .rcv-search:
+                                         that class reserves right padding for a
+                                         spinner/clear slot these fields have no
+                                         use for. --}}
+                                    <div class="position-relative" data-bom-field="{{ $field['key'] }}">
+                                        <input type="text" name="{{ $field['name'] }}" id="{{ $field['id'] }}"
+                                               class="form-control" maxlength="{{ $field['max'] }}" autocomplete="off"
+                                               role="combobox" aria-expanded="false" aria-autocomplete="list"
+                                               @if($field['required']) required @endif
+                                               value="{{ old($field['name']) }}">
+                                        <div class="rcv-menu d-none position-absolute w-100 mt-1 bg-body border rounded-3 shadow" data-bom-panel>
+                                            <div class="rcv-menu-label" data-bom-hint></div>
+                                            <div class="list-group list-group-flush rcv-menu-scroll" data-bom-list role="listbox"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        {{-- Says which of the two states the fields are in, so a
+                             style with no BOM data does not look broken. --}}
+                        <p class="form-text mt-0 mb-3" id="rcvIndBomNote"></p>
+
+                        <div class="small fw-semibold text-uppercase text-muted mb-2">
+                            <i class="bi bi-truck me-1" aria-hidden="true"></i>Delivery Details
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label fw-semibold" for="rcvIndReceiveDate">Receive Date <span class="text-danger">*</span></label>
+                                <input type="date" name="receive_date" id="rcvIndReceiveDate" value="{{ now()->toDateString() }}" class="form-control" required>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label fw-semibold" for="rcvIndGrnDate">GRN Date</label>
+                                <input type="date" name="grn_date" id="rcvIndGrnDate" value="{{ now()->toDateString() }}" class="form-control">
+                                <div class="form-text text-muted">Defaults to Receive Date</div>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label fw-semibold" for="rcvIndInvoiceNo">Invoice No</label>
+                                <input type="text" name="invoice_no" id="rcvIndInvoiceNo" class="form-control" maxlength="100" value="{{ old('invoice_no') }}">
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label fw-semibold" for="rcvIndSourceType">Source</label>
+                                <select name="source_type" id="rcvIndSourceType" class="form-select">
+                                    <option value="booking" selected>Booking-wise</option>
+                                    <option value="internal_po">Internal PO-wise</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label fw-semibold" for="rcvIndInvoiceQty">Invoice Qty</label>
+                                <input type="number" step="0.0001" min="0" name="invoice_qty" id="rcvIndInvoiceQty" class="form-control" value="{{ old('invoice_qty') }}">
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label fw-semibold" for="rcvIndQty">Physical Rcv Qty <span class="text-danger">*</span></label>
+                                <input type="number" step="0.0001" min="0.0001" name="qty" id="rcvIndQty" class="form-control" required value="{{ old('qty') }}">
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label fw-semibold" for="rcvIndUnitPrice">Unit Price</label>
+                                <input type="number" step="0.0001" min="0" name="unit_price" id="rcvIndUnitPrice" class="form-control" value="{{ old('unit_price') }}">
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label fw-semibold">GRN No</label>
+                                <input type="text" class="form-control bg-light text-muted" value="Auto-generated" readonly disabled>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold" for="rcvIndRemarks">Remarks</label>
+                                <textarea name="remarks" id="rcvIndRemarks" rows="2" class="form-control" maxlength="1000"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end mt-4">
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-check-lg me-1" aria-hidden="true"></i>Save Independent Receiving
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
             @endif
         </div>
     </div>
@@ -599,8 +769,21 @@
                                     @if($r->invoice_no)<span class="text-muted">Inv: {{ $r->invoice_no }}</span>@endif
                                 </td>
                                 <td>
-                                    <div class="fw-semibold">{{ $r->po_no }} · {{ $r->material_description }}</div>
+                                    <div class="fw-semibold">
+                                        @if($r->isIndependent())
+                                            {{-- No PO number to show yet, so the badge
+                                                 takes its place rather than leaving a
+                                                 bare separator. --}}
+                                            <span class="badge bg-warning-subtle text-warning-emphasis me-1">Independent</span>
+                                        @else
+                                            {{ $r->po_no }} ·
+                                        @endif
+                                        {{ $r->material_name ?: $r->material_description }}
+                                    </div>
                                     <div class="small text-muted">{{ collect([$r->buyer_name.' / '.$r->style_name, $r->material_color, $r->size])->filter()->implode(' · ') }}</div>
+                                    @if($r->isIndependent())
+                                        <div class="small text-warning-emphasis">Not counted in closing stock until linked to a PO.</div>
+                                    @endif
                                 </td>
                                 {{-- Booking vs Internal PO read as two different
                                      routes into stock, so they get two tones
@@ -619,10 +802,33 @@
                                     @if($r->invoice_value !== null)<div class="text-muted">Val: {{ number_format((float)$r->invoice_value, 2) }}</div>@endif
                                 </td>
                                 <td class="text-end">
-                                    <form method="POST" action="{{ route('store.material.receivings.destroy', $r) }}" onsubmit="return confirm('Remove this receiving? Closing stock will update.');">
-                                        @csrf @method('DELETE')
-                                        <button class="btn btn-sm rcv-ghost-danger" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
-                                    </form>
+                                    {{-- Corrections are an Admin / Management right
+                                         (store.edit / store.delete). The buttons are
+                                         absent for everyone else rather than disabled,
+                                         and the controller re-checks server-side. --}}
+                                    <div class="d-flex justify-content-end align-items-center gap-2">
+                                        @if($canEdit && $r->isIndependent())
+                                            {{-- The deliberate, human-confirmed re-match.
+                                                 There is no automatic OCR matcher in this
+                                                 app, and guessing the BOM line would book
+                                                 stock onto the wrong row. --}}
+                                            <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
+                                                    data-rcv-link="{{ $r->id }}"
+                                                    data-rcv-grn="{{ $r->grn_no }}"
+                                                    data-rcv-style="{{ $r->buyer_name }} / {{ $r->style_name }}">
+                                                <i class="bi bi-link-45deg me-1" aria-hidden="true"></i>Link to PO
+                                            </button>
+                                        @endif
+                                        @if($canDelete)
+                                            <form method="POST" action="{{ route('store.material.receivings.destroy', $r) }}" onsubmit="return confirm('Remove this receiving? Closing stock will update.');">
+                                                @csrf @method('DELETE')
+                                                <button class="btn btn-sm btn-outline-danger text-nowrap"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                            </form>
+                                        @endif
+                                        @if(! $canEdit && ! $canDelete)
+                                            <span class="text-muted small">—</span>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -632,6 +838,78 @@
                 </table>
             </div>
             <div class="mt-3">{{ $receivings->links() }}</div>
+        </div>
+    </div>
+</div>
+
+{{-- Link an Independent receiving to the PO it turned out to be for. Reuses the
+     same po-search and po-items endpoints the normal flow uses, so there is one
+     matching path in the application rather than two. --}}
+<div class="modal fade" id="rcvLinkModal" tabindex="-1" aria-labelledby="rcvLinkModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:var(--gx-radius);">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-0" id="rcvLinkModalLabel">Link Receiving to PO</h5>
+                    <div class="small text-muted" id="rcvLinkSubtitle">—</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <form method="POST" id="rcvLinkForm">
+                @csrf
+                <input type="hidden" name="booking_po_id" id="rcvLinkPoId">
+                <input type="hidden" name="excel_row_id" id="rcvLinkRowId">
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold" for="rcvLinkSearch">Find the PO</label>
+                        <div class="position-relative rcv-search" id="rcvLinkSearchWrap">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+                                <input type="text" class="form-control" id="rcvLinkSearch" autocomplete="off"
+                                       role="combobox" aria-expanded="false" aria-autocomplete="list"
+                                       aria-controls="rcvLinkResultsList"
+                                       placeholder="Click or type to see available PO Numbers…">
+                            </div>
+                            <div id="rcvLinkResults" class="rcv-menu d-none position-absolute w-100 mt-1 bg-body border rounded-3 shadow">
+                                <div class="rcv-menu-label" id="rcvLinkResultsHint"></div>
+                                <div class="list-group list-group-flush rcv-menu-scroll" id="rcvLinkResultsList" role="listbox"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- The PO alone is not enough: stock is booked against one
+                         BOM line, so the material line has to be chosen too. --}}
+                    <div id="rcvLinkItemsWrap" class="d-none">
+                        <label class="form-label fw-semibold">Material line <span class="text-danger">*</span></label>
+                        <div class="table-responsive border rounded">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr class="text-muted small text-uppercase">
+                                        <th style="width:42px;"></th>
+                                        <th>Material</th><th>Style</th><th>Colour / Size</th>
+                                        <th class="text-end">Available</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rcvLinkItemBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="rcvLinkLoading" class="d-none text-center text-muted py-3">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Loading items…
+                    </div>
+                    <div id="rcvLinkError" class="alert alert-warning py-2 px-3 small d-none mb-0" role="alert"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="rcvLinkSubmit" disabled>
+                        <i class="bi bi-link-45deg me-1" aria-hidden="true"></i>Confirm Link
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -771,7 +1049,10 @@
         const ITEMS_URL = @json(route('store.material.receivings.po-items', ['bookingPo' => '__ID__']));
         const TODAY = @json(now()->toDateString());
 
-        const LABELS = { po_no: 'PO Number', sap_code: 'SAP Code', pi_number: 'PI Number', invoice_no: 'Invoice No' };
+        const LABELS = { po_no: 'PO Number', pi_number: 'PI Number', invoice_no: 'Invoice No' };
+        const STYLE_SEARCH_URL = @json(route('store.material.receivings.style-search'));
+        const STYLE_BOM_URL = @json(route('store.material.receivings.style-bom'));
+        const LINK_URL = @json(route('store.material.receivings.link', ['materialReceiving' => '__ID__']));
 
         // esc() normalises a value for logic; h() escapes it for HTML/attribute
         // interpolation. BOM values come from uploaded workbooks, so anything
@@ -803,7 +1084,42 @@
 
         const hintType = document.getElementById('rcvHintType');
 
+        // "Independent" is not another way of finding a PO — it is the path for a
+        // delivery that has none. So it swaps the whole PO form out for the
+        // independent one rather than just relabelling the search box.
+        const independentWrap = document.getElementById('rcvIndependent');
+        const poSearchCol = document.getElementById('rcvPoSearchCol');
+        const poFormEl = document.getElementById('rcvForm');
+
+        function applyMode() {
+            const independent = filterType.value === 'independent';
+
+            independentWrap.classList.toggle('d-none', !independent);
+            poSearchCol.classList.toggle('d-none', independent);
+            selectedWrap.classList.toggle('d-none', independent || !poIdEl.value);
+            emptyBox.classList.toggle('d-none', independent);
+            sharedWrap.classList.toggle('d-none', independent || !rowsWrap.children.length);
+
+            // A hidden required input blocks submit with an error the user cannot
+            // see, so the PO form's own requirements stand down while it is away.
+            poFormEl.querySelectorAll('[required]').forEach((el) => {
+                if (independent) {
+                    el.dataset.rcvRequired = '1';
+                    el.required = false;
+                } else if (el.dataset.rcvRequired) {
+                    el.required = true;
+                }
+            });
+
+            if (independent) closeSuggest();
+        }
+
         filterType.addEventListener('change', function () {
+            if (filterType.value === 'independent') {
+                applyMode();
+                return;
+            }
+
             const label = LABELS[filterType.value];
             searchLabel.textContent = label;
             searchEl.placeholder = 'Click or type to see available ' + label + 's…';
@@ -811,6 +1127,7 @@
             searchEl.value = '';
             closeSuggest();
             syncSearchStatus();
+            applyMode();
         });
 
         const DEBOUNCE_MS = 300;
@@ -1442,7 +1759,7 @@
                     (received > 0 ? h(trimNum(received)) : '—') + '</td>' +
                 '<td><input type="number" step="0.0001" min="0" name="' + n('invoice_qty') + '" data-field="invoice_qty"' +
                     ' value="' + h(preset.invoice_qty) + '" class="form-control form-control-sm"></td>' +
-                '<td><input type="number" step="0.0001" min="0" name="' + n('qty') + '"' +
+                '<td><input type="number" step="0.0001" min="0" name="' + n('qty') + '" data-field="qty"' +
                     ' value="' + h(preset.qty) + '" class="form-control form-control-sm" required></td>' +
                 '<td><input type="number" step="0.0001" min="0" name="' + n('unit_price') + '" data-field="unit_price"' +
                     ' value="' + h(unitPrice) + '" class="form-control form-control-sm"></td>' +
@@ -1455,16 +1772,20 @@
             return tr;
         }
 
-        // Display only; the server recomputes this on save.
+        // Display only; the server recomputes this on save with the same formula.
+        //
+        // Valued on PHYSICAL Rcv Qty, not Invoice Qty: the invoice states what the
+        // vendor billed, but the value carried into stock has to be what actually
+        // arrived. A short delivery invoiced in full must not be valued in full.
         function recalcRow(tr) {
-            const qty = parseFloat(tr.querySelector('[data-field="invoice_qty"]').value);
+            const qty = parseFloat(tr.querySelector('[data-field="qty"]').value);
             const price = parseFloat(tr.querySelector('[data-field="unit_price"]').value);
             tr.querySelector('[data-field="invoice_value"]').textContent =
                 (isNaN(qty) || isNaN(price)) ? '—' : (qty * price).toFixed(4);
             recalcTotal();
         }
 
-        // Sum of the rows that have both an invoice qty and a rate. Rows missing
+        // Sum of the rows that have both a physical qty and a rate. Rows missing
         // either contribute nothing rather than being counted as zero.
         function recalcTotal() {
             const totalEl = document.getElementById('rcvTotalValue');
@@ -1472,7 +1793,7 @@
             let counted = 0;
 
             Array.from(rowsWrap.querySelectorAll('tr')).forEach(tr => {
-                const qty = parseFloat(tr.querySelector('[data-field="invoice_qty"]').value);
+                const qty = parseFloat(tr.querySelector('[data-field="qty"]').value);
                 const price = parseFloat(tr.querySelector('[data-field="unit_price"]').value);
                 if (!isNaN(qty) && !isNaN(price)) { total += qty * price; counted++; }
             });
@@ -1482,7 +1803,8 @@
 
         rowsWrap.addEventListener('input', function (e) {
             const field = e.target.dataset.field;
-            if (field === 'invoice_qty' || field === 'unit_price') recalcRow(e.target.closest('tr'));
+            // Invoice Qty no longer feeds the value, so it no longer triggers it.
+            if (field === 'qty' || field === 'unit_price') recalcRow(e.target.closest('tr'));
         });
 
         rowsWrap.addEventListener('click', function (e) {
@@ -1510,11 +1832,12 @@
 
         function refreshState() {
             const n = rowsWrap.children.length;
+            const independent = filterType.value === 'independent';
             countEl.textContent = n;
-            sharedWrap.classList.toggle('d-none', n === 0);
+            sharedWrap.classList.toggle('d-none', independent || n === 0);
             // The hint only has a job while nothing is chosen yet — once a PO is
             // selected the card above it says what to do next.
-            emptyBox.classList.toggle('d-none', n > 0 || poIdEl.value !== '');
+            emptyBox.classList.toggle('d-none', independent || n > 0 || poIdEl.value !== '');
             recalcTotal();
 
             if (n > 0) {
@@ -1568,6 +1891,464 @@
                 refreshState();
             });
         }
+
+        // --- Independent entry: BOM-backed material fields --------------------
+        /**
+         * The six Material inputs stay ordinary text inputs — same names, same
+         * submitted values. This only hangs a suggestion list off each one,
+         * built from the BOM lines the chosen style already carries.
+         *
+         * The whole lines are kept, not six independent value lists, so choosing
+         * a material name can narrow the other fields to combinations that
+         * actually exist rather than offering every colour in the style.
+         */
+        const bomFields = (function initBomFields() {
+            const boxes = Array.from(document.querySelectorAll('[data-bom-field]'));
+            if (!boxes.length) return null;
+
+            const note = document.getElementById('rcvIndBomNote');
+            let lines = [];
+
+            const fields = boxes.map((wrap) => ({
+                key: wrap.dataset.bomField,
+                wrap,
+                input: wrap.querySelector('input'),
+                panel: wrap.querySelector('[data-bom-panel]'),
+                list: wrap.querySelector('[data-bom-list]'),
+                hint: wrap.querySelector('[data-bom-hint]'),
+            }));
+
+            const byKey = (key) => fields.find((f) => f.key === key);
+            const nameField = byKey('material_name');
+
+            const closeAll = () => fields.forEach((f) => {
+                f.panel.classList.add('d-none');
+                f.input.setAttribute('aria-expanded', 'false');
+            });
+
+            /**
+             * Lines still in play. Once a material name has been entered that
+             * matches the BOM, the other fields only offer values from that
+             * material's lines — a colour that never appears against it is not a
+             * useful suggestion.
+             */
+            function scopedLines(forKey) {
+                const chosen = (nameField && nameField.input.value.trim().toLowerCase()) || '';
+                if (!chosen || forKey === 'material_name') return lines;
+
+                const narrowed = lines.filter((l) =>
+                    esc(l.material_name).trim().toLowerCase() === chosen);
+
+                // A name the user typed themselves matches nothing, so narrowing
+                // would leave every other field with no suggestions at all.
+                return narrowed.length ? narrowed : lines;
+            }
+
+            function optionsFor(field) {
+                const term = field.input.value.trim().toLowerCase();
+
+                return scopedLines(field.key)
+                    .map((l) => l[field.key])
+                    .filter((v) => esc(v) !== '')
+                    .filter((v, i, all) => all.indexOf(v) === i)
+                    .filter((v) => term === '' || String(v).toLowerCase().includes(term))
+                    .sort((a, b) => String(a).localeCompare(String(b)));
+            }
+
+            function render(field) {
+                const options = optionsFor(field);
+
+                // No BOM value to offer — the field simply behaves as free text.
+                if (!options.length) {
+                    field.panel.classList.add('d-none');
+                    field.input.setAttribute('aria-expanded', 'false');
+                    return;
+                }
+
+                field.hint.textContent = options.length +
+                    (options.length === 1 ? ' value on this style' : ' values on this style');
+
+                field.list.innerHTML = options.map((v) =>
+                    '<div class="list-group-item rcv-option" role="option" tabindex="-1" data-value="' + h(v) + '">' +
+                        '<div class="rcv-option-primary">' + dash(v) + '</div>' +
+                    '</div>').join('');
+
+                field.panel.classList.remove('d-none');
+                field.input.setAttribute('aria-expanded', 'true');
+            }
+
+            fields.forEach((field) => {
+                field.input.addEventListener('focus', () => { closeAll(); render(field); });
+                field.input.addEventListener('click', () => { closeAll(); render(field); });
+                field.input.addEventListener('input', () => render(field));
+
+                field.input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') closeAll();
+                    // Never submit the form from a suggestion box.
+                    if (e.key === 'Enter') e.preventDefault();
+                });
+
+                field.list.addEventListener('mousedown', (e) => e.preventDefault());
+
+                field.list.addEventListener('click', function (e) {
+                    const option = e.target.closest('.rcv-option');
+                    if (!option) return;
+
+                    field.input.value = option.dataset.value || '';
+                    closeAll();
+
+                    // Choosing the material name is the one pick that can carry
+                    // the rest: only when it resolves to exactly one BOM line is
+                    // there a single correct answer for the other fields. With
+                    // several lines the options are narrowed instead — filling
+                    // one of them would be a guess.
+                    if (field.key === 'material_name') autofillFrom(option.dataset.value);
+                });
+            });
+
+            function autofillFrom(materialName) {
+                const matches = lines.filter((l) =>
+                    esc(l.material_name).trim().toLowerCase() === String(materialName).trim().toLowerCase());
+
+                if (matches.length !== 1) return;
+
+                const line = matches[0];
+                fields.forEach((f) => {
+                    if (f.key === 'material_name') return;
+                    // Never overwrite something the user already typed.
+                    if (f.input.value.trim() !== '') return;
+                    if (esc(line[f.key]) !== '') f.input.value = line[f.key];
+                });
+            }
+
+            document.addEventListener('click', function (e) {
+                if (!e.target.closest('[data-bom-field]')) closeAll();
+            });
+
+            return {
+                /** Swap in the BOM for a newly chosen style. */
+                load(styleName) {
+                    lines = [];
+                    closeAll();
+
+                    if (!styleName) {
+                        note.textContent = '';
+                        return;
+                    }
+
+                    note.textContent = 'Loading material values for this style…';
+
+                    fetch(STYLE_BOM_URL + '?style_name=' + encodeURIComponent(styleName),
+                            { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                        .then(data => {
+                            lines = data.lines || [];
+                            note.textContent = lines.length
+                                ? 'Click a field to pick from the ' + lines.length +
+                                  ' material line(s) already on this style, or type a new value.'
+                                : 'This style has no BOM material lines yet — type the values in.';
+                        })
+                        .catch(() => {
+                            lines = [];
+                            note.textContent = 'Could not load this style’s BOM values. You can still type them in.';
+                        });
+                },
+            };
+        })();
+
+        // --- Independent entry: style picker ----------------------------------
+        // A small dedicated picker rather than a branch inside the PO search
+        // above: that one carries browse caching, per-type labels and PO
+        // selection semantics that mean nothing for a style.
+        (function initStylePicker() {
+            const box = document.getElementById('rcvIndSearch');
+            if (!box) return;
+
+            const wrap = document.getElementById('rcvIndSearchWrap');
+            const panel = document.getElementById('rcvIndResults');
+            const list = document.getElementById('rcvIndResultsList');
+            const hint = document.getElementById('rcvIndResultsHint');
+            const body = document.getElementById('rcvIndBody');
+            const chip = document.getElementById('rcvIndChip');
+
+            const buyerEl = document.getElementById('rcvIndBuyer');
+            const seasonEl = document.getElementById('rcvIndSeason');
+            const styleEl = document.getElementById('rcvIndStyle');
+
+            let loaded = null;
+            let timer = null;
+
+            const open = () => { panel.classList.remove('d-none'); box.setAttribute('aria-expanded', 'true'); };
+            const close = () => { panel.classList.add('d-none'); box.setAttribute('aria-expanded', 'false'); };
+
+            function render(results, term) {
+                if (!results.length) {
+                    hint.textContent = '';
+                    list.innerHTML = '<div class="list-group-item text-center text-muted py-3 small">No matching styles' +
+                        (term ? ' for “' + h(term) + '”' : '') + '</div>';
+                    return;
+                }
+
+                hint.textContent = term === ''
+                    ? 'All styles (' + results.length + ')'
+                    : results.length + (results.length === 1 ? ' match' : ' matches');
+
+                list.innerHTML = results.map(r =>
+                    '<div class="list-group-item rcv-option" role="option" tabindex="-1"' +
+                        ' data-style="' + h(r.style_name) + '"' +
+                        ' data-buyer="' + h(r.buyer_name) + '"' +
+                        ' data-season="' + h(r.season_name) + '">' +
+                        '<div class="rcv-option-primary">' + dash(r.style_name) + '</div>' +
+                        '<div class="rcv-option-meta">' +
+                            dash([r.buyer_name, r.season_name].filter(Boolean).join(' · ')) + '</div>' +
+                    '</div>'
+                ).join('');
+            }
+
+            function load(term) {
+                // The full list is cached once; a complete dataset is filtered in
+                // the browser rather than re-fetched on every keystroke.
+                if (term === '' && loaded) { render(loaded, ''); return Promise.resolve(); }
+
+                hint.textContent = 'Loading…';
+                list.innerHTML = '';
+
+                return fetch(STYLE_SEARCH_URL + (term ? '?term=' + encodeURIComponent(term) : ''),
+                        { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                    .then(data => {
+                        const results = data.results || [];
+                        if (term === '' && data.complete) loaded = results;
+                        render(results, term);
+                    })
+                    .catch(() => {
+                        hint.textContent = '';
+                        list.innerHTML = '<div class="list-group-item text-muted small">Could not load styles. Please try again.</div>';
+                    });
+            }
+
+            const show = () => { open(); load(box.value.trim()); };
+
+            box.addEventListener('focus', show);
+            box.addEventListener('click', show);
+
+            box.addEventListener('input', function () {
+                clearTimeout(timer);
+                const term = box.value.trim();
+                open();
+
+                if (loaded) {
+                    const needle = term.toLowerCase();
+                    render(needle === '' ? loaded : loaded.filter(r =>
+                        [r.style_name, r.buyer_name, r.season_name]
+                            .some(f => esc(f).toLowerCase().includes(needle))), term);
+                    return;
+                }
+
+                timer = setTimeout(() => load(term), DEBOUNCE_MS);
+            });
+
+            box.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') close();
+                // Enter must never submit the form from the search box.
+                if (e.key === 'Enter') e.preventDefault();
+            });
+
+            document.addEventListener('click', function (e) {
+                if (!wrap.contains(e.target)) close();
+            });
+
+            list.addEventListener('click', function (e) {
+                const option = e.target.closest('.rcv-option');
+                if (!option) return;
+
+                styleEl.value = option.dataset.style || '';
+                buyerEl.value = option.dataset.buyer || '';
+                seasonEl.value = option.dataset.season || '';
+
+                chip.textContent = [option.dataset.buyer, option.dataset.style]
+                    .filter(Boolean).join(' / ') || '—';
+                body.classList.remove('d-none');
+                box.value = '';
+                close();
+
+                // Offer this style's own BOM values in the Material fields.
+                if (bomFields) bomFields.load(styleEl.value);
+            });
+
+            document.getElementById('rcvIndClear').addEventListener('click', function () {
+                styleEl.value = ''; buyerEl.value = ''; seasonEl.value = '';
+                body.classList.add('d-none');
+                if (bomFields) bomFields.load('');
+                box.focus();
+            });
+
+            // A rejected save comes back with old() already in the fields; the
+            // chip and the body have to be reopened to match, or the user is
+            // looking at an empty style picker over a form they did fill.
+            if (styleEl.value) {
+                chip.textContent = [buyerEl.value, styleEl.value].filter(Boolean).join(' / ') || '—';
+                body.classList.remove('d-none');
+                if (bomFields) bomFields.load(styleEl.value);
+            }
+        })();
+
+        // Reflect whichever mode the page loaded in, including after a rejected
+        // Independent save.
+        applyMode();
+
+        // --- Linking an Independent receiving to its PO -----------------------
+        (function initLinkModal() {
+            const modalNode = document.getElementById('rcvLinkModal');
+            if (!modalNode) return;
+
+            const linkForm = document.getElementById('rcvLinkForm');
+            const subtitle = document.getElementById('rcvLinkSubtitle');
+            const box = document.getElementById('rcvLinkSearch');
+            const wrap = document.getElementById('rcvLinkSearchWrap');
+            const panel = document.getElementById('rcvLinkResults');
+            const optionList = document.getElementById('rcvLinkResultsList');
+            const hint = document.getElementById('rcvLinkResultsHint');
+            const itemsWrap = document.getElementById('rcvLinkItemsWrap');
+            const itemTbody = document.getElementById('rcvLinkItemBody');
+            const loading = document.getElementById('rcvLinkLoading');
+            const errorBox = document.getElementById('rcvLinkError');
+            const submitBtn = document.getElementById('rcvLinkSubmit');
+            const linkPoId = document.getElementById('rcvLinkPoId');
+            const linkRowId = document.getElementById('rcvLinkRowId');
+
+            let timer = null;
+
+            const open = () => panel.classList.remove('d-none');
+            const close = () => panel.classList.add('d-none');
+
+            // The PO lookup reuses the page's existing endpoint and its PO Number
+            // browse list — the same search Store already knows.
+            function search(term) {
+                hint.textContent = term ? 'Searching…' : 'Loading…';
+                optionList.innerHTML = '';
+
+                const url = SEARCH_URL + '?type=po_no' + (term ? '&term=' + encodeURIComponent(term) : '');
+
+                return fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                    .then(data => {
+                        const results = data.results || [];
+                        hint.textContent = results.length
+                            ? results.length + (results.length === 1 ? ' match' : ' matches')
+                            : '';
+
+                        optionList.innerHTML = results.length
+                            ? results.map(r =>
+                                '<div class="list-group-item rcv-option" role="option" tabindex="-1"' +
+                                    ' data-id="' + h(r.id) + '" data-po="' + h(r.po_no) + '">' +
+                                    '<div class="rcv-option-primary">' + dash(r.po_no) + '</div>' +
+                                    '<div class="rcv-option-meta">' +
+                                        dash([r.buyer_name, r.season_name, r.vendor_name].filter(Boolean).join(' · ')) + '</div>' +
+                                '</div>').join('')
+                            : '<div class="list-group-item text-center text-muted py-3 small">No matching POs</div>';
+                    })
+                    .catch(() => {
+                        hint.textContent = '';
+                        optionList.innerHTML = '<div class="list-group-item text-muted small">Could not load POs. Please try again.</div>';
+                    });
+            }
+
+            box.addEventListener('focus', () => { open(); search(box.value.trim()); });
+            box.addEventListener('click', () => { open(); search(box.value.trim()); });
+            box.addEventListener('input', function () {
+                clearTimeout(timer);
+                open();
+                timer = setTimeout(() => search(box.value.trim()), DEBOUNCE_MS);
+            });
+            box.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+            document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) close(); });
+
+            optionList.addEventListener('click', function (e) {
+                const option = e.target.closest('.rcv-option');
+                if (!option) return;
+
+                linkPoId.value = option.dataset.id;
+                linkRowId.value = '';
+                submitBtn.disabled = true;
+                box.value = option.dataset.po || '';
+                close();
+                loadLines(option.dataset.id);
+            });
+
+            // Stock is booked against one BOM line, so the PO alone is not enough.
+            function loadLines(id) {
+                itemsWrap.classList.add('d-none');
+                errorBox.classList.add('d-none');
+                loading.classList.remove('d-none');
+
+                fetch(ITEMS_URL.replace('__ID__', encodeURIComponent(id)),
+                        { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                    .then(data => {
+                        loading.classList.add('d-none');
+                        const list = data.items || [];
+
+                        if (!list.length) {
+                            errorBox.textContent = 'This PO has no material lines to link against.';
+                            errorBox.classList.remove('d-none');
+                            return;
+                        }
+
+                        itemTbody.innerHTML = list.map(item =>
+                            '<tr class="rcv-link-row" style="cursor:pointer;">' +
+                                '<td><input type="radio" class="form-check-input rcv-link-cb" name="rcv_link_pick"' +
+                                    ' value="' + h(item.excel_row_id) + '"' +
+                                    ' aria-label="Select material line ' + h(item.material_name) + '"></td>' +
+                                '<td><div class="fw-semibold small">' + dash(item.material_name) + '</div>' +
+                                    '<div class="small text-muted">' + dash(item.material_description) + '</div></td>' +
+                                '<td class="small">' + dash(item.style_name) + '</td>' +
+                                '<td class="small">' + dash([item.material_color, item.size].filter(Boolean).join(' · ')) + '</td>' +
+                                '<td class="small text-end">' + trimNum(parseFloat(item.received_qty) || 0) + ' received</td>' +
+                            '</tr>').join('');
+
+                        itemsWrap.classList.remove('d-none');
+                    })
+                    .catch((status) => {
+                        loading.classList.add('d-none');
+                        errorBox.textContent = status === 423
+                            ? 'This file/style is locked. Linking is not allowed.'
+                            : 'Could not load the items for this PO. Please try again.';
+                        errorBox.classList.remove('d-none');
+                    });
+            }
+
+            itemTbody.addEventListener('click', function (e) {
+                const row = e.target.closest('tr');
+                if (!row) return;
+
+                const radio = row.querySelector('.rcv-link-cb');
+                if (!radio) return;
+                radio.checked = true;
+                linkRowId.value = radio.value;
+                submitBtn.disabled = false;
+            });
+
+            // Opening from a row carries that receiving's id into the form action.
+            document.addEventListener('click', function (e) {
+                const trigger = e.target.closest('[data-rcv-link]');
+                if (!trigger) return;
+
+                linkForm.action = LINK_URL.replace('__ID__', encodeURIComponent(trigger.dataset.rcvLink));
+                subtitle.textContent = 'GRN ' + (trigger.dataset.rcvGrn || '—') + ' · ' + (trigger.dataset.rcvStyle || '—');
+
+                linkPoId.value = '';
+                linkRowId.value = '';
+                box.value = '';
+                submitBtn.disabled = true;
+                itemsWrap.classList.add('d-none');
+                errorBox.classList.add('d-none');
+                itemTbody.innerHTML = '';
+                close();
+
+                bootstrap.Modal.getOrCreateInstance(modalNode).show();
+            });
+        })();
     })();
 </script>
 @endsection

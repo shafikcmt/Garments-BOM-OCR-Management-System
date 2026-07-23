@@ -337,8 +337,9 @@ function initPanel(cfg) {
     const saveLabel = document.getElementById('biSaveLabel');
 
     const filterType = document.getElementById('biFilterType');
-    const searchLabel = document.getElementById('biSearchLabel');
     const poSearch = document.getElementById('biPoSearch');
+    const poLoading = document.getElementById('biPoLoading');
+    const poError = document.getElementById('biPoError');
     const poPanel = document.getElementById('biPoPanel');
     const poList = document.getElementById('biPoList');
     const poHint = document.getElementById('biPoHint');
@@ -348,6 +349,7 @@ function initPanel(cfg) {
     const selectedText = document.getElementById('biSelectedText');
     const summary = document.getElementById('biSummaryGrid');
     const sumCounts = document.getElementById('biSumCounts');
+    const pickBtn = document.getElementById('biPickBtn');
 
     const itemRows = document.getElementById('biItemRows');
     const noItems = document.getElementById('biNoItems');
@@ -376,7 +378,24 @@ function initPanel(cfg) {
     const crumb1 = document.getElementById('biCrumb1');
     const crumb2 = document.getElementById('biCrumb2');
 
-    const LABELS = { po_no: 'PO Number', pi_number: 'PI Number', invoice_no: 'Invoice No' };
+    // Garments PO is the buyer's garment-level PO from the BOM, a separate
+    // identifier from the material PO that po_no searches.
+    const LABELS = {
+        po_no: 'PO Number',
+        garments_po: 'Garments PO',
+        pi_number: 'PI Number',
+        invoice_no: 'Invoice No',
+    };
+
+    // Spelled out rather than built by appending "s", which turned
+    // "Garments PO" into "Garments POs". The other three keep the exact wording
+    // they already had.
+    const LABELS_PLURAL = {
+        po_no: 'PO Numbers',
+        garments_po: 'Garments PO numbers',
+        pi_number: 'PI Numbers',
+        invoice_no: 'Invoice Nos',
+    };
     const DEBOUNCE_MS = 300;
 
     let items = [];        // every material line under the loaded PO
@@ -504,7 +523,7 @@ function initPanel(cfg) {
 
         const browsing = term === '' && source && source.complete;
         poHint.textContent = browsing
-            ? 'All ' + LABELS[type] + 's (' + results.length + ')'
+            ? 'All ' + LABELS_PLURAL[type] + ' (' + results.length + ')'
             : results.length + (results.length === 1 ? ' match' : ' matches');
 
         poList.innerHTML = results.map((r) => {
@@ -520,12 +539,14 @@ function initPanel(cfg) {
     }
 
     filterType.addEventListener('change', () => {
-        const label = LABELS[filterType.value];
-        searchLabel.textContent = label;
-        poSearch.placeholder = 'Click or type to see available ' + label + 's…';
+        poSearch.placeholder = 'Click or type to browse ' + LABELS_PLURAL[filterType.value] + '…';
         poSearch.value = '';
         closeSuggest();
         syncSearchStatus();
+        // The selector is part of the search control, so changing it reopens the
+        // list for the new type rather than leaving an empty box.
+        poSearch.focus();
+        showBrowse();
     });
 
     poSearch.addEventListener('focus', showBrowse);
@@ -622,8 +643,11 @@ function initPanel(cfg) {
         items = [];
         loadedPoId = null;
         poSearch.value = '';
+        poLoading.classList.add('d-none');
+        poError.classList.add('d-none');
         syncSearchStatus();
         refreshItemsState();
+        checkOver();
         poSearch.focus();
         showBrowse();
     });
@@ -648,6 +672,12 @@ function initPanel(cfg) {
         modalError.classList.add('d-none');
         setSummary(null);
 
+        // The lookup is started from the panel, so its progress and any failure
+        // have to be visible there — not only inside a modal that may be closed.
+        poLoading.classList.remove('d-none');
+        poError.classList.add('d-none');
+        pickBtn.disabled = true;
+
         return fetch(cfg.routes.poItems.replace('__ID__', encodeURIComponent(id)), {
             headers: { Accept: 'application/json' }, credentials: 'same-origin',
         })
@@ -656,27 +686,60 @@ function initPanel(cfg) {
                 if (String(poId.value) !== String(id)) return;   // changed meanwhile
                 items = data.items || [];
                 loadedPoId = id;
+                // A different PO means the remembered ticks refer to lines that
+                // are no longer on screen.
+                clearPicked();
                 setSummary(data);
+                pickBtn.disabled = items.length === 0;
                 modalPo.textContent = 'PO ' + (esc(data.po_no) || '—') +
                     ' · ' + styleNames().length + ' style(s) · ' + items.length + ' item(s)';
+
+                if (!items.length) {
+                    poError.textContent = 'This PO has no material lines to issue against.';
+                    poError.classList.remove('d-none');
+                }
             })
             .catch((status) => {
+                if (String(poId.value) !== String(id)) return;
+                loadedPoId = null;
+                items = [];
                 modalLoading.classList.add('d-none');
-                modalError.classList.remove('d-none');
-                modalError.textContent = status === 423
+                const message = status === 423
                     ? 'This file/style is locked. Stock entry is not allowed.'
                     : 'Could not load the items for this PO. Please try again.';
+                modalError.textContent = message;
+                modalError.classList.remove('d-none');
+                poError.textContent = message;
+                poError.classList.remove('d-none');
+            })
+            .finally(() => {
+                if (String(poId.value) !== String(id)) return;
+                poLoading.classList.add('d-none');
             });
     }
+
+    /**
+     * The picker's ticks, held outside the table markup.
+     *
+     * renderStyles() and renderItems() rebuild their tbody from scratch on every
+     * step change, which threw away every checkbox the user had set: stepping
+     * Back to add a style and forward again silently dropped the items already
+     * chosen. Keeping the selection here and re-applying it after each rebuild
+     * is what makes Back/Next non-destructive.
+     */
+    let pickedStyles = [];
+    let pickedItems = [];
+    const clearPicked = () => { pickedStyles = []; pickedItems = []; };
 
     function showStep(step) {
         modalLoading.classList.add('d-none');
         modalError.classList.add('d-none');
         step1.classList.toggle('d-none', step !== 1);
         step2.classList.toggle('d-none', step !== 2);
-        // With a single style there is nothing to choose at step 1, so Back would
-        // only lead to a one-row list the user never saw.
-        backBtn.classList.toggle('d-none', step !== 2 || styleNames().length < 2);
+        // The style step is always part of the flow, including the single-style
+        // case: issuing against the wrong style is not a recoverable mistake, so
+        // the style is confirmed explicitly rather than assumed.
+        backBtn.classList.toggle('d-none', step !== 2);
         nextBtn.classList.toggle('d-none', step !== 1);
         addBtn.classList.toggle('d-none', step !== 2);
         crumb1.classList.toggle('is-current', step === 1);
@@ -688,6 +751,9 @@ function initPanel(cfg) {
 
     function renderStyles() {
         const already = addedRowIds();
+
+        // Capture the ticks before the tbody they live in is replaced.
+        if (styleBody.querySelector('.bi-style-cb')) pickedStyles = chosenStyles();
 
         styleBody.innerHTML = styleNames().map((name, i) => {
             const under = items.filter((it) => styleKey(it) === name);
@@ -711,6 +777,17 @@ function initPanel(cfg) {
             '</tr>';
         }).join('');
 
+        const boxes = Array.from(styleBody.querySelectorAll('.bi-style-cb:not(:disabled)'));
+
+        if (pickedStyles.length) {
+            // Put back what the user had chosen before stepping away.
+            boxes.forEach((cb) => { cb.checked = pickedStyles.indexOf(cb.value) !== -1; });
+        } else if (boxes.length === 1) {
+            // A PO with one style still shows this step, but there is nothing to
+            // decide — so it comes pre-ticked and the user only confirms it.
+            boxes[0].checked = true;
+        }
+
         updatePickCount();
     }
 
@@ -718,8 +795,16 @@ function initPanel(cfg) {
 
     function renderItems() {
         const already = addedRowIds();
-        // With one style there is no style step, so every item is in scope.
-        const styles = styleNames().length < 2 ? styleNames() : chosenStyles();
+
+        // Capture the ticks before the tbody they live in is replaced. Already-
+        // added rows are excluded: they are checked because they are disabled,
+        // not because the user chose them in this pass.
+        if (itemBody.querySelector('.bi-item-cb')) {
+            pickedItems = Array.from(itemBody.querySelectorAll('.bi-item-cb:not(:disabled)'))
+                .filter((cb) => cb.checked).map((cb) => cb.value);
+        }
+        // Only the styles the user confirmed at step 1 are in scope.
+        const styles = chosenStyles();
         const sub = (label, value) => (esc(value) === '' ? '' : label + ' ' + h(value));
         const joinSub = (parts) => parts.filter(Boolean).join(' · ') || '—';
         let html = '';
@@ -769,6 +854,12 @@ function initPanel(cfg) {
         });
 
         itemBody.innerHTML = html;
+
+        // Re-tick what was already chosen. An item that fell out of scope because
+        // its style was unticked simply has no checkbox left to match.
+        Array.from(itemBody.querySelectorAll('.bi-item-cb:not(:disabled)'))
+            .forEach((cb) => { if (pickedItems.indexOf(cb.value) !== -1) cb.checked = true; });
+
         updatePickCount();
     }
 
@@ -825,10 +916,8 @@ function initPanel(cfg) {
     backBtn.addEventListener('click', () => showStep(1));
 
     modalEl.addEventListener('show.bs.modal', () => {
-        const open = () => {
-            // One style means nothing to choose — go straight to its items.
-            showStep(styleNames().length < 2 ? 2 : 1);
-        };
+        // Always land on the style step, whatever the PO carries.
+        const open = () => { if (items.length) showStep(1); };
         if (loadedPoId === poId.value) open(); else loadItems(poId.value).then(open);
     });
 
@@ -850,6 +939,9 @@ function initPanel(cfg) {
 
         chosen.forEach((item) => addItemRow(item));
         refreshItemsState();
+        // These are quantity blocks now, not pending ticks — reopening the
+        // picker to "Add More Items" should start from a clean sheet.
+        clearPicked();
         bootstrap.Modal.getOrCreateInstance(modalEl).hide();
     });
 
@@ -879,9 +971,14 @@ function initPanel(cfg) {
                     '<div class="bi-item-meta">' + dash([item.style_name, item.art_no, identity].filter(Boolean).join(' · ')) + '</div>' +
                 '</div>' +
                 '<div class="d-flex align-items-center gap-2 flex-shrink-0">' +
+                    '<span class="badge bg-secondary-subtle text-secondary-emphasis text-nowrap" data-bi-filled ' +
+                        'title="How many of the four quantity fields carry a value">0/4</span>' +
                     '<span class="badge bg-success-subtle text-success text-nowrap">Avail: ' + fmtNum(avail) + '</span>' +
-                    '<button type="button" class="btn btn-sm btn-link text-danger p-0" data-bi-remove-item ' +
-                        'title="Remove this item" aria-label="Remove this item"><i class="bi bi-x-lg" aria-hidden="true"></i></button>' +
+                    // Labelled rather than a bare ✕ — store staff should not have
+                    // to hover a card to learn that the cross drops the item.
+                    '<button type="button" class="btn btn-sm btn-link text-danger p-0 text-decoration-none bi-btn-inline" ' +
+                        'data-bi-remove-item title="Remove this item from the issue">' +
+                        '<i class="bi bi-x-lg me-1" aria-hidden="true"></i>Remove</button>' +
                 '</div>' +
             '</div>' +
             '<input type="hidden" name="' + n('excel_row_id') + '" value="' + h(item.excel_row_id) + '">' +
@@ -913,7 +1010,9 @@ function initPanel(cfg) {
     }
 
     function qtyCell(cls, label, dot, tone, name, value) {
-        return '<div class="col-6"><div class="bi-qty-card ' + cls + '">' +
+        // Two-up on a narrow panel, all four on one line once the slide-over is
+        // wide enough for them (xl and above).
+        return '<div class="col-6 col-xl-3"><div class="bi-qty-card ' + cls + '">' +
             '<label class="form-label fw-semibold ' + tone + '">' + dot + ' ' + label + '</label>' +
             '<input type="number" step="0.0001" min="0" name="' + h(name) + '" placeholder="0" ' +
                 'class="form-control form-control-sm bi-qty"' +
@@ -938,6 +1037,24 @@ function initPanel(cfg) {
         noItems.classList.toggle('d-none', count > 0);
         // Editing corrects one issue, so there is nothing to add alongside it.
         addMoreWrap.classList.toggle('d-none', count === 0 || editing);
+        publishState();
+    }
+
+    /**
+     * Hands the Alpine wizard shell what it needs to gate its steps. One-way on
+     * purpose: Alpine reads this and never writes back into the DOM this module
+     * owns, so the two cannot fight over the same nodes.
+     */
+    function publishState(extra) {
+        const blocked = Array.from(itemRows.children).some((c) => c.classList.contains('is-over'));
+        panelEl.querySelector('.offcanvas-body').dispatchEvent(new CustomEvent('bi:state', {
+            detail: Object.assign({
+                hasPo: !!poId.value,
+                itemCount: itemRows.children.length,
+                blocked,
+                editing,
+            }, extra || {}),
+        }));
     }
 
     /**
@@ -951,10 +1068,21 @@ function initPanel(cfg) {
 
         Array.from(itemRows.children).forEach((card) => {
             const avail = parseFloat(card.dataset.available) || 0;
-            const total = Array.from(card.querySelectorAll('.bi-qty'))
-                .reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
+            const fields = Array.from(card.querySelectorAll('.bi-qty'));
+            const total = fields.reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
             const over = total > avail + 1e-9;
             const name = card.querySelector('.bi-item-head').textContent.trim();
+
+            // "n/4" reads at a glance on a card that carries four inputs.
+            const filled = fields.filter((el) => el.value !== '' && parseFloat(el.value) > 0).length;
+            const filledEl = card.querySelector('[data-bi-filled]');
+            if (filledEl) {
+                filledEl.textContent = filled + '/4';
+                filledEl.classList.toggle('bg-secondary-subtle', filled === 0);
+                filledEl.classList.toggle('text-secondary-emphasis', filled === 0);
+                filledEl.classList.toggle('bg-primary-subtle', filled > 0);
+                filledEl.classList.toggle('text-primary-emphasis', filled > 0);
+            }
 
             card.classList.toggle('is-over', over);
 
@@ -988,6 +1116,8 @@ function initPanel(cfg) {
             saveBtn.disabled = offenders.length > 0;
             saveBtn.title = offenders.length ? 'One or more items exceed their available stock' : '';
         }
+
+        publishState();
 
         return offenders.length > 0;
     }
@@ -1030,20 +1160,28 @@ function initPanel(cfg) {
         poId.value = '';
         items = [];
         loadedPoId = null;
+        clearPicked();
         itemRows.innerHTML = '';
         selectedRow.classList.add('d-none');
         overWarn.classList.add('d-none');
         poSearch.value = '';
-        filterType.value = 'po_no';
-        searchLabel.textContent = LABELS.po_no;
-        poSearch.placeholder = 'Click or type to see available PO Numbers…';
+        // Reset returns the selector to whichever option the markup ships first,
+        // so this does not have to be kept in step with the dropdown by hand.
+        filterType.selectedIndex = 0;
+        poSearch.placeholder = 'Click or type to browse ' + LABELS_PLURAL[filterType.value] + '…';
+        poLoading.classList.add('d-none');
+        poError.classList.add('d-none');
         syncSearchStatus();
         closeSuggest();
         title.textContent = 'New Bulk Issue';
-        saveLabel.textContent = 'Save';
+        saveLabel.textContent = 'Confirm';
         if (issueDateEl) issueDateEl.value = new Date().toISOString().slice(0, 10);
         if (issueNoEl) issueNoEl.classList.remove('bi-suggested');
         refreshItemsState();
+        // Clears any over-stock block left by the previous entry.
+        checkOver();
+        // reset:true tells the wizard to return to its first step.
+        publishState({ reset: true });
     }
 
     const newBtn = document.getElementById('biNewBtn');
@@ -1068,6 +1206,9 @@ function initPanel(cfg) {
         saveLabel.textContent = 'Update';
         form.action = cfg.routes.update.replace('__ID__', encodeURIComponent(id));
         methodEl.value = 'PUT';
+        // Correcting an existing issue: the PO is already settled, so the wizard
+        // opens on the details rather than making the user walk step 1 again.
+        publishState({ reset: true });
         panel.show();
 
         fetch(cfg.routes.show.replace('__ID__', encodeURIComponent(id)), {

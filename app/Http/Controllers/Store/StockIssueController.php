@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Store;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Models\StockItem;
 use App\Models\StockIssue;
 use Illuminate\Http\Request;
@@ -14,6 +15,8 @@ use Illuminate\Http\Request;
  */
 class StockIssueController extends Controller
 {
+    use AuthorizesStoreCorrections;
+
     public function index(Request $request)
     {
         $issues = StockIssue::with(['stockItem', 'createdBy'])
@@ -24,7 +27,9 @@ class StockIssueController extends Controller
 
         $items = StockItem::where('is_active', true)->orderBy('name')->get();
 
-        return view('store.stock.issues', compact('issues', 'items'));
+        ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
+
+        return view('store.stock.issues', compact('issues', 'items', 'canEdit', 'canDelete'));
     }
 
     public function store(Request $request)
@@ -56,6 +61,8 @@ class StockIssueController extends Controller
 
     public function destroy(StockIssue $stockIssue)
     {
+        $this->authorizeStoreDelete('stock issue');
+
         $stockIssue->delete();
 
         return back()->with('success', 'Issue entry removed.');

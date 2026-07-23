@@ -141,7 +141,9 @@ class MaterialBulkIssueController extends Controller
     public function poSearch(Request $request)
     {
         $validated = $request->validate([
-            'type' => ['required', 'in:po_no,pi_number,invoice_no'],
+            // garments_po is an additional handle, not a replacement: po_no
+            // still searches the material PO that booking_pos.po_no carries.
+            'type' => ['required', 'in:po_no,garments_po,pi_number,invoice_no'],
             'term' => ['nullable', 'string', 'max:100'],
         ]);
 

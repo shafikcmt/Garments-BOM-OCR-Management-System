@@ -140,9 +140,11 @@ it('saves one receiving per selected line, each keyed to its own BOM row and its
     // One GRN per record, and they are distinct.
     expect($saved->pluck('grn_no')->filter()->unique())->toHaveCount(2);
 
-    // Invoice Value is recomputed server-side, never taken from the form.
+    // Invoice Value is recomputed server-side, never taken from the form, and
+    // valued on the PHYSICAL qty: the second row was invoiced for 4 but 5
+    // arrived, so it is worth 5 x 3 = 15, not 4 x 3 = 12.
     expect((float) $saved[0]->invoice_value)->toBe(25.0)
-        ->and((float) $saved[1]->invoice_value)->toBe(12.0);
+        ->and((float) $saved[1]->invoice_value)->toBe(15.0);
 });
 
 it('recomputes Invoice Value server-side and ignores any value posted by the client', function () {
@@ -198,32 +200,29 @@ it('requires Physical Rcv Qty on every row and saves nothing when one row is inv
     expect(MaterialReceiving::count())->toBe(0);
 });
 
-it('finds the PO by PO number, SAP code and PI number alike', function () {
+it('finds the PO by PO number and PI number alike', function () {
     poWithLines('PO-0007', ['Thread Tex 40', 'Zipper'], ['sap_code' => '1000753', 'pi_number' => 'PI-ABC-1']);
 
     $user = storeUser();
 
     $byPo = $this->actingAs($user)->getJson(route('store.material.receivings.po-search', ['type' => 'po_no', 'term' => 'PO-0007']));
-    $bySap = $this->actingAs($user)->getJson(route('store.material.receivings.po-search', ['type' => 'sap_code', 'term' => '1000753']));
     $byPi = $this->actingAs($user)->getJson(route('store.material.receivings.po-search', ['type' => 'pi_number', 'term' => 'PI-ABC-1']));
 
-    foreach ([$byPo, $bySap, $byPi] as $response) {
+    foreach ([$byPo, $byPi] as $response) {
         $response->assertOk();
         expect($response->json('results.0.po_no'))->toBe('PO-0007');
     }
 });
 
-it('returns every matching PO when one SAP code spans several POs', function () {
+// SAP Code identifies a material, not the paperwork a delivery arrives under, so
+// it fanned out to POs unrelated to the shipment. It is no longer a search
+// handle — the column itself still auto-fills onto the receiving row.
+it('rejects SAP code as a search handle', function () {
     poWithLines('PO-0008', ['Thread Tex 40'], ['sap_code' => 'SHARED-SAP']);
-    poWithLines('PO-0009', ['Zipper'], ['sap_code' => 'SHARED-SAP']);
 
-    $results = $this->actingAs(storeUser())
+    $this->actingAs(storeUser())
         ->getJson(route('store.material.receivings.po-search', ['type' => 'sap_code', 'term' => 'SHARED-SAP']))
-        ->assertOk()
-        ->json('results');
-
-    expect(collect($results)->pluck('po_no')->sort()->values()->all())
-        ->toEqual(['PO-0008', 'PO-0009']);
+        ->assertStatus(422);
 });
 
 it('matches partially and case-insensitively, and returns nothing for an unknown term', function () {

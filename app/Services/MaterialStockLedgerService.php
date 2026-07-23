@@ -111,6 +111,10 @@ class MaterialStockLedgerService
                 'material_description' => $identitySource->material_description,
                 'sap_code' => $identitySource->sap_code,
                 'material_color' => $identitySource->material_color,
+                // Garment colour, distinct from the material's own. Only the
+                // receiving/issue tables carry it, hence the null-safe read —
+                // a liability or dead movement row has no such column.
+                'gmts_color_name' => $identitySource->gmts_color_name ?? null,
                 'uom' => $identitySource->uom,
 
                 'booking_receive_qty' => $bookingReceive,

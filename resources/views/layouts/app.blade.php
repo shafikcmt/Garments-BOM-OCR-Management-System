@@ -102,11 +102,78 @@
             sidebarClose?.addEventListener('click', closeSidebar);
             sidebarBackdrop?.addEventListener('click', closeSidebar);
 
+            // --- Collapsible sidebar (desktop) ---------------------------------
+            // Only the body class is toggled; every width in the shell already
+            // derives from --app-sidebar, so the layout follows on its own.
+            const COLLAPSE_KEY = 'sidebarCollapsed';
+            const collapseToggle = document.getElementById('sidebarCollapseToggle');
+            const isDesktop = () => window.matchMedia('(min-width: 992px)').matches;
+
+            // Hover labels for the collapsed rail, taken from each item's own
+            // text. Reading the DOM means role-filtered menus label themselves
+            // and no list has to be maintained alongside the Blade.
+            document.querySelectorAll('.sidebar-nav-link, .sidebar-group-button').forEach(function (item) {
+                const label = item.querySelector('.sidebar-link-text')?.textContent.trim();
+                if (label) item.setAttribute('data-tip', label);
+            });
+
+            function applyCollapsed(collapsed) {
+                document.body.classList.toggle('sidebar-collapsed', collapsed);
+
+                if (!collapseToggle) return;
+                collapseToggle.setAttribute('aria-expanded', String(!collapsed));
+                collapseToggle.querySelector('.sidebar-link-text').textContent =
+                    collapsed ? 'Expand Menu' : 'Collapse Menu';
+                collapseToggle.setAttribute('data-tip', 'Expand Menu');
+            }
+
+            function setCollapsed(collapsed) {
+                applyCollapsed(collapsed);
+                try {
+                    localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
+                } catch (e) {
+                    // Private mode / quota. The choice simply will not persist.
+                }
+            }
+
+            function storedCollapsed() {
+                try {
+                    return localStorage.getItem(COLLAPSE_KEY) === '1';
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            // Restore the saved choice, but never on a narrow screen where the
+            // sidebar is a slide-over instead.
+            if (isDesktop() && storedCollapsed()) applyCollapsed(true);
+
+            collapseToggle?.addEventListener('click', function () {
+                setCollapsed(!document.body.classList.contains('sidebar-collapsed'));
+            });
+
+            // Crossing the lg boundary: the rail only exists on desktop, so the
+            // class is dropped below it and restored on the way back up.
+            window.matchMedia('(min-width: 992px)').addEventListener('change', function (e) {
+                applyCollapsed(e.matches && storedCollapsed());
+            });
+
             document.querySelectorAll('[data-sidebar-group-toggle]').forEach(function (toggle) {
                 toggle.addEventListener('click', function () {
                     const group = this.closest('.sidebar-group');
                     const submenu = group?.querySelector('.sidebar-submenu');
                     if (!group || !submenu) return;
+
+                    // A submenu cannot open inside the collapsed rail, so the
+                    // first click expands the sidebar and opens the group there
+                    // rather than appearing to do nothing.
+                    if (document.body.classList.contains('sidebar-collapsed')) {
+                        setCollapsed(false);
+                        group.classList.add('is-open');
+                        submenu.classList.add('is-open');
+                        this.setAttribute('aria-expanded', 'true');
+                        return;
+                    }
 
                     const isOpen = group.classList.contains('is-open');
 

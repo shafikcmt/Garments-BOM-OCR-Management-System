@@ -306,28 +306,55 @@
         color: #0f172a;
     }
 
-    .order-meta-chip-batch {
-        background: #eff6ff;
-        color: #1d4ed8;
-        border: 1px solid #bfdbfe;
-    }
-
     .order-meta-chip-status {
         background: #f0fdf4;
         color: #15803d;
         border: 1px solid #bbf7d0;
     }
 
+    /* One department's progress on this order, inline in the meta row so it
+       costs no vertical space on an already dense screen. */
+    .order-dept-progress {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        font-size: 11px;
+        line-height: 1.4;
+    }
+
+    .order-dept-name { font-weight: 700; color: #0f172a; }
+    .order-dept-count { color: #64748b; white-space: nowrap; }
+
+    .order-dept-bar {
+        display: inline-block;
+        width: 76px;
+        height: 6px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        overflow: hidden;
+    }
+
+    .order-dept-bar-fill {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: #2563eb;
+    }
+
+    .order-dept-percent { font-weight: 700; color: #1d4ed8; }
+
+    @media (max-width: 767.98px) {
+        .order-dept-bar { display: none; }
+    }
+
     .order-meta-chip-locked {
         background: #fef2f2;
         color: #b91c1c;
         border: 1px solid #fecaca;
-    }
-
-    .order-meta-chip-rows {
-        background: #f8fafc;
-        color: #475569;
-        border: 1px solid #e2e8f0;
     }
 
     .order-summary-grid {
@@ -873,11 +900,35 @@
         <div class="order-summary-top">
             <div class="order-summary-meta">
                 <span class="fw-bold text-slate-900 me-1" style="font-size:13px;">Order Information</span>
-                <span class="order-meta-chip order-meta-chip-batch"><span class="order-meta-chip-label">Batch</span><span class="order-meta-chip-value">{{ $excelFile->upload_batch_no }}</span></span>
-                <span class="order-meta-chip order-meta-chip-rows"><span class="order-meta-chip-label">Rows</span><span class="order-meta-chip-value">{{ $excelFile->total_rows }}</span></span>
+                {{-- Batch No and Row count were removed from this bar: both are
+                     internal upload detail that told an end user nothing about
+                     the order. The columns are untouched and still read
+                     elsewhere — only these two chips are gone. --}}
                 <span class="order-meta-chip order-meta-chip-status"><span class="order-meta-chip-label">Status</span><span class="order-meta-chip-value">{{ ucfirst($excelFile->status ?? 'pending') }}</span></span>
                 @if($excelFile->is_locked)
                     <span class="order-meta-chip order-meta-chip-locked"><i class="bi bi-lock-fill me-1" aria-hidden="true"></i>{{ $fileLockInfo['summary'] ?? $excelFile->lockScopeLabel() }}</span>
+                @endif
+
+                {{-- The signed-in user's OWN department only. Admin/Management
+                     own no required columns, so this is simply absent for them
+                     and no cross-department figure is ever rendered here. --}}
+                @if(!empty($myDepartmentProgress))
+                    @php
+                        $dept = $myDepartmentProgress;
+                        $deptPercent = min(100, (float) $dept['percent']);
+                    @endphp
+                    <span class="order-dept-progress" role="group"
+                          aria-label="Your department progress on this order">
+                        <span class="order-dept-name">{{ $dept['label'] }}</span>
+                        <span class="order-dept-count">{{ number_format($dept['filled']) }}/{{ number_format($dept['expected']) }} required fields</span>
+                        <span class="order-dept-bar" aria-hidden="true">
+                            <span class="order-dept-bar-fill" style="width: {{ $deptPercent }}%;"></span>
+                        </span>
+                        <span class="order-dept-percent">{{ $dept['percent'] }}%</span>
+                        <span class="badge {{ \App\Services\DepartmentActivityService::statusTone($dept['status']) }}">
+                            {{ \App\Services\DepartmentActivityService::statusLabel($dept['status']) }}
+                        </span>
+                    </span>
                 @endif
             </div>
             <div class="d-flex gap-2 flex-shrink-0 d-print-none">

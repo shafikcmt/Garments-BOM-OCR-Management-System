@@ -93,19 +93,29 @@ class ReportController extends Controller
             'buyer' => ['nullable', 'string', 'max:255'],
             'style' => ['nullable', 'string', 'max:255'],
             'material' => ['nullable', 'string', 'max:255'],
+            'season' => ['nullable', 'string', 'max:255'],
+            'po_no' => ['nullable', 'string', 'max:255'],
+            'gmts_color' => ['nullable', 'string', 'max:255'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ], [], [
             'date_from' => 'from date',
             'date_to' => 'to date',
+            'po_no' => 'PO number',
+            'gmts_color' => 'GMTS colour',
         ]);
 
         $type = $validated['type'] ?? StoreReportService::TYPE_STYLE;
 
+        // Carried through index(), pdf() and excel() alike — the three share this
+        // method, so a filter added here reaches the screen and both exports.
         $filters = [
             'buyer' => $validated['buyer'] ?? null,
             'style' => $validated['style'] ?? null,
             'material' => $validated['material'] ?? null,
+            'season' => $validated['season'] ?? null,
+            'po_no' => $validated['po_no'] ?? null,
+            'gmts_color' => $validated['gmts_color'] ?? null,
             'date_from' => $validated['date_from'] ?? null,
             'date_to' => $validated['date_to'] ?? null,
         ];

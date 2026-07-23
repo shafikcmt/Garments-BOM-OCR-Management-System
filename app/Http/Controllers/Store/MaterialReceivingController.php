@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Store;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Models\BookingPo;
 use App\Models\ExcelCell;
 use App\Models\MaterialReceiving;
@@ -16,6 +17,8 @@ use Illuminate\Http\Request;
  */
 class MaterialReceivingController extends Controller
 {
+    use AuthorizesStoreCorrections;
+
     /**
      * How many browse options the search field will list before it stops being
      * a complete picture and typing has to reach the server instead.
@@ -35,7 +38,13 @@ class MaterialReceivingController extends Controller
         // exist at all.
         $hasBookingPos = BookingPo::query()->exists();
 
-        return view('store.material-stock.receivings', compact('receivings', 'hasBookingPos'));
+        // Correction rights decide whether the action column renders at all —
+        // the buttons are absent for a role that cannot use them, not disabled.
+        ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
+
+        return view('store.material-stock.receivings', compact(
+            'receivings', 'hasBookingPos', 'canEdit', 'canDelete'
+        ));
     }
 
     /**
@@ -145,8 +154,12 @@ class MaterialReceivingController extends Controller
      */
     public function poSearch(Request $request)
     {
+        // SAP Code was dropped as a search handle: a SAP code identifies a
+        // material, not the paperwork a receiving arrives under, so it routinely
+        // fanned out to POs that had nothing to do with the delivery. The column
+        // itself is untouched and still auto-fills onto the receiving row.
         $validated = $request->validate([
-            'type' => ['required', 'in:po_no,sap_code,pi_number,invoice_no'],
+            'type' => ['required', 'in:po_no,pi_number,invoice_no'],
             'term' => ['nullable', 'string', 'max:100'],
         ]);
 
@@ -190,6 +203,100 @@ class MaterialReceivingController extends Controller
                 'vendor_name' => $po->vendor_name,
             ])->values(),
         ]);
+    }
+
+    /**
+     * Existing buyer/style pairs, for the Independent flow's style picker.
+     *
+     * Read from booking_pos with the same distinct-style idiom the Style Budget
+     * screen already uses, so Store sees the same style vocabulary everywhere.
+     * Buyer and season travel with the style because a style name alone is not
+     * unique across buyers, and the GRN number needs both.
+     */
+    public function styleSearch(Request $request)
+    {
+        $validated = $request->validate([
+            'term' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $term = trim((string) ($validated['term'] ?? ''));
+
+        $query = BookingPo::query()
+            ->whereNotNull('style_name')
+            ->where('style_name', '!=', '');
+
+        if ($term !== '') {
+            $query->where(function ($q) use ($term) {
+                $q->where('style_name', 'like', '%'.$term.'%')
+                    ->orWhere('buyer_name', 'like', '%'.$term.'%');
+            });
+        }
+
+        // One option per buyer/style/season, not per PO: the user is choosing
+        // which style the material belongs to, and a style spans many POs.
+        $options = $query->orderBy('buyer_name')->orderBy('style_name')
+            ->get(['buyer_name', 'season_name', 'style_name', 'buyer_code', 'season_code'])
+            ->unique(fn ($po) => $po->buyer_name.'|'.$po->style_name.'|'.$po->season_name)
+            ->take(self::BROWSE_LIMIT)
+            ->values();
+
+        return response()->json([
+            'complete' => $term === '' && $options->count() < self::BROWSE_LIMIT,
+            'results' => $options->map(fn ($po) => [
+                'value' => $po->style_name,
+                'style_name' => $po->style_name,
+                'buyer_name' => $po->buyer_name,
+                'season_name' => $po->season_name,
+                'buyer_code' => $po->buyer_code,
+                'season_code' => $po->season_code,
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * The material lines a style already carries on its BOM, for the Independent
+     * form's field suggestions.
+     *
+     * Returns whole rows rather than six separate lists of distinct values: the
+     * browser needs to know which colour belongs to which material name so that
+     * choosing a material can narrow the other fields to combinations that
+     * genuinely exist. Deriving the distinct lists from these rows is cheap and
+     * keeps the relationship between the fields intact.
+     *
+     * Scoped to the one style, so a large workbook does not travel to the
+     * browser. Every field is still free-text on the form — this only offers
+     * what is already known.
+     */
+    public function styleBom(Request $request)
+    {
+        $validated = $request->validate([
+            'style_name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $source = app(\App\Services\BookingPoSourceService::class);
+        $rows = $source->rowsMatchingGroupValue('style', $validated['style_name']);
+
+        $clean = static function (?string $value): ?string {
+            $value = trim((string) $value);
+
+            return $value === '' ? null : $value;
+        };
+
+        // One entry per distinct combination: a BOM routinely repeats the same
+        // material line across sizes, and duplicates would only pad the lists.
+        $lines = $rows->map(fn (\App\Models\ExcelRow $row) => [
+            'material_name' => $clean($source->sourceValueForRow($row, 'material_name')),
+            'material_description' => $clean($source->sourceValueForRow($row, 'material_description')),
+            'supplier_name' => $clean($source->sourceValueForRow($row, 'vendor')),
+            'material_color' => $clean($source->sourceValueForRow($row, 'material_color')),
+            'size' => $clean($source->sourceValueForRow($row, 'size')),
+            'uom' => $clean($source->sourceValueForRow($row, 'uom')),
+        ])
+            ->reject(fn (array $line) => collect($line)->filter()->isEmpty())
+            ->unique(fn (array $line) => implode('|', array_map(fn ($v) => (string) $v, $line)))
+            ->values();
+
+        return response()->json(['lines' => $lines]);
     }
 
     /**
@@ -378,10 +485,16 @@ class MaterialReceivingController extends Controller
                 // Invoice Value is never taken from the form — the browser only
                 // previews it. Recomputed here so the stored figure always
                 // matches its inputs.
+                //
+                // Valued on PHYSICAL Rcv Qty, not Invoice Qty. The invoice says
+                // what the vendor billed; the value booked against stock has to
+                // be what actually arrived, or a short delivery invoiced in full
+                // would carry its full value into the ledger. This is the same
+                // basis the Store reports already use (SUM(qty * unit_price)).
                 $invoiceQty = $row['invoice_qty'] ?? null;
                 $unitPrice = $row['unit_price'] ?? null;
-                $invoiceValue = ($invoiceQty !== null && $unitPrice !== null)
-                    ? round((float) $invoiceQty * (float) $unitPrice, 4)
+                $invoiceValue = ($unitPrice !== null)
+                    ? round((float) $row['qty'] * (float) $unitPrice, 4)
                     : null;
 
                 $payload = array_merge(
@@ -429,14 +542,200 @@ class MaterialReceivingController extends Controller
     }
 
     /**
+     * Record a receiving whose paperwork does not match any PO / PI / Invoice.
+     *
+     * The material physically arrived, so refusing to record it just pushes the
+     * entry back into a spreadsheet. It is stored against the style the user
+     * picked and flagged `independent`.
+     *
+     * booking_po_id and excel_row_id stay NULL by design. That is what keeps it
+     * out of the stock ledger — MaterialStockLedgerService keys on
+     * (excel_row_id, size) and ignores unlinked events — so an unmatched
+     * delivery can never inflate closing stock. It joins the ledger the moment
+     * link() attaches it to a real BOM row.
+     */
+    public function storeIndependent(Request $request)
+    {
+        $validated = $request->validate([
+            'buyer_name' => ['required', 'string', 'max:255'],
+            'style_name' => ['required', 'string', 'max:255'],
+            'season_name' => ['nullable', 'string', 'max:255'],
+
+            // No BOM row to copy identity from, so Store types the material.
+            'material_name' => ['required', 'string', 'max:255'],
+            'material_description' => ['nullable', 'string', 'max:1000'],
+            'material_color' => ['nullable', 'string', 'max:255'],
+            'size' => ['nullable', 'string', 'max:255'],
+            'uom' => ['nullable', 'string', 'max:50'],
+            'supplier_name' => ['nullable', 'string', 'max:255'],
+
+            'invoice_no' => ['nullable', 'string', 'max:100'],
+            'receive_date' => ['required', 'date'],
+            'grn_date' => ['nullable', 'date'],
+            'source_type' => ['required', 'in:booking,internal_po'],
+            'qty' => ['required', 'numeric', 'min:0.0001'],
+            'invoice_qty' => ['nullable', 'numeric', 'min:0'],
+            'unit_price' => ['nullable', 'numeric', 'min:0'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+        ], [], [
+            'qty' => 'Physical Rcv Qty',
+            'invoice_qty' => 'Invoice Qty',
+            'receive_date' => 'Receive Date',
+            'material_name' => 'Material Name',
+        ]);
+
+        // The style came from the booking_pos list, so its buyer/season codes are
+        // available for the GRN number without trusting anything from the form.
+        $reference = BookingPo::query()
+            ->where('buyer_name', $validated['buyer_name'])
+            ->where('style_name', $validated['style_name'])
+            ->first();
+
+        // Same rule as the PO path: Invoice Value is always recomputed, never
+        // accepted from the browser, and always valued on the physical qty.
+        $invoiceQty = $validated['invoice_qty'] ?? null;
+        $unitPrice = $validated['unit_price'] ?? null;
+        $invoiceValue = ($unitPrice !== null)
+            ? round((float) $validated['qty'] * (float) $unitPrice, 4)
+            : null;
+
+        $grnNo = null;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use (
+            $validated, $reference, $invoiceQty, $unitPrice, $invoiceValue, &$grnNo
+        ) {
+            $payload = [
+                'buyer_name' => $validated['buyer_name'],
+                'style_name' => $validated['style_name'],
+                'season_name' => $validated['season_name'] ?? $reference?->season_name,
+                'supplier_name' => $validated['supplier_name'] ?? null,
+                'material_name' => $validated['material_name'],
+                'material_description' => $validated['material_description'] ?? null,
+                'material_color' => $validated['material_color'] ?? null,
+                'size' => $validated['size'] ?? null,
+                'uom' => $validated['uom'] ?? null,
+                'invoice_no' => $validated['invoice_no'] ?? null,
+                'receive_date' => $validated['receive_date'],
+                'grn_date' => $validated['grn_date'] ?? $validated['receive_date'],
+                'source_type' => $validated['source_type'],
+                'match_status' => MaterialReceiving::MATCH_INDEPENDENT,
+                'qty' => $validated['qty'],
+                'invoice_qty' => $invoiceQty,
+                'unit_price' => $unitPrice,
+                'invoice_value' => $invoiceValue,
+                'remarks' => $validated['remarks'] ?? null,
+                'created_by' => auth()->id(),
+            ];
+
+            // Same short retry as the PO path — the unique index is the real guard.
+            for ($attempt = 1; $attempt <= 5; $attempt++) {
+                $candidate = $this->generateGrnNoFrom(
+                    $reference?->buyer_code, $validated['buyer_name'],
+                    $reference?->season_code, $validated['season_name'] ?? $reference?->season_name,
+                    $validated['receive_date']
+                );
+
+                try {
+                    MaterialReceiving::create(array_merge($payload, ['grn_no' => $candidate]));
+                    $grnNo = $candidate;
+                    break;
+                } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+                    if ($attempt === 5) {
+                        throw $e;
+                    }
+                }
+            }
+        });
+
+        return back()->with('success',
+            'Independent receiving recorded (GRN '.$grnNo.'). It will not affect closing stock until it is linked to a PO.');
+    }
+
+    /**
+     * Attach an Independent receiving to the PO and BOM line it turned out to
+     * belong to.
+     *
+     * There is no automatic OCR re-match in this application — Booking POs are
+     * generated from BOM rows, and nothing walks back over orphan receivings. So
+     * this is the deliberate, human-confirmed step: it reuses the same poSearch
+     * and poItems endpoints the normal flow already uses, rather than adding a
+     * second matching system that could guess the wrong material line.
+     *
+     * Saving re-resolves identity from the chosen BOM row, so the row stops
+     * being independent and starts behaving exactly like a normal receiving —
+     * including feeding the stock ledger, which the model's save hook triggers.
+     */
+    public function link(Request $request, MaterialReceiving $materialReceiving)
+    {
+        // Linking changes a recorded receiving and pushes its quantity into the
+        // stock ledger, so it is a correction under the same rule as edit — not
+        // ordinary data entry.
+        $this->authorizeStoreEdit('receiving');
+
+        if (! $materialReceiving->isIndependent()) {
+            return back()->with('warning', 'This receiving is already linked to a PO.');
+        }
+
+        $validated = $request->validate([
+            'booking_po_id' => ['required', 'exists:booking_pos,id'],
+            'excel_row_id' => ['required', 'integer'],
+        ]);
+
+        $po = BookingPo::with('excelFile')->findOrFail($validated['booking_po_id']);
+
+        if ($locked = $this->lockGuard($po)) {
+            return $locked;
+        }
+
+        // Same guard as store(): the line must genuinely belong to this PO, or a
+        // tampered id would book stock onto another buyer's BOM row.
+        $excelRow = app(\App\Services\BookingPoSourceService::class)
+            ->itemRowsForBookingPo($po)
+            ->keyBy('id')
+            ->get((int) $validated['excel_row_id']);
+
+        if (! $excelRow) {
+            return back()->withErrors(['excel_row_id' => 'That item does not belong to the selected PO.']);
+        }
+
+        // Quantities, dates, remarks and the GRN number are all left alone — the
+        // delivery itself did not change, only what it is now known to be against.
+        $materialReceiving->fill(array_merge(
+            $this->autoFieldsForRow($po, $excelRow),
+            [
+                'match_status' => MaterialReceiving::MATCH_LINKED,
+                'matched_at' => now(),
+                'matched_by' => auth()->id(),
+            ]
+        ))->save();
+
+        return back()->with('success',
+            'Receiving '.$materialReceiving->grn_no.' linked to PO '.$po->po_no.'. Closing stock updated.');
+    }
+
+    /**
      * Build a unique, human-readable GRN No that encodes buyer / season / year
      * and a global running sequence, reusing the codes already stored on the PO
      * (same convention as PO numbers). Format: GRN-{buyer}-{season}-{YYYY}-{0001}.
      */
     private function generateGrnNo(BookingPo $po, string $receiveDate): string
     {
-        $buyer = $this->shortCode($po->buyer_code, $po->buyer_name, 2);
-        $season = $this->seasonCode($po->season_code, $po->season_name);
+        return $this->generateGrnNoFrom(
+            $po->buyer_code, $po->buyer_name, $po->season_code, $po->season_name, $receiveDate
+        );
+    }
+
+    /**
+     * Same GRN convention, but from loose buyer/season values rather than a PO —
+     * an Independent receiving has no PO to read them from, only the style the
+     * user picked. The numbering sequence is shared, so an Independent GRN can
+     * never collide with a PO-linked one.
+     */
+    private function generateGrnNoFrom(
+        ?string $buyerCode, ?string $buyerName, ?string $seasonCode, ?string $seasonName, string $receiveDate
+    ): string {
+        $buyer = $this->shortCode($buyerCode, $buyerName, 2);
+        $season = $this->seasonCode($seasonCode, $seasonName);
         $year = date('Y', strtotime($receiveDate) ?: time());
         $prefix = "GRN-{$buyer}-{$season}-{$year}-";
 
@@ -493,6 +792,8 @@ class MaterialReceivingController extends Controller
 
     public function destroy(MaterialReceiving $materialReceiving)
     {
+        $this->authorizeStoreDelete('receiving');
+
         $materialReceiving->delete();
 
         return back()->with('success', 'Receiving entry removed. Closing stock updated.');

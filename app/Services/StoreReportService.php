@@ -126,13 +126,16 @@ class StoreReportService
      * Distinct filter options, sourced from the existing movement tables so the
      * dropdowns only ever offer values that can actually return rows.
      *
-     * @return array{buyers: Collection<int, string>, styles: Collection<int, string>}
+     * @return array{buyers: Collection<int, string>, styles: Collection<int, string>, seasons: Collection<int, string>, poNos: Collection<int, string>, gmtsColors: Collection<int, string>}
      */
     public function filterOptions(): array
     {
         return [
             'buyers' => $this->distinctValues('buyer_name'),
             'styles' => $this->distinctValues('style_name'),
+            'seasons' => $this->distinctValues('season_name'),
+            'poNos' => $this->distinctValues('po_no'),
+            'gmtsColors' => $this->distinctValues('gmts_color_name'),
         ];
     }
 
@@ -285,6 +288,21 @@ class StoreReportService
                 $q->where('material_description', 'like', "%{$material}%")
                     ->orWhere('sap_code', 'like', "%{$material}%");
             });
+        }
+
+        // Structured filters, ANDed with the above. Every column here exists on
+        // all three source tables (receivings, bulk issues, ledger), which is
+        // what lets one method scope them identically.
+        if ($season = ($filters['season'] ?? null)) {
+            $query->where('season_name', $season);
+        }
+
+        if ($poNo = ($filters['po_no'] ?? null)) {
+            $query->where('po_no', $poNo);
+        }
+
+        if ($gmtsColor = ($filters['gmts_color'] ?? null)) {
+            $query->where('gmts_color_name', $gmtsColor);
         }
     }
 

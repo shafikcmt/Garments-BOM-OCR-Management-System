@@ -14,7 +14,7 @@
     $supplyPaymentUrl = route('supply_chain.payment_requests.index');
 @endphp
 
-<nav class="sidebar" aria-label="Main sidebar navigation">
+<nav class="sidebar" id="appSidebar" aria-label="Main sidebar navigation">
     <div class="sidebar-inner">
         <div class="sidebar-logo">
             <a href="{{ url('/dashboard') }}" class="sidebar-brand-link">
@@ -399,6 +399,22 @@
                 </div>
             @endcan
 
+        </div>
+
+        {{-- Collapse control. Desktop only: below lg the sidebar is already a
+             slide-over with its own close button, and two competing hide
+             mechanisms would fight each other.
+
+             Carries a visible "Collapse Menu" label while expanded. Once
+             collapsed there is no room for text, so it falls back to the same
+             hover-label the icon rail uses — the established convention for a
+             collapsed rail, not a bare unlabelled action button. --}}
+        <div class="sidebar-footer d-none d-lg-block">
+            <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseToggle"
+                    data-tip="Expand Menu" aria-expanded="true" aria-controls="appSidebar">
+                <span class="sidebar-icon"><i class="bi bi-chevron-double-left" aria-hidden="true"></i></span>
+                <span class="sidebar-link-text">Collapse Menu</span>
+            </button>
         </div>
     </div>
 </nav>

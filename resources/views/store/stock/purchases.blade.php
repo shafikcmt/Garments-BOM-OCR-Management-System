@@ -79,11 +79,18 @@
                                         <td class="text-end fw-bold">{{ rtrim(rtrim(number_format((float)$p->qty, 4), '0'), '.') }}</td>
                                         <td class="text-end small">{{ $p->unit_price !== null ? number_format((float)$p->unit_price, 4) : '—' }}</td>
                                         <td class="small text-muted">{{ $p->supplier_name ?: '—' }}</td>
+                                        {{-- Delete is an Admin / Management right
+                                             (store.delete); the controller enforces
+                                             the same check server-side. --}}
                                         <td class="text-end">
-                                            <form method="POST" action="{{ route('store.stock.purchases.destroy', $p) }}" onsubmit="return confirm('Remove this purchase?');">
-                                                @csrf @method('DELETE')
-                                                <button class="btn btn-sm btn-outline-danger rounded-pill px-3" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
-                                            </form>
+                                            @if($canDelete)
+                                                <form method="POST" action="{{ route('store.stock.purchases.destroy', $p) }}" onsubmit="return confirm('Remove this purchase?');">
+                                                    @csrf @method('DELETE')
+                                                    <button class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                                </form>
+                                            @else
+                                                <span class="text-muted small">—</span>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty

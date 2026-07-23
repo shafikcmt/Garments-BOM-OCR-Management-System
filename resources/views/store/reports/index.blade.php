@@ -64,6 +64,36 @@
                         @endforeach
                     </select>
                 </div>
+                {{-- Structured filters, ANDed with everything else on this bar.
+                     They wrap onto a second row on smaller screens rather than
+                     squeezing the existing controls. --}}
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label fw-semibold small mb-1">Season</label>
+                    <select name="season" class="form-select">
+                        <option value="">All</option>
+                        @foreach($options['seasons'] as $season)
+                            <option value="{{ $season }}" {{ ($filters['season'] ?? null) === $season ? 'selected' : '' }}>{{ $season }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label fw-semibold small mb-1">PO Number</label>
+                    <select name="po_no" class="form-select">
+                        <option value="">All</option>
+                        @foreach($options['poNos'] as $poNo)
+                            <option value="{{ $poNo }}" {{ ($filters['po_no'] ?? null) === $poNo ? 'selected' : '' }}>{{ $poNo }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label fw-semibold small mb-1">GMTS Color Name</label>
+                    <select name="gmts_color" class="form-select">
+                        <option value="">All</option>
+                        @foreach($options['gmtsColors'] as $gmtsColor)
+                            <option value="{{ $gmtsColor }}" {{ ($filters['gmts_color'] ?? null) === $gmtsColor ? 'selected' : '' }}>{{ $gmtsColor }}</option>
+                        @endforeach
+                    </select>
+                </div>
                 <div class="col-12 col-md-6 col-xl-2">
                     <label class="form-label fw-semibold small mb-1">Material / SAP Code</label>
                     <input name="material" value="{{ $filters['material'] }}" class="form-control" placeholder="Type to search…">

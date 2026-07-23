@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ExcelFile;
 use App\Models\ExcelRow;
 use App\Services\DashboardMetricsService;
+use App\Services\DepartmentActivityService;
 
 /**
  * Merchandising owns the largest share of the BOM columns, so the dashboard
@@ -16,7 +17,11 @@ class DashboardController extends Controller
 {
     public function index(DashboardMetricsService $metrics)
     {
-        $workspace = $metrics->workspaceCompletionFor('merchant');
+        // Required-column progress for this department only, from the same
+        // service the Admin Dashboard reads — so a department and admin
+        // never see two different numbers for the same work.
+        $activity = app(DepartmentActivityService::class);
+        $workspace = $activity->forRole('merchant') ?? $activity->emptyProgressFor('merchant');
 
         $trend = $metrics->monthlyTrend(ExcelRow::query());
         $delta = $metrics->deltaFor($trend);

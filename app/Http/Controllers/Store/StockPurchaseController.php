@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Store;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Models\StockItem;
 use App\Models\StockPurchase;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ use Illuminate\Http\Request;
  */
 class StockPurchaseController extends Controller
 {
+    use AuthorizesStoreCorrections;
+
     public function index(Request $request)
     {
         $purchases = StockPurchase::with(['stockItem', 'createdBy'])
@@ -22,7 +25,9 @@ class StockPurchaseController extends Controller
 
         $items = StockItem::where('is_active', true)->orderBy('name')->get();
 
-        return view('store.stock.purchases', compact('purchases', 'items'));
+        ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
+
+        return view('store.stock.purchases', compact('purchases', 'items', 'canEdit', 'canDelete'));
     }
 
     public function store(Request $request)
@@ -45,6 +50,8 @@ class StockPurchaseController extends Controller
 
     public function destroy(StockPurchase $stockPurchase)
     {
+        $this->authorizeStoreDelete('stock purchase');
+
         $stockPurchase->delete();
 
         return back()->with('success', 'Purchase entry removed.');

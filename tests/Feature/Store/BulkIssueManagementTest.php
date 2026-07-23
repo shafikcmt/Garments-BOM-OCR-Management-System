@@ -16,6 +16,28 @@ function bulkIssueStoreUser(): User
     return User::factory()->create()->assignRole('store');
 }
 
+/**
+ * A user who may correct recorded store records.
+ *
+ * Editing and deleting are Admin / Management rights (store.edit /
+ * store.delete) — a plain Store user records movements but cannot revise them,
+ * because every change recomputes closing stock. The tests below that exercise
+ * update/delete therefore need this user, not the Store one.
+ */
+function bulkIssueAdminUser(): User
+{
+    $role = Role::findOrCreate('admin', 'web');
+
+    foreach (['store.edit', 'store.delete'] as $name) {
+        \Spatie\Permission\Models\Permission::findOrCreate($name, 'web');
+        if (! $role->hasPermissionTo($name)) {
+            $role->givePermissionTo($name);
+        }
+    }
+
+    return User::factory()->create()->assignRole($role);
+}
+
 function makeBookingPo(): \App\Models\BookingPo
 {
     $file = \App\Models\ExcelFile::create([
@@ -88,22 +110,25 @@ it('returns a single issue as json for the edit panel', function () {
 });
 
 it('updates an issue', function () {
-    $user = bulkIssueStoreUser();
+    $user = bulkIssueAdminUser();
     $issue = makeIssue(['bulk_qty' => 10]);
 
     $this->actingAs($user)->put(route('store.material.bulk-issues.update', $issue), [
         'booking_po_id' => $issue->booking_po_id ?? makeBookingPo()->id,
         'issue_date' => now()->toDateString(),
         'indent_section' => 'Sewing',
-        'bulk_qty' => 25,
+        // Within the balance this issue itself already holds (10). A larger
+        // figure is refused by the stock-integrity rule, not by permissions, so
+        // it would never have proved that the update applied.
+        'bulk_qty' => 8,
     ])->assertRedirect();
 
-    expect($issue->fresh()->bulk_qty)->toEqual('25.0000')
+    expect($issue->fresh()->bulk_qty)->toEqual('8.0000')
         ->and($issue->fresh()->indent_section)->toBe('Sewing');
 });
 
 it('rejects an update with no quantities', function () {
-    $user = bulkIssueStoreUser();
+    $user = bulkIssueAdminUser();
     $issue = makeIssue(['bulk_qty' => 10]);
     $poId = makeBookingPo()->id;
 
@@ -118,7 +143,7 @@ it('rejects an update with no quantities', function () {
 });
 
 it('bulk deletes selected issues', function () {
-    $user = bulkIssueStoreUser();
+    $user = bulkIssueAdminUser();
     $a = makeIssue();
     $b = makeIssue();
     $c = makeIssue();

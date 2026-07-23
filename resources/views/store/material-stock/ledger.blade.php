@@ -33,20 +33,37 @@
     </div>
 
     <x-card class="mb-3" body-class="p-3">
+        {{-- Two rows: the four structured dropdowns first, then the free-text
+             box with the actions. Every filter is ANDed, so Season + PO Number
+             narrows on both. Reset is a plain link to the unfiltered route, so
+             it clears whatever is added here without further wiring. --}}
         <form method="GET" class="row g-2 align-items-end">
-            <div class="col-12 col-md-3">
-                <label class="form-label fw-semibold small mb-1">Buyer</label>
-                <select name="buyer" class="form-select"><option value="">All</option>@foreach($buyers as $b)<option value="{{ $b }}" {{ request('buyer')==$b?'selected':'' }}>{{ $b }}</option>@endforeach</select>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label fw-semibold small mb-1" for="lgBuyer">Buyer</label>
+                <select name="buyer" id="lgBuyer" class="form-select"><option value="">All</option>@foreach($buyers as $b)<option value="{{ $b }}" {{ request('buyer')==$b?'selected':'' }}>{{ $b }}</option>@endforeach</select>
             </div>
-            <div class="col-12 col-md-3">
-                <label class="form-label fw-semibold small mb-1">Style</label>
-                <select name="style" class="form-select"><option value="">All</option>@foreach($styles as $s)<option value="{{ $s }}" {{ request('style')==$s?'selected':'' }}>{{ $s }}</option>@endforeach</select>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label fw-semibold small mb-1" for="lgStyle">Style</label>
+                <select name="style" id="lgStyle" class="form-select"><option value="">All</option>@foreach($styles as $s)<option value="{{ $s }}" {{ request('style')==$s?'selected':'' }}>{{ $s }}</option>@endforeach</select>
             </div>
-            <div class="col-12 col-md-4">
-                <label class="form-label fw-semibold small mb-1">Search (material / SAP / PO / color)</label>
-                <input name="q" value="{{ request('q') }}" class="form-control" placeholder="Type to search…">
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label fw-semibold small mb-1" for="lgSeason">Season</label>
+                <select name="season" id="lgSeason" class="form-select"><option value="">All</option>@foreach($seasons as $s)<option value="{{ $s }}" {{ request('season')==$s?'selected':'' }}>{{ $s }}</option>@endforeach</select>
             </div>
-            <div class="col-12 col-md-2 d-flex gap-2">
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label fw-semibold small mb-1" for="lgPoNo">PO Number</label>
+                <select name="po_no" id="lgPoNo" class="form-select"><option value="">All</option>@foreach($poNos as $p)<option value="{{ $p }}" {{ request('po_no')==$p?'selected':'' }}>{{ $p }}</option>@endforeach</select>
+            </div>
+
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label fw-semibold small mb-1" for="lgGmtsColor">GMTS Color Name</label>
+                <select name="gmts_color" id="lgGmtsColor" class="form-select"><option value="">All</option>@foreach($gmtsColors as $c)<option value="{{ $c }}" {{ request('gmts_color')==$c?'selected':'' }}>{{ $c }}</option>@endforeach</select>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-5">
+                <label class="form-label fw-semibold small mb-1" for="lgSearch">Search (material / SAP / PO / color)</label>
+                <input name="q" id="lgSearch" value="{{ request('q') }}" class="form-control" placeholder="Type to search…">
+            </div>
+            <div class="col-12 col-lg-4 d-flex gap-2">
                 <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
                 <a href="{{ route('store.material.ledger') }}" class="btn btn-outline-secondary">Reset</a>
             </div>

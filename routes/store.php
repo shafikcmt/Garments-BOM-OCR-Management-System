@@ -26,8 +26,14 @@ Route::prefix('store/reports')
         Route::get('/excel', [ReportController::class, 'excel'])->name('excel');
     });
 
+// Admin and Management are included alongside Store for the same reason the
+// bulk-issue group below already includes them: corrections are their
+// responsibility, so they have to be able to OPEN the screen that carries the
+// record. Reaching a screen is not the same as being able to change it — every
+// edit/delete action inside still requires the store.edit / store.delete
+// permission, which Store does not hold.
 Route::prefix('store')
-    ->middleware(['auth', 'role:store'])
+    ->middleware(['auth', 'role:store,admin,management'])
     ->name('store.')
     ->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -60,11 +66,20 @@ Route::prefix('store')
             Route::get('/receivings', [MaterialReceivingController::class, 'index'])->name('receivings.index');
             // Auto-fill lookup for the Record Receiving form's PO dropdown.
             Route::get('/receivings/po-details/{bookingPo}', [MaterialReceivingController::class, 'poDetails'])->name('receivings.po-details');
-            // PO lookup by PO No / SAP Code / PI No.
+            // PO lookup by PO No / PI No / Invoice No.
             Route::get('/receivings/po-search', [MaterialReceivingController::class, 'poSearch'])->name('receivings.po-search');
+            // Buyer/style lookup for an Independent receiving, which has no PO.
+            Route::get('/receivings/style-search', [MaterialReceivingController::class, 'styleSearch'])->name('receivings.style-search');
+            // The material lines that style already carries on its BOM, used to
+            // suggest values on the Independent form.
+            Route::get('/receivings/style-bom', [MaterialReceivingController::class, 'styleBom'])->name('receivings.style-bom');
             // Every material line under one PO, for the item picker.
             Route::get('/receivings/po-items/{bookingPo}', [MaterialReceivingController::class, 'poItems'])->name('receivings.po-items');
             Route::post('/receivings', [MaterialReceivingController::class, 'store'])->name('receivings.store');
+            // Record a receiving that matches no PO / PI / Invoice yet.
+            Route::post('/receivings/independent', [MaterialReceivingController::class, 'storeIndependent'])->name('receivings.independent');
+            // Attach an Independent receiving to the PO it turned out to be for.
+            Route::post('/receivings/{materialReceiving}/link', [MaterialReceivingController::class, 'link'])->name('receivings.link');
             Route::delete('/receivings/{materialReceiving}', [MaterialReceivingController::class, 'destroy'])->name('receivings.destroy');
 
             // NOTE: bulk-issue routes live in their own group below — they are

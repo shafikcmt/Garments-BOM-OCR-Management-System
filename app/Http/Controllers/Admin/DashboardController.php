@@ -13,7 +13,7 @@ use App\Models\BookingPo;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(\Illuminate\Http\Request $request)
     {
         $totalUsers = User::count();
         $activeUsers = User::where('status', 1)->count();
@@ -32,6 +32,21 @@ class DashboardController extends Controller
         // ownership the other dashboards report on for themselves.
         $ownership = $metrics->workspaceOwnershipBreakdown();
 
+        // Department progress on the columns each one owns. Scoped to one order
+        // when ?workspace= names a real file, otherwise every workspace at once —
+        // the same widget answers "where is everyone" and "where is this order".
+        $workspaceOptions = ExcelFile::query()
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get(['id', 'original_file_name', 'upload_batch_no']);
+
+        $selectedWorkspace = $request->filled('workspace')
+            ? $workspaceOptions->firstWhere('id', (int) $request->input('workspace'))
+            : null;
+
+        $departmentActivity = app(\App\Services\DepartmentActivityService::class)
+            ->summary($selectedWorkspace);
+
         $trend = $metrics->monthlyTrend(BookingPo::query());
         $delta = $metrics->deltaFor($trend);
 
@@ -47,6 +62,9 @@ class DashboardController extends Controller
             'defaultBookingInstructions',
             'totalGeneratedPos',
             'ownership',
+            'departmentActivity',
+            'workspaceOptions',
+            'selectedWorkspace',
             'trend',
             'delta',
         ));

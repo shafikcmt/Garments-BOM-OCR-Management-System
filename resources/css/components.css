@@ -1004,3 +1004,135 @@ button:focus-visible,
     justify-content: space-between;
     gap: 8px;
 }
+
+/* ==========================================================================
+   Collapsible sidebar
+   --------------------------------------------------------------------------
+   The whole shell is already laid out from --app-sidebar (the sidebar's width,
+   the header's left offset and the content's margin all read it), so collapsing
+   is a matter of redefining that one variable and hiding the text. No layout
+   rule is duplicated and nothing has to be kept in sync by hand.
+
+   Desktop only: below lg the sidebar is a slide-over with its own backdrop and
+   close button, and the collapsed rail would collide with it.
+   ========================================================================== */
+
+.sidebar-footer {
+    flex: 0 0 auto;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--sidebar-border);
+}
+
+.sidebar-collapse-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--sidebar-muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color .18s ease, color .18s ease;
+}
+.sidebar-collapse-btn:hover {
+    background: var(--sidebar-soft);
+    color: var(--sidebar-text);
+}
+.sidebar-collapse-btn .sidebar-icon i { transition: transform .22s ease; }
+
+@media (min-width: 992px) {
+    /* --- Collapsed state ------------------------------------------------- */
+    body.sidebar-collapsed { --app-sidebar: 76px; }
+
+    /* The three shell pieces animate together so the content does not lag
+       behind the rail. Quick and linear — no bounce. */
+    body.sidebar-collapsed .sidebar,
+    .sidebar,
+    .header,
+    .content {
+        transition: width .22s ease, left .22s ease, margin-left .22s ease;
+    }
+
+    /* Text disappears; icons stay and centre themselves. */
+    body.sidebar-collapsed .sidebar-link-text,
+    body.sidebar-collapsed .sidebar-chevron,
+    body.sidebar-collapsed .sidebar-brand-link .min-w-0,
+    body.sidebar-collapsed .sidebar-badge {
+        display: none;
+    }
+
+    body.sidebar-collapsed .sidebar-inner { padding-inline: 10px; }
+    body.sidebar-collapsed .sidebar-logo { justify-content: center; padding-inline: 0; }
+    body.sidebar-collapsed .sidebar-brand-link { justify-content: center; }
+
+    body.sidebar-collapsed .sidebar-nav-link,
+    body.sidebar-collapsed .sidebar-group-button,
+    body.sidebar-collapsed .sidebar-collapse-btn {
+        justify-content: center;
+        padding-inline: 0;
+    }
+    body.sidebar-collapsed .sidebar-link-main { justify-content: center; gap: 0; }
+
+    /* Section headings become dividers: the grouping stays legible without
+       the words that no longer fit. */
+    body.sidebar-collapsed .sidebar-section-label {
+        height: 0;
+        padding: 0;
+        margin: 0 6px 10px;
+        overflow: hidden;
+        border-top: 1px solid var(--sidebar-border);
+    }
+    body.sidebar-collapsed .sidebar-section:first-child .sidebar-section-label {
+        border-top: 0;
+        margin-bottom: 4px;
+    }
+
+    /* A submenu cannot open inside a 76px rail. Clicking the group expands the
+       sidebar first (see app.blade.php), so nothing becomes unreachable. */
+    body.sidebar-collapsed .sidebar-submenu { display: none !important; }
+
+    body.sidebar-collapsed .sidebar-collapse-btn .sidebar-icon i { transform: rotate(180deg); }
+
+    /* --- Hover labels for the collapsed rail ------------------------------
+       The accepted convention for an icon rail: the label is still available,
+       it just arrives on hover instead of taking permanent width. */
+    body.sidebar-collapsed [data-tip] { position: relative; }
+    body.sidebar-collapsed [data-tip]::after {
+        content: attr(data-tip);
+        position: absolute;
+        left: calc(100% + 12px);
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 1060;
+        padding: 6px 10px;
+        border-radius: 8px;
+        background: #0f172a;
+        border: 1px solid var(--sidebar-border);
+        color: #e2e8f0;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        box-shadow: 0 10px 24px rgba(2, 6, 23, .45);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity .14s ease;
+        pointer-events: none;
+    }
+    body.sidebar-collapsed [data-tip]:hover::after,
+    body.sidebar-collapsed [data-tip]:focus-visible::after {
+        opacity: 1;
+        visibility: visible;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sidebar, .header, .content,
+    .sidebar-collapse-btn .sidebar-icon i,
+    body.sidebar-collapsed [data-tip]::after { transition: none; }
+}

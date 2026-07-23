@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Store;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Models\BookingPo;
 use App\Models\MaterialRequisition;
 use App\Models\StockItem;
@@ -15,6 +16,8 @@ use Illuminate\Http\Request;
  */
 class MaterialRequisitionController extends Controller
 {
+    use AuthorizesStoreCorrections;
+
     public function index(Request $request)
     {
         $requisitions = MaterialRequisition::with(['requestedBy', 'approvedBy'])
@@ -56,7 +59,9 @@ class MaterialRequisitionController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'uom']);
 
-        return view('store.material-stock.requisitions', compact('requisitions', 'poGroups', 'stockItems'));
+        ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
+
+        return view('store.material-stock.requisitions', compact('requisitions', 'poGroups', 'stockItems', 'canEdit', 'canDelete'));
     }
 
     public function store(Request $request)
@@ -158,6 +163,8 @@ class MaterialRequisitionController extends Controller
 
     public function destroy(MaterialRequisition $materialRequisition)
     {
+        $this->authorizeStoreDelete('requisition');
+
         if ($materialRequisition->status === MaterialRequisition::STATUS_ISSUED) {
             return back()->with('warning', 'An issued requisition cannot be deleted.');
         }

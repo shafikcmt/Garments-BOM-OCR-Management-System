@@ -49,8 +49,11 @@ Avoid:
 
 - Primary action should be visually clear.
 - Secondary actions should not compete with the main action.
-- Use text labels with icons where action is not obvious.
-- Icon-only buttons should have tooltip/title.
+- Every action button must show a visible text label. An icon may sit alongside
+  the label, but never replace it. A tooltip or `title` is not sufficient — the
+  user must be able to read what a button does without hovering it.
+- The only exception is a plain close "X" in the top-right corner of a modal or
+  offcanvas, which is a universal convention. It still needs an `aria-label`.
 - Dangerous actions need confirmation.
 
 ## Table Rules

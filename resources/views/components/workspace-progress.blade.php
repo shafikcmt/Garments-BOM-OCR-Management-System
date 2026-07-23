@@ -5,13 +5,16 @@
     of the sheet is countable. Shared by the roles that have no module of their
     own (merchant, commercial, account) and by supply chain.
 
-    Props: workspace — the array from DashboardMetricsService::workspaceCompletionFor()
+    Props: workspace — the array from DepartmentActivityService::forRole(), which
+    now feeds this card so a department sees the same figure the Admin Dashboard
+    reports for it. Scoped to REQUIRED, ACTIVE columns only.
 --}}
 @props(['workspace' => [], 'role' => null])
 
 @php
     $percent = (float) ($workspace['percent'] ?? 0);
     $tone = $percent >= 75 ? 'success' : ($percent >= 40 ? 'warning' : 'danger');
+    $status = $workspace['status'] ?? null;
 @endphp
 
 <div {{ $attributes->merge(['class' => 'gx-tone-'.$tone]) }}>
@@ -19,6 +22,11 @@
         <div>
             <span class="gx-stat-value">{{ $percent }}%</span>
             <span class="gx-stat-label d-inline ms-1">complete</span>
+            @if($status)
+                <span class="badge {{ \App\Services\DepartmentActivityService::statusTone($status) }} ms-1">
+                    {{ \App\Services\DepartmentActivityService::statusLabel($status) }}
+                </span>
+            @endif
         </div>
         <div class="small text-muted">
             {{ number_format($workspace['filled'] ?? 0) }} of {{ number_format($workspace['expected'] ?? 0) }} fields
@@ -33,7 +41,7 @@
 
     <div class="row g-2 mt-3">
         <div class="col-4">
-            <div class="small text-muted">Columns owned</div>
+            <div class="small text-muted">Required columns</div>
             <div class="fw-bold">{{ number_format($workspace['fields'] ?? 0) }}</div>
         </div>
         <div class="col-4">

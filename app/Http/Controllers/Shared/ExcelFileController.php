@@ -163,10 +163,21 @@ class ExcelFileController extends Controller
 
         $activityTotal = ActivityLog::where('excel_file_id', $excelFile->id)->count();
 
+        // This user's own department progress on THIS file. Null for admin and
+        // management, who own no required columns and get the all-department
+        // table on their own dashboard instead — a department user never
+        // receives another department's figures from here.
+        $activityService = app(\App\Services\DepartmentActivityService::class);
+        $myDepartmentRole = $activityService->departmentRoleFor(auth()->user());
+        $myDepartmentProgress = $myDepartmentRole
+            ? $activityService->forRole($myDepartmentRole, $excelFile)
+            : null;
+
         return view('shared.excel-files.show', compact(
             'excelFile',
             'headers',
             'rows',
+            'myDepartmentProgress',
             'activityLog',
             'activityTotal',
             'editableHeaderIds',

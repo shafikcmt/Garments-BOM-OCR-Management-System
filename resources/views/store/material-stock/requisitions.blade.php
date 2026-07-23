@@ -138,10 +138,13 @@
                                             <button class="btn btn-sm btn-outline-success rounded-pill px-3"><i class="bi bi-check2 me-1" aria-hidden="true"></i>Approve</button>
                                         </form>
                                     @endif
-                                    @if($req->status !== 'issued')
+                                    {{-- Delete is an Admin / Management right
+                                         (store.delete). Approve is left alone: it is a
+                                         workflow step Store owns, not a correction. --}}
+                                    @if($canDelete && $req->status !== 'issued')
                                         <form method="POST" action="{{ route('store.material.requisitions.destroy', $req) }}" class="d-inline" onsubmit="return confirm('Remove this requisition?');">
                                             @csrf @method('DELETE')
-                                            <button class="btn btn-sm btn-outline-danger rounded-pill px-3" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                            <button class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                         </form>
                                     @endif
                                 </td>

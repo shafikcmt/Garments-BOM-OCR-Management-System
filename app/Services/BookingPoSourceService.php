@@ -563,6 +563,53 @@ class BookingPoSourceService
     }
 
     /**
+     * Worksheet (BOM) rows whose cell for $group holds exactly $value.
+     *
+     * The generic form of what siblingSourceRows() does for a PO number: resolve
+     * the group's header aliases, find the cells carrying the value, return
+     * their rows with cells eager-loaded so callers can read further fields via
+     * sourceValueForRow() without an N+1.
+     *
+     * Used by Store's Independent Receiving to offer the material names,
+     * colours and sizes a style already has on its BOM, instead of asking the
+     * user to retype them from memory.
+     *
+     * @return Collection<int, ExcelRow>
+     */
+    public function rowsMatchingGroupValue(string $group, string $value, int $limit = 500): Collection
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return collect();
+        }
+
+        $headerIds = $this->headerIdsForGroup($group);
+
+        if ($headerIds->isEmpty()) {
+            return collect();
+        }
+
+        $rowIds = ExcelCell::query()
+            ->whereIn('header_id', $headerIds->all())
+            ->whereRaw('TRIM(value) = ?', [$value])
+            ->limit($limit)
+            ->pluck('row_id')
+            ->unique()
+            ->values();
+
+        if ($rowIds->isEmpty()) {
+            return collect();
+        }
+
+        return ExcelRow::query()
+            ->whereIn('id', $rowIds->all())
+            ->with('cells.header')
+            ->orderBy('row_number')
+            ->get();
+    }
+
+    /**
      * All worksheet rows that share this BookingPo's PO number, excluding the
      * BookingPo's own primary row. These are the extra booking lines (other
      * styles/materials) that were merged into the same PO at generation time
@@ -953,6 +1000,17 @@ class BookingPoSourceService
     {
         return match ($group) {
             'po_no' => ['material_po_number', 'material_po_no', 'material_purchase_order_number', 'material_purchase_order_no', 'PO Number'],
+            // The buyer's garment-level PO, a Merchant-owned BOM column. A
+            // SEPARATE identifier from po_no above: that one carries the
+            // system-generated material PO (HB26FA0004) which is mirrored onto
+            // booking_pos.po_no, while this holds the buyer's own number
+            // (12458787). They never share a value, so the two must stay
+            // distinct search handles.
+            //
+            // Deliberately excludes 'gmnts_po_number' — a different Store-owned
+            // column whose relationship to this one is an open business
+            // question, not something to merge here.
+            'garments_po' => ['garments_po', 'garment_po', 'garments_po_number', 'garment_po_number', 'Garments PO'],
             'buyer' => ['buyer_name', 'buyer', 'Buyer Name'],
             'season' => ['season_name', 'season', 'Season Name'],
             'vendor' => ['vendor_name', 'supplier_name', 'supplier', 'vendor', 'Vendor Name'],
