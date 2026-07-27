@@ -17,6 +17,12 @@
 
     /* Searchable PO picker (offcanvas + inline reuse). */
     .bi-search { position: relative; }
+    /* `.bi-search` is a layout wrapper here, but bootstrap-icons also ships a
+       glyph under that exact name and paints it through [class*=" bi-"]::before —
+       which left a stray magnifier floating above both search fields. Suppressed
+       for the wrappers only; the real <i class="bi bi-search"> icons still carry
+       the .bi base class and are untouched. */
+    .bi-search:not(.bi)::before { content: none !important; }
     .bi-search-panel { z-index: 1080; max-height: 300px; overflow-y: auto; }
     .bi-opt { cursor: pointer; border-left: 2px solid transparent; transition: background-color .15s ease, border-color .15s ease; }
     .bi-opt:hover { background: var(--gx-bg, #F8FAFC); }
@@ -31,11 +37,36 @@
     #biSummaryGrid .bi-sum-value { font-weight: 600; color: var(--gx-primary, #0F172A); line-height: 1.3; overflow-wrap: anywhere; }
 
     /* Colour-coded quantity cards. Compact padding + a tight label so all four
-       fit without the form feeling stretched. */
-    .bi-qty-card { border: 1px solid var(--bs-border-color, #E2E8F0); border-radius: 10px; padding: .5rem .6rem; }
+       fit without the form feeling stretched. The border keeps the colour coding; a small
+       solid dot repeats it on the label so the four are told apart at a glance
+       without relying on hue alone. */
+    .bi-qty-card {
+        border: 1px solid var(--bs-border-color, #E2E8F0); border-radius: 10px; padding: .5rem .6rem;
+        background: #fff; height: 100%; transition: border-color .15s ease, box-shadow .15s ease;
+    }
     .bi-qty-card.bulk { border-color: #A7F3D0; } .bi-qty-card.sample { border-color: #BFDBFE; }
     .bi-qty-card.liability { border-color: #FDE68A; } .bi-qty-card.dead { border-color: #FECACA; }
-    .bi-qty-grid .bi-qty-card .form-label { font-size: .78rem; margin-bottom: .25rem; }
+    .bi-qty-card:focus-within { box-shadow: 0 0 0 3px rgba(37, 99, 235, .1); }
+    .bi-qty-grid .bi-qty-card .form-label {
+        display: flex; align-items: center; gap: .35rem; font-size: .75rem; font-weight: 600;
+        text-transform: uppercase; letter-spacing: .03em; margin-bottom: .3rem; white-space: nowrap;
+    }
+    .bi-qty-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+    .bi-qty-card.bulk .bi-qty-dot { background: #10B981; }
+    .bi-qty-card.sample .bi-qty-dot { background: #3B82F6; }
+    .bi-qty-card.liability .bi-qty-dot { background: #F59E0B; }
+    .bi-qty-card.dead .bi-qty-dot { background: #EF4444; }
+    /* Figures line up column to column, so four cards read as one row of numbers. */
+    .bi-qty-card .bi-qty { font-variant-numeric: tabular-nums; text-align: right; border-radius: 8px; }
+
+    /* Live total against the item's balance — the same numbers the block already
+       computes, stated before the user reaches the error. */
+    .bi-item-total {
+        display: flex; align-items: center; gap: .35rem; font-size: .75rem; font-weight: 600;
+        color: var(--gx-text-muted, #64748B); font-variant-numeric: tabular-nums; margin-top: .5rem;
+    }
+    .bi-item-total .bi-item-total-num { color: var(--gx-primary, #0F172A); }
+    .bi-item-card.is-over .bi-item-total .bi-item-total-num { color: var(--gx-danger-700, #B91C1C); }
 
     /* Auto-suggested value: reads as a suggestion until the user edits it. */
     .bi-suggested { font-style: italic; color: var(--gx-text-muted, #64748B); }
@@ -155,7 +186,7 @@
 
     /* Remarks: counter parks inside the field, bottom-right. */
     .bi-remarks { position: relative; }
-    .bi-remarks textarea.form-control { border-radius: 12px; padding: .7rem .85rem 1.9rem; resize: vertical; }
+    .bi-remarks textarea.form-control { border-radius: 12px; padding: .7rem .85rem 1.9rem; resize: vertical; line-height: 1.5; }
     .bi-remarks textarea.form-control::placeholder { color: #94A3B8; }
     .bi-remarks-count {
         position: absolute; right: .55rem; bottom: .45rem; pointer-events: none; font-size: .6875rem;
@@ -205,7 +236,9 @@
 
     @media (prefers-reduced-motion: reduce) {
         .bi-step-enter, .bi-wz-dot, .bi-wz-step + .bi-wz-step::before { transition: none; }
-        .bi-shake { animation: none; }
+        .bi-step, .bi-step-dot, .bi-step + .bi-step::before,
+        .bi-pick tbody tr.bi-row, .bi-qty-card, .bi-item-card { transition: none; }
+        .bi-shake, .bi-step-in { animation: none; }
     }
 
     /* A wide slide-over, not a narrow drawer. Each item row carries a long
@@ -241,21 +274,83 @@
     #biSearchWrap .btn-close { font-size: .7rem; opacity: .5; }
     #biSearchWrap .btn-close:hover { opacity: 1; }
 
-    /* Item picker modal — mirrors Receiving's stepper and pick table. */
-    .bi-steps { display: flex; align-items: center; gap: .75rem; list-style: none; padding: 0; margin: 0; }
-    .bi-step { display: flex; align-items: center; gap: .5rem; color: #94A3B8; font-size: .875rem; }
-    .bi-step + .bi-step::before { content: ''; width: 2.5rem; height: 1px; background: var(--bs-border-color, #E2E8F0); margin-right: .25rem; }
-    .bi-step-dot {
-        width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
-        font-size: .8125rem; font-weight: 700; background: #fff; color: #94A3B8; border: 2px solid var(--bs-border-color, #E2E8F0);
+    /* Item picker modal — mirrors Receiving's stepper and pick table, so the two
+       screens read as one system. Dot + caption/title, connector fills on
+       progress, tick replaces the number once a step is behind you. */
+    .bi-steps {
+        display: flex; align-items: center; list-style: none; margin: 0;
+        padding: .7rem .9rem; background: var(--gx-bg, #F8FAFC);
+        border: 1px solid var(--bs-border-color, #E2E8F0); border-radius: 12px;
     }
-    .bi-step.is-current { color: var(--gx-primary, #0F172A); font-weight: 600; }
+    .bi-step { display: flex; align-items: center; gap: .6rem; min-width: 0; color: #94A3B8; transition: color .15s ease; }
+    .bi-step + .bi-step { flex: 1 1 auto; }
+    .bi-step + .bi-step::before {
+        content: ''; flex: 1 1 auto; min-width: 1.5rem; height: 2px; border-radius: 2px;
+        background: var(--bs-border-color, #E2E8F0); margin: 0 .85rem; transition: background-color .15s ease;
+    }
+    .bi-step.is-current::before, .bi-step.is-done::before { background: var(--gx-secondary-600, #2563EB); }
+    .bi-step-dot {
+        width: 30px; height: 30px; flex: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+        font-size: .8125rem; font-weight: 700; background: #fff; color: #94A3B8; border: 2px solid var(--bs-border-color, #E2E8F0);
+        transition: background-color .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .bi-step-dot .bi { display: none; font-size: .875rem; }
+    .bi-step.is-done .bi-step-dot .bi { display: inline; }
+    .bi-step.is-done .bi-step-dot .bi-step-num { display: none; }
+    .bi-step-label { display: block; min-width: 0; }
+    .bi-step-caption {
+        display: block; font-size: .625rem; font-weight: 600; text-transform: uppercase;
+        letter-spacing: .06em; color: #94A3B8; line-height: 1.3;
+    }
+    .bi-step-text {
+        display: block; font-size: .8125rem; font-weight: 600; line-height: 1.3;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .bi-step.is-current { color: var(--gx-primary, #0F172A); }
     .bi-step.is-current .bi-step-dot {
         border-color: var(--gx-secondary-600, #2563EB); color: var(--gx-secondary-700, #1D4ED8);
         box-shadow: 0 0 0 4px rgba(37, 99, 235, .14);
     }
-    .bi-step.is-done { color: #334155; }
+    .bi-step.is-current .bi-step-caption { color: var(--gx-secondary-600, #2563EB); }
+    .bi-step.is-current .bi-step-text { color: var(--gx-primary, #0F172A); font-weight: 700; }
+    .bi-step.is-done { color: #64748B; }
     .bi-step.is-done .bi-step-dot { background: var(--gx-secondary-600, #2563EB); border-color: var(--gx-secondary-600, #2563EB); color: #fff; }
+    .bi-step.is-done .bi-step-text { color: #334155; }
+
+    /* Toolbar above the pick table: filter, labelled Select all, live count.
+       The filter is a Bootstrap input-group, the same construction the page's
+       other search fields use, rather than an icon absolutely positioned over a
+       plain input — the group sizes itself, so the magnifier cannot drift out of
+       the field when the row's height changes. */
+    .bi-pick-bar { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin: 1rem 0 .65rem; }
+    .bi-pick-filter { flex: 1 1 16rem; min-width: 0; width: auto; }
+    .bi-pick-filter .input-group-text {
+        background: #fff; border-right: 0; color: #94A3B8; padding-right: .35rem;
+        border-radius: 12px 0 0 12px;
+    }
+    .bi-pick-filter .form-control { border-left: 0; border-radius: 0 12px 12px 0; font-size: .875rem; }
+    /* One ring around the whole group, so the split border still reads as a
+       single field when it takes focus. */
+    .bi-pick-filter .form-control:focus { box-shadow: none; border-color: var(--bs-border-color, #E2E8F0); }
+    .bi-pick-filter:focus-within .input-group-text,
+    .bi-pick-filter:focus-within .form-control { border-color: var(--gx-secondary-600, #2563EB); }
+    .bi-pick-filter:focus-within { border-radius: 12px; box-shadow: 0 0 0 4px rgba(37, 99, 235, .12); }
+    /* Text label, never an icon: the project-wide rule in components.css turns
+       any .btn carrying a leading <i class="bi"> into a 38px icon-only square
+       and hides its <span>, which is the opposite of what a shortcut button
+       needs. Leaving the icon off keeps the count visible. */
+    .bi-selectall { flex: none; border-radius: 12px; font-weight: 600; font-size: .8125rem; padding: .45rem .85rem; white-space: nowrap; }
+    .bi-pick-clear { flex: none; font-size: .78rem; font-weight: 600; text-decoration: none; padding: .45rem .35rem; }
+    .bi-showing { flex: none; font-size: .75rem; color: #94A3B8; font-variant-numeric: tabular-nums; }
+    /* Filtered out, not removed — the ticks on those rows survive. */
+    .bi-pick tr.is-filtered { display: none; }
+    .bi-nomatch {
+        border: 1px dashed #CBD5E1; border-radius: 12px; background: var(--gx-bg, #F8FAFC);
+        padding: 1.75rem 1rem; text-align: center; color: var(--gx-text-muted, #64748B); font-size: .8125rem;
+    }
+
+    @keyframes biStepIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+    .bi-step-in { animation: biStepIn .18s cubic-bezier(.4, 0, .2, 1) both; }
 
     /* modal-xl only reaches 1140px at >=1200px viewport, and drops to 800/500px
        below that — which read as "squeezed" beside the 620px slide-in panel. An
@@ -281,7 +376,16 @@
     /* Whole row is the hit target, so the checkbox is an affordance not the only way in. */
     .bi-pick tbody tr.bi-row { cursor: pointer; transition: background-color .15s ease; }
     .bi-pick tbody tr.bi-row:hover { background: #F1F5F9; }
+    /* Tint plus a left accent, so a ticked row stays legible on a washed-out
+       factory monitor where the tint alone is easy to miss. */
     .bi-pick tbody tr.bi-row.is-checked { background: var(--gx-secondary-bg, #DBEAFE); }
+    .bi-pick tbody tr.bi-row.is-checked td:first-child { box-shadow: inset 3px 0 0 var(--gx-secondary-600, #2563EB); }
+    .bi-pick tbody tr.bi-row.is-checked .bi-cell-primary { font-weight: 600; }
+    /* Compact rows: this is a scan-and-tick surface. */
+    .bi-pick td { padding-top: .5rem; padding-bottom: .5rem; }
+    .bi-pick td:first-child, .bi-pick th:first-child { padding-left: .85rem; }
+    .bi-pick td:last-child, .bi-pick th:last-child { padding-right: .85rem; }
+    .bi-pick .form-check-input { width: 1.05rem; height: 1.05rem; margin-top: 0; }
     /* Already added: visible for reference, but not selectable again. */
     .bi-pick tbody tr.is-added { cursor: default; color: #94A3B8; }
     .bi-pick tbody tr.is-added:hover { background: transparent; }
@@ -290,7 +394,15 @@
     .bi-cell-sub { font-size: .75rem; color: var(--gx-text-muted, #64748B); line-height: 1.35; }
     .bi-pick tbody tr.is-added .bi-cell-primary { color: #94A3B8; }
 
-    .bi-modal-footer { background: #F1F5F9; border-top: 1px solid var(--bs-border-color, #E2E8F0); gap: .5rem; }
+    /* Sticky action bar. modal-dialog-scrollable already parks the footer under
+       the scrolling body; these give it the weight to read as one. */
+    .bi-modal-footer {
+        background: #fff; border-top: 1px solid var(--bs-border-color, #E2E8F0); gap: .5rem;
+        box-shadow: 0 -8px 20px -14px rgba(15, 23, 42, .5);
+    }
+    .bi-modal-footer .btn { border-radius: 10px; font-weight: 600; font-size: .8125rem; padding: .5rem .95rem; }
+    .bi-modal-footer .btn-primary { padding-inline: 1.35rem; box-shadow: 0 8px 16px -8px rgba(37, 99, 235, .65); }
+    .bi-modal-footer .btn-primary:disabled { box-shadow: none; }
     .bi-selcount { display: inline-flex; align-items: center; gap: .45rem; font-size: .8125rem; color: var(--gx-text-muted, #64748B); }
     .bi-selcount-badge { min-width: 1.5rem; padding: .1rem .4rem; border-radius: 6px; background: var(--bs-border-color, #E2E8F0); color: var(--gx-primary, #0F172A); font-weight: 600; text-align: center; }
     .bi-selcount.is-active .bi-selcount-badge { background: var(--gx-secondary-600, #2563EB); color: #fff; }
@@ -590,10 +702,10 @@
             </div>{{-- /card --}}
 
             <div class="bi-card">
-                <label class="form-label" for="biRemarks">Remarks</label>
+                <label class="form-label" for="biRemarks">Remarks <span class="text-muted small fw-normal">(optional)</span></label>
                 <div class="bi-remarks">
                     <textarea name="remarks" id="biRemarks" rows="3" class="form-control" maxlength="1000"
-                              placeholder="Any note for this issue — gate pass, receiver, or reason."
+                              placeholder="Gate pass number, who collected the material, or why it was issued."
                               @input="syncRemarks(); queueDraft()"></textarea>
                     <span class="bi-remarks-count" :class="remarksLength > remarksMax - 50 ? 'is-warn' : ''" aria-hidden="true">
                         <span x-text="remarksLength"></span>/<span x-text="remarksMax"></span>
@@ -716,15 +828,46 @@
             </div>
 
             <div class="modal-body">
-                <ol class="bi-steps mb-4" id="biSteps">
-                    <li class="bi-step is-current" id="biCrumb1"><span class="bi-step-dot">1</span><span>Choose Style</span></li>
-                    <li class="bi-step" id="biCrumb2"><span class="bi-step-dot">2</span><span>Choose Items</span></li>
+                <ol class="bi-steps" id="biSteps">
+                    <li class="bi-step is-current" id="biCrumb1">
+                        <span class="bi-step-dot"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="bi-step-num">1</span></span>
+                        <span class="bi-step-label">
+                            <span class="bi-step-caption">Step 1</span>
+                            <span class="bi-step-text">Choose Style</span>
+                        </span>
+                    </li>
+                    <li class="bi-step" id="biCrumb2">
+                        <span class="bi-step-dot"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="bi-step-num">2</span></span>
+                        <span class="bi-step-label">
+                            <span class="bi-step-caption">Step 2</span>
+                            <span class="bi-step-text">Choose Items</span>
+                        </span>
+                    </li>
                 </ol>
 
                 <div id="biModalLoading" class="text-center text-muted py-5">
                     <div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading items…
                 </div>
                 <div id="biModalError" class="alert alert-warning d-none mb-0"></div>
+
+                {{-- Filter + Select all. Both act on whichever step is showing,
+                     so one toolbar serves the style list and the item list. --}}
+                <div class="bi-pick-bar d-none" id="biPickBar">
+                    <div class="input-group bi-pick-filter">
+                        <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+                        <input type="text" class="form-control" id="biFilter" autocomplete="off"
+                               placeholder="Filter this list…" aria-label="Filter the list below">
+                    </div>
+                    <span class="bi-showing" id="biShowing" aria-live="polite"></span>
+                    <button type="button" class="btn btn-link bi-pick-clear d-none" id="biFilterClear">Clear filter</button>
+                    <button type="button" class="btn btn-outline-primary bi-selectall" id="biSelectAllBtn">
+                        <span id="biSelectAllText">Select all</span>
+                    </button>
+                </div>
+
+                <div class="bi-nomatch d-none" id="biNoMatch">
+                    <i class="bi bi-search me-1" aria-hidden="true"></i>Nothing matches that filter.
+                </div>
 
                 {{-- Level 1: styles --}}
                 <div id="biStep1" class="d-none">

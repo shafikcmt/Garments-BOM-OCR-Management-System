@@ -149,64 +149,180 @@
 
     /* --- Item picker modal ------------------------------------------------ */
 
-    /* Stepper: numbered dots joined by a rule, current one filled. */
+    /* Stepper: numbered dots joined by a connector that fills as the picker
+       advances. The step owns two lines — a quiet "Step n" caption and the title
+       — so the current position reads without the label having to say so. */
     .rcv-steps {
         display: flex;
         align-items: center;
-        gap: .75rem;
         list-style: none;
-        padding: 0;
+        padding: .7rem .9rem;
         margin: 0;
+        background: var(--gx-bg, #F8FAFC);
+        border: 1px solid var(--rcv-border);
+        border-radius: var(--rcv-radius-lg);
     }
     .rcv-step {
         display: flex;
         align-items: center;
-        gap: .5rem;
+        gap: .6rem;
+        min-width: 0;
         color: var(--rcv-text-3);
-        font-size: .875rem;
         transition: color var(--rcv-transition);
     }
-    /* The connector belongs to the step that follows it. */
+    /* The connector belongs to the step that follows it, and grows to fill
+       whatever width is left between the two labels. */
+    .rcv-step + .rcv-step { flex: 1 1 auto; }
     .rcv-step + .rcv-step::before {
         content: '';
-        width: 2.5rem;
-        height: 1px;
+        flex: 1 1 auto;
+        min-width: 1.5rem;
+        height: 2px;
+        border-radius: 2px;
         background: var(--rcv-border);
-        margin-right: .25rem;
+        margin: 0 .85rem;
+        transition: background-color var(--rcv-transition);
     }
+    .rcv-step.is-current::before, .rcv-step.is-done::before { background: var(--rcv-primary); }
     .rcv-step-dot {
-        width: 26px;
-        height: 26px;
+        width: 30px;
+        height: 30px;
+        flex: none;
         border-radius: 50%;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         font-size: .8125rem;
-        font-weight: 600;
-        background: var(--rcv-surface);
+        font-weight: 700;
+        background: #fff;
         color: var(--rcv-text-3);
-        border: 1px solid var(--rcv-border);
-        transition: background-color var(--rcv-transition), color var(--rcv-transition), border-color var(--rcv-transition);
+        border: 2px solid var(--rcv-border);
+        transition: background-color var(--rcv-transition), color var(--rcv-transition),
+                    border-color var(--rcv-transition), box-shadow var(--rcv-transition);
     }
-    .rcv-step.is-current { color: var(--rcv-text); font-weight: 600; }
+    .rcv-step-label { display: block; min-width: 0; }
+    .rcv-step-caption {
+        display: block;
+        font-size: .625rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: var(--rcv-text-3);
+        line-height: 1.3;
+    }
+    .rcv-step-text {
+        display: block;
+        font-size: .8125rem;
+        font-weight: 600;
+        line-height: 1.3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    /* One dot carries both a number and a tick; the state decides which shows. */
+    .rcv-step-dot .bi { display: none; font-size: .875rem; }
+    .rcv-step.is-done .rcv-step-dot .bi { display: inline; }
+    .rcv-step.is-done .rcv-step-dot .rcv-step-num { display: none; }
+
+    .rcv-step.is-current { color: var(--rcv-text); }
     .rcv-step.is-current .rcv-step-dot {
+        border-color: var(--rcv-primary);
+        color: var(--gx-secondary-700, #1D4ED8);
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, .14);
+    }
+    .rcv-step.is-current .rcv-step-caption { color: var(--rcv-primary); }
+    .rcv-step.is-current .rcv-step-text { color: var(--rcv-text); font-weight: 700; }
+    /* A finished step gives the ring back to the current one but keeps its fill. */
+    .rcv-step.is-done { color: var(--rcv-text-2); }
+    .rcv-step.is-done .rcv-step-dot {
         background: var(--rcv-primary);
         border-color: var(--rcv-primary);
         color: #fff;
     }
-    /* A finished step keeps its colour but gives the fill back to the current one. */
-    .rcv-step.is-done { color: var(--rcv-text-2); }
-    .rcv-step.is-done .rcv-step-dot {
-        background: var(--gx-secondary-bg, #DBEAFE);
-        border-color: var(--gx-secondary-border, #BFDBFE);
-        color: var(--gx-secondary-700, #1D4ED8);
+    .rcv-step.is-done .rcv-step-text { color: #334155; }
+
+    /* Toolbar above the pick table: filter, a labelled Select all, and a live
+       count of what the filter is showing. */
+    .rcv-pick-bar {
+        display: flex;
+        align-items: center;
+        gap: .6rem;
+        flex-wrap: wrap;
+        margin: 1rem 0 .65rem;
     }
+    /* A Bootstrap input-group, the same construction the page's other search
+       fields use, rather than an icon absolutely positioned over a plain input —
+       the group sizes itself, so the magnifier cannot drift out of the field
+       when the row's height changes. */
+    .rcv-filter { flex: 1 1 16rem; min-width: 0; width: auto; }
+    .rcv-filter .input-group-text {
+        background: #fff;
+        border-right: 0;
+        color: var(--rcv-text-3);
+        padding-right: .35rem;
+        border-radius: var(--rcv-radius-lg) 0 0 var(--rcv-radius-lg);
+    }
+    .rcv-filter .form-control {
+        border-left: 0;
+        border-radius: 0 var(--rcv-radius-lg) var(--rcv-radius-lg) 0;
+        font-size: .875rem;
+    }
+    /* One ring around the whole group, so the split border still reads as a
+       single field when it takes focus. */
+    .rcv-filter .form-control:focus { box-shadow: none; border-color: var(--rcv-border); }
+    .rcv-filter:focus-within .input-group-text,
+    .rcv-filter:focus-within .form-control { border-color: var(--rcv-primary); }
+    .rcv-filter:focus-within { border-radius: var(--rcv-radius-lg); box-shadow: 0 0 0 4px rgba(37, 99, 235, .12); }
+
+    /* Select all is the shortcut that saves the most clicks on a long PO, so it
+       is a labelled button rather than only the header checkbox.
+       Deliberately carries no <i class="bi">: the project-wide rule in
+       components.css turns any such .btn into a 38px icon-only square and hides
+       its <span>, which would throw away the count this button exists to show. */
+    .rcv-selectall {
+        flex: none;
+        border-radius: var(--rcv-radius-lg);
+        font-weight: 600;
+        font-size: .8125rem;
+        padding: .45rem .85rem;
+        white-space: nowrap;
+    }
+    .rcv-filter-clear { flex: none; font-size: .78rem; font-weight: 600; text-decoration: none; padding: .45rem .35rem; }
+    .rcv-showing {
+        flex: none;
+        font-size: .75rem;
+        color: var(--rcv-text-3);
+        font-variant-numeric: tabular-nums;
+    }
+    /* Rows the filter excluded. Hidden, never removed, so the ticks on them
+       survive a filter change. */
+    .rcv-pick tr.is-filtered { display: none; }
+    .rcv-nomatch {
+        border: 1px dashed #CBD5E1;
+        border-radius: var(--rcv-radius-lg);
+        background: var(--gx-bg, #F8FAFC);
+        padding: 1.75rem 1rem;
+        text-align: center;
+        color: var(--rcv-text-2);
+        font-size: .8125rem;
+    }
+
+    /* Step change: a short fade + slide, enough to show the table was replaced
+       without making the picker feel slow. */
+    @keyframes rcvStepIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+    .rcv-step-in { animation: rcvStepIn .18s cubic-bezier(.4, 0, .2, 1) both; }
 
     .rcv-pick {
         max-height: 52vh;
         border: 1px solid var(--rcv-border);
         border-radius: var(--rcv-radius-lg);
     }
+    /* Compact rows: the picker is a scan-and-tick surface, so vertical padding
+       is tightened and the identity columns carry the density instead. */
+    .rcv-pick td { padding-top: .5rem; padding-bottom: .5rem; }
+    .rcv-pick td:first-child, .rcv-pick th:first-child { padding-left: .85rem; }
+    .rcv-pick td:last-child, .rcv-pick th:last-child { padding-right: .85rem; }
+    .rcv-pick .form-check-input { width: 1.05rem; height: 1.05rem; margin-top: 0; }
     .rcv-pick thead th {
         background: var(--rcv-surface);
         font-size: .6875rem;
@@ -224,7 +340,11 @@
         transition: background-color var(--rcv-transition);
     }
     .rcv-pick tbody tr.rcv-row:hover { background: var(--rcv-surface); }
+    /* A ticked row is tinted AND carries a left accent, so the selection is
+       still legible on a projector or a washed-out factory monitor. */
     .rcv-pick tbody tr.rcv-row.is-checked { background: var(--gx-secondary-bg, #DBEAFE); }
+    .rcv-pick tbody tr.rcv-row.is-checked td:first-child { box-shadow: inset 3px 0 0 var(--rcv-primary); }
+    .rcv-pick tbody tr.rcv-row.is-checked .rcv-cell-primary { font-weight: 600; }
     /* Already added: visible for reference, but not selectable again. */
     .rcv-pick tbody tr.is-added {
         cursor: default;
@@ -259,10 +379,31 @@
     }
     .rcv-state-fill { display: block; height: 100%; background: var(--gx-accent, #10B981); }
 
+    /* Sticky action bar. modal-dialog-scrollable already parks the footer below
+       the scrolling body; these rules give it the weight to read as one. */
     .rcv-modal-footer {
-        background: var(--rcv-surface);
+        background: #fff;
         border-top: 1px solid var(--rcv-border);
         gap: .5rem;
+        box-shadow: 0 -8px 20px -14px rgba(15, 23, 42, .5);
+    }
+    .rcv-modal-footer .btn {
+        border-radius: var(--rcv-radius-md);
+        font-weight: 600;
+        font-size: .8125rem;
+        padding: .5rem .95rem;
+    }
+    /* One dominant primary so the next move is never in doubt. */
+    .rcv-modal-footer .btn-primary {
+        padding-inline: 1.35rem;
+        box-shadow: 0 8px 16px -8px rgba(37, 99, 235, .65);
+    }
+    .rcv-modal-footer .btn-primary:disabled { box-shadow: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .rcv-step-in { animation: none; }
+        .rcv-step, .rcv-step-dot, .rcv-step + .rcv-step::before,
+        .rcv-pick tbody tr.rcv-row { transition: none; }
     }
     .rcv-selcount {
         display: inline-flex;
@@ -930,14 +1071,20 @@
             <div class="modal-body">
                 {{-- Visual stepper. The numbers carry the state, so the label
                      underneath never has to say "you are here". --}}
-                <ol class="rcv-steps mb-4" id="rcvSteps">
+                <ol class="rcv-steps" id="rcvSteps">
                     <li class="rcv-step is-current" id="rcvCrumb1">
-                        <span class="rcv-step-dot">1</span>
-                        <span class="rcv-step-text">Choose Style</span>
+                        <span class="rcv-step-dot"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="rcv-step-num">1</span></span>
+                        <span class="rcv-step-label">
+                            <span class="rcv-step-caption">Step 1</span>
+                            <span class="rcv-step-text">Choose Style</span>
+                        </span>
                     </li>
                     <li class="rcv-step" id="rcvCrumb2">
-                        <span class="rcv-step-dot">2</span>
-                        <span class="rcv-step-text">Choose Items</span>
+                        <span class="rcv-step-dot"><i class="bi bi-check-lg" aria-hidden="true"></i><span class="rcv-step-num">2</span></span>
+                        <span class="rcv-step-label">
+                            <span class="rcv-step-caption">Step 2</span>
+                            <span class="rcv-step-text">Choose Items</span>
+                        </span>
                     </li>
                 </ol>
 
@@ -945,6 +1092,25 @@
                     <div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading items…
                 </div>
                 <div id="rcvModalError" class="alert alert-warning d-none mb-0"></div>
+
+                {{-- Filter + Select all. Both act on the step that is showing, so
+                     one toolbar serves the style list and the item list. --}}
+                <div class="rcv-pick-bar d-none" id="rcvPickBar">
+                    <div class="input-group rcv-filter">
+                        <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+                        <input type="text" class="form-control" id="rcvFilter" autocomplete="off"
+                               placeholder="Filter this list…" aria-label="Filter the list below">
+                    </div>
+                    <span class="rcv-showing" id="rcvShowing" aria-live="polite"></span>
+                    <button type="button" class="btn btn-link rcv-filter-clear d-none" id="rcvFilterClear">Clear filter</button>
+                    <button type="button" class="btn btn-outline-primary rcv-selectall" id="rcvSelectAllBtn">
+                        <span id="rcvSelectAllText">Select all</span>
+                    </button>
+                </div>
+
+                <div class="rcv-nomatch d-none" id="rcvNoMatch">
+                    <i class="bi bi-search me-1" aria-hidden="true"></i>Nothing matches that filter.
+                </div>
 
                 {{-- Level 1: styles --}}
                 <div id="rcvStep1" class="d-none">
@@ -1514,6 +1680,9 @@
             step1.classList.add('d-none');
             step2.classList.add('d-none');
             modalError.classList.add('d-none');
+            // Nothing to filter or select all of until the rows arrive.
+            pickBar.classList.add('d-none');
+            noMatchEl.classList.add('d-none');
 
             const poId = poIdEl.value;
 
@@ -1532,6 +1701,7 @@
                 })
                 .catch(status => {
                     modalLoading.classList.add('d-none');
+                    pickBar.classList.add('d-none');
                     modalError.classList.remove('d-none');
                     modalError.textContent = status === 423
                         ? 'This file/style is locked. Stock entry is not allowed.'
@@ -1553,7 +1723,18 @@
             crumb1.classList.toggle('is-done', step === 2);
             crumb2.classList.toggle('is-current', step === 2);
 
+            // The two steps filter on different columns, so the box starts empty
+            // on each one rather than carrying a style term into the item list.
+            if (filterInput) filterInput.value = '';
+            if (pickBar) pickBar.classList.remove('d-none');
+
             if (step === 1) renderStyles(); else renderItems();
+
+            // Restart the entrance animation on the panel that just took over.
+            const panel = step === 1 ? step1 : step2;
+            panel.classList.remove('rcv-step-in');
+            void panel.offsetWidth;
+            panel.classList.add('rcv-step-in');
         }
 
         // "Added" as a state with a progress bar, rather than a bare "2 / 5" the
@@ -1594,7 +1775,9 @@
                 '</tr>';
             }).join('');
 
-            updateSelCount();
+            // applyFilter() finishes with updateSelCount(), so the toolbar counts
+            // and the footer badge are refreshed from one place.
+            applyFilter();
         }
 
         function chosenStyles() {
@@ -1648,7 +1831,7 @@
             });
 
             itemBody.innerHTML = html;
-            updateSelCount();
+            applyFilter();
         }
 
         const activeBoxes = () => Array.from(
@@ -1656,11 +1839,73 @@
                 .querySelectorAll(step1.classList.contains('d-none') ? '.rcv-item-cb:not(:disabled)' : '.rcv-style-cb:not(:disabled)')
         );
 
+        /**
+         * The boxes the filter is currently showing.
+         *
+         * Select all — the header checkbox and the toolbar button — acts on these
+         * rather than on every row, which is what makes "filter, then take the
+         * lot" a single gesture. The selected COUNT deliberately stays on
+         * activeBoxes(): a tick made before the filter was typed is still a real
+         * selection and must not appear to vanish.
+         */
+        const visibleBoxes = () => activeBoxes().filter(cb => {
+            const tr = cb.closest('tr');
+            return tr && !tr.classList.contains('is-filtered');
+        });
+
         const selCountWrap = document.getElementById('rcvSelCountWrap');
         const selCountLabel = document.getElementById('rcvSelCountLabel');
+        const pickBar = document.getElementById('rcvPickBar');
+        const filterInput = document.getElementById('rcvFilter');
+        const filterClear = document.getElementById('rcvFilterClear');
+        const selectAllBtn = document.getElementById('rcvSelectAllBtn');
+        const selectAllText = document.getElementById('rcvSelectAllText');
+        const showingEl = document.getElementById('rcvShowing');
+        const noMatchEl = document.getElementById('rcvNoMatch');
+
+        /**
+         * Client-side row filter. Matches on the row's own rendered text, so it
+         * covers material, art no, SAP code, colour, size and unit without the
+         * markup having to declare which columns are searchable.
+         */
+        function applyFilter() {
+            const onItems = step1.classList.contains('d-none');
+            const body = onItems ? itemBody : styleBody;
+            const term = (filterInput.value || '').trim().toLowerCase();
+            const rows = Array.from(body.querySelectorAll('tr'));
+            let total = 0;
+            let shown = 0;
+
+            rows.forEach(tr => {
+                if (tr.classList.contains('rcv-group-row')) return;   // handled below
+                total += 1;
+                const hit = !term || tr.textContent.toLowerCase().indexOf(term) !== -1;
+                tr.classList.toggle('is-filtered', !hit);
+                if (hit) shown += 1;
+            });
+
+            // A style heading with nothing left under it is noise, so it follows
+            // its own rows out of the list.
+            rows.filter(tr => tr.classList.contains('rcv-group-row')).forEach(head => {
+                let any = false;
+                for (let el = head.nextElementSibling; el && !el.classList.contains('rcv-group-row'); el = el.nextElementSibling) {
+                    if (!el.classList.contains('is-filtered')) { any = true; break; }
+                }
+                head.classList.toggle('is-filtered', !any);
+            });
+
+            filterClear.classList.toggle('d-none', term === '');
+            noMatchEl.classList.toggle('d-none', !(total > 0 && shown === 0));
+            showingEl.textContent = term
+                ? shown + ' of ' + total + ' shown'
+                : total + (total === 1 ? ' row' : ' rows');
+
+            updateSelCount();
+        }
 
         function updateSelCount() {
             const boxes = activeBoxes();
+            const shownBoxes = visibleBoxes();
             const checked = boxes.filter(cb => cb.checked);
             const onItems = step1.classList.contains('d-none');
 
@@ -1674,8 +1919,16 @@
             addBtn.disabled = checked.length === 0;
 
             const master = onItems ? itemAll : styleAll;
-            master.disabled = boxes.length === 0;
-            master.checked = boxes.length > 0 && boxes.every(cb => cb.checked);
+            master.disabled = shownBoxes.length === 0;
+            master.checked = shownBoxes.length > 0 && shownBoxes.every(cb => cb.checked);
+
+            // The button mirrors the header checkbox, spelled out. On a one- or
+            // two-item PO it is the whole selection in a single click.
+            const allShown = shownBoxes.length > 0 && shownBoxes.every(cb => cb.checked);
+            selectAllBtn.disabled = shownBoxes.length === 0;
+            selectAllText.textContent = allShown
+                ? 'Clear all'
+                : 'Select all' + (shownBoxes.length ? ' (' + shownBoxes.length + ')' : '');
 
             // Keep the row tint in step with its checkbox.
             boxes.forEach(cb => {
@@ -1684,9 +1937,25 @@
             });
         }
 
+        filterInput.addEventListener('input', applyFilter);
+        filterInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { filterInput.value = ''; applyFilter(); }
+        });
+        filterClear.addEventListener('click', function () {
+            filterInput.value = '';
+            filterInput.focus();
+            applyFilter();
+        });
+        selectAllBtn.addEventListener('click', function () {
+            const shownBoxes = visibleBoxes();
+            const allShown = shownBoxes.length > 0 && shownBoxes.every(cb => cb.checked);
+            shownBoxes.forEach(cb => { cb.checked = !allShown; });
+            updateSelCount();
+        });
+
         [[styleAll, styleBody], [itemAll, itemBody]].forEach(([master, body]) => {
             master.addEventListener('change', function () {
-                activeBoxes().forEach(cb => { cb.checked = master.checked; });
+                visibleBoxes().forEach(cb => { cb.checked = master.checked; });
                 updateSelCount();
             });
             body.addEventListener('change', function (e) {

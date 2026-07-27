@@ -377,6 +377,13 @@ function initPanel(cfg) {
     const modalPo = document.getElementById('biModalPo');
     const crumb1 = document.getElementById('biCrumb1');
     const crumb2 = document.getElementById('biCrumb2');
+    const pickBar = document.getElementById('biPickBar');
+    const filterInput = document.getElementById('biFilter');
+    const filterClear = document.getElementById('biFilterClear');
+    const selectAllBtn = document.getElementById('biSelectAllBtn');
+    const selectAllText = document.getElementById('biSelectAllText');
+    const showingEl = document.getElementById('biShowing');
+    const noMatchEl = document.getElementById('biNoMatch');
 
     // Garments PO is the buyer's garment-level PO from the BOM, a separate
     // identifier from the material PO that po_no searches.
@@ -670,6 +677,9 @@ function initPanel(cfg) {
         step1.classList.add('d-none');
         step2.classList.add('d-none');
         modalError.classList.add('d-none');
+        // Nothing to filter or select all of until the rows arrive.
+        pickBar.classList.add('d-none');
+        noMatchEl.classList.add('d-none');
         setSummary(null);
 
         // The lookup is started from the panel, so its progress and any failure
@@ -704,6 +714,7 @@ function initPanel(cfg) {
                 loadedPoId = null;
                 items = [];
                 modalLoading.classList.add('d-none');
+                pickBar.classList.add('d-none');
                 const message = status === 423
                     ? 'This file/style is locked. Stock entry is not allowed.'
                     : 'Could not load the items for this PO. Please try again.';
@@ -746,7 +757,18 @@ function initPanel(cfg) {
         crumb1.classList.toggle('is-done', step === 2);
         crumb2.classList.toggle('is-current', step === 2);
 
+        // The two steps filter on different columns, so the box starts empty on
+        // each one rather than carrying a style term into the item list.
+        filterInput.value = '';
+        pickBar.classList.remove('d-none');
+
         if (step === 1) renderStyles(); else renderItems();
+
+        // Restart the entrance animation on the panel that just took over.
+        const panel = step === 1 ? step1 : step2;
+        panel.classList.remove('bi-step-in');
+        void panel.offsetWidth;
+        panel.classList.add('bi-step-in');
     }
 
     function renderStyles() {
@@ -788,7 +810,9 @@ function initPanel(cfg) {
             boxes[0].checked = true;
         }
 
-        updatePickCount();
+        // applyFilter() finishes with updatePickCount(), so the toolbar counts
+        // and the footer badge are refreshed from one place.
+        applyFilter();
     }
 
     const chosenStyles = () => Array.from(styleBody.querySelectorAll('.bi-style-cb:checked')).map((cb) => cb.value);
@@ -860,7 +884,7 @@ function initPanel(cfg) {
         Array.from(itemBody.querySelectorAll('.bi-item-cb:not(:disabled)'))
             .forEach((cb) => { if (pickedItems.indexOf(cb.value) !== -1) cb.checked = true; });
 
-        updatePickCount();
+        applyFilter();
     }
 
     const onItemStep = () => step1.classList.contains('d-none');
@@ -868,8 +892,61 @@ function initPanel(cfg) {
         (onItemStep() ? itemBody : styleBody)
             .querySelectorAll(onItemStep() ? '.bi-item-cb:not(:disabled)' : '.bi-style-cb:not(:disabled)'));
 
+    /**
+     * The boxes the filter is currently showing.
+     *
+     * Select all — the header checkbox and the toolbar button — acts on these, so
+     * "filter, then take the lot" is one gesture. The selected COUNT stays on
+     * activeBoxes(): a tick made before the filter was typed is still a real
+     * selection and must not appear to vanish.
+     */
+    const visibleBoxes = () => activeBoxes().filter((cb) => {
+        const tr = cb.closest('tr');
+        return tr && !tr.classList.contains('is-filtered');
+    });
+
+    /**
+     * Client-side row filter over the row's own rendered text, so it covers
+     * material, art no, SAP code, colour, size and unit without the markup
+     * having to declare which columns are searchable.
+     */
+    function applyFilter() {
+        const body = onItemStep() ? itemBody : styleBody;
+        const term = (filterInput.value || '').trim().toLowerCase();
+        const rows = Array.from(body.querySelectorAll('tr'));
+        let total = 0;
+        let shown = 0;
+
+        rows.forEach((tr) => {
+            if (tr.classList.contains('bi-group-row')) return;   // handled below
+            total += 1;
+            const hit = !term || tr.textContent.toLowerCase().indexOf(term) !== -1;
+            tr.classList.toggle('is-filtered', !hit);
+            if (hit) shown += 1;
+        });
+
+        // A style heading with nothing left under it is noise, so it follows its
+        // own rows out of the list.
+        rows.filter((tr) => tr.classList.contains('bi-group-row')).forEach((head) => {
+            let any = false;
+            for (let el = head.nextElementSibling; el && !el.classList.contains('bi-group-row'); el = el.nextElementSibling) {
+                if (!el.classList.contains('is-filtered')) { any = true; break; }
+            }
+            head.classList.toggle('is-filtered', !any);
+        });
+
+        filterClear.classList.toggle('d-none', term === '');
+        noMatchEl.classList.toggle('d-none', !(total > 0 && shown === 0));
+        showingEl.textContent = term
+            ? shown + ' of ' + total + ' shown'
+            : total + (total === 1 ? ' row' : ' rows');
+
+        updatePickCount();
+    }
+
     function updatePickCount() {
         const boxes = activeBoxes();
+        const shownBoxes = visibleBoxes();
         const checked = boxes.filter((cb) => cb.checked);
         const onItems = onItemStep();
 
@@ -883,8 +960,16 @@ function initPanel(cfg) {
         addBtn.disabled = checked.length === 0;
 
         const master = onItems ? itemAll : styleAll;
-        master.disabled = boxes.length === 0;
-        master.checked = boxes.length > 0 && boxes.every((cb) => cb.checked);
+        master.disabled = shownBoxes.length === 0;
+        master.checked = shownBoxes.length > 0 && shownBoxes.every((cb) => cb.checked);
+
+        // The button mirrors the header checkbox, spelled out. On a one- or
+        // two-item PO it is the whole selection in a single click.
+        const allShown = shownBoxes.length > 0 && shownBoxes.every((cb) => cb.checked);
+        selectAllBtn.disabled = shownBoxes.length === 0;
+        selectAllText.textContent = allShown
+            ? 'Clear all'
+            : 'Select all' + (shownBoxes.length ? ' (' + shownBoxes.length + ')' : '');
 
         boxes.forEach((cb) => {
             const tr = cb.closest('tr');
@@ -892,9 +977,25 @@ function initPanel(cfg) {
         });
     }
 
+    filterInput.addEventListener('input', applyFilter);
+    filterInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { filterInput.value = ''; applyFilter(); }
+    });
+    filterClear.addEventListener('click', () => {
+        filterInput.value = '';
+        filterInput.focus();
+        applyFilter();
+    });
+    selectAllBtn.addEventListener('click', () => {
+        const shownBoxes = visibleBoxes();
+        const allShown = shownBoxes.length > 0 && shownBoxes.every((cb) => cb.checked);
+        shownBoxes.forEach((cb) => { cb.checked = !allShown; });
+        updatePickCount();
+    });
+
     [[styleAll, styleBody], [itemAll, itemBody]].forEach(([master, body]) => {
         master.addEventListener('change', () => {
-            activeBoxes().forEach((cb) => { cb.checked = master.checked; });
+            visibleBoxes().forEach((cb) => { cb.checked = master.checked; });
             updatePickCount();
         });
         body.addEventListener('change', (e) => {
@@ -983,10 +1084,17 @@ function initPanel(cfg) {
             '</div>' +
             '<input type="hidden" name="' + n('excel_row_id') + '" value="' + h(item.excel_row_id) + '">' +
             '<div class="row g-2 bi-qty-grid">' +
-                qtyCell('bulk', 'Bulk', '🟢', 'text-success', n('bulk_qty'), preset.bulk_qty) +
-                qtyCell('sample', 'Sample', '🔵', 'text-primary', n('sample_qty'), preset.sample_qty) +
-                qtyCell('liability', 'Liability', '🟠', 'text-warning', n('liability_qty'), preset.liability_qty) +
-                qtyCell('dead', 'Dead', '🔴', 'text-danger', n('dead_qty'), preset.dead_qty) +
+                qtyCell('bulk', 'Bulk', 'text-success', n('bulk_qty'), preset.bulk_qty) +
+                qtyCell('sample', 'Sample', 'text-primary', n('sample_qty'), preset.sample_qty) +
+                qtyCell('liability', 'Liability', 'text-warning', n('liability_qty'), preset.liability_qty) +
+                qtyCell('dead', 'Dead', 'text-danger', n('dead_qty'), preset.dead_qty) +
+            '</div>' +
+            // Running total against the balance. The same figures checkOver()
+            // already computes, stated before the user hits the error rather
+            // than only after.
+            '<div class="bi-item-total">' +
+                '<i class="bi bi-calculator" aria-hidden="true"></i>' +
+                '<span>Total <span class="bi-item-total-num" data-bi-total>0</span> of ' + fmtNum(avail) + '</span>' +
             '</div>' +
             // The limit applies to the sum of four independent fields, so which
             // one to reduce is the user's call — hence a blocking message with a
@@ -1009,12 +1117,20 @@ function initPanel(cfg) {
         checkOver();
     }
 
-    function qtyCell(cls, label, dot, tone, name, value) {
+    function qtyCell(cls, label, tone, name, value) {
         // Two-up on a narrow panel, all four on one line once the slide-over is
         // wide enough for them (xl and above).
+        //
+        // The colour marker is a CSS dot rather than an emoji: emoji render at a
+        // different size and hue on every OS, which is what made the four labels
+        // look uneven. The field name is untouched.
+        const id = 'biQty_' + String(name).replace(/\W/g, '_');
+
         return '<div class="col-6 col-xl-3"><div class="bi-qty-card ' + cls + '">' +
-            '<label class="form-label fw-semibold ' + tone + '">' + dot + ' ' + label + '</label>' +
-            '<input type="number" step="0.0001" min="0" name="' + h(name) + '" placeholder="0" ' +
+            '<label class="form-label ' + tone + '" for="' + id + '">' +
+                '<span class="bi-qty-dot" aria-hidden="true"></span>' + label +
+            '</label>' +
+            '<input type="number" step="0.0001" min="0" id="' + id + '" name="' + h(name) + '" placeholder="0" ' +
                 'class="form-control form-control-sm bi-qty"' +
                 (value !== undefined && value !== null && value !== '' ? ' value="' + h(value) + '"' : '') + '>' +
         '</div></div>';
@@ -1085,6 +1201,11 @@ function initPanel(cfg) {
             }
 
             card.classList.toggle('is-over', over);
+
+            // Live running total, so the balance is visible while typing rather
+            // than only once it has already been exceeded.
+            const totalEl = card.querySelector('[data-bi-total]');
+            if (totalEl) totalEl.textContent = fmtNum(total);
 
             const box = card.querySelector('[data-bi-over]');
             if (box) {
