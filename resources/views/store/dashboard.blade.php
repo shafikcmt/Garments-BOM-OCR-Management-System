@@ -7,7 +7,7 @@
     $fmt = fn ($v) => rtrim(rtrim(number_format((float) $v, 2), '0'), '.');
 @endphp
 <div class="container-fluid">
-    <x-page-header icon="box-seam" eyebrow="Store"
+    <x-page-header data-aos="fade-down" icon="box-seam" eyebrow="Store"
                    title="Welcome, {{ auth()->user()->name }}"
                    copy="Stock position, movement and what needs attention.">
         <x-slot:actions>
@@ -142,7 +142,7 @@
         </div>
     </div>
 
-    <div class="row g-3">
+    <div class="row g-3" data-aos="fade-up">
         <div class="col-12 col-md-6 col-xl-3">
             <x-quick-action class="gx-fade-in" style="--gx-delay:800ms" icon="box-arrow-in-down" tone="success"
                 title="Receiving" description="Record material in"

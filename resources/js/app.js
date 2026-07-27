@@ -8,6 +8,8 @@ import { initSubmitButtons } from './modules/submit-button';
 import { initBulkIssueTable } from './modules/bulk-issue-table';
 
 import Alpine from 'alpinejs';
+import AOS from 'aos';
+import 'aos/dist/aos.css';
 import { registerBulkIssueWizard } from './modules/bulk-issue-wizard';
 
 window.Alpine = Alpine;
@@ -16,6 +18,12 @@ window.Alpine = Alpine;
 registerBulkIssueWizard(Alpine);
 
 Alpine.start();
+
+// Scroll-reveal animations for elements carrying data-aos attributes (skipped
+// when the user prefers reduced motion).
+AOS.init({
+    disable: () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+});
 
 
 // Dashboard figures count up when scrolled into view (no-op when the user

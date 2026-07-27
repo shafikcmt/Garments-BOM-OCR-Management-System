@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="container-fluid">
-    <x-page-header icon="sliders" eyebrow="Admin"
+    <x-page-header data-aos="fade-down" icon="sliders" eyebrow="Admin"
                    title="Welcome, {{ auth()->user()->name }}"
                    copy="Users, roles, workspace columns and vendor master.">
         <x-slot:actions>
@@ -174,7 +174,7 @@
         </div>
     </div>
 
-    <div class="row g-3">
+    <div class="row g-3" data-aos="fade-up">
         <div class="col-12 col-md-6 col-xl-3">
             <x-quick-action class="gx-fade-in" style="--gx-delay:800ms" icon="person-plus" tone="primary"
                 title="Add User" description="Create an account and assign a role"

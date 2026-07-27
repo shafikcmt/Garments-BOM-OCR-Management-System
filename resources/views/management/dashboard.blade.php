@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="container-fluid">
-    <x-page-header icon="clipboard2-check" eyebrow="Management"
+    <x-page-header data-aos="fade-down" icon="clipboard2-check" eyebrow="Management"
                    title="Welcome, {{ auth()->user()->name }}"
                    copy="Payment Request Approvals — current position and recent activity.">
         <x-slot:actions>
@@ -70,7 +70,7 @@
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-4" data-aos="fade-up">
         <div class="col-12 col-xl-7">
             <x-card class="gx-fade-in h-100" style="--gx-delay:600ms">
                 <x-slot:title>Recent approval activity</x-slot:title>

@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="container-fluid">
-    <x-page-header icon="pencil-square" eyebrow="Merchandising"
+    <x-page-header data-aos="fade-down" icon="pencil-square" eyebrow="Merchandising"
                    title="Welcome, {{ auth()->user()->name }}"
                    copy="Your share of the BOM workspace and what is still outstanding.">
         <x-slot:actions>
@@ -59,7 +59,7 @@
         </div>
     </div>
 
-    <div class="row g-3">
+    <div class="row g-3" data-aos="fade-up">
         <div class="col-12 col-md-6">
             <x-quick-action class="gx-fade-in" style="--gx-delay:600ms" icon="grid-3x3-gap" tone="primary"
                 title="BOM Workspace" description="Fill in the columns you own"

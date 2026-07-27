@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="container-fluid">
-    <x-page-header icon="calculator" eyebrow="Accounts"
+    <x-page-header data-aos="fade-down" icon="calculator" eyebrow="Accounts"
                    title="Welcome, {{ auth()->user()->name }}"
                    copy="Payment request position and your share of the BOM workspace.">
         <x-slot:actions>
@@ -37,7 +37,7 @@
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-4" data-aos="fade-up">
         <div class="col-12 col-xl-7">
             <x-card class="gx-fade-in h-100" style="--gx-delay:400ms">
                 <x-slot:title>

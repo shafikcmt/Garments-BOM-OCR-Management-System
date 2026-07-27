@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="container-fluid">
-    <x-page-header icon="truck" eyebrow="Supply Chain"
+    <x-page-header data-aos="fade-down" icon="truck" eyebrow="Supply Chain"
                    title="Welcome, {{ auth()->user()->name }}"
                    copy="Booking POs, payment requests and your share of the BOM.">
         <x-slot:actions>
@@ -62,7 +62,7 @@
         </div>
     </div>
 
-    <div class="row g-3">
+    <div class="row g-3" data-aos="fade-up">
         <div class="col-12 col-md-4">
             <x-quick-action class="gx-fade-in" style="--gx-delay:600ms" icon="clipboard-plus" tone="primary"
                 title="Generate PO" description="Create booking POs from the BOM"
