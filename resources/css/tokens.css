@@ -44,6 +44,13 @@
     --gx-radius-sm: 10px;
     --gx-radius-pill: 999px;
 
+    /* Raised surface. Not new values — these are what `.card` has always used
+       app-wide; the stat and quick-action tiles carried their own slightly
+       different pair, which is why a KPI row and the chart card beside it never
+       quite looked like the same kind of surface. One token, one look. */
+    --gx-surface-border: rgba(226, 232, 240, .92);
+    --gx-surface-shadow: 0 14px 34px rgba(15, 23, 42, .055);
+
     /* --- Bootstrap binding ------------------------------------------------
      * Utilities that read a variable (.text-*, .bg-*-subtle, .alert-*,
      * .text-bg-*) pick these up automatically. The -rgb triplets are required

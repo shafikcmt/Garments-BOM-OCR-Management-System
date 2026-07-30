@@ -14,7 +14,9 @@
         </x-slot:actions>
     </x-page-header>
 
-    <div class="row g-3 mb-4">
+    {{-- data-aos sits on the row, never on the tiles: the tiles already run
+         gx-fade-in and two opacity animations on one node leave it stuck. --}}
+    <div class="row g-3 mb-4" data-aos="fade-up">
         <div class="col-12 col-sm-6 col-xl-3">
             <x-stat-card class="gx-fade-in h-100" style="--gx-delay:0ms"
                 icon="columns-gap" tone="primary" label="Columns you own"

@@ -23,7 +23,9 @@
     'bodyClass' => 'p-4',
 ])
 
-<div {{ $attributes->merge(['class' => 'card gx-card border-0 shadow-sm']) }}>
+{{-- border-0 / shadow-sm are gone on purpose: .gx-card now owns both, so the
+     card matches the stat tiles instead of carrying Bootstrap's defaults. --}}
+<div {{ $attributes->merge(['class' => 'card gx-card']) }}>
     <div class="card-body {{ $bodyClass }}">
         @if($title || isset($actions))
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">

@@ -19,12 +19,12 @@
     padding: 18px 18px 14px;
     border-radius: var(--gx-radius);
     background: var(--gx-card);
-    border: 1px solid #e8eef6;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, .05);
+    border: 1px solid var(--gx-surface-border);
+    box-shadow: var(--gx-surface-shadow);
     text-decoration: none;
     color: inherit;
     overflow: hidden;
-    transition: transform .2s ease, box-shadow .2s ease;
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
 }
 
 .gx-stat--success { --gx-tone: var(--gx-accent);  --gx-tone-bg: var(--gx-accent-bg); }
@@ -32,6 +32,18 @@
 .gx-stat--danger  { --gx-tone: var(--gx-danger);  --gx-tone-bg: var(--gx-danger-bg); }
 
 a.gx-stat:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(15, 23, 42, .10); }
+
+/* A tile without an href is not clickable, so it answers the pointer without
+   the lift that reads as "press me" — the shadow deepens and the border picks
+   up the tile's own tone. Until now these tiles were simply inert, which on the
+   Merchandising dashboard meant every one of the four was. */
+.gx-stat:not(a):hover {
+    box-shadow: 0 18px 40px rgba(15, 23, 42, .10);
+    border-color: var(--gx-tone, var(--gx-secondary));
+}
+/* The icon tile picks up the tone as well, so the whole card acknowledges the
+   pointer rather than only its outline. */
+.gx-stat:not(a):hover .gx-stat-icon { background: var(--gx-tone, var(--gx-secondary)); color: #fff; }
 
 .gx-stat-head {
     display: flex;
@@ -51,6 +63,7 @@ a.gx-stat:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(15, 
     background: var(--gx-tone-bg);
     color: var(--gx-tone);
     font-size: 19px;
+    transition: background-color .2s ease, color .2s ease;
 }
 
 .gx-stat-delta {
@@ -196,8 +209,8 @@ a.gx-stat:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(15, 
     padding: 16px 18px;
     border-radius: var(--gx-radius);
     background: var(--gx-card);
-    border: 1px solid #e8eef6;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+    border: 1px solid var(--gx-surface-border);
+    box-shadow: var(--gx-surface-shadow);
     text-decoration: none;
     color: inherit;
     height: 100%;
@@ -244,6 +257,7 @@ a.gx-stat:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(15, 
     .gx-donut-slice { animation: none !important; }
 
     .gx-stat,
+    .gx-stat-icon,
     .gx-action,
     .gx-action-arrow,
     .gx-area-dot { transition: none !important; }

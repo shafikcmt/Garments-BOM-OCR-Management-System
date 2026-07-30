@@ -4,39 +4,33 @@
 
 @section('content')
 <div class="container-fluid">
+    {{-- Merchandising reaches this screen too, and store.dashboard is closed to
+         that role — linking there sent them straight to a 403. The role
+         dispatcher resolves to whichever dashboard the viewer actually owns. --}}
     <x-breadcrumb :items="[
-        ['label' => 'Store', 'url' => route('store.dashboard')],
+        ['label' => 'Dashboard', 'url' => route('dashboard')],
         ['label' => 'Stock Reports'],
     ]" />
 
-    <div class="app-hero-card p-4 mb-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
-                <div>
-                    <div class="app-hero-eyebrow">Store</div>
-                    <h3 class="app-hero-title mb-0">Stock Reports</h3>
-                    <p class="app-hero-copy mb-0">Receive and issue summary by style, buyer or material.</p>
-                </div>
-            </div>
-            @if($canDownload)
-                <div class="d-flex gap-2">
-                    <a href="{{ route('store.reports.pdf', request()->query()) }}" class="btn btn-outline-danger">
-                        <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF
-                    </a>
-                    <a href="{{ route('store.reports.excel', request()->query()) }}" class="btn btn-outline-success">
-                        <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel
-                    </a>
-                </div>
-            @endif
-        </div>
-    </div>
+    <x-page-header data-aos="fade-down" icon="file-earmark-bar-graph" eyebrow="Reporting"
+                   title="Stock Reports"
+                   copy="Receive and issue summary by style, buyer or material.">
+        @if($canDownload)
+            <x-slot:actions>
+                <a href="{{ route('store.reports.pdf', request()->query()) }}" class="btn btn-outline-danger">
+                    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>PDF
+                </a>
+                <a href="{{ route('store.reports.excel', request()->query()) }}" class="btn btn-outline-success">
+                    <i class="bi bi-file-earmark-excel" aria-hidden="true"></i>Excel
+                </a>
+            </x-slot:actions>
+        @endif
+    </x-page-header>
 
-    @include('store._flash')
+    <x-flash />
 
     {{-- Single filter panel: report type + buyer + style + material + date range --}}
-    <div class="card border-0 shadow-sm mb-3" style="border-radius:var(--gx-radius);">
-        <div class="card-body p-3">
+    <x-card class="mb-3" body-class="p-3">
             <form method="GET" action="{{ route('store.reports.index') }}" class="row g-2 align-items-end">
                 <div class="col-12 col-md-6 col-xl-2">
                     <label class="form-label fw-semibold small mb-1">Report Type</label>
@@ -107,19 +101,22 @@
                     <input type="date" name="date_to" value="{{ $filters['date_to'] }}" class="form-control">
                 </div>
                 <div class="col-12 col-xl-2 d-flex gap-2">
-                    <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
+                    {{-- No leading <i>: components.css collapses any .btn that
+                         has one into a 38px icon-only square and hides its
+                         label, which on a flex-grow button rendered as a wide
+                         blue bar showing nothing but a funnel. --}}
+                    <button class="btn btn-primary flex-grow-1">Apply</button>
                     <a href="{{ route('store.reports.index') }}" class="btn btn-outline-secondary">Reset</a>
                 </div>
             </form>
-        </div>
-    </div>
+    </x-card>
 
     @error('date_to')
         <div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ $message }}</div>
     @enderror
 
-    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
-        <div class="card-header bg-white border-0 pt-3 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2" style="border-radius:var(--gx-radius) 14px 0 0;">
+    <x-card body-class="p-0">
+        <div class="store-report-head d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <div class="fw-semibold">{{ $reportTypes[$type] }} Report</div>
                 <div class="text-muted small">{{ $rows->count() }} {{ Str::plural(Str::lower($groupHeading), $rows->count()) }}</div>
@@ -128,24 +125,33 @@
                 <i class="bi bi-info-circle me-1" aria-hidden="true"></i>Period Movement follows the date filter. Current Stock Balance is the lifetime ledger closing and ignores it.
             </div>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive store-report-preview">
-                @include('store.reports._table')
-            </div>
+        <div class="table-responsive store-report-preview">
+            @include('store.reports._table')
         </div>
-    </div>
+    </x-card>
 </div>
 
 @endsection
 
 @section('styles')
 <style>
+    /* Card header strip. Was a .card-header with its own radius overrides; the
+       card now owns the radius, so this only has to be the divider. */
+    .store-report-head {
+        padding: 1rem 1rem .85rem;
+        border-bottom: 1px solid var(--gx-surface-border);
+    }
+
     .store-report-preview .report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .store-report-preview .report-table th {
-        background: #f8fafc; color: #475569; font-size: 11px; font-weight: 700;
+        background: var(--gx-bg, #f8fafc); color: #475569; font-size: 11px; font-weight: 700;
         text-transform: uppercase; letter-spacing: .02em; text-align: right;
-        padding: 10px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: bottom;
+        padding: 10px 8px; border-bottom: 1px solid var(--gx-surface-border); vertical-align: bottom;
     }
+    /* Row hover, the same affordance the Store stock tables give — on a wide
+       eleven-column report it is what keeps the eye on one line. */
+    .store-report-preview .report-table tbody tr { transition: background-color .15s ease; }
+    .store-report-preview .report-table tbody tr:hover { background: var(--gx-bg, #f8fafc); }
     .store-report-preview .report-table th.col-sl,
     .store-report-preview .report-table th.col-group { text-align: left; }
     .store-report-preview .report-table th .sub {
@@ -158,9 +164,14 @@
     .store-report-preview .report-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
     .store-report-preview .report-table th.col-sl, .store-report-preview .report-table td.col-sl { width: 48px; padding-left: 16px; }
     .store-report-preview .report-table td.col-group { min-width: 220px; max-width: 360px; word-break: break-word; }
-    .store-report-preview .report-table td.empty { text-align: center; color: #94a3b8; padding: 28px 8px; }
+    .store-report-preview .report-table td.empty { text-align: center; color: #94a3b8; padding: 40px 8px; font-size: 13px; }
+    .store-report-preview .report-table tbody tr:has(td.empty):hover { background: transparent; }
     .store-report-preview .report-table tfoot .grand td {
         background: #f1f5f9; font-weight: 700; color: #0f172a; border-top: 2px solid #e2e8f0; border-bottom: 0;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .store-report-preview .report-table tbody tr { transition: none; }
     }
 </style>
 @endsection
