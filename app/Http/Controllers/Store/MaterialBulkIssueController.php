@@ -91,6 +91,59 @@ class MaterialBulkIssueController extends Controller
         ));
     }
 
+    /**
+     * The full-page New Bulk Issue form.
+     *
+     * Same form as the index page's slide-in panel — both render the one
+     * _bulk-issue-form partial — so this adds a route and a page shell, not a
+     * second implementation. The panel stays until this page is signed off.
+     */
+    public function create(Request $request)
+    {
+        abort_unless($request->user()?->can('store.issue'), 403);
+
+        return view('store.material-stock.bulk-issue-form', $this->formData() + [
+            'editing' => false,
+            'issue' => null,
+        ]);
+    }
+
+    /**
+     * The same page in correction mode. The record itself is fetched by the
+     * form's own JavaScript through show(), which is the path the panel already
+     * used — one prefill route, not two.
+     */
+    public function edit(Request $request, MaterialBulkIssue $materialBulkIssue)
+    {
+        abort_unless($request->user()?->can('store.edit'), 403);
+
+        return view('store.material-stock.bulk-issue-form', $this->formData() + [
+            'editing' => true,
+            'issue' => $materialBulkIssue,
+        ]);
+    }
+
+    /**
+     * What the form needs whichever shell renders it, mirroring index().
+     *
+     * @return array<string, mixed>
+     */
+    private function formData(): array
+    {
+        return [
+            // The picker fetches POs and their per-row stock on demand, so the
+            // page only needs to know whether anything is issuable at all.
+            'hasBookingPos' => BookingPo::exists(),
+            'requisitions' => MaterialRequisition::whereIn('status', [
+                MaterialRequisition::STATUS_PENDING,
+                MaterialRequisition::STATUS_APPROVED,
+            ])->latest('id')->get(),
+            // Standard production sections for the Indent Section dropdown (no
+            // master table exists — see config/stock.php).
+            'sections' => config('stock.indent_sections', []),
+        ];
+    }
+
     /** Scope a query to a date tab window (issue_date). "all" is a no-op. */
     private function applyTab($query, string $tab): void
     {
@@ -141,47 +194,78 @@ class MaterialBulkIssueController extends Controller
     public function poSearch(Request $request)
     {
         $validated = $request->validate([
-            // garments_po is an additional handle, not a replacement: po_no
-            // still searches the material PO that booking_pos.po_no carries.
-            'type' => ['required', 'in:po_no,garments_po,pi_number,invoice_no'],
+            // Every handle Store recognises a booking by. All of them resolve
+            // through the same source service — the order/booking fields, the
+            // material line's own fields, and the paperwork numbers.
+            //
+            // contract_po is the buyer's order/contract PO (GMNTS PO Number /
+            // Initial Contract Number) and is what the "PO Number" option
+            // searches. po_no is a different number — the system-generated
+            // material PO on booking_pos.po_no — and stays available to the
+            // rest of the app even though the picker does not offer it.
+            'type' => ['required', 'in:po_no,contract_po,season,buyer,style,material_name,material_description,sap_code,art_no,gmts_color,material_color,size'],
             'term' => ['nullable', 'string', 'max:100'],
+            // Present once step 1 has been answered: the exact field value whose
+            // bookings step 2 should list.
+            'value' => ['nullable', 'string', 'max:255'],
         ]);
 
         $term = trim((string) ($validated['term'] ?? ''));
+        $value = trim((string) ($validated['value'] ?? ''));
         $source = app(\App\Services\BookingPoSourceService::class);
 
-        // Empty term = browse: opening the field shows what exists instead of
-        // demanding a number up front.
-        if ($term === '') {
-            $options = $source->browseOptionsForGroup($validated['type'], self::BROWSE_LIMIT);
+        // The picker is two steps, and the same endpoint serves both: without a
+        // `value` it lists what the chosen field holds; with one it lists the
+        // bookings under that value. Both go through the one generic pair
+        // resolver, so every search type behaves identically.
+        if ($value !== '') {
+            $bookings = $source->bookingPosForGroupValue($validated['type'], $value, self::BROWSE_LIMIT);
 
             return response()->json([
-                // Whole dataset in hand means the browser can filter locally and
-                // stop calling back on every keystroke.
-                'complete' => $options->count() < self::BROWSE_LIMIT,
-                'results' => $options->map(fn (array $option) => [
-                    'id' => $option['po']->id,
-                    'value' => $option['value'],
-                    'po_no' => $option['po']->po_no,
-                    'buyer_name' => $option['po']->buyer_name,
-                    'season_name' => $option['po']->season_name,
-                    'vendor_name' => $option['po']->vendor_name,
-                ])->values(),
+                'step' => 2,
+                'value' => $value,
+                'complete' => $bookings->count() < self::BROWSE_LIMIT,
+                'results' => $bookings->map(fn (BookingPo $po) => $this->poOption($po))->values(),
             ]);
         }
 
+        // Step 1 — the field's own distinct values, each with how many bookings
+        // it covers. A term narrows that list rather than jumping to bookings,
+        // so typing and browsing land in the same place.
+        $values = $source->distinctValuesForGroup($validated['type'], self::BROWSE_LIMIT);
+
+        if ($term !== '') {
+            $needle = mb_strtolower($term);
+            $values = $values->filter(fn (array $v) => str_contains(mb_strtolower($v['value']), $needle))->values();
+        }
+
         return response()->json([
-            'complete' => false,
-            'results' => $source->bookingPosMatching($validated['type'], $term)
-                ->map(fn (BookingPo $po) => [
-                    'id' => $po->id,
-                    'value' => $po->po_no,
-                    'po_no' => $po->po_no,
-                    'buyer_name' => $po->buyer_name,
-                    'season_name' => $po->season_name,
-                    'vendor_name' => $po->vendor_name,
-                ])->values(),
+            'step' => 1,
+            // Whole dataset in hand means the browser can filter locally and
+            // stop calling back on every keystroke.
+            'complete' => $values->count() < self::BROWSE_LIMIT,
+            'results' => $values,
         ]);
+    }
+
+    /**
+     * One booking as the picker's step 2 shows it. Style travels too, so the
+     * meta line can identify a booking without repeating whichever field the
+     * user already chose in step 1.
+     *
+     * @return array<string, mixed>
+     */
+    private function poOption(BookingPo $po): array
+    {
+        return [
+            'id' => $po->id,
+            'value' => $po->po_no,
+            'po_no' => $po->po_no,
+            'buyer_name' => $po->buyer_name,
+            'season_name' => $po->season_name,
+            'style_name' => $po->style_name,
+            'vendor_name' => $po->vendor_name,
+        ];
     }
 
     /**

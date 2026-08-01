@@ -27,9 +27,10 @@ class MaterialReceivingController extends Controller
 
     public function index(Request $request)
     {
-        $receivings = MaterialReceiving::with('createdBy')
-            ->latest('receive_date')
-            ->latest('id')
+        $filters = $this->historyFilters($request);
+
+        $receivings = $this->historyQuery($filters)
+            ->with('createdBy')
             ->paginate(25)
             ->withQueryString();
 
@@ -43,8 +44,268 @@ class MaterialReceivingController extends Controller
         ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
 
         return view('store.material-stock.receivings', compact(
-            'receivings', 'hasBookingPos', 'canEdit', 'canDelete'
+            'receivings', 'hasBookingPos', 'canEdit', 'canDelete', 'filters'
         ));
+    }
+
+    /**
+     * The Receiving History list on its own, for the filter bar's live reload.
+     *
+     * Same filters, same query, same 25-per-page paginator and the same row
+     * partial the full page renders — only the surrounding page is left out, so
+     * a filtered AJAX list can never differ from what a full reload would show.
+     *
+     * The rows come back as rendered HTML rather than raw records: the row
+     * markup carries role-gated action buttons and several formatting rules
+     * that would have to be duplicated in JavaScript otherwise.
+     */
+    public function historyData(Request $request)
+    {
+        $filters = $this->historyFilters($request);
+
+        $receivings = $this->historyQuery($filters)
+            ->with('createdBy')
+            ->paginate(25)
+            ->withQueryString();
+
+        ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
+
+        $activeFilters = array_filter($filters);
+
+        return response()->json([
+            'rows_html' => view('store.material-stock._receivings-history-rows', compact(
+                'receivings', 'canEdit', 'canDelete', 'activeFilters'
+            ))->render(),
+            // Laravel's own pagination view, so page links keep the project's
+            // existing look; the JS intercepts clicks on them.
+            'pagination_html' => (string) $receivings->links(),
+            'filters' => $filters,
+            'filtered' => (bool) $activeFilters,
+            // Drives the "Filtered view" banner. Null when nothing is filtered.
+            'filter_summary' => $this->filterSummary($filters),
+            'meta' => [
+                'total' => $receivings->total(),
+                'current_page' => $receivings->currentPage(),
+                'last_page' => $receivings->lastPage(),
+                'per_page' => $receivings->perPage(),
+                'from' => $receivings->firstItem(),
+                'to' => $receivings->lastItem(),
+            ],
+            // Export links rebuilt for the scope just applied, so Print /
+            // Download keeps matching the screen after an AJAX filter.
+            'export' => [
+                'pdf' => route('store.material.receivings.export.pdf', $activeFilters),
+                'excel' => route('store.material.receivings.export.excel', $activeFilters),
+            ],
+        ]);
+    }
+
+    /**
+     * Receiving History filters, read from the query string so the screen and
+     * both export routes can be given the exact same scope by carrying the
+     * same three parameters.
+     *
+     * All three are optional: an empty filter bar means the whole history, and
+     * must never raise a validation error.
+     *
+     * @return array{from_date: ?string, to_date: ?string, invoice_no: ?string}
+     */
+    private function historyFilters(Request $request): array
+    {
+        $validated = $request->validate([
+            'from_date' => ['nullable', 'date'],
+            'to_date' => ['nullable', 'date'],
+            'invoice_no' => ['nullable', 'string', 'max:100'],
+        ], [], [
+            'from_date' => 'From Date',
+            'to_date' => 'To Date',
+            'invoice_no' => 'Invoice No',
+        ]);
+
+        // A submitted-but-empty box is the same as no filter at all, so both
+        // become null and the rest of the code has one case to handle.
+        $blankToNull = static function ($value): ?string {
+            $value = trim((string) $value);
+
+            return $value === '' ? null : $value;
+        };
+
+        $filters = [
+            'from_date' => $blankToNull($validated['from_date'] ?? null),
+            'to_date' => $blankToNull($validated['to_date'] ?? null),
+            'invoice_no' => $blankToNull($validated['invoice_no'] ?? null),
+        ];
+
+        // Compared here rather than with 'after_or_equal:from_date'. Laravel's
+        // compareDates() first tries to parse the literal string "from_date"
+        // as a date and only falls back to the field's value once that fails,
+        // which logs a Carbon parse warning on every single request — even
+        // when both dates are present and valid.
+        if ($filters['from_date'] && $filters['to_date']
+            && \Carbon\Carbon::parse($filters['to_date'])->lt(\Carbon\Carbon::parse($filters['from_date']))) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'to_date' => 'To Date cannot be earlier than From Date.',
+            ]);
+        }
+
+        return $filters;
+    }
+
+    /**
+     * The one ordering the Receiving History uses, shared by the on-screen list
+     * and both exports so a downloaded register can never be sorted differently
+     * from what Store just looked at — and, with $filters, never scoped
+     * differently either.
+     *
+     * Date filtering is on receive_date, the "Inventory/MRR Date" column of the
+     * register, not grn_date: that is the date the screen sorts and reports by.
+     *
+     * @param  array{from_date?: ?string, to_date?: ?string, invoice_no?: ?string}  $filters
+     */
+    private function historyQuery(array $filters = [])
+    {
+        return MaterialReceiving::query()
+            ->when($filters['from_date'] ?? null, fn ($q, $date) => $q->whereDate('receive_date', '>=', $date))
+            ->when($filters['to_date'] ?? null, fn ($q, $date) => $q->whereDate('receive_date', '<=', $date))
+            ->when($filters['invoice_no'] ?? null, function ($q, $term) {
+                // Partial match on the GRN's own invoice_no. LIKE wildcards in
+                // the term are escaped so a typed "%" searches for a literal %
+                // instead of matching everything.
+                $q->where('invoice_no', 'like', '%'.addcslashes($term, '%_\\').'%');
+            })
+            ->latest('receive_date')
+            ->latest('id');
+    }
+
+    /**
+     * One-line description of the active filters, printed under the report
+     * title so a downloaded register is never mistaken for the full history.
+     * Null when nothing is filtered.
+     *
+     * @param  array{from_date: ?string, to_date: ?string, invoice_no: ?string}  $filters
+     */
+    private function filterSummary(array $filters): ?string
+    {
+        $parts = [];
+
+        if ($filters['from_date'] || $filters['to_date']) {
+            // An open-ended range still reads correctly with only one side set.
+            $from = $filters['from_date']
+                ? \Carbon\Carbon::parse($filters['from_date'])->format('d-M-Y')
+                : 'beginning';
+            $to = $filters['to_date']
+                ? \Carbon\Carbon::parse($filters['to_date'])->format('d-M-Y')
+                : 'to date';
+
+            $parts[] = 'Period: '.$from.' to '.$to;
+        }
+
+        if ($filters['invoice_no']) {
+            $parts[] = 'Invoice No: '.$filters['invoice_no'];
+        }
+
+        return $parts ? implode('   ·   ', $parts) : null;
+    }
+
+    /**
+     * Report-only document fields that live on the BOM row rather than on the
+     * GRN: PI No, LC No, BL/AWB No, BOE No + date, Vendor Type and Booking Qty.
+     *
+     * These are deliberately NOT copied onto material_receivings. They belong to
+     * Commercial/Merchandising, are edited in the OCR workspace after a delivery
+     * is recorded, and a stored copy would silently go stale. Reading them here
+     * keeps one source of truth — the same rule autoFieldsForRow() follows.
+     *
+     * Resolution is by canonical header key through the shared resolver, so a
+     * header that does not exist yet simply yields null today and starts
+     * populating the moment it is created in the workspace — no code change.
+     * LC No is exactly that case right now.
+     *
+     * One bulk cell query for the whole export, mirroring rowPrefill() above;
+     * BookingPoSourceService::sourceValueForRow() resolves the same way but
+     * loads cells per row, which would be N+1 across a full history.
+     *
+     * @param  \Illuminate\Support\Collection<int, int>  $rowIds
+     * @return array<int, array<string, ?string>>
+     */
+    private function rowDocFields($rowIds): array
+    {
+        // field => canonical header keys, most specific first. The first
+        // non-blank cell wins, so "BL / AWB No" is preferred over the older
+        // "BL No" column when a workbook carries both.
+        $groups = [
+            'pi_number' => ['material_pi_number'],
+            'lc_no' => ['lc_no'],
+            'bl_no' => ['bl_awb_no', 'bl_no'],
+            'boe_no' => ['bill_of_entry_no'],
+            'boe_date' => ['bill_of_entry_date'],
+            'vendor_type' => ['vendor_type'],
+            'booking_qty' => ['materials_to_be_ordered', 'materials_ordered'],
+        ];
+
+        $rowIds = collect($rowIds)->filter()->unique()->values();
+
+        if ($rowIds->isEmpty()) {
+            return [];
+        }
+
+        $resolver = app(HeaderAliasResolver::class);
+
+        // field => ordered header ids, de-duplicated while keeping preference.
+        $headerIds = [];
+        foreach ($groups as $field => $canonicals) {
+            $ids = [];
+            foreach ($canonicals as $canonical) {
+                foreach ($resolver->headerIdsForCanonical($canonical) as $id) {
+                    if (! in_array($id, $ids, true)) {
+                        $ids[] = $id;
+                    }
+                }
+            }
+            $headerIds[$field] = $ids;
+        }
+
+        $allIds = collect($headerIds)->flatten()->unique()->values();
+
+        if ($allIds->isEmpty()) {
+            return [];
+        }
+
+        // cells[row_id][header_id] = value
+        $cells = ExcelCell::whereIn('row_id', $rowIds->all())
+            ->whereIn('header_id', $allIds->all())
+            ->get(['row_id', 'header_id', 'value'])
+            ->groupBy('row_id')
+            ->map(fn ($group) => $group->pluck('value', 'header_id'));
+
+        $clean = static function ($value): ?string {
+            $value = trim((string) $value);
+
+            return $value === '' ? null : $value;
+        };
+
+        $docs = [];
+        foreach ($rowIds as $rowId) {
+            $rowCells = $cells->get($rowId);
+            if (! $rowCells) {
+                continue;
+            }
+
+            $row = [];
+            foreach ($headerIds as $field => $ids) {
+                $row[$field] = null;
+                foreach ($ids as $id) {
+                    if ($value = $clean($rowCells->get($id))) {
+                        $row[$field] = $value;
+                        break;
+                    }
+                }
+            }
+
+            $docs[$rowId] = $row;
+        }
+
+        return $docs;
     }
 
     /**
@@ -446,6 +707,9 @@ class MaterialReceivingController extends Controller
             // qty = Physical Rcv Qty; it alone drives the stock ledger.
             'rows.*.qty' => ['required', 'numeric', 'min:0.0001'],
             'rows.*.invoice_qty' => ['nullable', 'numeric', 'min:0'],
+            // Packing info off the delivery challan — free text, because Store
+            // writes both "12" and "12 Roll".
+            'rows.*.roll_bale' => ['nullable', 'string', 'max:100'],
             'rows.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             'rows.*.remarks' => ['nullable', 'string', 'max:1000'],
         ], [
@@ -508,6 +772,7 @@ class MaterialReceivingController extends Controller
                         'source_type' => $row['source_type'],
                         'qty' => $row['qty'],
                         'invoice_qty' => $invoiceQty,
+                        'roll_bale' => $row['roll_bale'] ?? null,
                         'unit_price' => $unitPrice,
                         'invoice_value' => $invoiceValue,
                         'remarks' => $row['remarks'] ?? null,
@@ -575,6 +840,7 @@ class MaterialReceivingController extends Controller
             'source_type' => ['required', 'in:booking,internal_po'],
             'qty' => ['required', 'numeric', 'min:0.0001'],
             'invoice_qty' => ['nullable', 'numeric', 'min:0'],
+            'roll_bale' => ['nullable', 'string', 'max:100'],
             'unit_price' => ['nullable', 'numeric', 'min:0'],
             'remarks' => ['nullable', 'string', 'max:1000'],
         ], [], [
@@ -621,6 +887,7 @@ class MaterialReceivingController extends Controller
                 'match_status' => MaterialReceiving::MATCH_INDEPENDENT,
                 'qty' => $validated['qty'],
                 'invoice_qty' => $invoiceQty,
+                'roll_bale' => $validated['roll_bale'] ?? null,
                 'unit_price' => $unitPrice,
                 'invoice_value' => $invoiceValue,
                 'remarks' => $validated['remarks'] ?? null,
@@ -788,6 +1055,66 @@ class MaterialReceivingController extends Controller
         }
 
         return str_pad(substr($value, -4), 4, 'X', STR_PAD_LEFT);
+    }
+
+    /**
+     * The full Receiving History register, in the on-screen order, with the BOM
+     * document fields resolved in one pass.
+     *
+     * Every page rather than the current one: the screen paginates for
+     * readability, but an MRR register that stopped at 25 rows would not be a
+     * register. Column order and every value are shared with the PDF/Excel
+     * blades, so preview and download cannot drift.
+     *
+     * Scope follows the filter bar exactly — the same query string the screen
+     * was showing, so "what I am looking at" is what downloads.
+     *
+     * @return array{receivings: \Illuminate\Database\Eloquent\Collection<int, MaterialReceiving>, docs: array<int, array<string, ?string>>, summary: ?string}
+     */
+    private function historyForExport(Request $request): array
+    {
+        $filters = $this->historyFilters($request);
+        $receivings = $this->historyQuery($filters)->get();
+
+        return [
+            'receivings' => $receivings,
+            'docs' => $this->rowDocFields($receivings->pluck('excel_row_id')),
+            'summary' => $this->filterSummary($filters),
+        ];
+    }
+
+    /**
+     * Excel export of the Receiving History (FromView, so the sheet and the PDF
+     * are generated from the same 25 columns).
+     */
+    public function exportExcel(Request $request)
+    {
+        $data = $this->historyForExport($request);
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\MaterialReceivingExport(
+                $data['receivings'],
+                $data['docs'],
+                $data['summary'],
+            ),
+            'receiving-history-'.now()->format('Ymd-His').'.xlsx',
+        );
+    }
+
+    /**
+     * PDF export of the Receiving History (A4 landscape, per the PDF/Excel
+     * rules — same paper and margins as the Bulk Issue register).
+     */
+    public function exportPdf(Request $request)
+    {
+        $data = $this->historyForExport($request);
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('store.material-stock.receivings-pdf', [
+            'receivings' => $data['receivings'],
+            'docs' => $data['docs'],
+            'filterSummary' => $data['summary'],
+            'generatedAt' => now(),
+        ])->setPaper('a4', 'landscape')->download('receiving-history-'.now()->format('Ymd-His').'.pdf');
     }
 
     public function destroy(MaterialReceiving $materialReceiving)

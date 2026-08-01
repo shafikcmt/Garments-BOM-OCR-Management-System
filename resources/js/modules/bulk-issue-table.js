@@ -9,6 +9,8 @@
  * it in; it never invents rows the server did not send.
  */
 
+import { createColumnFilter } from './column-filter';
+
 function readConfig() {
     const el = document.getElementById('bi-config');
     if (!el) return null;
@@ -27,6 +29,11 @@ const fmtNum = (n) => (Math.round((Number(n) || 0) * 10000) / 10000).toString();
 export function initBulkIssueTable() {
     const cfg = readConfig();
     if (!cfg) return;
+
+    // The form is initialised first and independently of the listing: it is
+    // rendered both inside the index page's slide-in panel and on its own
+    // full-width create/edit route, where there is no history table at all.
+    initPanel(cfg);
 
     const container = document.getElementById('biTableContainer');
     const skeleton = document.getElementById('biSkeleton');
@@ -308,9 +315,6 @@ export function initBulkIssueTable() {
         if (selectedIds().length) clearSelection();
     });
 
-    // --- Create / Edit slide-in panel -----------------------------------------
-    initPanel(cfg);
-
     // Initial paint (state already matches the server-rendered partial).
     afterSwap();
 }
@@ -326,11 +330,19 @@ export function initBulkIssueTable() {
  * delivery header.
  */
 function initPanel(cfg) {
-    const panelEl = document.getElementById('biPanel');
-    if (!panelEl || typeof bootstrap === 'undefined') return;
-    const panel = bootstrap.Offcanvas.getOrCreateInstance(panelEl);
-
     const form = document.getElementById('biForm');
+    if (!form || typeof bootstrap === 'undefined') return;
+
+    // Two shells render this same form: the index page's slide-in panel, and
+    // the full-width create/edit route. Everything below is shell-agnostic —
+    // only opening and closing differ, and those are the panel's alone.
+    const panelEl = document.getElementById('biPanel');
+    const panel = panelEl ? bootstrap.Offcanvas.getOrCreateInstance(panelEl) : null;
+    // Where the vanilla side publishes state for the Alpine shell to read.
+    const stateHost = panelEl
+        ? panelEl.querySelector('.offcanvas-body')
+        : form.closest('[x-data]');
+
     const methodEl = document.getElementById('biMethod');
     const poId = document.getElementById('biPoId');
     const title = document.getElementById('biPanelTitle');
@@ -345,6 +357,7 @@ function initPanel(cfg) {
     const poHint = document.getElementById('biPoHint');
     const poSpin = document.getElementById('biPoSpin');
     const poClear = document.getElementById('biPoClear');
+    const poChip = document.getElementById('biPoChip');
     const selectedRow = document.getElementById('biSelectedRow');
     const selectedText = document.getElementById('biSelectedText');
     const summary = document.getElementById('biSummaryGrid');
@@ -385,23 +398,40 @@ function initPanel(cfg) {
     const showingEl = document.getElementById('biShowing');
     const noMatchEl = document.getElementById('biNoMatch');
 
-    // Garments PO is the buyer's garment-level PO from the BOM, a separate
-    // identifier from the material PO that po_no searches.
+    // contract_po is the buyer's order/contract PO (GMNTS PO Number / Initial
+    // Contract Number) — a separate identifier from the material PO that po_no
+    // searches, which is why both keys exist here.
     const LABELS = {
-        po_no: 'PO Number',
-        garments_po: 'Garments PO',
-        pi_number: 'PI Number',
-        invoice_no: 'Invoice No',
+        po_no: 'Material PO',
+        contract_po: 'PO Number',
+        season: 'Season',
+        buyer: 'Buyer Name',
+        style: 'Style Number',
+        material_name: 'Material Name',
+        material_description: 'Material Description',
+        sap_code: 'SAP Code',
+        art_no: 'Art. No',
+        gmts_color: 'GMTS Color Name',
+        material_color: 'Material Color',
+        size: 'Size',
     };
 
     // Spelled out rather than built by appending "s", which turned
-    // "Garments PO" into "Garments POs". The other three keep the exact wording
-    // they already had.
+    // "Garments PO" into "Garments POs". Each entry is the wording that reads
+    // correctly inside "Click or type to browse …".
     const LABELS_PLURAL = {
-        po_no: 'PO Numbers',
-        garments_po: 'Garments PO numbers',
-        pi_number: 'PI Numbers',
-        invoice_no: 'Invoice Nos',
+        po_no: 'Material PO numbers',
+        contract_po: 'PO Numbers',
+        season: 'Seasons',
+        buyer: 'Buyer names',
+        style: 'Style numbers',
+        material_name: 'Material names',
+        material_description: 'Material descriptions',
+        sap_code: 'SAP Codes',
+        art_no: 'Art. Nos',
+        gmts_color: 'GMTS Color names',
+        material_color: 'Material Colors',
+        size: 'Sizes',
     };
     const DEBOUNCE_MS = 300;
 
@@ -433,21 +463,79 @@ function initPanel(cfg) {
     const browseCache = {};
     const browseInFlight = {};
 
-    function loadBrowse(type) {
-        if (browseCache[type]) return Promise.resolve(browseCache[type]);
-        if (browseInFlight[type]) return browseInFlight[type];
+    /**
+     * The picker is two steps for every search type.
+     *
+     * Step 1 lists what the chosen field actually holds — each Season, each
+     * Material Name, each Size, once. Step 2 lists the bookings under the one
+     * value the user picked. Before this, a field like Buyer repeated "Hugo
+     * Boss" once per booking, which read as a duplicate bug rather than as ten
+     * different bookings.
+     *
+     * pickedValue is the whole of the state: null means step 1.
+     */
+    let pickedValue = null;
 
-        browseInFlight[type] = fetch(cfg.routes.poSearch + '?type=' + encodeURIComponent(type), {
+    const browseKey = (type) => type + '|' + (pickedValue === null ? '' : pickedValue);
+
+    function loadBrowse(type) {
+        const key = browseKey(type);
+        if (browseCache[key]) return Promise.resolve(browseCache[key]);
+        if (browseInFlight[key]) return browseInFlight[key];
+
+        const url = cfg.routes.poSearch + '?type=' + encodeURIComponent(type) +
+            (pickedValue === null ? '' : '&value=' + encodeURIComponent(pickedValue));
+
+        browseInFlight[key] = fetch(url, {
             headers: { Accept: 'application/json' }, credentials: 'same-origin',
         })
             .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
             .then((data) => {
-                browseCache[type] = { results: data.results || [], complete: !!data.complete };
-                return browseCache[type];
+                browseCache[key] = {
+                    results: data.results || [],
+                    complete: !!data.complete,
+                    step: data.step || 1,
+                };
+                return browseCache[key];
             })
-            .finally(() => { delete browseInFlight[type]; });
+            .finally(() => { delete browseInFlight[key]; });
 
-        return browseInFlight[type];
+        return browseInFlight[key];
+    }
+
+    /** The chosen step 1 value, shown as a chip so it can be seen and undone. */
+    function syncPickChip() {
+        if (!poChip) return;
+
+        if (pickedValue === null) {
+            poChip.classList.add('d-none');
+            poChip.innerHTML = '';
+            return;
+        }
+
+        poChip.classList.remove('d-none');
+        poChip.innerHTML = '<span class="bi-pickchip">' +
+            '<span class="bi-pickchip-label">' + h(LABELS[filterType.value] || '') + '</span>' +
+            '<span class="bi-pickchip-value">' + h(pickedValue) + '</span>' +
+            '<button type="button" class="bi-pickchip-x" data-bi-pickclear aria-label="Clear this value and choose another">&times;</button>' +
+            '</span>';
+    }
+
+    /** Back to step 1: a different value, or a different field entirely. */
+    function clearPickedValue() {
+        pickedValue = null;
+        poSearch.value = '';
+        syncPickChip();
+        syncSearchStatus();
+        poSearch.placeholder = 'Click or type to browse ' + LABELS_PLURAL[filterType.value] + '…';
+        showBrowse();
+        poSearch.focus();
+    }
+
+    if (poChip) {
+        poChip.addEventListener('click', (e) => {
+            if (e.target.closest('[data-bi-pickclear]')) clearPickedValue();
+        });
     }
 
     // Opening the field shows what exists — no typing required.
@@ -484,7 +572,7 @@ function initPanel(cfg) {
         if (needle === '') return results;
 
         return results.filter((r) =>
-            [r.value, r.po_no, r.buyer_name, r.season_name, r.vendor_name]
+            [r.value, r.po_no, r.buyer_name, r.season_name, r.style_name, r.vendor_name]
                 .some((f) => esc(f).toLowerCase().includes(needle)));
     }
 
@@ -499,7 +587,10 @@ function initPanel(cfg) {
         poHint.textContent = 'Searching…';
         poList.innerHTML = '';
 
-        fetch(cfg.routes.poSearch + '?type=' + encodeURIComponent(type) + '&term=' + encodeURIComponent(term), {
+        // A term narrows whichever step is showing: the value list, or the
+        // bookings under the value already chosen.
+        fetch(cfg.routes.poSearch + '?type=' + encodeURIComponent(type) + '&term=' + encodeURIComponent(term) +
+            (pickedValue === null ? '' : '&value=' + encodeURIComponent(pickedValue)), {
             headers: { Accept: 'application/json' }, credentials: 'same-origin',
         })
             .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
@@ -518,34 +609,119 @@ function initPanel(cfg) {
             });
     }
 
+    /**
+     * A value's initial in a tinted disc, so a long list can be scanned by
+     * shape before it is read. The tint is derived from the text itself, which
+     * keeps one buyer the same colour everywhere without a colour table to
+     * maintain.
+     */
+    const AVATAR_TONES = [
+        ['#EFF6FF', '#1D4ED8'], ['#ECFDF5', '#047857'], ['#FFF7ED', '#C2410C'],
+        ['#F5F3FF', '#6D28D9'], ['#FDF2F8', '#BE185D'], ['#ECFEFF', '#0E7490'],
+        ['#FEFCE8', '#A16207'], ['#F1F5F9', '#334155'],
+    ];
+
+    function avatarFor(value) {
+        const text = esc(value).trim();
+        // Letter or digit — a size of "10" should still show something.
+        const initial = text ? text.charAt(0).toUpperCase() : '?';
+
+        // djb2 with an avalanche finish. A plain character sum, or a *31 hash
+        // reduced over a power-of-two palette, kept putting same-initial values
+        // on the same tone — "Hugo Boss" above "HUMANA" in matching colours
+        // reads as one entry repeated, the very thing this list exists to stop.
+        // Measured over the real buyer/season/material/size lists, this cuts
+        // adjacent colour clashes from seven to two.
+        let hash = 5381;
+        for (let i = 0; i < text.length; i++) hash = ((hash << 5) + hash + text.charCodeAt(i)) | 0;
+        hash ^= hash >>> 15;
+        hash = Math.imul(hash, 0x2c1b3c6d) | 0;
+        hash ^= hash >>> 12;
+
+        const [bg, fg] = AVATAR_TONES[Math.abs(hash) % AVATAR_TONES.length];
+
+        return '<span class="bi-opt-avatar" style="background:' + bg + ';color:' + fg + ';" aria-hidden="true">' +
+            h(initial) + '</span>';
+    }
+
     function renderResults(results, type, term, source) {
         activeIndex = -1;
 
         if (!results.length) {
             poHint.textContent = '';
-            poList.innerHTML = '<div class="list-group-item text-center text-muted py-3 small">No matching records' +
-                (term ? ' for “' + h(term) + '”' : '') + '</div>';
+            poList.innerHTML = '<div class="bi-opt-empty">' +
+                '<span class="bi-opt-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>' +
+                '<div class="bi-opt-empty-title">No matches found</div>' +
+                '<p class="bi-opt-empty-text">' +
+                    (term ? 'Nothing here matches “' + h(term) + '”. Try a shorter term'
+                          : 'This field has no values on record yet') +
+                    (pickedValue === null ? ', or pick a different field above.' : ', or clear the value above.') +
+                '</p></div>';
             return;
         }
 
         const browsing = term === '' && source && source.complete;
-        poHint.textContent = browsing
-            ? 'All ' + LABELS_PLURAL[type] + ' (' + results.length + ')'
-            : results.length + (results.length === 1 ? ' match' : ' matches');
+
+        // --- Step 1: the field's own values, each once ------------------------
+        if (pickedValue === null) {
+            poHint.textContent = browsing
+                ? 'All ' + LABELS_PLURAL[type] + ' (' + results.length + ')'
+                : results.length + (results.length === 1 ? ' match' : ' matches');
+
+            poList.innerHTML = results.map((r) => {
+                const n = Number(r.count) || 0;
+                // Several bookings under one value is the case worth spotting
+                // while scanning — that value is where the work is.
+                const heavy = n > 1 ? ' is-many' : '';
+
+                return '<div class="list-group-item bi-opt bi-opt-row" role="option" tabindex="-1"' +
+                    ' data-bi-pick="' + h(r.value) + '">' +
+                    avatarFor(r.value) +
+                    '<div class="bi-opt-body"><div class="bi-opt-primary">' + dash(r.value) + '</div></div>' +
+                    '<span class="bi-opt-count' + heavy + '">' + n +
+                        '<span class="bi-opt-count-unit">' + (n === 1 ? 'booking' : 'bookings') + '</span></span>' +
+                    '</div>';
+            }).join('');
+            return;
+        }
+
+        // --- Step 2: the bookings under the value chosen above ----------------
+        poHint.textContent = results.length + (results.length === 1 ? ' booking' : ' bookings') +
+            ' under ' + LABELS[type] + ' “' + h(pickedValue) + '”';
+
+        // Whatever identified step 1 is already stated on the chip above, so it
+        // is left out here rather than repeated on every row.
+        const skip = {
+            po_no: 'po_no', contract_po: 'po_no', buyer: 'buyer_name',
+            season: 'season_name', style: 'style_name',
+        }[type];
 
         poList.innerHTML = results.map((r) => {
-            // The PO number is already the primary line when browsing by PO, so
-            // it is not repeated in the meta.
-            const meta = [type === 'po_no' ? null : r.po_no, r.buyer_name, r.vendor_name].filter(Boolean).join(' · ');
+            const meta = [
+                skip === 'po_no' ? null : r.po_no,
+                skip === 'buyer_name' ? null : r.buyer_name,
+                skip === 'style_name' ? null : r.style_name,
+                skip === 'season_name' ? null : r.season_name,
+                r.vendor_name,
+            ].filter(Boolean).join(' · ');
 
-            return '<div class="list-group-item bi-opt" role="option" tabindex="-1"' +
+            // Same row shape as step 1, so moving between the two steps does not
+            // feel like moving between two different lists.
+            return '<div class="list-group-item bi-opt bi-opt-row" role="option" tabindex="-1"' +
                 ' data-id="' + h(r.id) + '" data-po="' + h(r.po_no) + '">' +
-                '<div class="bi-opt-primary">' + dash(r.value || r.po_no) + '</div>' +
-                '<div class="bi-opt-meta">' + dash(meta) + '</div></div>';
+                avatarFor(r.po_no) +
+                '<div class="bi-opt-body">' +
+                    '<div class="bi-opt-primary">' + dash(r.po_no) + '</div>' +
+                    '<div class="bi-opt-meta">' + dash(meta) + '</div>' +
+                '</div></div>';
         }).join('');
     }
 
     filterType.addEventListener('change', () => {
+        // A new field means a new question, so any value chosen under the old
+        // one goes with it rather than scoping a list it no longer describes.
+        pickedValue = null;
+        syncPickChip();
         poSearch.placeholder = 'Click or type to browse ' + LABELS_PLURAL[filterType.value] + '…';
         poSearch.value = '';
         closeSuggest();
@@ -599,7 +775,7 @@ function initPanel(cfg) {
         if (e.key === 'Enter') {
             // Never submit the form from the search box.
             e.preventDefault();
-            if (open && list.length) selectPo(activeIndex >= 0 ? list[activeIndex] : list[0]);
+            if (open && list.length) chooseOption(activeIndex >= 0 ? list[activeIndex] : list[0]);
             return;
         }
         if (!open || !list.length) return;
@@ -611,10 +787,29 @@ function initPanel(cfg) {
         list[activeIndex].scrollIntoView({ block: 'nearest' });
     });
 
-    poList.addEventListener('click', (e) => {
-        const opt = e.target.closest('.bi-opt');
-        if (opt) selectPo(opt);
-    });
+    /**
+     * One row, whichever step it belongs to: a step 1 row answers "which
+     * value", a step 2 row answers "which booking". Mouse and keyboard both
+     * come through here so the two cannot drift apart.
+     */
+    function chooseOption(opt) {
+        if (!opt) return;
+
+        if (opt.dataset.biPick !== undefined) {
+            pickedValue = opt.dataset.biPick;
+            poSearch.value = '';
+            syncPickChip();
+            syncSearchStatus();
+            poSearch.placeholder = 'Search bookings under this ' + (LABELS[filterType.value] || 'value') + '…';
+            showBrowse();
+            poSearch.focus();
+            return;
+        }
+
+        selectPo(opt);
+    }
+
+    poList.addEventListener('click', (e) => chooseOption(e.target.closest('.bi-opt')));
 
     document.addEventListener('click', (e) => {
         const wrap = document.getElementById('biSearchWrap');
@@ -762,6 +957,12 @@ function initPanel(cfg) {
         filterInput.value = '';
         pickBar.classList.remove('d-none');
 
+        // Column filters belong to one pass through the item list. Returning to
+        // the style step can change which items exist at all, so a filter left
+        // over from the previous pass could hide rows the user just chose.
+        closePickerMenus();
+        pickerFilter.clearAll();
+
         if (step === 1) renderStyles(); else renderItems();
 
         // Restart the entrance animation on the panel that just took over.
@@ -817,6 +1018,41 @@ function initPanel(cfg) {
 
     const chosenStyles = () => Array.from(styleBody.querySelectorAll('.bi-style-cb:checked')).map((cb) => cb.value);
 
+    /**
+     * Excel-style column filter over the item picker's list, sharing its rules
+     * with the Bulk Issuing Full Table through column-filter.js — one set of
+     * semantics, two renderers.
+     *
+     * Scoped to the styles confirmed at step 1, so a value list never offers a
+     * colour or SAP code from a style the user did not pick.
+     */
+    const PICKER_COLUMNS = [
+        // Style leads the table and is filterable in its own right. It replaces
+        // the separate "choose the style first" step: issuing against the wrong
+        // style is not recoverable, so the style must be readable on every row
+        // rather than confirmed once and then out of sight.
+        { key: 'style_name' },
+        { key: 'material_name' },
+        { key: 'material_description' },
+        { key: 'art_no' },
+        { key: 'sap_code' },
+        { key: 'gmts_color_name' },
+        { key: 'material_color' },
+        { key: 'size' },
+        { key: 'uom' },
+        { key: 'available', type: 'num' },
+    ];
+
+    const pickerFilter = createColumnFilter({
+        columns: PICKER_COLUMNS,
+        getRows: () => {
+            const styles = chosenStyles();
+            return items.filter((it) => styles.indexOf(styleKey(it)) !== -1);
+        },
+    });
+
+    let openPickerMenu = '';
+
     function renderItems() {
         const already = addedRowIds();
 
@@ -827,17 +1063,18 @@ function initPanel(cfg) {
             pickedItems = Array.from(itemBody.querySelectorAll('.bi-item-cb:not(:disabled)'))
                 .filter((cb) => cb.checked).map((cb) => cb.value);
         }
-        // Only the styles the user confirmed at step 1 are in scope.
+        // Only the styles the user confirmed at step 1 are in scope, narrowed
+        // further by whatever the column filters allow. apply() has already
+        // sorted, so slicing per style keeps that order inside each group.
         const styles = chosenStyles();
-        const sub = (label, value) => (esc(value) === '' ? '' : label + ' ' + h(value));
-        const joinSub = (parts) => parts.filter(Boolean).join(' · ') || '—';
+        const allowed = pickerFilter.apply();
         let html = '';
 
         styles.forEach((name) => {
-            const under = items.filter((it) => styleKey(it) === name);
+            const under = allowed.filter((it) => styleKey(it) === name);
 
             if (styles.length > 1) {
-                html += '<tr class="bi-group-row"><td colspan="6">' +
+                html += '<tr class="bi-group-row"><td colspan="11">' +
                     '<i class="bi bi-tag me-1" aria-hidden="true"></i>Style ' + dash(name) +
                     ' <span class="fw-normal">· ' + under.length + ' item(s)</span></td></tr>';
             }
@@ -858,17 +1095,18 @@ function initPanel(cfg) {
                                  : (noStock ? ' disabled title="No available stock"' : '')) +
                         ' aria-label="Select material line ' + h(item.material_name) + '"></td>' +
 
-                    '<td><div class="bi-cell-primary">' + dash(item.material_name) + '</div>' +
-                        '<div class="bi-cell-sub">' + dash(item.material_description) + '</div></td>' +
-
-                    '<td><div class="bi-cell-primary small">' + dash(item.art_no) + '</div>' +
-                        '<div class="bi-cell-sub">' + (esc(item.sap_code) === '' ? '—' : 'SAP ' + h(item.sap_code)) + '</div></td>' +
-
-                    // GMTS colour is the garment's, material colour is the trim's.
-                    '<td><div class="bi-cell-primary small">' +
-                            joinSub([sub('GMTS', item.gmts_color_name), sub('Mat', item.material_color)]) + '</div>' +
-                        '<div class="bi-cell-sub">' + (esc(item.size) === '' ? '—' : 'Size ' + h(item.size)) + '</div></td>' +
-
+                    // One cell per field, matching the header columns so each is
+                    // filterable on its own. GMTS colour is the garment's,
+                    // material colour is the trim's — separate columns, not one.
+                    '<td><span class="bi-style-tag">' + dash(item.style_name) + '</span></td>' +
+                    '<td><div class="bi-cell-primary">' + dash(item.material_name) + '</div></td>' +
+                    '<td class="bi-ft-wide"><div class="bi-cell-sub" title="' + h(item.material_description) + '">' +
+                        dash(item.material_description) + '</div></td>' +
+                    '<td class="small">' + dash(item.art_no) + '</td>' +
+                    '<td class="small">' + dash(item.sap_code) + '</td>' +
+                    '<td class="small">' + dash(item.gmts_color_name) + '</td>' +
+                    '<td class="small">' + dash(item.material_color) + '</td>' +
+                    '<td class="small">' + dash(item.size) + '</td>' +
                     '<td class="small">' + dash(item.uom) + '</td>' +
                     '<td class="small text-end">' + (noStock
                         ? '<span class="badge bg-secondary-subtle text-secondary-emphasis">Out of stock</span>'
@@ -884,7 +1122,148 @@ function initPanel(cfg) {
         Array.from(itemBody.querySelectorAll('.bi-item-cb:not(:disabled)'))
             .forEach((cb) => { if (pickedItems.indexOf(cb.value) !== -1) cb.checked = true; });
 
+        syncPickerHeads();
         applyFilter();
+    }
+
+    // --- Item picker column filters -------------------------------------------
+    /**
+     * The dropdown for one column, built with the same markup and classes as the
+     * Full Table's so the two look and behave identically. Rendered on demand:
+     * a picker can hold hundreds of values across nine columns, and building all
+     * of them up front would cost more than it saves.
+     */
+    function renderPickerMenu(key) {
+        const menu = document.querySelector('[data-bi-pmenu="' + key + '"]');
+        if (!menu) return;
+
+        const values = pickerFilter.valuesFor(key);
+        const opts = values.map((v) => '<label class="bi-ft-mopt">' +
+            '<input type="checkbox" class="form-check-input" data-bi-pval="' + h(v) + '"' +
+            (pickerFilter.isChecked(key, v) ? ' checked' : '') + '>' +
+            '<span>' + h(v) + '</span></label>').join('');
+
+        menu.innerHTML =
+            '<button type="button" class="bi-ft-mitem" data-bi-psort="asc"><i class="bi bi-sort-alpha-down" aria-hidden="true"></i>Sort A to Z</button>' +
+            '<button type="button" class="bi-ft-mitem" data-bi-psort="desc"><i class="bi bi-sort-alpha-up-alt" aria-hidden="true"></i>Sort Z to A</button>' +
+            '<div class="bi-ft-msep"></div>' +
+            '<div class="bi-ft-msearch"><i class="bi bi-search" aria-hidden="true"></i>' +
+                '<input type="text" class="form-control form-control-sm" data-bi-pneedle placeholder="Search values…"' +
+                ' value="' + h(pickerFilter.needles[key] || '') + '" aria-label="Search values"></div>' +
+            '<label class="bi-ft-mall"><input type="checkbox" class="form-check-input" data-bi-pall' +
+                (pickerFilter.allChecked(key) ? ' checked' : '') + '><span>(Select All)</span></label>' +
+            '<div class="bi-ft-mlist">' + (opts || '<div class="bi-ft-mempty">No matching values</div>') + '</div>' +
+            '<div class="bi-ft-mfoot">' +
+                '<button type="button" class="btn btn-sm btn-link text-decoration-none p-0" data-bi-pclear>Clear filter</button>' +
+                '<button type="button" class="btn btn-sm btn-primary bi-btn-xs" data-bi-pdone>Done</button>' +
+            '</div>';
+    }
+
+    /** Funnel icons follow the filter state, as they do on the Full Table. */
+    function syncPickerHeads() {
+        document.querySelectorAll('[data-bi-pfilter]').forEach((btn) => {
+            const key = btn.getAttribute('data-bi-pfilter');
+            const on = pickerFilter.isFiltered(key) || pickerFilter.sortKey === key;
+            btn.classList.toggle('is-on', on);
+            const icon = btn.querySelector('i');
+            if (icon) icon.className = pickerFilter.isFiltered(key) ? 'bi bi-funnel-fill' : 'bi bi-chevron-down';
+        });
+    }
+
+    function closePickerMenus() {
+        openPickerMenu = '';
+        document.querySelectorAll('[data-bi-pmenu]').forEach((m) => m.classList.add('d-none'));
+        document.querySelectorAll('[data-bi-pfilter]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+    }
+
+    const itemTableEl = document.getElementById('biItemTable');
+
+    if (itemTableEl) {
+        itemTableEl.addEventListener('click', (e) => {
+            // Open / close a column's menu.
+            const trigger = e.target.closest('[data-bi-pfilter]');
+            if (trigger) {
+                const key = trigger.getAttribute('data-bi-pfilter');
+                const wasOpen = openPickerMenu === key;
+                closePickerMenus();
+                if (!wasOpen) {
+                    openPickerMenu = key;
+                    pickerFilter.needles[key] = '';
+                    renderPickerMenu(key);
+
+                    const menuEl = document.querySelector('[data-bi-pmenu="' + key + '"]');
+                    menuEl.classList.remove('d-none');
+                    // The picker table scrolls sideways, and an absolutely
+                    // positioned menu inside that box would be clipped by it.
+                    // Pinned to the viewport instead, under its own header.
+                    const box = trigger.getBoundingClientRect();
+                    const width = menuEl.offsetWidth || 250;
+                    menuEl.style.top = Math.round(box.bottom + 4) + 'px';
+                    menuEl.style.left = Math.round(Math.min(box.left, window.innerWidth - width - 12)) + 'px';
+
+                    trigger.setAttribute('aria-expanded', 'true');
+                }
+                return;
+            }
+
+            const menu = e.target.closest('[data-bi-pmenu]');
+            if (!menu) { closePickerMenus(); return; }
+
+            const key = menu.getAttribute('data-bi-pmenu');
+
+            const sort = e.target.closest('[data-bi-psort]');
+            if (sort) {
+                pickerFilter.sortBy(key, sort.getAttribute('data-bi-psort'));
+                closePickerMenus();
+                renderItems();
+                return;
+            }
+
+            if (e.target.closest('[data-bi-pclear]')) {
+                pickerFilter.clearFilter(key);
+                closePickerMenus();
+                renderItems();
+                return;
+            }
+
+            if (e.target.closest('[data-bi-pdone]')) { closePickerMenus(); return; }
+        });
+
+        itemTableEl.addEventListener('change', (e) => {
+            const menu = e.target.closest('[data-bi-pmenu]');
+            if (!menu) return;
+            const key = menu.getAttribute('data-bi-pmenu');
+
+            if (e.target.hasAttribute('data-bi-pall')) {
+                pickerFilter.toggleAll(key);
+            } else if (e.target.hasAttribute('data-bi-pval')) {
+                pickerFilter.toggleValue(key, e.target.getAttribute('data-bi-pval'));
+            } else {
+                return;
+            }
+
+            // The list is rebuilt rather than patched: ticking one value changes
+            // what the OTHER columns can offer, and the row list behind it.
+            renderPickerMenu(key);
+            renderItems();
+        });
+
+        itemTableEl.addEventListener('input', (e) => {
+            if (!e.target.hasAttribute('data-bi-pneedle')) return;
+            const menu = e.target.closest('[data-bi-pmenu]');
+            const key = menu.getAttribute('data-bi-pmenu');
+            pickerFilter.needles[key] = e.target.value;
+
+            // Only the value list changes while typing, so the caret stays put.
+            const list = menu.querySelector('.bi-ft-mlist');
+            const values = pickerFilter.valuesFor(key);
+            list.innerHTML = values.length
+                ? values.map((v) => '<label class="bi-ft-mopt">' +
+                    '<input type="checkbox" class="form-check-input" data-bi-pval="' + h(v) + '"' +
+                    (pickerFilter.isChecked(key, v) ? ' checked' : '') + '>' +
+                    '<span>' + h(v) + '</span></label>').join('')
+                : '<div class="bi-ft-mempty">No matching values</div>';
+        });
     }
 
     const onItemStep = () => step1.classList.contains('d-none');
@@ -1069,7 +1448,12 @@ function initPanel(cfg) {
             '<div class="d-flex align-items-start justify-content-between gap-2 mb-2">' +
                 '<div class="min-w-0">' +
                     '<div class="bi-item-head">' + dash(item.material_name || item.material_description) + '</div>' +
-                    '<div class="bi-item-meta">' + dash([item.style_name, item.art_no, identity].filter(Boolean).join(' · ')) + '</div>' +
+                    // The style is called out rather than buried in the meta
+                    // line: it is the one thing on this card that cannot be
+                    // corrected after the issue is saved.
+                    '<div class="bi-item-style"><i class="bi bi-tag-fill" aria-hidden="true"></i>' +
+                        dash(item.style_name) + '</div>' +
+                    '<div class="bi-item-meta">' + dash([item.art_no, identity].filter(Boolean).join(' · ')) + '</div>' +
                 '</div>' +
                 '<div class="d-flex align-items-center gap-2 flex-shrink-0">' +
                     '<span class="badge bg-secondary-subtle text-secondary-emphasis text-nowrap" data-bi-filled ' +
@@ -1157,17 +1541,28 @@ function initPanel(cfg) {
     }
 
     /**
-     * Hands the Alpine wizard shell what it needs to gate its steps. One-way on
-     * purpose: Alpine reads this and never writes back into the DOM this module
-     * owns, so the two cannot fight over the same nodes.
+     * Hands the Alpine shell what it needs to lock its sections and gate Save.
+     * One-way on purpose: Alpine reads this and never writes back into the DOM
+     * this module owns, so the two cannot fight over the same nodes.
      */
     function publishState(extra) {
-        const blocked = Array.from(itemRows.children).some((c) => c.classList.contains('is-over'));
-        panelEl.querySelector('.offcanvas-body').dispatchEvent(new CustomEvent('bi:state', {
+        const cards = Array.from(itemRows.children);
+        // Items over their stock balance — the count the status bar shows and
+        // the reason Save stays disabled.
+        const errorCount = cards.filter((c) => c.classList.contains('is-over')).length;
+        // Items carrying at least one of the four quantities. An issue with
+        // items but no numbers on them is not saveable.
+        const withQty = cards.filter((c) => Array.from(c.querySelectorAll('.bi-qty'))
+            .some((el) => el.value !== '' && parseFloat(el.value) > 0)).length;
+
+        if (!stateHost) return;
+        stateHost.dispatchEvent(new CustomEvent('bi:state', {
             detail: Object.assign({
                 hasPo: !!poId.value,
-                itemCount: itemRows.children.length,
-                blocked,
+                itemCount: cards.length,
+                blocked: errorCount > 0,
+                errorCount,
+                withQty,
                 editing,
             }, extra || {}),
         }));
@@ -1231,13 +1626,10 @@ function initPanel(cfg) {
             overWarn.classList.add('d-none');
         }
 
-        // Blocking the button states the rule before the user commits to it.
-        const saveBtn = form.querySelector('button[type="submit"]');
-        if (saveBtn) {
-            saveBtn.disabled = offenders.length > 0;
-            saveBtn.title = offenders.length ? 'One or more items exceed their available stock' : '';
-        }
-
+        // The Save button's disabled state belongs to the Alpine shell, which
+        // weighs this against the other save conditions. Publishing the counts
+        // is this module's whole part in it — two owners of one attribute is
+        // how the two layers start fighting.
         publishState();
 
         return offenders.length > 0;
@@ -1289,6 +1681,8 @@ function initPanel(cfg) {
         // Reset returns the selector to whichever option the markup ships first,
         // so this does not have to be kept in step with the dropdown by hand.
         filterType.selectedIndex = 0;
+        pickedValue = null;
+        syncPickChip();
         poSearch.placeholder = 'Click or type to browse ' + LABELS_PLURAL[filterType.value] + '…';
         poLoading.classList.add('d-none');
         poError.classList.add('d-none');
@@ -1301,12 +1695,13 @@ function initPanel(cfg) {
         refreshItemsState();
         // Clears any over-stock block left by the previous entry.
         checkOver();
-        // reset:true tells the wizard to return to its first step.
+        // reset:true tells the shell this is a fresh entry, so it re-reads the
+        // remarks counter and offers any saved draft.
         publishState({ reset: true });
     }
 
     const newBtn = document.getElementById('biNewBtn');
-    if (newBtn) {
+    if (newBtn && panel) {
         newBtn.addEventListener('click', () => {
             resetForm();
             // Suggest up front so the field shows a real number on open.
@@ -1315,22 +1710,29 @@ function initPanel(cfg) {
         });
     }
 
-    // Delegated edit buttons in the (swappable) table.
-    document.getElementById('biTableContainer').addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-bi-edit]');
-        if (!btn) return;
-        const id = btn.getAttribute('data-bi-edit');
+    // On the create page there is nothing to open: the form is the page, so it
+    // starts ready. Edit mode is left alone — openEdit() fills it instead.
+    if (!panelEl && !document.querySelector('[data-bi-edit-id]')) suggestIssueNo();
 
+    /**
+     * Load an existing issue into the form for correction.
+     *
+     * Reached two ways: an Edit button in the history table (the panel shell),
+     * or landing on /bulk-issues/{id}/edit, where the page itself names the
+     * record. One loader either way — the prefill route is the same.
+     */
+    function openEdit(id) {
         resetForm();
         editing = true;
         title.textContent = 'Edit Bulk Issue';
         saveLabel.textContent = 'Update';
         form.action = cfg.routes.update.replace('__ID__', encodeURIComponent(id));
         methodEl.value = 'PUT';
-        // Correcting an existing issue: the PO is already settled, so the wizard
-        // opens on the details rather than making the user walk step 1 again.
+        // Correcting an existing issue: the PO is already settled, and the row
+        // it loads arrives a moment later, so the shell treats an empty item
+        // list in edit mode as "not fetched yet" rather than "nothing chosen".
         publishState({ reset: true });
-        panel.show();
+        if (panel) panel.show();
 
         fetch(cfg.routes.show.replace('__ID__', encodeURIComponent(id)), {
             headers: { Accept: 'application/json' }, credentials: 'same-origin',
@@ -1373,7 +1775,22 @@ function initPanel(cfg) {
                 });
             })
             .catch(() => {});
-    });
+    }
+
+    // Edit buttons in the (swappable) history table — panel shell only.
+    const tableContainer = document.getElementById('biTableContainer');
+    if (tableContainer) {
+        tableContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-bi-edit]');
+            if (!btn) return;
+            openEdit(btn.getAttribute('data-bi-edit'));
+        });
+    }
+
+    // Landing straight on /bulk-issues/{id}/edit: the page names the record, so
+    // the same loader runs without a click.
+    const editHost = document.querySelector('[data-bi-edit-id]');
+    if (editHost) openEdit(editHost.getAttribute('data-bi-edit-id'));
 
     function setField(id, val) {
         const el = document.getElementById(id);

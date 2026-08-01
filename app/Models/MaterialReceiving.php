@@ -47,6 +47,7 @@ class MaterialReceiving extends Model
         'matched_by',
         'qty',
         'invoice_qty',
+        'roll_bale',
         'internal_po_qty',
         'unit_price',
         'invoice_value',

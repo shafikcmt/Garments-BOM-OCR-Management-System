@@ -692,6 +692,10 @@
                                     <th class="text-end">Already Rcvd</th>
                                     <th style="min-width:110px;">Invoice Qty</th>
                                     <th style="min-width:130px;">Physical Rcv Qty <span class="text-danger">*</span></th>
+                                    {{-- Packing info off the delivery challan. Free
+                                         text because Store writes both "12" and
+                                         "12 Roll". --}}
+                                    <th style="min-width:95px;">Roll / Bale</th>
                                     <th style="min-width:110px;">Unit Price</th>
                                     <th class="text-end">Invoice Value</th>
                                     <th></th>
@@ -861,6 +865,12 @@
                                 <input type="number" step="0.0001" min="0.0001" name="qty" id="rcvIndQty" class="form-control" required value="{{ old('qty') }}">
                             </div>
                             <div class="col-6 col-lg-3">
+                                {{-- Packing info off the delivery challan — free text,
+                                     because Store writes both "12" and "12 Roll". --}}
+                                <label class="form-label fw-semibold" for="rcvIndRollBale">Roll / Bale</label>
+                                <input type="text" name="roll_bale" id="rcvIndRollBale" class="form-control" maxlength="100" placeholder="e.g. 12" value="{{ old('roll_bale') }}">
+                            </div>
+                            <div class="col-6 col-lg-3">
                                 <label class="form-label fw-semibold" for="rcvIndUnitPrice">Unit Price</label>
                                 <input type="number" step="0.0001" min="0" name="unit_price" id="rcvIndUnitPrice" class="form-control" value="{{ old('unit_price') }}">
                             </div>
@@ -888,97 +898,129 @@
 
     <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
         <div class="card-body p-4">
-            <h5 class="mb-3">Receiving History <span class="badge bg-primary-subtle text-primary ms-1">{{ $receivings->total() }}</span></h5>
-            <div class="table-responsive">
+            @php
+                // Carried onto the export links so a download always matches
+                // the scope the screen is showing.
+                $activeFilters = array_filter([
+                    'from_date' => $filters['from_date'] ?? null,
+                    'to_date' => $filters['to_date'] ?? null,
+                    'invoice_no' => $filters['invoice_no'] ?? null,
+                ]);
+            @endphp
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h5 class="mb-0">Receiving History
+                    <span class="badge bg-primary-subtle text-primary ms-1" id="rcvHistCount">{{ $receivings->total() }}</span>
+                    {{-- Only visible while a filter request is in flight. --}}
+                    <span class="spinner-border spinner-border-sm text-primary ms-2 d-none" id="rcvHistSpinner" role="status" aria-hidden="true"></span>
+                </h5>
+                {{-- The MRR register download. Whole history by default; when the
+                     filter bar is in use it downloads exactly that scope — the
+                     hrefs are rewritten after every AJAX filter. --}}
+                <div class="d-flex gap-2">
+                    <a href="{{ route('store.material.receivings.export.pdf', $activeFilters) }}"
+                       id="rcvExportPdf" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Download PDF
+                    </a>
+                    <a href="{{ route('store.material.receivings.export.excel', $activeFilters) }}"
+                       id="rcvExportExcel" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Download Excel
+                    </a>
+                </div>
+            </div>
+
+            {{-- Compact filter bar. Typing in any of the three boxes reloads the
+                 list over AJAX; the form stays a plain GET so it still works,
+                 with a full page load, when JavaScript is unavailable. --}}
+            <form method="GET" action="{{ route('store.material.receivings.index') }}"
+                  id="rcvFilterForm"
+                  class="row g-2 align-items-end mb-3 p-3 rounded" style="background:#F8FAFC;">
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label small fw-semibold mb-1" for="rcvFromDate">From Date</label>
+                    <input type="date" name="from_date" id="rcvFromDate"
+                           class="form-control form-control-sm @error('from_date') is-invalid @enderror"
+                           value="{{ $filters['from_date'] ?? '' }}">
+                </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label small fw-semibold mb-1" for="rcvToDate">To Date</label>
+                    <input type="date" name="to_date" id="rcvToDate"
+                           class="form-control form-control-sm @error('to_date') is-invalid @enderror"
+                           value="{{ $filters['to_date'] ?? '' }}">
+                </div>
+                <div class="col-12 col-md-4 col-lg-3">
+                    <label class="form-label small fw-semibold mb-1" for="rcvInvoiceNo">Invoice No</label>
+                    <input type="text" name="invoice_no" id="rcvInvoiceNo" maxlength="100"
+                           class="form-control form-control-sm @error('invoice_no') is-invalid @enderror"
+                           placeholder="Full or partial" value="{{ $filters['invoice_no'] ?? '' }}">
+                </div>
+                <div class="col-12 col-md-2 col-lg-auto d-flex gap-2">
+                    {{-- The filter applies on its own a moment after typing
+                         stops; this stays for anyone who prefers to confirm,
+                         and is the whole mechanism without JavaScript. --}}
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply Filter
+                    </button>
+                    <a href="{{ route('store.material.receivings.index') }}"
+                       id="rcvClearFilter"
+                       class="btn btn-sm btn-outline-secondary @unless($activeFilters) d-none @endunless">
+                        Clear Filter
+                    </a>
+                </div>
+                @error('to_date')
+                    <div class="col-12"><div class="small text-danger">{{ $message }}</div></div>
+                @enderror
+                @error('from_date')
+                    <div class="col-12"><div class="small text-danger">{{ $message }}</div></div>
+                @enderror
+                @error('invoice_no')
+                    <div class="col-12"><div class="small text-danger">{{ $message }}</div></div>
+                @enderror
+            </form>
+
+            {{-- Filter feedback. Rebuilt by the live filter, so it always
+                 describes the scope the table below is actually showing. --}}
+            <div class="small text-danger mb-2 d-none" id="rcvFilterError"></div>
+            <div id="rcvFilterBanner">
+                @if($activeFilters)
+                    {{-- Same wording as the PDF/Excel note, so the screen and a
+                         download tell the reader the same thing. --}}
+                    <div class="alert alert-warning py-2 px-3 small d-flex flex-wrap gap-3 align-items-center">
+                        <span class="fw-semibold">Filtered view</span>
+                        @if(($filters['from_date'] ?? null) || ($filters['to_date'] ?? null))
+                            <span>Period:
+                                {{ ($filters['from_date'] ?? null) ? \Carbon\Carbon::parse($filters['from_date'])->format('d-M-Y') : 'beginning' }}
+                                to
+                                {{ ($filters['to_date'] ?? null) ? \Carbon\Carbon::parse($filters['to_date'])->format('d-M-Y') : 'to date' }}
+                            </span>
+                        @endif
+                        @if($filters['invoice_no'] ?? null)
+                            <span>Invoice No: <span class="fw-semibold">{{ $filters['invoice_no'] }}</span></span>
+                        @endif
+                        <span class="text-muted">Print / Download will use this same scope.</span>
+                    </div>
+                @endif
+            </div>
+            {{-- position-relative so the loading veil below can cover exactly
+                 the table while a filter request is in flight. --}}
+            <div class="table-responsive position-relative" id="rcvHistoryWrap">
                 <table class="table align-middle mb-0 rcv-history">
                     <thead>
                         <tr class="text-muted small text-uppercase">
                             <th>Date</th><th>GRN No</th><th>PO / Material</th><th>Source</th><th class="text-end">Inv Qty</th><th class="text-end">Rcv Qty</th><th class="text-end">Price</th><th class="text-end">Action</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @forelse($receivings as $r)
-                            <tr>
-                                <td class="small">{{ optional($r->receive_date)->format('d-M-Y') ?? '—' }}</td>
-                                <td class="small">
-                                    <span class="fw-semibold text-nowrap d-block">{{ $r->grn_no ?: '—' }}</span>
-                                    {{-- Only worth showing when it differs from the
-                                         Date column already on the left. --}}
-                                    @if($r->grn_date && optional($r->receive_date)->toDateString() !== $r->grn_date->toDateString())
-                                        <span class="text-muted d-block">GRN dt: {{ $r->grn_date->format('d-M-Y') }}</span>
-                                    @endif
-                                    @if($r->invoice_no)<span class="text-muted">Inv: {{ $r->invoice_no }}</span>@endif
-                                </td>
-                                <td>
-                                    <div class="fw-semibold">
-                                        @if($r->isIndependent())
-                                            {{-- No PO number to show yet, so the badge
-                                                 takes its place rather than leaving a
-                                                 bare separator. --}}
-                                            <span class="badge bg-warning-subtle text-warning-emphasis me-1">Independent</span>
-                                        @else
-                                            {{ $r->po_no }} ·
-                                        @endif
-                                        {{ $r->material_name ?: $r->material_description }}
-                                    </div>
-                                    <div class="small text-muted">{{ collect([$r->buyer_name.' / '.$r->style_name, $r->material_color, $r->size])->filter()->implode(' · ') }}</div>
-                                    @if($r->isIndependent())
-                                        <div class="small text-warning-emphasis">Not counted in closing stock until linked to a PO.</div>
-                                    @endif
-                                </td>
-                                {{-- Booking vs Internal PO read as two different
-                                     routes into stock, so they get two tones
-                                     rather than one shared badge colour. --}}
-                                <td>
-                                    @if($r->source_type == 'internal_po')
-                                        <span class="badge bg-success-subtle text-success-emphasis">Internal PO</span>
-                                    @else
-                                        <span class="badge bg-primary-subtle text-primary-emphasis">Booking</span>
-                                    @endif
-                                </td>
-                                <td class="text-end small">{{ $r->invoice_qty !== null ? rtrim(rtrim(number_format((float)$r->invoice_qty, 4), '0'), '.') : '—' }}</td>
-                                <td class="text-end fw-bold">{{ rtrim(rtrim(number_format((float)$r->qty, 4), '0'), '.') }}</td>
-                                <td class="text-end small">
-                                    {{ $r->unit_price !== null ? number_format((float)$r->unit_price, 4) : '—' }}
-                                    @if($r->invoice_value !== null)<div class="text-muted">Val: {{ number_format((float)$r->invoice_value, 2) }}</div>@endif
-                                </td>
-                                <td class="text-end">
-                                    {{-- Corrections are an Admin / Management right
-                                         (store.edit / store.delete). The buttons are
-                                         absent for everyone else rather than disabled,
-                                         and the controller re-checks server-side. --}}
-                                    <div class="d-flex justify-content-end align-items-center gap-2">
-                                        @if($canEdit && $r->isIndependent())
-                                            {{-- The deliberate, human-confirmed re-match.
-                                                 There is no automatic OCR matcher in this
-                                                 app, and guessing the BOM line would book
-                                                 stock onto the wrong row. --}}
-                                            <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
-                                                    data-rcv-link="{{ $r->id }}"
-                                                    data-rcv-grn="{{ $r->grn_no }}"
-                                                    data-rcv-style="{{ $r->buyer_name }} / {{ $r->style_name }}">
-                                                <i class="bi bi-link-45deg me-1" aria-hidden="true"></i>Link to PO
-                                            </button>
-                                        @endif
-                                        @if($canDelete)
-                                            <form method="POST" action="{{ route('store.material.receivings.destroy', $r) }}" onsubmit="return confirm('Remove this receiving? Closing stock will update.');">
-                                                @csrf @method('DELETE')
-                                                <button class="btn btn-sm btn-outline-danger text-nowrap"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
-                                            </form>
-                                        @endif
-                                        @if(! $canEdit && ! $canDelete)
-                                            <span class="text-muted small">—</span>
-                                        @endif
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="8" class="text-center text-muted py-5">No receiving recorded yet.</td></tr>
-                        @endforelse
+                    <tbody id="rcvHistoryBody">
+                        @include('store.material-stock._receivings-history-rows')
                     </tbody>
                 </table>
+                {{-- Loading veil: the current rows stay readable, dimmed, while
+                     the filtered set is fetched. --}}
+                <div class="position-absolute top-0 start-0 w-100 h-100 d-none align-items-start justify-content-center"
+                     id="rcvHistoryVeil" style="background:rgba(255,255,255,.6);z-index:5;">
+                    <span class="spinner-border spinner-border-sm text-primary mt-4" role="status" aria-hidden="true"></span>
+                </div>
             </div>
-            <div class="mt-3">{{ $receivings->links() }}</div>
+            <div class="mt-3" id="rcvHistoryPagination">{{ $receivings->links() }}</div>
         </div>
     </div>
 </div>
@@ -2030,6 +2072,8 @@
                     ' value="' + h(preset.invoice_qty) + '" class="form-control form-control-sm"></td>' +
                 '<td><input type="number" step="0.0001" min="0" name="' + n('qty') + '" data-field="qty"' +
                     ' value="' + h(preset.qty) + '" class="form-control form-control-sm" required></td>' +
+                '<td><input type="text" maxlength="100" name="' + n('roll_bale') + '" data-field="roll_bale"' +
+                    ' value="' + h(preset.roll_bale) + '" class="form-control form-control-sm" placeholder="e.g. 12"></td>' +
                 '<td><input type="number" step="0.0001" min="0" name="' + n('unit_price') + '" data-field="unit_price"' +
                     ' value="' + h(unitPrice) + '" class="form-control form-control-sm"></td>' +
                 '<td class="text-end small text-muted" data-field="invoice_value">—</td>' +
@@ -2618,6 +2662,195 @@
                 bootstrap.Modal.getOrCreateInstance(modalNode).show();
             });
         })();
+    })();
+
+    /* Receiving History live filter.
+       Typing in From Date / To Date / Invoice No reloads just the history table
+       over AJAX. Independent of the Record Receiving form above, so it still
+       runs on a screen where that form is not rendered. */
+    (function () {
+        const form = document.getElementById('rcvFilterForm');
+        const body = document.getElementById('rcvHistoryBody');
+        if (!form || !body) return;
+
+        const HISTORY_URL = @json(route('store.material.receivings.history-data'));
+        const DEBOUNCE_MS = 450;
+
+        const fromEl = document.getElementById('rcvFromDate');
+        const toEl = document.getElementById('rcvToDate');
+        const invoiceEl = document.getElementById('rcvInvoiceNo');
+        const clearBtn = document.getElementById('rcvClearFilter');
+        const bannerWrap = document.getElementById('rcvFilterBanner');
+        const errorBox = document.getElementById('rcvFilterError');
+        const countEl = document.getElementById('rcvHistCount');
+        const spinner = document.getElementById('rcvHistSpinner');
+        const veil = document.getElementById('rcvHistoryVeil');
+        const pagerWrap = document.getElementById('rcvHistoryPagination');
+        const pdfLink = document.getElementById('rcvExportPdf');
+        const excelLink = document.getElementById('rcvExportExcel');
+
+        let timer = null;
+        // Only the newest request may paint. A slow earlier response must never
+        // overwrite the list with a scope the user has already moved on from.
+        let requestSeq = 0;
+
+        function currentFilters() {
+            return {
+                from_date: (fromEl && fromEl.value) || '',
+                to_date: (toEl && toEl.value) || '',
+                invoice_no: (invoiceEl && invoiceEl.value.trim()) || '',
+            };
+        }
+
+        function queryString(page) {
+            const params = new URLSearchParams();
+            const f = currentFilters();
+
+            Object.keys(f).forEach(function (key) {
+                if (f[key]) params.set(key, f[key]);
+            });
+            if (page && page > 1) params.set('page', page);
+
+            return params.toString();
+        }
+
+        function busy(on) {
+            if (spinner) spinner.classList.toggle('d-none', !on);
+            if (veil) {
+                veil.classList.toggle('d-none', !on);
+                veil.classList.toggle('d-flex', on);
+            }
+        }
+
+        function showError(message) {
+            if (!errorBox) return;
+            errorBox.textContent = message || '';
+            errorBox.classList.toggle('d-none', !message);
+        }
+
+        /* "Filtered view" banner, rebuilt from the summary the server returns so
+           the screen and a downloaded register word the scope identically. */
+        function renderBanner(data) {
+            if (!bannerWrap) return;
+
+            if (!data.filtered || !data.filter_summary) {
+                bannerWrap.innerHTML = '';
+                return;
+            }
+
+            const parts = data.filter_summary.split('   ·   ').map(function (part) {
+                const span = document.createElement('span');
+                span.textContent = part;
+                return span.outerHTML;
+            }).join('');
+
+            bannerWrap.innerHTML =
+                '<div class="alert alert-warning py-2 px-3 small d-flex flex-wrap gap-3 align-items-center">' +
+                '<span class="fw-semibold">Filtered view</span>' + parts +
+                '<span class="text-muted">Print / Download will use this same scope.</span>' +
+                '</div>';
+        }
+
+        function load(page) {
+            const seq = ++requestSeq;
+            const qs = queryString(page);
+
+            busy(true);
+
+            fetch(HISTORY_URL + (qs ? '?' + qs : ''), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            })
+                .then(function (res) {
+                    return res.json().then(function (data) {
+                        return { ok: res.ok, status: res.status, data: data };
+                    });
+                })
+                .then(function (result) {
+                    if (seq !== requestSeq) return;
+
+                    if (!result.ok) {
+                        // 422 carries the same validation messages the full page
+                        // submit would have shown (e.g. To Date before From Date).
+                        const errors = (result.data && result.data.errors) || {};
+                        const first = Object.keys(errors).length
+                            ? errors[Object.keys(errors)[0]][0]
+                            : 'Could not apply this filter. Please try again.';
+                        showError(first);
+                        return;
+                    }
+
+                    const data = result.data;
+
+                    showError('');
+                    body.innerHTML = data.rows_html;
+                    if (pagerWrap) pagerWrap.innerHTML = data.pagination_html || '';
+                    if (countEl) countEl.textContent = data.meta.total;
+                    renderBanner(data);
+
+                    // Print / Download must follow the scope now on screen.
+                    if (pdfLink) pdfLink.href = data.export.pdf;
+                    if (excelLink) excelLink.href = data.export.excel;
+                    if (clearBtn) clearBtn.classList.toggle('d-none', !data.filtered);
+
+                    // Address bar kept in step, so a copied link or a refresh
+                    // reopens the same scope.
+                    const pageQs = queryString(page);
+                    window.history.replaceState({}, '', window.location.pathname + (pageQs ? '?' + pageQs : ''));
+                })
+                .catch(function () {
+                    if (seq !== requestSeq) return;
+                    showError('Could not load the history. Please check your connection and try again.');
+                })
+                .then(function () {
+                    if (seq === requestSeq) busy(false);
+                });
+        }
+
+        function schedule() {
+            // Debounced, so a typed invoice number is one request rather than
+            // one per keystroke.
+            clearTimeout(timer);
+            timer = setTimeout(function () { load(1); }, DEBOUNCE_MS);
+        }
+
+        [fromEl, toEl, invoiceEl].forEach(function (el) {
+            if (!el) return;
+            el.addEventListener('input', schedule);
+            el.addEventListener('change', schedule);
+        });
+
+        // Apply Filter stays as a manual trigger; it just runs the same load
+        // immediately instead of reloading the page.
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            clearTimeout(timer);
+            load(1);
+        });
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                clearTimeout(timer);
+                if (fromEl) fromEl.value = '';
+                if (toEl) toEl.value = '';
+                if (invoiceEl) invoiceEl.value = '';
+                load(1);
+            });
+        }
+
+        // Pagination links are re-rendered on every load, so the click is caught
+        // on the container rather than bound to each anchor.
+        if (pagerWrap) {
+            pagerWrap.addEventListener('click', function (e) {
+                const link = e.target.closest('a[href]');
+                if (!link) return;
+
+                e.preventDefault();
+                const page = new URL(link.href, window.location.origin).searchParams.get('page');
+                load(page ? parseInt(page, 10) : 1);
+            });
+        }
     })();
 </script>
 @endsection

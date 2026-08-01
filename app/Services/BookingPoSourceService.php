@@ -716,10 +716,12 @@ class BookingPoSourceService
                 ->values();
         }
 
-        $headerIds = $this->headerIdsForGroup($group);
+        $headerIds = $this->searchHeaderIds($group);
 
+        // A group with no BOM column of its own can still be browsable through
+        // the booking_pos column that carries the same value.
         if ($headerIds->isEmpty()) {
-            return collect();
+            return $this->columnBrowseOptions($group, $limit);
         }
 
         $cells = ExcelCell::query()
@@ -730,7 +732,7 @@ class BookingPoSourceService
             ->get(['row_id', 'value']);
 
         if ($cells->isEmpty()) {
-            return collect();
+            return $this->columnBrowseOptions($group, $limit);
         }
 
         $rowIds = $cells->pluck('row_id')->unique()->values();
@@ -765,10 +767,158 @@ class BookingPoSourceService
                 return $po ? ['value' => trim((string) $cell->value), 'po' => $po] : null;
             })
             ->filter()
+            // A PO whose BOM cell for this group is blank still carries the
+            // value on its own column, so both routes are offered.
+            ->concat($this->columnBrowseOptions($group, $limit))
             // The same value under two different POs stays as two entries — they
             // are genuinely different choices.
-            ->unique(fn (array $option) => $option['value'].'|'.$option['po']->id)
+            ->unique(fn (array $option) => mb_strtolower($option['value']).'|'.$option['po']->id)
             ->take($limit)
+            ->values();
+    }
+
+    /**
+     * Browse options taken from the booking_pos column behind a group, for the
+     * two cases the BOM cells cannot cover: the workbook has no column of that
+     * name at all (Material Name, Art. No), or a particular PO's cell is blank.
+     *
+     * Reads the same column fallbackValueFromBookingPo() reads, so a search
+     * looks at exactly the value the picker displays.
+     *
+     * @return Collection<int, array{value: string, po: BookingPo}>
+     */
+    protected function columnBrowseOptions(string $group, int $limit): Collection
+    {
+        $column = $this->searchColumnForGroup($group);
+
+        if ($column === null) {
+            return collect();
+        }
+
+        // $column comes from the fixed map below, never from request input.
+        return BookingPo::query()
+            ->whereRaw("TRIM(COALESCE({$column}, '')) <> ''")
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->map(fn (BookingPo $po) => ['value' => trim((string) $po->{$column}), 'po' => $po])
+            ->values();
+    }
+
+    /**
+     * The booking_pos column carrying the same value as a search group, or null
+     * when the group lives only in the BOM cells (PI number, invoice number).
+     *
+     * Deliberately the same mapping as fallbackValueFromBookingPo(): what a
+     * search matches on must be what the screen shows for that field.
+     */
+    protected function searchColumnForGroup(string $group): ?string
+    {
+        return match ($group) {
+            'po_no' => 'po_no',
+            'buyer' => 'buyer_name',
+            'season' => 'season_name',
+            'vendor' => 'vendor_name',
+            // No column entry for 'style' on purpose. booking_pos.style_name was
+            // filled at PO-generation time through the 'style' group, so on some
+            // POs it holds the contract number rather than a style name
+            // (LAXR260001 → "ICN-2026-1020"). Matching it would put those
+            // numbers back into the Style Number results, which is exactly the
+            // overlap with PO Number that the search is meant to avoid. The
+            // Style Name cells cover 613 of 614 rows on their own.
+            'material_type' => 'item_type',
+            'material_name' => 'item_name',
+            'material_description' => 'description',
+            // One column serves both handles: the workbooks carry no separate
+            // Art. No column, so today the two search the same value.
+            'sap_code', 'art_no' => 'supplier_article',
+            'material_color', 'gmts_color' => 'color',
+            'size' => 'size_width',
+            default => null,
+        };
+    }
+
+    /**
+     * Header ids a search scans for a group — its own aliases, plus a documented
+     * stand-in where the workbooks carry no column of that name.
+     *
+     * Kept separate from headerIdsForGroup() so widening a *search* never
+     * changes which cell the picker, the ledger or an export reads for that
+     * field.
+     */
+    protected function searchHeaderIds(string $group): Collection
+    {
+        $ids = $this->headerIdsForGroup($group);
+
+        // No "Material Name" column exists in the current workbooks. Material
+        // Type is the column Store reads as the material's name, and is what
+        // booking_pos.item_name is filled from.
+        if ($group === 'material_name') {
+            $ids = $ids->merge($this->headerIdsForGroup('material_type'))->unique()->values();
+        }
+
+        // A Style Number search looks at the style columns only. The 'style'
+        // group also reads Initial Contract Number / Sales Contract as a
+        // display fallback, and those numbers now have their own PO Number
+        // search — two options returning the same rows would only confuse.
+        if ($group === 'style') {
+            $ids = $this->headerIdsForGroup('style_name');
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Step 1 of the two-step picker: the distinct values behind one search
+     * field, each with how many bookings sit under it.
+     *
+     * Built on browseOptionsForGroup(), which already resolves any group to
+     * value/PO pairs through the header aliases and the booking_pos column
+     * fallback. Collapsing those pairs by value is the whole of step 1, so a
+     * group added to headerAliases() becomes browsable in both steps with no
+     * code here — that is the point of routing both steps through one primitive.
+     *
+     * Case-insensitive collapse: "Hugo Boss" and "HUGO BOSS" are one season's
+     * worth of bookings, not two entries in a list meant to be scanned.
+     *
+     * @return Collection<int, array{value: string, count: int}>
+     */
+    public function distinctValuesForGroup(string $group, int $limit = 500): Collection
+    {
+        return $this->browseOptionsForGroup($group, $limit)
+            ->groupBy(fn (array $option) => mb_strtolower(trim($option['value'])))
+            ->map(fn (Collection $sharing) => [
+                // The first spelling seen wins the label; the count is of
+                // distinct bookings, so one PO carrying the value on several of
+                // its lines still counts once.
+                'value' => trim($sharing->first()['value']),
+                'count' => $sharing->pluck('po.id')->unique()->count(),
+            ])
+            ->sortBy('value', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+    }
+
+    /**
+     * Step 2: every booking sitting under one exact value of that field.
+     *
+     * Exact, not LIKE — the value came from the step 1 list, so a partial match
+     * here would fold neighbouring values ("Black" pulling in "Black Melange")
+     * into a list the user believes is one value's worth of bookings.
+     *
+     * @return Collection<int, BookingPo>
+     */
+    public function bookingPosForGroupValue(string $group, string $value, int $limit = 500): Collection
+    {
+        $needle = mb_strtolower(trim($value));
+
+        if ($needle === '') {
+            return collect();
+        }
+
+        return $this->browseOptionsForGroup($group, $limit)
+            ->filter(fn (array $option) => mb_strtolower(trim($option['value'])) === $needle)
+            ->pluck('po')
+            ->unique('id')
             ->values();
     }
 
@@ -807,7 +957,7 @@ class BookingPoSourceService
                 ->get();
         }
 
-        $headerIds = $this->headerIdsForGroup($group);
+        $headerIds = $this->searchHeaderIds($group);
 
         $rowIds = $headerIds->isEmpty() ? collect() : ExcelCell::query()
             ->whereIn('header_id', $headerIds->all())
@@ -842,12 +992,14 @@ class BookingPoSourceService
             $matched = true;
         }
 
-        // SAP code also has a dedicated booking_pos column, so a primary line
-        // still matches when its BOM cell is blank.
-        if ($group === 'sap_code') {
+        // Several groups also have a dedicated booking_pos column (SAP code,
+        // buyer, season, style, material name…), so a PO still matches when its
+        // BOM cell is blank — or when the workbook has no such column at all.
+        // $column is from a fixed map, never from request input.
+        if ($column = $this->searchColumnForGroup($group)) {
             $matched
-                ? $query->orWhereRaw('LOWER(supplier_article) LIKE ?', [$like])
-                : $query->whereRaw('LOWER(supplier_article) LIKE ?', [$like]);
+                ? $query->orWhereRaw("LOWER({$column}) LIKE ?", [$like])
+                : $query->whereRaw("LOWER({$column}) LIKE ?", [$like]);
             $matched = true;
         }
 
@@ -1000,21 +1152,31 @@ class BookingPoSourceService
     {
         return match ($group) {
             'po_no' => ['material_po_number', 'material_po_no', 'material_purchase_order_number', 'material_purchase_order_no', 'PO Number'],
-            // The buyer's garment-level PO, a Merchant-owned BOM column. A
-            // SEPARATE identifier from po_no above: that one carries the
-            // system-generated material PO (HB26FA0004) which is mirrored onto
-            // booking_pos.po_no, while this holds the buyer's own number
-            // (12458787). They never share a value, so the two must stay
-            // distinct search handles.
+            // The buyer's order/contract PO (4800093964, ICN-2026-1020) — a
+            // SEPARATE identifier from po_no above, which carries the
+            // system-generated material PO (HB26FA0004) mirrored onto
+            // booking_pos.po_no. The two never share a value.
             //
-            // Deliberately excludes 'gmnts_po_number' — a different Store-owned
-            // column whose relationship to this one is an open business
-            // question, not something to merge here.
-            'garments_po' => ['garments_po', 'garment_po', 'garments_po_number', 'garment_po_number', 'Garments PO'],
+            // GMNTS PO Number (Store-owned) and Initial Contract Number
+            // (Merchant-owned) are listed together because they are the same
+            // number kept in two departments' columns: across the current data
+            // all 614 rows hold identical values in both, with no exception.
+            //
+            // The Merchant-owned "Garments PO" column (12458787) is a third,
+            // different number and is NOT part of this group. It is no longer
+            // offered as a search handle — it was filled on 4 of 614 rows, so it
+            // found almost nothing while reading as a duplicate of this option.
+            // The column and its data are untouched.
+            'contract_po' => ['gmnts_po_number', 'gmts_po_number', 'gmt_po_number', 'initial_contract_number', 'contract_number', 'po_number', 'GMNTS PO Number', 'Initial Contract Number', 'PO Number'],
             'buyer' => ['buyer_name', 'buyer', 'Buyer Name'],
             'season' => ['season_name', 'season', 'Season Name'],
             'vendor' => ['vendor_name', 'supplier_name', 'supplier', 'vendor', 'Vendor Name'],
             'style' => ['style_name', 'style_no', 'style_order', 'order_style_no', 'order_style', 'initial_contract_number', 'contract_number', 'sales_contract', 'Style Name'],
+            // The style's own name/number, without the contract-number columns
+            // the 'style' group falls back to when a sheet carries no style
+            // column. Used by searching only, so a Style Number search cannot
+            // return the same rows the PO Number search already covers.
+            'style_name' => ['style_name', 'style_no', 'style_order', 'order_style_no', 'order_style', 'Style Name'],
             'shipment_month' => ['shipment_month', 'shipment_mth', 'ship_month', 'Shipment Month'],
             'vendor_type' => ['vendor_type', 'supplier_type', 'Vendor Type', 'Supplier Type'],
             'final_status' => ['final_status', 'Final Status'],

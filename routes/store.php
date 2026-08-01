@@ -64,6 +64,15 @@ Route::prefix('store')
             Route::post('/ledger/{ledger}/dead-movement', [MaterialStockLedgerController::class, 'storeDeadMovement'])->name('ledger.dead');
 
             Route::get('/receivings', [MaterialReceivingController::class, 'index'])->name('receivings.index');
+            // Receiving History register downloads (whole history, screen order).
+            // Read-only, so they sit under the same role gate as the listing —
+            // declared before the {materialReceiving} wildcard below.
+            // Receiving History rows only, for the filter bar's live reload.
+            // Read-only and under the same role gate as the listing; declared
+            // before the {materialReceiving} wildcard below.
+            Route::get('/receivings/history-data', [MaterialReceivingController::class, 'historyData'])->name('receivings.history-data');
+            Route::get('/receivings/export/excel', [MaterialReceivingController::class, 'exportExcel'])->name('receivings.export.excel');
+            Route::get('/receivings/export/pdf', [MaterialReceivingController::class, 'exportPdf'])->name('receivings.export.pdf');
             // Auto-fill lookup for the Record Receiving form's PO dropdown.
             Route::get('/receivings/po-details/{bookingPo}', [MaterialReceivingController::class, 'poDetails'])->name('receivings.po-details');
             // PO lookup by PO No / PI No / Invoice No.
@@ -104,6 +113,15 @@ Route::prefix('store/material-stock')
     ->name('store.material.')
     ->group(function () {
         Route::get('/bulk-issues', [MaterialBulkIssueController::class, 'index'])->name('bulk-issues.index');
+        // Full-page create / edit. Declared before the {materialBulkIssue}
+        // wildcard below, which would otherwise swallow "create" and fail to
+        // bind it to a record.
+        //
+        // The slide-in panel on the index page still works and is being kept
+        // until this page has been signed off; both render the same form
+        // partial, so there is one form to maintain, not two.
+        Route::get('/bulk-issues/create', [MaterialBulkIssueController::class, 'create'])->name('bulk-issues.create');
+        Route::get('/bulk-issues/{materialBulkIssue}/edit', [MaterialBulkIssueController::class, 'edit'])->name('bulk-issues.edit');
         // Auto-fill lookup for the Record Bulk Issue form's PO/Material summary.
         Route::get('/bulk-issues/po-details/{bookingPo}', [MaterialBulkIssueController::class, 'poDetails'])->name('bulk-issues.po-details');
         // Item picker cascade: PO/PI/Invoice lookup, then the lines under one PO.

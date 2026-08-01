@@ -1,15 +1,17 @@
 /**
- * Alpine shell for the New Bulk Issue panel: step navigation, toasts, the
- * remarks counter and draft autosave.
+ * Alpine shell for the New Bulk Issue panel: section gating, the save gate,
+ * toasts, the remarks counter and draft autosave.
+ *
+ * The panel is a single page, not a wizard: Select PO, Issue Quantities, Indent
+ * Details and Remarks are all mounted at once and the numbers on them are a
+ * reading order, not navigation. Sections 2-4 are locked (greyed + `inert`)
+ * until a PO is chosen, because their content can only be built from a booking.
  *
  * Deliberately narrow. The PO search, the item picker and the stock-balance
  * validation stay in bulk-issue-table.js and keep owning their own DOM — two
  * frameworks writing the same nodes is how these panels rot. The vanilla module
  * publishes what it knows on a `bi:state` event and this component only reads
  * it, so neither side reaches into the other.
- *
- * Steps use x-show rather than x-if on purpose: hidden inputs must stay in the
- * form so a submit from step 3 still carries the values entered on steps 1-2.
  */
 
 const DRAFT_KEY = 'bulkIssueDraft';
@@ -21,14 +23,18 @@ const DRAFT_FIELDS = ['biSection', 'biPerson', 'biReqNo', 'biIssueNo', 'biRemark
 
 export function registerBulkIssueWizard(Alpine) {
     Alpine.data('bulkIssueWizard', () => ({
-        step: 1,
-        lastStep: 3,
-
         // Mirrored from the vanilla module via bi:state.
         hasPo: false,
         itemCount: 0,
         blocked: false,
         editing: false,
+        // Items carrying at least one of the four quantities, and items whose
+        // total exceeds their stock balance.
+        withQty: 0,
+        errorCount: 0,
+        // Mirrored so the Save gate re-evaluates when the date is cleared —
+        // reading the input inside saveBlocker() alone would not be reactive.
+        issueDate: '',
 
         remarksLength: 0,
         remarksMax: 1000,
@@ -39,111 +45,113 @@ export function registerBulkIssueWizard(Alpine) {
         init() {
             this.$el.addEventListener('bi:state', (e) => {
                 const d = e.detail || {};
+                const hadPo = this.hasPo;
+
                 this.hasPo = !!d.hasPo;
                 this.itemCount = d.itemCount || 0;
                 this.blocked = !!d.blocked;
                 this.editing = !!d.editing;
+                this.withQty = d.withQty || 0;
+                this.errorCount = d.errorCount || 0;
 
-                // Opening the panel resets it to the first step; editing an
-                // existing issue skips the PO picker and starts on step 2, the
-                // quantities it is there to correct.
-                if (d.reset) {
-                    this.step = d.editing ? 2 : 1;
-                    this.syncRemarks();
-                    if (!d.editing) this.offerDraft();
-                }
-            });
+                // Re-read on every state change, not only on reset: editing an
+                // existing issue fills these fields after the panel is already
+                // open, and the Save gate reads the date.
+                this.syncRemarks();
+                this.syncIssueDate();
 
-            this.$watch('step', () => {
-                // Move focus to the newly shown step so keyboard and screen
-                // reader users are not left behind on a hidden panel.
-                this.$nextTick(() => {
-                    const target = this.$el.querySelector('[data-bi-step="' + this.step + '"] [autofocus], ' +
-                        '[data-bi-step="' + this.step + '"] input:not([type=hidden]), ' +
-                        '[data-bi-step="' + this.step + '"] select');
-                    if (target) target.focus({ preventScroll: true });
-                });
+                if (d.reset && !d.editing) this.offerDraft();
+
+                // The moment a PO unlocks the rest of the form, bring it into
+                // view — the sections below were greyed a second ago, and on a
+                // laptop they sit under the fold.
+                if (this.hasPo && !hadPo && !d.reset) this.revealItems();
             });
 
             this.syncRemarks();
+            this.syncIssueDate();
         },
 
-        // --- Step navigation --------------------------------------------------
-        stepTitle(n) {
-            return { 1: 'Select PO', 2: 'Issue Quantities', 3: 'Indent Details' }[n];
+        // --- Section gating ---------------------------------------------------
+        /** Scrolls to Issue Quantities without taking focus from the search. */
+        revealItems() {
+            this.$nextTick(() => {
+                const el = this.$el.querySelector('[data-bi-section="2"]');
+                if (!el) return;
+                const motion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                el.scrollIntoView({ behavior: motion ? 'auto' : 'smooth', block: 'start' });
+            });
         },
 
         /**
-         * Why the current step cannot be left yet, or null when it can.
+         * Why Save is not available yet, or null when it is.
          *
-         * Quantities sit ahead of the indent header so the stock balance gates
-         * the flow early: an issue the ledger cannot cover is stopped here,
-         * before anyone types indent details for it. The rules themselves are
-         * unchanged — the vanilla module still owns the per-item check and the
-         * server re-runs it on save; this only decides when they are enforced.
+         * The same three conditions the server enforces on store/update: a
+         * booking, at least one item, and a quantity on it. Stock integrity is
+         * a hard rule, so an item over its balance blocks here too. None of the
+         * rules changed with the single-page layout — only where they surface.
          */
-        blockerFor(step) {
-            if (step === 1 && !this.hasPo) return 'Select a PO, PI or Invoice first.';
-            if (step === 2) {
-                // Edit mode loads its one row asynchronously, so an empty list
-                // there means "not fetched yet", not "nothing chosen".
-                if (!this.itemCount && !this.editing) return 'Select at least one item to issue.';
-                if (this.blocked) return 'One or more items exceed the available stock. Fix the quantities to continue.';
-            }
-            if (step === 3) {
-                const date = document.getElementById('biIssueDate');
-                if (date && !date.value) return 'Issue Date is required.';
-            }
+        saveBlocker() {
+            if (!this.hasPo) return 'Select a Purchase Order first.';
+            // Edit mode loads its one row asynchronously, so an empty list there
+            // means "not fetched yet", not "nothing chosen".
+            if (!this.itemCount && !this.editing) return 'Select at least one item to issue.';
+            if (this.blocked) return 'One or more items exceed the available stock.';
+            if (!this.withQty && !this.editing) return 'Enter at least one quantity.';
+            if (!this.issueDate) return 'Issue Date is required.';
             return null;
         },
 
-        next() {
-            const blocker = this.blockerFor(this.step);
-            if (blocker) {
-                this.toast(blocker, 'error');
-                this.shake();
+        syncIssueDate() {
+            const el = document.getElementById('biIssueDate');
+            this.issueDate = el ? el.value : '';
+        },
+
+        canSave() {
+            return this.saveBlocker() === null;
+        },
+
+        /** The left-hand line of the sticky bar. */
+        statusText() {
+            if (!this.hasPo) return 'Start by selecting a Purchase Order';
+            if (!this.itemCount) return 'Select the item(s) to issue';
+            const blocker = this.saveBlocker();
+            return blocker || 'Ready to save';
+        },
+
+        // --- Closing ----------------------------------------------------------
+        /** Cancel: confirmed first when the form carries anything worth losing. */
+        requestClose() {
+            const dirty = this.hasPo || this.itemCount > 0 || DRAFT_FIELDS.some((id) => {
+                const el = document.getElementById(id);
+                return el && el.value && !(id === 'biIssueNo' && el.classList.contains('bi-suggested'));
+            });
+
+            if (dirty && !window.confirm('Discard this bulk issue? Anything entered here will be lost.')) return;
+
+            // Two shells, two ways to leave: the panel closes over the history
+            // it was opened from, the page goes back to that history.
+            const panelEl = document.getElementById('biPanel');
+            if (panelEl && window.bootstrap) {
+                window.bootstrap.Offcanvas.getOrCreateInstance(panelEl).hide();
                 return;
             }
-            if (this.step < this.lastStep) this.step += 1;
+
+            const cfg = document.getElementById('bi-config');
+            let index = '';
+            try { index = (JSON.parse(cfg.textContent).routes || {}).index || ''; } catch (e) { /* fall through */ }
+            window.location.href = index || document.referrer || '/';
         },
 
-        prev() {
-            if (this.step > 1) this.step -= 1;
-        },
-
-        /** Jumping via the indicator, but never past an unmet requirement. */
-        goTo(n) {
-            if (n === this.step) return;
-            if (n < this.step) { this.step = n; return; }
-
-            for (let s = this.step; s < n; s++) {
-                const blocker = this.blockerFor(s);
-                if (blocker) {
-                    this.toast(blocker, 'error');
-                    this.shake();
-                    return;
-                }
-            }
-            this.step = n;
-        },
-
-        shake() {
-            const el = this.$el.querySelector('[data-bi-step="' + this.step + '"]');
-            if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-            el.classList.remove('bi-shake');
-            void el.offsetWidth;   // restart the animation
-            el.classList.add('bi-shake');
-        },
-
-        // Enter advances, except inside a textarea or on the final step where it
-        // would race the form's own submit handling.
+        // Enter must not submit from a single-line field: on one page every
+        // input sits in the same form, so a stray Enter in the PO search would
+        // otherwise save the whole issue. The textarea keeps its newlines and
+        // the Save button itself still works.
         onKeydown(e) {
             if (e.key !== 'Enter') return;
             const tag = (e.target.tagName || '').toLowerCase();
             if (tag === 'textarea' || e.target.type === 'submit') return;
-            if (this.step >= this.lastStep) return;
             e.preventDefault();
-            this.next();
         },
 
         // --- Remarks counter --------------------------------------------------

@@ -59,6 +59,11 @@ class HeaderAliasResolver
             'pmt_doc_no' => ['pmt doc no', 'payment doc no', 'payment reference number', 'payment ref no'],
             'committed_ex_mill' => ['committed ex mill', 'committed x-fty date', 'committed x fty date', 'committed ex-fty date', 'committed ex fty date'],
             'bl_awb_no' => ['bl / awb no', 'bl awb no', 'bl no', 'awb no'],
+            // Commercial's letter-of-credit number. No workbook uploaded so far
+            // carries this column; the aliases are here so that whichever
+            // spelling the header is eventually created with resolves without a
+            // further code change (the Receiving report reads it by canonical).
+            'lc_no' => ['lc no', 'l/c no', 'lc number', 'l/c number', 'lc/no', 'letter of credit no', 'letter of credit number'],
             'committed_etd' => ['committed etd', 'commited etd'],
             'committed_eta' => ['committed eta', 'committed e.t.a', 'committed arrival date'],
             'committed_inhouse' => ['committed inhouse', 'committed in house', 'committed in-house'],
