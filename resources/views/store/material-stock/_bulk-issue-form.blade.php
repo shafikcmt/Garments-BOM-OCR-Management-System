@@ -47,6 +47,36 @@
 
             <div class="bi-card">
 
+            {{-- Choosing the PO is the one required first action, so it is the
+                 first thing on the card rather than a button that opens a
+                 dialog to reveal it. One box: the term goes to all eleven
+                 fields the matrix shows (SMART_SEARCH_GROUPS), so a SAP Code or
+                 an Art. No finds a PO as readily as a style does.
+
+                 Replaced a 200px dashed empty-state panel whose only content
+                 was a button to open the Filters dialog — a box, a click and a
+                 modal standing between the user and a text field. --}}
+            <div id="biPoPicker">
+                <div class="bi-search" id="biSearchWrap">
+                    <div class="bi-mx-search">
+                        <i class="bi bi-search" aria-hidden="true"></i>
+                        <input type="text" class="form-control" id="biPoSearch" autocomplete="off"
+                               placeholder="Search PO, style, buyer or season to start"
+                               role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="biPoList">
+                        <span class="bi-pick-status">
+                            <span class="spinner-border spinner-border-sm text-primary d-none" id="biPoSpin" role="status" aria-hidden="true"></span>
+                            <button type="button" class="btn-close d-none" id="biPoClear" aria-label="Clear search"></button>
+                        </span>
+                    </div>
+
+                    <div id="biPoPanel" class="bi-search-panel d-none position-absolute w-100 mt-1 bg-body border rounded-3 shadow">
+                        <div class="bi-po-hint" id="biPoHint"></div>
+                        <div class="list-group list-group-flush" id="biPoList" role="listbox"></div>
+                    </div>
+                </div>
+                <p class="bi-po-help mb-0">Type a PO number, style, buyer or material to begin.</p>
+            </div>
+
             {{-- The loaded PO, stated above the grid. Every row carries the same
                  PO — one issue is recorded against one booking — so it is said
                  once here rather than read off 55 identical cells. --}}
@@ -62,8 +92,10 @@
                     {{-- Labelled, not a bare ✕: on a chip that already shows a PO
                          number, a lone ✕ reads as "delete this PO" rather than
                          "pick a different one". --}}
+                    {{-- Brings the search box back rather than opening the
+                         Filters dialog: the dialog narrows the rows of a PO,
+                         and the point of this button is to not have one. --}}
                     <button type="button" class="btn btn-sm btn-outline-secondary bi-btn-xs" id="biClearPo"
-                            data-bs-toggle="modal" data-bs-target="#biMatrixFilterModal"
                             title="Load a different PO">Change PO</button>
                 </div>
             </div>
@@ -134,13 +166,13 @@
                 </table>
             </div>
 
-            {{-- Before a PO is chosen. The action is the same dialog the Filters
-                 button opens — one place decides which lines are on screen. --}}
-            <div id="biNoItems" class="bi-empty">
-                <div class="bi-empty-icon"><i class="bi bi-funnel" aria-hidden="true"></i></div>
-                <div class="bi-empty-title">No PO selected yet</div>
-                <p class="bi-empty-text">Select a PO to see its items.</p>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#biMatrixFilterModal">Select PO</button>
+            {{-- The empty state is the search box above, not a panel down here:
+                 an instruction to "select a PO" is redundant next to the field
+                 that selects one. This is only for the case a PO loaded and
+                 turned out to carry nothing. --}}
+            <div id="biNoItems" class="bi-empty d-none">
+                <div class="bi-empty-title">This PO has no items to issue</div>
+                <p class="bi-empty-text mb-0">Try a different PO.</p>
             </div>
             <div class="alert alert-warning py-2 px-3 small d-none mt-3 mb-0" id="biOverWarn"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i><span id="biOverText"></span></div>
             </div>{{-- /card --}}

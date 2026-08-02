@@ -31,12 +31,34 @@ class MaterialBulkIssueController extends Controller
     /**
      * The fields one free-text term is asked of.
      *
-     * Five, not the twelve the drill-down offers: every group but po_no costs a
-     * LIKE scan over ExcelCell, so the search box covers the handles a booking
-     * is actually looked up by and leaves the rest to the Filters dialog, where
-     * one field is chosen and only that field is queried.
+     * Every field the issue matrix shows, so the search box on the form can find
+     * a PO by anything printed on its rows — a SAP Code or an Art. No is a
+     * perfectly ordinary way for Store to arrive at a booking, and before this
+     * the box quietly failed for them.
+     *
+     * BOTH PO numbers are here. po_no is the material PO this system generates,
+     * the one the matrix's "PO Number" column shows and the one a user reading
+     * that column will type; contract_po is the buyer's order/contract PO from
+     * the GMNTS PO Number columns. They are different numbers and Store uses
+     * both, so leaving either out makes the search silently fail for whichever
+     * half of the paperwork is in front of them. po_no is also the cheapest
+     * group here: a direct column LIKE on booking_pos, no ExcelCell scan.
+     *
+     * The cost of the rest is real but bounded: each is a LIKE scan over
+     * ExcelCell, and a leading wildcard cannot use an index, so this is linear
+     * in the size of that table. Measured over 77.5k cells the full set takes
+     * ~92ms against ~65ms for the five this used to hold. The browser keeps that
+     * in hand by debouncing and by refusing to search a single character — see
+     * runSearch() in bulk-issue-table.js. If excel_cells grows an order of
+     * magnitude this needs revisiting, most likely as a search index rather than
+     * by taking fields away again.
      */
-    private const SMART_SEARCH_GROUPS = ['contract_po', 'style', 'buyer', 'season', 'material_name'];
+    private const SMART_SEARCH_GROUPS = [
+        'po_no', 'contract_po',
+        'style', 'buyer', 'season', 'material_name',
+        'material_description', 'sap_code', 'art_no', 'gmts_color',
+        'material_color', 'size',
+    ];
 
     /** Per-field cap for the smart search, and for its merged result. */
     private const SMART_SEARCH_LIMIT = 50;

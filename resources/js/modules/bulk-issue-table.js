@@ -36,21 +36,19 @@ const fmtNum = (n) => (Math.round((Number(n) || 0) * 10000) / 10000).toString();
  * The order is the order the filter modal renders its boxes in.
  *
  * `group` is the same field as po-search knows it — the name it validates in
- * its `type` parameter and resolves through BookingPoSourceService. It is what
- * lets one field answer both of the dialog's questions: which bookings carry
- * this value (server, before a PO is loaded), and which loaded rows carry it
- * (browser, after).
+ * its `type` parameter and resolves through BookingPoSourceService.
  *
- * PO Number maps to `po_no`, not `contract_po`. Both exist server-side and the
- * old drill-down offered `contract_po` under this label, but the matrix column
- * headed "PO Number" shows `item.po_no` — so `po_no` is what makes the field's
- * options and the column it filters agree.
+ * `server: true` keeps a field out of the Filters dialog's grid. Only PO Number
+ * is: it is what the form's own search box answers, and under one PO every row
+ * carries the same value, so a dropdown for it would offer a single option. It
+ * still gets its dataset stamp, so the matrix search and the row markup are
+ * unchanged.
  */
 const MATRIX_FIELDS = [
     { key: 'season_name', data: 'season', group: 'season', label: 'Season' },
     { key: 'buyer_name', data: 'buyer', group: 'buyer', label: 'Buyer Name' },
     { key: 'style_name', data: 'style', group: 'style', label: 'Style Number' },
-    { key: 'po_no', data: 'po', group: 'po_no', label: 'PO Number' },
+    { key: 'po_no', data: 'po', group: 'po_no', label: 'PO Number', server: true },
     { key: 'gmts_color_name', data: 'gmts', group: 'gmts_color', label: 'GMTS Color Name' },
     { key: 'material_name', data: 'material', group: 'material_name', label: 'Material Name' },
     { key: 'material_description', data: 'desc', group: 'material_description', label: 'Material Description' },
@@ -382,9 +380,13 @@ function initPanel(cfg) {
     const title = document.getElementById('biPanelTitle');
     const saveLabel = document.getElementById('biSaveLabel');
 
-    // Booking lookup lives inside the Filters dialog: choosing the booking and
-    // narrowing its rows are the same decision, so they are the same dialog.
-    // There is no search input any more — the eleven dropdowns are the search.
+    // Choosing the PO is the first required action, so its search box is on the
+    // form itself rather than behind the Filters dialog — which is now only for
+    // narrowing the items of a PO already loaded.
+    const poPicker = document.getElementById('biPoPicker');
+    const poSearch = document.getElementById('biPoSearch');
+    const poSpin = document.getElementById('biPoSpin');
+    const poClear = document.getElementById('biPoClear');
     const poLoading = document.getElementById('biPoLoading');
     const poError = document.getElementById('biPoError');
     const poPanel = document.getElementById('biPoPanel');
@@ -413,80 +415,122 @@ function initPanel(cfg) {
     // so its single row posts flat field names instead of the rows[] array.
     let editing = false;
 
-    // --- Finding a booking through the eleven fields --------------------------
-    // Which request's answer is still wanted: a slow lookup for a value the user
-    // has already moved on from must not overwrite a newer one.
+    // --- Finding the PO -------------------------------------------------------
+    // Which request's answer is still wanted: a slow lookup for a term the user
+    // has already typed past must not overwrite a newer one.
     let searchTicket = 0;
+    let searchTimer = null;
+    let searching = false;
+    let activeIndex = -1;
 
-    function openSuggest() { poPanel.classList.remove('d-none'); }
-    function closeSuggest() { poPanel.classList.add('d-none'); }
+    const DEBOUNCE_MS = 300;
+    // A single character matches most of the workbook and tells the user
+    // nothing, while costing eleven LIKE scans over ExcelCell to say so.
+    const MIN_TERM = 2;
 
-    /**
-     * The distinct values one field holds across every booking.
-     *
-     * Fetched once per field and kept for the page's life, and only when the
-     * field is first focused — every group but po_no costs a scan over
-     * ExcelCell, so eleven of them on dialog open is the cost this defers. The
-     * endpoint is po-search in its step-1 shape, unchanged.
-     */
-    const valueCache = {};
-    const valueInFlight = {};
-
-    function loadGroupValues(group) {
-        if (valueCache[group]) return Promise.resolve(valueCache[group]);
-        if (valueInFlight[group]) return valueInFlight[group];
-
-        valueInFlight[group] = fetch(cfg.routes.poSearch + '?type=' + encodeURIComponent(group), {
-            headers: { Accept: 'application/json' }, credentials: 'same-origin',
-        })
-            .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-            .then((data) => {
-                valueCache[group] = data.results || [];
-                return valueCache[group];
-            })
-            .finally(() => { delete valueInFlight[group]; });
-
-        return valueInFlight[group];
+    function syncSearchStatus() {
+        const hasText = poSearch.value !== '';
+        poSpin.classList.toggle('d-none', !searching);
+        poClear.classList.toggle('d-none', searching || !hasText);
     }
 
-    /**
-     * Which bookings carry this value in this field.
-     *
-     * One match is unambiguous, so it loads straight into the matrix — that is
-     * the whole point of picking a PO Number. Several are listed under the grid
-     * for the user to choose between, which is what happens when the field is
-     * something a booking does not uniquely own, like a Season or a Size.
-     */
-    function findBookings(group, value, label) {
-        const ticket = ++searchTicket;
+    function openSuggest() { poPanel.classList.remove('d-none'); poSearch.setAttribute('aria-expanded', 'true'); }
+    function closeSuggest() { poPanel.classList.add('d-none'); poSearch.setAttribute('aria-expanded', 'false'); activeIndex = -1; }
 
+    /**
+     * One term, asked of every field the matrix shows.
+     *
+     * The server side is SMART_SEARCH_GROUPS, now all eleven of them, so a SAP
+     * Code or an Art. No finds a PO as readily as a style does. That breadth is
+     * why this debounces and refuses a single character: each group is a LIKE
+     * scan with a leading wildcard, which no index can help.
+     */
+    function runSearch() {
+        const term = poSearch.value.trim();
+
+        if (term.length < MIN_TERM) {
+            searchTicket++;
+            searching = false;
+            syncSearchStatus();
+            poHint.textContent = '';
+            poList.innerHTML = '<div class="bi-opt-empty">' +
+                '<div class="bi-opt-empty-title">Keep typing</div>' +
+                '<p class="bi-opt-empty-text">Enter at least ' + MIN_TERM + ' characters to search.</p></div>';
+            openSuggest();
+            return;
+        }
+
+        const ticket = ++searchTicket;
+        searching = true;
+        syncSearchStatus();
         openSuggest();
         poHint.textContent = 'Searching…';
         poList.innerHTML = '';
 
-        fetch(cfg.routes.poSearch + '?type=' + encodeURIComponent(group) +
-            '&value=' + encodeURIComponent(value), {
+        fetch(cfg.routes.poSearch + '?q=' + encodeURIComponent(term), {
             headers: { Accept: 'application/json' }, credentials: 'same-origin',
         })
             .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
             .then((data) => {
                 if (ticket !== searchTicket) return;
-                const results = data.results || [];
-
-                if (results.length === 1) {
-                    closeSuggest();
-                    selectPo(results[0].id, results[0].po_no);
-                    return;
-                }
-
-                renderResults(results, label, value);
+                searching = false;
+                syncSearchStatus();
+                renderResults(data.results || [], term);
             })
             .catch(() => {
                 if (ticket !== searchTicket) return;
+                searching = false;
+                syncSearchStatus();
                 poHint.textContent = '';
-                poList.innerHTML = '<div class="list-group-item text-muted">Could not load the POs for this value. Please try again.</div>';
+                poList.innerHTML = '<div class="list-group-item text-muted">Could not search. Please try again.</div>';
             });
     }
+
+    poSearch.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        syncSearchStatus();
+        if (poSearch.value.trim() === '') { closeSuggest(); return; }
+        searchTimer = setTimeout(runSearch, DEBOUNCE_MS);
+    });
+
+    poSearch.addEventListener('focus', () => { if (poSearch.value.trim() !== '') runSearch(); });
+
+    poClear.addEventListener('click', () => {
+        clearTimeout(searchTimer);
+        searchTicket++;
+        searching = false;
+        poSearch.value = '';
+        syncSearchStatus();
+        closeSuggest();
+        poSearch.focus();
+    });
+
+    const searchOptions = () => Array.from(poList.querySelectorAll('.bi-opt'));
+
+    poSearch.addEventListener('keydown', (e) => {
+        const open = !poPanel.classList.contains('d-none');
+        const list = searchOptions();
+
+        if (e.key === 'Escape') { closeSuggest(); return; }
+        if (e.key === 'Enter') {
+            // Never submit the form from the search box.
+            e.preventDefault();
+            const opt = activeIndex >= 0 ? list[activeIndex] : list[0];
+            if (open && opt) selectPo(opt.dataset.id, opt.dataset.po);
+            return;
+        }
+        if (!open || !list.length) return;
+        if (e.key === 'ArrowDown') { e.preventDefault(); activeIndex = (activeIndex + 1) % list.length; }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex = (activeIndex - 1 + list.length) % list.length; }
+        else return;
+
+        list.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+        list[activeIndex].scrollIntoView({ block: 'nearest' });
+    });
+
+    document.addEventListener('click', (e) => {
+        if (poPicker && !poPicker.contains(e.target)) closeSuggest();
+    });
 
     /**
      * A value's initial in a tinted disc, so a long list can be scanned by
@@ -523,35 +567,31 @@ function initPanel(cfg) {
             h(initial) + '</span>';
     }
 
-    /**
-     * The bookings carrying the value just chosen, listed under the grid.
-     *
-     * Only ever reached when there is more than one — a single match skips this
-     * and loads itself, because there is nothing to choose.
-     */
-    function renderResults(results, label, value) {
+    /** The POs matching what was typed. */
+    function renderResults(results, term) {
+        activeIndex = -1;
+
         if (!results.length) {
             poHint.textContent = '';
             poList.innerHTML = '<div class="bi-opt-empty">' +
                 '<span class="bi-opt-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>' +
                 '<div class="bi-opt-empty-title">No POs found</div>' +
-                '<p class="bi-opt-empty-text">No PO has “' + h(value) + '” in ' + h(label) + '.</p></div>';
+                '<p class="bi-opt-empty-text">Nothing matches “' + h(term) + '”. Try a shorter term.</p></div>';
             return;
         }
 
-        poHint.textContent = results.length + ' POs match “' + h(value) + '” — select one';
+        poHint.textContent = results.length + (results.length === 1 ? ' PO matches ' : ' POs match ') +
+            '“' + h(term) + '”';
 
         poList.innerHTML = bookingRows(results);
     }
 
-    /** Bookings as rows, ready to be chosen. */
+    /** POs as rows, ready to be chosen. */
     function bookingRows(results) {
         return results.map((r) => {
-            const meta = [r.po_no, r.buyer_name, r.style_name, r.season_name, r.vendor_name]
+            const meta = [r.buyer_name, r.style_name, r.season_name, r.vendor_name]
                 .filter(Boolean).join(' · ');
 
-            // Same row shape as step 1, so moving between the two steps does not
-            // feel like moving between two different lists.
             return '<div class="list-group-item bi-opt bi-opt-row" role="option" tabindex="-1"' +
                 ' data-id="' + h(r.id) + '" data-po="' + h(r.po_no) + '">' +
                 avatarFor(r.po_no) +
@@ -567,11 +607,11 @@ function initPanel(cfg) {
         if (opt) selectPo(opt.dataset.id, opt.dataset.po);
     });
 
-    // --- Choosing the booking -------------------------------------------------
+    // --- Choosing the PO ------------------------------------------------------
     /**
-     * A booking chosen in the Filters dialog. Its material lines go straight
-     * into the matrix — there is no item-picker step between the two any more,
-     * so the rows the issue is typed against are the rows the PO actually has.
+     * A PO chosen from the search results. Its items go straight into the
+     * matrix — there is no picker step between the two, so the rows the issue is
+     * typed against are the rows the PO actually has.
      */
     function selectPo(newId, poNo) {
         if (String(newId) === String(poId.value)) { closeSuggest(); return; }
@@ -583,7 +623,43 @@ function initPanel(cfg) {
         selectedText.textContent = poNo || '—';
         selectedRow.classList.remove('d-none');
         closeSuggest();
+        showPicker(false);
         loadItems(newId);
+    }
+
+    /**
+     * The search box and the loaded-PO summary are the same slot in two states:
+     * one is how you choose, the other is what you chose.
+     */
+    function showPicker(on) {
+        if (poPicker) poPicker.classList.toggle('d-none', !on);
+        if (on) {
+            poSearch.value = '';
+            syncSearchStatus();
+            closeSuggest();
+        }
+    }
+
+    /** Change PO: back to the search box, with the same guard as choosing one. */
+    const clearPoBtn = document.getElementById('biClearPo');
+    if (clearPoBtn) {
+        clearPoBtn.addEventListener('click', () => {
+            if (hasTypedQty() &&
+                !window.confirm('Changing the PO will clear the quantities you typed. Continue?')) return;
+
+            poId.value = '';
+            items = [];
+            loadedPoId = null;
+            itemRows.innerHTML = '';
+            resetMatrixChoices();
+            selectedRow.classList.add('d-none');
+            poError.classList.add('d-none');
+            overWarn.classList.add('d-none');
+            showPicker(true);
+            refreshItemsState();
+            checkOver();
+            poSearch.focus();
+        });
     }
 
     /** Anything worth warning about before the matrix is replaced. */
@@ -647,7 +723,6 @@ function initPanel(cfg) {
                     // The dialog is normally still open — the PO was chosen in
                     // it — so the eleven fields switch to narrowing these rows
                     // now rather than on the next open.
-                    syncFilterMode();
                 }
 
                 if (!items.length) {
@@ -689,8 +764,21 @@ function initPanel(cfg) {
      * whatever is typed in it. Excluded and hidden are different states, and
      * they are styled differently for exactly that reason.
      */
+    /**
+     * Is this row part of the issue? The checkbox is the answer.
+     *
+     * Deliberately NOT the `bi-mx-excluded` class. That class is the dimmed
+     * look of a row the user has actively taken out, and an untouched row
+     * carries neither the tick nor the dimming — it is simply not in the issue
+     * yet, while still being fully typeable. Reading the class here would count
+     * every freshly loaded row as included.
+     */
     function isIncluded(row) {
-        return !row.classList.contains('bi-mx-excluded');
+        if (row.classList.contains('bi-mx-nostock')) return false;
+        const cb = row.querySelector('[data-bi-include]');
+
+        // Edit mode renders no checkbox: its single row is always in.
+        return cb ? cb.checked : true;
     }
 
     function setRowIncluded(row, on) {
@@ -829,7 +917,17 @@ function initPanel(cfg) {
         // used to take from the BOM's GMTS Order Qty went with it, for the same
         // reason: pre-filling 50 rows is not a suggestion, it is an issue nobody
         // asked for. Edit mode still prefills, from the record being corrected.
-        setRowIncluded(wrap, editing || rowTotal(wrap) > 0);
+        //
+        // "Out of the issue" is NOT the same as "locked". The quantity cells
+        // stay live so the first thing a user does can be to type in one —
+        // calling setRowIncluded(false) here disabled all four and made the row
+        // look like it needed permission before it would accept a number.
+        // Nothing is disabled unless the user says so, or the ledger does.
+        if (noStock) {
+            setRowIncluded(wrap, false);
+        } else if (editing || rowTotal(wrap) > 0) {
+            setRowIncluded(wrap, true);
+        }
 
         if (!suspendCheck) checkOver();
     }
@@ -875,7 +973,10 @@ function initPanel(cfg) {
         const count = itemRows.children.length;
         // "No purchase order selected" would be a lie for the second or two a
         // PO's lines are in flight — the spinner above says what is happening.
-        noItems.classList.toggle('d-none', count > 0 || loadingItems);
+        // Only ever "this PO turned out to be empty". Before a PO is chosen the
+        // search box is the empty state, and an instruction to select a PO
+        // sitting under the field that selects one is noise.
+        noItems.classList.toggle('d-none', count > 0 || loadingItems || !poId.value);
         applyMatrixFilter();
         syncIncludeHead();
         publishState();
@@ -893,8 +994,6 @@ function initPanel(cfg) {
     const mxShowing = document.getElementById('biMatrixShowing');
     const mxFilterBtn = document.getElementById('biMatrixFilterBtn');
     const mxFooterCount = document.getElementById('biFooterCount');
-    const mxSectTitle = document.getElementById('biFxSectTitle');
-    const mxSectNote = document.getElementById('biFxSectNote');
 
     // Chosen value per field, empty string meaning "all".
     const mxChoice = {};
@@ -905,8 +1004,8 @@ function initPanel(cfg) {
     const mxSelects = {};
     let gridBuilt = false;
 
-    /** Identify a booking, or narrow the one already loaded? */
-    const inNarrowMode = () => matrixRows().length > 0;
+    /** The fields this dialog shows — everything the form's search box does not. */
+    const gridFields = () => MATRIX_FIELDS.filter((f) => !f.server);
 
     /** Drop every row filter. A new PO's rows carry different values. */
     function resetMatrixChoices() {
@@ -928,7 +1027,7 @@ function initPanel(cfg) {
     function buildFilterGrid() {
         if (!mxGrid || gridBuilt) return;
 
-        mxGrid.innerHTML = MATRIX_FIELDS.map((f) => {
+        mxGrid.innerHTML = gridFields().map((f) => {
             // Descriptions are long enough that a half-width box truncates them.
             const wide = f.data === 'desc' ? ' bi-fx-wide' : '';
 
@@ -944,7 +1043,7 @@ function initPanel(cfg) {
             '</div>';
         }).join('');
 
-        MATRIX_FIELDS.forEach((f) => {
+        gridFields().forEach((f) => {
             const el = mxGrid.querySelector('#biFx_' + f.data);
             if (!el) return;
 
@@ -980,46 +1079,19 @@ function initPanel(cfg) {
         const ts = mxSelects[f.data];
         if (!ts) return;
 
-        if (inNarrowMode()) {
-            const values = Array.from(new Set(
-                matrixRows().map((r) => (r.dataset[f.data] || '').trim()).filter(Boolean)
-            )).sort((a, b) => a.localeCompare(b));
+        // Straight off the loaded rows. Nothing is fetched: this dialog only
+        // ever narrows a PO that is already on screen, so the values it can
+        // offer are exactly the values in front of the user.
+        const values = Array.from(new Set(
+            matrixRows().map((r) => (r.dataset[f.data] || '').trim()).filter(Boolean)
+        )).sort((a, b) => a.localeCompare(b));
 
-            setOptions(ts, values.map((v) => ({ value: v, text: v })), mxChoice[f.data]);
-            return;
-        }
-
-        if (ts.loading || valueCache[f.group]) {
-            if (valueCache[f.group]) {
-                setOptions(ts, valueCache[f.group].map((r) => ({
-                    value: r.value,
-                    text: r.value + (Number(r.count) > 1 ? '  (' + r.count + ' POs)' : ''),
-                })), mxChoice[f.data]);
-            }
-            return;
-        }
-
-        ts.loading = 1;
-        ts.wrapper.classList.add('bi-fx-loading');
-
-        loadGroupValues(f.group)
-            .then((values) => {
-                setOptions(ts, values.map((r) => ({
-                    value: r.value,
-                    text: r.value + (Number(r.count) > 1 ? '  (' + r.count + ' POs)' : ''),
-                })), mxChoice[f.data]);
-            })
-            .catch(() => { /* an empty field is its own message */ })
-            .finally(() => {
-                ts.loading = 0;
-                ts.wrapper.classList.remove('bi-fx-loading');
-                ts.refreshOptions(false);
-            });
+        setOptions(ts, values.map((v) => ({ value: v, text: v })), mxChoice[f.data]);
     }
 
     // Set while options are being written into a control. Refilling a field is
     // not the user choosing something, and TomSelect cannot tell the difference
-    // — without this, restoring a value would re-run the booking lookup.
+    // — without this, restoring a value would count as a fresh selection.
     let fillingField = false;
 
     /** Replace a control's options without disturbing what is selected. */
@@ -1036,41 +1108,13 @@ function initPanel(cfg) {
         }
     }
 
+    /**
+     * Narrowing waits for Apply, so a run of changes is one pass over the rows
+     * rather than one per field.
+     */
     function onFieldChange(f, value) {
         if (fillingField) return;
         mxChoice[f.data] = value || '';
-
-        // Narrowing waits for Apply, so a run of changes is one pass over the
-        // rows rather than eleven.
-        if (inNarrowMode()) return;
-
-        if (!value) { closeSuggest(); return; }
-
-        // Nothing is loaded yet, so this field is being used to find a booking.
-        // Every other field is cleared: they describe a different booking's
-        // values and would read as an AND this dialog cannot honour.
-        MATRIX_FIELDS.forEach((other) => {
-            if (other.data === f.data) return;
-            mxChoice[other.data] = '';
-            if (mxSelects[other.data]) mxSelects[other.data].clear(true);
-        });
-
-        findBookings(f.group, value, f.label);
-    }
-
-    /**
-     * The heading follows the job the grid is currently doing.
-     *
-     * The note carries the one fact a first-time user cannot guess: narrowing
-     * only hides items, it does not drop them from the issue. That used to be
-     * spelled out in a second sentence under the dialog title; it is the same
-     * point in four words here.
-     */
-    function syncFilterMode() {
-        const narrow = inNarrowMode();
-
-        if (mxSectTitle) mxSectTitle.textContent = narrow ? 'Narrow the list' : 'Find a PO';
-        if (mxSectNote) mxSectNote.textContent = narrow ? 'Hidden items are still saved' : 'Click a field and type to search';
     }
 
     // Rows the current filter is hiding. Kept so the footer can be rewritten
@@ -1133,7 +1177,6 @@ function initPanel(cfg) {
     if (mxModal) {
         mxModal.addEventListener('show.bs.modal', () => {
             buildFilterGrid();
-            syncFilterMode();
             // Options are fetched on focus, but a field already holding a value
             // has to be able to show it — otherwise reopening the dialog shows
             // an empty box over an active filter.
@@ -1151,7 +1194,6 @@ function initPanel(cfg) {
         mxReset.addEventListener('click', () => {
             resetMatrixChoices();
             closeSuggest();
-            syncFilterMode();
             applyMatrixFilter();
         });
     }
@@ -1304,10 +1346,8 @@ function initPanel(cfg) {
         overWarn.classList.add('d-none');
         poLoading.classList.add('d-none');
         poError.classList.add('d-none');
-        // A fresh entry starts with the eleven fields back to finding a booking
-        // rather than narrowing the last one's rows.
-        closeSuggest();
-        syncFilterMode();
+        // A fresh entry starts back at the search box.
+        showPicker(true);
         title.textContent = 'New Bulk Issue';
         saveLabel.textContent = 'Record Issue';
         if (issueDateEl) issueDateEl.value = new Date().toISOString().slice(0, 10);
@@ -1346,6 +1386,9 @@ function initPanel(cfg) {
         editing = true;
         // Hides the include column: correcting one issue is one row, always in.
         form.classList.add('bi-edit-mode');
+        // The PO is already settled on an existing issue, so there is nothing
+        // to search for — the summary strip states it instead.
+        showPicker(false);
         title.textContent = 'Edit Bulk Issue';
         saveLabel.textContent = 'Update';
         form.action = cfg.routes.update.replace('__ID__', encodeURIComponent(id));
@@ -1440,8 +1483,13 @@ function initPanel(cfg) {
         // row is dropped here rather than sent to fail — leaving it out is the
         // same mechanism the checkbox uses, so nothing typed is lost either way.
         if (!editing) {
+            // Every row's cells are live from the moment the PO loads, so the
+            // ones not being issued are switched off here rather than never
+            // having been on. Two reasons a row is not in the issue: the user
+            // did not tick it, or nothing was typed in it — store() rejects a
+            // zero row outright, so sending either would only fail.
             matrixRows().forEach((row) => {
-                if (rowTotal(row) <= 0) setRowIncluded(row, false);
+                if (!isIncluded(row) || rowTotal(row) <= 0) setRowIncluded(row, false);
             });
             syncIncludeHead();
 

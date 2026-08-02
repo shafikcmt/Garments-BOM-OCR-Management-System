@@ -1,24 +1,16 @@
-{{-- The one dialog that decides which rows are in the matrix.
+{{-- Narrows the items of the PO already loaded. Nothing else.
 
-     Eleven equal fields, every one a searchable dropdown. There is no separate
-     free-text search box above them: PO, Style, Buyer, Season and Material were
-     already fields in this grid, so a second search mechanism on top was one
-     mechanism too many.
+     Finding the PO is the search box on the form itself, so this dialog no
+     longer does double duty — it is only reachable once there are rows to
+     narrow, and every field here means the same thing every time.
 
-     The grid does two jobs, decided by whether a booking is loaded yet:
+     Ten fields, not eleven: PO Number is what the form's search box answers,
+     and under one PO every row carries the same one, so a dropdown for it would
+     offer a single option. MATRIX_FIELDS marks it `server: true` to keep it out
+     of this grid while still stamping the row dataset the matrix search reads.
 
-     A. Nothing loaded — IDENTIFY. Each field's options are the distinct values
-        that field holds across every booking, fetched from po-search
-        (?type=<group>) the first time the field is focused, never before —
-        eleven eager scans of ExcelCell on open is exactly the cost this avoids.
-        Choosing a value asks po-search (?type=<group>&value=<v>) which bookings
-        carry it. One match loads straight into the matrix; several are listed
-        below the grid to pick from.
-
-     B. A booking loaded — NARROW. The same eleven fields switch to the row
-        filter: their options are now the values the loaded rows actually carry,
-        read from the rows themselves, and choosing one hides the rows that do
-        not match. No request, no server involved.
+     Each field is a searchable dropdown whose options are the values the loaded
+     rows actually carry, read from the rows themselves — no request, no server.
 
      Narrowing is display-only. A row hidden here keeps whatever quantity was
      typed into it and is still submitted, which is why the bar above the matrix
@@ -42,21 +34,12 @@
             <div class="modal-body">
                 <div class="bi-fx-sect">
                     <div class="bi-fx-sect-head">
-                        <span class="bi-fx-sect-title" id="biFxSectTitle">Find a PO</span>
-                        <span class="bi-fx-opt" id="biFxSectNote">Click a field and type to search</span>
+                        <span class="bi-fx-sect-title">Narrow the list</span>
+                        <span class="bi-fx-opt">Hidden items are still saved</span>
                     </div>
 
                     {{-- Filled by buildFilterGrid(); one .bi-fx-card per field. --}}
                     <div class="bi-fx-grid" id="biMatrixFilterGrid"></div>
-                </div>
-
-                {{-- Bookings matching the value picked above, when more than one
-                     carries it. Sits under the grid rather than floating over
-                     it: the dialog body scrolls, and an absolutely positioned
-                     panel inside a scrolling box is clipped by it. --}}
-                <div id="biPoPanel" class="bi-search-panel bi-po-results d-none mt-3 bg-body border rounded-3">
-                    <div class="bi-po-hint" id="biPoHint"></div>
-                    <div class="list-group list-group-flush" id="biPoList" role="listbox"></div>
                 </div>
             </div>
 

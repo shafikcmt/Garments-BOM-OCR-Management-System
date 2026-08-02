@@ -222,15 +222,30 @@
     .bi-fx-req { background: var(--gx-secondary-bg, #DBEAFE); color: var(--gx-secondary-700, #1D4ED8); }
     .bi-fx-opt { background: #F1F5F9; color: #64748B; text-transform: none; letter-spacing: 0; font-weight: 600; }
 
-    /* The matching-bookings list, in flow inside the dialog. Capped so a long
-       list cannot push the footer buttons off the bottom. */
-    .bi-po-results { max-height: 40vh; overflow-y: auto; scrollbar-width: thin; }
-    .bi-po-results::-webkit-scrollbar { width: 6px; }
-    .bi-po-results::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+    /* --- The PO search, inline on the form --------------------------------
+       Replaced a 200px dashed empty-state panel whose only content was a
+       button that opened a dialog to reveal a text field. The box IS the
+       empty state now, so it is the first thing in the card and about a third
+       the height. */
+    #biPoPicker { margin-bottom: .75rem; }
+    #biPoPicker .bi-mx-search .form-control { height: 38px; font-size: .875rem; padding-left: 34px; }
+    .bi-po-help { margin-top: .35rem; font-size: .75rem; color: #94A3B8; }
+    /* Spinner and clear share one slot inside the field, so neither changes
+       its width when it appears. */
+    .bi-pick-status {
+        position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+        z-index: 5; display: flex; align-items: center;
+    }
+    .bi-pick-status .btn-close { font-size: .7rem; opacity: .5; }
+    .bi-pick-status .btn-close:hover { opacity: 1; }
+
+    /* The results, floating over the card rather than pushing it down — this
+       one is not inside a scrolling dialog, so it can. */
     .bi-po-hint {
         padding: .5rem .75rem; border-bottom: 1px solid #E9EDF3;
         font-size: .75rem; font-weight: 600; color: #64748B;
     }
+    .bi-po-hint:empty { display: none; }
 
     /* --- TomSelect, wearing this dialog's clothes -------------------------
        The library ships a Bootstrap 5 theme, which gets the shape right but
