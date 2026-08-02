@@ -545,7 +545,13 @@ class MaterialBulkIssueController extends Controller
         // the dates are entered once and shared, exactly as Receiving shares its
         // delivery header across the items it books.
         $validated = $request->validate([
-            'booking_po_id' => ['required', 'exists:booking_pos,id'],
+            // The header PO is now a FALLBACK, not the source of truth. A row
+            // may name its own booking (rows.*.booking_po_id) so one issue can
+            // span several POs; a row that names none inherits this, which is
+            // exactly what the single-PO form has always posted. Both shapes
+            // are accepted, so the existing form keeps working unchanged.
+            'booking_po_id' => ['nullable', 'exists:booking_pos,id'],
+            'rows.*.booking_po_id' => ['nullable', 'exists:booking_pos,id'],
             'material_requisition_id' => ['nullable', 'exists:material_requisitions,id'],
             // Indent header (Excel "Bulk Issuing" register). All optional.
             'indent_section' => ['nullable', 'string', 'max:100'],
@@ -564,27 +570,63 @@ class MaterialBulkIssueController extends Controller
             'rows.*.dead_qty' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $po = BookingPo::with('excelFile')->findOrFail($validated['booking_po_id']);
+        // Resolve every row to its booking first: the row's own, or the header's
+        // as a fallback. Nothing else can proceed until each row knows which PO
+        // it belongs to.
+        $headerPoId = $validated['booking_po_id'] ?? null;
+        $rowPoIds = [];
 
-        if ($po->excelFile && $po->excelFile->isLockedForUser(auth()->user())) {
-            return back()->with('warning', 'This file/style is locked. Stock entry is not allowed.');
+        foreach ($validated['rows'] as $index => $row) {
+            $poId = $row['booking_po_id'] ?? $headerPoId;
+
+            if (! $poId) {
+                return back()->with('warning', 'Item '.($index + 1).' is not linked to a PO. Please reselect the items.');
+            }
+
+            $rowPoIds[$index] = (int) $poId;
         }
 
-        // Only the rows genuinely under this PO can be issued against it, so a
+        // One query for however many distinct POs the submission touches —
+        // usually one.
+        $pos = BookingPo::with('excelFile')->findMany(array_unique($rowPoIds))->keyBy('id');
+
+        foreach ($pos as $po) {
+            if ($po->excelFile && $po->excelFile->isLockedForUser(auth()->user())) {
+                return back()->with('warning', 'PO '.$po->po_no.': this file/style is locked. Stock entry is not allowed.');
+            }
+        }
+
+        // One issue, one buyer. The indent header — section, person, requisition
+        // number — is entered once and applies to every row, which only makes
+        // sense for a single buyer's paperwork. Rows spanning two buyers is
+        // almost certainly a mistake, so it is refused rather than recorded.
+        $buyers = $pos->map(fn (BookingPo $po) => trim((string) $po->buyer_name))
+            ->filter()->unique()->values();
+
+        if ($buyers->count() > 1) {
+            return back()->with('warning', 'An issue cannot mix buyers ('.$buyers->implode(', ').
+                '). Record one issue per buyer.');
+        }
+
+        // Only the rows genuinely under a PO can be issued against it, so a
         // tampered excel_row_id cannot attach an issue to an unrelated BOM line.
-        $allowedRows = app(\App\Services\BookingPoSourceService::class)
-            ->itemRowsForBookingPo($po)
-            ->keyBy('id');
+        // Resolved once per PO rather than once per row.
+        $source = app(\App\Services\BookingPoSourceService::class);
+        $allowedByPo = $pos->map(fn (BookingPo $po) => $source->itemRowsForBookingPo($po)->keyBy('id'));
 
         // Stock integrity: nothing may be issued beyond what is on hand. The
         // browser blocks this too, but that is convenience — this is the rule.
+        // Keyed by excel row, so it is unaffected by how the rows group into POs.
         $available = $this->availableByRow(collect($validated['rows'])->pluck('excel_row_id'));
 
         $prepared = [];
         foreach ($validated['rows'] as $index => $row) {
-            $rowModel = $allowedRows->get((int) $row['excel_row_id']);
+            $po = $pos->get($rowPoIds[$index]);
+            $rowModel = $allowedByPo->get($rowPoIds[$index])->get((int) $row['excel_row_id']);
+
             if (! $rowModel) {
-                return back()->with('warning', 'One of the selected items does not belong to this PO. Please reselect the items.');
+                return back()->with('warning', 'Item '.($index + 1).' does not belong to PO '.$po->po_no.
+                    '. Please reselect the items.');
             }
 
             $quantities = [
@@ -613,7 +655,9 @@ class MaterialBulkIssueController extends Controller
                     ') exceeds available stock ('.$this->trim($onHand).').');
             }
 
-            $prepared[] = [$rowModel, $quantities];
+            // The row's own PO travels with it, so identity is stamped from the
+            // booking that row actually belongs to rather than from one header.
+            $prepared[] = [$po, $rowModel, $quantities];
         }
 
         $shared = [
@@ -629,10 +673,10 @@ class MaterialBulkIssueController extends Controller
 
         // All-or-nothing: a half-saved multi-item issue would leave closing stock
         // reflecting only some of the lines the user confirmed.
-        \Illuminate\Support\Facades\DB::transaction(function () use ($prepared, $po, $shared) {
-            foreach ($prepared as [$rowModel, $quantities]) {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($prepared, $shared) {
+            foreach ($prepared as [$rowPo, $rowModel, $quantities]) {
                 MaterialBulkIssue::create(array_merge(
-                    $this->identityForRow($po, $rowModel),
+                    $this->identityForRow($rowPo, $rowModel),
                     $shared,
                     $quantities,
                 ));
