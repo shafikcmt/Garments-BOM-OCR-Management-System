@@ -124,120 +124,15 @@
     .bi-bulkbar-div { width: 1px; height: 22px; background: #E2E8F0; flex: none; }
     .bi-bulkbar .btn { border-radius: 10px; font-weight: 600; font-size: .8125rem; padding: .4rem .8rem; }
 
-    /* --- Full Table view --------------------------------------------------
-       The 22-column register. Breaks out of the page container to use the full
-       viewport width; anything past that scrolls the PAGE sideways rather than
-       an inner box, which is what lets the header row stay stuck while reading. */
-    .bi-fullbleed { margin-inline: calc(50% - 50vw); border-radius: 0; border-inline: 0; }
-    .bi-viewseg .bi-tab { gap: .35rem; }
-    .bi-viewseg .bi-tab i { font-size: .8125rem; }
+    /* The Full Table view has been removed — Summary is the only view. The
+       column-filter styles it shared with the Select Items picker (.bi-ft-*)
+       moved to _bulk-issue-form-styles, which is the partial both of the
+       picker's shells include; this page pulls that in below. */
 
-    .bi-ft-bar {
-        display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
-        padding: .75rem 1rem; border-bottom: 1px solid #EFF2F7; background: #FBFCFE;
-    }
-    .bi-ft-count { font-size: .8125rem; font-weight: 600; color: #475569; font-variant-numeric: tabular-nums; }
-    .bi-ft-chip {
-        display: inline-flex; align-items: center; gap: .35rem; font-size: .75rem; font-weight: 600;
-        color: var(--gx-secondary-700, #1D4ED8); background: #EFF6FF; border: 1px solid #DBEAFE;
-        border-radius: 999px; padding: .15rem .6rem;
-    }
-    .bi-ft-chip.is-sel { color: #047857; background: #ECFDF5; border-color: #A7F3D0; }
-    .bi-ft-hint { font-size: .7rem; color: #94A3B8; }
-    .bi-ft-bar .btn { border-radius: 9px; font-weight: 600; font-size: .8125rem; }
-
-    .bi-fulltable { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: .8125rem; }
-    /* Sticky against the page scroll — there is deliberately no overflow
-       wrapper, since a scroll container would anchor this to itself instead. */
-    .bi-fulltable thead th {
-        position: sticky; top: 0; z-index: 20; vertical-align: bottom; text-align: left;
-        background: #FEF9E7; border-bottom: 2px solid #F1D592; border-right: 1px solid #F3E4BE;
-        padding: .5rem .6rem; font-size: .6875rem; font-weight: 700; letter-spacing: .02em;
-        color: #6B5417; white-space: nowrap;
-    }
-    .bi-fulltable tbody td {
-        padding: .45rem .6rem; border-bottom: 1px solid #F1F5F9; border-right: 1px solid #F5F7FA;
-        vertical-align: top; color: #1E293B; white-space: nowrap;
-    }
-    .bi-fulltable tbody tr:hover td { background: #FAFBFD; }
-    .bi-fulltable tbody tr.is-picked td { background: #F5F9FF; }
-    .bi-ft-num, .bi-fulltable td.bi-ft-num { text-align: right; font-variant-numeric: tabular-nums; }
-    /* Long free text is capped and told in full on hover, so one description
-       cannot set the width of the whole register. */
-    .bi-ft-wide { max-width: 22rem; }
-    .bi-fulltable td.bi-ft-wide span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .bi-ft-blank { color: #CBD5E1; }
-    .bi-ft-check { width: 38px; text-align: center; }
-    .bi-fulltable td.bi-ft-check { white-space: nowrap; }
-
-    .bi-ft-head { display: flex; align-items: center; gap: .35rem; }
-    .bi-ft-label { flex: 1 1 auto; }
-    .bi-ft-fbtn {
-        flex: none; border: 1px solid transparent; background: transparent; border-radius: 6px;
-        width: 20px; height: 20px; line-height: 1; padding: 0; color: #A0894A; font-size: .7rem;
-        transition: background-color .15s ease, color .15s ease, border-color .15s ease;
-    }
-    .bi-ft-fbtn:hover { background: #fff; border-color: #E7D3A1; color: #6B5417; }
-    .bi-ft-fbtn.is-on { background: var(--gx-secondary-600, #2563EB); border-color: var(--gx-secondary-600, #2563EB); color: #fff; }
-
-    /* Column dropdown: Excel's order — the two sorts, a search, then Select All
-       over the value list. */
-    .bi-ft-menu {
-        position: absolute; top: 100%; left: 0; z-index: 60; width: 250px; margin-top: .25rem;
-        background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; padding: .35rem;
-        box-shadow: 0 12px 32px -12px rgba(15, 23, 42, .4); white-space: normal;
-        font-weight: 500; letter-spacing: normal; color: #334155; text-transform: none;
-    }
-    .bi-ft-mitem {
-        display: flex; align-items: center; gap: .5rem; width: 100%; border: 0; background: transparent;
-        padding: .4rem .5rem; border-radius: 8px; font-size: .8125rem; font-weight: 500; color: #334155; text-align: left;
-    }
-    .bi-ft-mitem:hover { background: #F1F5F9; }
-    .bi-ft-mitem i { color: #64748B; }
-    .bi-ft-msep { height: 1px; background: #EFF2F7; margin: .3rem .25rem; }
-    .bi-ft-msearch { position: relative; padding: .15rem .25rem .35rem; }
-    .bi-ft-msearch i { position: absolute; left: .6rem; top: .55rem; font-size: .75rem; color: #94A3B8; }
-    .bi-ft-msearch .form-control { padding-left: 1.75rem; border-radius: 8px; border-color: #E2E8F0; font-size: .8125rem; }
-    .bi-ft-mall, .bi-ft-mopt {
-        display: flex; align-items: center; gap: .5rem; padding: .3rem .5rem; border-radius: 7px;
-        font-size: .8125rem; font-weight: 500; cursor: pointer; margin: 0;
-    }
-    .bi-ft-mall { font-weight: 600; border-bottom: 1px solid #EFF2F7; border-radius: 7px 7px 0 0; }
-    .bi-ft-mall:hover, .bi-ft-mopt:hover { background: #F8FAFC; }
-    .bi-ft-mall span, .bi-ft-mopt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    /* The value list is the one place a scroll box is right: it can hold
-       hundreds of values and must not push the menu off screen. */
-    .bi-ft-mlist { max-height: 190px; overflow-y: auto; }
-    .bi-ft-mempty { padding: .6rem .5rem; font-size: .75rem; color: #94A3B8; text-align: center; }
-    .bi-ft-mfoot {
-        display: flex; align-items: center; justify-content: space-between; gap: .5rem;
-        border-top: 1px solid #EFF2F7; margin-top: .3rem; padding: .4rem .35rem .15rem;
-    }
-
-    /* --- Item picker column filters ---------------------------------------
-       Same dropdown component as the Full Table, inside the Select Items modal.
-       One difference: the picker's table sits in a horizontally scrolling box,
-       which would clip an absolutely positioned menu — so those are pinned to
-       the viewport and placed by the picker JS. */
-    #biItemsModal [data-bi-pcol] { position: relative; vertical-align: bottom; white-space: nowrap; }
-    #biItemsModal .bi-ft-menu { position: fixed; top: auto; left: auto; z-index: 1090; }
-    #biItemsModal .bi-ft-head { gap: .3rem; }
-    #biItemsModal .bi-ft-fbtn { color: #94A3B8; }
-    #biItemsModal .bi-ft-fbtn:hover { background: #fff; border-color: #E2E8F0; color: #334155; }
-    /* Nine columns will not fit the modal at every width; the picker scrolls
-       sideways rather than crushing the material description. */
-    .bi-pick-wide table { min-width: 1020px; }
-    .bi-pick-wide td.bi-ft-wide { max-width: 16rem; }
-    .bi-pick-wide td.bi-ft-wide .bi-cell-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-    /* Print: the register only, no page chrome. */
+    /* Print: the list only, no page chrome. */
     @media print {
-        .app-hero-card, .bi-toolbar, .bi-ft-bar, .bi-tablefoot, .bi-bulkbar,
-        .bi-ft-check, nav, .breadcrumb, footer { display: none !important; }
-        .bi-fullbleed { margin-inline: 0; }
-        .bi-fulltable { font-size: 8pt; width: 100%; }
-        .bi-fulltable thead th { background: #FEF9E7 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .bi-fulltable td.bi-ft-wide span { white-space: normal; }
+        .app-hero-card, .bi-toolbar, .bi-tablefoot, .bi-bulkbar,
+        nav, .breadcrumb, footer { display: none !important; }
     }
 
     /* Table footer: pagination sits level with the count, both quiet. */
@@ -294,14 +189,7 @@
 
     @include('store._flash')
 
-    {{-- View mode wraps the whole surface: the Full Table needs the card to
-         drop its width limit, and both tables live inside the swappable
-         partial, which reads `mode` from this scope. --}}
-    <div x-data="{
-            mode: (localStorage.getItem('bulkIssueView') === 'full' ? 'full' : 'summary'),
-            setMode(m) { this.mode = m; try { localStorage.setItem('bulkIssueView', m); } catch (e) { /* private mode */ } }
-         }">
-    <div class="bi-surface" :class="{ 'bi-fullbleed': mode === 'full' }">
+    <div class="bi-surface">
         {{-- Toolbar: the period filter and the search sit on one line, so the
              whole way of narrowing the list is in a single place above it. --}}
         @php $tabLabels = ['all' => 'All Issues', 'today' => 'Today', 'week' => 'This Week', 'month' => 'This Month']; @endphp
@@ -323,20 +211,6 @@
                                placeholder="Search PO, buyer, style, material…" aria-label="Search bulk issues">
                     </div>
                     <span class="bi-search-spin d-none" id="biSearchSpin"><span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span></span>
-                </div>
-
-                {{-- View mode. Summary is the readable, mobile-friendly list;
-                     Full Table is the 22-column register with column filters.
-                     The choice is remembered per browser. --}}
-                <div class="bi-seg bi-viewseg ms-auto" role="group" aria-label="View mode">
-                    <button type="button" class="bi-tab" :class="{ 'active': mode === 'summary' }"
-                            @click="setMode('summary')" :aria-pressed="mode === 'summary'">
-                        <i class="bi bi-list-ul" aria-hidden="true"></i>Summary
-                    </button>
-                    <button type="button" class="bi-tab" :class="{ 'active': mode === 'full' }"
-                            @click="setMode('full')" :aria-pressed="mode === 'full'">
-                        <i class="bi bi-table" aria-hidden="true"></i>Full Table
-                    </button>
                 </div>
             </div>
         </div>
@@ -361,11 +235,8 @@
     {{-- Floating selection bar. Fixed to the viewport rather than parked after
          the table, so the actions stay in the same place however far the list is
          scrolled. Hidden until at least one row is ticked — the JS only toggles
-         d-none, so the markup keeps its ids and data-bi-action hooks.
-
-         Summary only: the Full Table carries its own selection and its own
-         export buttons, so two bars would be two different selections. --}}
-    <div class="bi-bulkbar d-none py-2 px-3 d-flex flex-wrap align-items-center gap-2" id="biBulkBar" role="region" aria-label="Actions for selected rows" x-show="mode === 'summary'">
+         d-none, so the markup keeps its ids and data-bi-action hooks. --}}
+    <div class="bi-bulkbar d-none py-2 px-3 d-flex flex-wrap align-items-center gap-2" id="biBulkBar" role="region" aria-label="Actions for selected rows">
         <span class="bi-bulkbar-count">
             <span class="bi-bulkbar-num" id="biSelCount">0</span> selected
         </span>
@@ -382,7 +253,6 @@
             <button type="button" class="btn btn-sm btn-link text-decoration-none text-secondary" data-bi-action="cancel">Cancel</button>
         </div>
     </div>
-    </div>{{-- /view mode --}}
 </div>
 
 {{-- Slide-in create / edit panel. Rendered for anyone who can record a new
@@ -398,7 +268,9 @@
     </div>
 </div>
 
-@include("store.material-stock._bulk-issue-item-picker")
+{{-- The panel renders the same issue matrix as the full-page route, so it needs
+     the same one Filters dialog — the PO and the row filters both live in it. --}}
+@include("store.material-stock._bulk-issue-filter-modal")
 @endif
 
 {{-- Hidden POST form used to stream selection exports/deletes. --}}

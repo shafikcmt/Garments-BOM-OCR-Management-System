@@ -9,7 +9,8 @@
  * it in; it never invents rows the server did not send.
  */
 
-import { createColumnFilter } from './column-filter';
+import TomSelect from 'tom-select';
+import 'tom-select/dist/css/tom-select.bootstrap5.css';
 
 function readConfig() {
     const el = document.getElementById('bi-config');
@@ -25,6 +26,39 @@ const esc = (v) => (v === null || v === undefined) ? '' : String(v);
 const h = (v) => esc(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const dash = (v) => esc(v).trim() === '' ? '—' : h(v);
 const fmtNum = (n) => (Math.round((Number(n) || 0) * 10000) / 10000).toString();
+
+/**
+ * The identity fields the issue matrix can be searched and filtered on.
+ *
+ * `key` is the field name poItems() returns (and the column on
+ * material_bulk_issues it is stored in); `data` is the row dataset key the
+ * filter modal reads. Nothing here is new — every one is an existing column.
+ * The order is the order the filter modal renders its boxes in.
+ *
+ * `group` is the same field as po-search knows it — the name it validates in
+ * its `type` parameter and resolves through BookingPoSourceService. It is what
+ * lets one field answer both of the dialog's questions: which bookings carry
+ * this value (server, before a PO is loaded), and which loaded rows carry it
+ * (browser, after).
+ *
+ * PO Number maps to `po_no`, not `contract_po`. Both exist server-side and the
+ * old drill-down offered `contract_po` under this label, but the matrix column
+ * headed "PO Number" shows `item.po_no` — so `po_no` is what makes the field's
+ * options and the column it filters agree.
+ */
+const MATRIX_FIELDS = [
+    { key: 'season_name', data: 'season', group: 'season', label: 'Season' },
+    { key: 'buyer_name', data: 'buyer', group: 'buyer', label: 'Buyer Name' },
+    { key: 'style_name', data: 'style', group: 'style', label: 'Style Number' },
+    { key: 'po_no', data: 'po', group: 'po_no', label: 'PO Number' },
+    { key: 'gmts_color_name', data: 'gmts', group: 'gmts_color', label: 'GMTS Color Name' },
+    { key: 'material_name', data: 'material', group: 'material_name', label: 'Material Name' },
+    { key: 'material_description', data: 'desc', group: 'material_description', label: 'Material Description' },
+    { key: 'art_no', data: 'art', group: 'art_no', label: 'Art. No' },
+    { key: 'sap_code', data: 'sap', group: 'sap_code', label: 'SAP Code' },
+    { key: 'material_color', data: 'mcolor', group: 'material_color', label: 'Material Color' },
+    { key: 'size', data: 'size', group: 'size', label: 'Size' },
+];
 
 export function initBulkIssueTable() {
     const cfg = readConfig();
@@ -348,264 +382,109 @@ function initPanel(cfg) {
     const title = document.getElementById('biPanelTitle');
     const saveLabel = document.getElementById('biSaveLabel');
 
-    const filterType = document.getElementById('biFilterType');
-    const poSearch = document.getElementById('biPoSearch');
+    // Booking lookup lives inside the Filters dialog: choosing the booking and
+    // narrowing its rows are the same decision, so they are the same dialog.
+    // There is no search input any more — the eleven dropdowns are the search.
     const poLoading = document.getElementById('biPoLoading');
     const poError = document.getElementById('biPoError');
     const poPanel = document.getElementById('biPoPanel');
     const poList = document.getElementById('biPoList');
     const poHint = document.getElementById('biPoHint');
-    const poSpin = document.getElementById('biPoSpin');
-    const poClear = document.getElementById('biPoClear');
-    const poChip = document.getElementById('biPoChip');
     const selectedRow = document.getElementById('biSelectedRow');
     const selectedText = document.getElementById('biSelectedText');
     const summary = document.getElementById('biSummaryGrid');
     const sumCounts = document.getElementById('biSumCounts');
-    const pickBtn = document.getElementById('biPickBtn');
 
     const itemRows = document.getElementById('biItemRows');
     const noItems = document.getElementById('biNoItems');
-    const addMoreWrap = document.getElementById('biAddMoreWrap');
+    const includeAll = document.getElementById('biIncludeAll');
     const overWarn = document.getElementById('biOverWarn');
     const overText = document.getElementById('biOverText');
     const issueNoEl = document.getElementById('biIssueNo');
     const issueDateEl = document.getElementById('biIssueDate');
 
-    const modalEl = document.getElementById('biItemsModal');
-    const step1 = document.getElementById('biStep1');
-    const step2 = document.getElementById('biStep2');
-    const styleBody = document.getElementById('biStyleBody');
-    const itemBody = document.getElementById('biItemBody');
-    const styleAll = document.getElementById('biStyleAll');
-    const itemAll = document.getElementById('biItemAll');
-    const backBtn = document.getElementById('biBackBtn');
-    const nextBtn = document.getElementById('biNextBtn');
-    const addBtn = document.getElementById('biAddSelected');
-    const pickCount = document.getElementById('biPickCount');
-    const pickCountLabel = document.getElementById('biPickCountLabel');
-    const pickCountWrap = document.getElementById('biSelCountWrap');
-    const modalLoading = document.getElementById('biModalLoading');
-    const modalError = document.getElementById('biModalError');
-    const modalPo = document.getElementById('biModalPo');
-    const crumb1 = document.getElementById('biCrumb1');
-    const crumb2 = document.getElementById('biCrumb2');
-    const pickBar = document.getElementById('biPickBar');
-    const filterInput = document.getElementById('biFilter');
-    const filterClear = document.getElementById('biFilterClear');
-    const selectAllBtn = document.getElementById('biSelectAllBtn');
-    const selectAllText = document.getElementById('biSelectAllText');
-    const showingEl = document.getElementById('biShowing');
-    const noMatchEl = document.getElementById('biNoMatch');
-
-    // contract_po is the buyer's order/contract PO (GMNTS PO Number / Initial
-    // Contract Number) — a separate identifier from the material PO that po_no
-    // searches, which is why both keys exist here.
-    const LABELS = {
-        po_no: 'Material PO',
-        contract_po: 'PO Number',
-        season: 'Season',
-        buyer: 'Buyer Name',
-        style: 'Style Number',
-        material_name: 'Material Name',
-        material_description: 'Material Description',
-        sap_code: 'SAP Code',
-        art_no: 'Art. No',
-        gmts_color: 'GMTS Color Name',
-        material_color: 'Material Color',
-        size: 'Size',
-    };
-
-    // Spelled out rather than built by appending "s", which turned
-    // "Garments PO" into "Garments POs". Each entry is the wording that reads
-    // correctly inside "Click or type to browse …".
-    const LABELS_PLURAL = {
-        po_no: 'Material PO numbers',
-        contract_po: 'PO Numbers',
-        season: 'Seasons',
-        buyer: 'Buyer names',
-        style: 'Style numbers',
-        material_name: 'Material names',
-        material_description: 'Material descriptions',
-        sap_code: 'SAP Codes',
-        art_no: 'Art. Nos',
-        gmts_color: 'GMTS Color names',
-        material_color: 'Material Colors',
-        size: 'Sizes',
-    };
-    const DEBOUNCE_MS = 300;
-
     let items = [];        // every material line under the loaded PO
     let loadedPoId = null;
+    let loadingItems = false;
+    // Set while the matrix is being built row by row — see loadItems().
+    let suspendCheck = false;
     let uid = 0;
     // Edit mode reuses the same panel but corrects exactly one existing issue,
     // so its single row posts flat field names instead of the rows[] array.
     let editing = false;
 
-    // --- Step 1: find the PO --------------------------------------------------
-    let searchTimer = null;
+    // --- Finding a booking through the eleven fields --------------------------
+    // Which request's answer is still wanted: a slow lookup for a value the user
+    // has already moved on from must not overwrite a newer one.
     let searchTicket = 0;
-    let activeIndex = -1;
-    let searching = false;
 
-    function syncSearchStatus() {
-        const hasText = poSearch.value !== '';
-        poSpin.classList.toggle('d-none', !searching);
-        poClear.classList.toggle('d-none', searching || !hasText);
-    }
-
-    function openSuggest() { poPanel.classList.remove('d-none'); poSearch.setAttribute('aria-expanded', 'true'); }
-    function closeSuggest() { poPanel.classList.add('d-none'); poSearch.setAttribute('aria-expanded', 'false'); activeIndex = -1; }
-
-    // Browse list per filter type, fetched once and kept for the page's life.
-    // `complete` means the server sent the whole dataset, so typing can be
-    // filtered here instead of going back for every keystroke.
-    const browseCache = {};
-    const browseInFlight = {};
+    function openSuggest() { poPanel.classList.remove('d-none'); }
+    function closeSuggest() { poPanel.classList.add('d-none'); }
 
     /**
-     * The picker is two steps for every search type.
+     * The distinct values one field holds across every booking.
      *
-     * Step 1 lists what the chosen field actually holds — each Season, each
-     * Material Name, each Size, once. Step 2 lists the bookings under the one
-     * value the user picked. Before this, a field like Buyer repeated "Hugo
-     * Boss" once per booking, which read as a duplicate bug rather than as ten
-     * different bookings.
-     *
-     * pickedValue is the whole of the state: null means step 1.
+     * Fetched once per field and kept for the page's life, and only when the
+     * field is first focused — every group but po_no costs a scan over
+     * ExcelCell, so eleven of them on dialog open is the cost this defers. The
+     * endpoint is po-search in its step-1 shape, unchanged.
      */
-    let pickedValue = null;
+    const valueCache = {};
+    const valueInFlight = {};
 
-    const browseKey = (type) => type + '|' + (pickedValue === null ? '' : pickedValue);
+    function loadGroupValues(group) {
+        if (valueCache[group]) return Promise.resolve(valueCache[group]);
+        if (valueInFlight[group]) return valueInFlight[group];
 
-    function loadBrowse(type) {
-        const key = browseKey(type);
-        if (browseCache[key]) return Promise.resolve(browseCache[key]);
-        if (browseInFlight[key]) return browseInFlight[key];
-
-        const url = cfg.routes.poSearch + '?type=' + encodeURIComponent(type) +
-            (pickedValue === null ? '' : '&value=' + encodeURIComponent(pickedValue));
-
-        browseInFlight[key] = fetch(url, {
+        valueInFlight[group] = fetch(cfg.routes.poSearch + '?type=' + encodeURIComponent(group), {
             headers: { Accept: 'application/json' }, credentials: 'same-origin',
         })
             .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
             .then((data) => {
-                browseCache[key] = {
-                    results: data.results || [],
-                    complete: !!data.complete,
-                    step: data.step || 1,
-                };
-                return browseCache[key];
+                valueCache[group] = data.results || [];
+                return valueCache[group];
             })
-            .finally(() => { delete browseInFlight[key]; });
+            .finally(() => { delete valueInFlight[group]; });
 
-        return browseInFlight[key];
+        return valueInFlight[group];
     }
 
-    /** The chosen step 1 value, shown as a chip so it can be seen and undone. */
-    function syncPickChip() {
-        if (!poChip) return;
-
-        if (pickedValue === null) {
-            poChip.classList.add('d-none');
-            poChip.innerHTML = '';
-            return;
-        }
-
-        poChip.classList.remove('d-none');
-        poChip.innerHTML = '<span class="bi-pickchip">' +
-            '<span class="bi-pickchip-label">' + h(LABELS[filterType.value] || '') + '</span>' +
-            '<span class="bi-pickchip-value">' + h(pickedValue) + '</span>' +
-            '<button type="button" class="bi-pickchip-x" data-bi-pickclear aria-label="Clear this value and choose another">&times;</button>' +
-            '</span>';
-    }
-
-    /** Back to step 1: a different value, or a different field entirely. */
-    function clearPickedValue() {
-        pickedValue = null;
-        poSearch.value = '';
-        syncPickChip();
-        syncSearchStatus();
-        poSearch.placeholder = 'Click or type to browse ' + LABELS_PLURAL[filterType.value] + '…';
-        showBrowse();
-        poSearch.focus();
-    }
-
-    if (poChip) {
-        poChip.addEventListener('click', (e) => {
-            if (e.target.closest('[data-bi-pickclear]')) clearPickedValue();
-        });
-    }
-
-    // Opening the field shows what exists — no typing required.
-    function showBrowse() {
-        const type = filterType.value;
-        const ticket = ++searchTicket;
-        openSuggest();
-
-        if (!browseCache[type]) {
-            searching = true;
-            syncSearchStatus();
-            poHint.textContent = 'Loading…';
-            poList.innerHTML = '';
-        }
-
-        return loadBrowse(type)
-            .then((data) => {
-                if (ticket !== searchTicket) return;
-                searching = false;
-                syncSearchStatus();
-                renderResults(filterLocally(data.results, poSearch.value.trim()), type, poSearch.value.trim(), data);
-            })
-            .catch(() => {
-                if (ticket !== searchTicket) return;
-                searching = false;
-                syncSearchStatus();
-                poHint.textContent = '';
-                poList.innerHTML = '<div class="list-group-item text-muted">Could not load the list. Please try again.</div>';
-            });
-    }
-
-    function filterLocally(results, term) {
-        const needle = term.toLowerCase();
-        if (needle === '') return results;
-
-        return results.filter((r) =>
-            [r.value, r.po_no, r.buyer_name, r.season_name, r.style_name, r.vendor_name]
-                .some((f) => esc(f).toLowerCase().includes(needle)));
-    }
-
-    function runSearch() {
-        const type = filterType.value;
-        const term = poSearch.value.trim();
+    /**
+     * Which bookings carry this value in this field.
+     *
+     * One match is unambiguous, so it loads straight into the matrix — that is
+     * the whole point of picking a PO Number. Several are listed under the grid
+     * for the user to choose between, which is what happens when the field is
+     * something a booking does not uniquely own, like a Season or a Size.
+     */
+    function findBookings(group, value, label) {
         const ticket = ++searchTicket;
 
-        searching = true;
-        syncSearchStatus();
         openSuggest();
         poHint.textContent = 'Searching…';
         poList.innerHTML = '';
 
-        // A term narrows whichever step is showing: the value list, or the
-        // bookings under the value already chosen.
-        fetch(cfg.routes.poSearch + '?type=' + encodeURIComponent(type) + '&term=' + encodeURIComponent(term) +
-            (pickedValue === null ? '' : '&value=' + encodeURIComponent(pickedValue)), {
+        fetch(cfg.routes.poSearch + '?type=' + encodeURIComponent(group) +
+            '&value=' + encodeURIComponent(value), {
             headers: { Accept: 'application/json' }, credentials: 'same-origin',
         })
             .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
             .then((data) => {
                 if (ticket !== searchTicket) return;
-                searching = false;
-                syncSearchStatus();
-                renderResults(data.results || [], type, term, data);
+                const results = data.results || [];
+
+                if (results.length === 1) {
+                    closeSuggest();
+                    selectPo(results[0].id, results[0].po_no);
+                    return;
+                }
+
+                renderResults(results, label, value);
             })
             .catch(() => {
                 if (ticket !== searchTicket) return;
-                searching = false;
-                syncSearchStatus();
                 poHint.textContent = '';
-                poList.innerHTML = '<div class="list-group-item text-muted">Could not load the list. Please try again.</div>';
+                poList.innerHTML = '<div class="list-group-item text-muted">Could not load the POs for this value. Please try again.</div>';
             });
     }
 
@@ -644,66 +523,32 @@ function initPanel(cfg) {
             h(initial) + '</span>';
     }
 
-    function renderResults(results, type, term, source) {
-        activeIndex = -1;
-
+    /**
+     * The bookings carrying the value just chosen, listed under the grid.
+     *
+     * Only ever reached when there is more than one — a single match skips this
+     * and loads itself, because there is nothing to choose.
+     */
+    function renderResults(results, label, value) {
         if (!results.length) {
             poHint.textContent = '';
             poList.innerHTML = '<div class="bi-opt-empty">' +
                 '<span class="bi-opt-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>' +
-                '<div class="bi-opt-empty-title">No matches found</div>' +
-                '<p class="bi-opt-empty-text">' +
-                    (term ? 'Nothing here matches “' + h(term) + '”. Try a shorter term'
-                          : 'This field has no values on record yet') +
-                    (pickedValue === null ? ', or pick a different field above.' : ', or clear the value above.') +
-                '</p></div>';
+                '<div class="bi-opt-empty-title">No POs found</div>' +
+                '<p class="bi-opt-empty-text">No PO has “' + h(value) + '” in ' + h(label) + '.</p></div>';
             return;
         }
 
-        const browsing = term === '' && source && source.complete;
+        poHint.textContent = results.length + ' POs match “' + h(value) + '” — select one';
 
-        // --- Step 1: the field's own values, each once ------------------------
-        if (pickedValue === null) {
-            poHint.textContent = browsing
-                ? 'All ' + LABELS_PLURAL[type] + ' (' + results.length + ')'
-                : results.length + (results.length === 1 ? ' match' : ' matches');
+        poList.innerHTML = bookingRows(results);
+    }
 
-            poList.innerHTML = results.map((r) => {
-                const n = Number(r.count) || 0;
-                // Several bookings under one value is the case worth spotting
-                // while scanning — that value is where the work is.
-                const heavy = n > 1 ? ' is-many' : '';
-
-                return '<div class="list-group-item bi-opt bi-opt-row" role="option" tabindex="-1"' +
-                    ' data-bi-pick="' + h(r.value) + '">' +
-                    avatarFor(r.value) +
-                    '<div class="bi-opt-body"><div class="bi-opt-primary">' + dash(r.value) + '</div></div>' +
-                    '<span class="bi-opt-count' + heavy + '">' + n +
-                        '<span class="bi-opt-count-unit">' + (n === 1 ? 'booking' : 'bookings') + '</span></span>' +
-                    '</div>';
-            }).join('');
-            return;
-        }
-
-        // --- Step 2: the bookings under the value chosen above ----------------
-        poHint.textContent = results.length + (results.length === 1 ? ' booking' : ' bookings') +
-            ' under ' + LABELS[type] + ' “' + h(pickedValue) + '”';
-
-        // Whatever identified step 1 is already stated on the chip above, so it
-        // is left out here rather than repeated on every row.
-        const skip = {
-            po_no: 'po_no', contract_po: 'po_no', buyer: 'buyer_name',
-            season: 'season_name', style: 'style_name',
-        }[type];
-
-        poList.innerHTML = results.map((r) => {
-            const meta = [
-                skip === 'po_no' ? null : r.po_no,
-                skip === 'buyer_name' ? null : r.buyer_name,
-                skip === 'style_name' ? null : r.style_name,
-                skip === 'season_name' ? null : r.season_name,
-                r.vendor_name,
-            ].filter(Boolean).join(' · ');
+    /** Bookings as rows, ready to be chosen. */
+    function bookingRows(results) {
+        return results.map((r) => {
+            const meta = [r.po_no, r.buyer_name, r.style_name, r.season_name, r.vendor_name]
+                .filter(Boolean).join(' · ');
 
             // Same row shape as step 1, so moving between the two steps does not
             // feel like moving between two different lists.
@@ -717,142 +562,34 @@ function initPanel(cfg) {
         }).join('');
     }
 
-    filterType.addEventListener('change', () => {
-        // A new field means a new question, so any value chosen under the old
-        // one goes with it rather than scoping a list it no longer describes.
-        pickedValue = null;
-        syncPickChip();
-        poSearch.placeholder = 'Click or type to browse ' + LABELS_PLURAL[filterType.value] + '…';
-        poSearch.value = '';
-        closeSuggest();
-        syncSearchStatus();
-        // The selector is part of the search control, so changing it reopens the
-        // list for the new type rather than leaving an empty box.
-        poSearch.focus();
-        showBrowse();
+    poList.addEventListener('click', (e) => {
+        const opt = e.target.closest('.bi-opt');
+        if (opt) selectPo(opt.dataset.id, opt.dataset.po);
     });
 
-    poSearch.addEventListener('focus', showBrowse);
-    poSearch.addEventListener('click', showBrowse);
-
-    poSearch.addEventListener('input', () => {
-        clearTimeout(searchTimer);
-        const term = poSearch.value.trim();
-        const cached = browseCache[filterType.value];
-        syncSearchStatus();
-
-        // Whole dataset already in hand — filter here, no request, no debounce.
-        if (cached && cached.complete) {
-            searchTicket++;
-            searching = false;
-            syncSearchStatus();
-            openSuggest();
-            renderResults(filterLocally(cached.results, term), filterType.value, term, cached);
-            return;
-        }
-
-        if (term === '') { showBrowse(); return; }
-        searchTimer = setTimeout(runSearch, DEBOUNCE_MS);
-    });
-
-    poClear.addEventListener('click', () => {
-        clearTimeout(searchTimer);
-        searchTicket++;
-        searching = false;
-        poSearch.value = '';
-        syncSearchStatus();
-        showBrowse();
-        poSearch.focus();
-    });
-
-    const options = () => Array.from(poList.querySelectorAll('.bi-opt'));
-
-    poSearch.addEventListener('keydown', (e) => {
-        const open = !poPanel.classList.contains('d-none');
-        const list = options();
-
-        if (e.key === 'Escape') { closeSuggest(); return; }
-        if (e.key === 'Enter') {
-            // Never submit the form from the search box.
-            e.preventDefault();
-            if (open && list.length) chooseOption(activeIndex >= 0 ? list[activeIndex] : list[0]);
-            return;
-        }
-        if (!open || !list.length) return;
-        if (e.key === 'ArrowDown') { e.preventDefault(); activeIndex = (activeIndex + 1) % list.length; }
-        else if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex = (activeIndex - 1 + list.length) % list.length; }
-        else return;
-
-        list.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
-        list[activeIndex].scrollIntoView({ block: 'nearest' });
-    });
-
+    // --- Choosing the booking -------------------------------------------------
     /**
-     * One row, whichever step it belongs to: a step 1 row answers "which
-     * value", a step 2 row answers "which booking". Mouse and keyboard both
-     * come through here so the two cannot drift apart.
+     * A booking chosen in the Filters dialog. Its material lines go straight
+     * into the matrix — there is no item-picker step between the two any more,
+     * so the rows the issue is typed against are the rows the PO actually has.
      */
-    function chooseOption(opt) {
-        if (!opt) return;
+    function selectPo(newId, poNo) {
+        if (String(newId) === String(poId.value)) { closeSuggest(); return; }
 
-        if (opt.dataset.biPick !== undefined) {
-            pickedValue = opt.dataset.biPick;
-            poSearch.value = '';
-            syncPickChip();
-            syncSearchStatus();
-            poSearch.placeholder = 'Search bookings under this ' + (LABELS[filterType.value] || 'value') + '…';
-            showBrowse();
-            poSearch.focus();
-            return;
-        }
-
-        selectPo(opt);
-    }
-
-    poList.addEventListener('click', (e) => chooseOption(e.target.closest('.bi-opt')));
-
-    document.addEventListener('click', (e) => {
-        const wrap = document.getElementById('biSearchWrap');
-        if (wrap && !wrap.contains(e.target)) closeSuggest();
-    });
-
-    // --- Step 2: lock the selection ------------------------------------------
-    function selectPo(optEl) {
-        const newId = optEl.dataset.id;
-
-        if (itemRows.children.length && String(newId) !== String(poId.value)) {
-            if (!window.confirm('Changing the PO will clear the items already added. Continue?')) return;
-            itemRows.innerHTML = '';
-        }
+        if (hasTypedQty() &&
+            !window.confirm('Changing the PO will clear the quantities you typed. Continue?')) return;
 
         poId.value = newId;
-        selectedText.textContent = optEl.dataset.po || '—';
+        selectedText.textContent = poNo || '—';
         selectedRow.classList.remove('d-none');
-        poSearch.value = '';
-        syncSearchStatus();
         closeSuggest();
         loadItems(newId);
-        refreshItemsState();
     }
 
-    document.getElementById('biClearPo').addEventListener('click', () => {
-        if (itemRows.children.length &&
-            !window.confirm('Clearing the PO will remove the items already added. Continue?')) return;
-
-        itemRows.innerHTML = '';
-        poId.value = '';
-        selectedRow.classList.add('d-none');
-        items = [];
-        loadedPoId = null;
-        poSearch.value = '';
-        poLoading.classList.add('d-none');
-        poError.classList.add('d-none');
-        syncSearchStatus();
-        refreshItemsState();
-        checkOver();
-        poSearch.focus();
-        showBrowse();
-    });
+    /** Anything worth warning about before the matrix is replaced. */
+    function hasTypedQty() {
+        return matrixRows().some((row) => rowTotal(row) > 0);
+    }
 
     function setSummary(data) {
         summary.querySelectorAll('[data-sum]').forEach((el) => {
@@ -862,26 +599,25 @@ function initPanel(cfg) {
         sumCounts.textContent = data ? (styleNames().length + ' style(s) · ' + items.length + ' item(s)') : '—';
     }
 
-    // --- Steps 3-4: the item picker ------------------------------------------
     const styleKey = (item) => (esc(item.style_name) === '' ? '—' : esc(item.style_name));
     const styleNames = () => [...new Set(items.map(styleKey))];
-    const addedRowIds = () => Array.from(itemRows.querySelectorAll('[data-row-id]')).map((el) => String(el.dataset.rowId));
 
+    /**
+     * Every material line under the chosen booking, laid straight into the
+     * matrix.
+     *
+     * Same endpoint the item picker used to feed — poItems() is unchanged, and
+     * so is what it returns. What changed is where the rows land: in the grid
+     * the user types into, rather than in a dialog they had to confirm out of
+     * first. Edit mode is the exception; it lays out its own single row.
+     */
     function loadItems(id) {
-        modalLoading.classList.remove('d-none');
-        step1.classList.add('d-none');
-        step2.classList.add('d-none');
-        modalError.classList.add('d-none');
-        // Nothing to filter or select all of until the rows arrive.
-        pickBar.classList.add('d-none');
-        noMatchEl.classList.add('d-none');
-        setSummary(null);
-
-        // The lookup is started from the panel, so its progress and any failure
-        // have to be visible there — not only inside a modal that may be closed.
+        loadingItems = true;
         poLoading.classList.remove('d-none');
         poError.classList.add('d-none');
-        pickBtn.disabled = true;
+        itemRows.innerHTML = '';
+        setSummary(null);
+        refreshItemsState();
 
         return fetch(cfg.routes.poItems.replace('__ID__', encodeURIComponent(id)), {
             headers: { Accept: 'application/json' }, credentials: 'same-origin',
@@ -891,16 +627,31 @@ function initPanel(cfg) {
                 if (String(poId.value) !== String(id)) return;   // changed meanwhile
                 items = data.items || [];
                 loadedPoId = id;
-                // A different PO means the remembered ticks refer to lines that
-                // are no longer on screen.
-                clearPicked();
                 setSummary(data);
-                pickBtn.disabled = items.length === 0;
-                modalPo.textContent = 'PO ' + (esc(data.po_no) || '—') +
-                    ' · ' + styleNames().length + ' style(s) · ' + items.length + ' item(s)';
+
+                if (!editing) {
+                    // checkOver() walks the whole matrix, so letting each row
+                    // trigger it while the matrix is being built is quadratic —
+                    // unnoticeable at 20 rows, not at 500. One pass at the end
+                    // reaches the same state.
+                    suspendCheck = true;
+                    items.forEach((item) => addItemRow(item));
+                    suspendCheck = false;
+
+                    // A different PO carries different values, so a filter left
+                    // over from the last one would hide rows for no stated
+                    // reason.
+                    resetMatrixChoices();
+                    checkOver();
+                    refreshItemsState();
+                    // The dialog is normally still open — the PO was chosen in
+                    // it — so the eleven fields switch to narrowing these rows
+                    // now rather than on the next open.
+                    syncFilterMode();
+                }
 
                 if (!items.length) {
-                    poError.textContent = 'This PO has no material lines to issue against.';
+                    poError.textContent = 'This PO has no items to issue.';
                     poError.classList.remove('d-none');
                 }
             })
@@ -908,524 +659,89 @@ function initPanel(cfg) {
                 if (String(poId.value) !== String(id)) return;
                 loadedPoId = null;
                 items = [];
-                modalLoading.classList.add('d-none');
-                pickBar.classList.add('d-none');
-                const message = status === 423
+                refreshItemsState();
+                poError.textContent = status === 423
                     ? 'This file/style is locked. Stock entry is not allowed.'
                     : 'Could not load the items for this PO. Please try again.';
-                modalError.textContent = message;
-                modalError.classList.remove('d-none');
-                poError.textContent = message;
                 poError.classList.remove('d-none');
             })
             .finally(() => {
                 if (String(poId.value) !== String(id)) return;
+                loadingItems = false;
                 poLoading.classList.add('d-none');
+                refreshItemsState();
             });
     }
 
+    // --- Including and excluding rows -----------------------------------------
     /**
-     * The picker's ticks, held outside the table markup.
+     * The whole PO loads, so most rows start with nothing typed in them and
+     * `store()` rejects any submitted row totalling zero. The checkbox is what
+     * says which rows are part of this issue.
      *
-     * renderStyles() and renderItems() rebuild their tbody from scratch on every
-     * step change, which threw away every checkbox the user had set: stepping
-     * Back to add a style and forward again silently dropped the items already
-     * chosen. Keeping the selection here and re-applying it after each rebuild
-     * is what makes Back/Next non-destructive.
-     */
-    let pickedStyles = [];
-    let pickedItems = [];
-    const clearPicked = () => { pickedStyles = []; pickedItems = []; };
-
-    function showStep(step) {
-        modalLoading.classList.add('d-none');
-        modalError.classList.add('d-none');
-        step1.classList.toggle('d-none', step !== 1);
-        step2.classList.toggle('d-none', step !== 2);
-        // The style step is always part of the flow, including the single-style
-        // case: issuing against the wrong style is not a recoverable mistake, so
-        // the style is confirmed explicitly rather than assumed.
-        backBtn.classList.toggle('d-none', step !== 2);
-        nextBtn.classList.toggle('d-none', step !== 1);
-        addBtn.classList.toggle('d-none', step !== 2);
-        crumb1.classList.toggle('is-current', step === 1);
-        crumb1.classList.toggle('is-done', step === 2);
-        crumb2.classList.toggle('is-current', step === 2);
-
-        // The two steps filter on different columns, so the box starts empty on
-        // each one rather than carrying a style term into the item list.
-        filterInput.value = '';
-        pickBar.classList.remove('d-none');
-
-        // Column filters belong to one pass through the item list. Returning to
-        // the style step can change which items exist at all, so a filter left
-        // over from the previous pass could hide rows the user just chose.
-        closePickerMenus();
-        pickerFilter.clearAll();
-
-        if (step === 1) renderStyles(); else renderItems();
-
-        // Restart the entrance animation on the panel that just took over.
-        const panel = step === 1 ? step1 : step2;
-        panel.classList.remove('bi-step-in');
-        void panel.offsetWidth;
-        panel.classList.add('bi-step-in');
-    }
-
-    function renderStyles() {
-        const already = addedRowIds();
-
-        // Capture the ticks before the tbody they live in is replaced.
-        if (styleBody.querySelector('.bi-style-cb')) pickedStyles = chosenStyles();
-
-        styleBody.innerHTML = styleNames().map((name, i) => {
-            const under = items.filter((it) => styleKey(it) === name);
-            const allAdded = under.every((it) => already.includes(String(it.excel_row_id)));
-            const avail = under.reduce((sum, it) => sum + (parseFloat(it.available) || 0), 0);
-            // Nothing under this style can be issued, so there is nothing to
-            // choose here either.
-            const noStock = !under.some((it) => (parseFloat(it.available) || 0) > 0);
-            const blocked = allAdded || noStock;
-            const why = noStock ? 'No available stock under this style' : 'Every item under this style is already added';
-
-            return '<tr class="' + (blocked ? (noStock ? 'is-empty' : 'is-added') : 'bi-row') + '">' +
-                '<td><input type="checkbox" class="form-check-input bi-style-cb" id="biStyle' + i + '"' +
-                    ' value="' + h(name) + '"' + (blocked ? ' disabled title="' + why + '"' : '') +
-                    ' aria-label="Select style ' + h(name) + '"></td>' +
-                '<td class="bi-cell-primary fw-semibold">' + dash(name) + '</td>' +
-                '<td class="text-end small">' + under.length + '</td>' +
-                '<td class="text-end small">' + (noStock
-                    ? '<span class="badge bg-secondary-subtle text-secondary-emphasis">Out of stock</span>'
-                    : fmtNum(avail)) + '</td>' +
-            '</tr>';
-        }).join('');
-
-        const boxes = Array.from(styleBody.querySelectorAll('.bi-style-cb:not(:disabled)'));
-
-        if (pickedStyles.length) {
-            // Put back what the user had chosen before stepping away.
-            boxes.forEach((cb) => { cb.checked = pickedStyles.indexOf(cb.value) !== -1; });
-        } else if (boxes.length === 1) {
-            // A PO with one style still shows this step, but there is nothing to
-            // decide — so it comes pre-ticked and the user only confirms it.
-            boxes[0].checked = true;
-        }
-
-        // applyFilter() finishes with updatePickCount(), so the toolbar counts
-        // and the footer badge are refreshed from one place.
-        applyFilter();
-    }
-
-    const chosenStyles = () => Array.from(styleBody.querySelectorAll('.bi-style-cb:checked')).map((cb) => cb.value);
-
-    /**
-     * Excel-style column filter over the item picker's list, sharing its rules
-     * with the Bulk Issuing Full Table through column-filter.js — one set of
-     * semantics, two renderers.
+     * Excluding disables the row's inputs rather than clearing them: a disabled
+     * field is not submitted, but it keeps its value, so a row can be taken out
+     * and put back without the user retyping anything. That is the whole reason
+     * it is a checkbox and not a Remove button — the old Remove is gone, since
+     * with no picker to re-add from, removing a row was one-way.
      *
-     * Scoped to the styles confirmed at step 1, so a value list never offers a
-     * colour or SAP code from a style the user did not pick.
+     * Distinct from the display filter: a row hidden by Filters still submits
+     * whatever is typed in it. Excluded and hidden are different states, and
+     * they are styled differently for exactly that reason.
      */
-    const PICKER_COLUMNS = [
-        // Style leads the table and is filterable in its own right. It replaces
-        // the separate "choose the style first" step: issuing against the wrong
-        // style is not recoverable, so the style must be readable on every row
-        // rather than confirmed once and then out of sight.
-        { key: 'style_name' },
-        { key: 'material_name' },
-        { key: 'material_description' },
-        { key: 'art_no' },
-        { key: 'sap_code' },
-        { key: 'gmts_color_name' },
-        { key: 'material_color' },
-        { key: 'size' },
-        { key: 'uom' },
-        { key: 'available', type: 'num' },
-    ];
-
-    const pickerFilter = createColumnFilter({
-        columns: PICKER_COLUMNS,
-        getRows: () => {
-            const styles = chosenStyles();
-            return items.filter((it) => styles.indexOf(styleKey(it)) !== -1);
-        },
-    });
-
-    let openPickerMenu = '';
-
-    function renderItems() {
-        const already = addedRowIds();
-
-        // Capture the ticks before the tbody they live in is replaced. Already-
-        // added rows are excluded: they are checked because they are disabled,
-        // not because the user chose them in this pass.
-        if (itemBody.querySelector('.bi-item-cb')) {
-            pickedItems = Array.from(itemBody.querySelectorAll('.bi-item-cb:not(:disabled)'))
-                .filter((cb) => cb.checked).map((cb) => cb.value);
-        }
-        // Only the styles the user confirmed at step 1 are in scope, narrowed
-        // further by whatever the column filters allow. apply() has already
-        // sorted, so slicing per style keeps that order inside each group.
-        const styles = chosenStyles();
-        const allowed = pickerFilter.apply();
-        let html = '';
-
-        styles.forEach((name) => {
-            const under = allowed.filter((it) => styleKey(it) === name);
-
-            if (styles.length > 1) {
-                html += '<tr class="bi-group-row"><td colspan="11">' +
-                    '<i class="bi bi-tag me-1" aria-hidden="true"></i>Style ' + dash(name) +
-                    ' <span class="fw-normal">· ' + under.length + ' item(s)</span></td></tr>';
-            }
-
-            under.forEach((item, i) => {
-                const isAdded = already.includes(String(item.excel_row_id));
-                const avail = parseFloat(item.available) || 0;
-                // Stock integrity: an item with nothing on hand cannot be issued,
-                // so it is shown for reference but never selectable.
-                const noStock = avail <= 0;
-                const cbId = 'biItem' + h(name).replace(/\W/g, '') + i;
-                const rowCls = isAdded ? 'is-added' : (noStock ? 'is-empty' : 'bi-row');
-
-                html += '<tr class="' + rowCls + '">' +
-                    '<td><input type="checkbox" class="form-check-input bi-item-cb" id="' + cbId + '"' +
-                        ' value="' + h(item.excel_row_id) + '"' +
-                        (isAdded ? ' checked disabled title="Already added below"'
-                                 : (noStock ? ' disabled title="No available stock"' : '')) +
-                        ' aria-label="Select material line ' + h(item.material_name) + '"></td>' +
-
-                    // One cell per field, matching the header columns so each is
-                    // filterable on its own. GMTS colour is the garment's,
-                    // material colour is the trim's — separate columns, not one.
-                    '<td><span class="bi-style-tag">' + dash(item.style_name) + '</span></td>' +
-                    '<td><div class="bi-cell-primary">' + dash(item.material_name) + '</div></td>' +
-                    '<td class="bi-ft-wide"><div class="bi-cell-sub" title="' + h(item.material_description) + '">' +
-                        dash(item.material_description) + '</div></td>' +
-                    '<td class="small">' + dash(item.art_no) + '</td>' +
-                    '<td class="small">' + dash(item.sap_code) + '</td>' +
-                    '<td class="small">' + dash(item.gmts_color_name) + '</td>' +
-                    '<td class="small">' + dash(item.material_color) + '</td>' +
-                    '<td class="small">' + dash(item.size) + '</td>' +
-                    '<td class="small">' + dash(item.uom) + '</td>' +
-                    '<td class="small text-end">' + (noStock
-                        ? '<span class="badge bg-secondary-subtle text-secondary-emphasis">Out of stock</span>'
-                        : '<span class="fw-semibold">' + fmtNum(avail) + '</span>') + '</td>' +
-                '</tr>';
-            });
-        });
-
-        itemBody.innerHTML = html;
-
-        // Re-tick what was already chosen. An item that fell out of scope because
-        // its style was unticked simply has no checkbox left to match.
-        Array.from(itemBody.querySelectorAll('.bi-item-cb:not(:disabled)'))
-            .forEach((cb) => { if (pickedItems.indexOf(cb.value) !== -1) cb.checked = true; });
-
-        syncPickerHeads();
-        applyFilter();
+    function isIncluded(row) {
+        return !row.classList.contains('bi-mx-excluded');
     }
 
-    // --- Item picker column filters -------------------------------------------
-    /**
-     * The dropdown for one column, built with the same markup and classes as the
-     * Full Table's so the two look and behave identically. Rendered on demand:
-     * a picker can hold hundreds of values across nine columns, and building all
-     * of them up front would cost more than it saves.
-     */
-    function renderPickerMenu(key) {
-        const menu = document.querySelector('[data-bi-pmenu="' + key + '"]');
-        if (!menu) return;
+    function setRowIncluded(row, on) {
+        // Nothing on hand cannot be issued — the server refuses it outright, so
+        // the row is shown for reference but never selectable.
+        if (row.classList.contains('bi-mx-nostock')) on = false;
 
-        const values = pickerFilter.valuesFor(key);
-        const opts = values.map((v) => '<label class="bi-ft-mopt">' +
-            '<input type="checkbox" class="form-check-input" data-bi-pval="' + h(v) + '"' +
-            (pickerFilter.isChecked(key, v) ? ' checked' : '') + '>' +
-            '<span>' + h(v) + '</span></label>').join('');
-
-        menu.innerHTML =
-            '<button type="button" class="bi-ft-mitem" data-bi-psort="asc"><i class="bi bi-sort-alpha-down" aria-hidden="true"></i>Sort A to Z</button>' +
-            '<button type="button" class="bi-ft-mitem" data-bi-psort="desc"><i class="bi bi-sort-alpha-up-alt" aria-hidden="true"></i>Sort Z to A</button>' +
-            '<div class="bi-ft-msep"></div>' +
-            '<div class="bi-ft-msearch"><i class="bi bi-search" aria-hidden="true"></i>' +
-                '<input type="text" class="form-control form-control-sm" data-bi-pneedle placeholder="Search values…"' +
-                ' value="' + h(pickerFilter.needles[key] || '') + '" aria-label="Search values"></div>' +
-            '<label class="bi-ft-mall"><input type="checkbox" class="form-check-input" data-bi-pall' +
-                (pickerFilter.allChecked(key) ? ' checked' : '') + '><span>(Select All)</span></label>' +
-            '<div class="bi-ft-mlist">' + (opts || '<div class="bi-ft-mempty">No matching values</div>') + '</div>' +
-            '<div class="bi-ft-mfoot">' +
-                '<button type="button" class="btn btn-sm btn-link text-decoration-none p-0" data-bi-pclear>Clear filter</button>' +
-                '<button type="button" class="btn btn-sm btn-primary bi-btn-xs" data-bi-pdone>Done</button>' +
-            '</div>';
+        row.classList.toggle('bi-mx-excluded', !on);
+        const cb = row.querySelector('[data-bi-include]');
+        if (cb) cb.checked = on;
+        row.querySelectorAll('.bi-qty, input[type="hidden"]').forEach((el) => { el.disabled = !on; });
     }
 
-    /** Funnel icons follow the filter state, as they do on the Full Table. */
-    function syncPickerHeads() {
-        document.querySelectorAll('[data-bi-pfilter]').forEach((btn) => {
-            const key = btn.getAttribute('data-bi-pfilter');
-            const on = pickerFilter.isFiltered(key) || pickerFilter.sortKey === key;
-            btn.classList.toggle('is-on', on);
-            const icon = btn.querySelector('i');
-            if (icon) icon.className = pickerFilter.isFiltered(key) ? 'bi bi-funnel-fill' : 'bi bi-chevron-down';
+    const rowTotal = (row) => Array.from(row.querySelectorAll('.bi-qty'))
+        .reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
+
+    /** Rows the header checkbox acts on: on screen, and issuable at all. */
+    const selectableRows = () => matrixRows().filter((row) =>
+        !row.classList.contains('bi-mx-hidden') && !row.classList.contains('bi-mx-nostock'));
+
+    function syncIncludeHead() {
+        // Including or excluding a row changes the footer's count without
+        // touching the filter, so the count is refreshed from here too.
+        syncFooterCount();
+
+        if (!includeAll) return;
+        const rows = selectableRows();
+        const on = rows.filter(isIncluded).length;
+
+        includeAll.disabled = rows.length === 0;
+        includeAll.checked = rows.length > 0 && on === rows.length;
+        includeAll.indeterminate = on > 0 && on < rows.length;
+    }
+
+    if (includeAll) {
+        includeAll.addEventListener('change', () => {
+            selectableRows().forEach((row) => setRowIncluded(row, includeAll.checked));
+            syncIncludeHead();
+            checkOver();
         });
     }
 
-    function closePickerMenus() {
-        openPickerMenu = '';
-        document.querySelectorAll('[data-bi-pmenu]').forEach((m) => m.classList.add('d-none'));
-        document.querySelectorAll('[data-bi-pfilter]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
-    }
-
-    const itemTableEl = document.getElementById('biItemTable');
-
-    if (itemTableEl) {
-        itemTableEl.addEventListener('click', (e) => {
-            // Open / close a column's menu.
-            const trigger = e.target.closest('[data-bi-pfilter]');
-            if (trigger) {
-                const key = trigger.getAttribute('data-bi-pfilter');
-                const wasOpen = openPickerMenu === key;
-                closePickerMenus();
-                if (!wasOpen) {
-                    openPickerMenu = key;
-                    pickerFilter.needles[key] = '';
-                    renderPickerMenu(key);
-
-                    const menuEl = document.querySelector('[data-bi-pmenu="' + key + '"]');
-                    menuEl.classList.remove('d-none');
-                    // The picker table scrolls sideways, and an absolutely
-                    // positioned menu inside that box would be clipped by it.
-                    // Pinned to the viewport instead, under its own header.
-                    const box = trigger.getBoundingClientRect();
-                    const width = menuEl.offsetWidth || 250;
-                    menuEl.style.top = Math.round(box.bottom + 4) + 'px';
-                    menuEl.style.left = Math.round(Math.min(box.left, window.innerWidth - width - 12)) + 'px';
-
-                    trigger.setAttribute('aria-expanded', 'true');
-                }
-                return;
-            }
-
-            const menu = e.target.closest('[data-bi-pmenu]');
-            if (!menu) { closePickerMenus(); return; }
-
-            const key = menu.getAttribute('data-bi-pmenu');
-
-            const sort = e.target.closest('[data-bi-psort]');
-            if (sort) {
-                pickerFilter.sortBy(key, sort.getAttribute('data-bi-psort'));
-                closePickerMenus();
-                renderItems();
-                return;
-            }
-
-            if (e.target.closest('[data-bi-pclear]')) {
-                pickerFilter.clearFilter(key);
-                closePickerMenus();
-                renderItems();
-                return;
-            }
-
-            if (e.target.closest('[data-bi-pdone]')) { closePickerMenus(); return; }
-        });
-
-        itemTableEl.addEventListener('change', (e) => {
-            const menu = e.target.closest('[data-bi-pmenu]');
-            if (!menu) return;
-            const key = menu.getAttribute('data-bi-pmenu');
-
-            if (e.target.hasAttribute('data-bi-pall')) {
-                pickerFilter.toggleAll(key);
-            } else if (e.target.hasAttribute('data-bi-pval')) {
-                pickerFilter.toggleValue(key, e.target.getAttribute('data-bi-pval'));
-            } else {
-                return;
-            }
-
-            // The list is rebuilt rather than patched: ticking one value changes
-            // what the OTHER columns can offer, and the row list behind it.
-            renderPickerMenu(key);
-            renderItems();
-        });
-
-        itemTableEl.addEventListener('input', (e) => {
-            if (!e.target.hasAttribute('data-bi-pneedle')) return;
-            const menu = e.target.closest('[data-bi-pmenu]');
-            const key = menu.getAttribute('data-bi-pmenu');
-            pickerFilter.needles[key] = e.target.value;
-
-            // Only the value list changes while typing, so the caret stays put.
-            const list = menu.querySelector('.bi-ft-mlist');
-            const values = pickerFilter.valuesFor(key);
-            list.innerHTML = values.length
-                ? values.map((v) => '<label class="bi-ft-mopt">' +
-                    '<input type="checkbox" class="form-check-input" data-bi-pval="' + h(v) + '"' +
-                    (pickerFilter.isChecked(key, v) ? ' checked' : '') + '>' +
-                    '<span>' + h(v) + '</span></label>').join('')
-                : '<div class="bi-ft-mempty">No matching values</div>';
-        });
-    }
-
-    const onItemStep = () => step1.classList.contains('d-none');
-    const activeBoxes = () => Array.from(
-        (onItemStep() ? itemBody : styleBody)
-            .querySelectorAll(onItemStep() ? '.bi-item-cb:not(:disabled)' : '.bi-style-cb:not(:disabled)'));
-
-    /**
-     * The boxes the filter is currently showing.
-     *
-     * Select all — the header checkbox and the toolbar button — acts on these, so
-     * "filter, then take the lot" is one gesture. The selected COUNT stays on
-     * activeBoxes(): a tick made before the filter was typed is still a real
-     * selection and must not appear to vanish.
-     */
-    const visibleBoxes = () => activeBoxes().filter((cb) => {
-        const tr = cb.closest('tr');
-        return tr && !tr.classList.contains('is-filtered');
+    itemRows.addEventListener('change', (e) => {
+        const cb = e.target.closest('[data-bi-include]');
+        if (!cb) return;
+        setRowIncluded(cb.closest('.bi-item-card'), cb.checked);
+        syncIncludeHead();
+        checkOver();
     });
 
-    /**
-     * Client-side row filter over the row's own rendered text, so it covers
-     * material, art no, SAP code, colour, size and unit without the markup
-     * having to declare which columns are searchable.
-     */
-    function applyFilter() {
-        const body = onItemStep() ? itemBody : styleBody;
-        const term = (filterInput.value || '').trim().toLowerCase();
-        const rows = Array.from(body.querySelectorAll('tr'));
-        let total = 0;
-        let shown = 0;
-
-        rows.forEach((tr) => {
-            if (tr.classList.contains('bi-group-row')) return;   // handled below
-            total += 1;
-            const hit = !term || tr.textContent.toLowerCase().indexOf(term) !== -1;
-            tr.classList.toggle('is-filtered', !hit);
-            if (hit) shown += 1;
-        });
-
-        // A style heading with nothing left under it is noise, so it follows its
-        // own rows out of the list.
-        rows.filter((tr) => tr.classList.contains('bi-group-row')).forEach((head) => {
-            let any = false;
-            for (let el = head.nextElementSibling; el && !el.classList.contains('bi-group-row'); el = el.nextElementSibling) {
-                if (!el.classList.contains('is-filtered')) { any = true; break; }
-            }
-            head.classList.toggle('is-filtered', !any);
-        });
-
-        filterClear.classList.toggle('d-none', term === '');
-        noMatchEl.classList.toggle('d-none', !(total > 0 && shown === 0));
-        showingEl.textContent = term
-            ? shown + ' of ' + total + ' shown'
-            : total + (total === 1 ? ' row' : ' rows');
-
-        updatePickCount();
-    }
-
-    function updatePickCount() {
-        const boxes = activeBoxes();
-        const shownBoxes = visibleBoxes();
-        const checked = boxes.filter((cb) => cb.checked);
-        const onItems = onItemStep();
-
-        pickCount.textContent = checked.length;
-        pickCountLabel.textContent = onItems
-            ? (checked.length === 1 ? 'item selected' : 'items selected')
-            : (checked.length === 1 ? 'style selected' : 'styles selected');
-        pickCountWrap.classList.toggle('is-active', checked.length > 0);
-
-        nextBtn.disabled = onItems ? false : checked.length === 0;
-        addBtn.disabled = checked.length === 0;
-
-        const master = onItems ? itemAll : styleAll;
-        master.disabled = shownBoxes.length === 0;
-        master.checked = shownBoxes.length > 0 && shownBoxes.every((cb) => cb.checked);
-
-        // The button mirrors the header checkbox, spelled out. On a one- or
-        // two-item PO it is the whole selection in a single click.
-        const allShown = shownBoxes.length > 0 && shownBoxes.every((cb) => cb.checked);
-        selectAllBtn.disabled = shownBoxes.length === 0;
-        selectAllText.textContent = allShown
-            ? 'Clear all'
-            : 'Select all' + (shownBoxes.length ? ' (' + shownBoxes.length + ')' : '');
-
-        boxes.forEach((cb) => {
-            const tr = cb.closest('tr');
-            if (tr) tr.classList.toggle('is-checked', cb.checked);
-        });
-    }
-
-    filterInput.addEventListener('input', applyFilter);
-    filterInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') { filterInput.value = ''; applyFilter(); }
-    });
-    filterClear.addEventListener('click', () => {
-        filterInput.value = '';
-        filterInput.focus();
-        applyFilter();
-    });
-    selectAllBtn.addEventListener('click', () => {
-        const shownBoxes = visibleBoxes();
-        const allShown = shownBoxes.length > 0 && shownBoxes.every((cb) => cb.checked);
-        shownBoxes.forEach((cb) => { cb.checked = !allShown; });
-        updatePickCount();
-    });
-
-    [[styleAll, styleBody], [itemAll, itemBody]].forEach(([master, body]) => {
-        master.addEventListener('change', () => {
-            visibleBoxes().forEach((cb) => { cb.checked = master.checked; });
-            updatePickCount();
-        });
-        body.addEventListener('change', (e) => {
-            if (e.target.classList.contains('bi-style-cb') || e.target.classList.contains('bi-item-cb')) updatePickCount();
-        });
-        // Clicking anywhere on a selectable row toggles it. Clicks on the box
-        // itself are left alone or they would toggle twice.
-        body.addEventListener('click', (e) => {
-            const tr = e.target.closest('tr.bi-row');
-            if (!tr || e.target.matches('input[type="checkbox"]')) return;
-            const cb = tr.querySelector('input[type="checkbox"]:not(:disabled)');
-            if (!cb) return;
-            cb.checked = !cb.checked;
-            updatePickCount();
-        });
-    });
-
-    nextBtn.addEventListener('click', () => showStep(2));
-    backBtn.addEventListener('click', () => showStep(1));
-
-    modalEl.addEventListener('show.bs.modal', () => {
-        // Always land on the style step, whatever the PO carries.
-        const open = () => { if (items.length) showStep(1); };
-        if (loadedPoId === poId.value) open(); else loadItems(poId.value).then(open);
-    });
-
-    addBtn.addEventListener('click', () => {
-        const chosen = activeBoxes().filter((cb) => cb.checked)
-            .map((cb) => items.find((it) => String(it.excel_row_id) === String(cb.value)))
-            .filter(Boolean);
-
-        // The checkboxes for these are disabled, so this only catches a tampered
-        // or stale DOM — but an out-of-stock item must never reach the form.
-        const empty = chosen.filter((it) => (parseFloat(it.available) || 0) <= 0);
-        if (empty.length) {
-            modalError.textContent = empty.length === 1
-                ? 'That item has no available stock and cannot be issued.'
-                : empty.length + ' of the selected items have no available stock and cannot be issued.';
-            modalError.classList.remove('d-none');
-            return;
-        }
-
-        chosen.forEach((item) => addItemRow(item));
-        refreshItemsState();
-        // These are quantity blocks now, not pending ticks — reopening the
-        // picker to "Add More Items" should start from a clean sheet.
-        clearPicked();
-        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
-    });
-
-    // --- Step 5: one quantity block per selected item -------------------------
+    // --- One row per material line --------------------------------------------
     /**
      * In create mode each item posts as rows[i][...] so one submission can record
      * several issues. In edit mode a single row posts the original flat field
@@ -1436,108 +752,408 @@ function initPanel(cfg) {
         const i = uid++;
         const n = (field) => (editing ? field : 'rows[' + i + '][' + field + ']');
         const avail = parseFloat(item.available) || 0;
+        // Nothing on hand: store() refuses it, so the row is shown for reference
+        // and can never be included.
+        const noStock = avail <= 0;
 
-        const wrap = document.createElement('div');
-        wrap.className = 'bi-item-card';
+        // One <tr> per item. The class, the dataset and every data-bi-* hook are
+        // the ones the card layout used, so checkOver(), publishState() and the
+        // set-max handler below did not have to change with it.
+        const wrap = document.createElement('tr');
+        wrap.className = 'bi-item-card' + (noStock ? ' bi-mx-nostock' : '');
         wrap.dataset.rowId = item.excel_row_id;
         wrap.dataset.available = String(avail);
 
-        const identity = [item.material_color, item.size, item.uom].filter(Boolean).join(' · ');
+        // Every identity field the matrix can filter on, kept on the row itself
+        // so the filter modal reads the row rather than re-parsing its cells.
+        MATRIX_FIELDS.forEach((f) => {
+            wrap.dataset[f.data] = String(item[f.key] == null ? '' : item[f.key]);
+        });
 
         wrap.innerHTML =
-            '<div class="d-flex align-items-start justify-content-between gap-2 mb-2">' +
-                '<div class="min-w-0">' +
-                    '<div class="bi-item-head">' + dash(item.material_name || item.material_description) + '</div>' +
-                    // The style is called out rather than buried in the meta
-                    // line: it is the one thing on this card that cannot be
-                    // corrected after the issue is saved.
-                    '<div class="bi-item-style"><i class="bi bi-tag-fill" aria-hidden="true"></i>' +
-                        dash(item.style_name) + '</div>' +
-                    '<div class="bi-item-meta">' + dash([item.art_no, identity].filter(Boolean).join(' · ')) + '</div>' +
-                '</div>' +
-                '<div class="d-flex align-items-center gap-2 flex-shrink-0">' +
-                    '<span class="badge bg-secondary-subtle text-secondary-emphasis text-nowrap" data-bi-filled ' +
-                        'title="How many of the four quantity fields carry a value">0/4</span>' +
-                    '<span class="badge bg-success-subtle text-success text-nowrap">Avail: ' + fmtNum(avail) + '</span>' +
-                    // Labelled rather than a bare ✕ — store staff should not have
-                    // to hover a card to learn that the cross drops the item.
-                    '<button type="button" class="btn btn-sm btn-link text-danger p-0 text-decoration-none bi-btn-inline" ' +
-                        'data-bi-remove-item title="Remove this item from the issue">' +
-                        '<i class="bi bi-x-lg me-1" aria-hidden="true"></i>Remove</button>' +
-                '</div>' +
-            '</div>' +
-            '<input type="hidden" name="' + n('excel_row_id') + '" value="' + h(item.excel_row_id) + '">' +
-            '<div class="row g-2 bi-qty-grid">' +
-                qtyCell('bulk', 'Bulk', 'text-success', n('bulk_qty'), preset.bulk_qty) +
-                qtyCell('sample', 'Sample', 'text-primary', n('sample_qty'), preset.sample_qty) +
-                qtyCell('liability', 'Liability', 'text-warning', n('liability_qty'), preset.liability_qty) +
-                qtyCell('dead', 'Dead', 'text-danger', n('dead_qty'), preset.dead_qty) +
-            '</div>' +
+            // Include / exclude. Edit mode corrects exactly one row, so there is
+            // nothing to include or leave out and the cell stays empty — the
+            // column itself is hidden by CSS in that mode.
+            '<td class="bi-mx-check">' + (editing ? '' :
+                '<input type="checkbox" class="form-check-input" data-bi-include' +
+                (noStock ? ' disabled title="No available stock"' : '') +
+                ' aria-label="Include ' + h(item.material_name || item.material_description) + ' in this issue">') +
+            '</td>' +
+            cell('season', item.season_name) +
+            cell('buyer', item.buyer_name) +
+            // The style is called out rather than plain text: it is the one
+            // thing on this row that cannot be corrected after the issue saves.
+            '<td class="bi-mx-po bi-mx-style">' + dash(item.style_name) + '</td>' +
+            cell('po', item.po_no) +
+            cell('gmts', item.gmts_color_name) +
+            '<td class="bi-item-head bi-mx-strong">' + dash(item.material_name || item.material_description) + '</td>' +
+            '<td class="bi-mx-desc">' + dash(item.material_description) + '</td>' +
+            '<td class="bi-mx-art">' + dash(item.art_no) + '</td>' +
+            '<td>' + dash(item.sap_code) + '</td>' +
+            '<td>' + dash(item.material_color) + '</td>' +
+            '<td>' + dash(item.size) + '</td>' +
+            '<td class="text-center text-muted">' + dash(item.uom) + '</td>' +
+            // The hidden row id rides inside a cell, not between two: a stray
+            // <input> in <tr> context is foster-parented out of the table by the
+            // HTML parser and would never reach the POST.
+            '<td class="text-end bi-mx-avail">' + fmtNum(avail) +
+                '<input type="hidden" name="' + n('excel_row_id') + '" value="' + h(item.excel_row_id) + '">' +
+            '</td>' +
+            qtyCell('bulk', 'Bulk Issued Qty', n('bulk_qty'), preset.bulk_qty) +
+            qtyCell('sample', 'Sample Issued Qty', n('sample_qty'), preset.sample_qty) +
+            qtyCell('liability', 'Liability Stock Qty', n('liability_qty'), preset.liability_qty) +
+            qtyCell('dead', 'Dead Stock Qty', n('dead_qty'), preset.dead_qty) +
             // Running total against the balance. The same figures checkOver()
             // already computes, stated before the user hits the error rather
-            // than only after.
-            '<div class="bi-item-total">' +
-                '<i class="bi bi-calculator" aria-hidden="true"></i>' +
-                '<span>Total <span class="bi-item-total-num" data-bi-total>0</span> of ' + fmtNum(avail) + '</span>' +
-            '</div>' +
-            // The limit applies to the sum of four independent fields, so which
-            // one to reduce is the user's call — hence a blocking message with a
+            // than only after. The over-limit message lives here too: the limit
+            // applies to the sum of four independent fields, so which one to
+            // reduce is the user's call — hence a blocking message with a
             // one-click way out, rather than silently rewriting what they typed.
-            '<div class="d-flex align-items-center justify-content-between gap-2 mt-2 d-none" data-bi-over>' +
-                '<span class="bi-item-error"><i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>' +
-                    '<span data-bi-over-text></span></span>' +
-                '<button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" data-bi-setmax ' +
-                    'title="Set Bulk to the available balance and clear the other three">Set to max</button>' +
-            '</div>';
+            '<td class="bi-mx-total">' +
+                '<span class="bi-item-total-num" data-bi-total>0</span>' +
+                '<span class="bi-mx-filled" data-bi-filled ' +
+                    'title="How many of the four quantity fields carry a value">0/4</span>' +
+                '<div class="bi-mx-over d-none" data-bi-over>' +
+                    '<span class="bi-item-error"><i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>' +
+                        '<span data-bi-over-text></span></span>' +
+                    '<button type="button" class="btn btn-sm btn-outline-danger" data-bi-setmax ' +
+                        'title="Set Bulk to the available balance and clear the other three">Set to max</button>' +
+                '</div>' +
+            '</td>';
 
         itemRows.appendChild(wrap);
 
-        // Suggested bulk default from the BOM's GMTS Order Qty, as before.
-        if (preset.bulk_qty === undefined && item.gmts_order_qty) {
-            const bulkInput = wrap.querySelector('input[name$="[bulk_qty]"], input[name="bulk_qty"]');
-            if (bulkInput) bulkInput.value = item.gmts_order_qty;
+        // A row starts out of the issue and joins it when a quantity is typed.
+        // The whole PO loads now, so the opposite default would offer to issue
+        // every line under the booking — and the suggested Bulk default this
+        // used to take from the BOM's GMTS Order Qty went with it, for the same
+        // reason: pre-filling 50 rows is not a suggestion, it is an issue nobody
+        // asked for. Edit mode still prefills, from the record being corrected.
+        setRowIncluded(wrap, editing || rowTotal(wrap) > 0);
+
+        if (!suspendCheck) checkOver();
+    }
+
+    /**
+     * One quantity cell. On a matrix the column header carries the label, so the
+     * per-field label becomes the input's accessible name instead of visible
+     * text — the colour of the input is what tells the four columns apart, and
+     * that colour comes from the `bi-qty-<kind>` class rather than inline style.
+     */
+    function qtyCell(kind, label, name, value) {
+        const id = 'biQty_' + String(name).replace(/\W/g, '_');
+
+        return '<td class="bi-mx-qty">' +
+            '<input type="number" step="0.0001" min="0" id="' + id + '" name="' + h(name) + '" placeholder="–" ' +
+                'aria-label="' + h(label) + '" class="bi-qty bi-qty-input bi-qty-' + kind + '"' +
+                (value !== undefined && value !== null && value !== '' ? ' value="' + h(value) + '"' : '') + '>' +
+        '</td>';
+    }
+
+    /** Plain identity cell, tagged so the panel shell can drop the wide ones. */
+    function cell(tag, value) {
+        return '<td class="bi-mx-po bi-mx-' + tag + '">' + dash(value) + '</td>';
+    }
+
+    itemRows.addEventListener('input', (e) => {
+        if (!e.target.classList.contains('bi-qty')) return;
+
+        // Typing a quantity is what says "this line is part of the issue", so
+        // it ticks the row rather than making the user tick it first. Clearing
+        // the field again does not untick: the row is left in, and submit drops
+        // it only if it is still empty then.
+        const row = e.target.closest('.bi-item-card');
+        if (row && e.target.value !== '') {
+            setRowIncluded(row, true);
+            syncIncludeHead();
         }
 
         checkOver();
-    }
-
-    function qtyCell(cls, label, tone, name, value) {
-        // Two-up on a narrow panel, all four on one line once the slide-over is
-        // wide enough for them (xl and above).
-        //
-        // The colour marker is a CSS dot rather than an emoji: emoji render at a
-        // different size and hue on every OS, which is what made the four labels
-        // look uneven. The field name is untouched.
-        const id = 'biQty_' + String(name).replace(/\W/g, '_');
-
-        return '<div class="col-6 col-xl-3"><div class="bi-qty-card ' + cls + '">' +
-            '<label class="form-label ' + tone + '" for="' + id + '">' +
-                '<span class="bi-qty-dot" aria-hidden="true"></span>' + label +
-            '</label>' +
-            '<input type="number" step="0.0001" min="0" id="' + id + '" name="' + h(name) + '" placeholder="0" ' +
-                'class="form-control form-control-sm bi-qty"' +
-                (value !== undefined && value !== null && value !== '' ? ' value="' + h(value) + '"' : '') + '>' +
-        '</div></div>';
-    }
-
-    itemRows.addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-bi-remove-item]');
-        if (!btn) return;
-        btn.closest('.bi-item-card').remove();
-        refreshItemsState();
-        checkOver();
-    });
-
-    itemRows.addEventListener('input', (e) => {
-        if (e.target.classList.contains('bi-qty')) checkOver();
     });
 
     function refreshItemsState() {
         const count = itemRows.children.length;
-        noItems.classList.toggle('d-none', count > 0);
-        // Editing corrects one issue, so there is nothing to add alongside it.
-        addMoreWrap.classList.toggle('d-none', count === 0 || editing);
+        // "No purchase order selected" would be a lie for the second or two a
+        // PO's lines are in flight — the spinner above says what is happening.
+        noItems.classList.toggle('d-none', count > 0 || loadingItems);
+        applyMatrixFilter();
+        syncIncludeHead();
         publishState();
+    }
+
+    // --- Matrix search + Excel-style column filter -----------------------------
+    // Display only. Hiding a row never detaches its inputs, so a quantity typed
+    // and then filtered out of view is still saved — which is why the count of
+    // hidden rows is always on screen rather than left for the user to infer.
+    const mxSearch = document.getElementById('biMatrixSearch');
+    const mxGrid = document.getElementById('biMatrixFilterGrid');
+    const mxModal = document.getElementById('biMatrixFilterModal');
+    const mxApply = document.getElementById('biMatrixFilterApply');
+    const mxReset = document.getElementById('biMatrixFilterReset');
+    const mxShowing = document.getElementById('biMatrixShowing');
+    const mxFilterBtn = document.getElementById('biMatrixFilterBtn');
+    const mxFooterCount = document.getElementById('biFooterCount');
+    const mxSectTitle = document.getElementById('biFxSectTitle');
+    const mxSectNote = document.getElementById('biFxSectNote');
+
+    // Chosen value per field, empty string meaning "all".
+    const mxChoice = {};
+
+    // One TomSelect per field, keyed by `data`. Built once and then refilled,
+    // never rebuilt: destroying and re-creating eleven controls on every open
+    // loses focus, scroll position and any options already fetched.
+    const mxSelects = {};
+    let gridBuilt = false;
+
+    /** Identify a booking, or narrow the one already loaded? */
+    const inNarrowMode = () => matrixRows().length > 0;
+
+    /** Drop every row filter. A new PO's rows carry different values. */
+    function resetMatrixChoices() {
+        MATRIX_FIELDS.forEach((f) => { mxChoice[f.data] = ''; });
+        if (mxSearch) mxSearch.value = '';
+        Object.values(mxSelects).forEach((ts) => ts.clear(true));
+    }
+
+    function matrixRows() {
+        return Array.from(itemRows.children);
+    }
+
+    /**
+     * The eleven controls, created once.
+     *
+     * Each is a TomSelect so a field with 400 SAP codes can be typed at rather
+     * than scrolled through. Options are NOT loaded here — see fillField().
+     */
+    function buildFilterGrid() {
+        if (!mxGrid || gridBuilt) return;
+
+        mxGrid.innerHTML = MATRIX_FIELDS.map((f) => {
+            // Descriptions are long enough that a half-width box truncates them.
+            const wide = f.data === 'desc' ? ' bi-fx-wide' : '';
+
+            // The empty <option> is load-bearing. A single <select> with no
+            // empty choice makes TomSelect select the first option the moment
+            // any are added — which fired onChange, found one booking and
+            // loaded a PO nobody had picked.
+            return '<div class="bi-fx-card' + wide + '">' +
+                '<label for="biFx_' + f.data + '">' + h(f.label) + '</label>' +
+                '<select class="bi-fx-select" id="biFx_' + f.data + '" data-bi-fx="' + f.data + '">' +
+                    '<option value="">All</option>' +
+                '</select>' +
+            '</div>';
+        }).join('');
+
+        MATRIX_FIELDS.forEach((f) => {
+            const el = mxGrid.querySelector('#biFx_' + f.data);
+            if (!el) return;
+
+            const ts = new TomSelect(el, {
+                maxOptions: null,
+                placeholder: 'All',
+                allowEmptyOption: true,
+                // The value list is the whole point of the control; hiding it
+                // behind a typed character would make an empty field look
+                // broken on a screen where most fields are left alone.
+                openOnFocus: true,
+                onFocus: () => fillField(f),
+                onChange: (value) => onFieldChange(f, value),
+            });
+
+            mxSelects[f.data] = ts;
+        });
+
+        gridBuilt = true;
+    }
+
+    /**
+     * Put the right options into one field, for whichever question it is
+     * currently answering.
+     *
+     * Narrow mode reads the loaded rows — no request, and the values offered are
+     * exactly the values on screen. Identify mode asks the server for what the
+     * field holds across every booking, once per field per page: this is the
+     * lazy load, and it is why eleven fields do not cost eleven scans of
+     * ExcelCell just to open the dialog.
+     */
+    function fillField(f) {
+        const ts = mxSelects[f.data];
+        if (!ts) return;
+
+        if (inNarrowMode()) {
+            const values = Array.from(new Set(
+                matrixRows().map((r) => (r.dataset[f.data] || '').trim()).filter(Boolean)
+            )).sort((a, b) => a.localeCompare(b));
+
+            setOptions(ts, values.map((v) => ({ value: v, text: v })), mxChoice[f.data]);
+            return;
+        }
+
+        if (ts.loading || valueCache[f.group]) {
+            if (valueCache[f.group]) {
+                setOptions(ts, valueCache[f.group].map((r) => ({
+                    value: r.value,
+                    text: r.value + (Number(r.count) > 1 ? '  (' + r.count + ' POs)' : ''),
+                })), mxChoice[f.data]);
+            }
+            return;
+        }
+
+        ts.loading = 1;
+        ts.wrapper.classList.add('bi-fx-loading');
+
+        loadGroupValues(f.group)
+            .then((values) => {
+                setOptions(ts, values.map((r) => ({
+                    value: r.value,
+                    text: r.value + (Number(r.count) > 1 ? '  (' + r.count + ' POs)' : ''),
+                })), mxChoice[f.data]);
+            })
+            .catch(() => { /* an empty field is its own message */ })
+            .finally(() => {
+                ts.loading = 0;
+                ts.wrapper.classList.remove('bi-fx-loading');
+                ts.refreshOptions(false);
+            });
+    }
+
+    // Set while options are being written into a control. Refilling a field is
+    // not the user choosing something, and TomSelect cannot tell the difference
+    // — without this, restoring a value would re-run the booking lookup.
+    let fillingField = false;
+
+    /** Replace a control's options without disturbing what is selected. */
+    function setOptions(ts, options, keep) {
+        fillingField = true;
+        try {
+            ts.clearOptions();
+            ts.addOption({ value: '', text: 'All' });
+            ts.addOptions(options);
+            if (keep) { ts.addOption({ value: keep, text: keep }); ts.setValue(keep, true); }
+            ts.refreshOptions(false);
+        } finally {
+            fillingField = false;
+        }
+    }
+
+    function onFieldChange(f, value) {
+        if (fillingField) return;
+        mxChoice[f.data] = value || '';
+
+        // Narrowing waits for Apply, so a run of changes is one pass over the
+        // rows rather than eleven.
+        if (inNarrowMode()) return;
+
+        if (!value) { closeSuggest(); return; }
+
+        // Nothing is loaded yet, so this field is being used to find a booking.
+        // Every other field is cleared: they describe a different booking's
+        // values and would read as an AND this dialog cannot honour.
+        MATRIX_FIELDS.forEach((other) => {
+            if (other.data === f.data) return;
+            mxChoice[other.data] = '';
+            if (mxSelects[other.data]) mxSelects[other.data].clear(true);
+        });
+
+        findBookings(f.group, value, f.label);
+    }
+
+    /**
+     * The heading follows the job the grid is currently doing.
+     *
+     * The note carries the one fact a first-time user cannot guess: narrowing
+     * only hides items, it does not drop them from the issue. That used to be
+     * spelled out in a second sentence under the dialog title; it is the same
+     * point in four words here.
+     */
+    function syncFilterMode() {
+        const narrow = inNarrowMode();
+
+        if (mxSectTitle) mxSectTitle.textContent = narrow ? 'Narrow the list' : 'Find a PO';
+        if (mxSectNote) mxSectNote.textContent = narrow ? 'Hidden items are still saved' : 'Click a field and type to search';
+    }
+
+    // Rows the current filter is hiding. Kept so the footer can be rewritten
+    // without re-running the filter — see applyMatrixFilter().
+    let hiddenByFilter = 0;
+
+    /**
+     * "n of m row(s) in this issue", plus what the filter is hiding.
+     *
+     * Two different things move this line: the filter, and ticking a row in or
+     * out. Only the first goes through applyMatrixFilter, so the count lives
+     * here and both call it.
+     */
+    function syncFooterCount() {
+        if (!mxFooterCount) return;
+        const rows = matrixRows();
+
+        mxFooterCount.textContent = rows.length === 0
+            ? 'No PO selected'
+            : rows.filter(isIncluded).length + ' of ' + rows.length + ' item(s) in this issue' +
+              (hiddenByFilter > 0 ? ' · ' + hiddenByFilter + ' hidden by filter' : '');
+    }
+
+    /** Hide the rows that fail the search term or any chosen filter value. */
+    function applyMatrixFilter() {
+        const rows = matrixRows();
+        const term = (mxSearch ? mxSearch.value : '').trim().toLowerCase();
+        const active = MATRIX_FIELDS.filter((f) => mxChoice[f.data]);
+
+        let shown = 0;
+        rows.forEach((row) => {
+            const hit = MATRIX_FIELDS.some((f) => (row.dataset[f.data] || '').toLowerCase().includes(term));
+            const passes = (term === '' || hit) &&
+                active.every((f) => (row.dataset[f.data] || '') === mxChoice[f.data]);
+
+            row.classList.toggle('bi-mx-hidden', !passes);
+            if (passes) shown++;
+        });
+
+        const filtering = term !== '' || active.length > 0;
+        if (mxShowing) {
+            mxShowing.textContent = filtering ? 'Showing ' + shown + ' of ' + rows.length : '';
+            mxShowing.classList.toggle('d-none', !filtering);
+        }
+        if (mxFilterBtn) mxFilterBtn.classList.toggle('is-on', active.length > 0);
+
+        // What the filter last hid, so the footer can be rewritten on its own
+        // when rows are included or excluded — that changes the count without
+        // changing the filter, and re-running the whole pass to say so would be
+        // wasted work on a 500-row matrix.
+        hiddenByFilter = filtering ? rows.length - shown : 0;
+        syncFooterCount();
+
+        // A filter changes which rows the header checkbox speaks for.
+        syncIncludeHead();
+    }
+
+    if (mxSearch) mxSearch.addEventListener('input', applyMatrixFilter);
+
+    if (mxModal) {
+        mxModal.addEventListener('show.bs.modal', () => {
+            buildFilterGrid();
+            syncFilterMode();
+            // Options are fetched on focus, but a field already holding a value
+            // has to be able to show it — otherwise reopening the dialog shows
+            // an empty box over an active filter.
+            MATRIX_FIELDS.forEach((f) => { if (mxChoice[f.data]) fillField(f); });
+        });
+
+        // The booking list lives in this dialog; closing over an open list would
+        // leave it hanging there for the next open.
+        mxModal.addEventListener('hidden.bs.modal', closeSuggest);
+    }
+
+    if (mxApply) mxApply.addEventListener('click', applyMatrixFilter);
+
+    if (mxReset) {
+        mxReset.addEventListener('click', () => {
+            resetMatrixChoices();
+            closeSuggest();
+            syncFilterMode();
+            applyMatrixFilter();
+        });
     }
 
     /**
@@ -1547,19 +1163,23 @@ function initPanel(cfg) {
      */
     function publishState(extra) {
         const cards = Array.from(itemRows.children);
-        // Items over their stock balance — the count the status bar shows and
+        // Only the rows actually going into the issue count. An excluded row is
+        // not submitted, so neither its quantity nor its stock error is the
+        // user's problem.
+        const included = cards.filter(isIncluded);
+        // Rows over their stock balance — the count the status bar shows and
         // the reason Save stays disabled.
-        const errorCount = cards.filter((c) => c.classList.contains('is-over')).length;
-        // Items carrying at least one of the four quantities. An issue with
-        // items but no numbers on them is not saveable.
-        const withQty = cards.filter((c) => Array.from(c.querySelectorAll('.bi-qty'))
-            .some((el) => el.value !== '' && parseFloat(el.value) > 0)).length;
+        const errorCount = included.filter((c) => c.classList.contains('is-over')).length;
+        // Rows carrying at least one of the four quantities. These are exactly
+        // what will be POSTed, so this is the count the save gate reads.
+        const withQty = included.filter((c) => rowTotal(c) > 0).length;
 
         if (!stateHost) return;
         stateHost.dispatchEvent(new CustomEvent('bi:state', {
             detail: Object.assign({
                 hasPo: !!poId.value,
                 itemCount: cards.length,
+                includedCount: included.length,
                 blocked: errorCount > 0,
                 errorCount,
                 withQty,
@@ -1581,7 +1201,9 @@ function initPanel(cfg) {
             const avail = parseFloat(card.dataset.available) || 0;
             const fields = Array.from(card.querySelectorAll('.bi-qty'));
             const total = fields.reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
-            const over = total > avail + 1e-9;
+            // An excluded row is not submitted, so it cannot be over anything —
+            // its figures stay on screen but stop blocking Save.
+            const over = isIncluded(card) && total > avail + 1e-9;
             const name = card.querySelector('.bi-item-head').textContent.trim();
 
             // "n/4" reads at a glance on a card that carries four inputs.
@@ -1618,7 +1240,7 @@ function initPanel(cfg) {
         if (offenders.length) {
             overText.textContent = offenders.length === 1
                 ? 'Cannot save: ' + offenders[0] + ' exceeds its available stock.'
-                : 'Cannot save: ' + offenders.length + ' items exceed their available stock — ' + offenders.join('; ') + '.';
+                : 'Cannot save: ' + offenders.length + ' items exceed available stock — ' + offenders.join('; ') + '.';
             overWarn.classList.remove('d-none');
             overWarn.classList.remove('alert-warning');
             overWarn.classList.add('alert-danger');
@@ -1646,6 +1268,8 @@ function initPanel(cfg) {
         card.querySelectorAll('.bi-qty').forEach((el) => { el.value = ''; });
         const bulkInput = card.querySelector('input[name$="[bulk_qty]"], input[name="bulk_qty"]');
         if (bulkInput) bulkInput.value = fmtNum(avail);
+        setRowIncluded(card, true);
+        syncIncludeHead();
         checkOver();
     });
 
@@ -1673,23 +1297,19 @@ function initPanel(cfg) {
         poId.value = '';
         items = [];
         loadedPoId = null;
-        clearPicked();
         itemRows.innerHTML = '';
+        resetMatrixChoices();
+        form.classList.remove('bi-edit-mode');
         selectedRow.classList.add('d-none');
         overWarn.classList.add('d-none');
-        poSearch.value = '';
-        // Reset returns the selector to whichever option the markup ships first,
-        // so this does not have to be kept in step with the dropdown by hand.
-        filterType.selectedIndex = 0;
-        pickedValue = null;
-        syncPickChip();
-        poSearch.placeholder = 'Click or type to browse ' + LABELS_PLURAL[filterType.value] + '…';
         poLoading.classList.add('d-none');
         poError.classList.add('d-none');
-        syncSearchStatus();
+        // A fresh entry starts with the eleven fields back to finding a booking
+        // rather than narrowing the last one's rows.
         closeSuggest();
+        syncFilterMode();
         title.textContent = 'New Bulk Issue';
-        saveLabel.textContent = 'Confirm';
+        saveLabel.textContent = 'Record Issue';
         if (issueDateEl) issueDateEl.value = new Date().toISOString().slice(0, 10);
         if (issueNoEl) issueNoEl.classList.remove('bi-suggested');
         refreshItemsState();
@@ -1724,6 +1344,8 @@ function initPanel(cfg) {
     function openEdit(id) {
         resetForm();
         editing = true;
+        // Hides the include column: correcting one issue is one row, always in.
+        form.classList.add('bi-edit-mode');
         title.textContent = 'Edit Bulk Issue';
         saveLabel.textContent = 'Update';
         form.action = cfg.routes.update.replace('__ID__', encodeURIComponent(id));
@@ -1809,9 +1431,28 @@ function initPanel(cfg) {
         }
         if (!itemRows.children.length) {
             e.preventDefault();
-            window.alert('Select at least one item to issue.');
+            window.alert('This PO has no items to issue.');
             return;
         }
+
+        // The whole PO is on screen, but only the rows carrying a quantity are
+        // the issue. store() rejects a row totalling zero outright, so an empty
+        // row is dropped here rather than sent to fail — leaving it out is the
+        // same mechanism the checkbox uses, so nothing typed is lost either way.
+        if (!editing) {
+            matrixRows().forEach((row) => {
+                if (rowTotal(row) <= 0) setRowIncluded(row, false);
+            });
+            syncIncludeHead();
+
+            const included = matrixRows().filter(isIncluded);
+            if (!included.length) {
+                e.preventDefault();
+                window.alert('Enter a quantity on at least one item.');
+                return;
+            }
+        }
+
         // Stock integrity is a hard rule, not a confirmation. The server rejects
         // the same case, so letting it through here would only waste a round trip.
         if (checkOver()) {
@@ -1819,12 +1460,16 @@ function initPanel(cfg) {
             overWarn.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
         }
-        // An item whose balance ran out between picking and saving.
-        const empty = Array.from(itemRows.children)
+
+        // A row whose balance ran out between loading and saving. Only the rows
+        // being submitted matter — an out-of-stock line the user never touched
+        // is excluded already and is not their problem.
+        const empty = matrixRows()
+            .filter(isIncluded)
             .filter((card) => (parseFloat(card.dataset.available) || 0) <= 0);
         if (empty.length) {
             e.preventDefault();
-            window.alert('One or more selected items have no available stock and cannot be issued. Remove them and try again.');
+            window.alert('Some items have no available stock. Untick them and try again.');
         }
     });
 

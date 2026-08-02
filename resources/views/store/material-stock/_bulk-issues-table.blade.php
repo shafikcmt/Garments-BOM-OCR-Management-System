@@ -42,12 +42,7 @@
 {{-- Tab counts travel with the partial so an AJAX swap can refresh the badges. --}}
 <span data-bi-counts='{{ json_encode($counts ?? []) }}' hidden></span>
 
-{{-- Full Table view. Included here, inside the swappable partial, so a tab /
-     search / sort / page change refreshes it together with the Summary table
-     below — Alpine re-initialises the new markup on its own. --}}
-@include('store.material-stock._bulk-issues-full-table')
-
-<div class="table-responsive bi-table-wrap" x-show="mode === 'summary'">
+<div class="table-responsive bi-table-wrap">
     <table class="table align-middle mb-0 bi-history-table" id="biHistoryTable">
         <thead>
             <tr class="text-muted small text-uppercase">

@@ -2,12 +2,14 @@
  * Alpine shell for the New Bulk Issue panel: section gating, the save gate,
  * toasts, the remarks counter and draft autosave.
  *
- * The panel is a single page, not a wizard: Select PO, Issue Quantities, Indent
- * Details and Remarks are all mounted at once and the numbers on them are a
- * reading order, not navigation. Sections 2-4 are locked (greyed + `inert`)
- * until a PO is chosen, because their content can only be built from a booking.
+ * One screen, not a wizard: Filters (which hold the Purchase Order itself), the
+ * issue matrix, the Indent header and Save are all mounted at once. The matrix
+ * card stays live even before a PO exists — it carries the empty state whose
+ * button opens the Filters dialog — while the Indent header below it is locked
+ * (greyed + `inert`) until a booking is chosen, because an issue with no
+ * booking has nothing to authorise.
  *
- * Deliberately narrow. The PO search, the item picker and the stock-balance
+ * Deliberately narrow. The PO search, the matrix and the stock-balance
  * validation stay in bulk-issue-table.js and keep owning their own DOM — two
  * frameworks writing the same nodes is how these panels rot. The vanilla module
  * publishes what it knows on a `bi:state` event and this component only reads
@@ -26,9 +28,12 @@ export function registerBulkIssueWizard(Alpine) {
         // Mirrored from the vanilla module via bi:state.
         hasPo: false,
         itemCount: 0,
+        // Rows ticked into the issue. The whole PO loads into the matrix now,
+        // so rows on screen and rows being saved are two different counts.
+        includedCount: 0,
         blocked: false,
         editing: false,
-        // Items carrying at least one of the four quantities, and items whose
+        // Rows carrying at least one of the four quantities, and rows whose
         // total exceeds their stock balance.
         withQty: 0,
         errorCount: 0,
@@ -49,6 +54,7 @@ export function registerBulkIssueWizard(Alpine) {
 
                 this.hasPo = !!d.hasPo;
                 this.itemCount = d.itemCount || 0;
+                this.includedCount = d.includedCount || 0;
                 this.blocked = !!d.blocked;
                 this.editing = !!d.editing;
                 this.withQty = d.withQty || 0;
@@ -92,12 +98,14 @@ export function registerBulkIssueWizard(Alpine) {
          * rules changed with the single-page layout — only where they surface.
          */
         saveBlocker() {
-            if (!this.hasPo) return 'Select a Purchase Order first.';
+            if (!this.hasPo) return 'Select a PO first.';
             // Edit mode loads its one row asynchronously, so an empty list there
             // means "not fetched yet", not "nothing chosen".
-            if (!this.itemCount && !this.editing) return 'Select at least one item to issue.';
-            if (this.blocked) return 'One or more items exceed the available stock.';
-            if (!this.withQty && !this.editing) return 'Enter at least one quantity.';
+            if (!this.itemCount && !this.editing) return 'This PO has no items to issue.';
+            if (this.blocked) return 'Some items exceed available stock.';
+            // The whole PO is on screen, so having rows is not the same as
+            // having an issue: what makes it one is a quantity on a row.
+            if (!this.withQty && !this.editing) return 'Enter a quantity on at least one item.';
             if (!this.issueDate) return 'Issue Date is required.';
             return null;
         },
@@ -113,21 +121,25 @@ export function registerBulkIssueWizard(Alpine) {
 
         /** The left-hand line of the sticky bar. */
         statusText() {
-            if (!this.hasPo) return 'Start by selecting a Purchase Order';
-            if (!this.itemCount) return 'Select the item(s) to issue';
+            if (!this.hasPo) return 'No PO selected';
+            if (!this.itemCount) return 'Loading items…';
             const blocker = this.saveBlocker();
-            return blocker || 'Ready to save';
+            if (blocker) return blocker;
+            return 'Ready to save ' + this.withQty + (this.withQty === 1 ? ' item' : ' items');
         },
 
         // --- Closing ----------------------------------------------------------
         /** Cancel: confirmed first when the form carries anything worth losing. */
         requestClose() {
-            const dirty = this.hasPo || this.itemCount > 0 || DRAFT_FIELDS.some((id) => {
+            // Loading a PO is not "worth losing" on its own — the whole booking
+            // lands in the matrix the moment one is chosen, so what counts as
+            // entered work is a quantity typed, not a row on screen.
+            const dirty = this.withQty > 0 || DRAFT_FIELDS.some((id) => {
                 const el = document.getElementById(id);
                 return el && el.value && !(id === 'biIssueNo' && el.classList.contains('bi-suggested'));
             });
 
-            if (dirty && !window.confirm('Discard this bulk issue? Anything entered here will be lost.')) return;
+            if (dirty && !window.confirm('Discard this issue? Anything entered will be lost.')) return;
 
             // Two shells, two ways to leave: the panel closes over the history
             // it was opened from, the page goes back to that history.
@@ -229,7 +241,7 @@ export function registerBulkIssueWizard(Alpine) {
         offerDraft() {
             const stored = this.readDraft();
             if (!stored || !stored.draft) return;
-            this.toast('Unsaved details from an earlier entry are available.', 'info');
+            this.toast('Unsaved draft found.', 'info');
             this.draftAvailable = true;
         },
 

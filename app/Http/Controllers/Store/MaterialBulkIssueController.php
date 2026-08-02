@@ -28,6 +28,19 @@ class MaterialBulkIssueController extends Controller
     /** Cap on the browse list; past it the server narrows instead of the browser. */
     private const BROWSE_LIMIT = 500;
 
+    /**
+     * The fields one free-text term is asked of.
+     *
+     * Five, not the twelve the drill-down offers: every group but po_no costs a
+     * LIKE scan over ExcelCell, so the search box covers the handles a booking
+     * is actually looked up by and leaves the rest to the Filters dialog, where
+     * one field is chosen and only that field is queried.
+     */
+    private const SMART_SEARCH_GROUPS = ['contract_po', 'style', 'buyer', 'season', 'material_name'];
+
+    /** Per-field cap for the smart search, and for its merged result. */
+    private const SMART_SEARCH_LIMIT = 50;
+
     public function index(Request $request)
     {
         $tab = in_array($request->query('tab'), self::TABS, true) ? $request->query('tab') : 'all';
@@ -203,23 +216,61 @@ class MaterialBulkIssueController extends Controller
             // searches. po_no is a different number — the system-generated
             // material PO on booking_pos.po_no — and stays available to the
             // rest of the app even though the picker does not offer it.
-            'type' => ['required', 'in:po_no,contract_po,season,buyer,style,material_name,material_description,sap_code,art_no,gmts_color,material_color,size'],
+            // Not required when `q` is given: the smart search below asks the
+            // same question of several fields at once, so it has no single type.
+            'type' => ['required_without:q', 'nullable', 'in:po_no,contract_po,season,buyer,style,material_name,material_description,sap_code,art_no,gmts_color,material_color,size'],
             'term' => ['nullable', 'string', 'max:100'],
             // Present once step 1 has been answered: the exact field value whose
             // bookings step 2 should list.
             'value' => ['nullable', 'string', 'max:255'],
+            // Free-text across SMART_SEARCH_GROUPS — the single search box.
+            'q' => ['nullable', 'string', 'max:100'],
         ]);
 
         $term = trim((string) ($validated['term'] ?? ''));
         $value = trim((string) ($validated['value'] ?? ''));
+        $q = trim((string) ($validated['q'] ?? ''));
+        $type = $validated['type'] ?? null;
         $source = app(\App\Services\BookingPoSourceService::class);
 
-        // The picker is two steps, and the same endpoint serves both: without a
-        // `value` it lists what the chosen field holds; with one it lists the
-        // bookings under that value. Both go through the one generic pair
-        // resolver, so every search type behaves identically.
+        // Smart search: one term asked of the handles Store actually recognises
+        // a booking by, answered with bookings rather than with field values.
+        //
+        // Deliberately a loop over the existing per-field matcher rather than a
+        // new query: bookingPosMatching() already resolves a term through the
+        // header aliases and the booking_pos column fallback, and Receiving's
+        // picker has been using it that way. Deduplicated by id because one
+        // term can legitimately reach the same booking through two fields.
+        if ($q !== '') {
+            $bookings = collect();
+            foreach (self::SMART_SEARCH_GROUPS as $group) {
+                $bookings = $bookings->concat($source->bookingPosMatching($group, $q, self::SMART_SEARCH_LIMIT));
+            }
+
+            $bookings = $bookings->unique('id')->take(self::SMART_SEARCH_LIMIT)->values();
+
+            return response()->json([
+                // Shaped as step 2 so the browser renders these with the same
+                // booking row it already uses for a drilled-down list.
+                'step' => 2,
+                'mode' => 'smart',
+                'value' => $q,
+                'complete' => false,
+                'results' => $bookings->map(fn (BookingPo $po) => $this->poOption($po))->values(),
+            ]);
+        }
+
+        // `q` present but blank and no field chosen: nothing has been asked yet.
+        if ($type === null) {
+            return response()->json(['step' => 1, 'complete' => true, 'results' => []]);
+        }
+
+        // The drill-down is two steps, and the same endpoint serves both:
+        // without a `value` it lists what the chosen field holds; with one it
+        // lists the bookings under that value. Both go through the one generic
+        // pair resolver, so every search type behaves identically.
         if ($value !== '') {
-            $bookings = $source->bookingPosForGroupValue($validated['type'], $value, self::BROWSE_LIMIT);
+            $bookings = $source->bookingPosForGroupValue($type, $value, self::BROWSE_LIMIT);
 
             return response()->json([
                 'step' => 2,
@@ -232,7 +283,7 @@ class MaterialBulkIssueController extends Controller
         // Step 1 — the field's own distinct values, each with how many bookings
         // it covers. A term narrows that list rather than jumping to bookings,
         // so typing and browsing land in the same place.
-        $values = $source->distinctValuesForGroup($validated['type'], self::BROWSE_LIMIT);
+        $values = $source->distinctValuesForGroup($type, self::BROWSE_LIMIT);
 
         if ($term !== '') {
             $needle = mb_strtolower($term);

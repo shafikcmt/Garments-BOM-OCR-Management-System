@@ -11,13 +11,11 @@ import Alpine from 'alpinejs';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import { registerBulkIssueWizard } from './modules/bulk-issue-wizard';
-import { registerBulkIssueFullTable } from './modules/bulk-issue-fulltable';
 
 window.Alpine = Alpine;
 
 // Components must be registered before start() or their x-data never resolves.
 registerBulkIssueWizard(Alpine);
-registerBulkIssueFullTable(Alpine);
 
 Alpine.start();
 

@@ -12,12 +12,13 @@
             <span class="bi-notice-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span>
             <div class="bi-notice-body">
                 <div class="bi-notice-title">Unsaved draft found</div>
-                <p class="bi-notice-text">Details from an earlier entry are still saved on this device.</p>
+                <p class="bi-notice-text">From an earlier entry on this device.</p>
             </div>
             <div class="bi-notice-actions">
-                <button type="button" class="btn btn-primary bi-btn-xs" @click="restoreDraft()">
-                    <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Restore
-                </button>
+                {{-- Icon-free, like every other labelled action on this screen:
+                     components.css collapses a .btn with a direct-child bi icon
+                     to an unlabelled square. See the Filters dialog footer. --}}
+                <button type="button" class="btn btn-primary bi-btn-xs" @click="restoreDraft()">Restore</button>
                 <button type="button" class="btn btn-outline-secondary bi-btn-xs" @click="discardDraft()">Discard</button>
             </div>
         </div>
@@ -27,232 +28,207 @@
             <input type="hidden" name="_method" id="biMethod" value="">
             <input type="hidden" name="booking_po_id" id="biPoId" value="" required>
 
-            {{-- SECTION 1 — find the paperwork. Every section below is on this
-                 same page: the numbers are a reading order, not navigation. --}}
-            <section class="bi-sect" data-bi-section="1">
+            {{-- THE ITEM GRID — one screen, not a wizard.
+                 Filters (which include the PO itself) → items → Indent Details
+                 → Save. There is no "select a PO" step and no item-picker
+                 dialog: choosing a PO in the Filters dialog loads its items
+                 straight into the grid below, and the quantities are typed
+                 where the items already are.
+
+                 Not gated on hasPo, unlike the Indent section further down: this
+                 card holds the empty state whose button opens the Filters
+                 dialog, so it has to stay reachable before a PO exists.
+
+                 No heading of its own: the page title directly above already
+                 names this screen, and the line under it already says what to
+                 do. Saying it a third time here was the clutter, not the
+                 information. --}}
+            <section class="bi-sect" data-bi-section="2">
 
             <div class="bi-card">
-            <div class="bi-sec">
-                <div>
-                    <h6 class="bi-sec-title"><span class="bi-sec-num">01</span>Select Purchase Order</h6>
-                    <p class="bi-sec-sub">Find the booking by its order details, its PO number, or the material on it.</p>
-                </div>
-            </div>
 
-            {{-- One control, not two: the type selector sits inside the search
-                 field so there is a single label, a single magnifier and a
-                 single place to type. --}}
-            <label class="form-label" for="biPoSearch">Find Purchase Order <span class="text-danger">*</span></label>
-            <div class="bi-search mb-3" id="biSearchWrap">
-                <div class="input-group">
-                    <select class="form-select bi-filter-type" id="biFilterType" aria-label="Search by">
-                        {{-- One flat list in the order Store asked for. The first
-                             option is the default: the reset in
-                             bulk-issue-table.js selects index 0 rather than a
-                             hard-coded value, so reordering here is enough. --}}
-                        <option value="season" selected>Season</option>
-                        <option value="buyer">Buyer Name</option>
-                        <option value="style">Style Number</option>
-                        {{-- The buyer's order/contract PO, carried by the GMNTS
-                             PO Number and Initial Contract Number columns
-                             (identical values on every row). NOT the material PO
-                             this system generates. --}}
-                        <option value="contract_po">PO Number</option>
-                        <option value="gmts_color">GMTS Color Name</option>
-                        <option value="material_name">Material Name</option>
-                        <option value="material_description">Material Description</option>
-                        {{-- The workbooks carry no separate Art. No column yet,
-                             so this searches the same supplier article SAP Code
-                             does. Kept as its own handle: a sheet that adds the
-                             column starts working with no code change. --}}
-                        <option value="art_no">Art. No</option>
-                        <option value="sap_code">SAP Code</option>
-                        <option value="material_color">Material Color</option>
-                        <option value="size">Size</option>
-                    </select>
-                    <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
-                    <input type="text" class="form-control" id="biPoSearch" autocomplete="off"
-                           placeholder="Click or type to browse…"
-                           role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="biPoList">
-                    <span class="bi-pick-status">
-                        <span class="spinner-border spinner-border-sm text-primary d-none" id="biPoSpin" role="status" aria-hidden="true"></span>
-                        <button type="button" class="btn-close d-none" id="biPoClear" aria-label="Clear search"></button>
-                    </span>
-                </div>
-                {{-- The value chosen at step 1, shown so the list below is
-                     never a mystery — and clearable, which is how the user gets
-                     back to step 1 for a different value or field. --}}
-                <div id="biPoChip" class="d-none mt-2"></div>
-
-                <div id="biPoPanel" class="bi-search-panel d-none position-absolute w-100 mt-1 bg-body border rounded-3 shadow">
-                    {{-- Sticky: after a scroll this line is the only thing
-                         saying which field's values are on screen. --}}
-                    <div class="px-3 py-2 border-bottom" id="biPoHint"></div>
-                    <div class="list-group list-group-flush" id="biPoList" role="listbox"></div>
+            {{-- The loaded PO, stated above the grid. Every row carries the same
+                 PO — one issue is recorded against one booking — so it is said
+                 once here rather than read off 55 identical cells. --}}
+            <div id="biSelectedRow" class="d-none">
+                <div id="biSummaryGrid" class="bi-po-summary">
+                    <span class="bi-chip-sel"><i class="bi bi-check-circle-fill" aria-hidden="true"></i><span id="biSelectedText">—</span></span>
+                    <div class="bi-sum-facts">
+                        <div><div class="bi-sum-label">Buyer</div><div class="bi-sum-value" data-sum="buyer_name">—</div></div>
+                        <div><div class="bi-sum-label">Season</div><div class="bi-sum-value" data-sum="season_name">—</div></div>
+                        <div><div class="bi-sum-label">PO Number</div><div class="bi-sum-value" data-sum="po_no">—</div></div>
+                        <div><div class="bi-sum-label">Styles / Items</div><div class="bi-sum-value" id="biSumCounts">—</div></div>
+                    </div>
+                    {{-- Labelled, not a bare ✕: on a chip that already shows a PO
+                         number, a lone ✕ reads as "delete this PO" rather than
+                         "pick a different one". --}}
+                    <button type="button" class="btn btn-sm btn-outline-secondary bi-btn-xs" id="biClearPo"
+                            data-bs-toggle="modal" data-bs-target="#biMatrixFilterModal"
+                            title="Load a different PO">Change PO</button>
                 </div>
             </div>
 
             {{-- Loading / failure state for the PO lookup. Without this a failed
-                 or slow fetch just left the summary card reading "—" with no
+                 or slow fetch just left the summary reading "—" with no
                  explanation of why. --}}
             <div id="biPoLoading" class="d-none d-flex align-items-center gap-2 text-muted small mb-3">
                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                <span>Loading PO details…</span>
+                <span>Loading items…</span>
             </div>
             <div id="biPoError" class="alert alert-warning py-2 px-3 small d-none mb-3" role="alert"></div>
 
-            {{-- Step 2 — the selection locks into a chip with the PO-level
-                 summary beside it, and opens the item picker. --}}
-            <div id="biSelectedRow" class="d-none">
-                <div id="biSummaryGrid" class="p-3">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                        <span class="bi-chip-sel"><i class="bi bi-check-circle-fill" aria-hidden="true"></i><span id="biSelectedText">—</span>
-                            {{-- Labelled, not a bare ✕: on a chip that already
-                                 shows a PO number, a lone ✕ reads as "delete
-                                 this PO" rather than "pick a different one". --}}
-                            <button type="button" class="btn btn-sm btn-link p-0 ms-2 text-decoration-none bi-btn-inline" id="biClearPo" title="Pick a different PO, PI or Invoice"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Change</button>
-                        </span>
-                        <span class="badge bg-success-subtle text-success"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Selected</span>
-                    </div>
-                    <div class="row g-3">
-                        <div class="col-6 col-xl-3"><div class="bi-sum-label">Buyer</div><div class="bi-sum-value" data-sum="buyer_name">—</div></div>
-                        <div class="col-6 col-xl-3"><div class="bi-sum-label">Season</div><div class="bi-sum-value" data-sum="season_name">—</div></div>
-                        <div class="col-6 col-xl-3"><div class="bi-sum-label">PO Number</div><div class="bi-sum-value" data-sum="po_no">—</div></div>
-                        <div class="col-6 col-xl-3"><div class="bi-sum-label">Styles / Items</div><div class="bi-sum-value" id="biSumCounts">—</div></div>
-                    </div>
+            {{-- Search + the Filters dialog over the rows already in the matrix.
+                 Both are display-only — a row hidden here keeps whatever was
+                 typed in it and still saves, which is why the hidden count stays
+                 on screen rather than being left for the user to work out.
+                 Excluding a row from the issue is the checkbox, not the filter,
+                 and the two look different for exactly that reason. --}}
+            <div class="bi-mx-bar" x-show="itemCount > 0" x-cloak>
+                <div class="bi-mx-search">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <input type="text" id="biMatrixSearch" class="form-control" autocomplete="off"
+                           placeholder="Search style, material, SAP code…"
+                           aria-label="Search the items">
                 </div>
-            </div>
-            </div>{{-- /card --}}
-            </section>{{-- /section 1 --}}
-
-            {{-- SECTION 2 — one quantity block per selected item. Kept above the
-                 indent header because this is what the stock balance can block,
-                 and there is no point typing indent details for an issue the
-                 ledger will not allow. The four fields, their colour coding and
-                 the per-item rules are unchanged.
-
-                 Locked until a PO is chosen: the item list can only be built
-                 from a booking, so acting here first is not a valid order. --}}
-            <section class="bi-sect" data-bi-section="2"
-                     :class="{ 'is-locked': !hasPo }" :inert="!hasPo">
-
-            <div class="bi-card" :class="{ 'bi-locked': !hasPo }">
-            <div class="bi-sec">
-                <div>
-                    <h6 class="bi-sec-title"><span class="bi-sec-num">02</span>Issue Quantities</h6>
-                    <p class="bi-sec-sub">Choose the item(s) to issue against this PO, then split each one into Bulk / Sample / Liability / Dead.</p>
-                </div>
-                <button type="button" class="btn btn-primary btn-sm bi-btn-xs" id="biPickBtn" data-bs-toggle="modal" data-bs-target="#biItemsModal">
-                    <i class="bi bi-list-check me-1" aria-hidden="true"></i>Select Items
-                </button>
+                <span class="bi-mx-showing d-none" id="biMatrixShowing" aria-live="polite"></span>
+                <button type="button" class="btn bi-mx-filterbtn" id="biMatrixFilterBtn"
+                        data-bs-toggle="modal" data-bs-target="#biMatrixFilterModal">Filters</button>
             </div>
 
-            <div class="bi-lock-note" x-show="!hasPo">
-                <i class="bi bi-lock" aria-hidden="true"></i>Select a Purchase Order above to choose items.
+            {{-- The matrix scrolls inside its own box, both ways: the page
+                 itself must never grow a second horizontal scrollbar. --}}
+            <div class="bi-mx-card" x-show="itemCount > 0" x-cloak>
+                <table class="bi-mx-table">
+                    <thead>
+                        <tr>
+                            {{-- Include / exclude. The whole PO loads, so this is
+                                 how a line the user is not issuing today is kept
+                                 out of the save without clearing what is typed
+                                 in the lines they are. Hidden in edit mode,
+                                 which corrects exactly one row. --}}
+                            <th class="bi-mx-check">
+                                <input type="checkbox" class="form-check-input" id="biIncludeAll"
+                                       aria-label="Include or exclude every row on screen">
+                            </th>
+                            <th class="bi-mx-po">Season</th>
+                            <th class="bi-mx-po">Buyer Name</th>
+                            <th class="bi-mx-po">Style Number</th>
+                            <th class="bi-mx-po">PO Number</th>
+                            <th class="bi-mx-po">GMTS Color Name</th>
+                            <th>Material Name</th>
+                            <th class="bi-mx-desc">Material Description</th>
+                            <th class="bi-mx-art">Art. No</th>
+                            <th>SAP Code</th>
+                            <th>Material Color</th>
+                            <th>Size</th>
+                            <th class="text-center">Unit</th>
+                            <th class="text-end">Available</th>
+                            <th class="text-center bi-mx-h-bulk">Bulk Issued Qty</th>
+                            <th class="text-center bi-mx-h-sample">Sample Issued Qty</th>
+                            <th class="text-center bi-mx-h-liability">Liability Stock Qty</th>
+                            <th class="text-center bi-mx-h-dead">Dead Stock Qty</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="biItemRows"></tbody>
+                </table>
             </div>
 
-            <div id="biItemRows" class="d-flex flex-column gap-2"></div>
+            {{-- Before a PO is chosen. The action is the same dialog the Filters
+                 button opens — one place decides which lines are on screen. --}}
             <div id="biNoItems" class="bi-empty">
-                <div class="bi-empty-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></div>
-                <div class="bi-empty-title">No items selected yet</div>
-                <p class="bi-empty-text">Pick the material lines to issue against this PO. Each one splits into Bulk, Sample, Liability and Dead.</p>
-                {{-- The action, in the place the user is already looking. Same
-                     modal hook as the header button — no new JS. --}}
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#biItemsModal">
-                    <i class="bi bi-list-check me-1" aria-hidden="true"></i>Select Items
-                </button>
-            </div>
-            <div class="d-flex justify-content-end mt-3 d-none" id="biAddMoreWrap">
-                <button type="button" class="btn btn-sm btn-outline-primary bi-btn-xs" data-bs-toggle="modal" data-bs-target="#biItemsModal">
-                    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add More Items
-                </button>
+                <div class="bi-empty-icon"><i class="bi bi-funnel" aria-hidden="true"></i></div>
+                <div class="bi-empty-title">No PO selected yet</div>
+                <p class="bi-empty-text">Select a PO to see its items.</p>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#biMatrixFilterModal">Select PO</button>
             </div>
             <div class="alert alert-warning py-2 px-3 small d-none mt-3 mb-0" id="biOverWarn"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i><span id="biOverText"></span></div>
             </div>{{-- /card --}}
-            </section>{{-- /section 2 --}}
+            </section>{{-- /matrix --}}
 
-            {{-- SECTION 3 — indent header. Shared by every item in the
-                 submission. Locked with section 2 on the same dependency. --}}
+            {{-- SECTION 3 + the action bar. On the full-page shell these are
+                 pinned to the bottom of the window (see .bi-page .bi-bottom in
+                 the styles partial), so the indent header and Save stay in
+                 reach however far down the matrix is scrolled. Inside the
+                 slide-in panel the same markup stays in normal flow. --}}
+            <div class="bi-bottom">
             <section class="bi-sect" data-bi-section="3"
                      :class="{ 'is-locked': !hasPo }" :inert="!hasPo">
 
-            <div class="bi-card" :class="{ 'bi-locked': !hasPo }">
-            <div class="bi-sec">
-                <div>
-                    <h6 class="bi-sec-title"><span class="bi-sec-num">03</span>Indent Details</h6>
-                    <p class="bi-sec-sub">These details apply to every item in this issue.</p>
-                </div>
+            <div class="bi-card bi-indent-card" :class="{ 'bi-locked': !hasPo }">
+            <div class="bi-indent-title">
+                <i class="bi bi-file-earmark-text" aria-hidden="true"></i>Indent Details
+                <span class="bi-indent-note">Applies to all items</span>
             </div>
 
-            @if($requisitions->isNotEmpty())
-                <div class="mb-3">
-                    <label class="form-label">Fulfil Requisition <span class="text-muted small fw-normal">(optional)</span></label>
-                    <select name="material_requisition_id" id="biReq" class="form-select">
-                        <option value="">None</option>
-                        @foreach($requisitions as $req)
-                            <option value="{{ $req->id }}">#{{ $req->id }} · {{ $req->po_no }} · {{ $req->material_description }} ({{ ucfirst($req->status) }})</option>
-                        @endforeach
-                    </select>
+            <div class="row g-2 bi-indent-grid">
+                <div class="col-6 col-lg-2">
+                    <label class="form-label" for="biIssueDate">Issue Date <span class="text-danger">*</span></label>
+                    <input type="date" name="issue_date" id="biIssueDate" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" class="form-control" required @input="syncIssueDate()" @change="syncIssueDate()">
                 </div>
-            @endif
-
-            <div class="row g-3">
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <label class="form-label">Indent Section</label>
+                <div class="col-6 col-lg-2">
+                    <label class="form-label" for="biSection">Indent Section</label>
                     <select name="indent_section" id="biSection" class="form-select" @change="queueDraft()">
                         <option value="">Select…</option>
                         @foreach($sections as $section)<option value="{{ $section }}">{{ $section }}</option>@endforeach
                     </select>
                 </div>
-                <div class="col-12 col-sm-6 col-xl-3"><label class="form-label" for="biPerson">Indent Person</label><input name="indent_person" id="biPerson" class="form-control" maxlength="100" placeholder="Name of requester" @input="queueDraft()"></div>
-                <div class="col-12 col-sm-6 col-xl-3"><label class="form-label" for="biReqNo">Requisition No</label><input name="requisition_number" id="biReqNo" class="form-control" maxlength="100" placeholder="Optional reference" @input="queueDraft()"></div>
-                <div class="col-12 col-sm-6 col-xl-3"><label class="form-label" for="biIssueDate">Issue Date <span class="text-danger">*</span></label><input type="date" name="issue_date" id="biIssueDate" value="{{ now()->toDateString() }}" max="{{ now()->toDateString() }}" class="form-control" required @input="syncIssueDate()" @change="syncIssueDate()"></div>
-                <div class="col-12 col-xl-6">
+                <div class="col-6 col-lg-2"><label class="form-label" for="biPerson">Indent Person</label><input name="indent_person" id="biPerson" class="form-control" maxlength="100" placeholder="Name of requester" @input="queueDraft()"></div>
+                <div class="col-6 col-lg-2"><label class="form-label" for="biReqNo">Requisition Number</label><input name="requisition_number" id="biReqNo" class="form-control" maxlength="100" placeholder="Optional reference" @input="queueDraft()"></div>
+                <div class="col-6 col-lg-2">
                     <label class="form-label" for="biIssueNo">Issue No</label>
                     {{-- Pre-filled with the generated number. bi-suggested renders it
                          lighter/italic until the user types, so it reads as a
                          suggestion rather than a value they entered. --}}
-                    <input name="issue_no" id="biIssueNo" class="form-control bi-suggested" autocomplete="off" @input="queueDraft()">
-                    <div class="form-text"><i class="bi bi-magic me-1" aria-hidden="true"></i>Auto-suggested · editable</div>
+                    <input name="issue_no" id="biIssueNo" class="form-control bi-suggested" autocomplete="off"
+                           title="Auto-suggested — you can edit" @input="queueDraft()">
                 </div>
-            </div>
-            </div>{{-- /card --}}
-            </section>{{-- /section 3 --}}
-
-            {{-- Remarks — last, because it describes the issue as a whole. --}}
-            <section class="bi-sect" data-bi-section="4"
-                     :class="{ 'is-locked': !hasPo }" :inert="!hasPo">
-                <div class="bi-card" :class="{ 'bi-locked': !hasPo }">
-                    <label class="form-label" for="biRemarks">Remarks <span class="text-muted small fw-normal">(optional)</span></label>
+                {{-- Remarks describes the issue as a whole, so it sits on the
+                     same shared header rather than in a card of its own. --}}
+                <div class="col-6 col-lg-2">
+                    <label class="form-label" for="biRemarks">Remarks</label>
                     <div class="bi-remarks">
-                        <textarea name="remarks" id="biRemarks" rows="3" class="form-control" maxlength="1000"
-                                  placeholder="Gate pass number, who collected the material, or why it was issued."
+                        <textarea name="remarks" id="biRemarks" rows="1" class="form-control" maxlength="1000"
+                                  placeholder="Gate pass, collected by, or reason"
                                   @input="syncRemarks(); queueDraft()"></textarea>
                         <span class="bi-remarks-count" :class="remarksLength > remarksMax - 50 ? 'is-warn' : ''" aria-hidden="true">
                             <span x-text="remarksLength"></span>/<span x-text="remarksMax"></span>
                         </span>
                     </div>
                 </div>
-            </section>
+                @if($requisitions->isNotEmpty())
+                    <div class="col-12">
+                        <label class="form-label" for="biReq">Fulfil Requisition</label>
+                        <select name="material_requisition_id" id="biReq" class="form-select">
+                            <option value="">None</option>
+                            @foreach($requisitions as $req)
+                                <option value="{{ $req->id }}">#{{ $req->id }} · {{ $req->po_no }} · {{ $req->material_description }} ({{ ucfirst($req->status) }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+            </div>
+            </div>{{-- /card --}}
+            </section>{{-- /section 3 --}}
 
-            {{-- Sticky status + actions. No step counter: the whole form is on
-                 one page, so what matters is how far the data is from saveable —
+            {{-- Status + actions. No step counter: the whole form is on one
+                 page, so what matters is how far the data is from saveable —
                  items chosen, and anything currently blocking Save. --}}
             <div class="bi-wizard-bar">
                 <div class="bi-bar-meta">
                     <div class="d-flex flex-wrap align-items-center gap-2">
                         <span class="bi-bar-step" x-text="statusText()"></span>
-                        <span class="bi-bar-chip" x-show="itemCount > 0" x-cloak>
-                            <i class="bi bi-check2-square" aria-hidden="true"></i>
-                            <span x-text="itemCount"></span> item(s) selected
-                        </span>
+                        {{-- Written by the matrix filter so the count also says
+                             how many rows the current filter is hiding — a
+                             hidden row still saves whatever was typed in it. --}}
+                        <span class="bi-bar-chip" id="biFooterCount" x-show="itemCount > 0" x-cloak></span>
                         <span class="bi-bar-chip is-error" x-show="errorCount > 0" x-cloak>
                             <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
                             <span x-text="errorCount"></span> to fix
                         </span>
                     </div>
                     <p class="bi-bar-hint mb-0" x-show="hasPo && itemCount > 0" x-cloak>
-                        <i class="bi bi-lightbulb" aria-hidden="true"></i>Enter at least one of the four quantities per item.
+                        <i class="bi bi-lightbulb" aria-hidden="true"></i>Enter at least one quantity per item.
                     </p>
                 </div>
 
@@ -261,15 +237,21 @@
                          before it is thrown away. --}}
                     <button type="button" class="btn btn-link text-decoration-none text-secondary" @click="requestClose()">Cancel</button>
 
-                    {{-- "Confirm" for a new issue; the JS swaps it to "Update"
-                         when an existing one is being corrected. Disabled until
-                         a PO, an item and at least one quantity are in place —
-                         the same rules the server enforces on save. --}}
+                    {{-- "Record Issue" for a new one; the JS swaps it to "Update"
+                         when an existing one is being corrected. Matches
+                         Receiving's "Record Receiving" — the two screens are
+                         the same shape and should read the same way.
+                         Disabled until a PO, an item and at least one quantity
+                         are in place — the same rules the server enforces. --}}
+                    {{-- The one action the whole screen exists for. It keeps its
+                         words: a blank square here is the worst possible place
+                         for the icon-only collapse in components.css. --}}
                     <button type="submit" class="btn btn-primary" :disabled="!canSave()" :title="saveBlocker() || ''">
-                        <i class="bi bi-check-lg me-1" aria-hidden="true"></i><span id="biSaveLabel">Confirm</span>
+                        <span id="biSaveLabel">Record Issue</span>
                     </button>
                 </div>
             </div>
+            </div>{{-- /bi-bottom --}}
         </form>
 
         {{-- Toasts. Fixed to the viewport so they clear the panel and are not

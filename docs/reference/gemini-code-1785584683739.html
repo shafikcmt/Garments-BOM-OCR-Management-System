@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Material Issue Control Center - High Density</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-canvas: #fafafa;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --border-light: #e5e7eb;
+            
+            /* Matrix Row Focus Colors */
+            --bulk: #059669;
+            --sample: #2563eb;
+            --liability: #d97706;
+            --dead: #dc2626;
+        }
+
+        body {
+            background-color: var(--bg-canvas);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem; /* Readability enhanced */
+            color: var(--text-main);
+            margin: 0;
+            padding: 12px 14px 180px 14px; /* Tight container padding */
+            overflow: hidden; /* Stops double scrollbar on page */
+        }
+
+        /* Relevant Breadcrumb Navigation */
+        .ui-breadcrumb {
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .ui-breadcrumb span.active {
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        /* Material Specific Filter Timeline */
+        .timeline-filter-wrapper {
+            display: flex;
+            gap: 14px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-light);
+            white-space: nowrap;
+        }
+        .timeline-item {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.78rem;
+            font-weight: 500;
+            padding-bottom: 4px;
+        }
+        .timeline-item.active {
+            color: var(--text-main);
+            border-bottom: 2px solid var(--text-main);
+        }
+
+        /* Top Action Grid: Search & Filter Combo */
+        .search-action-container {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            flex-grow: 1;
+        }
+
+        .search-input-wrapper i {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .smart-search-field {
+            width: 100%;
+            padding: 5px 12px 5px 32px;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            font-size: 0.82rem;
+            background-color: #ffffff;
+            outline: none;
+        }
+
+        .btn-matrix-filter {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 4px 12px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* HIGH-DENSITY TABLE GRID WITH VERTICAL & HORIZONTAL SCROLLBAR */
+        .matrix-table-card {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            overflow-x: auto; /* Horizontal Scroll */
+            overflow-y: auto; /* Vertical Scroll for 50-60+ rows */
+            width: 100%;
+            max-height: calc(100vh - 290px); /* Dynamically locks height to push indent section down */
+            box-shadow: 0 1px 2px rgba(0,0,0,0.01);
+        }
+
+        .smart-matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            vertical-align: middle;
+            min-width: 1750px; 
+        }
+
+        /* Sticky Table Header so it stays on top when scrolling down */
+        .smart-matrix-table th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            text-align: left;
+            padding: 6px 8px; /* High density padding */
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--text-main);
+            border-bottom: 2px solid var(--border-light);
+            background: #f9fafb;
+            white-space: nowrap;
+        }
+
+        .smart-matrix-table td {
+            padding: 4px 8px; /* Ultra tight row space */
+            border-bottom: 1px solid var(--border-light);
+            color: #1f2937;
+            font-size: 0.82rem; /* Enhanced text visibility */
+            white-space: nowrap;
+        }
+
+        .smart-matrix-table tbody tr:hover {
+            background-color: #f3f4f6;
+        }
+
+        .desc-text-box {
+            white-space: normal !important;
+            max-width: 280px;
+            font-size: 0.78rem;
+            line-height: 1.3;
+        }
+
+        .qty-matrix-input {
+            width: 75px;
+            text-align: center;
+            font-weight: 600;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 2px;
+            font-size: 0.82rem;
+            height: 24px;
+            background: #ffffff;
+        }
+
+        /* Custom Double Scrollbar Styling */
+        .matrix-table-card::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .matrix-table-card::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .matrix-table-card::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        /* FIXED BOTTOM CONTAINER FOR INDENT SECTION & FOOTER */
+        .fixed-bottom-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-canvas);
+            z-index: 1030;
+            padding: 0 14px;
+        }
+
+        /* SMART INDENT SECTION (Pushed to bottom above footer) */
+        .smart-indent-section {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 54px; /* Leaves space for the save footer */
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.02);
+        }
+        
+        .indent-section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 6px;
+        }
+
+        .indent-field-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .indent-field-group label {
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .smart-indent-input {
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.78rem;
+            color: var(--text-main);
+            outline: none;
+            background-color: #ffffff;
+            height: 28px;
+        }
+
+        /* Window Fixed Bottom Footer Area */
+        .window-smart-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-top: 1px solid var(--border-light);
+            padding: 8px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-summary-text {
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .btn-window-save {
+            background: var(--text-main);
+            color: #ffffff;
+            font-size: 0.8rem;
+            font-weight: 500;
+            padding: 5px 20px;
+            border-radius: 4px;
+            border: none;
+        }
+        
+        /* Excel grid structure */
+        .excel-popup-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(195px, 1fr)); gap: 10px; }
+        .excel-card-input { background: #fffff2; border: 1px solid #000000; padding: 6px 8px; border-radius: 2px; }
+        .excel-card-input label { display: block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+        .excel-select-box { width: 100%; font-size: 0.76rem; border: 1px solid #4b5563; height: 24px; }
+    </style>
+</head>
+<body>
+
+<!-- BREADCRUMB -->
+<div class="ui-breadcrumb">
+    Inventory &nbsp;/&nbsp; Central Store &nbsp;/&nbsp; <span class="active">Material Issue Control Center</span>
+</div>
+
+<!-- TIMELINE FILTER -->
+<div class="timeline-filter-wrapper">
+    <a href="#" class="timeline-item active">All Issues Matrix</a>
+    <a href="#" class="timeline-item">Today's Requisitions</a>
+    <a href="#" class="timeline-item">Pending Bulk Issued</a>
+    <a href="#" class="timeline-item">Sample Allocation</a>
+    <a href="#" class="timeline-item">Liability Stock Status</a>
+    <a href="#" class="timeline-item">Dead Stock History</a>
+</div>
+
+<!-- SEARCH & FILTER BAR -->
+<div class="search-action-container">
+    <div class="search-input-wrapper">
+        <i class="bi bi-search"></i>
+        <input type="text" class="smart-search-field" placeholder="Search by Style, PO, Component or SAP Code...">
+    </div>
+    <button class="btn-matrix-filter" data-bs-toggle="modal" data-bs-target="#matrixFilterModal">
+        Filters <i class="bi bi-filter-left"></i>
+    </button>
+</div>
+
+<!-- ULTRA-DENSE SMART DATA TABLE MATRIX (WITH DOWN/VERTICAL SCROLLBAR) -->
+<div class="matrix-table-card">
+    <table class="smart-matrix-table">
+        <thead>
+            <tr>
+                <th style="width: 30px;"><input type="checkbox" class="form-check-input"></th>
+                <th>Season</th>
+                <th>Buyer Name</th>
+                <th>Style Number</th>
+                <th>PO Number</th>
+                <th>GMTS Color Name</th>
+                <th>Material Name</th>
+                <th>Material Description</th>
+                <th>Art. No</th>
+                <th>SAP Code</th>
+                <th>Material Color</th>
+                <th>Size</th>
+                <th class="text-center">Unit</th>
+                <th class="text-center" style="color: var(--bulk);">Bulk Issued Qty</th>
+                <th class="text-center" style="color: var(--sample);">Sample Issued Qty</th>
+                <th class="text-center" style="color: var(--liability);">Liability Stock Qty</th>
+                <th class="text-center" style="color: var(--dead);">Dead Stock Qty</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Dummy Rows to Simulate 50+ Grid Flow -->
+            <script>
+                for(let i=1; i<=55; i++) {
+                    document.write(`
+                    <tr>
+                        <td><input type="checkbox" class="form-check-input"></td>
+                        <td>W24WI</td>
+                        <td>Hugo Boss</td>
+                        <td><span class="text-decoration-underline" style="cursor:pointer; font-weight: 500;">BROOKS2431</span></td>
+                        <td>4901534538</td>
+                        <td>001-Black</td>
+                        <td class="fw-semibold">TC Pocketing</td>
+                        <td class="desc-text-box">CS-23-ND-05290001) Non- Brushed Pocketing Row ${i}</td>
+                        <td style="color: #db2777; font-weight:500;">CS23-ND-05290001</td>
+                        <td>1000790</td>
+                        <td>001 Black</td>
+                        <td>ALL</td>
+                        <td class="text-center text-muted fw-medium">Yds</td>
+                        <td class="text-center"><input type="number" class="qty-matrix-input" style="color: var(--bulk); border-color: #86efac;" value="${i === 1 ? 4 : 7}"></td>
+                        <td class="text-center"><input type="number" class="qty-matrix-input" style="color: var(--sample);" placeholder="-"></td>
+                        <td class="text-center"><input type="number" class="qty-matrix-input" style="color: var(--liability);" placeholder="-"></td>
+                        <td class="text-center"><input type="number" class="qty-matrix-input" style="color: var(--dead);" placeholder="-"></td>
+                    </tr>
+                    `);
+                }
+            </script>
+        </tbody>
+    </table>
+</div>
+
+<!-- FIXED AT BOTTOM CONTAINER: INDENT SECTION + WINDOW FOOTER -->
+<div class="fixed-bottom-container">
+    
+    <!-- INDENT SECTION (DOWN AT THE VERY BOTTOM OF TABLE) -->
+    <div class="smart-indent-section">
+        <div class="indent-section-title">
+            <i class="bi bi-file-earmark-text text-secondary me-1"></i> Indent Authorization Details
+        </div>
+        <div class="row g-2">
+            <div class="col-md-3 indent-field-group">
+                <label>Issue Date</label>
+                <input type="date" class="smart-indent-input" value="2026-02-20">
+            </div>
+            <div class="col-md-3 indent-field-group">
+                <label>Indent Section</label>
+                <select class="smart-indent-input form-select" style="padding-top:2px; padding-bottom:2px;">
+                    <option selected>Cutting Section</option>
+                    <option>Sewing Production</option>
+                    <option>Finishing Line</option>
+                </select>
+            </div>
+            <div class="col-md-3 indent-field-group">
+                <label>Indent Person</label>
+                <input type="text" class="smart-indent-input" value="Raza">
+            </div>
+            <div class="col-md-3 indent-field-group">
+                <label>Requisition Number</label>
+                <input type="text" class="smart-indent-input" value="2580">
+            </div>
+        </div>
+    </div>
+
+    <!-- WINDOW FIXED SAVE FOOTER -->
+    <div class="window-smart-footer">
+        <div class="footer-summary-text">
+            Active Records: 55 matrix items available
+        </div>
+        <div>
+            <button type="submit" class="btn-window-save shadow-sm">
+                <i class="bi bi-shield-check me-1"></i> Save Issue Matrix
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 11 EXCEL FILTER POPUP MODAL -->
+<div class="modal fade" id="matrixFilterModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content" style="border: none; border-radius: 6px;">
+            <div class="modal-header bg-dark text-white py-1">
+                <div class="modal-title small fw-bold text-warning">Excel Specification Filter Grid</div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light p-2">
+                <div class="excel-popup-grid">
+                    <div class="excel-card-input"><label>Season</label><select class="excel-select-box"><option>W24WI</option></select></div>
+                    <div class="excel-card-input"><label>Buyer Name</label><select class="excel-select-box"><option>Hugo Boss</option></select></div>
+                    <div class="excel-card-input"><label>Style Number</label><select class="excel-select-box"><option>BROOKS2431</option></select></div>
+                    <div class="excel-card-input"><label>PO Number</label><select class="excel-select-box"><option>4901534538</option></select></div>
+                    <div class="excel-card-input"><label>GMTS Color Name</label><select class="excel-select-box"><option>001-Black</option></select></div>
+                    <div class="excel-card-input"><label>Material Name</label><select class="excel-select-box"><option>All Items</option></select></div>
+                    <div class="excel-card-input" style="grid-column: span 2;"><label>Material Description</label><select class="excel-select-box"><option>All Descriptions</option></select></div>
+                    <div class="excel-card-input"><label>Art. No</label><select class="excel-select-box"><option>All</option></select></div>
+                    <div class="excel-card-input"><label>SAP Code</label><select class="excel-select-box"><option>All</option></select></div>
+                    <div class="excel-card-input"><label>Material Color</label><select class="excel-select-box"><option>All</option></select></div>
+                    <div class="excel-card-input"><label>Size</label><select class="excel-select-box"><option>All</option></select></div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-1">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Reset</button>
+                <button type="button" class="btn btn-dark btn-sm px-3" data-bs-dismiss="modal">Apply</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap 5 Bundle JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

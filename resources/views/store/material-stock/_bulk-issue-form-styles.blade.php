@@ -3,6 +3,77 @@
      A partial because two shells render that form: the index page's slide-in
      panel and the full-page create/edit route. Both pull this in, so the form
      cannot look like two different forms. --}}
+@include('store.material-stock._bulk-issue-matrix-styles')
+
+    /* --- Column filter dropdown (.bi-ft-*) --------------------------------
+       The Select Items picker puts one of these on every column header, and
+       the shared column-filter JS builds the menu bodies. These rules used to
+       live in the Bulk Issuing listing page, alongside the Full Table view
+       that also used them; that view is gone, so they moved here — the one
+       partial BOTH of the picker's shells include (the listing's slide-in
+       panel and the full-page create/edit route). On the full-page route the
+       picker had never been styled at all, because that page does not load the
+       listing's stylesheet. */
+    .bi-ft-head { display: flex; align-items: center; gap: .35rem; }
+    .bi-ft-label { flex: 1 1 auto; }
+    .bi-ft-num { text-align: right; font-variant-numeric: tabular-nums; }
+    .bi-ft-wide { max-width: 22rem; }
+    .bi-ft-fbtn {
+        flex: none; border: 1px solid transparent; background: transparent; border-radius: 6px;
+        width: 20px; height: 20px; line-height: 1; padding: 0; color: #A0894A; font-size: .7rem;
+        transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+    }
+    .bi-ft-fbtn:hover { background: #fff; border-color: #E7D3A1; color: #6B5417; }
+    .bi-ft-fbtn.is-on { background: var(--gx-secondary-600, #2563EB); border-color: var(--gx-secondary-600, #2563EB); color: #fff; }
+
+    /* Menu contents: Excel's order — the two sorts, a search, then Select All
+       over the value list. */
+    .bi-ft-menu {
+        position: absolute; top: 100%; left: 0; z-index: 60; width: 250px; margin-top: .25rem;
+        background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; padding: .35rem;
+        box-shadow: 0 12px 32px -12px rgba(15, 23, 42, .4); white-space: normal;
+        font-weight: 500; letter-spacing: normal; color: #334155; text-transform: none;
+    }
+    .bi-ft-mitem {
+        display: flex; align-items: center; gap: .5rem; width: 100%; border: 0; background: transparent;
+        padding: .4rem .5rem; border-radius: 8px; font-size: .8125rem; font-weight: 500; color: #334155; text-align: left;
+    }
+    .bi-ft-mitem:hover { background: #F1F5F9; }
+    .bi-ft-mitem i { color: #64748B; }
+    .bi-ft-msep { height: 1px; background: #EFF2F7; margin: .3rem .25rem; }
+    .bi-ft-msearch { position: relative; padding: .15rem .25rem .35rem; }
+    .bi-ft-msearch i { position: absolute; left: .6rem; top: .55rem; font-size: .75rem; color: #94A3B8; }
+    .bi-ft-msearch .form-control { padding-left: 1.75rem; border-radius: 8px; border-color: #E2E8F0; font-size: .8125rem; }
+    .bi-ft-mall, .bi-ft-mopt {
+        display: flex; align-items: center; gap: .5rem; padding: .3rem .5rem; border-radius: 7px;
+        font-size: .8125rem; font-weight: 500; cursor: pointer; margin: 0;
+    }
+    .bi-ft-mall { font-weight: 600; border-bottom: 1px solid #EFF2F7; border-radius: 7px 7px 0 0; }
+    .bi-ft-mall:hover, .bi-ft-mopt:hover { background: #F8FAFC; }
+    .bi-ft-mall span, .bi-ft-mopt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* The value list is the one place a scroll box is right: it can hold
+       hundreds of values and must not push the menu off screen. */
+    .bi-ft-mlist { max-height: 190px; overflow-y: auto; }
+    .bi-ft-mempty { padding: .6rem .5rem; font-size: .75rem; color: #94A3B8; text-align: center; }
+    .bi-ft-mfoot {
+        display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+        border-top: 1px solid #EFF2F7; margin-top: .3rem; padding: .4rem .35rem .15rem;
+    }
+
+    /* Inside the Select Items modal the table sits in a horizontally scrolling
+       box, which would clip an absolutely positioned menu — so those are pinned
+       to the viewport and placed by the picker JS. */
+    #biItemsModal [data-bi-pcol] { position: relative; vertical-align: bottom; white-space: nowrap; }
+    #biItemsModal .bi-ft-menu { position: fixed; top: auto; left: auto; z-index: 1090; }
+    #biItemsModal .bi-ft-head { gap: .3rem; }
+    #biItemsModal .bi-ft-fbtn { color: #94A3B8; }
+    #biItemsModal .bi-ft-fbtn:hover { background: #fff; border-color: #E2E8F0; color: #334155; }
+    /* Nine columns will not fit the modal at every width; the picker scrolls
+       sideways rather than crushing the material description. */
+    .bi-pick-wide table { min-width: 1020px; }
+    .bi-pick-wide td.bi-ft-wide { max-width: 16rem; }
+    .bi-pick-wide td.bi-ft-wide .bi-cell-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
     /* Searchable PO picker (offcanvas + inline reuse). */
     .bi-search { position: relative; }
     /* `.bi-search` is a layout wrapper here, but bootstrap-icons also ships a
@@ -82,25 +153,6 @@
     .bi-opt-empty-title { font-size: .8125rem; font-weight: 600; color: #334155; }
     .bi-opt-empty-text { font-size: .75rem; line-height: 1.5; color: #94A3B8; margin: .15rem auto 0; max-width: 20rem; }
 
-    /* Step 1's answer, carried above step 2's list. Reads as "you are inside
-       this value" rather than as another filter box. */
-    .bi-pickchip {
-        display: inline-flex; align-items: center; gap: .4rem; max-width: 100%;
-        background: #EFF6FF; border: 1px solid #DBEAFE; border-radius: 999px;
-        padding: .2rem .3rem .2rem .7rem; font-size: .78rem;
-    }
-    .bi-pickchip-label { font-weight: 600; color: #64748B; flex: none; }
-    .bi-pickchip-label::after { content: ':'; }
-    .bi-pickchip-value {
-        font-weight: 700; color: var(--gx-secondary-700, #1D4ED8);
-        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .bi-pickchip-x {
-        flex: none; border: 0; background: #fff; color: #64748B; border-radius: 999px;
-        width: 18px; height: 18px; line-height: 1; font-size: .85rem; padding: 0;
-        transition: background-color .15s ease, color .15s ease;
-    }
-    .bi-pickchip-x:hover { background: var(--gx-secondary-600, #2563EB); color: #fff; }
     /* The chosen PO, stated once at the head of its summary card. Tinted, not
        filled: the card underneath is already the emphasis. */
     .bi-chip-sel {
@@ -139,33 +191,9 @@
        fit without the form feeling stretched. The border keeps the colour coding; a small
        solid dot repeats it on the label so the four are told apart at a glance
        without relying on hue alone. */
-    .bi-qty-card {
-        border: 1px solid var(--bs-border-color, #E2E8F0); border-radius: 10px; padding: .5rem .6rem;
-        background: #fff; height: 100%; transition: border-color .15s ease, box-shadow .15s ease;
-    }
-    .bi-qty-card.bulk { border-color: #A7F3D0; } .bi-qty-card.sample { border-color: #BFDBFE; }
-    .bi-qty-card.liability { border-color: #FDE68A; } .bi-qty-card.dead { border-color: #FECACA; }
-    .bi-qty-card:focus-within { box-shadow: 0 0 0 3px rgba(37, 99, 235, .1); }
-    .bi-qty-grid .bi-qty-card .form-label {
-        display: flex; align-items: center; gap: .35rem; font-size: .75rem; font-weight: 600;
-        text-transform: uppercase; letter-spacing: .03em; margin-bottom: .3rem; white-space: nowrap;
-    }
-    .bi-qty-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
-    .bi-qty-card.bulk .bi-qty-dot { background: #10B981; }
-    .bi-qty-card.sample .bi-qty-dot { background: #3B82F6; }
-    .bi-qty-card.liability .bi-qty-dot { background: #F59E0B; }
-    .bi-qty-card.dead .bi-qty-dot { background: #EF4444; }
-    /* Figures line up column to column, so four cards read as one row of numbers. */
-    .bi-qty-card .bi-qty { font-variant-numeric: tabular-nums; text-align: right; border-radius: 8px; }
-
-    /* Live total against the item's balance — the same numbers the block already
-       computes, stated before the user reaches the error. */
-    .bi-item-total {
-        display: flex; align-items: center; gap: .35rem; font-size: .75rem; font-weight: 600;
-        color: var(--gx-text-muted, #64748B); font-variant-numeric: tabular-nums; margin-top: .5rem;
-    }
-    .bi-item-total .bi-item-total-num { color: var(--gx-primary, #0F172A); }
-    .bi-item-card.is-over .bi-item-total .bi-item-total-num { color: var(--gx-danger-700, #B91C1C); }
+    /* The four quantity fields are matrix columns now, not cards — their colour
+       coding, their inputs and the running total live in
+       _bulk-issue-matrix-styles alongside the grid they belong to. */
 
     /* Auto-suggested value: reads as a suggestion until the user edits it. */
     .bi-suggested { font-style: italic; color: var(--gx-text-muted, #64748B); }
@@ -373,7 +401,7 @@
 
     @media (prefers-reduced-motion: reduce) {
         .bi-step, .bi-step-dot, .bi-step + .bi-step::before,
-        .bi-pick tbody tr.bi-row, .bi-qty-card, .bi-item-card { transition: none; }
+        .bi-pick tbody tr.bi-row, .bi-item-card, .bi-qty-input { transition: none; }
         .bi-shake, .bi-step-in { animation: none; }
     }
 
@@ -398,17 +426,9 @@
         #biPanel.bi-offcanvas { --bs-offcanvas-width: 100%; }
     }
 
-    .bi-search-spin { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
-
-    /* Spinner and clear share one slot inside the search field, so neither
-       changes the input-group's width when it appears. */
-    .bi-pick-status { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 5; display: flex; align-items: center; }
-    /* Type selector rides inside the search group; it sizes to its content so
-       the box the user types into keeps the remaining width. */
-    .bi-filter-type { flex: 0 0 auto; width: auto; border-right: 0; background-color: #F8FAFC; font-weight: 500; }
-    #biSearchWrap .form-control { padding-right: 2.25rem; }
-    #biSearchWrap .btn-close { font-size: .7rem; opacity: .5; }
-    #biSearchWrap .btn-close:hover { opacity: 1; }
+    /* The free-text PO search box, its spinner, its clear button and the field
+       selector that rode inside it are gone: the Filters dialog's eleven
+       dropdowns are the search now. Their styling went with them. */
 
     /* Item picker modal — mirrors Receiving's stepper and pick table, so the two
        screens read as one system. Dot + caption/title, connector fills on
@@ -543,40 +563,16 @@
     .bi-selcount-badge { min-width: 1.5rem; padding: .1rem .4rem; border-radius: 6px; background: var(--bs-border-color, #E2E8F0); color: var(--gx-primary, #0F172A); font-weight: 600; text-align: center; }
     .bi-selcount.is-active .bi-selcount-badge { background: var(--gx-secondary-600, #2563EB); color: #fff; }
 
-    /* One selected item = one card carrying its identity and its four fields.
-       Over-limit is an error, not a warning: the save is blocked until fixed. */
-    .bi-item-card {
-        border: 1px solid var(--bs-border-color, #E2E8F0); border-radius: 12px; padding: .8rem;
-        background: #fff; transition: border-color .15s ease, box-shadow .15s ease;
-    }
-    .bi-item-card:hover { border-color: #CBD5E1; box-shadow: 0 2px 8px -4px rgba(15, 23, 42, .18); }
-    .bi-item-card.is-over { border-color: var(--gx-danger, #EF4444); background: #FEF2F2; }
-    .bi-item-card.is-over .bi-qty { border-color: var(--gx-danger, #EF4444); }
+    /* A selected item is one matrix row (.bi-item-card on a <tr>). Its own
+       layout is in _bulk-issue-matrix-styles; what stays here is the shared
+       error tone and the style tag the picker also uses. Over-limit is an
+       error, not a warning: the save is blocked until it is fixed. */
     .bi-item-error { font-size: .78rem; color: var(--gx-danger-700, #B91C1C); font-weight: 500; }
-    .bi-item-head { font-size: .8125rem; font-weight: 600; color: var(--gx-primary, #0F172A); line-height: 1.35; overflow-wrap: anywhere; }
-    .bi-item-meta { font-size: .75rem; color: var(--gx-text-muted, #64748B); line-height: 1.35; overflow-wrap: anywhere; }
-    /* Style, called out on a selected item's card. The one field on it that a
-       correction cannot undo, so it is stated rather than listed. */
-    .bi-item-style {
-        display: inline-flex; align-items: center; gap: .3rem; margin: .15rem 0;
-        font-size: .75rem; font-weight: 700; color: #4338CA; background: #EEF2FF;
-        border: 1px solid #DDE3FE; border-radius: 7px; padding: .1rem .4rem;
-    }
-    .bi-item-style i { font-size: .65rem; opacity: .8; }
-    /* Same treatment in the picker's leading column, so the two read as one. */
+    .bi-item-card.is-over .bi-qty { border-color: var(--gx-danger, #EF4444); }
     .bi-style-tag { font-size: .75rem; font-weight: 700; color: #4338CA; white-space: nowrap; }
-    /* The identity column must be allowed to shrink, or a long material name
-       pushes the badges and the remove button off the card. */
-    .bi-item-card .min-w-0 { min-width: 0; }
 
-    /* Wide viewport: the panel is roomy enough for the four quantity fields to
-       sit on one line, and for the cards to breathe. */
     @media (min-width: 1200px) {
         .bi-card { padding: 1.15rem 1.35rem; }
-        .bi-item-card { padding: .95rem 1.05rem; }
-        .bi-item-head { font-size: .875rem; }
-        .bi-qty-card { padding: .55rem .7rem; }
-        .bi-qty-grid .bi-qty-card .form-label { font-size: .75rem; }
     }
 
     /* Listing search: one tall, quiet field — the icon inside it rather than in
