@@ -61,8 +61,10 @@ class StockIssueController extends Controller
         $issues = StockIssue::with(['stockItem', 'indentSection', 'indentPerson', 'approver', 'itemCategory', 'createdBy'])
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $like = '%'.$search.'%';
-                $q->where(fn ($w) => $w->where('requisition_no', 'like', $like)
-                    ->orWhereHas('stockItem', fn ($i) => $i->where('name', 'like', $like)));
+                // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE
+                // is case-sensitive, and stays LIKE everywhere else.
+                $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
+                    ->orWhereHas('stockItem', fn ($i) => $i->whereLike('name', $like)));
             })
             ->when($filters['month'] ?? null, function ($q, $month) {
                 [$year, $m] = explode('-', $month);

@@ -59,9 +59,11 @@ class PurchaseRequisitionController extends Controller
             ->when($filters['section'] ?? null, fn ($q, $id) => $q->where('indent_section_id', $id))
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $like = '%'.$search.'%';
-                $q->where(fn ($w) => $w->where('requisition_no', 'like', $like)
-                    ->orWhereHas('indentPerson', fn ($p) => $p->where('name', 'like', $like))
-                    ->orWhereHas('items.stockItem', fn ($i) => $i->where('name', 'like', $like)));
+                // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE
+                // is case-sensitive, and stays LIKE everywhere else.
+                $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
+                    ->orWhereHas('indentPerson', fn ($p) => $p->whereLike('name', $like))
+                    ->orWhereHas('items.stockItem', fn ($i) => $i->whereLike('name', $like)));
             })
             ->orderByDesc('requisition_date')
             ->orderByDesc('id')

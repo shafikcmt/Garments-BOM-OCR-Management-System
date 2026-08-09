@@ -44,16 +44,22 @@ class StockPurchaseController extends Controller
         // RV, and the same hand-typed number was reused months apart, so the
         // date is part of the key — otherwise two unrelated old deliveries
         // would merge into one group.
-        $keyExpr = "CONCAT(COALESCE(rv_no,''),'|',COALESCE(challan_no,''),'|',COALESCE(purchase_date,''))";
+        $keyExpr = "CONCAT(COALESCE(rv_no,''),'|',COALESCE(challan_no,''),'|',".$this->dateKeyExpr('purchase_date').')';
 
         $applyFilters = function ($q) use ($filters) {
             return $q
                 ->when($filters['search'] ?? null, function ($q, $search) {
                     $like = '%'.$search.'%';
-                    $q->where(fn ($w) => $w->where('challan_no', 'like', $like)
-                        ->orWhere('rv_no', 'like', $like)
-                        ->orWhere('supplier_name', 'like', $like)
-                        ->orWhereHas('stockItem', fn ($i) => $i->where('name', 'like', $like)));
+                    // whereLike, not where(..., 'like', ...): PostgreSQL's LIKE
+                    // is case-sensitive, so "ch158" would not find "CH158" —
+                    // the search silently returned less than it should. The
+                    // framework's whereLike compiles to ILIKE on Postgres and
+                    // stays LIKE on MySQL/MariaDB and SQLite, where LIKE is
+                    // already case-insensitive.
+                    $q->where(fn ($w) => $w->whereLike('challan_no', $like)
+                        ->orWhereLike('rv_no', $like)
+                        ->orWhereLike('supplier_name', $like)
+                        ->orWhereHas('stockItem', fn ($i) => $i->whereLike('name', $like)));
                 })
                 ->when($filters['month'] ?? null, function ($q, $month) {
                     [$year, $m] = explode('-', $month);
@@ -191,6 +197,32 @@ class StockPurchaseController extends Controller
         return back()->with('success', $count === 1
             ? 'Purchase recorded under RV No '.$rvNo.'.'
             : $count.' item(s) received under RV No '.$rvNo.'.');
+    }
+
+    /**
+     * A date column rendered as 'YYYY-MM-DD' text, or '' when it is NULL, for
+     * use inside the grouping key.
+     *
+     * COALESCE(<date column>, '') cannot be written directly. PostgreSQL
+     * resolves a COALESCE to one common type, picks `date` from the column, and
+     * then rejects '' as a date — "invalid input syntax for type date". MySQL
+     * and MariaDB accept the same expression only because they coerce the
+     * column to text instead, so the bug is invisible until the app runs on
+     * Postgres. The date is therefore converted to text FIRST, and the fallback
+     * is then an empty string against a string, which every engine accepts.
+     *
+     * Formatted explicitly rather than left to each engine's default rendering:
+     * the key only has to be internally consistent, but a key that reads the
+     * same everywhere is far easier to compare when a group looks wrong on one
+     * environment and right on another.
+     */
+    private function dateKeyExpr(string $column): string
+    {
+        return match (DB::getDriverName()) {
+            'pgsql' => "COALESCE(TO_CHAR({$column}, 'YYYY-MM-DD'), '')",
+            'sqlite' => "COALESCE(STRFTIME('%Y-%m-%d', {$column}), '')",
+            default => "COALESCE(DATE_FORMAT({$column}, '%Y-%m-%d'), '')",
+        };
     }
 
     /**
