@@ -64,7 +64,7 @@
 
         <button type="button" class="btn btn-sm btn-outline-danger gx-upload-remove"
                 data-upload-remove aria-label="Remove selected file">
-            <i class="bi bi-x-lg" aria-hidden="true"></i>
+            <i class="bi bi-x-lg me-1" aria-hidden="true"></i>Remove
         </button>
     </div>
 

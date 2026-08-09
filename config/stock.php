@@ -73,4 +73,78 @@ return [
         'Store',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Buyer-first Bulk Issue entry (multi-PO)
+    |--------------------------------------------------------------------------
+    |
+    | OFF by default. When false the New Bulk Issue screen selects one PO at a
+    | time, which is how it has always worked. When true it selects a BUYER and
+    | loads every item under all of that buyer's POs into one grid, so a single
+    | issue can span several POs.
+    |
+    | This gates the UI only. store() already accepts a per-row booking_po_id
+    | and already refuses rows spanning two buyers, so flipping this flag cannot
+    | leave the save path half-migrated — and flipping it back is instant if
+    | Store finds the buyer-first screen confusing.
+    |
+    | Set BULK_ISSUE_MULTI_PO=true to trial it.
+    |
+    */
+    'bulk_issue_multi_po' => env('BULK_ISSUE_MULTI_PO', false),
+
+    /*
+    | Cap on the items one buyer can pull into the grid. A buyer with 20 POs of
+    | 30 lines would otherwise put 600 rows on screen. Past this the browser is
+    | told what was withheld rather than silently truncated.
+    */
+    'bulk_issue_buyer_item_limit' => 500,
+
+    /*
+    |--------------------------------------------------------------------------
+    | General Stock report (Consumable Stock Report)
+    |--------------------------------------------------------------------------
+    |
+    | The constants baked into the company's Excel "Stock <Month>" sheet. They
+    | are settings, not code, so the store manager can have them changed without
+    | a deployment when the factory calendar changes.
+    |
+    |   Consumption per day = last month's issued qty / working_days_per_month
+    |   Safety Stock Level  = Consumption per day x safety_stock_days
+    |   Re-order Level      = Safety Stock + (Consumption per day
+    |                             x (item lead time + order_placing_days))
+    |
+    | Original Excel formulas, for reference:
+    |   I = SUMIFS(prev month issued)/26
+    |   J = I*7
+    |   K = IF(I=0,"-", J+(I*(L+3)))
+    |
+    */
+    'general_stock' => [
+        // Excel divides last month's consumption by 26 (6-day factory week).
+        'working_days_per_month' => 26,
+
+        // "Safety Stock Level (7 days stock)".
+        'safety_stock_days' => 7,
+
+        // "time to place order" inside the re-order formula.
+        'order_placing_days' => 3,
+
+        // Lead time assumed when an item has none set in the item master.
+        // Company standard is 7 days.
+        'default_lead_time_days' => 7,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Purchase Requisition
+    |--------------------------------------------------------------------------
+    |
+    | Defaults for the Purchase Requisition document, matching the header block
+    | of the company's "Month_Of_<Month>.xlsx" workbook. Settings rather than
+    | code so the printed heading can be changed without a deployment.
+    |
+    */
+    'company_name' => 'Humana Apparels Pvt. Ltd.',
+
 ];

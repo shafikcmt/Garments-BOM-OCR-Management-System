@@ -8,39 +8,35 @@ use App\Models\MaterialReceiving;
 use App\Models\MaterialRequisition;
 use App\Models\MaterialRequisitionItem;
 use App\Models\MaterialStockLedger;
-use App\Models\StockItem;
 use App\Models\StockIssue;
 use App\Models\StockPurchase;
+use App\Services\GeneralStockReportService;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        // General Stock: live current stock per item = purchases - issues.
-        $items = StockItem::withSum('purchases as purchased_qty', 'qty')
-            ->withSum('issues as issued_qty', 'qty')
-            ->get();
+        // General Stock levels come from the same service the Consumable Stock
+        // Report uses, so the dashboard count can never disagree with the count
+        // on the report itself.
+        $report = app(GeneralStockReportService::class);
+        $reportRows = $report->rows(now()->startOfMonth());
+        $reportSummary = $report->summary($reportRows);
 
-        // Reusable helper: current stock and re-order threshold per item.
-        $stockLevels = $items->map(function (StockItem $item) {
-            $current = (float) $item->purchased_qty - (float) $item->issued_qty;
-            $threshold = $item->reorder_level ?? $item->safety_stock_qty;
+        $stockLevels = $report->actionList($reportRows)->map(fn (array $row) => [
+            'name' => $row['item']->name,
+            'category' => $row['item']->category,
+            'uom' => $row['item']->uom,
+            'current' => $row['stock_as_on'],
+            'threshold' => $row['safety'],
+            'status' => $row['status'],
+            'low' => true,
+        ]);
 
-            return [
-                'name' => $item->name,
-                'code' => $item->code,
-                'uom' => $item->uom,
-                'current' => $current,
-                'threshold' => $threshold !== null ? (float) $threshold : null,
-                'low' => $threshold !== null && $current <= (float) $threshold,
-            ];
-        })
-            // Low stock first, then lowest quantity, so attention items lead.
-            ->sortBy([['low', 'desc'], ['current', 'asc']])
-            ->values();
-
-        $reorderCount = $stockLevels->where('low', true)->count();
+        // Anything not "Ok": out of stock, below safety stock, or below the
+        // re-order level.
+        $reorderCount = $stockLevels->count();
 
         // Requisition flow (display-only): shortfalls from the line items. These
         // never mutate stock — actual IN/OUT stays in the existing screens.
@@ -53,8 +49,9 @@ class DashboardController extends Controller
             ->sum(DB::raw('issued_qty - received_qty'));
 
         $stats = [
-            'stock_items' => $items->count(),
+            'stock_items' => $reportSummary['items'],
             'reorder_count' => $reorderCount,
+            'place_order_count' => $reportSummary['place_order'] + $reportSummary['out'],
             'material_lines' => MaterialStockLedger::count(),
             'running_qty' => (float) MaterialStockLedger::sum('running_closing_qty'),
             'liability_qty' => (float) MaterialStockLedger::sum('liability_closing_qty'),
@@ -126,7 +123,7 @@ class DashboardController extends Controller
         $issues = StockIssue::with('stockItem')->latest('id')->take(8)->get()->map(fn ($s) => [
             'direction' => 'out',
             'module' => 'General',
-            'label' => optional($s->stockItem)->name ?: ($s->item_description ?: 'Issue'),
+            'label' => optional($s->stockItem)->name ?: 'Issue',
             'qty' => (float) $s->qty,
             'uom' => optional($s->stockItem)->uom,
             'date' => $s->issue_date ?? $s->created_at,

@@ -459,10 +459,10 @@
                         <label class="form-label fw-semibold">Message <span class="text-danger">*</span></label>
                         <div class="btn-toolbar mb-2" role="toolbar" aria-label="Formatting">
                             <div class="btn-group btn-group-sm" role="group">
-                                <button type="button" class="btn btn-light border" data-rt-cmd="bold" title="Bold"><i class="bi bi-type-bold" aria-hidden="true"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="italic" title="Italic"><i class="bi bi-type-italic" aria-hidden="true"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="underline" title="Underline"><i class="bi bi-type-underline" aria-hidden="true"></i></button>
-                                <button type="button" class="btn btn-light border" data-rt-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="bold"><i class="bi bi-type-bold me-1" aria-hidden="true"></i>Bold</button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="italic"><i class="bi bi-type-italic me-1" aria-hidden="true"></i>Italic</button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="underline"><i class="bi bi-type-underline me-1" aria-hidden="true"></i>Underline</button>
+                                <button type="button" class="btn btn-light border" data-rt-cmd="insertUnorderedList"><i class="bi bi-list-ul me-1" aria-hidden="true"></i>List</button>
                             </div>
                         </div>
                         <div id="emailBodyEditor" class="form-control" contenteditable="true"

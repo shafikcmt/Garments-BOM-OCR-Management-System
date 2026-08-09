@@ -57,7 +57,7 @@ class MaterialRequisitionController extends Controller
         // Same stock item master used by the General Stock issue screen.
         $stockItems = StockItem::where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'uom']);
+            ->get(['id', 'name', 'uom']);
 
         ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
 

@@ -376,6 +376,57 @@ class MaterialBulkIssueController extends Controller
         ]);
     }
 
+    /**
+     * Every item under every PO of one buyer, for the buyer-first grid.
+     *
+     * The multi-PO counterpart of poItems(): same item shape, same stock
+     * figures, same identity resolution — it differs only in carrying
+     * booking_po_id per item, because the rows no longer share one booking.
+     * store() already accepts that per-row field.
+     *
+     * Read-only. Nothing here saves, and the buyer-first screen it feeds is off
+     * unless config('stock.bulk_issue_multi_po') says otherwise.
+     */
+    public function buyerItems(Request $request)
+    {
+        $validated = $request->validate([
+            'buyer' => ['required', 'string', 'max:255'],
+        ]);
+
+        $limit = (int) config('stock.bulk_issue_buyer_item_limit', 500);
+        $source = app(\App\Services\BookingPoSourceService::class);
+        $pairs = $source->itemRowsForBuyer($validated['buyer'], $limit);
+
+        // A locked file blocks stock entry, so its lines are not offered at all
+        // rather than offered and refused on save.
+        $pairs = $pairs->reject(function (array $pair) {
+            $file = $pair['po']->excelFile;
+
+            return $file && $file->isLockedForUser(auth()->user());
+        })->values();
+
+        $prefill = $this->rowPrefill($pairs->pluck('row.id'));
+
+        $items = $pairs->map(function (array $pair) use ($prefill) {
+            $extra = $prefill[$pair['row']->id] ?? ['running' => 0.0, 'gmts_order_qty' => null];
+
+            return array_merge($this->identityForRow($pair['po'], $pair['row']), [
+                'available' => $extra['running'],
+                'gmts_order_qty' => $extra['gmts_order_qty'],
+            ]);
+        })->values();
+
+        return response()->json([
+            'buyer' => $validated['buyer'],
+            'po_count' => $pairs->pluck('po.id')->unique()->count(),
+            // True when the cap bit, so the browser can say what is missing
+            // instead of quietly showing a short list.
+            'truncated' => $pairs->count() >= $limit,
+            'limit' => $limit,
+            'items' => $items,
+        ]);
+    }
+
     /** Quantity for a message: 4dp storage without the trailing zeros. */
     private function trim(float $value): string
     {

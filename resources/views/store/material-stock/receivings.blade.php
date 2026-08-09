@@ -552,8 +552,8 @@
                                 <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
                                 <span id="rcvSelectedPoNo">—</span>
                                 <button type="button" class="rcv-chip-x" id="rcvClearPo"
-                                        title="Clear selection" aria-label="Clear selected PO">
-                                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                                        aria-label="Clear selected PO">
+                                    <span class="small me-1">Clear</span><i class="bi bi-x-lg" aria-hidden="true"></i>
                                 </button>
                             </span>
                             <button type="button" class="btn btn-primary" id="rcvPickBtn"
@@ -765,7 +765,7 @@
                                 <span class="rcv-chip">
                                     <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
                                     <span id="rcvIndChip">—</span>
-                                    <button type="button" class="rcv-chip-x" id="rcvIndClear" title="Choose a different style" aria-label="Choose a different style">
+                                    <button type="button" class="rcv-chip-x" id="rcvIndClear" aria-label="Choose a different style"><span class="small me-1">Change</span>
                                         <i class="bi bi-x-lg" aria-hidden="true"></i>
                                     </button>
                                 </span>
@@ -2078,7 +2078,7 @@
                     ' value="' + h(unitPrice) + '" class="form-control form-control-sm"></td>' +
                 '<td class="text-end small text-muted" data-field="invoice_value">—</td>' +
                 '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger rcv-remove"' +
-                    ' title="Remove this item" aria-label="Remove this item"><i class="bi bi-trash" aria-hidden="true"></i></button></td>';
+                    ' aria-label="Remove this item"><i class="bi bi-trash me-1" aria-hidden="true"></i>Remove</button></td>';
 
             rowsWrap.appendChild(tr);
             recalcRow(tr);

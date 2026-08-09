@@ -134,8 +134,8 @@
                                 @endif
                             </td>
                             <td class="text-end text-nowrap">
-                                <a href="{{ route('admin.users.show', $user) }}" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye" aria-hidden="true"></i></a>
-                                <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                                <a href="{{ route('admin.users.show', $user) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</a>
+                                <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</a>
 
                                 <button type="button" class="btn btn-sm btn-outline-warning" title="Reset password"
                                         data-bs-toggle="modal" data-bs-target="#resetPw{{ $user->id }}">
@@ -147,7 +147,7 @@
                                           data-delete-user="{{ $user->id }}"
                                           onsubmit="return confirm('Delete {{ $user->name }}? This cannot be undone.');">
                                         @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                     </form>
                                 @endif
                             </td>

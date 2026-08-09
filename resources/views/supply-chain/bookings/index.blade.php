@@ -744,10 +744,10 @@
                         </div>
                     </div>
                     <div class="booking-preview-header-tools no-print" aria-label="Booking preview zoom controls">
-                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomOut" title="Zoom out" aria-label="Zoom out"><i class="bi bi-zoom-out" aria-hidden="true"></i></button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomOut" aria-label="Zoom out"><i class="bi bi-zoom-out me-1" aria-hidden="true"></i>Zoom Out</button>
                         <span class="booking-preview-zoom-value" id="bookingPreviewZoomValue">100%</span>
-                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomIn" title="Zoom in" aria-label="Zoom in"><i class="bi bi-zoom-in" aria-hidden="true"></i></button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomReset" title="Reset zoom" aria-label="Reset zoom"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomIn" aria-label="Zoom in"><i class="bi bi-zoom-in me-1" aria-hidden="true"></i>Zoom In</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomReset" aria-label="Reset zoom"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset</button>
                     </div>
                     <button type="button" class="btn-close ms-1" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>

@@ -1,80 +1,259 @@
 @extends('layouts.app')
 
-@section('title', 'General Stock — Monthly Ledger')
+@section('title', 'General Stock — Stock Report')
+
+@php
+    // Trim trailing zeros so a whole-number qty reads "15", not "15.0000".
+    $qty = fn ($v) => $v === null ? '—' : rtrim(rtrim(number_format((float) $v, 4, '.', ','), '0'), '.');
+    $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
+    $date = fn ($v) => $v ? $v->format('d-M-y') : '—';
+
+    $badges = [
+        'out' => ['bg-danger text-white', 'bi-x-octagon'],
+        'place_order' => ['bg-danger-subtle text-danger', 'bi-cart-plus'],
+        'low' => ['bg-warning-subtle text-warning-emphasis', 'bi-exclamation-triangle'],
+        'ok' => ['bg-success-subtle text-success', 'bi-check2'],
+    ];
+@endphp
 
 @section('content')
-<div class="container-fluid">
+<div class="container-fluid gx-stock-scope">
     <x-breadcrumb :items="[
         ['label' => 'Store', 'url' => route('store.dashboard')],
         ['label' => 'General Stock'],
-        ['label' => 'Monthly Stock Ledger'],
+        ['label' => 'Stock Report'],
     ]" />
 
     <div class="app-hero-card p-4 mb-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon" style="width:46px;height:46px;border-radius:15px;font-size:20px;"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
+                <span class="app-stat-icon gx-stock-hero-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
                 <div>
                     <div class="app-hero-eyebrow">General Stock</div>
-                    <h3 class="app-hero-title mb-0">Monthly Stock Ledger</h3>
-                    <p class="app-hero-copy mb-0">Opening + Addition − Consumption = Closing · {{ $monthLabel }}</p>
+                    <h3 class="app-hero-title mb-0">Stock Report</h3>
+                    <p class="app-hero-copy mb-0">Opening + Addition − Consumption = Stock as on Date · {{ $monthLabel }}</p>
                 </div>
             </div>
-            <form method="GET" class="d-flex align-items-end gap-2">
-                <div>
-                    <label class="form-label fw-semibold small mb-1">Month</label>
-                    <input type="month" name="month" value="{{ $month }}" class="form-control">
+            <div class="d-flex gap-2">
+                <a href="{{ route('store.stock.ledger.pdf', request()->query()) }}"
+                   class="btn btn-outline-secondary" title="Download this report as PDF">
+                    <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF
+                </a>
+                <a href="{{ route('store.stock.ledger.excel', request()->query()) }}"
+                   class="btn btn-outline-secondary" title="Download this report as Excel">
+                    <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel
+                </a>
+            </div>
+        </div>
+    </div>
+
+    @include('store.stock._stock-ui')
+
+
+    @include('store._flash')
+
+    {{-- Status summary. Each tile links back into the same report with the
+         matching status filter applied, so a manager can go straight from the
+         count to the list behind it. --}}
+    <div class="row g-3 mb-4">
+        @foreach ([
+            ['label' => 'Items Tracked', 'value' => $summary['items'], 'status' => null, 'tone' => 'secondary', 'icon' => 'bi-box-seam'],
+            ['label' => 'Out of Stock', 'value' => $summary['out'], 'status' => 'out', 'tone' => 'danger', 'icon' => 'bi-x-octagon'],
+            ['label' => 'Place Order', 'value' => $summary['place_order'], 'status' => 'place_order', 'tone' => 'danger', 'icon' => 'bi-cart-plus'],
+            ['label' => 'Low Stock', 'value' => $summary['low'], 'status' => 'low', 'tone' => 'warning', 'icon' => 'bi-exclamation-triangle'],
+        ] as $tile)
+            @php $tileIsActive = ($filters['status'] ?? '') === (string) $tile['status'] && $tile['status'] !== null; @endphp
+            <div class="col-6 col-lg-3">
+                <a href="{{ route('store.stock.ledger', array_merge(request()->query(), ['status' => $tile['status']])) }}"
+                   class="card gx-stock-card gx-stock-tile h-100 {{ $tileIsActive ? 'is-active' : '' }}"
+                   @if($tileIsActive) aria-current="true" @endif>
+                    <div class="gx-stock-tile-body">
+                        <span class="gx-stock-tile-icon bg-{{ $tile['tone'] }}-subtle text-{{ $tile['tone'] }}">
+                            <i class="bi {{ $tile['icon'] }}" aria-hidden="true"></i>
+                        </span>
+                        <div>
+                            <div class="gx-stock-tile-label">{{ $tile['label'] }}</div>
+                            <div class="gx-stock-tile-value">{{ number_format($tile['value']) }}</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        @endforeach
+    </div>
+
+    <div class="card gx-stock-card mb-4">
+        <div class="gx-stock-card-body">
+            <form method="GET" class="row g-3 gx-stock-filter">
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="ledgerFilterMonth">Month</label>
+                    <input type="month" id="ledgerFilterMonth" name="month" value="{{ $month }}" class="form-control">
                 </div>
-                <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>View</button>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="ledgerFilterSearch">Search</label>
+                    <input id="ledgerFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item, brand, size or category">
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="ledgerFilterCategory">Category</label>
+                    <select id="ledgerFilterCategory" name="category" class="form-select js-searchable">
+                        <option value="">All</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category }}" @selected(($filters['category'] ?? '') === $category)>{{ $category }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="ledgerFilterStatus">Status</label>
+                    <select id="ledgerFilterStatus" name="status" class="form-select">
+                        <option value="">All</option>
+                        <option value="attention" @selected(($filters['status'] ?? '') === 'attention')>Needs Attention</option>
+                        @foreach($statusLabels as $key => $label)
+                            <option value="{{ $key }}" @selected(($filters['status'] ?? '') === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <div class="form-check">
+                        <input type="hidden" name="include_inactive" value="0">
+                        <input class="form-check-input" type="checkbox" name="include_inactive" value="1" id="includeInactive"
+                               @checked($filters['include_inactive'] ?? false)>
+                        <label class="form-check-label" for="includeInactive">Include inactive items</label>
+                    </div>
+                </div>
+                <div class="col-12 col-md-1 d-grid">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
+                </div>
             </form>
         </div>
     </div>
 
-    @if($reorderCount > 0)
-        <div class="alert alert-warning border-0 shadow-sm rounded-3"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ $reorderCount }} item(s) at or below re-order level.</div>
+    @if($actionList->isNotEmpty() && empty($filters['status']))
+        <div class="alert alert-warning border-0 shadow-sm rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <span>
+                <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                <strong>{{ $actionList->count() }}</strong> item(s) need purchase action this month.
+            </span>
+            <a href="{{ route('store.stock.ledger', array_merge(request()->query(), ['status' => 'attention'])) }}"
+               class="btn btn-sm btn-warning">View Place Order list</a>
+        </div>
     @endif
 
-    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
-        <div class="card-body p-4">
+    <div class="card gx-stock-card">
+        <div class="gx-stock-card-body">
+            <div class="gx-stock-card-head">
+                <h5>{{ $monthLabel }} <span class="badge bg-primary-subtle text-primary ms-1">{{ $rows->count() }} items</span></h5>
+                <div class="small text-muted">
+                    Closing Stock Value: <strong class="text-slate-900">{{ $money($summary['closing_value']) }}</strong>
+                </div>
+            </div>
+
+            {{-- 19 columns, same order as the reference sheet. The wrapper
+                 scrolls on its own so the page body never scrolls sideways. --}}
             <div class="table-responsive">
-                <table class="table align-middle mb-0">
+                <table class="table align-middle gx-stock-table">
                     <thead>
-                        <tr class="text-muted small text-uppercase">
-                            <th>Item</th><th>UOM</th>
-                            <th class="text-end">Opening</th>
+                        <tr>
+                            <th style="min-width:110px;">Order?</th>
+                            <th class="text-end">Sl</th>
+                            <th style="min-width:200px;">Item Name</th>
+                            <th>Brand</th>
+                            <th>Size</th>
+                            <th style="min-width:140px;">Specification</th>
+                            <th>Uom</th>
+                            <th>Category</th>
+                            {{-- Opening is the counted Item Master figure and never
+                                 moves. Balance B/F is last month's closing — the
+                                 figure this month's arithmetic actually builds on. --}}
+                            <th class="text-end" title="Counted stock from the Item Master — never changed by a purchase or an issue">Opening</th>
+                            <th class="text-end" title="Balance brought forward — last month's closing stock">Balance B/F</th>
+                            <th class="text-end" title="Last month consumption pattern (per day)">Cons./Day</th>
+                            <th class="text-end" title="Safety Stock Level (7 days stock)">Safety</th>
+                            <th class="text-end" title="Safety stock + (consumption per day x (lead time + time to place order))">Re-order</th>
+                            <th class="text-end" title="Lead time in days">Lead</th>
                             <th class="text-end">Addition</th>
+                            <th title="Date of last addition">Last Add.</th>
                             <th class="text-end">Consumption</th>
-                            <th class="text-end">Closing</th>
-                            <th class="text-end">Re-order Lvl</th>
-                            <th>Flag</th>
+                            <th title="Date of last consumption">Last Cons.</th>
+                            <th class="text-end">Stock as on Date</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Closing Value</th>
+                            <th style="min-width:120px;">Remarks</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($rows as $r)
-                            <tr class="{{ $r['needs_reorder'] ? 'table-warning' : '' }}">
-                                <td class="fw-semibold">{{ $r['item']->name }}<div class="small text-muted">{{ $r['item']->code ?: '' }}</div></td>
-                                <td class="small">{{ $r['item']->uom ?: '—' }}</td>
-                                <td class="text-end">{{ rtrim(rtrim(number_format($r['opening'], 4), '0'), '.') }}</td>
-                                <td class="text-end text-success">{{ rtrim(rtrim(number_format($r['addition'], 4), '0'), '.') }}</td>
-                                <td class="text-end text-danger">{{ rtrim(rtrim(number_format($r['consumption'], 4), '0'), '.') }}</td>
-                                <td class="text-end fw-bold">{{ rtrim(rtrim(number_format($r['closing'], 4), '0'), '.') }}</td>
-                                <td class="text-end small text-muted">{{ $r['reorder_level'] !== null ? rtrim(rtrim(number_format($r['reorder_level'], 4), '0'), '.') : '—' }}</td>
+                        @forelse($rows as $index => $r)
+                            @php [$badgeClass, $badgeIcon] = $badges[$r['status']]; @endphp
+                            <tr @class(['table-danger' => $r['status'] === 'out'])>
                                 <td>
-                                    @if($r['needs_reorder'])
-                                        <span class="badge bg-danger-subtle text-danger"><i class="bi bi-cart-plus me-1" aria-hidden="true"></i>Re-order</span>
-                                    @else
-                                        <span class="badge bg-success-subtle text-success">OK</span>
-                                    @endif
+                                    <span class="badge {{ $badgeClass }}"><i class="bi {{ $badgeIcon }} me-1" aria-hidden="true"></i>{{ $statusLabels[$r['status']] }}</span>
                                 </td>
+                                <td class="text-end text-muted">{{ $index + 1 }}</td>
+                                <td>
+                                    <div class="fw-semibold text-slate-900">{{ $r['item']->name }}</div>
+                                </td>
+                                <td>{{ $r['item']->brand ?: '—' }}</td>
+                                <td>{{ $r['item']->size ?: '—' }}</td>
+                                <td class="gx-stock-micro">{{ $r['item']->specification ?: '—' }}</td>
+                                <td>{{ $r['item']->uom ?: '—' }}</td>
+                                <td>{{ $r['item']->category ?: '—' }}</td>
+                                {{-- "—" before the item was counted: no count had
+                                     happened, which is not the same as zero. --}}
+                                <td class="text-end">{{ $qty($r['opening']) }}</td>
+                                <td class="text-end fw-semibold">{{ $qty($r['balance_bf']) }}</td>
+                                <td class="text-end text-muted">{{ number_format($r['consumption_per_day'], 2) }}</td>
+                                <td class="text-end">
+                                    {{ $qty($r['safety']) }}
+                                    @if($r['safety_is_manual'])<i class="bi bi-pin-angle-fill text-primary ms-1" title="Set by hand in the item master" aria-hidden="true"></i>@endif
+                                </td>
+                                <td class="text-end">
+                                    {{ $r['reorder'] === null ? '—' : $qty($r['reorder']) }}
+                                    @if($r['reorder_is_manual'])<i class="bi bi-pin-angle-fill text-primary ms-1" title="Set by hand in the item master" aria-hidden="true"></i>@endif
+                                </td>
+                                <td class="text-end text-muted">{{ $r['lead_time_days'] }}</td>
+                                <td class="text-end text-success">{{ $qty($r['addition']) }}</td>
+                                <td class="gx-stock-micro">{{ $date($r['last_addition_date']) }}</td>
+                                <td class="text-end text-danger">{{ $qty($r['consumption']) }}</td>
+                                <td class="gx-stock-micro">{{ $date($r['last_consumption_date']) }}</td>
+                                <td class="text-end fw-bold text-slate-900">{{ $qty($r['stock_as_on']) }}</td>
+                                <td class="text-end">{{ $money($r['unit_price']) }}</td>
+                                <td class="text-end fw-semibold">{{ $money($r['closing_value']) }}</td>
+                                <td class="gx-stock-micro">{{ $r['remarks'] ?: '—' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="text-center text-muted py-5">No stock items yet.</td></tr>
+                            <tr><td colspan="22" class="gx-stock-empty">
+                                            <span class="gx-stock-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>
+                                            <div class="gx-stock-empty-title">Nothing to show</div>
+                                            <div class="gx-stock-empty-hint">Try a different month, category or status.</div>
+                                        </td></tr>
                         @endforelse
                     </tbody>
+                    @if($rows->isNotEmpty())
+                        <tfoot>
+                            <tr>
+                                {{-- 14, not 13: Balance B/F sits inside this span and
+                                     is deliberately not totalled — summing a
+                                     brought-forward balance across unrelated items
+                                     says nothing. --}}
+                                <td colspan="14" class="text-end gx-stock-total-label">Total</td>
+                                <td class="text-end text-success">{{ $qty($summary['addition']) }}</td>
+                                <td></td>
+                                <td class="text-end text-danger">{{ $qty($summary['consumption']) }}</td>
+                                <td colspan="3"></td>
+                                <td class="text-end">{{ $money($summary['closing_value']) }}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </table>
             </div>
-            <p class="small text-muted mt-3 mb-0">Opening = all purchases − all issues before {{ $monthLabel }}. Closing carries forward as next month's opening.</p>
+
+            <p class="gx-stock-help mt-3">
+                Safety Stock = last month's consumption ÷ {{ config('stock.general_stock.working_days_per_month') }} working days ×
+                {{ config('stock.general_stock.safety_stock_days') }} days. Re-order Level adds the lead-time cover on top. A value
+                <i class="bi bi-pin-angle-fill text-primary" aria-hidden="true"></i> pinned in the Item Master overrides the calculated one.
+            </p>
         </div>
     </div>
+
+    @include('store.stock._searchable')
 </div>
 @endsection

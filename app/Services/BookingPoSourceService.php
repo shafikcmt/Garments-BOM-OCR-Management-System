@@ -563,6 +563,52 @@ class BookingPoSourceService
     }
 
     /**
+     * Every worksheet line under every PO belonging to one buyer, each tagged
+     * with the PO it came from.
+     *
+     * Deliberately a composition of the two methods above rather than a query of
+     * its own: bookingPosForGroupValue() already knows how to find a buyer's
+     * bookings and itemRowsForBookingPo() already knows how to expand one into
+     * its lines. Asking the rows first and mapping them back to POs would mean
+     * resolving each row's owner in reverse, which is the hard direction — this
+     * way every row arrives already knowing its booking.
+     *
+     * Deduplicated on the row, keeping the first PO that claims it: two bookings
+     * sharing a PO number would otherwise offer the same line twice, and one
+     * line can only be issued against one booking.
+     *
+     * @return Collection<int, array{row: ExcelRow, po: BookingPo}>
+     */
+    public function itemRowsForBuyer(string $buyer, int $limit = 500): Collection
+    {
+        $buyer = trim($buyer);
+
+        if ($buyer === '') {
+            return collect();
+        }
+
+        $out = collect();
+        $seen = [];
+
+        foreach ($this->bookingPosForGroupValue('buyer', $buyer, $limit) as $po) {
+            foreach ($this->itemRowsForBookingPo($po) as $row) {
+                if (isset($seen[$row->id])) {
+                    continue;
+                }
+
+                $seen[$row->id] = true;
+                $out->push(['row' => $row, 'po' => $po]);
+
+                if ($out->count() >= $limit) {
+                    return $out;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Worksheet (BOM) rows whose cell for $group holds exactly $value.
      *
      * The generic form of what siblingSourceRows() does for a PO number: resolve

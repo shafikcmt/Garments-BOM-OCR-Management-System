@@ -1,7 +1,48 @@
+{{--
+    Two label fixes live here rather than in components.css because this file is
+    the only one in scope for them.
+
+    .app-icon-btn is a fixed 42x42 square, which fits an icon and nothing else.
+    The labelled variant relaxes it into a pill. Scoped to the modifier class so
+    the sidebar toggle, which is not part of this change, keeps its current look.
+--}}
+<style>
+    .app-icon-btn.app-icon-btn-labelled {
+        width: auto;
+        min-width: 42px;
+        padding: 0 12px;
+        gap: 8px;
+        font-size: 12.5px;
+        font-weight: 650;
+        white-space: nowrap;
+    }
+    .app-icon-btn-text { line-height: 1; }
+
+    /* The account name and email stay on screen at every width. Where the
+       header runs out of room they narrow and ellipsis rather than vanish —
+       clamp() does that without a breakpoint that could hide them outright. */
+    .app-account-text > span { max-width: clamp(78px, 17vw, 150px); }
+
+    /* One of these two is always rendered, so the account is never unlabelled.
+       Below 390px the full name is swapped for its first token to give the
+       company name back the room it needs. */
+    .app-account-name-short { display: none; }
+    @media (max-width: 390px) {
+        .app-account-name-full { display: none; }
+        .app-account-name-short { display: inline; }
+    }
+</style>
+
 <header class="header">
     <div class="d-flex align-items-center gap-3 min-w-0">
-        <button class="app-icon-btn d-lg-none" id="sidebarToggle" type="button" aria-label="Open sidebar" title="Open menu">
-            <i class="bi bi-list fs-5" aria-hidden="true"></i>
+        {{-- Carries a visible label, so it needs the pill variant — the plain
+             42px square is sized for an icon alone and the text spilled past
+             its border. aria-label starts with the visible word for the same
+             reason as the Alerts button below; the title repeated it, so it is
+             gone. --}}
+        <button class="app-icon-btn app-icon-btn-labelled d-lg-none" id="sidebarToggle" type="button"
+                aria-label="Menu, open sidebar">
+            <i class="bi bi-list fs-5" aria-hidden="true"></i><span class="app-icon-btn-text">Menu</span>
         </button>
 
         <div class="min-w-0">
@@ -31,19 +72,25 @@
         @endphp
 
         <div class="dropdown">
-            {{-- title alone is a weak accessible name — not announced reliably
-                 and invisible on touch — so the count goes in an explicit
-                 label, which also tells a screen-reader user how many are
-                 waiting without opening the menu. --}}
-            <button class="app-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false"
-                    title="Notifications"
-                    aria-label="Notifications{{ $unreadNotificationCount > 0 ? ', '.$unreadNotificationCount.' unread' : '' }}">
-                <i class="bi bi-bell fs-6" aria-hidden="true"></i>
-                @if($unreadNotificationCount > 0)
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger shadow-sm">
-                        {{ $unreadNotificationCount > 99 ? '99+' : $unreadNotificationCount }}
-                    </span>
-                @endif
+            {{-- The visible word is "Alerts", so the accessible name starts with
+                 it too: a speech-input user can only say what they can read.
+                 The count stays in that label as well, which tells a
+                 screen-reader user how many are waiting without opening the
+                 menu. The old title="" is gone — it is not announced reliably,
+                 is invisible on touch, and the visible label now does its job. --}}
+            <button class="app-icon-btn app-icon-btn-labelled" type="button" data-bs-toggle="dropdown" aria-expanded="false"
+                    aria-label="Alerts{{ $unreadNotificationCount > 0 ? ', '.$unreadNotificationCount.' unread' : '' }}">
+                {{-- The badge is anchored to the bell rather than to the button
+                     so it stays on the icon now that the button is a wide pill. --}}
+                <span class="position-relative d-inline-flex">
+                    <i class="bi bi-bell fs-6" aria-hidden="true"></i>
+                    @if($unreadNotificationCount > 0)
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger shadow-sm">
+                            {{ $unreadNotificationCount > 99 ? '99+' : $unreadNotificationCount }}
+                        </span>
+                    @endif
+                </span>
+                <span class="app-icon-btn-text">Alerts</span>
             </button>
 
             <div class="dropdown-menu dropdown-menu-end p-0 border-0 shadow-lg overflow-hidden" style="width:min(380px, calc(100vw - 32px)); border-radius:20px; max-height:460px; overflow-y:auto;">
@@ -111,9 +158,19 @@
                 @else
                     <span class="profile-img d-inline-flex align-items-center justify-content-center bg-primary text-white fw-bold" style="font-size:13px;">{{ auth()->user()->initials() }}</span>
                 @endif
-                <span class="d-none d-md-block text-start min-w-0">
-                    <span class="d-block fw-bold text-slate-900 text-truncate" style="font-size:13px;max-width:150px;">{{ auth()->user()->name }}</span>
-                    <span class="d-block text-muted text-truncate" style="font-size:11px;max-width:150px;">{{ auth()->user()->email }}</span>
+                {{-- Visible at every width. Where the header is tight the text
+                     truncates instead of disappearing — a narrow label is still
+                     a label, an avatar on its own is not. --}}
+                <span class="d-block text-start min-w-0 app-account-text">
+                    {{-- Below 390px the full name would squeeze the company name
+                         out of the header, so the first token stands in. Still a
+                         readable label at every width — one of the two is always
+                         on screen, never neither. --}}
+                    <span class="d-block fw-bold text-slate-900 text-truncate" style="font-size:13px;">
+                        <span class="app-account-name-full">{{ auth()->user()->name }}</span>
+                        <span class="app-account-name-short">{{ \Illuminate\Support\Str::before(auth()->user()->name, ' ') }}</span>
+                    </span>
+                    <span class="d-block text-muted text-truncate" style="font-size:11px;">{{ auth()->user()->email }}</span>
                 </span>
             </button>
 

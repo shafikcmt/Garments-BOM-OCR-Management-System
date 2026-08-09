@@ -102,7 +102,7 @@
                                 @if($canDelete)
                                     <form method="POST" action="{{ route('store.material.bulk-issues.destroy', $i) }}" onsubmit="return confirm('Remove this bulk issue? Closing stock will update.');">
                                         @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger" aria-label="Delete this entry" title="Delete"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger" aria-label="Delete this entry"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                     </form>
                                 @endif
                             </div>

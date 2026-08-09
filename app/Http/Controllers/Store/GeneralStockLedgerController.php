@@ -2,79 +2,101 @@
 
 namespace App\Http\Controllers\Store;
 
+use App\Exports\GeneralStockReportExport;
 use App\Http\Controllers\Controller;
-use App\Models\StockItem;
-use App\Models\StockIssue;
-use App\Models\StockPurchase;
+use App\Services\GeneralStockReportService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
- * General Stock (module A) — monthly ledger (Excel "Stock <Month>" sheet).
- * Opening (prior-month closing) + Addition − Consumption = Closing. Built as a
- * live query: the general-stock event volume is light, so no cached table.
+ * General Stock (module A) — the Consumable Stock Report (Excel "Stock <Month>"
+ * sheet). Opening + Addition − Consumption = Stock as on Date, with the safety
+ * stock / re-order levels and the Place Order flag.
+ *
+ * Every month is recomputed from the underlying Purchase and Consumption
+ * records, so picking an older month gives that month's report and a backdated
+ * entry corrects history rather than leaving a stale copy behind. All the
+ * arithmetic lives in GeneralStockReportService.
  */
 class GeneralStockLedgerController extends Controller
 {
+    public function __construct(private readonly GeneralStockReportService $report)
+    {
+    }
+
     public function index(Request $request)
     {
-        // Month selector — defaults to the current month.
-        $month = $request->input('month', now()->format('Y-m'));
-        try {
-            $monthStart = Carbon::createFromFormat('Y-m', $month)->startOfMonth();
-        } catch (\Throwable $e) {
-            $monthStart = now()->startOfMonth();
-        }
-        $monthEnd = (clone $monthStart)->endOfMonth();
+        $data = $this->build($request);
 
-        $items = StockItem::orderBy('name')->get();
+        return view('store.stock.ledger', $data + [
+            'categories' => $this->report->categories(),
+            'statusLabels' => GeneralStockReportService::statusLabels(),
+            'actionList' => $this->report->actionList($data['rows']),
+        ]);
+    }
 
-        // Purchases/issues up to end of month, and within month, grouped by item.
-        $purchaseToDate = StockPurchase::whereDate('purchase_date', '<=', $monthEnd)
-            ->selectRaw('stock_item_id, SUM(qty) as qty')->groupBy('stock_item_id')->pluck('qty', 'stock_item_id');
-        $purchaseBefore = StockPurchase::whereDate('purchase_date', '<', $monthStart)
-            ->selectRaw('stock_item_id, SUM(qty) as qty')->groupBy('stock_item_id')->pluck('qty', 'stock_item_id');
-        $purchaseInMonth = StockPurchase::whereBetween('purchase_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-            ->selectRaw('stock_item_id, SUM(qty) as qty')->groupBy('stock_item_id')->pluck('qty', 'stock_item_id');
+    public function pdf(Request $request)
+    {
+        $data = $this->build($request);
 
-        $issueBefore = StockIssue::whereNotNull('stock_item_id')->whereDate('issue_date', '<', $monthStart)
-            ->selectRaw('stock_item_id, SUM(qty) as qty')->groupBy('stock_item_id')->pluck('qty', 'stock_item_id');
-        $issueInMonth = StockIssue::whereNotNull('stock_item_id')
-            ->whereBetween('issue_date', [$monthStart->toDateString(), $monthEnd->toDateString()])
-            ->selectRaw('stock_item_id, SUM(qty) as qty')->groupBy('stock_item_id')->pluck('qty', 'stock_item_id');
+        // Landscape A4: the sheet is 19 columns wide and will not fit portrait.
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('store.stock.ledger-pdf', $data)
+            ->setPaper('a4', 'landscape');
 
-        $rows = $items->map(function (StockItem $item) use ($purchaseBefore, $purchaseInMonth, $issueBefore, $issueInMonth) {
-            $opening = (float) ($purchaseBefore[$item->id] ?? 0) - (float) ($issueBefore[$item->id] ?? 0);
-            $addition = (float) ($purchaseInMonth[$item->id] ?? 0);
-            $consumption = (float) ($issueInMonth[$item->id] ?? 0);
-            $closing = $opening + $addition - $consumption;
+        return $pdf->download($this->filename($data['month']).'.pdf');
+    }
 
-            $reorderLevel = $item->reorder_level !== null ? (float) $item->reorder_level : null;
-            $safety = $item->safety_stock_qty !== null ? (float) $item->safety_stock_qty : null;
+    public function excel(Request $request)
+    {
+        $data = $this->build($request);
 
-            // Re-order flag: closing at or below re-order level (or safety stock).
-            $threshold = $reorderLevel ?? $safety;
-            $needsReorder = $threshold !== null && $closing <= $threshold;
+        return Excel::download(
+            new GeneralStockReportExport($data),
+            $this->filename($data['month']).'.xlsx',
+        );
+    }
 
-            return [
-                'item' => $item,
-                'opening' => $opening,
-                'addition' => $addition,
-                'consumption' => $consumption,
-                'closing' => $closing,
-                'reorder_level' => $reorderLevel,
-                'safety' => $safety,
-                'needs_reorder' => $needsReorder,
-            ];
-        });
+    /**
+     * Shared payload for screen, PDF and Excel, so the three can never drift
+     * apart — the same rows and the same filter summary feed all of them.
+     *
+     * @return array<string, mixed>
+     */
+    private function build(Request $request): array
+    {
+        $filters = $request->validate([
+            'month' => ['nullable', 'string'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'string', 'in:attention,out,place_order,low,ok'],
+            'include_inactive' => ['nullable', 'boolean'],
+        ]);
 
-        $reorderCount = $rows->where('needs_reorder', true)->count();
+        $monthStart = $this->report->resolveMonth($filters['month'] ?? null);
 
-        return view('store.stock.ledger', [
+        $rows = $this->report->rows($monthStart, [
+            'search' => $filters['search'] ?? null,
+            'category' => $filters['category'] ?? null,
+            'status' => $filters['status'] ?? null,
+            'only_active' => ! ($filters['include_inactive'] ?? false),
+        ]);
+
+        return [
             'rows' => $rows,
+            'summary' => $this->report->summary($rows),
+            'filters' => $filters,
             'month' => $monthStart->format('Y-m'),
             'monthLabel' => $monthStart->format('F Y'),
-            'reorderCount' => $reorderCount,
-        ]);
+            // Display name only. The screen sits under the General Stock menu,
+            // which already says "consumable", so the label does not repeat it.
+            // Route, controller and table names are unchanged.
+            'title' => 'Stock Report',
+        ];
+    }
+
+    private function filename(string $month): string
+    {
+        return 'Stock-Report-'.Str::slug($month);
     }
 }

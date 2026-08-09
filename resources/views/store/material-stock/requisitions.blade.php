@@ -175,7 +175,7 @@
     // Reusable <option> list for the stock item dropdowns.
     let stockOptions = '<option value="">Select item…</option>';
     STOCK_ITEMS.forEach(function (it) {
-        const label = [it.name, it.code].filter(Boolean).join(' · ');
+        const label = it.name;
         stockOptions += '<option value="' + it.id + '">' + label.replace(/</g, '&lt;') + '</option>';
     });
 

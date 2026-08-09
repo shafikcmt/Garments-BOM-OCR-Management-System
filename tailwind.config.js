@@ -20,6 +20,16 @@ export default {
         // Verified none of those 204 classes are used by any application view.
     ],
 
+    // Tailwind's `collapse` utility is `visibility: collapse`, and it collides
+    // head-on with Bootstrap's `.collapse` component class. Tailwind is emitted
+    // last (see app.css), so it won: an expanded Bootstrap collapse still got
+    // `display: block` from Bootstrap, but everything inside it inherited
+    // `visibility: collapse` and rendered as an empty box — which is exactly
+    // what "View Items" on Purchase History did. No view uses Tailwind's
+    // collapse utility; it is only generated because Bootstrap's class name
+    // appears in the scanned Blade files. Blocking it removes the collision.
+    blocklist: ['collapse'],
+
     // Bootstrap owns the base layer on every screen. Tailwind's preflight
     // would reset it and break the whole UI, so it stays off — this mirrors
     // the `corePlugins: { preflight: false }` the CDN build used before the

@@ -7,6 +7,11 @@ use App\Http\Controllers\Store\StockItemController;
 use App\Http\Controllers\Store\StockPurchaseController;
 use App\Http\Controllers\Store\StockIssueController;
 use App\Http\Controllers\Store\GeneralStockLedgerController;
+use App\Http\Controllers\Store\IssueSetupController;
+use App\Http\Controllers\Store\PurchaseSetupController;
+use App\Http\Controllers\Store\StockSetupController;
+use App\Http\Controllers\Store\PurchaseRequisitionController;
+use App\Http\Controllers\Store\MonthlyRequisitionReportController;
 use App\Http\Controllers\Store\MaterialReceivingController;
 use App\Http\Controllers\Store\MaterialBulkIssueController;
 use App\Http\Controllers\Store\MaterialRequisitionController;
@@ -41,20 +46,107 @@ Route::prefix('store')
 
         // --- Module A: General Stock (non-BOM) ---
         Route::prefix('stock')->name('stock.')->group(function () {
+            // Consumable Stock Report. PDF/Excel take the same query string as
+            // the screen, so a download always matches what was previewed.
             Route::get('/ledger', [GeneralStockLedgerController::class, 'index'])->name('ledger');
+            Route::get('/ledger/pdf', [GeneralStockLedgerController::class, 'pdf'])->name('ledger.pdf');
+            Route::get('/ledger/excel', [GeneralStockLedgerController::class, 'excel'])->name('ledger.excel');
+
+            // Master Setup — one screen for every General Stock master list.
+            // Composes only: each form on it still posts to the Purchase Setup
+            // or Issue Setup routes below, which are unchanged.
+            Route::get('/setup', [StockSetupController::class, 'index'])->name('setup');
+
+            // Issue Setup masters: Indent Section / Indent Person / Approved By
+            // / Category. {type} is whitelisted inside IssueSetupController.
+            //
+            // The index now lives on Master Setup; this redirect keeps old
+            // bookmarks and any link still pointing here working.
+            Route::get('/issue-setup', fn () => redirect()->route('store.stock.setup', ['tab' => 'sections']))
+                ->name('issue-setup.index');
+            // Blank sample template, one per master type.
+            Route::get('/issue-setup/{type}/template', [IssueSetupController::class, 'template'])->name('issue-setup.template');
+            Route::post('/issue-setup/{type}', [IssueSetupController::class, 'store'])->name('issue-setup.store');
+            Route::post('/issue-setup/{type}/bulk', [IssueSetupController::class, 'bulk'])->name('issue-setup.bulk');
+            Route::delete('/issue-setup/{type}/bulk-delete', [IssueSetupController::class, 'bulkDestroy'])->name('issue-setup.bulk-delete');
+            Route::put('/issue-setup/{type}/{id}', [IssueSetupController::class, 'update'])->name('issue-setup.update');
+            Route::delete('/issue-setup/{type}/{id}', [IssueSetupController::class, 'destroy'])->name('issue-setup.destroy');
 
             Route::get('/items', [StockItemController::class, 'index'])->name('items.index');
+            // Bulk item upload + its blank sample template.
+            Route::get('/items/template', [StockItemController::class, 'template'])->name('items.template');
+            Route::post('/items/import', [StockItemController::class, 'import'])->name('items.import');
             Route::post('/items', [StockItemController::class, 'store'])->name('items.store');
             Route::put('/items/{stockItem}', [StockItemController::class, 'update'])->name('items.update');
             Route::delete('/items/{stockItem}', [StockItemController::class, 'destroy'])->name('items.destroy');
+
+            // Purchase Setup — General Stock's own supplier list, behind the
+            // Record Purchase supplier dropdown.
+            // As with Issue Setup, the index moved to Master Setup and this
+            // redirect keeps every existing link and bookmark working.
+            Route::get('/purchase-setup', fn () => redirect()->route('store.stock.setup', ['tab' => 'suppliers']))
+                ->name('purchase-setup.index');
+            Route::get('/purchase-setup/template', [PurchaseSetupController::class, 'template'])->name('purchase-setup.template');
+            Route::post('/purchase-setup/import', [PurchaseSetupController::class, 'import'])->name('purchase-setup.import');
+            Route::post('/purchase-setup', [PurchaseSetupController::class, 'store'])->name('purchase-setup.store');
+            // Declared before /{supplier} so "bulk-delete" is never taken for a
+            // supplier id by the DELETE route below.
+            Route::delete('/purchase-setup/bulk-delete', [PurchaseSetupController::class, 'bulkDestroy'])->name('purchase-setup.bulk-delete');
+            Route::put('/purchase-setup/{supplier}', [PurchaseSetupController::class, 'update'])->name('purchase-setup.update');
+            Route::delete('/purchase-setup/{supplier}', [PurchaseSetupController::class, 'destroy'])->name('purchase-setup.destroy');
 
             Route::get('/purchases', [StockPurchaseController::class, 'index'])->name('purchases.index');
             Route::post('/purchases', [StockPurchaseController::class, 'store'])->name('purchases.store');
             Route::delete('/purchases/{stockPurchase}', [StockPurchaseController::class, 'destroy'])->name('purchases.destroy');
 
+            // Read-only stock position for one item — the Issue form calls this
+            // to warn about low / zero stock before the issue is confirmed.
+            Route::get('/issues/item-status/{stockItem}', [StockIssueController::class, 'itemStatus'])->name('issues.item-status');
+
             Route::get('/issues', [StockIssueController::class, 'index'])->name('issues.index');
             Route::post('/issues', [StockIssueController::class, 'store'])->name('issues.store');
             Route::delete('/issues/{stockIssue}', [StockIssueController::class, 'destroy'])->name('issues.destroy');
+
+            // Purchase Requisition — replaces the hand-kept
+            // "Month_Of_<Month>.xlsx" workbook. Single-item and multi-item
+            // requisitions are one record type differing by `mode`, so they
+            // share every route here.
+            //
+            // The two read-only lookups are declared BEFORE /{requisition} so
+            // "item-snapshot" and "next-number" are never taken for a
+            // requisition id by the model-bound routes below.
+            Route::get('/requisitions/item-snapshot/{stockItem}', [PurchaseRequisitionController::class, 'itemSnapshot'])
+                ->name('requisitions.item-snapshot');
+            Route::get('/requisitions/next-number', [PurchaseRequisitionController::class, 'nextNumber'])
+                ->name('requisitions.next-number');
+
+            // Monthly report — every requisition of a month compiled into one
+            // list plus per-category groupings, replacing the hand-built
+            // "Month_Of_<Month>.xlsx" workbook. Read-only, and declared with
+            // the other fixed paths ABOVE /{requisition} so "report" is never
+            // taken for a requisition id.
+            Route::get('/requisitions/report', [MonthlyRequisitionReportController::class, 'index'])
+                ->name('requisitions.report');
+            Route::get('/requisitions/report/pdf', [MonthlyRequisitionReportController::class, 'pdf'])
+                ->name('requisitions.report.pdf');
+            Route::get('/requisitions/report/excel', [MonthlyRequisitionReportController::class, 'excel'])
+                ->name('requisitions.report.excel');
+
+            Route::get('/requisitions', [PurchaseRequisitionController::class, 'index'])->name('requisitions.index');
+            Route::get('/requisitions/create', [PurchaseRequisitionController::class, 'create'])->name('requisitions.create');
+            Route::post('/requisitions', [PurchaseRequisitionController::class, 'store'])->name('requisitions.store');
+            Route::get('/requisitions/{requisition}', [PurchaseRequisitionController::class, 'show'])->name('requisitions.show');
+
+            // One requisition as its own printable document — the same layout
+            // as the monthly report, scoped to a single requisition.
+            Route::get('/requisitions/{requisition}/pdf', [PurchaseRequisitionController::class, 'pdf'])
+                ->name('requisitions.pdf');
+            Route::get('/requisitions/{requisition}/excel', [PurchaseRequisitionController::class, 'excel'])
+                ->name('requisitions.excel');
+
+            Route::get('/requisitions/{requisition}/edit', [PurchaseRequisitionController::class, 'edit'])->name('requisitions.edit');
+            Route::put('/requisitions/{requisition}', [PurchaseRequisitionController::class, 'update'])->name('requisitions.update');
+            Route::delete('/requisitions/{requisition}', [PurchaseRequisitionController::class, 'destroy'])->name('requisitions.destroy');
         });
 
         // --- Module B: Buyer/Style Stock (BOM/PO-linked) ---
@@ -129,6 +221,9 @@ Route::prefix('store/material-stock')
         // which is store-only and would 403 for Admin / Management here.
         Route::get('/bulk-issues/po-search', [MaterialBulkIssueController::class, 'poSearch'])->name('bulk-issues.po-search');
         Route::get('/bulk-issues/po-items/{bookingPo}', [MaterialBulkIssueController::class, 'poItems'])->name('bulk-issues.po-items');
+        // Buyer-first entry: every item under all of one buyer's POs at once.
+        // Read-only, and only reached when stock.bulk_issue_multi_po is on.
+        Route::get('/bulk-issues/buyer-items', [MaterialBulkIssueController::class, 'buyerItems'])->name('bulk-issues.buyer-items');
         Route::post('/bulk-issues', [MaterialBulkIssueController::class, 'store'])->name('bulk-issues.store');
         // Selection actions — static paths, declared before the {id} wildcard.
         Route::post('/bulk-issues/bulk-destroy', [MaterialBulkIssueController::class, 'bulkDestroy'])->name('bulk-issues.bulk-destroy');

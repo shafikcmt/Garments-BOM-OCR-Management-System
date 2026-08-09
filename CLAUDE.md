@@ -127,8 +127,27 @@ Avoid:
 - Childish animation
 - Repeated welcome text
 - Too many filter boxes if fewer filters can do the same job
-- Confusing icon-only action buttons without labels/tooltips
 - Technical words in management-facing pages
+
+### Button Rules
+
+> Icon-only buttons are not allowed anywhere in the system. Every action button must
+> have either a visible text label, or an icon paired with a visible text label next to
+> it. A tooltip alone is not a substitute for a visible label.
+
+Applying this rule:
+
+- Pair the icon with the label: `<i class="bi bi-trash me-1"></i>Delete`.
+- In dense table rows, use a small label next to a smaller icon (`btn-sm`) — a short
+  label is always better than none.
+- Keep the label a plain verb the user would say out loud: Edit, Delete, View, Filter,
+  Download PDF, Import.
+- A `title` tooltip may stay as extra detail, but never as the only label. If the label
+  already says the same thing, drop the tooltip rather than repeating it.
+- The only exception is a plain close "X" in the top-right corner of a modal or
+  offcanvas, which is a universal convention. It still needs an `aria-label`.
+- Our users are non-technical office and factory staff. An icon they have to decode, or
+  hover to identify, is a support call.
 
 ## PDF / Excel / Export Rules
 

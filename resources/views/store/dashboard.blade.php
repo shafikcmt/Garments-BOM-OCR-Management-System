@@ -41,9 +41,9 @@
         </div>
         <div class="col-12 col-sm-6 col-xl-3">
             <x-stat-card class="gx-fade-in h-100" style="--gx-delay:300ms"
-                icon="exclamation-triangle" tone="danger" label="Items at re-order level"
+                icon="exclamation-triangle" tone="danger" label="Items needing purchase"
                 :value="$stats['reorder_count']"
-                :href="route('store.stock.items.index')" />
+                :href="route('store.stock.ledger', ['status' => 'attention'])" />
         </div>
     </div>
 
@@ -115,22 +115,37 @@
 
         <div class="col-12 col-xl-5">
             <x-card class="gx-fade-in h-100" style="--gx-delay:700ms" title="Needs attention">
-                @php $lowStock = collect($stockLevels)->where('low', true)->take(6); @endphp
+                {{-- Worst first: out of stock, then below safety stock, then
+                     below re-order level. Same ordering as the Stock Report. --}}
+                @php
+                    $lowStock = collect($stockLevels)->take(6);
+                    $tone = ['out' => 'danger', 'place_order' => 'danger', 'low' => 'warning'];
+                    $statusLabels = \App\Services\GeneralStockReportService::statusLabels();
+                @endphp
 
                 @forelse($lowStock as $item)
                     <div class="d-flex align-items-center justify-content-between gap-2 py-2 border-bottom">
                         <div class="min-w-0">
                             <div class="fw-semibold text-truncate">{{ $item['name'] }}</div>
-                            <div class="small text-muted">{{ $item['code'] }}</div>
+                            <div class="small text-muted">
+                                <span class="badge bg-{{ $tone[$item['status']] }}-subtle text-{{ $tone[$item['status']] }}">{{ $statusLabels[$item['status']] }}</span>
+                                {{ $item['category'] }}
+                            </div>
                         </div>
                         <div class="text-end">
-                            <div class="fw-bold text-danger">{{ $fmt($item['current']) }} {{ $item['uom'] }}</div>
-                            <div class="small text-muted">re-order at {{ $fmt($item['threshold']) }}</div>
+                            <div class="fw-bold text-{{ $tone[$item['status']] }}">{{ $fmt($item['current']) }} {{ $item['uom'] }}</div>
+                            <div class="small text-muted">safety {{ $fmt($item['threshold']) }}</div>
                         </div>
                     </div>
                 @empty
-                    <p class="text-muted small mb-0">Nothing is at its re-order level.</p>
+                    <p class="text-muted small mb-0">Every consumable is above its re-order level.</p>
                 @endforelse
+
+                @if($stats['reorder_count'] > $lowStock->count())
+                    <a href="{{ route('store.stock.ledger', ['status' => 'attention']) }}" class="btn btn-sm btn-outline-danger mt-3">
+                        View all {{ $stats['reorder_count'] }} in the Place Order list
+                    </a>
+                @endif
 
                 @if($stats['pending_req_lines'] > 0)
                     <div class="alert alert-warning mt-3 mb-0 py-2 small">

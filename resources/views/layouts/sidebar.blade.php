@@ -4,9 +4,14 @@
     $isAdminUserRole = request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*');
     $isAdminBookingSettings = request()->routeIs('admin.suppliers.*') || request()->routeIs('admin.booking-delivery-destinations.*') || request()->routeIs('admin.booking-instructions.*') || request()->routeIs('admin.po-generate-control.*');
     $isAdminSettings = request()->routeIs('admin.alert-settings.*') || request()->routeIs('admin.payment-settings.*') || request()->routeIs('admin.email-templates.*');
-    // Store screens Admin shares with the store role (Bulk Issuing corrections,
-    // reports). Store's own sidebar block lists these separately.
-    $isAdminStore = request()->routeIs('store.material.bulk-issues.*') || request()->routeIs('store.reports.*');
+    // Store screens Admin shares with the store role: Bulk Issuing corrections,
+    // reports, and the General Stock purchase / setup screens Admin owns the
+    // edit and delete rights for. Store's own sidebar block lists these
+    // separately. Keeping the list here is what makes the Store group open and
+    // highlight itself when one of its pages is showing.
+    $isAdminStore = request()->routeIs('store.material.bulk-issues.*')
+        || request()->routeIs('store.reports.*')
+        || request()->routeIs('store.stock.*');
     $isSupplyBooking = request()->routeIs('supply_chain.bookings.*');
     $isSupplyPayment = request()->routeIs('supply_chain.payment_requests.*');
     $isSupplyEmails = request()->routeIs('supply_chain.sent_emails.*');
@@ -24,8 +29,8 @@
                     <span class="sidebar-brand-subtitle">Management System</span>
                 </span>
             </a>
-            <button type="button" class="btn btn-sm d-lg-none sidebar-close-btn" id="sidebarClose" aria-label="Close sidebar" title="Close menu">
-                <i class="bi bi-x-lg" aria-hidden="true"></i>
+            <button type="button" class="btn btn-sm d-lg-none sidebar-close-btn" id="sidebarClose" aria-label="Close sidebar" >
+                <i class="bi bi-x-lg me-1" aria-hidden="true"></i>Close
             </button>
         </div>
 
@@ -55,6 +60,22 @@
                             <span class="sidebar-submenu-rail"></span>
                             <a href="{{ route('store.material.bulk-issues.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.material.bulk-issues.*') ? 'is-active' : '' }}">Bulk Issuing</a>
                             <a href="{{ route('store.reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">Store Reports</a>
+                            {{-- General Stock screens Admin holds the edit / delete
+                                 rights for. Reachable by route before this, but with
+                                 no way to navigate to them. Listed in the same order
+                                 as the store role's own General Stock block, so the
+                                 two sidebars read alike. --}}
+                            <a href="{{ route('store.stock.ledger') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">Stock Report</a>
+                            <a href="{{ route('store.stock.items.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">Items</a>
+                            <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">Receiving</a>
+                            <a href="{{ route('store.stock.issues.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">Issues</a>
+                            {{-- Named in full to keep it distinct from the
+                                 material Requisitions under Buyer/Style Stock. --}}
+                            <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">Purchase Requisition</a>
+                            {{-- Purchase Setup and Issue Setup are one screen now.
+                                 Their old routes redirect here, so both spellings
+                                 still highlight this entry. --}}
+                            <a href="{{ route('store.stock.setup') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.setup') || request()->routeIs('store.stock.purchase-setup.*') || request()->routeIs('store.stock.issue-setup.*') ? 'is-active' : '' }}">Setup</a>
                         </div>
                     </li>
 
@@ -209,8 +230,8 @@
                 <div class="sidebar-section-label">General Stock</div>
                 <ul class="sidebar-list">
                     <li class="sidebar-item">
-                        <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Monthly Ledger</span></span>
+                        <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Stock Report</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
@@ -220,12 +241,27 @@
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span class="sidebar-link-text">Purchases</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span class="sidebar-link-text">Receiving</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.stock.issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span><span class="sidebar-link-text">Issues</span></span>
+                        </a>
+                    </li>
+                    {{-- Named in full to keep it distinct from the material
+                         Requisitions under Buyer/Style Stock. --}}
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Purchase Requisition</span></span>
+                        </a>
+                    </li>
+                    {{-- Purchase Setup and Issue Setup are one screen now. Their
+                         old routes redirect here, so both spellings still
+                         highlight this entry. --}}
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.stock.setup') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.setup') || request()->routeIs('store.stock.purchase-setup.*') || request()->routeIs('store.stock.issue-setup.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-sliders" aria-hidden="true"></i></span><span class="sidebar-link-text">Setup</span></span>
                         </a>
                     </li>
                 </ul>
@@ -345,6 +381,63 @@
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Bulk Issuing</span>
+                            </span>
+                        </a>
+                    </li>
+                    {{-- Same reason as Bulk Issuing above: Management carries the
+                         store.edit / store.delete rights for these General Stock
+                         screens, so it needs a way to reach them. Same order and
+                         icons as the store role's own General Stock block. --}}
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Stock Report</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.stock.items.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Items</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Receiving</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.stock.issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Issues</span>
+                            </span>
+                        </a>
+                    </li>
+                    {{-- Named in full to keep it distinct from the material
+                         Requisitions under Buyer/Style Stock. --}}
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Purchase Requisition</span>
+                            </span>
+                        </a>
+                    </li>
+                    {{-- Purchase Setup and Issue Setup are one screen now. Their
+                         old routes redirect here, so both spellings still
+                         highlight this entry. --}}
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.stock.setup') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.setup') || request()->routeIs('store.stock.purchase-setup.*') || request()->routeIs('store.stock.issue-setup.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-sliders" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Setup</span>
                             </span>
                         </a>
                     </li>
