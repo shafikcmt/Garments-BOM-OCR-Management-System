@@ -68,6 +68,26 @@ trait FormatsStoreSheet
      */
     private const MONEY_HEADINGS = ['rate', 'amount', 'price', 'value'];
 
+    /**
+     * Headings whose column holds a reference, not a measurement.
+     *
+     * A style number, PO number or SAP code is digits that happen to parse as a
+     * number; it is never added up and a thousands separator in it is simply
+     * wrong — style 4800093964 printed as "4,800,093,964" is not the style the
+     * buyer asked for. These print as plain digits instead.
+     *
+     * Matched on whole words, so "No" catches "Art. No" and "GRN/MRN No" while
+     * leaving "Nominal" and "Notes" alone.
+     */
+    private const IDENTIFIER_HEADINGS = ['no', 'nos', 'number', 'code', 'id', 'sl', 'style', 'sap', 'ref'];
+
+    /** Digits, no grouping — what a reference number should look like. */
+    private const FORMAT_IDENTIFIER = '0';
+
+    private const FORMAT_MONEY = '#,##0.00';
+
+    private const FORMAT_QUANTITY = '#,##0.####';
+
     protected function formatStoreSheet(Worksheet $sheet): void
     {
         $lastRow = $sheet->getHighestDataRow();
@@ -420,9 +440,7 @@ trait FormatsStoreSheet
                 $heading = $this->headingFor($sheet, $col, $headerStart, $firstDataRow - 1);
 
                 $sheet->getStyle($range)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-                $sheet->getStyle($range)->getNumberFormat()->setFormatCode(
-                    $this->isMoneyHeading($heading) ? '#,##0.00' : '#,##0.####'
-                );
+                $sheet->getStyle($range)->getNumberFormat()->setFormatCode($this->numberFormatFor($heading));
 
                 continue;
             }
@@ -534,7 +552,7 @@ trait FormatsStoreSheet
                     $col,
                     $headerStart + 1,
                     $lastRow,
-                    $this->isMoneyHeading($heading)
+                    $this->numberFormatFor($heading)
                 );
 
                 $width = max(self::WIDTH_NUMERIC_MIN, min(self::WIDTH_MAX, $longest + self::NUMERIC_PADDING));
@@ -561,7 +579,7 @@ trait FormatsStoreSheet
      * Non-numeric cells in the range are measured as they are — that is the
      * "Total-" label and the "—" placeholders, which share the column.
      */
-    private function longestFormattedIn(Worksheet $sheet, int $col, int $from, int $to, bool $money): int
+    private function longestFormattedIn(Worksheet $sheet, int $col, int $from, int $to, string $format): int
     {
         $longest = 0;
 
@@ -580,9 +598,11 @@ trait FormatsStoreSheet
 
             $value = (float) str_replace(',', '', $raw);
 
-            $shown = $money
-                ? number_format($value, 2)
-                : rtrim(rtrim(number_format($value, 4), '0'), '.');
+            $shown = match ($format) {
+                self::FORMAT_IDENTIFIER => number_format($value, 0, '.', ''),
+                self::FORMAT_MONEY => number_format($value, 2),
+                default => rtrim(rtrim(number_format($value, 4), '0'), '.'),
+            };
 
             $longest = max($longest, mb_strlen($shown));
         }
@@ -632,6 +652,39 @@ trait FormatsStoreSheet
     {
         foreach (self::MONEY_HEADINGS as $word) {
             if (stripos($heading, $word) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The number format a figures column should carry, decided from its heading.
+     *
+     * The single place that decision is made: styleBody applies the format and
+     * sizeColumns measures the text it produces, and a column comes out either
+     * ###### or over-wide the moment those two disagree.
+     */
+    private function numberFormatFor(string $heading): string
+    {
+        if ($this->isIdentifierHeading($heading)) {
+            return self::FORMAT_IDENTIFIER;
+        }
+
+        return $this->isMoneyHeading($heading) ? self::FORMAT_MONEY : self::FORMAT_QUANTITY;
+    }
+
+    /**
+     * A reference column, matched on whole words.
+     *
+     * Checked before money, so "PO No" stays an identifier even though a
+     * heading like "Invoice No / Value" mentions both.
+     */
+    private function isIdentifierHeading(string $heading): bool
+    {
+        foreach (self::IDENTIFIER_HEADINGS as $word) {
+            if (preg_match('/(?<![a-z])'.$word.'(?![a-z])/i', $heading) === 1) {
                 return true;
             }
         }

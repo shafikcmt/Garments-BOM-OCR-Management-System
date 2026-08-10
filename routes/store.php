@@ -12,6 +12,8 @@ use App\Http\Controllers\Store\PurchaseSetupController;
 use App\Http\Controllers\Store\StockSetupController;
 use App\Http\Controllers\Store\PurchaseRequisitionController;
 use App\Http\Controllers\Store\MonthlyRequisitionReportController;
+use App\Http\Controllers\Store\ReceivingReportController;
+use App\Http\Controllers\Store\IssueReportController;
 use App\Http\Controllers\Store\MaterialReceivingController;
 use App\Http\Controllers\Store\MaterialBulkIssueController;
 use App\Http\Controllers\Store\MaterialRequisitionController;
@@ -95,6 +97,19 @@ Route::prefix('store')
             Route::put('/purchase-setup/{supplier}', [PurchaseSetupController::class, 'update'])->name('purchase-setup.update');
             Route::delete('/purchase-setup/{supplier}', [PurchaseSetupController::class, 'destroy'])->name('purchase-setup.destroy');
 
+            // Bulk receiving upload + its blank sample template. Declared above
+            // the model-bound purchase routes so "template" and "import" are
+            // never taken for a purchase id.
+            Route::get('/purchases/template', [StockPurchaseController::class, 'template'])->name('purchases.template');
+            Route::post('/purchases/import', [StockPurchaseController::class, 'import'])->name('purchases.import');
+
+            // Receiving report — read-only, and declared with the other fixed
+            // paths ABOVE the model-bound routes so "report" is never taken for
+            // a purchase id. Access is this group's: store, admin, management.
+            Route::get('/purchases/report', [ReceivingReportController::class, 'index'])->name('purchases.report');
+            Route::get('/purchases/report/pdf', [ReceivingReportController::class, 'pdf'])->name('purchases.report.pdf');
+            Route::get('/purchases/report/excel', [ReceivingReportController::class, 'excel'])->name('purchases.report.excel');
+
             Route::get('/purchases', [StockPurchaseController::class, 'index'])->name('purchases.index');
             Route::post('/purchases', [StockPurchaseController::class, 'store'])->name('purchases.store');
             Route::delete('/purchases/{stockPurchase}', [StockPurchaseController::class, 'destroy'])->name('purchases.destroy');
@@ -102,6 +117,12 @@ Route::prefix('store')
             // Read-only stock position for one item — the Issue form calls this
             // to warn about low / zero stock before the issue is confirmed.
             Route::get('/issues/item-status/{stockItem}', [StockIssueController::class, 'itemStatus'])->name('issues.item-status');
+
+            // Issues report — read-only, declared above /issues/{stockIssue}
+            // for the same reason as the receiving one.
+            Route::get('/issues/report', [IssueReportController::class, 'index'])->name('issues.report');
+            Route::get('/issues/report/pdf', [IssueReportController::class, 'pdf'])->name('issues.report.pdf');
+            Route::get('/issues/report/excel', [IssueReportController::class, 'excel'])->name('issues.report.excel');
 
             Route::get('/issues', [StockIssueController::class, 'index'])->name('issues.index');
             Route::post('/issues', [StockIssueController::class, 'store'])->name('issues.store');

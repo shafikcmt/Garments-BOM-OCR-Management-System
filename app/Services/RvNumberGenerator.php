@@ -6,11 +6,18 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Allocates the RV No for a goods-receiving event: AUG26-00001.
+ * Allocates the RV No for a goods-receiving event: AUG26-0001.
  *
- * Three-letter month, two-digit year, five-digit sequence that restarts each
+ * Three-letter month, two-digit year, four-digit sequence that restarts each
  * month — the period is in the key, so a sequence that carried across months
  * would only make the prefix decorative.
+ *
+ * The sequence was five digits wide until the width was reduced to four. Only
+ * the RENDERING changed: the counter is a plain integer and was never touched,
+ * so numbering carries straight on. A month that was already in use therefore
+ * ends up holding both widths — AUG26-00004 followed by AUG26-0005 — and that
+ * is deliberate. Rewriting the numbers already issued would break every
+ * document, link and audit reference that quotes them.
  *
  * The number cannot be guaranteed by a unique index on stock_purchases.rv_no,
  * because one receiving writes several rows that deliberately share its RV No.
@@ -24,8 +31,8 @@ use Illuminate\Support\Facades\DB;
  */
 class RvNumberGenerator
 {
-    /** Digits in the sequence part — 99,999 receivings in one month. */
-    private const WIDTH = 5;
+    /** Digits in the sequence part — 9,999 receivings in one month. */
+    private const WIDTH = 4;
 
     /**
      * Take the next RV No for the month the goods were received in.

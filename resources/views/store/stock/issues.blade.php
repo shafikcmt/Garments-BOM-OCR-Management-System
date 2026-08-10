@@ -66,7 +66,10 @@
                     <h3 class="app-hero-title mb-0">Issues (Consumption)</h3>
                 </div>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ route('store.stock.issues.report') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-file-earmark-bar-graph me-1" aria-hidden="true"></i>Report
+                </a>
                 <a href="{{ route('store.stock.issue-setup.index') }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1" aria-hidden="true"></i>Issue Setup</a>
                 <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Items</a>
             </div>

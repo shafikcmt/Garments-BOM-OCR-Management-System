@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Store;
 
+use App\Exports\ReceivingTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
+use App\Imports\ReceivingImport;
 use App\Models\GeneralStockSupplier;
 use App\Models\StockItem;
 use App\Models\StockPurchase;
@@ -11,6 +13,7 @@ use App\Services\RvNumberGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * General Stock (module A) — challan-level receive (Excel "Purchase" sheet).
@@ -39,12 +42,10 @@ class StockPurchaseController extends Controller
             'month' => ['nullable', 'date_format:Y-m'],
         ]);
 
-        // One goods-receiving event = one RV No, one challan and one challan
-        // date, shared by all its lines. Legacy rows predate the auto-generated
-        // RV, and the same hand-typed number was reused months apart, so the
-        // date is part of the key — otherwise two unrelated old deliveries
-        // would merge into one group.
-        $keyExpr = "CONCAT(COALESCE(rv_no,''),'|',COALESCE(challan_no,''),'|',".$this->dateKeyExpr('purchase_date').')';
+        // How lines are grouped into deliveries. Defined once on the model, so
+        // Purchase History and the Receiving Report can never disagree about
+        // what counts as one delivery.
+        $keyExpr = StockPurchase::groupKeyExpr();
 
         $applyFilters = function ($q) use ($filters) {
             return $q
@@ -195,34 +196,105 @@ class StockPurchaseController extends Controller
         $count = count($data['items']);
 
         return back()->with('success', $count === 1
-            ? 'Purchase recorded under RV No '.$rvNo.'.'
-            : $count.' item(s) received under RV No '.$rvNo.'.');
+            ? 'Purchase recorded under GRN No '.$rvNo.'.'
+            : $count.' item(s) received under GRN No '.$rvNo.'.');
+    }
+
+    /** The blank sample workbook for the bulk receiving upload. */
+    public function template()
+    {
+        return Excel::download(new ReceivingTemplateExport, 'Receiving-Bulk-Upload-Template.xlsx');
     }
 
     /**
-     * A date column rendered as 'YYYY-MM-DD' text, or '' when it is NULL, for
-     * use inside the grouping key.
+     * Bulk goods-receiving upload — many deliveries, many item lines each, in
+     * one file.
      *
-     * COALESCE(<date column>, '') cannot be written directly. PostgreSQL
-     * resolves a COALESCE to one common type, picks `date` from the column, and
-     * then rejects '' as a date — "invalid input syntax for type date". MySQL
-     * and MariaDB accept the same expression only because they coerce the
-     * column to text instead, so the bug is invisible until the app runs on
-     * Postgres. The date is therefore converted to text FIRST, and the fallback
-     * is then an empty string against a string, which every engine accepts.
+     * The DELIVERY is the unit of success, not the file: a challan with a bad
+     * line is reported and left out, and every other challan in the same file
+     * still goes in. That matters because the files this reads are years of
+     * historical purchases, where a single unknown item name would otherwise
+     * block thousands of good rows.
      *
-     * Formatted explicitly rather than left to each engine's default rendering:
-     * the key only has to be internally consistent, but a key that reads the
-     * same everywhere is far easier to compare when a group looks wrong on one
-     * environment and right on another.
+     * Re-uploading a corrected file is safe: a challan already in Purchase
+     * History is recognised and skipped rather than recorded a second time.
+     *
+     * Everything is written inside ONE transaction so the RV numbers stay
+     * unique — RvNumberGenerator holds its lock only until the transaction ends.
      */
-    private function dateKeyExpr(string $column): string
+    public function import(Request $request, RvNumberGenerator $rv)
     {
-        return match (DB::getDriverName()) {
-            'pgsql' => "COALESCE(TO_CHAR({$column}, 'YYYY-MM-DD'), '')",
-            'sqlite' => "COALESCE(STRFTIME('%Y-%m-%d', {$column}), '')",
-            default => "COALESCE(DATE_FORMAT({$column}, '%Y-%m-%d'), '')",
-        };
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt,xlsx,xls', 'max:8192'],
+        ], [], ['file' => 'upload file']);
+
+        try {
+            $sheets = Excel::toArray(new ReceivingImport, $request->file('file'));
+        } catch (\Throwable $e) {
+            return back()->with('warning', 'That file could not be read. Please upload a CSV or Excel file based on the sample template.');
+        }
+
+        [
+            'challans' => $challans,
+            'errors' => $errors,
+            'skipped' => $skipped,
+            'notes' => $notes,
+        ] = ReceivingImport::parse($sheets[0] ?? []);
+
+        if (empty($challans)) {
+            return back()
+                ->with('warning', $errors
+                    ? 'Nothing was imported. Please correct the rows listed below and upload the file again.'
+                    : ($skipped
+                        ? 'No new deliveries were imported. See the skipped rows below.'
+                        : 'No receiving rows were found in that file. Please use the sample template.'))
+                ->with('import_errors', $errors)
+                ->with('import_skipped', $skipped)
+                ->with('import_notes', $notes);
+        }
+
+        $userId = auth()->id();
+        $lineCount = 0;
+
+        DB::transaction(function () use ($challans, $rv, $userId, &$lineCount) {
+            foreach ($challans as $challan) {
+                // The same allocator the manual form uses, keyed to the same
+                // date, so imported and typed deliveries share one continuous
+                // series with no gaps and no reused numbers. The legacy RV No in
+                // the file was only ever used to group the rows.
+                $rvNo = $rv->next(Carbon::parse($challan['rcv_date']));
+
+                foreach ($challan['lines'] as $line) {
+                    StockPurchase::create([
+                        'rv_no' => $rvNo,
+                        'purchase_date' => $challan['purchase_date'],
+                        'rcv_date' => $challan['rcv_date'],
+                        'challan_no' => $challan['challan_no'],
+                        'supplier_name' => $challan['supplier_name'],
+                        'general_stock_supplier_id' => $challan['general_stock_supplier_id'],
+                        'stock_item_id' => $line['stock_item_id'],
+                        'qty' => $line['qty'],
+                        'unit_price' => $line['unit_price'],
+                        'remarks' => $line['remarks'],
+                        'created_by' => $userId,
+                    ]);
+
+                    $lineCount++;
+                }
+            }
+        });
+
+        $count = count($challans);
+
+        return back()
+            ->with('success', $count.' '.($count === 1 ? 'delivery' : 'deliveries')
+                .' imported under '.$count.' new RV '.($count === 1 ? 'number' : 'numbers')
+                .', covering '.$lineCount.' item line(s).')
+            // Errors are not a failure here — they name the challans that were
+            // left out while the rest went in, so they stay on screen.
+            ->with('import_errors', $errors)
+            ->with('import_skipped', $skipped)
+            ->with('import_notes', $notes);
     }
 
     /**

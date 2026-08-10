@@ -27,7 +27,13 @@
                     <h3 class="app-hero-title mb-0">Receiving</h3>
                 </div>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ route('store.stock.purchases.report') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-file-earmark-bar-graph me-1" aria-hidden="true"></i>Report
+                </a>
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importReceivingModal">
+                    <i class="bi bi-upload me-1" aria-hidden="true"></i>Import
+                </button>
                 <a href="{{ route('store.stock.ledger') }}" class="btn btn-outline-secondary"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>Stock Report</a>
                 <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Items</a>
             </div>
@@ -38,6 +44,30 @@
 
 
     @include('store._flash')
+
+    {{-- Per-delivery outcome of a bulk import, in the same three-block shape the
+         item-master import uses. Errors name the challans that were left out —
+         the rest of the file still went in, so they are a to-do list, not a
+         failure notice. --}}
+    @foreach ([
+        ['key' => 'import_errors', 'tone' => 'danger', 'icon' => 'x-circle-fill', 'heading' => 'These deliveries were NOT imported. Correct them and upload the file again:'],
+        ['key' => 'import_skipped', 'tone' => 'warning', 'icon' => 'exclamation-triangle-fill', 'heading' => 'These were skipped:'],
+        ['key' => 'import_notes', 'tone' => 'info', 'icon' => 'info-circle-fill', 'heading' => 'Imported, with these notes:'],
+    ] as $report)
+        @if(session($report['key']))
+            <div class="alert alert-{{ $report['tone'] }} d-flex align-items-start gap-2" role="alert">
+                <i class="bi bi-{{ $report['icon'] }}" aria-hidden="true"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-semibold mb-1">{{ $report['heading'] }}</div>
+                    <ul class="mb-0 ps-3 small" style="max-height:220px; overflow-y:auto;">
+                        @foreach(session($report['key']) as $line)
+                            <li>{{ $line }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        @endif
+    @endforeach
 
     {{-- ------------------------------------------------------------------
          Record Purchase — one header, many item lines, mirroring Record Issue.
@@ -71,7 +101,7 @@
                             {{-- Allocated by the system on save. Shown as a preview,
                                  never typed: whoever saves first takes this number,
                                  so it is not promised to this form. --}}
-                            <label class="form-label" for="rvPreview">RV No</label>
+                            <label class="form-label" for="rvPreview">GRN No</label>
                             <input type="text" id="rvPreview" class="form-control gx-stock-readonly" readonly tabindex="-1" value="{{ $nextRv }}">
                         </div>
                         <div class="col-6 col-md-4 col-xl-2">
@@ -99,7 +129,7 @@
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                         <div>
                             <h6 class="gx-stock-subhead mb-0">Items</h6>
-                            <span class="gx-stock-help">Everything received on this challan. All lines share the RV No above.</span>
+                            <span class="gx-stock-help">Everything received on this challan. All lines share the GRN No above.</span>
                         </div>
                         <button type="button" class="btn btn-sm btn-outline-primary js-add-line" id="addPurchaseLine">
                             <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Another Item
@@ -190,7 +220,7 @@
                             <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Record Receiving
                         </button>
                         <p class="gx-stock-help mb-0" style="max-width:640px;">
-                            The RV No is generated on save and shared by every line on this challan.
+                            The GRN No is generated on save and shared by every line on this challan.
                             Each line is recorded as its own purchase against its item.
                         </p>
                     </div>
@@ -230,7 +260,7 @@
                 <table class="table align-middle gx-stock-table">
                     <thead>
                         <tr>
-                            <th style="min-width:140px;">RV No</th>
+                            <th style="min-width:140px;">GRN No</th>
                             <th>Challan / Inv</th>
                             <th>Challan Date</th>
                             <th>RCV Date</th>
@@ -248,7 +278,12 @@
                                 $paneId = 'rv-'.md5($group->group_key);
                                 // Numbers issued before the RV was generated are bare
                                 // digits; the generated ones always carry a month prefix.
-                                $isLegacy = ! preg_match('/^[A-Z]{3}\d{2}-\d{5}$/', (string) $group->rv_no);
+                                //
+                                // Four OR five digits: the sequence was narrowed from
+                                // five to four, and the numbers already issued keep the
+                                // width they were issued with. Matching only one width
+                                // would label half the generated numbers as legacy.
+                                $isLegacy = ! preg_match('/^[A-Z]{3}\d{2}-\d{4,5}$/', (string) $group->rv_no);
                             @endphp
                             <tr>
                                 <td>
@@ -335,6 +370,46 @@
                 </table>
             </div>
             <div class="mt-3">{{ $groups->links() }}</div>
+        </div>
+    </div>
+
+    {{-- Bulk receiving upload. Same shape as the item-master import modal, so
+         the two screens are learnt once. --}}
+    <div class="modal fade" id="importReceivingModal" tabindex="-1" aria-labelledby="importReceivingLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="importReceivingLabel">Import Receiving</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="gx-stock-help mb-3">
+                        Upload many deliveries at once. Rows sharing the same Challan No, Challan Date and
+                        Supplier are recorded together as one delivery, and each gets its own GRN No on save.
+                    </p>
+
+                    <a href="{{ route('store.stock.purchases.template') }}" class="btn btn-outline-secondary w-100 mb-3">
+                        <i class="bi bi-download me-1" aria-hidden="true"></i>Download Sample Template
+                    </a>
+
+                    <form method="POST" action="{{ route('store.stock.purchases.import') }}" enctype="multipart/form-data" id="importReceivingForm">
+                        @csrf
+                        <input type="file" name="file" class="form-control mb-2" accept=".csv,.txt,.xlsx,.xls" required
+                               aria-label="CSV or Excel file of receivings to import">
+                        <p class="gx-stock-help mb-0">
+                            Challan Date, Item Name and Purchased Qty are required on every row. Item names must
+                            already exist under Items. Blank RCV Date follows the Challan Date. The file's GRN No,
+                            Month, Uom, Category and Total Value are read for checking only — the item master and
+                            this system's own RV numbering are used. A delivery already in Purchase History is
+                            skipped, so re-uploading a corrected file is safe.
+                        </p>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" form="importReceivingForm" class="btn btn-primary"><i class="bi bi-upload me-1" aria-hidden="true"></i>Import Receiving</button>
+                </div>
+            </div>
         </div>
     </div>
 

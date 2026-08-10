@@ -34,6 +34,49 @@ class StockPurchase extends Model
     ];
 
     /**
+     * SQL that rebuilds "which lines belong to the same delivery".
+     *
+     * One goods-receiving event = one RV No, one challan and one challan date,
+     * shared by all its lines. Legacy rows predate the auto-generated RV, and
+     * the same hand-typed number was reused months apart, so the date is part
+     * of the key — otherwise two unrelated old deliveries would merge into one
+     * group.
+     *
+     * Lives on the model rather than in a controller because it describes how
+     * THIS TABLE groups, and both Purchase History and the Receiving Report
+     * have to group identically. One definition, so they cannot drift.
+     */
+    public static function groupKeyExpr(): string
+    {
+        return "CONCAT(COALESCE(rv_no,''),'|',COALESCE(challan_no,''),'|',".self::dateKeyExpr('purchase_date').')';
+    }
+
+    /**
+     * A date column rendered as 'YYYY-MM-DD' text, or '' when it is NULL.
+     *
+     * COALESCE(<date column>, '') cannot be written directly. PostgreSQL
+     * resolves a COALESCE to one common type, picks `date` from the column, and
+     * then rejects '' as a date — "invalid input syntax for type date". MySQL
+     * and MariaDB accept the same expression only because they coerce the
+     * column to text instead, so the bug is invisible until the app runs on
+     * Postgres. The date is therefore converted to text FIRST, and the fallback
+     * is then an empty string against a string, which every engine accepts.
+     *
+     * Formatted explicitly rather than left to each engine's default rendering:
+     * the key only has to be internally consistent, but a key that reads the
+     * same everywhere is far easier to compare when a group looks wrong on one
+     * environment and right on another.
+     */
+    private static function dateKeyExpr(string $column): string
+    {
+        return match (\Illuminate\Support\Facades\DB::getDriverName()) {
+            'pgsql' => "COALESCE(TO_CHAR({$column}, 'YYYY-MM-DD'), '')",
+            'sqlite' => "COALESCE(STRFTIME('%Y-%m-%d', {$column}), '')",
+            default => "COALESCE(DATE_FORMAT({$column}, '%Y-%m-%d'), '')",
+        };
+    }
+
+    /**
      * Total Value on the Excel "Purchase" sheet. Derived, never stored, so it
      * can never drift out of step with qty × unit price.
      */
