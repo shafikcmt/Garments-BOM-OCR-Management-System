@@ -25,6 +25,12 @@ use Illuminate\Support\Str;
 
 class ExcelFileController extends Controller
 {
+    /**
+     * Lets a user work the Store role's workspace columns without holding the
+     * Store role. Granted per user, never to a role — see getRoleIds().
+     */
+    private const PERMISSION_STORE_COLUMNS = 'bom.store_columns.edit';
+
     public function show(ExcelFile $excelFile)
     {
         DB::disableQueryLog();
@@ -1265,9 +1271,30 @@ class ExcelFileController extends Controller
         ]);
     }
 
+    /**
+     * Role ids whose workspace columns this user may work with.
+     *
+     * Column ownership is recorded on the header as a ROLE id, so a user only
+     * reaches a column by holding the role that owns it. That leaves no way to
+     * give one person the Store columns without giving them the whole Store
+     * role — which is the gap the narrow Store roles exposed: a user on
+     * Store — General Stock owns no columns at all.
+     *
+     * PERMISSION_STORE_COLUMNS closes it. Granted directly to a user, it adds
+     * the Store role's id here and nothing else: they work the Store columns
+     * without being a Store user anywhere else in the system. It is deliberately
+     * granted to no role, so it can only ever arrive as a per-user decision.
+     */
     private function getRoleIds()
     {
-        return Role::whereIn('name', auth()->user()->getRoleNames())->pluck('id');
+        $user = auth()->user();
+        $names = $user->getRoleNames()->all();
+
+        if ($user->can(self::PERMISSION_STORE_COLUMNS) && ! in_array('store', $names, true)) {
+            $names[] = 'store';
+        }
+
+        return Role::whereIn('name', $names)->pluck('id');
     }
 
     private function canViewHeader($header, $roleIds): bool

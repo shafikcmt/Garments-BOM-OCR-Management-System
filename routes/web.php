@@ -13,35 +13,40 @@ Route::get('/', function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    /*
+     * Where a signed-in user lands.
+     *
+     * This used to test one role name at a time and abort when none matched,
+     * which meant every role added after it was written had no landing page:
+     * a user on Store — General Stock was refused at /dashboard the moment they
+     * signed in, even though every screen behind it would have let them in.
+     *
+     * It now resolves the user's DEPARTMENT and sends them to that department's
+     * dashboard, so a role added later lands correctly as soon as it is mapped —
+     * which is the same map the user form already offers roles from.
+     */
     Route::get('/dashboard', function () {
         $user = auth()->user();
 
-        if ($user->hasRole('admin')) {
-            return redirect()->route('admin.dashboard');
-        }
+        $dashboards = [
+            'management' => 'admin.dashboard',
+            'merchandising' => 'merchant.dashboard',
+            'accounts' => 'account.dashboard',
+            'commercial' => 'commercial.dashboard',
+            'store' => 'store.dashboard',
+            'supply_chain' => 'supply_chain.dashboard',
+        ];
 
-        if ($user->hasRole('merchant')) {
-            return redirect()->route('merchant.dashboard');
-        }
-
-        if ($user->hasRole('account')) {
-            return redirect()->route('account.dashboard');
-        }
-
-        if ($user->hasRole('commercial')) {
-            return redirect()->route('commercial.dashboard');
-        }
-
-        if ($user->hasRole('store')) {
-            return redirect()->route('store.dashboard');
-        }
-
-        if ($user->hasRole('supply_chain')) {
-            return redirect()->route('supply_chain.dashboard');
-        }
-
+        // Admin and management share the Management / Admin department but not
+        // the same screen, so that one pair is still decided by role.
         if ($user->hasRole('management')) {
             return redirect()->route('management.dashboard');
+        }
+
+        $department = \App\Support\DepartmentRoles::departmentOf($user->getRoleNames()->first());
+
+        if ($department && isset($dashboards[$department])) {
+            return redirect()->route($dashboards[$department]);
         }
 
         abort(403, 'No dashboard route assigned for this role.');
