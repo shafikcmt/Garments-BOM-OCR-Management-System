@@ -33,6 +33,46 @@ Route::prefix('store/reports')
         Route::get('/excel', [ReportController::class, 'excel'])->name('excel');
     });
 
+/*
+ * Phase 3 — the store guards accept a PERMISSION as well as a role.
+ *
+ * role_or_perm passes when the user holds ANY of the listed roles OR any of the
+ * listed permissions. The three roles that could reach these screens yesterday
+ * are still listed first and still pass exactly as before, so this step cannot
+ * take access from anyone; it only opens a second door for a role that holds
+ * the permission but is not one of those three. That is what makes a narrow
+ * role — one scoped to General Stock only, say — possible at all: until now a
+ * user who was not store, admin or management was refused at the door however
+ * many permissions they held.
+ *
+ * The guards are module-level: General Stock and Buyer / Style Stock can now be
+ * granted independently of each other, which is the split the business asked
+ * for. Section-level guards (Issues without Receiving) are the next step and
+ * need the route order left alone, so they are deliberately not done here.
+ *
+ * Phase 4 removes the role names, at which point these become permission-only.
+ * Not before every module runs on this and has been verified.
+ */
+
+// Entry to the store area. Wide on purpose: it only has to admit somebody as
+// far as the dashboard, and the module guards below decide what they can then
+// open. A user holding any single General Stock or Buyer/Style permission gets
+// a landing page rather than a 403 with nowhere to go.
+$storeEntry = 'role_or_perm:store|admin|management'
+    .'|store.stock_report.view|store.items.view|store.receiving.view'
+    .'|store.issues.view|store.requisition.view|store.setup.view'
+    .'|material.closing_stock.view|material.receiving.view'
+    .'|material.bulk_issue.view|material.requisitions.view';
+
+// Module A — General Stock.
+$generalStock = 'role_or_perm:store|admin|management'
+    .'|store.stock_report.view|store.items.view|store.receiving.view'
+    .'|store.issues.view|store.requisition.view|store.setup.view';
+
+// Module B — Buyer / Style Stock. Bulk Issuing has its own group further down.
+$materialStock = 'role_or_perm:store|admin|management'
+    .'|material.closing_stock.view|material.receiving.view|material.requisitions.view';
+
 // Admin and Management are included alongside Store for the same reason the
 // bulk-issue group below already includes them: corrections are their
 // responsibility, so they have to be able to OPEN the screen that carries the
@@ -40,14 +80,14 @@ Route::prefix('store/reports')
 // edit/delete action inside still requires the store.edit / store.delete
 // permission, which Store does not hold.
 Route::prefix('store')
-    ->middleware(['auth', 'role:store,admin,management'])
+    ->middleware(['auth', $storeEntry])
     ->name('store.')
-    ->group(function () {
+    ->group(function () use ($generalStock, $materialStock) {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace');
 
         // --- Module A: General Stock (non-BOM) ---
-        Route::prefix('stock')->name('stock.')->group(function () {
+        Route::prefix('stock')->middleware($generalStock)->name('stock.')->group(function () {
             // Consumable Stock Report. PDF/Excel take the same query string as
             // the screen, so a download always matches what was previewed.
             Route::get('/ledger', [GeneralStockLedgerController::class, 'index'])->name('ledger');
@@ -171,7 +211,7 @@ Route::prefix('store')
         });
 
         // --- Module B: Buyer/Style Stock (BOM/PO-linked) ---
-        Route::prefix('material-stock')->name('material.')->group(function () {
+        Route::prefix('material-stock')->middleware($materialStock)->name('material.')->group(function () {
             Route::get('/ledger', [MaterialStockLedgerController::class, 'index'])->name('ledger');
             Route::post('/ledger/{ledger}/liability-movement', [MaterialStockLedgerController::class, 'storeLiabilityMovement'])->name('ledger.liability');
             Route::post('/ledger/{ledger}/dead-movement', [MaterialStockLedgerController::class, 'storeDeadMovement'])->name('ledger.dead');
@@ -222,7 +262,7 @@ Route::prefix('store')
 // Access here is role-based; the edit/delete actions themselves are gated on
 // the store.edit / store.delete permissions inside the controller and views.
 Route::prefix('store/material-stock')
-    ->middleware(['auth', 'role:store,admin,management'])
+    ->middleware(['auth', 'role_or_perm:store|admin|management|material.bulk_issue.view'])
     ->name('store.material.')
     ->group(function () {
         Route::get('/bulk-issues', [MaterialBulkIssueController::class, 'index'])->name('bulk-issues.index');
