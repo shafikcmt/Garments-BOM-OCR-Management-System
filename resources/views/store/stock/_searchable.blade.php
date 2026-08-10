@@ -97,8 +97,82 @@
         // Must match ResolvesIssueSetupMasters::NEW_VALUE_PREFIX.
         var NEW_PREFIX = 'new:';
 
+        var KEY_TAB = 9;
+        var KEY_UP = 38;
+        var KEY_DOWN = 40;
+
+        /**
+         * Tab picks the highlighted option, then moves on to the next field.
+         *
+         * Store staff enter a requisition from the keyboard: type a few letters,
+         * see the name they want, Tab to the next box. Without this, Tab left the
+         * field with nothing chosen and the typing was thrown away.
+         *
+         * TomSelect ships `selectOnTab`, but it calls preventDefault() so focus
+         * stays put — the operator then has to press Tab a second time. We want
+         * both halves: select, and carry on to the next field. So the key is
+         * handled here and the event is deliberately left alone afterwards, which
+         * lets the browser do its own Tab navigation.
+         *
+         * Hooked by replacing the instance's onKeyDown rather than by adding a
+         * listener to a particular element: TomSelect calls `self.onKeyDown(e)`
+         * through the instance at event time, and which element it listens on
+         * differs between its two control layouts. Going through the method is
+         * correct for both. Enter, arrows, Escape and every other key fall
+         * through to the original untouched.
+         */
+        function enableTabToSelect(self, userDrove, markUserDrove) {
+            var parentKeyDown = self.onKeyDown;
+
+            self.onKeyDown = function (e) {
+                if (e.keyCode === KEY_UP || e.keyCode === KEY_DOWN) {
+                    markUserDrove();
+                    return parentKeyDown.call(self, e);
+                }
+
+                // Ctrl/Alt/Meta+Tab belongs to the browser, not to us.
+                if (e.keyCode !== KEY_TAB || e.ctrlKey || e.altKey || e.metaKey) {
+                    return parentKeyDown.call(self, e);
+                }
+
+                var option = self.activeOption;
+
+                // canSelect() checks the list is open and the option is really
+                // in it. Guarded because the CDN build is pinned a few minor
+                // versions behind the one this was read from.
+                var selectable = typeof self.canSelect === 'function'
+                    ? self.canSelect(option)
+                    : !!(self.isOpen && option && self.dropdown_content.contains(option));
+
+                if (!userDrove() || !selectable) {
+                    // Nothing the user highlighted — plain Tab, no forced pick.
+                    return parentKeyDown.call(self, e);
+                }
+
+                // Handles the "Add <name> to the list" row too: onOptionSelect
+                // routes a .create option into createItem() itself, so a typed
+                // new master name is kept on Tab exactly as it is on Enter.
+                self.onOptionSelect(e, option);
+                self.close();
+
+                // No preventDefault, on purpose — the browser moves focus.
+            };
+        }
+
         function build(el, creatable) {
             if (el.tomselect) { return; }
+
+            // Did the user drive the highlight on this field, by typing a search
+            // or walking the list with the arrow keys?
+            //
+            // TomSelect highlights an option every time the list is refreshed,
+            // including the moment it opens, so there is always an "active"
+            // option whether the user asked for one or not. Selecting that on
+            // Tab unconditionally would mean clicking into an empty field and
+            // tabbing straight out silently picks whatever happened to be first.
+            // The flag is what separates a highlight the user aimed at from one
+            // the widget put there. Reset every time the list opens.
+            var userDroveHighlight = false;
 
             var options = {
                 maxOptions: null,
@@ -117,11 +191,16 @@
                 // leave a previous one open — two lists float over the page at
                 // once. Closing the others on open keeps it to one.
                 onDropdownOpen: function () {
+                    userDroveHighlight = false;
+
                     var self = this;
                     document.querySelectorAll('select.tomselected').forEach(function (el) {
                         if (el.tomselect && el.tomselect !== self) { el.tomselect.close(); }
                     });
                 },
+                // Typing a search counts as aiming at the highlight.
+                onType: function () { userDroveHighlight = true; },
+                onInitialize: function () { enableTabToSelect(this, function () { return userDroveHighlight; }, function () { userDroveHighlight = true; }); },
             };
 
             if (creatable) {
