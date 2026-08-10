@@ -28,23 +28,65 @@ class PermissionCatalog
      * matrix just because it is new.
      */
     private const MODULE_LABELS = [
+        'store' => 'General Stock',
+        'material' => 'Buyer / Style Stock',
         'orders' => 'Orders / BOM',
         'materials' => 'Materials',
         'vendors' => 'Vendors / Suppliers',
         'shipments' => 'Shipment',
         'payments' => 'Accounts / Payments',
-        'store' => 'Store — General Stock',
         'ocr' => 'OCR Workspace',
         'users' => 'User Management',
         'roles' => 'Roles & Permissions',
-        'reports' => 'Reports',
+        'reports' => 'Store Reports',
         'audit' => 'Audit Log',
     ];
 
-    /** Sub-sections, for the three-part names such as store.requisition.approve. */
-    private const SECTION_LABELS = [
-        'requisition' => 'Purchase Requisition',
+    /**
+     * Module order, matching the sidebar rather than the alphabet — the two
+     * stock modules first, because they are the ones with sub-sections and the
+     * ones an admin comes to this screen for. Anything unlisted sorts after.
+     */
+    private const MODULE_ORDER = [
+        'store', 'material', 'orders', 'materials', 'vendors', 'shipments',
+        'payments', 'reports', 'ocr', 'users', 'roles', 'audit',
     ];
+
+    /**
+     * Sub-section labels and order, taken from the sidebar so the matrix reads
+     * in the same sequence as the menu the user actually clicks.
+     *
+     * @see resources/views/layouts/sidebar.blade.php
+     */
+    private const SECTION_LABELS = [
+        // General Stock
+        'stock_report' => 'Stock Report',
+        'items' => 'Items',
+        'receiving' => 'Receiving',
+        'issues' => 'Issues',
+        'requisition' => 'Purchase Requisition',
+        'setup' => 'Setup',
+
+        // Buyer / Style Stock
+        'closing_stock' => 'Closing Stock',
+        'bulk_issue' => 'Bulk Issuing',
+        'requisitions' => 'Requisitions',
+    ];
+
+    /** Per-module sub-section order. Sections not listed follow, alphabetically. */
+    private const SECTION_ORDER = [
+        'store' => ['stock_report', 'items', 'receiving', 'issues', 'requisition', 'setup'],
+        'material' => ['closing_stock', 'receiving', 'bulk_issue', 'requisitions'],
+    ];
+
+    /**
+     * The row holding a module's older whole-module permissions — store.view,
+     * store.edit and the rest, which predate the sub-sections and are still
+     * what the roles are built from. Kept visible rather than hidden: they are
+     * real grants, and an admin looking for why somebody has access needs to
+     * see them.
+     */
+    private const MODULE_WIDE_LABEL = 'Module-wide';
 
     /**
      * Action labels. The five the matrix is built around come first; the rest
@@ -98,7 +140,9 @@ class PermissionCatalog
                         ]);
 
                         return [
-                            'section' => $section === '' ? null : $this->sectionLabel($section),
+                            // Raw key for ordering; label for display.
+                            'key' => $section === '' ? null : $section,
+                            'section' => $section === '' ? self::MODULE_WIDE_LABEL : $this->sectionLabel($section),
                             // Actions that have a column of their own...
                             'actions' => $entries
                                 ->filter(fn ($e, $action) => in_array($action, self::ACTION_ORDER, true))
@@ -116,12 +160,40 @@ class PermissionCatalog
                     ->values()
                     ->all();
 
+                // Sidebar order, so General Stock reads Stock Report, Items,
+                // Receiving, Issues, Purchase Requisition, Setup — the sequence
+                // of the menu itself. Module-wide sits first as the heading row
+                // for the module's older flat permissions.
+                $order = self::SECTION_ORDER[$moduleKey] ?? [];
+
+                usort($rows, function (array $a, array $b) use ($order) {
+                    $rank = function (?string $section) use ($order) {
+                        if ($section === null) {
+                            return -1;
+                        }
+
+                        $i = array_search($section, $order, true);
+
+                        return $i === false ? PHP_INT_MAX : $i;
+                    };
+
+                    return [$rank($a['key']), $a['section'] ?? ''] <=> [$rank($b['key']), $b['section'] ?? ''];
+                });
+
                 return [
+                    'key' => $moduleKey,
                     'label' => $this->moduleLabel($moduleKey),
                     'rows' => $rows,
                 ];
             })
-            ->sortBy(fn ($module, $key) => $key === self::SPECIAL_MODULE ? 'zzz' : $module['label']);
+            ->sortBy(function ($module, $key) {
+                $i = array_search($key, self::MODULE_ORDER, true);
+
+                // Unlisted modules follow in name order; the one-off switches last.
+                return $key === self::SPECIAL_MODULE
+                    ? 'z2'
+                    : ($i === false ? 'z1'.$module['label'] : sprintf('a%02d', $i));
+            });
     }
 
     /**
