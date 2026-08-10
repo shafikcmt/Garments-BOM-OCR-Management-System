@@ -67,5 +67,23 @@
             </dl>
         </div>
     </div>
+
+    {{-- Effective access: what the role brings plus what was granted directly.
+         Read-only — this page reports, the edit screen decides. --}}
+    <div class="card border-0 shadow-sm mt-4" style="border-radius:var(--gx-radius);">
+        <div class="card-body p-4">
+            <h5 class="mb-1">Effective Permissions</h5>
+            <p class="text-muted small mb-4">
+                Everything this user can be granted, as it stands today —
+                {{ count($directPermissions) }} granted directly on top of the
+                {{ $currentRole ? ucfirst(str_replace('_', ' ', $currentRole)) : 'no' }} role.
+            </p>
+
+            @include('admin.users._permission-matrix', [
+                'selectedRole' => $currentRole,
+                'readonly' => true,
+            ])
+        </div>
+    </div>
 </div>
 @endsection

@@ -124,6 +124,26 @@
                             @endif
                         </div>
 
+                        {{-- Additional permissions, saved by this same form so
+                             role and permissions can never be posted apart. --}}
+                        <div class="border-top pt-4 mb-4">
+                            <h6 class="mb-1">Additional Permissions</h6>
+                            <p class="text-muted small mb-3">
+                                @if($isSelf)
+                                    Your own permissions are locked here, for the same reason your
+                                    role and status are.
+                                @else
+                                    The role above already grants the greyed ticks. Tick anything
+                                    extra this person needs — it is saved against this user only.
+                                @endif
+                            </p>
+
+                            @include('admin.users._permission-matrix', [
+                                'selectedRole' => old('role', $currentRole),
+                                'readonly' => $isSelf,
+                            ])
+                        </div>
+
                         <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1" aria-hidden="true"></i>Save Profile</button>
                     </form>
                 </div>
