@@ -6,6 +6,7 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 /**
@@ -44,6 +45,18 @@ trait FormatsStoreSheet
     private const WIDTH_MIN = 7;
 
     private const WIDTH_MAX = 42;
+
+    /**
+     * Floor and slack for a figures column.
+     *
+     * Wider than the text floor because a value column's shortest sensible
+     * content is already something like "1,234.00", and because the total row
+     * prints it back at 12pt bold over the body's 9pt — the widest thing in the
+     * column is usually the total, set in the largest type on the sheet.
+     */
+    private const WIDTH_NUMERIC_MIN = 10;
+
+    private const NUMERIC_PADDING = 3;
 
     /** Above this many characters a text column wraps instead of running on. */
     private const WRAP_OVER = 26;
@@ -101,18 +114,64 @@ trait FormatsStoreSheet
             );
         }
 
-        $this->sizeColumns($sheet, $headerStart, $lastRow, $lastColumnIndex);
+        $this->sizeColumns($sheet, $headerStart, $headerEnd, $firstDataRow, $lastDataRow, $lastRow, $lastColumnIndex);
 
         // The header stays put while the buyer scrolls a few hundred lines.
         $sheet->freezePane('A'.$firstDataRow);
 
-        // Print setup, so File > Print is usable straight away rather than
-        // spilling 21 columns across a dozen sheets of paper.
-        $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
-        $sheet->getPageSetup()->setFitToWidth(1);
-        $sheet->getPageSetup()->setFitToHeight(0);
-        $sheet->getPageMargins()->setTop(0.4)->setBottom(0.4)->setLeft(0.25)->setRight(0.25);
+        $this->applyPrintSetup($sheet, $headerStart, $headerEnd, $lastColumn, $lastRow);
+
         $sheet->getSheetView()->setZoomScale(85);
+    }
+
+    /**
+     * Page setup, so File > Print is usable straight away rather than spilling
+     * 21 columns across a dozen sheets of paper.
+     *
+     * Paper size is the one that actually mattered. PhpSpreadsheet's default is
+     * US Letter (PageSetup::$paperSizeDefault), which nobody here prints on: a
+     * sheet scaled to fit Letter's wider landscape page comes out of an A4
+     * printer either clipped down the right edge or shrunk by the driver to
+     * something unreadable. Every other print setting below was already right
+     * and still looked wrong because of this one.
+     *
+     * Nothing here touches the data, the column order or the headings — only
+     * how the sheet is laid onto paper.
+     */
+    private function applyPrintSetup(Worksheet $sheet, int $headerStart, int $headerEnd, string $lastColumn, int $lastRow): void
+    {
+        $setup = $sheet->getPageSetup();
+
+        $setup->setPaperSize(PageSetup::PAPERSIZE_A4);
+        $setup->setOrientation(PageSetup::ORIENTATION_LANDSCAPE);
+
+        // One page wide, as many pages long as the data needs. setFitToWidth
+        // turns fitToPage on by itself, so the scaling is genuinely applied.
+        $setup->setFitToWidth(1);
+        $setup->setFitToHeight(0);
+
+        // The table's heading rows print again at the top of every page, so
+        // page four is still readable on its own. Deliberately the header block
+        // ONLY, not the letterhead above it: repeating a 28pt company name on
+        // each page would eat a third of the printable height and read as a
+        // duplicate rather than a running head.
+        $setup->setRowsToRepeatAtTopByStartAndEnd($headerStart, $headerEnd);
+
+        // Pin the range so a stray cell outside the report cannot drag a blank
+        // extra page along with it.
+        $setup->setPrintArea('A1:'.$lastColumn.$lastRow);
+
+        // Centred across the page: with fit-to-width the table rarely uses the
+        // full width exactly, and the leftover margin looks deliberate on the
+        // left and right rather than dumped on one side.
+        $sheet->setPrintGridlines(false);
+        $setup->setHorizontalCentered(true);
+
+        // 0.3in ≈ 7.6mm side margins. The previous 0.25in sat inside the
+        // non-printable edge of some office lasers, which is its own way of
+        // losing the first column; this clears it and still wastes no width.
+        $sheet->getPageMargins()->setTop(0.4)->setBottom(0.4)->setLeft(0.3)->setRight(0.3);
+        $sheet->getPageMargins()->setHeader(0.2)->setFooter(0.2);
     }
 
     /**
@@ -145,7 +204,75 @@ trait FormatsStoreSheet
             }
         }
 
+        // No "SL" column. The older store reports all have one, so they never
+        // reach this and their formatting is byte-for-byte what it always was —
+        // this is only the way in for the registers that number nothing, such as
+        // Bulk Issuing and the buyer/style Store Reports.
+        return $this->locateHeaderByShape($sheet, $limit, $lastColumnIndex);
+    }
+
+    /**
+     * The header row of a table that has no "SL" column, found by its shape.
+     *
+     * A heading row is wide and entirely textual, and has a row of data under
+     * it. The letterhead lines above the table look nothing like that: company
+     * name, title and filter summary are each one long cell spanning the sheet
+     * (the Blade writes them with colspan, which arrives here as one filled cell
+     * followed by empty ones), so the minimum width is what separates them.
+     *
+     * @return array{0: int|null, 1: int|null}
+     */
+    private function locateHeaderByShape(Worksheet $sheet, int $limit, int $lastColumnIndex): array
+    {
+        for ($row = 1; $row <= $limit; $row++) {
+            $filled = 0;
+            $numeric = false;
+
+            for ($col = 1; $col <= $lastColumnIndex; $col++) {
+                $value = trim((string) $sheet->getCellByColumnAndRow($col, $row)->getValue());
+
+                if ($value === '') {
+                    continue;
+                }
+
+                if ($this->isNumeric($value)) {
+                    $numeric = true;
+                    break;
+                }
+
+                $filled++;
+            }
+
+            // A heading carries no figures, and spans more than the two or
+            // three cells a stray label above the table would.
+            if ($numeric || $filled < 3) {
+                continue;
+            }
+
+            // Something has to be listed under it, or this is a caption rather
+            // than a header and the rows below are not a table.
+            if ($this->filledCount($sheet, $row + 1, $lastColumnIndex) < 2) {
+                continue;
+            }
+
+            return [$row, $row];
+        }
+
         return [null, null];
+    }
+
+    /** How many cells in the row hold anything. */
+    private function filledCount(Worksheet $sheet, int $row, int $lastColumnIndex): int
+    {
+        $filled = 0;
+
+        for ($col = 1; $col <= $lastColumnIndex; $col++) {
+            if (trim((string) $sheet->getCellByColumnAndRow($col, $row)->getValue()) !== '') {
+                $filled++;
+            }
+        }
+
+        return $filled;
     }
 
     /**
@@ -383,20 +510,84 @@ trait FormatsStoreSheet
      * content directly and clamping the result gives a readable column whether
      * the cell holds "Pkt" or a forty-character item name.
      */
-    private function sizeColumns(Worksheet $sheet, int $headerStart, int $lastRow, int $lastColumnIndex): void
-    {
+    private function sizeColumns(
+        Worksheet $sheet,
+        int $headerStart,
+        int $headerEnd,
+        int $firstDataRow,
+        int $lastDataRow,
+        int $lastRow,
+        int $lastColumnIndex
+    ): void {
         for ($col = 1; $col <= $lastColumnIndex; $col++) {
             $letter = Coordinate::stringFromColumnIndex($col);
 
-            // Headings are excluded from the measurement: they wrap, so a long
-            // one must not widen a column of short values.
-            $longest = $this->longestIn($sheet, $col, $headerStart + 1, $lastRow);
+            // A figures column is measured on what Excel will DRAW, not on what
+            // is stored in the cell. The sheet holds a bare 6710; the number
+            // format styleBody applies renders it as "6,710.00". Measuring the
+            // stored value asked for 4 characters and the cell needed 8, which
+            // is exactly how a value column ends up showing ######.
+            if ($this->columnIsNumeric($sheet, $col, $firstDataRow, $lastDataRow)) {
+                $heading = $this->headingFor($sheet, $col, $headerStart, $headerEnd);
+                $longest = $this->longestFormattedIn(
+                    $sheet,
+                    $col,
+                    $headerStart + 1,
+                    $lastRow,
+                    $this->isMoneyHeading($heading)
+                );
 
-            $width = max(self::WIDTH_MIN, min(self::WIDTH_MAX, $longest + 2));
+                $width = max(self::WIDTH_NUMERIC_MIN, min(self::WIDTH_MAX, $longest + self::NUMERIC_PADDING));
+            } else {
+                // Headings are excluded from the measurement: they wrap, so a
+                // long one must not widen a column of short values.
+                $longest = $this->longestIn($sheet, $col, $headerStart + 1, $lastRow);
+
+                $width = max(self::WIDTH_MIN, min(self::WIDTH_MAX, $longest + 2));
+            }
 
             $sheet->getColumnDimension($letter)->setAutoSize(false);
             $sheet->getColumnDimension($letter)->setWidth($width);
         }
+    }
+
+    /**
+     * Longest value in a figures column, measured as it will be displayed.
+     *
+     * Mirrors the number formats styleBody sets, so the two can only agree:
+     * money to two decimals, quantities to at most four with trailing zeros
+     * dropped, both with thousands separators.
+     *
+     * Non-numeric cells in the range are measured as they are — that is the
+     * "Total-" label and the "—" placeholders, which share the column.
+     */
+    private function longestFormattedIn(Worksheet $sheet, int $col, int $from, int $to, bool $money): int
+    {
+        $longest = 0;
+
+        for ($row = $from; $row <= $to; $row++) {
+            $raw = trim((string) $sheet->getCellByColumnAndRow($col, $row)->getValue());
+
+            if ($raw === '') {
+                continue;
+            }
+
+            if (! $this->isNumeric($raw)) {
+                $longest = max($longest, mb_strlen($raw));
+
+                continue;
+            }
+
+            $value = (float) str_replace(',', '', $raw);
+
+            $shown = $money
+                ? number_format($value, 2)
+                : rtrim(rtrim(number_format($value, 4), '0'), '.');
+
+            $longest = max($longest, mb_strlen($shown));
+        }
+
+        return $longest;
     }
 
     /** True when every non-empty value in the column is a number. */

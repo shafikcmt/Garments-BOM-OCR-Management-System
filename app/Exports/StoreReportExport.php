@@ -2,18 +2,27 @@
 
 namespace App\Exports;
 
+use App\Exports\Concerns\FormatsStoreSheet;
 use App\Services\StoreReportService;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromView;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Events\AfterSheet;
 
 /**
  * Excel export for the store reports. Renders the same blade the screen and PDF
  * use, so preview and download can never drift apart.
+ *
+ * Presentation comes from FormatsStoreSheet, so this prints A4 landscape and
+ * matches the other Store reports. ShouldAutoSize is gone with it: the trait
+ * sets the column widths itself, and the two contradict each other when both
+ * are on.
  */
-class StoreReportExport implements FromView, ShouldAutoSize, WithTitle
+class StoreReportExport implements FromView, WithEvents, WithTitle
 {
+    use FormatsStoreSheet;
+
     /**
      * @param  array<string, string|null>  $filters
      * @param  Collection<int, array<string, mixed>>  $rows
@@ -42,5 +51,15 @@ class StoreReportExport implements FromView, ShouldAutoSize, WithTitle
     public function title(): string
     {
         return StoreReportService::types()[$this->type];
+    }
+
+    /**
+     * @return array<string, callable>
+     */
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => fn (AfterSheet $event) => $this->formatStoreSheet($event->sheet->getDelegate()),
+        ];
     }
 }
