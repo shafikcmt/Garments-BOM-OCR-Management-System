@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\DepartmentRoles;
 use App\Support\PermissionCatalog;
 use Carbon\Carbon;
 use Spatie\Permission\Models\Permission;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -91,6 +93,8 @@ class UserController extends Controller
             'permissionGroups' => $catalog->grouped(),
             'actionColumns' => $catalog->actionColumns(),
             'catalog' => $catalog,
+            'departments' => DepartmentRoles::departments(),
+            'roleDepartments' => DepartmentRoles::indexFor(Role::all()),
             'rolePermissions' => Role::with('permissions')->get()
                 ->mapWithKeys(fn (Role $r) => [$r->name => $r->permissions->pluck('name')->all()])
                 ->all(),
@@ -99,6 +103,42 @@ class UserController extends Controller
             'directPermissions' => $user
                 ? $user->getDirectPermissions()->pluck('name')->all()
                 : [],
+        ];
+    }
+
+    /**
+     * The role must belong to the department that was chosen with it.
+     *
+     * The dropdown already hides the others, but hiding an option is a
+     * courtesy, not a control — a hand-made post can still name any role. This
+     * is the check that actually holds, and it is the one that stops a Store
+     * user being submitted with a Management role.
+     *
+     * A role mapped to no department is allowed through: existing roles that
+     * predate the map must stay assignable, or a user holding one could never
+     * be edited.
+     */
+    private function departmentRules(): array
+    {
+        return [
+            'department' => ['nullable', 'string', Rule::in(array_keys(DepartmentRoles::departments()))],
+            'role' => [
+                'required',
+                'exists:roles,name',
+                function ($attribute, $value, $fail) {
+                    $chosen = request()->input('department');
+                    $actual = DepartmentRoles::departmentOf($value);
+
+                    if ($chosen && $actual && $actual !== $chosen) {
+                        $fail(sprintf(
+                            'The %s role belongs to %s, not %s.',
+                            DepartmentRoles::roleLabel($value),
+                            DepartmentRoles::labelOf($actual),
+                            DepartmentRoles::labelOf($chosen)
+                        ));
+                    }
+                },
+            ],
         ];
     }
 
@@ -138,10 +178,9 @@ class UserController extends Controller
             'email' => ['required', 'email', 'unique:users,email'],
             'password' => ['required', 'min:6'],
             'status' => ['required', 'in:0,1'],
-            'role' => ['required', 'exists:roles,name'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
-        ]);
+        ] + $this->departmentRules());
 
         $user = User::create([
             'name' => $data['name'],
@@ -180,11 +219,10 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email,' . $user->id],
             'status' => ['required', 'in:0,1'],
-            'role' => ['required', 'exists:roles,name'],
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
-        ]);
+        ] + $this->departmentRules());
 
         $isSelf = $user->id === auth()->id();
 

@@ -88,14 +88,40 @@
                             @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
 
+                        @php($currentDepartment = old('department', \App\Support\DepartmentRoles::departmentOf($currentRole)))
+
+                        {{-- Department leads, Role follows. Department is not
+                             stored on the user — the role still decides it —
+                             so this select exists to narrow the role list and
+                             keep a Store user out of a Management role. --}}
                         <div class="row g-3 mb-3">
                             <div class="col-sm-6">
-                                <label class="form-label fw-semibold">Role</label>
-                                <select name="role" class="form-select @error('role') is-invalid @enderror" required {{ $isSelf ? 'disabled' : '' }}>
+                                <label class="form-label fw-semibold" for="departmentSelect">Department</label>
+                                <select name="department" id="departmentSelect"
+                                        class="form-select js-department @error('department') is-invalid @enderror"
+                                        required {{ $isSelf ? 'disabled' : '' }}>
+                                    <option value="">Select Department</option>
+                                    @foreach($departments as $key => $label)
+                                        <option value="{{ $key }}" @selected($currentDepartment === $key)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @if($isSelf)
+                                    <input type="hidden" name="department" value="{{ $currentDepartment }}">
+                                @endif
+                                @error('department')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text">Decides which roles are offered.</div>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-semibold" for="roleSelect">Role</label>
+                                <select name="role" id="roleSelect"
+                                        class="form-select js-role @error('role') is-invalid @enderror"
+                                        required {{ $isSelf ? 'disabled' : '' }}>
                                     <option value="">Select Role</option>
                                     @foreach($roles as $role)
-                                        <option value="{{ $role->name }}" @selected(old('role', $currentRole) === $role->name)>
-                                            {{ ucfirst(str_replace('_', ' ', $role->name)) }}
+                                        <option value="{{ $role->name }}"
+                                                data-department="{{ $roleDepartments[$role->name] ?? \App\Support\DepartmentRoles::UNASSIGNED }}"
+                                                @selected(old('role', $currentRole) === $role->name)>
+                                            {{ \App\Support\DepartmentRoles::roleLabel($role->name) }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -104,12 +130,9 @@
                                 @endif
                                 @error('role')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
-                            <div class="col-sm-6">
-                                <label class="form-label fw-semibold text-muted">Department</label>
-                                <input type="text" class="form-control bg-light" value="{{ $user->departmentLabel() ?: '—' }}" readonly>
-                                <div class="form-text">Derived from role.</div>
-                            </div>
                         </div>
+
+                        @include('admin.users._department-roles')
 
                         <div class="mb-4">
                             <label class="form-label fw-semibold d-block">Status</label>
