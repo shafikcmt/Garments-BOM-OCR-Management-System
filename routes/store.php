@@ -64,10 +64,43 @@ $storeEntry = 'role_or_perm:store|admin|management'
     .'|material.closing_stock.view|material.receiving.view'
     .'|material.bulk_issue.view|material.requisitions.view';
 
-// Module A — General Stock.
+// Module A — General Stock. The outer gate: holding ANY General Stock
+// permission gets you into the module, and the section guards below decide
+// which of its screens you can actually open.
 $generalStock = 'role_or_perm:store|admin|management'
     .'|store.stock_report.view|store.items.view|store.receiving.view'
     .'|store.issues.view|store.requisition.view|store.setup.view';
+
+/*
+ * Section guards inside General Stock.
+ *
+ * The module gate above cannot tell Issues from Receiving, so a user granted
+ * one was given both. These separate them: each run of routes is wrapped in the
+ * guard for the section it belongs to, and a user reaches only the sections
+ * they hold a permission for.
+ *
+ * The three roles are still listed on every one of them, so store, admin and
+ * management pass exactly as before and nothing narrows for anyone who has
+ * access today. What changes is that a NEW user can now be given
+ * store.issues.view alone and get Issues without Receiving.
+ *
+ * ROUTE ORDER IS UNCHANGED. Wrapping a run in a group does not move it —
+ * Laravel registers routes in declaration order either way — so every ordering
+ * rule the comments below describe still holds. Setup is declared in three
+ * separate runs with Items between them; they are deliberately left where they
+ * are and given three groups rather than being gathered into one, because
+ * gathering them would be a genuine reorder for no benefit.
+ *
+ * View-level only. A POST or DELETE inside a section is still gated on the
+ * section's view permission, not on .create / .delete — action-level guards are
+ * a separate step.
+ */
+$secStockReport = 'role_or_perm:store|admin|management|store.stock_report.view';
+$secSetup = 'role_or_perm:store|admin|management|store.setup.view';
+$secItems = 'role_or_perm:store|admin|management|store.items.view';
+$secReceiving = 'role_or_perm:store|admin|management|store.receiving.view';
+$secIssues = 'role_or_perm:store|admin|management|store.issues.view';
+$secRequisition = 'role_or_perm:store|admin|management|store.requisition.view';
 
 // Module B — Buyer / Style Stock. Bulk Issuing has its own group further down.
 $materialStock = 'role_or_perm:store|admin|management'
@@ -82,28 +115,33 @@ $materialStock = 'role_or_perm:store|admin|management'
 Route::prefix('store')
     ->middleware(['auth', $storeEntry])
     ->name('store.')
-    ->group(function () use ($generalStock, $materialStock) {
+    ->group(function () use ($generalStock, $materialStock, $secStockReport, $secSetup, $secItems, $secReceiving, $secIssues, $secRequisition) {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace');
 
         // --- Module A: General Stock (non-BOM) ---
-        Route::prefix('stock')->middleware($generalStock)->name('stock.')->group(function () {
+        Route::prefix('stock')->middleware($generalStock)->name('stock.')->group(function () use ($secStockReport, $secSetup, $secItems, $secReceiving, $secIssues, $secRequisition) {
             // Consumable Stock Report. PDF/Excel take the same query string as
             // the screen, so a download always matches what was previewed.
-            Route::get('/ledger', [GeneralStockLedgerController::class, 'index'])->name('ledger');
-            Route::get('/ledger/pdf', [GeneralStockLedgerController::class, 'pdf'])->name('ledger.pdf');
-            Route::get('/ledger/excel', [GeneralStockLedgerController::class, 'excel'])->name('ledger.excel');
+            Route::middleware($secStockReport)->group(function () {
+                Route::get('/ledger', [GeneralStockLedgerController::class, 'index'])->name('ledger');
+                Route::get('/ledger/pdf', [GeneralStockLedgerController::class, 'pdf'])->name('ledger.pdf');
+                Route::get('/ledger/excel', [GeneralStockLedgerController::class, 'excel'])->name('ledger.excel');
+            });
 
             // Master Setup — one screen for every General Stock master list.
             // Composes only: each form on it still posts to the Purchase Setup
             // or Issue Setup routes below, which are unchanged.
-            Route::get('/setup', [StockSetupController::class, 'index'])->name('setup');
+            Route::middleware($secSetup)->group(function () {
+                Route::get('/setup', [StockSetupController::class, 'index'])->name('setup');
+            });
 
             // Issue Setup masters: Indent Section / Indent Person / Approved By
             // / Category. {type} is whitelisted inside IssueSetupController.
             //
             // The index now lives on Master Setup; this redirect keeps old
             // bookmarks and any link still pointing here working.
+            Route::middleware($secSetup)->group(function () {
             Route::get('/issue-setup', fn () => redirect()->route('store.stock.setup', ['tab' => 'sections']))
                 ->name('issue-setup.index');
             // Blank sample template, one per master type.
@@ -113,7 +151,9 @@ Route::prefix('store')
             Route::delete('/issue-setup/{type}/bulk-delete', [IssueSetupController::class, 'bulkDestroy'])->name('issue-setup.bulk-delete');
             Route::put('/issue-setup/{type}/{id}', [IssueSetupController::class, 'update'])->name('issue-setup.update');
             Route::delete('/issue-setup/{type}/{id}', [IssueSetupController::class, 'destroy'])->name('issue-setup.destroy');
+            });
 
+            Route::middleware($secItems)->group(function () {
             Route::get('/items', [StockItemController::class, 'index'])->name('items.index');
             // Bulk item upload + its blank sample template.
             Route::get('/items/template', [StockItemController::class, 'template'])->name('items.template');
@@ -121,11 +161,13 @@ Route::prefix('store')
             Route::post('/items', [StockItemController::class, 'store'])->name('items.store');
             Route::put('/items/{stockItem}', [StockItemController::class, 'update'])->name('items.update');
             Route::delete('/items/{stockItem}', [StockItemController::class, 'destroy'])->name('items.destroy');
+            });
 
             // Purchase Setup — General Stock's own supplier list, behind the
             // Record Purchase supplier dropdown.
             // As with Issue Setup, the index moved to Master Setup and this
             // redirect keeps every existing link and bookmark working.
+            Route::middleware($secSetup)->group(function () {
             Route::get('/purchase-setup', fn () => redirect()->route('store.stock.setup', ['tab' => 'suppliers']))
                 ->name('purchase-setup.index');
             Route::get('/purchase-setup/template', [PurchaseSetupController::class, 'template'])->name('purchase-setup.template');
@@ -136,7 +178,9 @@ Route::prefix('store')
             Route::delete('/purchase-setup/bulk-delete', [PurchaseSetupController::class, 'bulkDestroy'])->name('purchase-setup.bulk-delete');
             Route::put('/purchase-setup/{supplier}', [PurchaseSetupController::class, 'update'])->name('purchase-setup.update');
             Route::delete('/purchase-setup/{supplier}', [PurchaseSetupController::class, 'destroy'])->name('purchase-setup.destroy');
+            });
 
+            Route::middleware($secReceiving)->group(function () {
             // Bulk receiving upload + its blank sample template. Declared above
             // the model-bound purchase routes so "template" and "import" are
             // never taken for a purchase id.
@@ -153,7 +197,9 @@ Route::prefix('store')
             Route::get('/purchases', [StockPurchaseController::class, 'index'])->name('purchases.index');
             Route::post('/purchases', [StockPurchaseController::class, 'store'])->name('purchases.store');
             Route::delete('/purchases/{stockPurchase}', [StockPurchaseController::class, 'destroy'])->name('purchases.destroy');
+            });
 
+            Route::middleware($secIssues)->group(function () {
             // Read-only stock position for one item — the Issue form calls this
             // to warn about low / zero stock before the issue is confirmed.
             Route::get('/issues/item-status/{stockItem}', [StockIssueController::class, 'itemStatus'])->name('issues.item-status');
@@ -167,7 +213,9 @@ Route::prefix('store')
             Route::get('/issues', [StockIssueController::class, 'index'])->name('issues.index');
             Route::post('/issues', [StockIssueController::class, 'store'])->name('issues.store');
             Route::delete('/issues/{stockIssue}', [StockIssueController::class, 'destroy'])->name('issues.destroy');
+            });
 
+            Route::middleware($secRequisition)->group(function () {
             // Purchase Requisition — replaces the hand-kept
             // "Month_Of_<Month>.xlsx" workbook. Single-item and multi-item
             // requisitions are one record type differing by `mode`, so they
@@ -208,6 +256,7 @@ Route::prefix('store')
             Route::get('/requisitions/{requisition}/edit', [PurchaseRequisitionController::class, 'edit'])->name('requisitions.edit');
             Route::put('/requisitions/{requisition}', [PurchaseRequisitionController::class, 'update'])->name('requisitions.update');
             Route::delete('/requisitions/{requisition}', [PurchaseRequisitionController::class, 'destroy'])->name('requisitions.destroy');
+            });
         });
 
         // --- Module B: Buyer/Style Stock (BOM/PO-linked) ---
