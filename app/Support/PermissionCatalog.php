@@ -86,7 +86,7 @@ class PermissionCatalog
      * real grants, and an admin looking for why somebody has access needs to
      * see them.
      */
-    private const MODULE_WIDE_LABEL = 'Module-wide';
+    private const MODULE_WIDE_LABEL = 'Whole module';
 
     /**
      * Action labels. The five the matrix is built around come first; the rest
@@ -180,10 +180,29 @@ class PermissionCatalog
                     return [$rank($a['key']), $a['section'] ?? ''] <=> [$rank($b['key']), $b['section'] ?? ''];
                 });
 
+                // The action columns THIS module actually uses. Drawing the
+                // global set instead meant Shipment, which has four actions,
+                // rendered twelve columns and eight dashes — the clutter that
+                // pushed the grid into horizontal scrolling.
+                $used = [];
+
+                foreach ($rows as $row) {
+                    $used = array_merge($used, array_keys($row['actions']));
+                }
+
+                $used = array_values(array_filter(
+                    self::ACTION_ORDER,
+                    fn ($action) => in_array($action, $used, true)
+                ));
+
                 return [
                     'key' => $moduleKey,
                     'label' => $this->moduleLabel($moduleKey),
                     'rows' => $rows,
+                    'columns' => $used,
+                    // A module with one row has no sub-sections worth showing:
+                    // its name is the row. Anything else gets section rows.
+                    'sectioned' => count($rows) > 1,
                 ];
             })
             ->sortBy(function ($module, $key) {

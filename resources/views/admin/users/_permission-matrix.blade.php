@@ -1,27 +1,32 @@
 {{--
-    Permission matrix — module (collapsible) > sub-section > action.
+    Permission matrix — one card per module.
 
-    Sub-sections mirror the sidebar, so the row an admin is looking for sits
-    where the menu taught them to expect it. "Module-wide" is the first row of a
-    module and holds its older flat permissions (store.view and the rest), which
-    are still what the roles are built from — shown rather than hidden, because
-    an admin working out why somebody has access needs to see them.
+    It was one wide grid with every action as a column. Action use is very
+    uneven across modules, though: General Stock uses eleven, most modules use
+    four, so eight columns out of twelve were dashes on most rows and the grid
+    only fitted by scrolling sideways. Each module now carries its own column
+    set, which is what makes it fit a laptop without scrolling.
 
-    Two kinds of tick, and the difference is the whole point of the screen:
+    A module with no sub-sections is a card and nothing else — its name is the
+    row, and its actions sit under the heading as labelled chips. Only General
+    Stock and Buyer / Style Stock have real sub-sections, and only they get
+    section rows, with the module name in a header that stays put whether the
+    card is open or shut.
 
-      * Comes with the role — ticked and disabled. Shown so the admin can see
-        the user already has it, and locked so it cannot be written here. Role
+    Two kinds of tick, and the difference is the point of the screen:
+
+      * Comes with the role — slate, locked. Shown so the admin can see the
+        user already has it, locked so it cannot be written here. Role
         permissions belong to the role; copying one onto the user would leave it
         behind when the role later changes, which is how somebody keeps access
         to a module they were moved out of.
-      * Granted directly to this user — ticked and editable. The only thing the
-        form writes.
+      * Granted to this user — blue, editable. The only thing the form writes.
 
-    Nothing here enforces anything. It records who is allowed what, ready for
-    enforcement to be fitted module by module in a later phase.
+    Nothing here enforces anything. It records who is allowed what.
 
-    Expects: $permissionGroups, $actionColumns, $catalog, $rolePermissions,
-             $directPermissions, and $readonly (true on the profile page).
+    Expects: $permissionGroups, $catalog, $rolePermissions, $directPermissions,
+             $readonly (true on the profile page). $actionColumns is accepted
+             for compatibility but each card uses its own $group['columns'].
 --}}
 @php
     $readonly = $readonly ?? false;
@@ -30,183 +35,302 @@
     $direct = collect(old('permissions', $directPermissions ?? []));
 @endphp
 
-<div class="gx-perm-matrix" data-role-permissions='@json($rolePermissions)'>
+<div class="gx-perm" data-role-permissions='@json($rolePermissions)'>
 
-    {{-- Filter bar. Plain text matching on the module and sub-section names —
-         83 permissions is more than anyone should have to read top to bottom. --}}
-    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-        <div class="position-relative flex-grow-1" style="max-width:320px;">
-            <i class="bi bi-search position-absolute text-slate-400" style="left:12px;top:50%;transform:translateY(-50%);" aria-hidden="true"></i>
+    <div class="gx-perm-toolbar">
+        <div class="gx-perm-search">
+            <i class="bi bi-search" aria-hidden="true"></i>
             <input type="search"
                    class="form-control form-control-sm js-perm-search"
-                   style="padding-left:34px;"
                    placeholder="Search module or section…"
                    aria-label="Search permissions">
         </div>
 
         <div class="btn-group btn-group-sm" role="group" aria-label="Permission filters">
-            <button type="button" class="btn btn-outline-secondary js-perm-chip is-active" data-filter="all">
-                <i class="bi bi-list-ul me-1" aria-hidden="true"></i>All
-            </button>
-            <button type="button" class="btn btn-outline-secondary js-perm-chip" data-filter="stock">
-                <i class="bi bi-box-seam me-1" aria-hidden="true"></i>Stock only
-            </button>
-            <button type="button" class="btn btn-outline-secondary js-perm-chip" data-filter="direct">
-                <i class="bi bi-person-check me-1" aria-hidden="true"></i>Granted only
-            </button>
-            <button type="button" class="btn btn-outline-secondary js-perm-chip" data-filter="role">
-                <i class="bi bi-people me-1" aria-hidden="true"></i>From role
-            </button>
+            <button type="button" class="btn btn-outline-secondary js-perm-chip is-active" data-filter="all">All</button>
+            <button type="button" class="btn btn-outline-secondary js-perm-chip" data-filter="stock">Stock only</button>
+            <button type="button" class="btn btn-outline-secondary js-perm-chip" data-filter="direct">Granted only</button>
+            <button type="button" class="btn btn-outline-secondary js-perm-chip" data-filter="role">From role</button>
         </div>
 
         <button type="button" class="btn btn-sm btn-outline-secondary js-perm-toggle-all" data-expanded="1">
-            <i class="bi bi-chevron-expand me-1" aria-hidden="true"></i>Collapse all
+            <i class="bi bi-chevron-contract me-1" aria-hidden="true"></i>Collapse all
         </button>
 
-        <span class="small text-muted ms-auto js-perm-count"></span>
+        <span class="gx-perm-count js-perm-count"></span>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-sm align-middle mb-0 gx-perm-table">
-            <thead>
-                <tr>
-                    <th style="min-width:210px;">Module / Section</th>
-                    @foreach($actionColumns as $action)
-                        <th class="text-center">{{ $catalog->actionLabel($action) }}</th>
-                    @endforeach
-                    <th style="min-width:150px;">Other</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($permissionGroups as $group)
-                    {{-- Module header. Clicking it folds the module away. --}}
-                    <tr class="gx-perm-module js-perm-module"
-                        data-module="{{ $group['key'] }}"
-                        data-text="{{ Str::lower($group['label']) }}">
-                        <td colspan="{{ count($actionColumns) + 2 }}">
-                            <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none fw-semibold js-perm-fold" aria-expanded="true">
-                                <i class="bi bi-chevron-down me-1 js-perm-caret" aria-hidden="true"></i>{{ $group['label'] }}
-                            </button>
-                            <span class="small text-muted ms-2">{{ count($group['rows']) }} section(s)</span>
-                        </td>
-                    </tr>
+    <div class="gx-perm-grid">
+        @foreach($permissionGroups as $group)
+            <section class="gx-perm-card js-perm-card {{ $group['sectioned'] ? 'is-wide' : '' }}"
+                     data-module="{{ $group['key'] }}"
+                     data-text="{{ Str::lower($group['label'].' '.collect($group['rows'])->pluck('section')->implode(' ')) }}">
 
-                    @foreach($group['rows'] as $row)
-                        <tr class="gx-perm-row js-perm-row"
-                            data-module="{{ $group['key'] }}"
-                            data-text="{{ Str::lower($group['label'].' '.$row['section']) }}">
-                            <td class="ps-4">
-                                <span class="{{ $row['key'] === null ? 'text-muted fst-italic' : '' }}">{{ $row['section'] }}</span>
-                            </td>
+                {{-- The module name lives here and never moves. Collapsing the
+                     card hides the body, not the identity. --}}
+                <header class="gx-perm-head">
+                    <button type="button" class="gx-perm-fold js-perm-fold" aria-expanded="true">
+                        <i class="bi bi-chevron-down gx-perm-caret" aria-hidden="true"></i>
+                        <span class="gx-perm-module">{{ $group['label'] }}</span>
+                    </button>
 
-                            @foreach($actionColumns as $action)
-                                <td class="text-center">
-                                    @php($entry = $row['actions'][$action] ?? null)
-                                    @if($entry)
-                                        @include('admin.users._permission-check', [
-                                            'entry' => $entry,
-                                            'roleGranted' => $roleGranted,
-                                            'direct' => $direct,
-                                            'readonly' => $readonly,
-                                            'showLabel' => false,
-                                        ])
-                                    @else
-                                        <span class="text-body-tertiary">—</span>
+                    {{-- Coverage: how much of this module the user reaches, and
+                         where it came from. The slate part is the role, the blue
+                         part was granted here. --}}
+                    <span class="gx-perm-meter" aria-hidden="true">
+                        <span class="gx-perm-meter-bar"><span class="gx-perm-meter-role"></span><span class="gx-perm-meter-direct"></span></span>
+                        <span class="gx-perm-meter-text js-perm-meter">0/0</span>
+                    </span>
+                </header>
+
+                <div class="gx-perm-body js-perm-body">
+                    @if($group['sectioned'])
+                        <table class="gx-perm-table">
+                            <thead>
+                                <tr>
+                                    <th class="gx-perm-th-section">Section</th>
+                                    @foreach($group['columns'] as $action)
+                                        <th>{{ $catalog->actionLabel($action) }}</th>
+                                    @endforeach
+                                    @if(collect($group['rows'])->contains(fn ($r) => ! empty($r['extra'])))
+                                        <th class="gx-perm-th-other">Other</th>
                                     @endif
-                                </td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($group['rows'] as $row)
+                                    <tr class="js-perm-row" data-text="{{ Str::lower($group['label'].' '.$row['section']) }}">
+                                        <th scope="row" class="{{ $row['key'] === null ? 'is-module-wide' : '' }}">{{ $row['section'] }}</th>
+
+                                        @foreach($group['columns'] as $action)
+                                            <td>
+                                                @php($entry = $row['actions'][$action] ?? null)
+                                                @if($entry)
+                                                    @include('admin.users._permission-check', [
+                                                        'entry' => $entry, 'roleGranted' => $roleGranted,
+                                                        'direct' => $direct, 'readonly' => $readonly, 'showLabel' => false,
+                                                    ])
+                                                @else
+                                                    <span class="gx-perm-na" aria-label="not applicable">·</span>
+                                                @endif
+                                            </td>
+                                        @endforeach
+
+                                        @if(collect($group['rows'])->contains(fn ($r) => ! empty($r['extra'])))
+                                            <td class="gx-perm-other">
+                                                @foreach($row['extra'] as $entry)
+                                                    @include('admin.users._permission-check', [
+                                                        'entry' => $entry, 'roleGranted' => $roleGranted,
+                                                        'direct' => $direct, 'readonly' => $readonly, 'showLabel' => true,
+                                                    ])
+                                                @endforeach
+                                            </td>
+                                        @endif
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @else
+                        {{-- No sub-sections: the card heading is the row, so the
+                             actions go straight underneath as named chips. --}}
+                        @php($row = $group['rows'][0] ?? ['actions' => [], 'extra' => []])
+                        <div class="gx-perm-flat js-perm-row" data-text="{{ Str::lower($group['label']) }}">
+                            @foreach($group['columns'] as $action)
+                                @php($entry = $row['actions'][$action] ?? null)
+                                @if($entry)
+                                    @include('admin.users._permission-check', [
+                                        'entry' => $entry, 'roleGranted' => $roleGranted,
+                                        'direct' => $direct, 'readonly' => $readonly, 'showLabel' => true,
+                                    ])
+                                @endif
                             @endforeach
 
-                            <td>
-                                @forelse($row['extra'] as $entry)
-                                    @include('admin.users._permission-check', [
-                                        'entry' => $entry,
-                                        'roleGranted' => $roleGranted,
-                                        'direct' => $direct,
-                                        'readonly' => $readonly,
-                                        'showLabel' => true,
-                                    ])
-                                @empty
-                                    <span class="text-body-tertiary">—</span>
-                                @endforelse
-                            </td>
-                        </tr>
-                    @endforeach
-                @endforeach
-            </tbody>
-        </table>
+                            @foreach($row['extra'] as $entry)
+                                @include('admin.users._permission-check', [
+                                    'entry' => $entry, 'roleGranted' => $roleGranted,
+                                    'direct' => $direct, 'readonly' => $readonly, 'showLabel' => true,
+                                ])
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            </section>
+        @endforeach
     </div>
 
-    <div class="gx-perm-empty d-none text-center text-muted small py-4">
-        Nothing matches this search.
-    </div>
+    <p class="gx-perm-empty d-none">Nothing matches this search.</p>
 
-    <div class="d-flex flex-wrap gap-3 mt-3 small text-muted">
-        <span><span class="gx-perm-key gx-perm-key-role"></span>Comes with the role — cannot be changed here</span>
-        <span><span class="gx-perm-key gx-perm-key-direct"></span>Granted to this user only</span>
+    <div class="gx-perm-legend">
+        <span><span class="gx-perm-swatch is-inherited"><i class="bi bi-lock-fill" aria-hidden="true"></i></span>Comes with the role — cannot be changed here</span>
+        <span><span class="gx-perm-swatch is-granted"><i class="bi bi-check-lg" aria-hidden="true"></i></span>Granted to this user only</span>
+        <span><span class="gx-perm-swatch is-open"></span>Available — click to grant</span>
     </div>
 </div>
 
 <style>
-    .gx-perm-table th {
-        font-size: .7rem;
-        text-transform: uppercase;
-        letter-spacing: .03em;
-        color: #64748b;
-        vertical-align: bottom;
+    /* ------------------------------------------------------------------
+     * Permission matrix. Colours are the app's own tokens: slate for what
+     * the role brings, --gx-secondary for what was granted here. Nothing
+     * new is introduced.
+     * ------------------------------------------------------------------ */
+    .gx-perm-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .5rem;
+        margin-bottom: 1rem;
     }
-    .gx-perm-table td { font-size: .82rem; }
-    .gx-perm-row:hover { background: #f8fafc; }
 
-    /* The module header is a band, so the eye can find where one module ends
-       and the next begins without counting indents. */
-    .gx-perm-module td {
-        background: #eef2ff;
-        border-top: 1px solid #c7d2fe;
-        padding-top: .45rem;
-        padding-bottom: .45rem;
+    .gx-perm-search { position: relative; flex: 1 1 240px; max-width: 320px; }
+    .gx-perm-search .bi {
+        position: absolute; left: 12px; top: 50%;
+        transform: translateY(-50%); color: #94a3b8; pointer-events: none;
     }
-    .gx-perm-module .js-perm-fold { color: #1e293b; }
-    .gx-perm-module.is-collapsed .js-perm-caret { transform: rotate(-90deg); }
-    .js-perm-caret { display: inline-block; transition: transform .12s ease; }
-
-    /* A locked tick has to read as "already has it", not as "disabled and
-       therefore off" — hence the fill rather than the usual greyed box. */
-    .gx-perm-table .form-check-input:disabled:checked {
-        background-color: #94a3b8;
-        border-color: #94a3b8;
-        opacity: 1;
-    }
+    .gx-perm-search .form-control { padding-left: 34px; }
 
     .js-perm-chip.is-active {
-        background: var(--bs-primary, #2563eb);
-        border-color: var(--bs-primary, #2563eb);
+        background: var(--gx-secondary, #3B82F6);
+        border-color: var(--gx-secondary, #3B82F6);
         color: #fff;
     }
 
-    .gx-perm-key {
-        display: inline-block;
-        width: 12px;
-        height: 12px;
-        border-radius: 3px;
-        margin-right: 6px;
-        vertical-align: -1px;
+    .gx-perm-count { margin-left: auto; font-size: .78rem; color: var(--gx-text-muted, #64748B); }
+
+    /* Cards sit two-up where there is room; the two sectioned modules take
+       the full width because their tables are wider. */
+    .gx-perm-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: .75rem;
+        align-items: start;
     }
-    .gx-perm-key-role { background: #94a3b8; }
-    .gx-perm-key-direct { background: var(--bs-primary, #2563eb); }
+    .gx-perm-card.is-wide { grid-column: 1 / -1; }
+
+    .gx-perm-card {
+        border: 1px solid var(--gx-surface-border, #e2e8f0);
+        border-radius: var(--gx-radius-sm, 10px);
+        background: var(--gx-card, #fff);
+        overflow: hidden;
+    }
+
+    .gx-perm-head {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        padding: .5rem .75rem;
+        background: #f8fafc;
+        border-bottom: 1px solid var(--gx-surface-border, #e2e8f0);
+    }
+
+    .gx-perm-fold {
+        display: flex; align-items: center; gap: .4rem;
+        background: none; border: 0; padding: 0;
+        font-size: .84rem; font-weight: 600;
+        color: var(--gx-text, #1E293B);
+        cursor: pointer;
+        text-align: left;
+    }
+    .gx-perm-caret { font-size: .7rem; color: #94a3b8; transition: transform .12s ease; }
+    .is-collapsed .gx-perm-caret { transform: rotate(-90deg); }
+
+    .gx-perm-meter { margin-left: auto; display: flex; align-items: center; gap: .45rem; }
+    .gx-perm-meter-bar {
+        display: flex; width: 54px; height: 5px;
+        border-radius: 999px; overflow: hidden; background: #e2e8f0;
+    }
+    .gx-perm-meter-role { background: #94a3b8; }
+    .gx-perm-meter-direct { background: var(--gx-secondary, #3B82F6); }
+    .gx-perm-meter-text {
+        font-size: .7rem; font-variant-numeric: tabular-nums;
+        color: var(--gx-text-muted, #64748B);
+    }
+
+    .gx-perm-body { padding: .6rem .75rem .7rem; }
+    .is-collapsed .gx-perm-body { display: none; }
+
+    .gx-perm-table { width: 100%; border-collapse: collapse; }
+    .gx-perm-table th, .gx-perm-table td { padding: .3rem .4rem; }
+    .gx-perm-table thead th {
+        font-size: .62rem; text-transform: uppercase; letter-spacing: .04em;
+        color: #94a3b8; font-weight: 600; text-align: center;
+        border-bottom: 1px solid #eef2f7; white-space: nowrap;
+    }
+    .gx-perm-th-section, .gx-perm-th-other { text-align: left !important; }
+    .gx-perm-table tbody th {
+        font-size: .8rem; font-weight: 500; text-align: left;
+        color: var(--gx-text, #1E293B); white-space: nowrap;
+    }
+    .gx-perm-table tbody th.is-module-wide { color: var(--gx-text-muted, #64748B); font-style: italic; }
+    .gx-perm-table tbody tr + tr th, .gx-perm-table tbody tr + tr td { border-top: 1px solid #f1f5f9; }
+    .gx-perm-table td { text-align: center; }
+    .gx-perm-other { text-align: left !important; }
+    .gx-perm-na { color: #cbd5e1; }
+
+    .gx-perm-flat { display: flex; flex-wrap: wrap; gap: .35rem; }
+
+    /* --- the chip -------------------------------------------------- */
+    .gx-perm-chip {
+        display: inline-flex; align-items: center; gap: .35rem;
+        padding: .2rem .5rem;
+        border: 1px solid #e2e8f0; border-radius: var(--gx-radius-pill, 999px);
+        background: #fff; cursor: pointer;
+        font-size: .74rem; line-height: 1.4; color: var(--gx-text-muted, #64748B);
+        transition: background .12s ease, border-color .12s ease, color .12s ease;
+    }
+    .gx-perm-chip.is-compact { padding: .2rem; border-radius: 7px; }
+
+    .gx-perm-input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+    .gx-perm-mark {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 17px; height: 17px; flex: 0 0 17px;
+        border: 1.5px solid #cbd5e1; border-radius: 5px;
+        background: #fff; color: transparent; font-size: .68rem;
+    }
+
+    .gx-perm-chip.is-granted { border-color: var(--gx-secondary-border, #BFDBFE); background: var(--gx-secondary-bg, #DBEAFE); color: #1d4ed8; }
+    .gx-perm-chip.is-granted .gx-perm-mark { background: var(--gx-secondary, #3B82F6); border-color: var(--gx-secondary, #3B82F6); color: #fff; }
+
+    .gx-perm-chip.is-inherited { border-color: #e2e8f0; background: #f1f5f9; color: #64748b; }
+    .gx-perm-chip.is-inherited .gx-perm-mark { background: #94a3b8; border-color: #94a3b8; color: #fff; }
+
+    .gx-perm-chip.is-locked { cursor: not-allowed; }
+    .gx-perm-chip.is-open:hover { border-color: var(--gx-secondary, #3B82F6); color: #1d4ed8; }
+
+    .gx-perm-input:focus-visible + .gx-perm-mark {
+        outline: 2px solid var(--gx-secondary, #3B82F6);
+        outline-offset: 2px;
+    }
+
+    .gx-perm-empty { text-align: center; color: var(--gx-text-muted, #64748B); font-size: .82rem; padding: 1.5rem 0; }
+
+    .gx-perm-legend {
+        display: flex; flex-wrap: wrap; gap: 1rem;
+        margin-top: .9rem; font-size: .75rem; color: var(--gx-text-muted, #64748B);
+    }
+    .gx-perm-legend span { display: inline-flex; align-items: center; gap: .4rem; }
+    .gx-perm-swatch {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 17px; height: 17px; border-radius: 5px;
+        border: 1.5px solid #cbd5e1; background: #fff; color: #fff; font-size: .62rem;
+    }
+    .gx-perm-swatch.is-inherited { background: #94a3b8; border-color: #94a3b8; }
+    .gx-perm-swatch.is-granted { background: var(--gx-secondary, #3B82F6); border-color: var(--gx-secondary, #3B82F6); }
+
+    @media (prefers-reduced-motion: reduce) {
+        .gx-perm-caret, .gx-perm-chip { transition: none; }
+    }
 </style>
 
 <script>
     (function () {
-        var matrix = document.currentScript.previousElementSibling;
-        while (matrix && ! matrix.classList.contains('gx-perm-matrix')) {
-            matrix = matrix.previousElementSibling;
-        }
-        if (! matrix) { matrix = document.querySelector('.gx-perm-matrix'); }
+        var script = document.currentScript;
+        var matrix = script.parentElement.querySelector('.gx-perm')
+            || document.querySelector('.gx-perm');
         if (! matrix) { return; }
 
         var readonly = @json($readonly);
-        var rows = Array.prototype.slice.call(matrix.querySelectorAll('.js-perm-row'));
-        var modules = Array.prototype.slice.call(matrix.querySelectorAll('.js-perm-module'));
+        var cards = Array.prototype.slice.call(matrix.querySelectorAll('.js-perm-card'));
         var search = matrix.querySelector('.js-perm-search');
         var chips = Array.prototype.slice.call(matrix.querySelectorAll('.js-perm-chip'));
         var counter = matrix.querySelector('.js-perm-count');
@@ -214,28 +338,51 @@
         var toggleAll = matrix.querySelector('.js-perm-toggle-all');
 
         var filter = 'all';
-        var collapsed = {};
 
-        function boxesIn(row) {
-            return Array.prototype.slice.call(row.querySelectorAll('.js-perm-box'));
+        function boxes(el) {
+            return Array.prototype.slice.call(el.querySelectorAll('.js-perm-box'));
+        }
+
+        /** Repaint one chip from its checkbox — the paint IS the state. */
+        function paint(box) {
+            var chip = box.closest('.gx-perm-chip');
+            if (! chip) { return; }
+
+            var inherited = box.disabled && box.checked;
+            chip.classList.toggle('is-inherited', inherited);
+            chip.classList.toggle('is-granted', ! inherited && box.checked);
+            chip.classList.toggle('is-open', ! box.checked);
+            chip.classList.toggle('is-locked', box.disabled);
+
+            var icon = chip.querySelector('.gx-perm-mark .bi');
+            if (icon) { icon.className = 'bi ' + (inherited ? 'bi-lock-fill' : 'bi-check-lg'); }
+        }
+
+        /** Coverage meter: how much of the module, and where it came from. */
+        function meter(card) {
+            var all = boxes(card);
+            var role = all.filter(function (b) { return b.disabled && b.checked; }).length;
+            var direct = all.filter(function (b) { return ! b.disabled && b.checked; }).length;
+            var total = all.length || 1;
+
+            card.querySelector('.gx-perm-meter-role').style.width = (role / total * 100) + '%';
+            card.querySelector('.gx-perm-meter-direct').style.width = (direct / total * 100) + '%';
+            card.querySelector('.js-perm-meter').textContent = (role + direct) + '/' + all.length;
         }
 
         /**
-         * Whether a row survives the current chip. Read off the live checkbox
-         * state rather than anything rendered server-side, so it stays true
-         * after the role dropdown changes what is locked.
+         * Whether a card survives the current chip. Read off live checkbox
+         * state, so it stays true after the role dropdown changes what is
+         * locked.
          */
-        function passesChip(row) {
+        function passesChip(card) {
             if (filter === 'all') { return true; }
             if (filter === 'stock') {
-                var m = row.dataset.module;
-                return m === 'store' || m === 'material';
+                return card.dataset.module === 'store' || card.dataset.module === 'material';
             }
 
-            return boxesIn(row).some(function (box) {
-                return filter === 'role'
-                    ? (box.disabled && box.checked)
-                    : (! box.disabled && box.checked);
+            return boxes(card).some(function (b) {
+                return filter === 'role' ? (b.disabled && b.checked) : (! b.disabled && b.checked);
             });
         }
 
@@ -243,25 +390,45 @@
             var term = (search.value || '').trim().toLowerCase();
             var visible = 0;
 
-            rows.forEach(function (row) {
-                var hit = (! term || row.dataset.text.indexOf(term) !== -1) && passesChip(row);
-                row.dataset.match = hit ? '1' : '0';
-                // A row in a folded module stays in the DOM but out of sight.
-                row.classList.toggle('d-none', ! hit || collapsed[row.dataset.module]);
-                if (hit) { visible++; }
+            cards.forEach(function (card) {
+                var hit = (! term || card.dataset.text.indexOf(term) !== -1) && passesChip(card);
+                card.classList.toggle('d-none', ! hit);
+                if (! hit) { return; }
+
+                visible++;
+
+                // Inside a matching card, narrow to the matching sections —
+                // searching "issues" should not leave every General Stock row
+                // on screen just because the module matched.
+                if (term) {
+                    var rows = card.querySelectorAll('.js-perm-row');
+                    var anyRow = false;
+
+                    rows.forEach(function (row) {
+                        var rowHit = row.dataset.text.indexOf(term) !== -1;
+                        row.classList.toggle('d-none', ! rowHit);
+                        if (rowHit) { anyRow = true; }
+                    });
+
+                    // Module name matched but no row did: show them all.
+                    if (! anyRow) {
+                        rows.forEach(function (row) { row.classList.remove('d-none'); });
+                    }
+                } else {
+                    card.querySelectorAll('.js-perm-row').forEach(function (row) {
+                        row.classList.remove('d-none');
+                    });
+                }
             });
 
-            // A module header goes when nothing under it survived — otherwise
-            // the screen fills with headings for empty modules.
-            modules.forEach(function (head) {
-                var any = rows.some(function (r) {
-                    return r.dataset.module === head.dataset.module && r.dataset.match === '1';
-                });
-                head.classList.toggle('d-none', ! any);
-            });
-
-            counter.textContent = visible + ' of ' + rows.length + ' sections';
+            counter.textContent = visible + ' of ' + cards.length + ' modules';
             empty.classList.toggle('d-none', visible > 0);
+        }
+
+        function refresh() {
+            matrix.querySelectorAll('.js-perm-box').forEach(paint);
+            cards.forEach(meter);
+            apply();
         }
 
         search.addEventListener('input', apply);
@@ -275,37 +442,32 @@
             });
         });
 
-        modules.forEach(function (head) {
-            head.querySelector('.js-perm-fold').addEventListener('click', function (e) {
-                var key = head.dataset.module;
-                collapsed[key] = ! collapsed[key];
-                head.classList.toggle('is-collapsed', collapsed[key]);
-                e.currentTarget.setAttribute('aria-expanded', collapsed[key] ? 'false' : 'true');
-                apply();
+        cards.forEach(function (card) {
+            card.querySelector('.js-perm-fold').addEventListener('click', function (e) {
+                var now = card.classList.toggle('is-collapsed');
+                e.currentTarget.setAttribute('aria-expanded', now ? 'false' : 'true');
             });
         });
 
         toggleAll.addEventListener('click', function () {
             var expand = toggleAll.dataset.expanded !== '1';
 
-            modules.forEach(function (head) {
-                collapsed[head.dataset.module] = ! expand;
-                head.classList.toggle('is-collapsed', ! expand);
-                head.querySelector('.js-perm-fold').setAttribute('aria-expanded', expand ? 'true' : 'false');
+            cards.forEach(function (card) {
+                card.classList.toggle('is-collapsed', ! expand);
+                card.querySelector('.js-perm-fold').setAttribute('aria-expanded', expand ? 'true' : 'false');
             });
 
             toggleAll.dataset.expanded = expand ? '1' : '0';
             toggleAll.innerHTML = expand
-                ? '<i class="bi bi-chevron-expand me-1" aria-hidden="true"></i>Collapse all'
-                : '<i class="bi bi-chevron-contract me-1" aria-hidden="true"></i>Expand all';
-            apply();
+                ? '<i class="bi bi-chevron-contract me-1" aria-hidden="true"></i>Collapse all'
+                : '<i class="bi bi-chevron-expand me-1" aria-hidden="true"></i>Expand all';
         });
 
         if (! readonly) {
             /**
              * Keep the matrix honest when the role dropdown changes.
              *
-             * The locked ticks describe the role selected right now. Change the
+             * The locked chips describe the role selected right now. Change the
              * role without this and the screen keeps showing the old role's
              * grants, which is worse than showing nothing: the admin ticks a box
              * believing the new role does not cover it, or leaves one unticked
@@ -330,6 +492,8 @@
                     var box = e.target.closest('.js-perm-box');
                     if (! box || box.disabled) { return; }
                     box.checked ? chosen.add(box.dataset.permission) : chosen.delete(box.dataset.permission);
+                    paint(box);
+                    meter(box.closest('.js-perm-card'));
                     apply();
                 });
 
@@ -342,7 +506,7 @@
                         box.checked = fromRole || chosen.has(box.dataset.permission);
                     });
 
-                    apply();
+                    refresh();
                 };
 
                 roleSelect.addEventListener('change', applyRole);
@@ -350,6 +514,6 @@
             }
         }
 
-        apply();
+        refresh();
     })();
 </script>
