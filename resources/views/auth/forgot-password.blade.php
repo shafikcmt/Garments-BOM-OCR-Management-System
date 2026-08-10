@@ -14,7 +14,7 @@
             <label for="email" class="form-label">Email Address</label>
             <div class="position-relative">
                 <i class="bi bi-envelope position-absolute text-slate-400" style="left:14px;top:50%;transform:translateY(-50%);"></i>
-                <input type="email" name="email" id="email" value="{{ old('email') }}" required autofocus class="form-control" style="padding-left:42px;" placeholder="Enter your email">
+                <input type="email" name="email" id="email" value="{{ old('email') }}" required autofocus autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" class="form-control" style="padding-left:42px;" placeholder="Enter your email">
             </div>
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>

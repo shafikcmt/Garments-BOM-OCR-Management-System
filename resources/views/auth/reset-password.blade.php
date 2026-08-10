@@ -11,7 +11,7 @@
 
         <div class="mb-3 text-start">
             <label for="email" class="form-label">Email Address</label>
-            <input type="email" name="email" id="email" value="{{ old('email', $request->email) }}" required autofocus class="form-control" placeholder="Your email">
+            <input type="email" name="email" id="email" value="{{ old('email', $request->email) }}" required autofocus autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" class="form-control" placeholder="Your email">
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
 

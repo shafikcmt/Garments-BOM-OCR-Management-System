@@ -7,23 +7,23 @@
 
     <x-auth-session-status class="mb-3" :status="session('status')" />
 
-    <form method="POST" action="{{ route('login') }}" class="space-y-4">
+    <form method="POST" action="{{ route('login') }}" class="space-y-4" name="login" id="login-form">
         @csrf
 
         <div class="text-start">
-            <label class="form-label">Email / Username</label>
+            <label class="form-label" for="login-email">Email / Username</label>
             <div class="position-relative">
                 <i class="bi bi-envelope position-absolute text-slate-400" style="left:14px;top:50%;transform:translateY(-50%);"></i>
-                <input type="email" placeholder="Enter your email" name="email" value="{{ old('email', $rememberedEmail ?? '') }}" required autofocus class="form-control" style="padding-left:42px;">
+                <input type="email" id="login-email" placeholder="Enter your email" name="email" value="{{ old('email', $rememberedEmail ?? '') }}" required autofocus autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" class="form-control" style="padding-left:42px;">
             </div>
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
 
         <div class="text-start">
-            <label class="form-label">Password</label>
+            <label class="form-label" for="login-password">Password</label>
             <div class="position-relative">
                 <i class="bi bi-lock position-absolute text-slate-400" style="left:14px;top:50%;transform:translateY(-50%);"></i>
-                <input type="password" placeholder="Enter your password" name="password" required class="form-control" style="padding-left:42px;">
+                <input type="password" id="login-password" placeholder="Enter your password" name="password" required autocomplete="current-password" spellcheck="false" class="form-control" style="padding-left:42px;">
             </div>
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
