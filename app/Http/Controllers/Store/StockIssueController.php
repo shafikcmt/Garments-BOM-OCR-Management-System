@@ -15,6 +15,7 @@ use App\Services\GeneralStockReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 /**
  * General Stock (module A) — requisition-style issue (Excel "Consumption"
@@ -116,12 +117,16 @@ class StockIssueController extends Controller
             'indent_person_id' => ['nullable', 'string', 'max:160'],
             'issue_approver_id' => ['nullable', 'string', 'max:160'],
             'requisition_no' => ['nullable', 'string', 'max:100'],
-            'requisition_type' => ['nullable', 'string', 'max:50'],
 
             'items' => ['required', 'array', 'min:1'],
             'items.*.stock_item_id' => ['required', 'exists:stock_items,id'],
             'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
             'items.*.item_category_id' => ['nullable', 'string', 'max:160'],
+            // New / Replace is per line, not per requisition: one issue can
+            // replace a worn part on one line and hand out a new one on the
+            // next. Constrained to the two known values so a hand-crafted post
+            // cannot put free text into a column the reports filter on.
+            'items.*.requisition_type' => ['nullable', Rule::in(StockIssue::REQUISITION_TYPES)],
             'items.*.remarks' => ['nullable', 'string', 'max:1000'],
         ], [
             'items.required' => 'Add at least one item to issue.',
@@ -144,7 +149,6 @@ class StockIssueController extends Controller
 
         $header['issue_date'] = $data['issue_date'];
         $header['requisition_no'] = $data['requisition_no'] ?? null;
-        $header['requisition_type'] = $data['requisition_type'] ?? null;
         $header['created_by'] = auth()->id();
 
         $itemIds = [];
@@ -160,8 +164,10 @@ class StockIssueController extends Controller
                 StockIssue::create($header + [
                     'stock_item_id' => $line['stock_item_id'],
                     'qty' => $line['qty'],
-                    // Category is per line: it follows the item, not the header.
+                    // Category and type are per line: they follow the item, not
+                    // the header.
                     'item_category_id' => $this->resolveMasterValue(ItemCategory::class, $line['item_category_id'] ?? null),
+                    'requisition_type' => $line['requisition_type'] ?? null,
                     'remarks' => $line['remarks'] ?? null,
                 ]);
 
@@ -291,6 +297,7 @@ class StockIssueController extends Controller
             $attributes['items.'.$index.'.stock_item_id'] = 'item on line '.$line;
             $attributes['items.'.$index.'.qty'] = 'issued qty on line '.$line;
             $attributes['items.'.$index.'.item_category_id'] = 'category on line '.$line;
+            $attributes['items.'.$index.'.requisition_type'] = 'type on line '.$line;
         }
 
         return $attributes;

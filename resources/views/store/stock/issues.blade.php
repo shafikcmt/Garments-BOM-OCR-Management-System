@@ -16,11 +16,13 @@
             'stock_item_id' => $line['stock_item_id'] ?? '',
             'item_category_id' => $line['item_category_id'] ?? '',
             'qty' => $line['qty'] ?? '',
+            'requisition_type' => $line['requisition_type'] ?? '',
             'remarks' => $line['remarks'] ?? '',
             'errors' => array_filter([
                 'item' => $errors->first('items.'.$index.'.stock_item_id'),
                 'qty' => $errors->first('items.'.$index.'.qty'),
                 'category' => $errors->first('items.'.$index.'.item_category_id'),
+                'type' => $errors->first('items.'.$index.'.requisition_type'),
             ]),
         ])
         ->values();
@@ -163,18 +165,13 @@
                                         @endforeach
                                     </select>
                                 </div>
-                                <div class="col-6 col-md-3 col-xl-2">
+                                {{-- Type is NOT here. New / Replace is decided per
+                                     item — one requisition can replace a worn part
+                                     and issue a new one on the next line — so it
+                                     lives in the Items table below. --}}
+                                <div class="col-6 col-md-3 col-xl-3">
                                     <label class="form-label">Requisition Number</label>
                                     <input name="requisition_no" value="{{ old('requisition_no') }}" class="form-control" maxlength="100">
-                                </div>
-                                <div class="col-6 col-md-3 col-xl-1">
-                                    <label class="form-label">Type</label>
-                                    <select name="requisition_type" class="form-select">
-                                        <option value="">—</option>
-                                        @foreach($requisitionTypes as $type)
-                                            <option value="{{ $type }}" @selected(old('requisition_type') === $type)>{{ $type }}</option>
-                                        @endforeach
-                                    </select>
                                 </div>
                             </div>
 
@@ -220,6 +217,7 @@
                                         <col style="width:88px;">
                                         <col style="width:20%;">
                                         <col style="width:130px;">
+                                        <col style="width:116px;">
                                         <col>
                                         <col style="width:104px;">
                                     </colgroup>
@@ -230,6 +228,7 @@
                                             <th>Uom</th>
                                             <th>Category</th>
                                             <th>Issued Qty <span class="text-danger">*</span></th>
+                                            <th>Type</th>
                                             <th>Remarks</th>
                                             <th class="text-end gx-stock-actions">Action</th>
                                         </tr>
@@ -288,6 +287,17 @@
                                     </select>
                                 </td>
                                 <td><input type="number" step="0.0001" min="0" class="form-control form-control-sm text-end js-line-qty" name="items[__INDEX__][qty]" required placeholder="0"></td>
+                                {{-- New / Replace, per line. Left as a plain select
+                                     (no TomSelect): two fixed options need no search
+                                     box, and it keeps the column narrow. --}}
+                                <td>
+                                    <select class="form-select form-select-sm js-line-type" name="items[__INDEX__][requisition_type]">
+                                        <option value="">—</option>
+                                        @foreach($requisitionTypes as $type)
+                                            <option value="{{ $type }}">{{ $type }}</option>
+                                        @endforeach
+                                    </select>
+                                </td>
                                 <td><input type="text" class="form-control form-control-sm" name="items[__INDEX__][remarks]" maxlength="1000" placeholder="Optional"></td>
                                 {{-- Padded away from the Remarks field so a fast
                                      click on the input cannot land on Remove. --}}
@@ -323,7 +333,7 @@
                                of crushing them. */
                             .gx-line-table {
                                 table-layout: fixed;
-                                min-width: 1100px !important;
+                                min-width: 1216px !important;
                             }
 
                             .gx-line-table thead th {
@@ -795,12 +805,14 @@
                     if (values.stock_item_id) { setSelectValue(item, values.stock_item_id); }
 
                     row.querySelector('.js-line-qty').value = values.qty || '';
+                    row.querySelector('.js-line-type').value = values.requisition_type || '';
                     row.querySelector('input[name$="[remarks]"]').value = values.remarks || '';
 
                     var errors = values.errors || {};
                     markInvalid(item, errors.item);
                     markInvalid(row.querySelector('.js-line-qty'), errors.qty);
                     markInvalid(category, errors.category);
+                    markInvalid(row.querySelector('.js-line-type'), errors.type);
 
                     loadStatus(row);
                 } else {
