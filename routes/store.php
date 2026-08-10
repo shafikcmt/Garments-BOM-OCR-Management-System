@@ -91,9 +91,9 @@ $generalStock = 'role_or_perm:store|admin|management'
  * are and given three groups rather than being gathered into one, because
  * gathering them would be a genuine reorder for no benefit.
  *
- * View-level only. A POST or DELETE inside a section is still gated on the
- * section's view permission, not on .create / .delete — action-level guards are
- * a separate step.
+ * These decide whether a section can be OPENED. What may then be done inside it
+ * is the action guards below (create) and AuthorizesStoreCorrections in the
+ * controllers (edit / delete).
  */
 $secStockReport = 'role_or_perm:store|admin|management|store.stock_report.view';
 $secSetup = 'role_or_perm:store|admin|management|store.setup.view';
@@ -101,6 +101,21 @@ $secItems = 'role_or_perm:store|admin|management|store.items.view';
 $secReceiving = 'role_or_perm:store|admin|management|store.receiving.view';
 $secIssues = 'role_or_perm:store|admin|management|store.issues.view';
 $secRequisition = 'role_or_perm:store|admin|management|store.requisition.view';
+
+/*
+ * Action guards, for the routes that CREATE a record.
+ *
+ * Edit and delete were already covered, one layer down: every General Stock
+ * controller uses AuthorizesStoreCorrections, which refuses a change to an
+ * existing record without store.edit / store.delete. Creation had no check at
+ * anything — reaching a section was enough to post a new record into it — so
+ * this is the half that was missing.
+ *
+ * Roles are still listed first, so store, admin and management create exactly
+ * what they could create before. The guard bites only for a user who was let
+ * into a section by a view permission alone.
+ */
+$act = fn (string $permission) => 'role_or_perm:store|admin|management|'.$permission;
 
 // Module B — Buyer / Style Stock. Bulk Issuing has its own group further down.
 $materialStock = 'role_or_perm:store|admin|management'
@@ -115,12 +130,12 @@ $materialStock = 'role_or_perm:store|admin|management'
 Route::prefix('store')
     ->middleware(['auth', $storeEntry])
     ->name('store.')
-    ->group(function () use ($generalStock, $materialStock, $secStockReport, $secSetup, $secItems, $secReceiving, $secIssues, $secRequisition) {
+    ->group(function () use ($generalStock, $materialStock, $secStockReport, $secSetup, $secItems, $secReceiving, $secIssues, $secRequisition, $act) {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace');
 
         // --- Module A: General Stock (non-BOM) ---
-        Route::prefix('stock')->middleware($generalStock)->name('stock.')->group(function () use ($secStockReport, $secSetup, $secItems, $secReceiving, $secIssues, $secRequisition) {
+        Route::prefix('stock')->middleware($generalStock)->name('stock.')->group(function () use ($secStockReport, $secSetup, $secItems, $secReceiving, $secIssues, $secRequisition, $act) {
             // Consumable Stock Report. PDF/Excel take the same query string as
             // the screen, so a download always matches what was previewed.
             Route::middleware($secStockReport)->group(function () {
@@ -153,12 +168,12 @@ Route::prefix('store')
             Route::delete('/issue-setup/{type}/{id}', [IssueSetupController::class, 'destroy'])->name('issue-setup.destroy');
             });
 
-            Route::middleware($secItems)->group(function () {
+            Route::middleware($secItems)->group(function () use ($act) {
             Route::get('/items', [StockItemController::class, 'index'])->name('items.index');
             // Bulk item upload + its blank sample template.
             Route::get('/items/template', [StockItemController::class, 'template'])->name('items.template');
-            Route::post('/items/import', [StockItemController::class, 'import'])->name('items.import');
-            Route::post('/items', [StockItemController::class, 'store'])->name('items.store');
+            Route::post('/items/import', [StockItemController::class, 'import'])->middleware($act('store.items.create'))->name('items.import');
+            Route::post('/items', [StockItemController::class, 'store'])->middleware($act('store.items.create'))->name('items.store');
             Route::put('/items/{stockItem}', [StockItemController::class, 'update'])->name('items.update');
             Route::delete('/items/{stockItem}', [StockItemController::class, 'destroy'])->name('items.destroy');
             });
@@ -180,12 +195,12 @@ Route::prefix('store')
             Route::delete('/purchase-setup/{supplier}', [PurchaseSetupController::class, 'destroy'])->name('purchase-setup.destroy');
             });
 
-            Route::middleware($secReceiving)->group(function () {
+            Route::middleware($secReceiving)->group(function () use ($act) {
             // Bulk receiving upload + its blank sample template. Declared above
             // the model-bound purchase routes so "template" and "import" are
             // never taken for a purchase id.
             Route::get('/purchases/template', [StockPurchaseController::class, 'template'])->name('purchases.template');
-            Route::post('/purchases/import', [StockPurchaseController::class, 'import'])->name('purchases.import');
+            Route::post('/purchases/import', [StockPurchaseController::class, 'import'])->middleware($act('store.receiving.create'))->name('purchases.import');
 
             // Receiving report — read-only, and declared with the other fixed
             // paths ABOVE the model-bound routes so "report" is never taken for
@@ -195,11 +210,11 @@ Route::prefix('store')
             Route::get('/purchases/report/excel', [ReceivingReportController::class, 'excel'])->name('purchases.report.excel');
 
             Route::get('/purchases', [StockPurchaseController::class, 'index'])->name('purchases.index');
-            Route::post('/purchases', [StockPurchaseController::class, 'store'])->name('purchases.store');
+            Route::post('/purchases', [StockPurchaseController::class, 'store'])->middleware($act('store.receiving.create'))->name('purchases.store');
             Route::delete('/purchases/{stockPurchase}', [StockPurchaseController::class, 'destroy'])->name('purchases.destroy');
             });
 
-            Route::middleware($secIssues)->group(function () {
+            Route::middleware($secIssues)->group(function () use ($act) {
             // Read-only stock position for one item — the Issue form calls this
             // to warn about low / zero stock before the issue is confirmed.
             Route::get('/issues/item-status/{stockItem}', [StockIssueController::class, 'itemStatus'])->name('issues.item-status');
@@ -211,11 +226,11 @@ Route::prefix('store')
             Route::get('/issues/report/excel', [IssueReportController::class, 'excel'])->name('issues.report.excel');
 
             Route::get('/issues', [StockIssueController::class, 'index'])->name('issues.index');
-            Route::post('/issues', [StockIssueController::class, 'store'])->name('issues.store');
+            Route::post('/issues', [StockIssueController::class, 'store'])->middleware($act('store.issues.create'))->name('issues.store');
             Route::delete('/issues/{stockIssue}', [StockIssueController::class, 'destroy'])->name('issues.destroy');
             });
 
-            Route::middleware($secRequisition)->group(function () {
+            Route::middleware($secRequisition)->group(function () use ($act) {
             // Purchase Requisition — replaces the hand-kept
             // "Month_Of_<Month>.xlsx" workbook. Single-item and multi-item
             // requisitions are one record type differing by `mode`, so they
@@ -242,8 +257,8 @@ Route::prefix('store')
                 ->name('requisitions.report.excel');
 
             Route::get('/requisitions', [PurchaseRequisitionController::class, 'index'])->name('requisitions.index');
-            Route::get('/requisitions/create', [PurchaseRequisitionController::class, 'create'])->name('requisitions.create');
-            Route::post('/requisitions', [PurchaseRequisitionController::class, 'store'])->name('requisitions.store');
+            Route::get('/requisitions/create', [PurchaseRequisitionController::class, 'create'])->middleware($act('store.requisition.create'))->name('requisitions.create');
+            Route::post('/requisitions', [PurchaseRequisitionController::class, 'store'])->middleware($act('store.requisition.create'))->name('requisitions.store');
             Route::get('/requisitions/{requisition}', [PurchaseRequisitionController::class, 'show'])->name('requisitions.show');
 
             // One requisition as its own printable document — the same layout
