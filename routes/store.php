@@ -263,6 +263,12 @@ Route::prefix('store')
 
             Route::get('/issues', [StockIssueController::class, 'index'])->name('issues.index');
             Route::post('/issues', [StockIssueController::class, 'store'])->middleware($act('store.issues.create'))->name('issues.store');
+            // Bulk consumption upload. Guarded exactly as the receiving pair
+            // is: the blank template rides the section's own guard, and the
+            // upload itself needs the create right, because importing issues
+            // is issuing.
+            Route::get('/issues/template', [StockIssueController::class, 'template'])->name('issues.template');
+            Route::post('/issues/import', [StockIssueController::class, 'import'])->middleware($act('store.issues.create'))->name('issues.import');
             Route::delete('/issues/{stockIssue}', [StockIssueController::class, 'destroy'])->name('issues.destroy');
             });
 

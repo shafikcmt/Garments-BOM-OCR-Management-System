@@ -70,6 +70,14 @@
                 <a href="{{ route('store.stock.issues.report') }}" class="btn btn-outline-secondary">
                     <i class="bi bi-file-earmark-bar-graph me-1" aria-hidden="true"></i>Report
                 </a>
+                {{-- Import needs the same right as recording an issue by hand,
+                     because that is what it does. Hidden rather than shown and
+                     refused for a view-only user. --}}
+                @can('store.issues.create')
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importIssuesModal">
+                        <i class="bi bi-upload me-1" aria-hidden="true"></i>Import
+                    </button>
+                @endcan
                 <a href="{{ route('store.stock.issue-setup.index') }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1" aria-hidden="true"></i>Issue Setup</a>
                 <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Items</a>
             </div>
@@ -477,6 +485,49 @@
             </div>
         </div>
     </div>
+
+    {{-- Bulk consumption upload. Same shape as the receiving import modal, so
+         the two screens are learnt once. --}}
+    @can('store.issues.create')
+        <div class="modal fade" id="importIssuesModal" tabindex="-1" aria-labelledby="importIssuesLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="importIssuesLabel">Import Issues</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="gx-stock-help mb-3">
+                            Upload many requisitions at once. Rows sharing the same Issue Date, Requisition
+                            Number, Indent Section, Indent Person and Approved By are recorded together as one
+                            requisition.
+                        </p>
+
+                        <a href="{{ route('store.stock.issues.template') }}" class="btn btn-outline-secondary w-100 mb-3">
+                            <i class="bi bi-download me-1" aria-hidden="true"></i>Download Sample Template
+                        </a>
+
+                        <form method="POST" action="{{ route('store.stock.issues.import') }}" enctype="multipart/form-data" id="importIssuesForm">
+                            @csrf
+                            <input type="file" name="file" class="form-control mb-2" accept=".csv,.txt,.xlsx,.xls" required
+                                   aria-label="CSV or Excel file of issues to import">
+                            <p class="gx-stock-help mb-0">
+                                Issue Date, Item Name and Issued Qty are required on every row. Item names, and any
+                                Indent Section, Indent Person, Approved By or Category named, must already exist —
+                                add them under Items and Issue Setup first. Month and Uom are read for checking
+                                only. A requisition is refused if the file would issue more of an item than is in
+                                stock, counting every row in the file together.
+                            </p>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" form="importIssuesForm" class="btn btn-primary"><i class="bi bi-upload me-1" aria-hidden="true"></i>Import Issues</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endcan
 
     @include('store.stock._searchable')
 

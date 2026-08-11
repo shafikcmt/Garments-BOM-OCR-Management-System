@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Store;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Http\Controllers\Concerns\ResolvesIssueSetupMasters;
+use App\Exports\IssueTemplateExport;
+use App\Imports\IssueImport;
 use App\Models\IndentPerson;
 use App\Models\IndentSection;
 use App\Models\IssueApprover;
@@ -16,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * General Stock (module A) — requisition-style issue (Excel "Consumption"
@@ -199,6 +202,107 @@ class StockIssueController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    public function template()
+    {
+        return Excel::download(new IssueTemplateExport, 'Issue-Bulk-Upload-Template.xlsx');
+    }
+
+    /**
+     * Bulk consumption upload — many requisitions, many item lines each, in one
+     * file.
+     *
+     * The REQUISITION is the unit of success, not the file: a requisition with
+     * a bad line is reported and left out, and every other requisition in the
+     * same file still goes in. Same arrangement as the receiving import, and
+     * the same reason — one unknown item name should not cost somebody a day's
+     * typing.
+     *
+     * The stock check that makes this different from receiving happens in
+     * IssueImport::settle(), which accumulates demand across the whole file
+     * before accepting anything. Issuing removes stock, and several
+     * requisitions in one file can draw on the same item.
+     *
+     * Everything is written inside ONE transaction, so a file either lands as a
+     * consistent set of requisitions or not at all.
+     */
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt,xlsx,xls', 'max:8192'],
+        ], [], ['file' => 'upload file']);
+
+        try {
+            $sheets = Excel::toArray(new IssueImport, $request->file('file'));
+        } catch (\Throwable $e) {
+            return back()->with('warning', 'That file could not be read. Please upload a CSV or Excel file based on the sample template.');
+        }
+
+        [
+            'requisitions' => $requisitions,
+            'errors' => $errors,
+            'skipped' => $skipped,
+            'notes' => $notes,
+        ] = IssueImport::parse($sheets[0] ?? []);
+
+        if (empty($requisitions)) {
+            return back()
+                ->with('warning', $errors
+                    ? 'Nothing was imported. Please correct the rows listed below and upload the file again.'
+                    : 'No issues were found in that file.')
+                ->with('import_errors', $errors)
+                ->with('import_skipped', $skipped)
+                ->with('import_notes', $notes);
+        }
+
+        $userId = auth()->id();
+        $lineCount = 0;
+
+        DB::transaction(function () use ($requisitions, $userId, &$lineCount) {
+            foreach ($requisitions as $requisition) {
+                // Denormalised copies of the two names, exactly as the manual
+                // form writes them, so an imported issue reads the same as a
+                // typed one everywhere the free-text columns are shown.
+                $header = [
+                    'issue_date' => $requisition['issue_date'],
+                    'requisition_no' => $requisition['requisition_no'],
+                    'indent_section_id' => $requisition['indent_section_id'],
+                    'indent_person_id' => $requisition['indent_person_id'],
+                    'issue_approver_id' => $requisition['issue_approver_id'],
+                    'department' => $requisition['indent_section_id']
+                        ? IndentSection::find($requisition['indent_section_id'])?->name
+                        : null,
+                    'issued_to' => $requisition['indent_person_id']
+                        ? IndentPerson::find($requisition['indent_person_id'])?->name
+                        : null,
+                    'created_by' => $userId,
+                ];
+
+                foreach ($requisition['lines'] as $line) {
+                    StockIssue::create($header + [
+                        'stock_item_id' => $line['stock_item_id'],
+                        'qty' => $line['qty'],
+                        'item_category_id' => $line['item_category_id'],
+                        'requisition_type' => $line['requisition_type'],
+                        'remarks' => $line['remarks'],
+                    ]);
+
+                    $lineCount++;
+                }
+            }
+        });
+
+        $count = count($requisitions);
+
+        return back()
+            ->with('success', $count.' '.($count === 1 ? 'requisition' : 'requisitions')
+                .' imported, covering '.$lineCount.' item line(s).')
+            // Errors are not a failure here — they name the requisitions that
+            // were left out while the rest went in, so they stay on screen.
+            ->with('import_errors', $errors)
+            ->with('import_skipped', $skipped)
+            ->with('import_notes', $notes);
     }
 
     /**
