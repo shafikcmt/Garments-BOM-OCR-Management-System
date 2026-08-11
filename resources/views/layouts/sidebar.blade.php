@@ -76,6 +76,9 @@
 
     $seeStoreArea = ! $hasOwnSidebarBlock && ($seeStoreHome || $seeStoreReports);
 
+    // Recomputed below once Workspace has been resolved, so somebody granted
+    // Workspace and nothing else still gets a menu to reach it from.
+
     /*
      * Team Management — the scoped User Management screen, for the head of the
      * department rather than everyone in it. The flag is what decides it, not
@@ -87,6 +90,18 @@
      * block — a block admin never renders.
      */
     $seeTeamManagement = $storeUser?->isDepartmentAdmin() ?? false;
+
+    /*
+     * Workspace asks its own question now.
+     *
+     * It used to sit under $seeStoreHome beside Dashboard, so any single
+     * General Stock permission put BOM files in the menu. It is the one Store
+     * screen with its own permission, and this is the only thing that decides
+     * whether the link appears — the route refuses anyone it would mislead.
+     */
+    $seeWorkspace = $storeUser?->can('store.workspace.view') ?? false;
+
+    $seeStoreArea = $seeStoreArea || (! $hasOwnSidebarBlock && $seeWorkspace);
 @endphp
 
 <nav class="sidebar" id="appSidebar" aria-label="Main sidebar navigation">
@@ -285,6 +300,8 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span><span class="sidebar-link-text">Dashboard</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($seeWorkspace)
                     <li class="sidebar-item">
                         <a href="{{ route('store.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('store.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>

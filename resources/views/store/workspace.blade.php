@@ -12,8 +12,11 @@
         <div class="alert alert-warning rounded-4 border-0 shadow-sm">{{ session('warning') }}</div>
     @endif
 
+    {{-- The resolver rather than store.dashboard: that screen is General Stock's
+         now, and a Buyer / Style user with Workspace access would be refused by
+         the crumb that was meant to take them home. --}}
     <x-breadcrumb :items="[
-        ['label' => 'Store', 'url' => route('store.dashboard')],
+        ['label' => 'Dashboard', 'url' => route('dashboard')],
         ['label' => 'Workspace'],
     ]" />
 
@@ -27,6 +30,20 @@
             </div>
         </div>
     </div>
+
+    {{-- Store's own required BOM columns, moved here from the Store dashboard.
+         It measures work done on this screen, and the all-department table
+         stays on the Admin Dashboard. Hidden when this department owns no
+         columns, so the card never states a total of zero. --}}
+    @if(($workspace['required_columns'] ?? 0) > 0)
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-xl-5">
+                <x-card class="h-100" title="Your share of the BOM">
+                    <x-workspace-progress :workspace="$workspace" />
+                </x-card>
+            </div>
+        </div>
+    @endif
 
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item">

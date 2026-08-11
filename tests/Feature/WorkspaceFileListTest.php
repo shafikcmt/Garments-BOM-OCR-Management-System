@@ -18,7 +18,17 @@ use Spatie\Permission\Models\Role;
  */
 function workspaceUser(string $role): User
 {
-    Role::findOrCreate($role, 'web');
+    $model = Role::findOrCreate($role, 'web');
+
+    // The Store workspace is gated on store.workspace.view since
+    // 2026_08_11_000006. The seeder that puts it on the store role does not run
+    // in tests, so the fixture grants it here — matching the seeded state
+    // rather than the empty role findOrCreate would otherwise leave behind.
+    if ($role === 'store') {
+        $model->givePermissionTo(
+            \Spatie\Permission\Models\Permission::findOrCreate('store.workspace.view', 'web')
+        );
+    }
 
     return User::factory()->create()->assignRole($role);
 }

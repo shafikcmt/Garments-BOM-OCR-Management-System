@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Store\DashboardController;
+use App\Http\Controllers\Store\MaterialDashboardController;
 use App\Http\Controllers\Store\WorkspaceController;
 use App\Http\Controllers\Store\StockItemController;
 use App\Http\Controllers\Store\StockPurchaseController;
@@ -127,12 +128,47 @@ $materialStock = 'role_or_perm:store|admin|management'
 // record. Reaching a screen is not the same as being able to change it — every
 // edit/delete action inside still requires the store.edit / store.delete
 // permission, which Store does not hold.
+/*
+ * Workspace.
+ *
+ * Deliberately OUTSIDE the store entry group below. That guard asks whether
+ * somebody may enter the Store area at all, and any single General Stock
+ * permission satisfies it — which is how a Store — General Stock user came to
+ * open BOM files nobody had decided they should see. Workspace asks its own
+ * question now, and store.workspace.view is the only answer to it.
+ *
+ * `can:` rather than the project's usual role_or_perm: this one is a
+ * permission and nothing else, no role names admitted. It routes through the
+ * Gate, so Gate::before keeps super admin working, and the store and
+ * management roles reach it by carrying the permission in their bundle rather
+ * than by being named here.
+ *
+ * Granting it per user is the Additional Permissions matrix's job, on the user
+ * edit screen, where it appears under General Stock / Workspace like any other
+ * permission. It briefly had a screen of its own; one permission did not
+ * justify a second place to look, a second menu item and a second set of
+ * guard rails to keep in step with the first.
+ */
+Route::prefix('store')
+    ->middleware(['auth'])
+    ->name('store.')
+    ->group(function () {
+        Route::get('/workspace', [WorkspaceController::class, 'index'])
+            ->middleware('can:store.workspace.view')
+            ->name('workspace');
+    });
+
 Route::prefix('store')
     ->middleware(['auth', $storeEntry])
     ->name('store.')
     ->group(function () use ($generalStock, $materialStock, $secStockReport, $secSetup, $secItems, $secReceiving, $secIssues, $secRequisition, $act) {
-        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-        Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace');
+        // The dashboard is General Stock's own now, so it sits behind that
+        // module's guard rather than the area-wide one. A Buyer / Style user
+        // is sent to their own dashboard instead — see the resolver on
+        // /dashboard in routes/web.php.
+        Route::get('/dashboard', [DashboardController::class, 'index'])
+            ->middleware($generalStock)
+            ->name('dashboard');
 
         // --- Module A: General Stock (non-BOM) ---
         Route::prefix('stock')->middleware($generalStock)->name('stock.')->group(function () use ($secStockReport, $secSetup, $secItems, $secReceiving, $secIssues, $secRequisition, $act) {
@@ -276,6 +312,10 @@ Route::prefix('store')
 
         // --- Module B: Buyer/Style Stock (BOM/PO-linked) ---
         Route::prefix('material-stock')->middleware($materialStock)->name('material.')->group(function () {
+            // This module's own dashboard. It used to share one screen with
+            // General Stock, which meant its figures were shown to users who
+            // cannot open any of the screens below.
+            Route::get('/dashboard', [MaterialDashboardController::class, 'index'])->name('dashboard');
             Route::get('/ledger', [MaterialStockLedgerController::class, 'index'])->name('ledger');
             Route::post('/ledger/{ledger}/liability-movement', [MaterialStockLedgerController::class, 'storeLiabilityMovement'])->name('ledger.liability');
             Route::post('/ledger/{ledger}/dead-movement', [MaterialStockLedgerController::class, 'storeDeadMovement'])->name('ledger.dead');

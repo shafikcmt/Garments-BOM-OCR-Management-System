@@ -45,6 +45,45 @@ Route::middleware(['auth'])->group(function () {
 
         $department = \App\Support\DepartmentRoles::departmentOf($user->getRoleNames()->first());
 
+        /*
+         * Store now has a dashboard per module, so the department alone no
+         * longer says where to land. General Stock first, because it is the
+         * broader of the two and the one most Store users work in; Buyer /
+         * Style only if they hold nothing in General Stock.
+         *
+         * Asked as permissions, not roles, so a user granted one module
+         * screen at a time lands somewhere useful without anybody remembering
+         * to update a list here.
+         */
+        if ($department === 'store') {
+            $generalStock = ['store.stock_report.view', 'store.items.view', 'store.receiving.view',
+                'store.issues.view', 'store.requisition.view', 'store.setup.view'];
+
+            $materialStock = ['material.closing_stock.view', 'material.receiving.view',
+                'material.bulk_issue.view', 'material.requisitions.view'];
+
+            if ($user->hasRole('store') || $user->canAny($generalStock)) {
+                return redirect()->route('store.dashboard');
+            }
+
+            if ($user->canAny($materialStock)) {
+                return redirect()->route('store.material.dashboard');
+            }
+
+            /*
+             * A Store user holding neither module. Reachable today by revoking
+             * a narrow role's permissions, and it used to be a bare 403 from
+             * whichever dashboard they were sent to — a dead end that did not
+             * say what was wrong or who could fix it. Their profile is a page
+             * every signed-in user can open, so it is somewhere to land while
+             * being told what is missing.
+             */
+            return redirect()->route('profile.edit')->with(
+                'warning',
+                'You do not have access to any Store module yet. Ask your administrator to grant it.'
+            );
+        }
+
         if ($department && isset($dashboards[$department])) {
             return redirect()->route($dashboards[$department]);
         }

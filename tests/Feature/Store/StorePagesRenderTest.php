@@ -15,7 +15,12 @@ use Spatie\Permission\Models\Role;
  */
 function storePageUser(): User
 {
-    Role::findOrCreate('store', 'web');
+    // Workspace is gated on its own permission since 2026_08_11_000006, and the
+    // seeder that puts it on the store role does not run in tests. Granted here
+    // so this fixture matches the seeded role rather than a bare one.
+    Role::findOrCreate('store', 'web')->givePermissionTo(
+        \Spatie\Permission\Models\Permission::findOrCreate('store.workspace.view', 'web')
+    );
 
     return User::factory()->create()->assignRole('store');
 }

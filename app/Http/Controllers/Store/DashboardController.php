@@ -3,23 +3,32 @@
 namespace App\Http\Controllers\Store;
 
 use App\Http\Controllers\Controller;
-use App\Models\MaterialBulkIssue;
-use App\Models\MaterialReceiving;
-use App\Models\MaterialRequisition;
-use App\Models\MaterialRequisitionItem;
-use App\Models\MaterialStockLedger;
+use App\Models\PurchaseRequisition;
 use App\Models\StockIssue;
 use App\Models\StockPurchase;
 use App\Services\GeneralStockReportService;
-use Illuminate\Support\Facades\DB;
 
+/**
+ * General Stock dashboard — consumables, and nothing else.
+ *
+ * It used to be "the Store dashboard" and carried both modules plus the BOM
+ * workspace. Seven of its nine cards read Buyer / Style Stock tables, which a
+ * user on Store — General Stock has no permission to open: they were shown
+ * closing quantities, requisition counts and receiving trends for a module
+ * whose every screen refuses them. Splitting the screen is what fixes that;
+ * the two modules now have a dashboard each, and each reads only its own
+ * tables.
+ *
+ * Every figure here comes from the General Stock side: the consumable stock
+ * report, its purchases and issues, and the purchase requisitions raised
+ * against it.
+ */
 class DashboardController extends Controller
 {
     public function index()
     {
-        // General Stock levels come from the same service the Consumable Stock
-        // Report uses, so the dashboard count can never disagree with the count
-        // on the report itself.
+        // Same service the Consumable Stock Report screen uses, so the
+        // dashboard can never disagree with the report it links to.
         $report = app(GeneralStockReportService::class);
         $reportRows = $report->rows(now()->startOfMonth());
         $reportSummary = $report->summary($reportRows);
@@ -31,107 +40,57 @@ class DashboardController extends Controller
             'current' => $row['stock_as_on'],
             'threshold' => $row['safety'],
             'status' => $row['status'],
-            'low' => true,
         ]);
-
-        // Anything not "Ok": out of stock, below safety stock, or below the
-        // re-order level.
-        $reorderCount = $stockLevels->count();
-
-        // Requisition flow (display-only): shortfalls from the line items. These
-        // never mutate stock — actual IN/OUT stays in the existing screens.
-        $pendingReqLines = MaterialRequisitionItem::whereColumn('issued_qty', '<', 'required_qty')->count();
-        $pendingReqQty = (float) MaterialRequisitionItem::whereColumn('issued_qty', '<', 'required_qty')
-            ->sum(DB::raw('required_qty - issued_qty'));
-
-        $pendingRecvLines = MaterialRequisitionItem::whereColumn('received_qty', '<', 'issued_qty')->count();
-        $pendingRecvQty = (float) MaterialRequisitionItem::whereColumn('received_qty', '<', 'issued_qty')
-            ->sum(DB::raw('issued_qty - received_qty'));
 
         $stats = [
             'stock_items' => $reportSummary['items'],
-            'reorder_count' => $reorderCount,
-            'place_order_count' => $reportSummary['place_order'] + $reportSummary['out'],
-            'material_lines' => MaterialStockLedger::count(),
-            'running_qty' => (float) MaterialStockLedger::sum('running_closing_qty'),
-            'liability_qty' => (float) MaterialStockLedger::sum('liability_closing_qty'),
-            'dead_qty' => (float) MaterialStockLedger::sum('dead_closing_qty'),
-            'pending_requisitions' => MaterialRequisition::where('status', MaterialRequisition::STATUS_PENDING)->count(),
-            'pending_req_lines' => $pendingReqLines,
-            'pending_req_qty' => $pendingReqQty,
-            'pending_recv_lines' => $pendingRecvLines,
-            'pending_recv_qty' => $pendingRecvQty,
+            // Anything not "Ok": out of stock, below safety, or below re-order.
+            'reorder_count' => $stockLevels->count(),
+            'out_of_stock' => $reportSummary['out'],
+            // NEW on this screen. The old "Pending requisitions" card counted
+            // MaterialRequisition, which belongs to Buyer / Style Stock and has
+            // moved there with the rest of that module. General Stock raises
+            // PurchaseRequisition instead, and had no requisition figure at all
+            // until now. Pending means anything the flow has not finished with —
+            // every status except the terminal one.
+            'pending_requisitions' => PurchaseRequisition::where(
+                'status', '!=', PurchaseRequisition::STATUS_PURCHASE_ACTION_TAKEN
+            )->count(),
         ];
 
-        $recentActivity = $this->recentActivity();
-
-        $metrics = app(\App\Services\DashboardMetricsService::class);
-        $trend = $metrics->monthlyTrend(MaterialReceiving::query(), 6, 'receive_date');
-        $delta = $metrics->deltaFor($trend);
-
-        // Store's own share of the BOM workspace, from the same service the
-        // Admin Dashboard reads — scoped to this department only.
-        $activity = app(\App\Services\DepartmentActivityService::class);
-        $workspace = $activity->forRole('store') ?? $activity->emptyProgressFor('store');
-
-        return view('store.dashboard', compact(
-            'stats',
-            'stockLevels',
-            'recentActivity',
-            'workspace',
-            'trend',
-            'delta'
-        ));
+        return view('store.dashboard', compact('stats', 'stockLevels') + [
+            'recentActivity' => $this->recentActivity(),
+        ]);
     }
 
     /**
-     * Merge the latest rows from the four real stock-movement tables into one
-     * normalized, read-only feed (module A: StockIssue/StockPurchase, module B:
-     * MaterialBulkIssue/MaterialReceiving). Never writes anything.
+     * Latest consumable movements, in and out, as one read-only feed.
+     *
+     * General Stock tables only. The combined feed this replaced also merged
+     * MaterialReceiving and MaterialBulkIssue rows, which is how Buyer / Style
+     * PO numbers ended up on a General Stock screen.
      *
      * @return \Illuminate\Support\Collection<int, array<string, mixed>>
      */
     private function recentActivity()
     {
-        $receivings = MaterialReceiving::latest('id')->take(8)->get()->map(fn ($r) => [
+        $purchases = StockPurchase::with('stockItem')->latest('id')->take(10)->get()->map(fn ($p) => [
             'direction' => 'in',
-            'module' => 'Buyer/Style',
-            'label' => trim(collect([$r->po_no, $r->material_description])->filter()->implode(' · ')) ?: 'Receiving',
-            'qty' => (float) $r->qty,
-            'uom' => $r->uom,
-            'date' => $r->receive_date ?? $r->created_at,
-        ]);
-
-        $bulkIssues = MaterialBulkIssue::latest('id')->take(8)->get()->map(fn ($i) => [
-            'direction' => 'out',
-            'module' => 'Buyer/Style',
-            'label' => trim(collect([$i->po_no, $i->material_description])->filter()->implode(' · ')) ?: 'Bulk Issue',
-            'qty' => (float) $i->bulk_qty + (float) $i->sample_qty + (float) $i->liability_qty + (float) $i->dead_qty,
-            'uom' => $i->uom,
-            'date' => $i->issue_date ?? $i->created_at,
-        ]);
-
-        $purchases = StockPurchase::with('stockItem')->latest('id')->take(8)->get()->map(fn ($p) => [
-            'direction' => 'in',
-            'module' => 'General',
             'label' => optional($p->stockItem)->name ?: 'Purchase',
             'qty' => (float) $p->qty,
             'uom' => optional($p->stockItem)->uom,
             'date' => $p->purchase_date ?? $p->created_at,
         ]);
 
-        $issues = StockIssue::with('stockItem')->latest('id')->take(8)->get()->map(fn ($s) => [
+        $issues = StockIssue::with('stockItem')->latest('id')->take(10)->get()->map(fn ($s) => [
             'direction' => 'out',
-            'module' => 'General',
             'label' => optional($s->stockItem)->name ?: 'Issue',
             'qty' => (float) $s->qty,
             'uom' => optional($s->stockItem)->uom,
             'date' => $s->issue_date ?? $s->created_at,
         ]);
 
-        return $receivings
-            ->concat($bulkIssues)
-            ->concat($purchases)
+        return $purchases
             ->concat($issues)
             ->sortByDesc(fn ($row) => optional($row['date'])->timestamp ?? 0)
             ->take(10)
