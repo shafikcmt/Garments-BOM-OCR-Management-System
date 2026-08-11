@@ -366,6 +366,269 @@ it('accepts legacy header spellings', function () {
         ->and($result['requisitions'][0]['lines'][0]['qty'])->toBe(4.0);
 });
 
+/**
+ * Write a parsed requisition the way the controller does, so the duplicate
+ * tests compare against rows that look exactly like imported ones.
+ */
+function recordParsed(array $requisitions): int
+{
+    $lines = 0;
+
+    foreach ($requisitions as $requisition) {
+        foreach ($requisition['lines'] as $line) {
+            StockIssue::create([
+                'issue_date' => $requisition['issue_date'],
+                'requisition_no' => $requisition['requisition_no'],
+                'indent_section_id' => $requisition['indent_section_id'],
+                'indent_person_id' => $requisition['indent_person_id'],
+                'issue_approver_id' => $requisition['issue_approver_id'],
+                'stock_item_id' => $line['stock_item_id'],
+                'qty' => $line['qty'],
+                'item_category_id' => $line['item_category_id'],
+                'requisition_type' => $line['requisition_type'],
+                'remarks' => $line['remarks'],
+            ]);
+
+            $lines++;
+        }
+    }
+
+    return $lines;
+}
+
+it('skips everything on a second import of the same file', function () {
+    $needle = issueItem();
+    $thread = issueItem('Sewing Thread', 'Cone');
+    stockOnHand($needle, 100);
+    stockOnHand($thread, 100);
+    IndentSection::create(['name' => 'Cutting']);
+
+    $sheet = issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 5]),
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Thread', 'Issued Qty*' => 3]),
+        issueRow(['Issue Date*' => '2026-08-02', 'Requisition Number' => 'REQ-2',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 2]),
+    ]);
+
+    // First pass.
+    $first = IssueImport::parse($sheet);
+
+    expect($first['requisitions'])->toHaveCount(2)
+        ->and($first['skipped'])->toBeEmpty();
+
+    recordParsed($first['requisitions']);
+
+    $countAfterFirst = StockIssue::count();
+    $issuedAfterFirst = (float) StockIssue::sum('qty');
+
+    expect($countAfterFirst)->toBe(3)
+        ->and($issuedAfterFirst)->toBe(10.0);
+
+    // Second pass, identical file.
+    $second = IssueImport::parse($sheet);
+
+    expect($second['requisitions'])->toBeEmpty()
+        ->and($second['errors'])->toBeEmpty()
+        ->and($second['skipped'])->toHaveCount(2);
+
+    expect(implode(' | ', $second['skipped']))
+        ->toContain('REQ-1')
+        ->toContain('REQ-2')
+        ->toContain('already recorded in Issue History and was skipped');
+
+    // Nothing to write, so nothing changed.
+    recordParsed($second['requisitions']);
+
+    expect(StockIssue::count())->toBe($countAfterFirst)
+        ->and((float) StockIssue::sum('qty'))->toBe($issuedAfterFirst);
+});
+
+it('still imports a genuinely different requisition on the same date', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+    IndentSection::create(['name' => 'Cutting']);
+
+    $recorded = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 5]),
+    ]));
+
+    recordParsed($recorded['requisitions']);
+
+    // Same date, same section, different number.
+    $next = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 5]),
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-2',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 4]),
+    ]));
+
+    expect($next['requisitions'])->toHaveCount(1)
+        ->and($next['requisitions'][0]['requisition_no'])->toBe('REQ-2')
+        ->and($next['skipped'])->toHaveCount(1);
+});
+
+it('does not re-import a numbered requisition that has gained a line', function () {
+    // The reason the item set is excluded from a numbered key: adding a
+    // forgotten line must not make the whole requisition look new.
+    $needle = issueItem();
+    $thread = issueItem('Sewing Thread', 'Cone');
+    stockOnHand($needle, 100);
+    stockOnHand($thread, 100);
+    IndentSection::create(['name' => 'Cutting']);
+
+    $recorded = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 5]),
+    ]));
+
+    recordParsed($recorded['requisitions']);
+
+    // Same requisition, now with a second item on it.
+    $again = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 5]),
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Thread', 'Issued Qty*' => 2]),
+    ]));
+
+    expect($again['requisitions'])->toBeEmpty()
+        ->and($again['skipped'])->toHaveCount(1);
+
+    // The needle was not issued a second time.
+    expect((float) StockIssue::sum('qty'))->toBe(5.0);
+});
+
+it('imports two unnumbered same-day issues carrying DIFFERENT items', function () {
+    // The item set is what tells them apart. Without it the second would be
+    // swallowed as a duplicate, losing a real issue.
+    $needle = issueItem();
+    $thread = issueItem('Sewing Thread', 'Cone');
+    stockOnHand($needle, 100);
+    stockOnHand($thread, 100);
+    IndentSection::create(['name' => 'Cutting']);
+
+    $recorded = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Indent Section' => 'Cutting',
+            'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 5]),
+    ]));
+
+    recordParsed($recorded['requisitions']);
+
+    $next = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Indent Section' => 'Cutting',
+            'Item Name*' => 'Sewing Thread', 'Issued Qty*' => 3]),
+    ]));
+
+    expect($next['requisitions'])->toHaveCount(1)
+        ->and($next['skipped'])->toBeEmpty();
+});
+
+it('skips two unnumbered same-day issues carrying the SAME items', function () {
+    // The honest weak spot, asserted rather than left to chance: two separate
+    // slips from one section on one day for one item are indistinguishable,
+    // and the second is treated as a duplicate. That is the designed trade —
+    // the alternative is double-counting every genuine re-upload.
+    $item = issueItem();
+    stockOnHand($item, 100);
+    IndentSection::create(['name' => 'Cutting']);
+
+    $recorded = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Indent Section' => 'Cutting',
+            'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 5]),
+    ]));
+
+    recordParsed($recorded['requisitions']);
+
+    // A genuinely separate slip — different quantity, same item and header.
+    $next = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Indent Section' => 'Cutting',
+            'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 9]),
+    ]));
+
+    expect($next['requisitions'])->toBeEmpty()
+        ->and($next['skipped'])->toHaveCount(1);
+
+    expect(implode(' ', $next['skipped']))->toContain('already recorded in Issue History');
+
+    // Stock reflects only the first: the second was not issued.
+    expect((float) StockIssue::sum('qty'))->toBe(5.0);
+});
+
+it('checks for duplicates before the stock check, so a repeat frees no headroom', function () {
+    // 100 in stock, 60 already issued by an earlier import. A re-uploaded copy
+    // of that 60 must not consume the remaining 40 and push a genuine new
+    // requisition into a shortfall.
+    $item = issueItem();
+    stockOnHand($item, 100);
+    IndentSection::create(['name' => 'Cutting']);
+
+    $recorded = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'OLD',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 60]),
+    ]));
+
+    recordParsed($recorded['requisitions']);
+
+    $mixed = IssueImport::parse(issueSheet([
+        // The duplicate, first in the file.
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'OLD',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 60]),
+        // A new requisition for what is genuinely left.
+        issueRow(['Issue Date*' => '2026-08-02', 'Requisition Number' => 'NEW',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 40]),
+    ]));
+
+    expect($mixed['skipped'])->toHaveCount(1)
+        ->and($mixed['errors'])->toBeEmpty()
+        ->and($mixed['requisitions'])->toHaveCount(1)
+        ->and($mixed['requisitions'][0]['requisition_no'])->toBe('NEW');
+});
+
+it('uploading the same file twice through the screen issues nothing extra', function () {
+    // End to end, through the real endpoint, because every other duplicate
+    // test writes the rows itself and could agree with a mistake the
+    // controller does not make.
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    // Both rights: the section guard needs view to enter Issues at all, and
+    // the import route needs create on top of it.
+    \Spatie\Permission\Models\Permission::findOrCreate('store.issues.view', 'web');
+    \Spatie\Permission\Models\Permission::findOrCreate('store.issues.create', 'web');
+
+    $user = \App\Models\User::factory()->create(['status' => 1]);
+    $user->givePermissionTo(['store.issues.view', 'store.issues.create']);
+
+    $csv = implode(',', IssueImport::COLUMNS)."\n"
+        .'2026-08-01,,,,,REQ-77,Sewing Needle,,,12,,'."\n";
+
+    $upload = fn () => $this->actingAs($user)->post(
+        route('store.stock.issues.import'),
+        ['file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('issues.csv', $csv)]
+    );
+
+    $upload()->assertRedirect()->assertSessionHas('success');
+
+    expect(StockIssue::count())->toBe(1)
+        ->and((float) StockIssue::sum('qty'))->toBe(12.0);
+
+    // Same file again.
+    $second = $upload()->assertRedirect();
+
+    $second->assertSessionHas('import_skipped');
+
+    expect(implode(' ', session('import_skipped') ?? []))
+        ->toContain('REQ-77')
+        ->toContain('already recorded in Issue History');
+
+    // Nothing added, nothing issued twice.
+    expect(StockIssue::count())->toBe(1)
+        ->and((float) StockIssue::sum('qty'))->toBe(12.0);
+});
+
 it('records imported issues through the controller, scoped by permission', function () {
     $item = issueItem();
     stockOnHand($item, 100);

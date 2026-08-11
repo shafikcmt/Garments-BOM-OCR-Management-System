@@ -160,6 +160,8 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             'category' => self::masterIndex(ItemCategory::class),
         ];
 
+        $alreadyRecorded = self::recordedRequisitionKeys();
+
         /** @var array<string, array<string, mixed>> $groups */
         $groups = [];
         $skipped = [];
@@ -368,7 +370,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             unset($group);
         }
 
-        return self::settle($groups, $skipped);
+        return self::settle($groups, $alreadyRecorded, $skipped);
     }
 
     /**
@@ -382,10 +384,11 @@ class IssueImport implements ToArray, WithCustomCsvSettings
      * cascade into refusing every later one for the same item.
      *
      * @param  array<string, array<string, mixed>>  $groups
+     * @param  array<string, true>  $alreadyRecorded
      * @param  list<string>  $skipped
      * @return array{requisitions: list<array<string, mixed>>, errors: list<string>, skipped: list<string>, notes: list<string>}
      */
-    private static function settle(array $groups, array $skipped): array
+    private static function settle(array $groups, array $alreadyRecorded, array $skipped): array
     {
         $requisitions = [];
         $errors = [];
@@ -426,6 +429,26 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             }
 
             if (empty($group['lines'])) {
+                continue;
+            }
+
+            // Before the stock check, deliberately. A requisition already in
+            // Issue History issues nothing, so letting it reach the balance
+            // would have it consume headroom a genuine later requisition needs
+            // and then be skipped anyway — refusing a real issue on the
+            // strength of one that is not going to happen.
+            $recordedKey = self::recordedKey(
+                $group['requisition_no'],
+                $group['issue_date'],
+                $group['indent_section_id'],
+                $group['indent_person_id'],
+                $group['issue_approver_id'],
+                self::itemSetKey($group['lines'])
+            );
+
+            if (isset($alreadyRecorded[$recordedKey])) {
+                $skipped[] = $label.' is already recorded in Issue History and was skipped.';
+
                 continue;
             }
 
@@ -506,6 +529,127 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             ->rows(now()->startOfMonth(), ['item_ids' => $itemIds, 'only_active' => false])
             ->mapWithKeys(fn ($row) => [(int) $row['item']->id => (float) $row['stock_as_on']])
             ->all();
+    }
+
+    /**
+     * Requisitions already in stock_issues, so a re-uploaded file issues
+     * nothing twice.
+     *
+     * Read in two passes, for the same reason ReceivingImport reads challans in
+     * two — the two kinds of requisition are not identified the same way:
+     *
+     *   - A NUMBERED requisition is identified by its number, with the date and
+     *     the three Issue Setup masters alongside it. requisition_no carries no
+     *     unique index and is typed by hand, so it is scoped rather than
+     *     trusted on its own.
+     *   - An UNNUMBERED one has no such reference, and date + section + person
+     *     + approver alone is not enough: one section can draw twice in a day
+     *     against two separate slips, and treating the second as a repeat would
+     *     silently drop a real issue. Its item set joins the key, so a repeat is
+     *     only a repeat when the same items are on it.
+     *
+     * stock_issues has no rv_no, so unnumbered rows are gathered by the same
+     * four fields the import groups incoming rows on — the closest analogue to
+     * the rv_no grouping receiving uses.
+     *
+     * @return array<string, true>
+     */
+    private static function recordedRequisitionKeys(): array
+    {
+        $keys = \App\Models\StockIssue::query()
+            ->whereNotNull('requisition_no')
+            ->where('requisition_no', '<>', '')
+            ->select('requisition_no', 'issue_date', 'indent_section_id', 'indent_person_id', 'issue_approver_id')
+            ->distinct()
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                self::recordedKey(
+                    $row->requisition_no,
+                    $row->issue_date?->toDateString(),
+                    $row->indent_section_id,
+                    $row->indent_person_id,
+                    $row->issue_approver_id
+                ) => true,
+            ])
+            ->all();
+
+        $unnumbered = \App\Models\StockIssue::query()
+            ->where(fn ($q) => $q->whereNull('requisition_no')->orWhere('requisition_no', ''))
+            ->get(['requisition_no', 'issue_date', 'indent_section_id', 'indent_person_id', 'issue_approver_id', 'stock_item_id'])
+            ->groupBy(fn ($row) => implode('|', [
+                $row->issue_date?->toDateString(),
+                (string) $row->indent_section_id,
+                (string) $row->indent_person_id,
+                (string) $row->issue_approver_id,
+            ]));
+
+        foreach ($unnumbered as $rows) {
+            $first = $rows->first();
+
+            $keys[self::recordedKey(
+                null,
+                $first->issue_date?->toDateString(),
+                $first->indent_section_id,
+                $first->indent_person_id,
+                $first->issue_approver_id,
+                self::itemSetKey($rows->all())
+            )] = true;
+        }
+
+        return $keys;
+    }
+
+    /**
+     * How a requisition is recognised as one already recorded.
+     *
+     * The item set participates ONLY when there is no requisition number. With
+     * a number present it would do harm rather than good: adding a forgotten
+     * line to a requisition already entered would change its item set, the
+     * requisition would no longer look recorded, and re-uploading the file
+     * would issue the whole thing a second time.
+     */
+    private static function recordedKey(
+        ?string $requisitionNo,
+        ?string $date,
+        ?int $sectionId,
+        ?int $personId,
+        ?int $approverId,
+        string $itemSet = ''
+    ): string {
+        $requisitionNo = mb_strtolower(trim((string) $requisitionNo));
+
+        return implode('|', [
+            $requisitionNo,
+            (string) $date,
+            (string) $sectionId,
+            (string) $personId,
+            (string) $approverId,
+            $requisitionNo === '' ? $itemSet : '',
+        ]);
+    }
+
+    /**
+     * A requisition's items as one comparable value: distinct item ids, sorted,
+     * so the same items listed in a different order still match.
+     *
+     * Ids rather than names — both sides of the comparison have already
+     * resolved their item through the master, so an id cannot disagree with
+     * itself over spelling or letter case the way a name can.
+     *
+     * @param  array<int, array<string, mixed>|\App\Models\StockIssue>  $lines
+     */
+    private static function itemSetKey(array $lines): string
+    {
+        $ids = [];
+
+        foreach ($lines as $line) {
+            $ids[] = (int) (is_array($line) ? $line['stock_item_id'] : $line->stock_item_id);
+        }
+
+        $ids = array_values(array_unique($ids));
+        sort($ids);
+
+        return implode(',', $ids);
     }
 
     /** How a requisition is named in every message about it. */
