@@ -71,10 +71,44 @@
         @endif
     </div>
 
+    {{-- Straight after the counts: the four things a stock user comes here to
+         do. They used to sit under the attention list and the movement feed,
+         which put the day's work below a page of reading. --}}
+    <div class="row g-3 mb-4" data-aos="fade-up">
+        @if($seeReceiving)
+            <div class="col-12 col-md-6 col-xl-3">
+                <x-quick-action class="gx-fade-in" style="--gx-delay:400ms" icon="box-arrow-in-down" tone="success"
+                    title="Receiving" description="Record consumables in"
+                    :href="route('store.stock.purchases.index')" />
+            </div>
+        @endif
+        @if($seeIssues)
+            <div class="col-12 col-md-6 col-xl-3">
+                <x-quick-action class="gx-fade-in" style="--gx-delay:450ms" icon="box-arrow-up" tone="warning"
+                    title="Issues" description="Issue to departments"
+                    :href="route('store.stock.issues.index')" />
+            </div>
+        @endif
+        @if($seeRequisition)
+            <div class="col-12 col-md-6 col-xl-3">
+                <x-quick-action class="gx-fade-in" style="--gx-delay:500ms" icon="clipboard-check" tone="primary"
+                    title="Purchase Requisition" description="Raise and track"
+                    :href="route('store.stock.requisitions.index')" />
+            </div>
+        @endif
+        @if($seeStockReport)
+            <div class="col-12 col-md-6 col-xl-3">
+                <x-quick-action class="gx-fade-in" style="--gx-delay:550ms" icon="journal-text" tone="primary"
+                    title="Stock Report" description="Closing position by item"
+                    :href="route('store.stock.ledger')" />
+            </div>
+        @endif
+    </div>
+
     <div class="row g-3 mb-4">
         @if($seeStockReport)
             <div class="col-12 col-xl-4">
-                <x-card class="gx-fade-in h-100" style="--gx-delay:400ms" title="Needs attention">
+                <x-card class="gx-fade-in h-100" style="--gx-delay:600ms" title="Needs attention">
                     {{-- Worst first: out of stock, then below safety stock, then
                          below re-order level. Same ordering as the Stock Report. --}}
                     @php
@@ -127,7 +161,7 @@
 
         @if($seeMovement)
             <div class="col-12 col-xl-8">
-                <x-card class="gx-fade-in h-100" style="--gx-delay:500ms">
+                <x-card class="gx-fade-in h-100" style="--gx-delay:700ms">
                     <x-slot:title>Recent stock movement</x-slot:title>
                     @if($seeStockReport)
                         <x-slot:actions>
@@ -141,35 +175,5 @@
         @endif
     </div>
 
-    <div class="row g-3" data-aos="fade-up">
-        @if($seeReceiving)
-            <div class="col-12 col-md-6 col-xl-3">
-                <x-quick-action class="gx-fade-in" style="--gx-delay:600ms" icon="box-arrow-in-down" tone="success"
-                    title="Receiving" description="Record consumables in"
-                    :href="route('store.stock.purchases.index')" />
-            </div>
-        @endif
-        @if($seeIssues)
-            <div class="col-12 col-md-6 col-xl-3">
-                <x-quick-action class="gx-fade-in" style="--gx-delay:650ms" icon="box-arrow-up" tone="warning"
-                    title="Issues" description="Issue to departments"
-                    :href="route('store.stock.issues.index')" />
-            </div>
-        @endif
-        @if($seeRequisition)
-            <div class="col-12 col-md-6 col-xl-3">
-                <x-quick-action class="gx-fade-in" style="--gx-delay:700ms" icon="clipboard-check" tone="primary"
-                    title="Purchase Requisition" description="Raise and track"
-                    :href="route('store.stock.requisitions.index')" />
-            </div>
-        @endif
-        @if($seeStockReport)
-            <div class="col-12 col-md-6 col-xl-3">
-                <x-quick-action class="gx-fade-in" style="--gx-delay:750ms" icon="journal-text" tone="primary"
-                    title="Stock Report" description="Closing position by item"
-                    :href="route('store.stock.ledger')" />
-            </div>
-        @endif
-    </div>
 </div>
 @endsection

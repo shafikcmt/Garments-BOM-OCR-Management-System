@@ -64,12 +64,46 @@
         @endif
     </div>
 
+    {{-- Straight after the counts: the four things a Buyer / Style user comes
+         here to do. Same position as the General Stock dashboard, so moving
+         between the two does not move the buttons. --}}
+    <div class="row g-3 mb-4" data-aos="fade-up">
+        @if($seeReceiving)
+            <div class="col-12 col-md-6 col-xl-3">
+                <x-quick-action class="gx-fade-in" style="--gx-delay:400ms" icon="box-arrow-in-down" tone="success"
+                    title="Receiving" description="Record material in"
+                    :href="route('store.material.receivings.index')" />
+            </div>
+        @endif
+        @if($seeBulkIssue)
+            <div class="col-12 col-md-6 col-xl-3">
+                <x-quick-action class="gx-fade-in" style="--gx-delay:450ms" icon="box-arrow-up" tone="warning"
+                    title="Bulk Issue" description="Issue to production"
+                    :href="route('store.material.bulk-issues.index')" />
+            </div>
+        @endif
+        @if($seeClosingStock)
+            <div class="col-12 col-md-6 col-xl-3">
+                <x-quick-action class="gx-fade-in" style="--gx-delay:500ms" icon="clipboard-data" tone="primary"
+                    title="Closing Stock" description="Running / liability / dead"
+                    :href="route('store.material.ledger')" />
+            </div>
+        @endif
+        @if($seeRequisitions)
+            <div class="col-12 col-md-6 col-xl-3">
+                <x-quick-action class="gx-fade-in" style="--gx-delay:550ms" icon="list-check" tone="primary"
+                    title="Requisitions" description="Track issue and receipt"
+                    :href="route('store.material.requisitions.index')" />
+            </div>
+        @endif
+    </div>
+
     <div class="row g-3 mb-4">
         @if($seeClosingStock)
             <div class="col-12 col-xl-5">
                 {{-- Running / Liability / Dead is the split Store actually manages:
                      liability and dead can still be transferred back to bulk. --}}
-                <x-card class="gx-fade-in h-100" style="--gx-delay:400ms" title="Closing stock split">
+                <x-card class="gx-fade-in h-100" style="--gx-delay:600ms" title="Closing stock split">
                     <x-donut-chart caption="Total qty"
                         :total="$fmt($stats['running_qty'] + $stats['liability_qty'] + $stats['dead_qty'])"
                         :segments="[
@@ -84,7 +118,7 @@
 
         @if($seeReceiving)
             <div class="col-12 col-xl-7">
-                <x-card class="gx-fade-in h-100" style="--gx-delay:500ms">
+                <x-card class="gx-fade-in h-100" style="--gx-delay:650ms">
                     <x-slot:title>
                         Receivings — last 6 months
                         @if($delta !== null)
@@ -102,7 +136,7 @@
     <div class="row g-3 mb-4">
         @if($seeMovement)
             <div class="col-12 col-xl-8">
-                <x-card class="gx-fade-in h-100" style="--gx-delay:600ms">
+                <x-card class="gx-fade-in h-100" style="--gx-delay:700ms">
                     <x-slot:title>Recent stock movement</x-slot:title>
                     @if($seeClosingStock)
                         <x-slot:actions>
@@ -117,7 +151,7 @@
 
         @if($seeRequisitions)
             <div class="col-12 col-xl-4">
-                <x-card class="gx-fade-in h-100" style="--gx-delay:700ms" title="Requisition follow-up">
+                <x-card class="gx-fade-in h-100" style="--gx-delay:750ms" title="Requisition follow-up">
                     {{-- Same rail treatment as Needs attention on the General
                          Stock dashboard, so the two read as one system. A line
                          with nothing outstanding stays neutral rather than
@@ -168,35 +202,5 @@
         @endif
     </div>
 
-    <div class="row g-3" data-aos="fade-up">
-        @if($seeReceiving)
-            <div class="col-12 col-md-6 col-xl-3">
-                <x-quick-action class="gx-fade-in" style="--gx-delay:800ms" icon="box-arrow-in-down" tone="success"
-                    title="Receiving" description="Record material in"
-                    :href="route('store.material.receivings.index')" />
-            </div>
-        @endif
-        @if($seeBulkIssue)
-            <div class="col-12 col-md-6 col-xl-3">
-                <x-quick-action class="gx-fade-in" style="--gx-delay:850ms" icon="box-arrow-up" tone="warning"
-                    title="Bulk Issue" description="Issue to production"
-                    :href="route('store.material.bulk-issues.index')" />
-            </div>
-        @endif
-        @if($seeClosingStock)
-            <div class="col-12 col-md-6 col-xl-3">
-                <x-quick-action class="gx-fade-in" style="--gx-delay:900ms" icon="clipboard-data" tone="primary"
-                    title="Closing Stock" description="Running / liability / dead"
-                    :href="route('store.material.ledger')" />
-            </div>
-        @endif
-        @if($seeRequisitions)
-            <div class="col-12 col-md-6 col-xl-3">
-                <x-quick-action class="gx-fade-in" style="--gx-delay:950ms" icon="list-check" tone="primary"
-                    title="Requisitions" description="Track issue and receipt"
-                    :href="route('store.material.requisitions.index')" />
-            </div>
-        @endif
-    </div>
 </div>
 @endsection
