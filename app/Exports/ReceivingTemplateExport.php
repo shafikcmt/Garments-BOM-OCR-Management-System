@@ -35,11 +35,18 @@ class ReceivingTemplateExport implements FromArray, WithHeadings, WithTitle, Wit
         // Two example lines sharing one challan, because the single thing a
         // user has to understand about this file is that consecutive rows with
         // the same challan are ONE delivery.
+        // Positions are found by heading rather than counted, so inserting a
+        // column into ReceivingImport::COLUMNS cannot silently drop the second
+        // example's quantity into the wrong cell — which is exactly what the
+        // hardcoded indexes here did when Brand, Size and Specification were
+        // added ahead of them.
+        $at = fn (string $heading) => array_search($heading, ReceivingImport::COLUMNS, true);
+
         $second = ReceivingImport::SAMPLE_ROW;
-        $second[6] = 'EXAMPLE — a second item on the SAME challan';
-        $second[9] = 5;
-        $second[10] = 20;
-        $second[11] = 100;
+        $second[$at('Item Name*')] = 'EXAMPLE — a second item on the SAME challan';
+        $second[$at('Purchased Qty*')] = 5;
+        $second[$at('Unit Price')] = 20;
+        $second[$at('Total Value')] = 100;
 
         return [ReceivingImport::SAMPLE_ROW, $second];
     }

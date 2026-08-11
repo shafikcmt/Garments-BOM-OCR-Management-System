@@ -58,6 +58,13 @@ class ReceivingImport implements ToArray, WithCustomCsvSettings
         'Challan No/Invoice No',
         'Supplier Name',
         'Item Name*',
+        // Reference columns. The company's own workbook carries them beside
+        // the item name, so the template matches what people paste from. They
+        // describe the ITEM, not the delivery, and the item master stays the
+        // authority for all three — see the cross-checks in parse().
+        'Brand',
+        'Size',
+        'Specification',
         'Uom',
         'Category',
         'Purchased Qty*',
@@ -83,6 +90,9 @@ class ReceivingImport implements ToArray, WithCustomCsvSettings
         'challan_no' => ['challannoinvoiceno', 'challanno', 'invoiceno', 'challaninvoiceno'],
         'supplier_name' => ['suppliername', 'supplier', 'vendorname', 'vendor'],
         'item_name' => ['itemname', 'nameofitem', 'nameofitems', 'item', 'particulars'],
+        'brand' => ['brand', 'brandname', 'make'],
+        'size' => ['size', 'itemsize'],
+        'specification' => ['specification', 'spec', 'specs', 'specifications'],
         'uom' => ['uom', 'unit'],
         'category' => ['category', 'itemcategory'],
         'qty' => ['purchasedqty', 'qty', 'quantity', 'receivedqty'],
@@ -101,7 +111,8 @@ class ReceivingImport implements ToArray, WithCustomCsvSettings
      */
     public const SAMPLE_ROW = [
         '2026-08-01', '2026-08-02', 'Aug-26', '', 'CH-862', 'Pioneer Sewing',
-        'EXAMPLE — delete this row', 'Pkt', 'Needle', 10, 145, 1450, 'Optional note',
+        'EXAMPLE — delete this row', 'Groz-Beckert', 'DBx1 90/14', 'Ball point, chrome',
+        'Pkt', 'Needle', 10, 145, 1450, 'Optional note',
     ];
 
     /** Item names starting with this are treated as template placeholders. */
@@ -159,7 +170,7 @@ class ReceivingImport implements ToArray, WithCustomCsvSettings
         }
 
         // One query each, not one per row.
-        $items = StockItem::get(['id', 'name', 'uom', 'category'])
+        $items = StockItem::get(['id', 'name', 'uom', 'category', 'brand', 'size', 'specification'])
             ->keyBy(fn (StockItem $item) => mb_strtolower(trim($item->name)));
 
         $suppliers = GeneralStockSupplier::get(['id', 'name'])
@@ -296,6 +307,31 @@ class ReceivingImport implements ToArray, WithCustomCsvSettings
             $fileCategory = self::text($cell('category'), 100);
             if ($fileCategory !== null && $item->category && mb_strtolower($fileCategory) !== mb_strtolower(trim($item->category))) {
                 $group['notes'][] = 'Row '.$line.': Category in the file is "'.$fileCategory.'" but "'.$itemName.'" is categorised as '.$item->category.'. The item master was used.';
+            }
+
+            // Brand, Size and Specification are reference columns on this
+            // sheet: they describe the item, which already exists by the time
+            // a row gets this far, so the file cannot introduce or change
+            // them. Same treatment as Uom and Category above — a difference is
+            // worth telling somebody about, but never worth losing a delivery
+            // over, so it is a note and the row imports.
+            foreach ([
+                'brand' => ['Brand', $item->brand],
+                'size' => ['Size', $item->size],
+                'specification' => ['Specification', $item->specification],
+            ] as $field => [$label, $masterValue]) {
+                $fileValue = self::text($cell($field), 190);
+
+                if ($fileValue === null || ! $masterValue) {
+                    continue;
+                }
+
+                if (mb_strtolower($fileValue) === mb_strtolower(trim($masterValue))) {
+                    continue;
+                }
+
+                $group['notes'][] = 'Row '.$line.': '.$label.' in the file is "'.$fileValue.'" but "'
+                    .$itemName.'" is held as '.trim($masterValue).'. The item master was used.';
             }
 
             $fileTotal = self::number($cell('total_value'));
