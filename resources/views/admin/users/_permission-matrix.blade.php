@@ -30,6 +30,9 @@
 --}}
 @php
     $readonly = $readonly ?? false;
+    // Permission names the person editing may hand out. Null means no limit —
+    // a super admin, and the profile page, which passes nothing.
+    $grantable = $grantablePermissions ?? null;
     $selectedRole = $selectedRole ?? null;
     $roleGranted = collect($rolePermissions[$selectedRole] ?? []);
     $direct = collect(old('permissions', $directPermissions ?? []));
@@ -108,7 +111,7 @@
                                                 @if($entry)
                                                     @include('admin.users._permission-check', [
                                                         'entry' => $entry, 'roleGranted' => $roleGranted,
-                                                        'direct' => $direct, 'readonly' => $readonly, 'showLabel' => false,
+                                                        'direct' => $direct, 'readonly' => $readonly, 'grantable' => $grantable, 'showLabel' => false,
                                                     ])
                                                 @else
                                                     <span class="gx-perm-na" aria-label="not applicable">·</span>
@@ -121,7 +124,7 @@
                                                 @foreach($row['extra'] as $entry)
                                                     @include('admin.users._permission-check', [
                                                         'entry' => $entry, 'roleGranted' => $roleGranted,
-                                                        'direct' => $direct, 'readonly' => $readonly, 'showLabel' => true,
+                                                        'direct' => $direct, 'readonly' => $readonly, 'grantable' => $grantable, 'showLabel' => true,
                                                     ])
                                                 @endforeach
                                             </td>
@@ -140,7 +143,7 @@
                                 @if($entry)
                                     @include('admin.users._permission-check', [
                                         'entry' => $entry, 'roleGranted' => $roleGranted,
-                                        'direct' => $direct, 'readonly' => $readonly, 'showLabel' => true,
+                                        'direct' => $direct, 'readonly' => $readonly, 'grantable' => $grantable, 'showLabel' => true,
                                     ])
                                 @endif
                             @endforeach
@@ -148,7 +151,7 @@
                             @foreach($row['extra'] as $entry)
                                 @include('admin.users._permission-check', [
                                     'entry' => $entry, 'roleGranted' => $roleGranted,
-                                    'direct' => $direct, 'readonly' => $readonly, 'showLabel' => true,
+                                    'direct' => $direct, 'readonly' => $readonly, 'grantable' => $grantable, 'showLabel' => true,
                                 ])
                             @endforeach
                         </div>
@@ -501,6 +504,13 @@
                     var granted = new Set(byRole[roleSelect.value] || []);
 
                     matrix.querySelectorAll('.js-perm-box').forEach(function (box) {
+                        // A permission the editor does not hold themselves is
+                        // left exactly as it was drawn — locked, and still
+                        // showing whatever the user actually has. Repainting it
+                        // from the role would either unlock it or tick it away,
+                        // and the server refuses both.
+                        if (box.dataset.beyondReach === '1') { return; }
+
                         var fromRole = granted.has(box.dataset.permission);
                         box.disabled = fromRole;
                         box.checked = fromRole || chosen.has(box.dataset.permission);

@@ -24,12 +24,23 @@
 <div class="mb-3">
     <label class="form-label" for="departmentSelect">Department</label>
     <select name="department" id="departmentSelect" class="form-control js-department" required>
-        <option value="">Select Department</option>
+        {{-- A department admin is offered one department, so there is nothing
+             to choose and no placeholder to leave sitting on "Select". --}}
+        @if($scope->isSuperAdmin())
+            <option value="">Select Department</option>
+        @endif
         @foreach($departments as $key => $label)
-            <option value="{{ $key }}" @selected($currentDepartment === $key)>{{ $label }}</option>
+            <option value="{{ $key }}"
+                @selected($currentDepartment === $key || ! $scope->isSuperAdmin())>{{ $label }}</option>
         @endforeach
     </select>
-    <div class="form-text">Choose the department first — it decides which roles are offered.</div>
+    <div class="form-text">
+        @if($scope->isSuperAdmin())
+            Choose the department first — it decides which roles are offered.
+        @else
+            You can add and manage {{ $scope->departmentLabel() }} users only.
+        @endif
+    </div>
 </div>
 
 <div class="mb-3">
@@ -46,6 +57,26 @@
     </select>
     <div class="form-text js-role-hint">The first role in a department is its Department Admin.</div>
 </div>
+
+{{-- Department Admin — a promotion, not an access setting, so only a super
+     admin ever sees it. The hidden marker says the control was on the page:
+     an unticked checkbox posts nothing, and without the marker a save from a
+     form that never showed this field would read as "untick it". --}}
+@if($scope->maySetDepartmentAdminFlag())
+    <div class="mb-3">
+        <input type="hidden" name="department_admin_control" value="1">
+        <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="isDepartmentAdmin"
+                   name="is_department_admin" value="1"
+                   @checked(old('is_department_admin', $user->is_department_admin ?? false))>
+            <label class="form-check-label" for="isDepartmentAdmin">Department Admin</label>
+        </div>
+        <div class="form-text">
+            Lets this person create and manage users in their own department only,
+            and grant them permissions they hold themselves. Only you can set this.
+        </div>
+    </div>
+@endif
 
 <div class="mb-3">
     <label class="form-label">Status</label>

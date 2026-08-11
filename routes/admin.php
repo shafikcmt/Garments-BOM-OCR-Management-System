@@ -14,16 +14,33 @@ use App\Http\Controllers\Admin\PaymentSettingController;
 use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\PraApproverController;
 
+/*
+ * User Management is the one admin screen a Department Admin can also reach,
+ * over the users of their own department only. It therefore sits outside the
+ * role:admin group below — that guard admits nobody but a super admin, and
+ * every other admin route still lives under it, unchanged.
+ *
+ * Access is decided by App\Policies\UserPolicy instead, which the controller
+ * calls on every action including the two password routes. Route middleware
+ * could only ask "which role"; the real question is "which users", and only a
+ * policy holding both the actor and the target can answer that.
+ */
+Route::prefix('admin')
+    ->middleware(['auth'])
+    ->name('admin.')
+    ->group(function () {
+        Route::resource('users', UserController::class)->except(['show']);
+        Route::put('users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
+        Route::post('users/{user}/send-reset-link', [UserController::class, 'sendPasswordResetLink'])->name('users.send-reset-link');
+        Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');
+    });
+
 Route::prefix('admin')
     ->middleware(['auth', 'role:admin'])
     ->name('admin.')
     ->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-        Route::resource('users', UserController::class)->except(['show']);
-        Route::put('users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
-        Route::post('users/{user}/send-reset-link', [UserController::class, 'sendPasswordResetLink'])->name('users.send-reset-link');
-        Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');
         Route::resource('roles', RoleController::class)->except(['show']);
         Route::resource('headers', HeaderController::class)->except(['show']);
 

@@ -12,7 +12,7 @@
 
 <div class="container-fluid">
     <x-breadcrumb :items="[
-        ['label' => 'Admin', 'url' => route('admin.dashboard')],
+        $rootCrumb,
         ['label' => 'Users'],
         ['label' => 'Edit User'],
     ]" />
@@ -100,9 +100,15 @@
                                 <select name="department" id="departmentSelect"
                                         class="form-select js-department @error('department') is-invalid @enderror"
                                         required {{ $isSelf ? 'disabled' : '' }}>
-                                    <option value="">Select Department</option>
+                                    {{-- A department admin is offered their own
+                                         department and nothing else, so there
+                                         is no empty choice to leave sitting. --}}
+                                    @if($scope->isSuperAdmin())
+                                        <option value="">Select Department</option>
+                                    @endif
                                     @foreach($departments as $key => $label)
-                                        <option value="{{ $key }}" @selected($currentDepartment === $key)>{{ $label }}</option>
+                                        <option value="{{ $key }}"
+                                            @selected($currentDepartment === $key || ! $scope->isSuperAdmin())>{{ $label }}</option>
                                     @endforeach
                                 </select>
                                 @if($isSelf)
@@ -146,6 +152,34 @@
                                 <input type="hidden" name="status" value="1">
                             @endif
                         </div>
+
+                        {{-- Department Admin — a promotion, not an access
+                             setting. Super admin only, and never on your own
+                             account, for the same reason your role and status
+                             are locked above.
+
+                             The hidden marker says the control was on the page:
+                             an unticked checkbox posts nothing, so without it a
+                             save from a form that never showed this field would
+                             read as "untick it" and quietly demote someone. --}}
+                        @if($scope->maySetDepartmentAdminFlag() && ! $isSelf)
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold d-block">Department Admin</label>
+                                <input type="hidden" name="department_admin_control" value="1">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch"
+                                           id="departmentAdminSwitch" name="is_department_admin" value="1"
+                                           @checked(old('is_department_admin', $user->is_department_admin))>
+                                    <label class="form-check-label" for="departmentAdminSwitch">
+                                        Can manage users in their own department
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Lets this person create and manage users of their own department only,
+                                    and grant them permissions they already hold themselves. Only you can set this.
+                                </div>
+                            </div>
+                        @endif
 
                         {{-- Additional permissions, saved by this same form so
                              role and permissions can never be posted apart. --}}

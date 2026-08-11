@@ -5,14 +5,25 @@
 @section('content')
 <div class="container-fluid">
     <x-breadcrumb :items="[
-        ['label' => 'Admin', 'url' => route('admin.dashboard')],
+        $rootCrumb,
         ['label' => 'User Management'],
     ]" />
 
-    <x-page-header icon="people" eyebrow="Admin" title="User Management"
-                   copy="Accounts, the role each one holds, and who is signed in right now.">
+    {{-- A department admin is running the same screen over their own
+         department, so it says whose users these are rather than implying the
+         list is everybody. --}}
+    <x-page-header icon="people"
+                   :eyebrow="$scope->isSuperAdmin() ? 'Admin' : $scope->departmentLabel()"
+                   :title="$scope->isSuperAdmin() ? 'User Management' : 'Team Management'"
+                   :copy="$scope->isSuperAdmin()
+                        ? 'Accounts, the role each one holds, and who is signed in right now.'
+                        : $scope->departmentLabel().' accounts, the role each one holds, and who is signed in right now.'">
         <x-slot:actions>
-            <a href="{{ route('admin.roles.index') }}" class="btn btn-outline-secondary">Roles</a>
+            {{-- Roles & Permissions stays a super admin screen: it edits what a
+                 role grants for everyone who holds it, across every department. --}}
+            @if($scope->isSuperAdmin())
+                <a href="{{ route('admin.roles.index') }}" class="btn btn-outline-secondary">Roles</a>
+            @endif
             <a href="{{ route('admin.users.create') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
                 <i class="bi bi-person-plus" aria-hidden="true"></i>Add User
             </a>

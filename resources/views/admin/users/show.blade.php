@@ -11,7 +11,7 @@
 
 <div class="container-fluid">
     <x-breadcrumb :items="[
-        ['label' => 'Admin', 'url' => route('admin.dashboard')],
+        $rootCrumb,
         ['label' => 'Users'],
         ['label' => 'User Details'],
     ]" />

@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\DepartmentRoles;
 use App\Support\PermissionCatalog;
+use App\Support\UserAdministrationScope;
 use Carbon\Carbon;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Illuminate\Http\Request;
@@ -18,9 +20,56 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    // Laravel's base controller no longer carries this. Added here rather than
+    // to App\Http\Controllers\Controller so no other controller's behaviour
+    // changes as a side effect of this screen gaining a policy.
+    use AuthorizesRequests;
+
+    /**
+     * What the signed-in administrator is allowed to hand out.
+     *
+     * Unlimited for a super admin, confined to one department for a department
+     * admin. Every scoping decision in this controller is asked of this object
+     * rather than re-derived, so there is one answer per question.
+     */
+    private function scope(): UserAdministrationScope
+    {
+        return UserAdministrationScope::for(auth()->user());
+    }
+
+    /**
+     * First breadcrumb on these screens.
+     *
+     * The Admin dashboard is still behind role:admin, so a department admin
+     * following that crumb would be thrown a 403 from the screen they were
+     * just allowed into. /dashboard sends each user to their own department's
+     * one, which for them is the right way back.
+     *
+     * @return array{label: string, url: string}
+     */
+    private function rootCrumb(): array
+    {
+        return $this->scope()->isSuperAdmin()
+            ? ['label' => 'Admin', 'url' => route('admin.dashboard')]
+            : ['label' => 'Dashboard', 'url' => route('dashboard')];
+    }
+
     public function index()
     {
+        $this->authorize('viewAny', User::class);
+
+        $scope = $this->scope();
+
         $users = User::with('roles')->latest()->get();
+
+        // A department admin sees their own department and nobody else. Done
+        // after loading so the department can be read off each user's role,
+        // which is where it lives — there is no column to filter on in SQL.
+        if (! $scope->isSuperAdmin()) {
+            $users = $users->filter(
+                fn (User $u) => auth()->user()->can('view', $u)
+            )->values();
+        }
 
         $stats = [
             'total' => $users->count(),
@@ -30,14 +79,22 @@ class UserController extends Controller
             'never_signed_in' => $users->whereNull('last_login_at')->count(),
         ];
 
-        $roleCounts = Role::withCount('users')->orderBy('name')->get();
+        // Counted over the visible users, not the whole table — a department
+        // admin's totals must add up to the list underneath them.
+        $roleCounts = $scope->assignableRoles()->map(function (Role $role) use ($users, $scope) {
+            $role->users_count = $scope->isSuperAdmin()
+                ? $role->users()->count()
+                : $users->filter(fn (User $u) => $u->hasRole($role->name))->count();
+
+            return $role;
+        });
 
         // Permissions are seeded and gate real features through @can(), but no
         // screen has ever shown them — an admin had to read the database to
         // find out who can do what. Read-only for now: editing this changes
         // access control for everyone.
         $permissionMatrix = [
-            'roles' => Role::with('permissions')->orderBy('name')->get(),
+            'roles' => $scope->assignableRoles(),
             'permissions' => Permission::orderBy('name')->get(),
         ];
 
@@ -62,12 +119,16 @@ class UserController extends Controller
                 ->values();
         }
 
-        return view('admin.users.index', compact('users', 'stats', 'roleCounts', 'permissionMatrix', 'sessions'));
+        $rootCrumb = $this->rootCrumb();
+
+        return view('admin.users.index', compact('users', 'stats', 'roleCounts', 'permissionMatrix', 'sessions', 'scope', 'rootCrumb'));
     }
 
     public function create()
     {
-        $roles = Role::with('permissions')->orderBy('name')->get();
+        $this->authorize('create', User::class);
+
+        $roles = $this->scope()->assignableRoles();
 
         return view('admin.users.create', array_merge(
             compact('roles'),
@@ -88,12 +149,29 @@ class UserController extends Controller
     private function permissionMatrixData(?User $user = null): array
     {
         $catalog = new PermissionCatalog();
+        $scope = $this->scope();
+
+        // A department admin is offered their own department and no other, so
+        // the select has one option and cannot be used to move somebody out.
+        // The controller refuses a different one regardless; this is only so
+        // the form does not offer what it will then reject.
+        $departments = $scope->isSuperAdmin()
+            ? DepartmentRoles::departments()
+            : array_intersect_key(
+                DepartmentRoles::departments(),
+                [$scope->departmentKey() => true]
+            );
 
         return [
             'permissionGroups' => $catalog->grouped(),
             'actionColumns' => $catalog->actionColumns(),
             'catalog' => $catalog,
-            'departments' => DepartmentRoles::departments(),
+            'departments' => $departments,
+            'scope' => $scope,
+            'rootCrumb' => $this->rootCrumb(),
+            // null means unlimited (super admin). An empty array would mean
+            // "may grant nothing", which is a different thing entirely.
+            'grantablePermissions' => $scope->grantablePermissions(),
             'roleDepartments' => DepartmentRoles::indexFor(Role::all()),
             'rolePermissions' => Role::with('permissions')->get()
                 ->mapWithKeys(fn (Role $r) => [$r->name => $r->permissions->pluck('name')->all()])
@@ -143,6 +221,88 @@ class UserController extends Controller
     }
 
     /**
+     * Refuse a submission that reaches outside the administrator's scope.
+     *
+     * Called before validation on both create and update, so an out-of-scope
+     * post is a 403 and not a form error: it is not a mistake to correct and
+     * resubmit, it is an action this account may not take. Nothing is written
+     * before every one of these has passed, so a rejected request cannot be
+     * applied in part.
+     *
+     * The form already hides all four of these. That is why they are here — the
+     * only way to arrive with one is to have bypassed the form.
+     */
+    private function guardScopedSubmission(Request $request): void
+    {
+        $scope = $this->scope();
+
+        if ($scope->isSuperAdmin()) {
+            return;
+        }
+
+        // 1. The department cannot be swapped. Silently rewriting it to their
+        //    own would let a post that asked for Commercial quietly succeed as
+        //    Store; the request asked for something they may not do.
+        $chosen = $request->input('department');
+
+        abort_if(
+            $chosen && $chosen !== $scope->departmentKey(),
+            403,
+            'You can only manage users in the '.$scope->departmentLabel().' department.'
+        );
+
+        // 2. The role must be one of their own department's.
+        abort_unless(
+            $scope->mayAssignRole($request->input('role')),
+            403,
+            'You can only assign '.$scope->departmentLabel().' roles.'
+        );
+
+        // 3. No granting a permission you do not hold yourself. This is the
+        //    self-escalation guard: the matrix lists every permission in the
+        //    system, so without it, ticking users.delete and saving would hand
+        //    the author a right nobody gave them.
+        $overreach = collect($request->input('permissions', []))
+            ->filter()
+            ->reject(fn ($name) => $scope->mayGrant($name));
+
+        abort_if(
+            $overreach->isNotEmpty(),
+            403,
+            'You can only grant permissions you hold yourself. Not yours: '
+                .$overreach->take(3)->implode(', ').'.'
+        );
+
+        // 4. Department Admin is a promotion, not an access setting. Only a
+        //    super admin may set it — on anyone, including the author.
+        abort_if(
+            $request->has('is_department_admin') || $request->has('department_admin_control'),
+            403,
+            'Only a super admin can make someone a Department Admin.'
+        );
+    }
+
+    /**
+     * The value to store for is_department_admin.
+     *
+     * A checkbox posts nothing when unticked, so the form carries a hidden
+     * marker alongside it to say the control was on the page at all. Without
+     * that, "unticked" and "the form never showed this field" look identical,
+     * and a department admin's save would demote whoever they edited.
+     *
+     * Reached only after guardScopedSubmission(), so any post carrying these
+     * keys is a super admin's.
+     */
+    private function departmentAdminFlag(Request $request, ?User $user = null): bool
+    {
+        if (! $request->has('department_admin_control')) {
+            return (bool) ($user?->is_department_admin ?? false);
+        }
+
+        return $request->boolean('is_department_admin');
+    }
+
+    /**
      * Write the ticked boxes as DIRECT permissions on the user.
      *
      * Anything the role already grants is skipped rather than copied down: if
@@ -168,11 +328,34 @@ class UserController extends Controller
 
         $valid = Permission::whereIn('name', $submitted)->pluck('name');
 
-        $user->syncPermissions($valid->reject(fn ($name) => $fromRole->contains($name))->values()->all());
+        $keep = $valid->reject(fn ($name) => $fromRole->contains($name));
+
+        // Grants the editor cannot reach survive their save.
+        //
+        // syncPermissions replaces the whole direct set, and the matrix posts
+        // its full state — so a department admin saving a user would delete
+        // every direct grant outside their own rights, including ones a super
+        // admin gave. Their boxes are drawn locked, so they would not even see
+        // it happen. Escalation is the guarded direction; this is the same bug
+        // pointing the other way.
+        $grantable = $this->scope()->grantablePermissions();
+
+        if ($grantable !== null) {
+            $keep = $keep->merge(
+                $user->getDirectPermissions()
+                    ->pluck('name')
+                    ->reject(fn ($name) => in_array($name, $grantable, true))
+            )->unique();
+        }
+
+        $user->syncPermissions($keep->values()->all());
     }
 
     public function store(Request $request)
     {
+        $this->authorize('create', User::class);
+        $this->guardScopedSubmission($request);
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
@@ -187,6 +370,7 @@ class UserController extends Controller
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'status' => $data['status'],
+            'is_department_admin' => $this->departmentAdminFlag($request),
         ]);
 
         $user->syncRoles([$data['role']]);
@@ -197,6 +381,8 @@ class UserController extends Controller
 
     public function show(User $user)
     {
+        $this->authorize('view', $user);
+
         return view('admin.users.show', array_merge(
             compact('user'),
             $this->permissionMatrixData($user)
@@ -205,7 +391,9 @@ class UserController extends Controller
 
     public function edit(User $user)
     {
-        $roles = Role::with('permissions')->orderBy('name')->get();
+        $this->authorize('update', $user);
+
+        $roles = $this->scope()->assignableRoles();
 
         return view('admin.users.edit', array_merge(
             compact('user', 'roles'),
@@ -215,6 +403,9 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
+        $this->authorize('update', $user);
+        $this->guardScopedSubmission($request);
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email,' . $user->id],
@@ -235,6 +426,7 @@ class UserController extends Controller
         $user->name = $data['name'];
         $user->email = $data['email'];
         $user->status = $data['status'];
+        $user->is_department_admin = $this->departmentAdminFlag($request, $user);
 
         if ($request->hasFile('profile_photo')) {
             if ($user->profile_photo) {
@@ -264,6 +456,8 @@ class UserController extends Controller
 
     public function resetPassword(Request $request, User $user)
     {
+        $this->authorize('resetPassword', $user);
+
         $request->validate([
             'new_password' => ['required', 'min:8', 'confirmed'],
         ]);
@@ -278,6 +472,8 @@ class UserController extends Controller
 
     public function sendPasswordResetLink(User $user)
     {
+        $this->authorize('resetPassword', $user);
+
         $status = Password::sendResetLink(['email' => $user->email]);
 
         if ($status === Password::RESET_LINK_SENT) {
@@ -291,10 +487,15 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
+        // Deleting your own account is refused in words rather than a 403 —
+        // it is a mistake, not an overreach — so it is checked ahead of the
+        // policy, which would otherwise answer first and answer bluntly.
         if ($user->id === auth()->id()) {
             return redirect()->route('admin.users.index')
                 ->with('error', 'You cannot delete your own account.');
         }
+
+        $this->authorize('delete', $user);
 
         $user->delete();
         return redirect()->route('admin.users.index')->with('success', 'User deleted successfully.');
