@@ -265,3 +265,88 @@ a.gx-stat:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(15, 
     a.gx-stat:hover,
     .gx-action:hover { transform: none; }
 }
+
+/* --- Attention list ------------------------------------------------------
+ *
+ * A severity list reads as one repeated shape when every row carries its own
+ * status badge: nine badges saying the same three things. The severity moves
+ * to a coloured rail on the left edge and a count summary above the list, so
+ * the badge disappears and the row is left saying only what is specific to it.
+ *
+ * The rail takes its colour from the .gx-tone-* class already on the row, so
+ * no new colour enters the palette.
+ */
+.gx-alert-list { display: flex; flex-direction: column; gap: 2px; }
+
+.gx-alert-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px 8px 12px;
+    border-left: 3px solid var(--gx-tone, var(--gx-secondary));
+    border-radius: 0 var(--gx-radius-sm) var(--gx-radius-sm) 0;
+    transition: background-color .15s ease;
+}
+
+.gx-alert-row:hover { background: var(--gx-tone-bg, transparent); }
+
+.gx-alert-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gx-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gx-alert-sub { font-size: 11px; color: var(--gx-text-muted); margin-top: 1px; }
+
+/* Tabular figures so the quantity column lines up down the list, which is
+ * what makes "0 / 50" scannable against "18 / 30" without a table. */
+.gx-alert-qty {
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--gx-tone, var(--gx-text));
+    white-space: nowrap;
+}
+
+.gx-alert-qty-sub {
+    font-size: 11px;
+    color: var(--gx-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Count chips standing in for the removed per-row badges. */
+.gx-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+
+.gx-chip {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: var(--gx-radius-pill, 999px);
+    background: var(--gx-tone-bg, var(--gx-surface-2));
+    color: var(--gx-tone, var(--gx-text));
+    white-space: nowrap;
+}
+
+/* --- Day divider in the movement feed ------------------------------------
+ *
+ * Every row used to end in its own "3 hours ago". Grouping under one heading
+ * per day says it once and lets the rows carry only the movement.
+ */
+.gx-feed-day {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--gx-text-muted);
+    margin: 16px 0 8px;
+}
+
+.gx-feed-day:first-child { margin-top: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+    .gx-alert-row { transition: none !important; }
+}

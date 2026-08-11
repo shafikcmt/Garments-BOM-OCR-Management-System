@@ -20,7 +20,7 @@
 @endphp
 <div class="container-fluid">
     <x-page-header data-aos="fade-down" icon="box-seam" eyebrow="General Stock"
-                   title="Welcome, {{ auth()->user()->name }}"
+                   title="General Stock"
                    copy="Consumable stock position, movement and what needs attention.">
         <x-slot:actions>
             @if($seeReceiving)
@@ -73,7 +73,7 @@
 
     <div class="row g-3 mb-4">
         @if($seeStockReport)
-            <div class="col-12 col-xl-5">
+            <div class="col-12 col-xl-4">
                 <x-card class="gx-fade-in h-100" style="--gx-delay:400ms" title="Needs attention">
                     {{-- Worst first: out of stock, then below safety stock, then
                          below re-order level. Same ordering as the Stock Report. --}}
@@ -81,25 +81,40 @@
                         $lowStock = collect($stockLevels)->take(6);
                         $tone = ['out' => 'danger', 'place_order' => 'danger', 'low' => 'warning'];
                         $statusLabels = \App\Services\GeneralStockReportService::statusLabels();
+
+                        // Counted over the whole list, not the six shown, so the
+                        // chips describe the situation rather than the excerpt.
+                        $bySeverity = collect($stockLevels)->countBy('status');
                     @endphp
 
-                    @forelse($lowStock as $item)
-                        <div class="d-flex align-items-center justify-content-between gap-2 py-2 border-bottom">
-                            <div class="min-w-0">
-                                <div class="fw-semibold text-truncate">{{ $item['name'] }}</div>
-                                <div class="small text-muted">
-                                    <span class="badge bg-{{ $tone[$item['status']] }}-subtle text-{{ $tone[$item['status']] }}">{{ $statusLabels[$item['status']] }}</span>
-                                    {{ $item['category'] }}
+                    @if($stats['reorder_count'] > 0)
+                        <div class="gx-chips">
+                            @foreach(['out', 'place_order', 'low'] as $status)
+                                @if(($bySeverity[$status] ?? 0) > 0)
+                                    <span class="gx-chip gx-tone-{{ $tone[$status] }}">
+                                        {{ $bySeverity[$status] }} {{ $statusLabels[$status] }}
+                                    </span>
+                                @endif
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <div class="gx-alert-list">
+                        @forelse($lowStock as $item)
+                            <div class="gx-alert-row gx-tone-{{ $tone[$item['status']] }}">
+                                <div class="min-w-0">
+                                    <div class="gx-alert-name">{{ $item['name'] }}</div>
+                                    <div class="gx-alert-sub">{{ $item['category'] }}</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="gx-alert-qty">{{ $fmt($item['current']) }} / {{ $fmt($item['threshold']) }}</div>
+                                    <div class="gx-alert-qty-sub">{{ $item['uom'] }}</div>
                                 </div>
                             </div>
-                            <div class="text-end">
-                                <div class="fw-bold text-{{ $tone[$item['status']] }}">{{ $fmt($item['current']) }} {{ $item['uom'] }}</div>
-                                <div class="small text-muted">safety {{ $fmt($item['threshold']) }}</div>
-                            </div>
-                        </div>
-                    @empty
-                        <p class="text-muted small mb-0">Every consumable is above its re-order level.</p>
-                    @endforelse
+                        @empty
+                            <p class="text-muted small mb-0">Every consumable is above its re-order level.</p>
+                        @endforelse
+                    </div>
 
                     @if($stats['reorder_count'] > $lowStock->count())
                         <a href="{{ route('store.stock.ledger', ['status' => 'attention']) }}" class="btn btn-sm btn-outline-danger mt-3">
@@ -111,7 +126,7 @@
         @endif
 
         @if($seeMovement)
-            <div class="col-12 col-xl-7">
+            <div class="col-12 col-xl-8">
                 <x-card class="gx-fade-in h-100" style="--gx-delay:500ms">
                     <x-slot:title>Recent stock movement</x-slot:title>
                     @if($seeStockReport)
@@ -120,18 +135,7 @@
                         </x-slot:actions>
                     @endif
 
-                    @php
-                        $movementItems = collect($recentActivity)->map(fn ($row) => [
-                            'tone' => $row['direction'] === 'in' ? 'success' : 'warning',
-                            'icon' => $row['direction'] === 'in' ? 'box-arrow-in-down' : 'box-arrow-up',
-                            'title' => $row['label'],
-                            'description' => ($row['direction'] === 'in' ? 'Received ' : 'Issued ')
-                                .$fmt($row['qty']).' '.($row['uom'] ?: ''),
-                            'meta' => optional($row['date'])->diffForHumans(),
-                        ])->all();
-                    @endphp
-
-                    <x-timeline :items="$movementItems" />
+                    @include('store._movement-feed', ['rows' => $recentActivity, 'fmt' => $fmt])
                 </x-card>
             </div>
         @endif

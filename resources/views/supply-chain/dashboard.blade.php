@@ -5,7 +5,7 @@
 @section('content')
 <div class="container-fluid">
     <x-page-header data-aos="fade-down" icon="truck" eyebrow="Supply Chain"
-                   title="Welcome, {{ auth()->user()->name }}"
+                   title="Supply Chain"
                    copy="Booking POs, payment requests and your share of the BOM.">
         <x-slot:actions>
             <a href="{{ route('supply_chain.bookings.index') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">

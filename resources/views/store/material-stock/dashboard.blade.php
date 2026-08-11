@@ -17,7 +17,7 @@
 @endphp
 <div class="container-fluid">
     <x-page-header data-aos="fade-down" icon="clipboard-data" eyebrow="Buyer / Style Stock"
-                   title="Welcome, {{ auth()->user()->name }}"
+                   title="Buyer / Style Stock"
                    copy="Closing stock by style, receiving and bulk issuing.">
         <x-slot:actions>
             @if($seeReceiving)
@@ -101,7 +101,7 @@
 
     <div class="row g-3 mb-4">
         @if($seeMovement)
-            <div class="col-12 col-xl-7">
+            <div class="col-12 col-xl-8">
                 <x-card class="gx-fade-in h-100" style="--gx-delay:600ms">
                     <x-slot:title>Recent stock movement</x-slot:title>
                     @if($seeClosingStock)
@@ -110,44 +110,56 @@
                         </x-slot:actions>
                     @endif
 
-                    @php
-                        $movementItems = collect($recentActivity)->map(fn ($row) => [
-                            'tone' => $row['direction'] === 'in' ? 'success' : 'warning',
-                            'icon' => $row['direction'] === 'in' ? 'box-arrow-in-down' : 'box-arrow-up',
-                            'title' => $row['label'],
-                            'description' => ($row['direction'] === 'in' ? 'Received ' : 'Issued ')
-                                .$fmt($row['qty']).' '.($row['uom'] ?: ''),
-                            'meta' => optional($row['date'])->diffForHumans(),
-                        ])->all();
-                    @endphp
-
-                    <x-timeline :items="$movementItems" />
+                    @include('store._movement-feed', ['rows' => $recentActivity, 'fmt' => $fmt])
                 </x-card>
             </div>
         @endif
 
         @if($seeRequisitions)
-            <div class="col-12 col-xl-5">
+            <div class="col-12 col-xl-4">
                 <x-card class="gx-fade-in h-100" style="--gx-delay:700ms" title="Requisition follow-up">
-                    <div class="d-flex align-items-center justify-content-between gap-2 py-2 border-bottom">
-                        <div class="min-w-0">
-                            <div class="fw-semibold">Not fully issued</div>
-                            <div class="small text-muted">Lines where less was issued than required</div>
+                    {{-- Same rail treatment as Needs attention on the General
+                         Stock dashboard, so the two read as one system. A line
+                         with nothing outstanding stays neutral rather than
+                         colouring a zero as a warning. --}}
+                    @php
+                        $followUp = [
+                            [
+                                'label' => 'Not fully issued',
+                                'sub' => 'Issued less than required',
+                                'lines' => $stats['pending_req_lines'],
+                                'qty' => $stats['pending_req_qty'],
+                            ],
+                            [
+                                'label' => 'Not fully received',
+                                'sub' => 'Received less than issued',
+                                'lines' => $stats['pending_recv_lines'],
+                                'qty' => $stats['pending_recv_qty'],
+                            ],
+                        ];
+
+                        $outstanding = collect($followUp)->sum('lines');
+                    @endphp
+
+                    @if($outstanding > 0)
+                        <div class="gx-chips">
+                            <span class="gx-chip gx-tone-warning">{{ $outstanding }} line(s) outstanding</span>
                         </div>
-                        <div class="text-end">
-                            <div class="fw-bold {{ $stats['pending_req_lines'] > 0 ? 'text-warning' : 'text-muted' }}">{{ $stats['pending_req_lines'] }}</div>
-                            <div class="small text-muted">{{ $fmt($stats['pending_req_qty']) }} qty</div>
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-center justify-content-between gap-2 py-2">
-                        <div class="min-w-0">
-                            <div class="fw-semibold">Not fully received</div>
-                            <div class="small text-muted">Lines where less was received than issued</div>
-                        </div>
-                        <div class="text-end">
-                            <div class="fw-bold {{ $stats['pending_recv_lines'] > 0 ? 'text-warning' : 'text-muted' }}">{{ $stats['pending_recv_lines'] }}</div>
-                            <div class="small text-muted">{{ $fmt($stats['pending_recv_qty']) }} qty</div>
-                        </div>
+                    @endif
+
+                    <div class="gx-alert-list">
+                        @foreach($followUp as $row)
+                            <div class="gx-alert-row gx-tone-{{ $row['lines'] > 0 ? 'warning' : 'primary' }}">
+                                <div class="min-w-0">
+                                    <div class="gx-alert-name">{{ $row['label'] }}</div>
+                                    <div class="gx-alert-sub">{{ $row['sub'] }}</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="gx-alert-qty">{{ $row['lines'] }}</div>
+                                    <div class="gx-alert-qty-sub">{{ $fmt($row['qty']) }} qty</div>
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
 
                     <a href="{{ route('store.material.requisitions.index') }}" class="btn btn-sm btn-outline-primary mt-3">Open requisitions</a>

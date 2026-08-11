@@ -5,7 +5,7 @@
 @section('content')
 <div class="container-fluid">
     <x-page-header data-aos="fade-down" icon="clipboard2-check" eyebrow="Management"
-                   title="Welcome, {{ auth()->user()->name }}"
+                   title="Management"
                    copy="Payment Request Approvals — current position and recent activity.">
         <x-slot:actions>
             <a href="{{ route('pra_approvals.index') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">

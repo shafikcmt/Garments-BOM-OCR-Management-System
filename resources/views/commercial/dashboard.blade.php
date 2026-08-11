@@ -5,7 +5,7 @@
 @section('content')
 <div class="container-fluid">
     <x-page-header data-aos="fade-down" icon="briefcase" eyebrow="Commercial"
-                   title="Welcome, {{ auth()->user()->name }}"
+                   title="Commercial"
                    copy="Your share of the BOM workspace and what is still outstanding.">
         <x-slot:actions>
             <a href="{{ route('commercial.workspace') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">

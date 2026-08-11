@@ -5,7 +5,7 @@
 @section('content')
 <div class="container-fluid">
     <x-page-header data-aos="fade-down" icon="sliders" eyebrow="Admin"
-                   title="Welcome, {{ auth()->user()->name }}"
+                   title="Admin"
                    copy="Users, roles, workspace columns and vendor master.">
         <x-slot:actions>
             <a href="{{ route('admin.users.index') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
