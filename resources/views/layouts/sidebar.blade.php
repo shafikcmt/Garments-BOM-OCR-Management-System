@@ -17,6 +17,76 @@
     $isSupplyEmails = request()->routeIs('supply_chain.sent_emails.*');
     $supplyBookingUrl = route('supply_chain.bookings.index');
     $supplyPaymentUrl = route('supply_chain.payment_requests.index');
+
+    /*
+     * Store menu visibility.
+     *
+     * The Store block used to hang off @role('store') alone, so a user on a
+     * narrow role — Store — General Stock, say — matched nothing and was shown
+     * an empty sidebar, even though every screen behind it would have let them
+     * in.
+     *
+     * Each item now asks the same question its own route guard asks: the store
+     * role still passes everything exactly as before, and a permission opens
+     * the one item it covers. Never wider than the guard, so no link is offered
+     * that would answer 403 — Store Reports is the case that matters there,
+     * since its route is still role-only and has no permission to grant.
+     *
+     * Only the store role's block is affected. Admin, Management and the other
+     * departments keep their own blocks unchanged.
+     */
+    $storeUser = auth()->user();
+    $isStoreRole = $storeUser?->hasRole('store') ?? false;
+
+    // role OR the permission — the same shape as role_or_perm on the routes.
+    $storeSees = fn (string $permission) => $isStoreRole || ($storeUser?->can($permission) ?? false);
+
+    $seeStockReport = $storeSees('store.stock_report.view');
+    $seeItems = $storeSees('store.items.view');
+    $seeGsReceiving = $storeSees('store.receiving.view');
+    $seeIssues = $storeSees('store.issues.view');
+    $seeRequisition = $storeSees('store.requisition.view');
+    $seeSetup = $storeSees('store.setup.view');
+
+    $seeClosingStock = $storeSees('material.closing_stock.view');
+    $seeBsReceiving = $storeSees('material.receiving.view');
+    $seeBulkIssue = $storeSees('material.bulk_issue.view');
+    $seeBsRequisitions = $storeSees('material.requisitions.view');
+
+    $seeGeneralStock = $seeStockReport || $seeItems || $seeGsReceiving || $seeIssues || $seeRequisition || $seeSetup;
+    $seeMaterialStock = $seeClosingStock || $seeBsReceiving || $seeBulkIssue || $seeBsRequisitions;
+
+    // Dashboard and Workspace sit behind the store area's entry guard, which
+    // admits anyone holding any one of the module permissions.
+    $seeStoreHome = $isStoreRole || $seeGeneralStock || $seeMaterialStock;
+
+    // Store Reports is guarded by role only — no permission exists for it, so a
+    // permission-only user must not be offered it.
+    $seeStoreReports = $isStoreRole;
+
+    /*
+     * Roles that already have a sidebar block of their own further up. Admin and
+     * Management list the Store screens inside their own group, and Gate::before
+     * answers true to every permission for admin — so without this the Store
+     * block would render for them as well and they would carry two sets of
+     * navigation to the same screens. Store is deliberately absent from the
+     * list: this block is its own.
+     */
+    $hasOwnSidebarBlock = $storeUser?->hasAnyRole(['admin', 'merchant', 'account', 'commercial', 'supply_chain', 'management']) ?? false;
+
+    $seeStoreArea = ! $hasOwnSidebarBlock && ($seeStoreHome || $seeStoreReports);
+
+    /*
+     * Team Management — the scoped User Management screen, for the head of the
+     * department rather than everyone in it. The flag is what decides it, not
+     * the role: every Store user holds a Store role, and only one or two of
+     * them should be creating accounts.
+     *
+     * Admin keeps its own "Users & Roles" entry further up and must not gain a
+     * second link to the same screen, which is why this sits inside the Store
+     * block — a block admin never renders.
+     */
+    $seeTeamManagement = $storeUser?->isDepartmentAdmin() ?? false;
 @endphp
 
 <nav class="sidebar" id="appSidebar" aria-label="Main sidebar navigation">
@@ -205,10 +275,11 @@
             </div>
             @endrole
 
-            @role('store')
+            @if($seeStoreArea)
             <div class="sidebar-section">
                 <div class="sidebar-section-label">Main Menu</div>
                 <ul class="sidebar-list">
+                    @if($seeStoreHome)
                     <li class="sidebar-item">
                         <a href="{{ route('store.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('store.dashboard') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span><span class="sidebar-link-text">Dashboard</span></span>
@@ -219,36 +290,56 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($seeStoreReports)
                     <li class="sidebar-item">
                         <a href="{{ route('store.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Reports</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($seeTeamManagement)
+                    <li class="sidebar-item">
+                        <a href="{{ route('admin.users.index') }}" class="sidebar-nav-link {{ request()->routeIs('admin.users.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-people" aria-hidden="true"></i></span><span class="sidebar-link-text">Team Management</span></span>
+                        </a>
+                    </li>
+                    @endif
                 </ul>
             </div>
+            @if($seeGeneralStock)
             <div class="sidebar-section">
                 <div class="sidebar-section-label">General Stock</div>
                 <ul class="sidebar-list">
+                    @if($seeStockReport)
                     <li class="sidebar-item">
                         <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Stock Report</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($seeItems)
                     <li class="sidebar-item">
                         <a href="{{ route('store.stock.items.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span><span class="sidebar-link-text">Items</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($seeGsReceiving)
                     <li class="sidebar-item">
                         <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span class="sidebar-link-text">Receiving</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($seeIssues)
                     <li class="sidebar-item">
                         <a href="{{ route('store.stock.issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span><span class="sidebar-link-text">Issues</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($seeRequisition)
                     {{-- Named in full to keep it distinct from the material
                          Requisitions under Buyer/Style Stock. --}}
                     <li class="sidebar-item">
@@ -256,6 +347,8 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Purchase Requisition</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($seeSetup)
                     {{-- Purchase Setup and Issue Setup are one screen now. Their
                          old routes redirect here, so both spellings still
                          highlight this entry. --}}
@@ -264,34 +357,46 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-sliders" aria-hidden="true"></i></span><span class="sidebar-link-text">Setup</span></span>
                         </a>
                     </li>
+                    @endif
                 </ul>
             </div>
+            @endif
+            @if($seeMaterialStock)
             <div class="sidebar-section">
                 <div class="sidebar-section-label">Buyer / Style Stock</div>
                 <ul class="sidebar-list">
+                    @if($seeClosingStock)
                     <li class="sidebar-item">
                         <a href="{{ route('store.material.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.ledger') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clipboard-data" aria-hidden="true"></i></span><span class="sidebar-link-text">Closing Stock</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($seeBsReceiving)
                     <li class="sidebar-item">
                         <a href="{{ route('store.material.receivings.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.receivings.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></span><span class="sidebar-link-text">Receiving</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($seeBulkIssue)
                     <li class="sidebar-item">
                         <a href="{{ route('store.material.bulk-issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.bulk-issues.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span><span class="sidebar-link-text">Bulk Issuing</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($seeBsRequisitions)
                     <li class="sidebar-item">
                         <a href="{{ route('store.material.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.requisitions.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Requisitions</span></span>
                         </a>
                     </li>
+                    @endif
                 </ul>
             </div>
-            @endrole
+            @endif
+            @endif
 
             @role('supply_chain')
             <div class="sidebar-section">

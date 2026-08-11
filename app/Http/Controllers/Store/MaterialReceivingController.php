@@ -19,6 +19,10 @@ class MaterialReceivingController extends Controller
 {
     use AuthorizesStoreCorrections;
 
+    /** Section this controller belongs to, for the section-scoped correction
+     *  permissions. The flat store.edit / store.delete still apply too. */
+    protected string $storeSection = 'material.receiving';
+
     /**
      * How many browse options the search field will list before it stops being
      * a complete picture and typing has to reach the server instead.

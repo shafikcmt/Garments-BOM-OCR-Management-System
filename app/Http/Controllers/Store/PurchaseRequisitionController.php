@@ -35,6 +35,10 @@ class PurchaseRequisitionController extends Controller
 {
     use AuthorizesStoreCorrections;
 
+    /** Section this controller belongs to, for the section-scoped correction
+     *  permissions. The flat store.edit / store.delete still apply too. */
+    protected string $storeSection = 'store.requisition';
+
     public function __construct(
         private readonly PurchaseRequisitionService $requisitions,
         private readonly PurchaseRequisitionNumberGenerator $numbers,

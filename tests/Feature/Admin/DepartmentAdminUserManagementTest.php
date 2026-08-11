@@ -263,6 +263,32 @@ it('never renders the department admin control to a department admin', function 
     expect($html)->toContain('name="is_department_admin"');
 });
 
+it('puts Team Management in the store sidebar and leaves Users & Roles to the admin', function () {
+    $admin = scopedStoreAdmin();
+
+    // Same underlying route, a different door and a different label.
+    $storeSidebar = $this->actingAs($admin)
+        ->get(route('store.dashboard'))->assertOk()->getContent();
+
+    expect($storeSidebar)->toContain('Team Management')
+        ->and($storeSidebar)->toContain(route('admin.users.index'))
+        ->and($storeSidebar)->not->toContain('Users &amp; Roles');
+
+    // A plain store user has no reason to see it, and does not.
+    $plain = $this->actingAs(scopedStoreMember())
+        ->get(route('store.dashboard'))->assertOk()->getContent();
+
+    expect($plain)->not->toContain('Team Management');
+
+    $adminSidebar = $this->actingAs(scopedSuperAdmin())
+        ->get(route('admin.dashboard'))->assertOk()->getContent();
+
+    expect($adminSidebar)->toContain('Users &amp; Roles')
+        ->and($adminSidebar)->toContain(route('admin.users.index'))
+        // No second link to the same screen for the super admin.
+        ->and($adminSidebar)->not->toContain('Team Management');
+});
+
 it('keeps a plain store user out of the screen entirely', function () {
     // Same department, same role family, no flag — the flag is the capability.
     $this->actingAs(scopedStoreMember())->get(route('admin.users.index'))->assertForbidden();

@@ -26,6 +26,10 @@ class PurchaseSetupController extends Controller
 {
     use AuthorizesStoreCorrections;
 
+    /** Section this controller belongs to, for the section-scoped correction
+     *  permissions. The flat store.edit / store.delete still apply too. */
+    protected string $storeSection = 'store.setup';
+
     public function index()
     {
         ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();

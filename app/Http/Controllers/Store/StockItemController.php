@@ -22,6 +22,10 @@ class StockItemController extends Controller
 {
     use AuthorizesStoreCorrections, ResolvesIssueSetupMasters;
 
+    /** Section this controller belongs to, for the section-scoped correction
+     *  permissions. The flat store.edit / store.delete still apply too. */
+    protected string $storeSection = 'store.items';
+
     public function index(Request $request)
     {
         // All three are optional. With none of them supplied the query below is

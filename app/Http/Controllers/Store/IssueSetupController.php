@@ -32,6 +32,10 @@ class IssueSetupController extends Controller
 {
     use AuthorizesStoreCorrections;
 
+    /** Section this controller belongs to, for the section-scoped correction
+     *  permissions. The flat store.edit / store.delete still apply too. */
+    protected string $storeSection = 'store.setup';
+
     /**
      * Whitelist of editable masters. The key is the URL segment; nothing
      * outside this map can ever be reached.

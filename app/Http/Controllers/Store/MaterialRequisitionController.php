@@ -18,6 +18,10 @@ class MaterialRequisitionController extends Controller
 {
     use AuthorizesStoreCorrections;
 
+    /** Section this controller belongs to, for the section-scoped correction
+     *  permissions. The flat store.edit / store.delete still apply too. */
+    protected string $storeSection = 'material.requisitions';
+
     public function index(Request $request)
     {
         $requisitions = MaterialRequisition::with(['requestedBy', 'approvedBy'])

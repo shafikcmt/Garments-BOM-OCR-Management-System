@@ -35,6 +35,10 @@ class StockIssueController extends Controller
 {
     use AuthorizesStoreCorrections, ResolvesIssueSetupMasters;
 
+    /** Section this controller belongs to, for the section-scoped correction
+     *  permissions. The flat store.edit / store.delete still apply too. */
+    protected string $storeSection = 'store.issues';
+
     /**
      * Header dropdowns, entered once per transaction. Each accepts an existing
      * id or a typed-in "new:<name>".
