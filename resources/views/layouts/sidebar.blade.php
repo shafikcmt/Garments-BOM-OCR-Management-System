@@ -308,13 +308,6 @@
                         </a>
                     </li>
                     @endif
-                    @if($seeStoreReports)
-                    <li class="sidebar-item">
-                        <a href="{{ route('store.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Reports</span></span>
-                        </a>
-                    </li>
-                    @endif
                     @if($seeTeamManagement)
                     <li class="sidebar-item">
                         <a href="{{ route('admin.users.index') }}" class="sidebar-nav-link {{ request()->routeIs('admin.users.*') ? 'is-active' : '' }}">
@@ -378,7 +371,7 @@
                 </ul>
             </div>
             @endif
-            @if($seeMaterialStock)
+            @if($seeMaterialStock || $seeStoreReports)
             <div class="sidebar-section">
                 <div class="sidebar-section-label">Buyer / Style Stock</div>
                 <ul class="sidebar-list">
@@ -407,6 +400,15 @@
                     <li class="sidebar-item">
                         <a href="{{ route('store.material.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.requisitions.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Requisitions</span></span>
+                        </a>
+                    </li>
+                    @endif
+                    {{-- Stock Reports is style-wise stock data, so it belongs with
+                         the other Buyer / Style screens rather than Main Menu. --}}
+                    @if($seeStoreReports)
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Reports</span></span>
                         </a>
                     </li>
                     @endif
