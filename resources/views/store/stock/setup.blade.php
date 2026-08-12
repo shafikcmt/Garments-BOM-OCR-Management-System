@@ -40,26 +40,16 @@
         ['label' => 'Master Setup'],
     ]" />
 
-    <div class="app-hero-card p-4 mb-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon gx-stock-hero-icon"><i class="bi bi-sliders" aria-hidden="true"></i></span>
-                <div>
-                    <div class="app-hero-eyebrow">General Stock</div>
-                    <h3 class="app-hero-title mb-0">Master Setup</h3>
-                    <p class="app-hero-copy mb-0">The lists behind the purchase, issue and item forms.</p>
-                </div>
-            </div>
-            <div class="d-flex gap-2">
-                <a href="{{ route('store.stock.purchases.index') }}" class="btn btn-outline-secondary"><i class="bi bi-truck me-1" aria-hidden="true"></i>Receiving</a>
-                <a href="{{ route('store.stock.issues.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Issues</a>
-                <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Items</a>
-            </div>
-        </div>
-    </div>
-
     @include('store.stock._stock-ui')
 
+    <x-page-header icon="sliders" eyebrow="General Stock" title="Master Setup"
+                   copy="The lists behind the purchase, issue and item forms.">
+        <x-slot:actions>
+            <a href="{{ route('store.stock.purchases.index') }}" class="btn btn-outline-secondary"><i class="bi bi-truck me-1" aria-hidden="true"></i>Receiving</a>
+            <a href="{{ route('store.stock.issues.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Issues</a>
+            <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Items</a>
+        </x-slot:actions>
+    </x-page-header>
 
     @include('store._flash')
 
@@ -251,14 +241,14 @@
                                                          methods enforce the same check server-side. --}}
                                                     <td class="text-end gx-stock-actions">
                                                         @if($canEdit)
-                                                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                                                            <button type="button" class="btn btn-sm btn-outline-primary"
                                                                     data-bs-toggle="modal" data-bs-target="#edit-{{ $key }}-{{ $row->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
                                                         @endif
                                                         @if($canDelete)
                                                             <form method="POST" action="{{ $destroyUrl($key, $row) }}" class="d-inline"
                                                                   onsubmit="return confirm('Remove &quot;{{ $row->name }}&quot; from the list?');">
                                                                 @csrf @method('DELETE')
-                                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                                             </form>
                                                         @endif
                                                         @if(! $canEdit && ! $canDelete)

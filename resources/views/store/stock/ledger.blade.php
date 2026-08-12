@@ -8,6 +8,11 @@
     $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
     $date = fn ($v) => $v ? $v->format('d-M-y') : '—';
 
+    // Drives the Clear button only — the filtering itself is the controller's.
+    // ->filter() with no callback so an unticked "include inactive" (false) and
+    // a blank box do not count as a filter being applied.
+    $hasFilters = collect($filters)->filter()->isNotEmpty();
+
     $badges = [
         'out' => ['bg-danger text-white', 'bi-x-octagon'],
         'place_order' => ['bg-danger-subtle text-danger', 'bi-cart-plus'],
@@ -24,31 +29,19 @@
         ['label' => 'Stock Report'],
     ]" />
 
-    <div class="app-hero-card p-4 mb-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon gx-stock-hero-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
-                <div>
-                    <div class="app-hero-eyebrow">General Stock</div>
-                    <h3 class="app-hero-title mb-0">Stock Report</h3>
-                    <p class="app-hero-copy mb-0">Opening + Addition − Consumption = Stock as on Date · {{ $monthLabel }}</p>
-                </div>
-            </div>
-            <div class="d-flex gap-2">
-                <a href="{{ route('store.stock.ledger.pdf', request()->query()) }}"
-                   class="btn btn-outline-secondary" title="Download this report as PDF">
-                    <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF
-                </a>
-                <a href="{{ route('store.stock.ledger.excel', request()->query()) }}"
-                   class="btn btn-outline-secondary" title="Download this report as Excel">
-                    <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel
-                </a>
-            </div>
-        </div>
-    </div>
-
     @include('store.stock._stock-ui')
 
+    <x-page-header icon="journal-text" eyebrow="General Stock" title="Stock Report"
+                   copy="Opening + Addition − Consumption = Stock as on Date · {{ $monthLabel }}">
+        <x-slot:actions>
+            <a href="{{ route('store.stock.ledger.pdf', request()->query()) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Download PDF
+            </a>
+            <a href="{{ route('store.stock.ledger.excel', request()->query()) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Download Excel
+            </a>
+        </x-slot:actions>
+    </x-page-header>
 
     @include('store._flash')
 
@@ -81,51 +74,6 @@
         @endforeach
     </div>
 
-    <div class="card gx-stock-card mb-4">
-        <div class="gx-stock-card-body">
-            <form method="GET" class="row g-3 gx-stock-filter">
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="ledgerFilterMonth">Month</label>
-                    <input type="month" id="ledgerFilterMonth" name="month" value="{{ $month }}" class="form-control">
-                </div>
-                <div class="col-6 col-md-3">
-                    <label class="form-label" for="ledgerFilterSearch">Search</label>
-                    <input id="ledgerFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item, brand, size or category">
-                </div>
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="ledgerFilterCategory">Category</label>
-                    <select id="ledgerFilterCategory" name="category" class="form-select js-searchable">
-                        <option value="">All</option>
-                        @foreach($categories as $category)
-                            <option value="{{ $category }}" @selected(($filters['category'] ?? '') === $category)>{{ $category }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-6 col-md-2">
-                    <label class="form-label" for="ledgerFilterStatus">Status</label>
-                    <select id="ledgerFilterStatus" name="status" class="form-select">
-                        <option value="">All</option>
-                        <option value="attention" @selected(($filters['status'] ?? '') === 'attention')>Needs Attention</option>
-                        @foreach($statusLabels as $key => $label)
-                            <option value="{{ $key }}" @selected(($filters['status'] ?? '') === $key)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-6 col-md-2">
-                    <div class="form-check">
-                        <input type="hidden" name="include_inactive" value="0">
-                        <input class="form-check-input" type="checkbox" name="include_inactive" value="1" id="includeInactive"
-                               @checked($filters['include_inactive'] ?? false)>
-                        <label class="form-check-label" for="includeInactive">Include inactive items</label>
-                    </div>
-                </div>
-                <div class="col-12 col-md-1 d-grid">
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     @if($actionList->isNotEmpty() && empty($filters['status']))
         <div class="alert alert-warning border-0 shadow-sm rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
             <span>
@@ -145,6 +93,57 @@
                     Closing Stock Value: <strong class="text-slate-900">{{ $money($summary['closing_value']) }}</strong>
                 </div>
             </div>
+
+            {{-- Filters sit inside the card they narrow, the same as every other
+                 General Stock list. As a separate card above they read as their
+                 own step and cost a full card's padding of vertical room. --}}
+            <form method="GET" class="row g-3 gx-stock-filter mb-4">
+                {{-- Six controls, so the row is laid out as 3 + 3 at tablet width
+                     and a single run of 6 at desktop. Each breakpoint adds to a
+                     full 12, which is what stops the last column stranding a
+                     third of the card empty. --}}
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="ledgerFilterMonth">Month</label>
+                    <input type="month" id="ledgerFilterMonth" name="month" value="{{ $month }}" class="form-control">
+                </div>
+                <div class="col-12 col-md-4 col-xl-2">
+                    <label class="form-label" for="ledgerFilterSearch">Search</label>
+                    <input id="ledgerFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item or brand">
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="ledgerFilterCategory">Category</label>
+                    <select id="ledgerFilterCategory" name="category" class="form-select js-searchable">
+                        <option value="">All</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category }}" @selected(($filters['category'] ?? '') === $category)>{{ $category }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="ledgerFilterStatus">Status</label>
+                    <select id="ledgerFilterStatus" name="status" class="form-select">
+                        <option value="">All</option>
+                        <option value="attention" @selected(($filters['status'] ?? '') === 'attention')>Needs Attention</option>
+                        @foreach($statusLabels as $key => $label)
+                            <option value="{{ $key }}" @selected(($filters['status'] ?? '') === $key)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <div class="form-check">
+                        <input type="hidden" name="include_inactive" value="0">
+                        <input class="form-check-input" type="checkbox" name="include_inactive" value="1" id="includeInactive"
+                               @checked($filters['include_inactive'] ?? false)>
+                        <label class="form-check-label" for="includeInactive">Include inactive items</label>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4 col-xl-2 gx-stock-filter-actions">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
+                    @if($hasFilters)
+                        <a href="{{ route('store.stock.ledger') }}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear</a>
+                    @endif
+                </div>
+            </form>
 
             {{-- 19 columns, same order as the reference sheet. The wrapper
                  scrolls on its own so the page body never scrolls sideways. --}}

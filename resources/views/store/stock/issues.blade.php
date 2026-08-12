@@ -57,35 +57,26 @@
         ['label' => 'Issues'],
     ]" />
 
-    <div class="app-hero-card p-4 mb-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon gx-stock-hero-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span>
-                <div>
-                    <div class="app-hero-eyebrow">General Stock</div>
-                    <h3 class="app-hero-title mb-0">Issues (Consumption)</h3>
-                </div>
-            </div>
-            <div class="d-flex flex-wrap gap-2">
-                <a href="{{ route('store.stock.issues.report') }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-file-earmark-bar-graph me-1" aria-hidden="true"></i>Report
-                </a>
-                {{-- Import needs the same right as recording an issue by hand,
-                     because that is what it does. Hidden rather than shown and
-                     refused for a view-only user. --}}
-                @can('store.issues.create')
-                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importIssuesModal">
-                        <i class="bi bi-upload me-1" aria-hidden="true"></i>Import
-                    </button>
-                @endcan
-                <a href="{{ route('store.stock.issue-setup.index') }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1" aria-hidden="true"></i>Issue Setup</a>
-                <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Items</a>
-            </div>
-        </div>
-    </div>
-
     @include('store.stock._stock-ui')
 
+    <x-page-header icon="box-arrow-up" eyebrow="General Stock" title="Issues (Consumption)"
+                   copy="What has left the store, against the requisition that asked for it.">
+        <x-slot:actions>
+            <a href="{{ route('store.stock.issues.report') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-bar-graph me-1" aria-hidden="true"></i>Report
+            </a>
+            {{-- Import needs the same right as recording an issue by hand,
+                 because that is what it does. Hidden rather than shown and
+                 refused for a view-only user. --}}
+            @can('store.issues.create')
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importIssuesModal">
+                    <i class="bi bi-upload me-1" aria-hidden="true"></i>Import
+                </button>
+            @endcan
+            <a href="{{ route('store.stock.issue-setup.index') }}" class="btn btn-outline-secondary"><i class="bi bi-sliders me-1" aria-hidden="true"></i>Issue Setup</a>
+            <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Items</a>
+        </x-slot:actions>
+    </x-page-header>
 
     @include('store._flash')
 
@@ -321,11 +312,12 @@
                         </template>
 
                         <style>
-                            /* Item lines table. Uses the app's own spacing and
-                               colour scale — no new design language. */
-                            .gx-line-scroll { overflow-x: auto; }
-
-                            .gx-line-table { border-collapse: separate; border-spacing: 0; }
+                            {{-- The item-lines table's own look — header, row
+                                 tint, hover, line number, action padding — was
+                                 declared here AND on the Receiving screen. It
+                                 now lives once in _stock-ui. What is left below
+                                 is only what this screen genuinely needs on top
+                                 of it. --}}
 
                             /* The <colgroup> above declares the column widths,
                                but under the default `table-layout: auto` they
@@ -347,44 +339,9 @@
                                 min-width: 1216px !important;
                             }
 
-                            .gx-line-table thead th {
-                                font-size: .68rem;
-                                text-transform: uppercase;
-                                letter-spacing: .04em;
-                                font-weight: 750;
-                                color: #64748b;
-                                background: #f8fafc;
-                                border-bottom: 1px solid #e2e8f0;
-                                padding: .6rem .55rem;
-                                white-space: nowrap;
-                            }
-                            .gx-line-table thead th:first-child { border-top-left-radius: 10px; }
-                            .gx-line-table thead th:last-child { border-top-right-radius: 10px; }
-
-                            .gx-line-table tbody td {
-                                padding: .55rem;
-                                border-bottom: 1px solid #eef2f7;
-                                vertical-align: top;
-                            }
-                            /* Alternating tint so a long list stays scannable. */
-                            .gx-line-table tbody tr:nth-child(even) td { background: #fcfdff; }
-                            .gx-line-table tbody tr:hover td { background: #f5f9ff; }
-
-                            .gx-line-no {
-                                font-size: .78rem;
-                                font-weight: 700;
-                                color: #94a3b8;
-                                padding-top: .95rem !important;
-                            }
-
-                            {{-- The row's auto-filled Uom now uses the shared
+                            {{-- The row's auto-filled Uom uses the shared
                                  .gx-stock-readonly (plus .text-center) instead of
                                  a local copy that set the same five properties. --}}
-
-                            .gx-line-action { padding-left: 1.25rem !important; }
-
-                            .gx-line-table .js-line-alert:empty { display: none; }
-                            .gx-line-table .js-line-alert .badge { font-weight: 650; }
 
                             {{-- The opt-out that used to live here, rescuing only
                                  this form's submit button from the icon-only
@@ -413,18 +370,21 @@
                             <label class="form-label" for="issueFilterMonth">Month</label>
                             <input type="month" id="issueFilterMonth" name="month" value="{{ $filters['month'] ?? '' }}" class="form-control">
                         </div>
-                        <div class="col-6 col-md-4">
+                        {{-- Search takes the room the row has left rather than
+                             stopping at a third of it and stranding the rest. --}}
+                        <div class="col-6 col-md-7">
                             <label class="form-label" for="issueFilterSearch">Search</label>
                             <input id="issueFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control"
                                    placeholder="Item or requisition no">
                         </div>
-                        <div class="col-12 col-md-2 d-flex gap-2">
-                            <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
+                        <div class="col-12 col-md-2 gx-stock-filter-actions">
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
                             @if($hasFilters)
-                                <a href="{{ route('store.stock.issues.index') }}" class="btn btn-outline-secondary">Clear</a>
+                                <a href="{{ route('store.stock.issues.index') }}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear</a>
                             @endif
                         </div>
                     </form>
+
                     <div class="table-responsive">
                         <table class="table align-middle gx-stock-table">
                             <thead>
@@ -463,7 +423,7 @@
                                             @if($canDelete)
                                                 <form method="POST" action="{{ route('store.stock.issues.destroy', $i) }}" onsubmit="return confirm('Remove this issue?');">
                                                     @csrf @method('DELETE')
-                                                    <button class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                                 </form>
                                             @else
                                                 <span class="text-muted small">—</span>
@@ -471,10 +431,14 @@
                                         </td>
                                     </tr>
                                 @empty
+                                    {{-- Says which of the two empties this is, the
+                                         same as every other General Stock list:
+                                         "nothing matched" and "nothing yet" call
+                                         for different next steps. --}}
                                     <tr><td colspan="10" class="gx-stock-empty">
-                                            <span class="gx-stock-empty-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span>
-                                            <div class="gx-stock-empty-title">No issues recorded yet</div>
-                                            <div class="gx-stock-empty-hint">Record an issue using the form above.</div>
+                                            <span class="gx-stock-empty-icon"><i class="bi bi-{{ $hasFilters ? 'search' : 'box-arrow-up' }}" aria-hidden="true"></i></span>
+                                            <div class="gx-stock-empty-title">{{ $hasFilters ? 'No issues match this filter' : 'No issues recorded yet' }}</div>
+                                            <div class="gx-stock-empty-hint">{{ $hasFilters ? 'Try a different month or search.' : 'Record an issue using the form above.' }}</div>
                                         </td></tr>
                                 @endforelse
                             </tbody>

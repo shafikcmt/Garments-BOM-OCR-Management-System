@@ -149,6 +149,19 @@
     .gx-stock-filter .ts-wrapper.form-select { min-height: 36px; }
     /* The submit button sat 1.5px short of the fields it lines up with. */
     .gx-stock-filter .btn { min-height: 36px; }
+    /* The Filter / Clear pair that closes every filter row. Was written four
+       different ways — `d-grid`, `flex-fill`, `flex-grow-1`, and one screen with
+       no Clear at all — so the buttons landed at a different width and a
+       different offset on each screen. One class now owns the pair: Filter takes
+       the room, Clear takes only what its label needs. */
+    .gx-stock-filter-actions {
+        display: flex;
+        align-items: end;
+        gap: .5rem;
+    }
+    .gx-stock-filter-actions .btn { flex: 1 1 auto; justify-content: center; }
+    .gx-stock-filter-actions .btn-outline-secondary { flex: 0 0 auto; }
+
     /* A checkbox has no label above it, so it needs to be pushed down to sit
        on the same baseline as the inputs beside it. Was an `mt-4` guess. */
     .gx-stock-filter .form-check {
@@ -349,6 +362,67 @@
     .gx-stock-table td.gx-stock-actions .btn + form,
     .gx-stock-table td.gx-stock-actions form + form { margin-left: .4rem; }
 
+    /* Row actions — View / Edit / Delete — are pills, so they read as a set and
+       never as the table's own borders. Every screen was writing this as
+       `rounded-pill px-3` on each button, which is nine copies of one decision
+       and one more thing to forget on the next screen. Specificity has to clear
+       the icon-button opt-out further down this file, which sets a 9px radius
+       with !important; the extra class on the left does that. */
+    .content .gx-stock-scope td.gx-stock-actions :is(a, button).btn:has(> i.bi),
+    .content .gx-stock-scope td.gx-stock-actions :is(a, button).btn {
+        border-radius: 999px !important;
+        padding-left: .85rem !important;
+        padding-right: .85rem !important;
+    }
+
+    /* --- Item line grid --------------------------------------------------
+     * The editable table inside Record Receiving and Record Issue. Both screens
+     * carried their own copy of these rules and the two had already drifted —
+     * one had a row hover, the other did not. Declared once here; the pieces
+     * that genuinely differ (Record Issue needs a fixed layout, Receiving has an
+     * expandable detail row) stay on their own screen.
+     */
+    .gx-line-scroll { overflow-x: auto; }
+
+    .gx-line-table { border-collapse: separate; border-spacing: 0; }
+
+    .gx-line-table thead th {
+        font-size: .68rem;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        font-weight: 750;
+        color: #64748b;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        padding: .6rem .55rem;
+        white-space: nowrap;
+    }
+    .gx-line-table thead th:first-child { border-top-left-radius: 10px; }
+    .gx-line-table thead th:last-child { border-top-right-radius: 10px; }
+
+    .gx-line-table tbody td {
+        padding: .55rem;
+        border-bottom: 1px solid #eef2f7;
+        vertical-align: top;
+    }
+    /* Alternating tint so a long list stays scannable, and a hover so the line
+       being typed into is obvious. */
+    .gx-line-table tbody tr:nth-child(even) td { background: #fcfdff; }
+    .gx-line-table tbody tr:hover td { background: #f5f9ff; }
+
+    .gx-line-no {
+        font-size: .78rem;
+        font-weight: 700;
+        color: #94a3b8;
+        padding-top: .95rem !important;
+    }
+    /* Remove sits away from the field beside it, so a fast click on the last
+       input cannot land on it. */
+    .gx-line-action { padding-left: 1.25rem !important; }
+
+    .gx-line-table .js-line-alert:empty { display: none; }
+    .gx-line-table .js-line-alert .badge { font-weight: 650; }
+
     /* --- Sideways scrolling ----------------------------------------------
      * The Stock Report is 21 columns wide, so it always scrolls. The browser
      * default scrollbar is thin, grey and only appears mid-scroll on Windows,
@@ -472,6 +546,45 @@
         display: block;
         height: 100%;
         border-radius: 999px;
+        /* Falls back to the neutral tone when no status class is set, so a bar
+           is never drawn with no colour at all. */
+        background: #94a3b8;
+    }
+    /* The fill colour was three hex values written inline on every row of the
+       Item Master, repeating a decision the status badge beside it had already
+       made. Named here instead, so the bar and the badge cannot drift. */
+    .gx-stock-health--danger > i  { background: #dc2626; }
+    .gx-stock-health--warning > i { background: #d97706; }
+    .gx-stock-health--success > i { background: #16a34a; }
+
+    /* --- Filter chips ----------------------------------------------------
+     * The counts above a list — "12 Out of Stock", "8 Place Order" — are
+     * links that re-run the list filtered to themselves. Drawn as plain
+     * badges they looked exactly like the static status pills in the rows
+     * below, so nothing said they could be clicked, and nothing said which
+     * one was currently applied.
+     */
+    .gx-stock-chip {
+        text-decoration: none;
+        border: 1px solid transparent;
+        transition: box-shadow .12s ease, border-color .12s ease;
+    }
+    .gx-stock-chip:hover { box-shadow: 0 1px 2px rgba(15, 23, 42, .10); border-color: currentColor; }
+    .gx-stock-chip:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+    /* The filter this list is narrowed to. */
+    .gx-stock-chip[aria-current] {
+        border-color: currentColor;
+        box-shadow: 0 0 0 3px rgba(15, 23, 42, .07);
+    }
+
+    /* Two pills in one cell — a status and, rarely, "Inactive" — sit side by
+       side and wrap only when they have to, rather than the second always
+       taking a line of its own and making every row in the table taller. */
+    .gx-stock-pills {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .25rem;
     }
 
     /* --- Grouped form --------------------------------------------------

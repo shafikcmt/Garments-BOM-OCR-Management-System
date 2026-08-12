@@ -18,30 +18,21 @@
         ['label' => 'Receiving'],
     ]" />
 
-    <div class="app-hero-card p-4 mb-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon gx-stock-hero-icon"><i class="bi bi-truck" aria-hidden="true"></i></span>
-                <div>
-                    <div class="app-hero-eyebrow">General Stock</div>
-                    <h3 class="app-hero-title mb-0">Receiving</h3>
-                </div>
-            </div>
-            <div class="d-flex flex-wrap gap-2">
-                <a href="{{ route('store.stock.purchases.report') }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-file-earmark-bar-graph me-1" aria-hidden="true"></i>Report
-                </a>
-                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importReceivingModal">
-                    <i class="bi bi-upload me-1" aria-hidden="true"></i>Import
-                </button>
-                <a href="{{ route('store.stock.ledger') }}" class="btn btn-outline-secondary"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>Stock Report</a>
-                <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Items</a>
-            </div>
-        </div>
-    </div>
-
     @include('store.stock._stock-ui')
 
+    <x-page-header icon="truck" eyebrow="General Stock" title="Receiving"
+                   copy="Goods received against a challan, recorded one delivery at a time.">
+        <x-slot:actions>
+            <a href="{{ route('store.stock.purchases.report') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-bar-graph me-1" aria-hidden="true"></i>Report
+            </a>
+            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importReceivingModal">
+                <i class="bi bi-upload me-1" aria-hidden="true"></i>Import
+            </button>
+            <a href="{{ route('store.stock.ledger') }}" class="btn btn-outline-secondary"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>Stock Report</a>
+            <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Items</a>
+        </x-slot:actions>
+    </x-page-header>
 
     @include('store._flash')
 
@@ -243,15 +234,17 @@
                     <label class="form-label" for="purchaseFilterMonth">Month</label>
                     <input type="month" id="purchaseFilterMonth" name="month" value="{{ $filters['month'] ?? '' }}" class="form-control">
                 </div>
-                <div class="col-6 col-md-4">
+                {{-- Search takes the room the row has left rather than stopping
+                     at a third of it and stranding the rest. --}}
+                <div class="col-6 col-md-7">
                     <label class="form-label" for="purchaseFilterSearch">Search</label>
                     <input id="purchaseFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control"
                            placeholder="Item, challan, RV, supplier">
                 </div>
-                <div class="col-12 col-md-2 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
+                <div class="col-12 col-md-2 gx-stock-filter-actions">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
                     @if($hasFilters)
-                        <a href="{{ route('store.stock.purchases.index') }}" class="btn btn-outline-secondary">Clear</a>
+                        <a href="{{ route('store.stock.purchases.index') }}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear</a>
                     @endif
                 </div>
             </form>
@@ -300,7 +293,7 @@
                                 <td class="text-end">{{ $qty($group->group_total_qty) }}</td>
                                 <td class="text-end fw-semibold">{{ $money($group->group_total_value) }}</td>
                                 <td class="text-end gx-stock-actions">
-                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                                    <button type="button" class="btn btn-sm btn-outline-primary"
                                             data-bs-toggle="collapse" data-bs-target="#{{ $paneId }}"
                                             aria-expanded="false" aria-controls="{{ $paneId }}"
                                             data-rv-toggle>
@@ -345,7 +338,7 @@
                                                                     <form method="POST" action="{{ route('store.stock.purchases.destroy', $line) }}" class="d-inline"
                                                                           onsubmit="return confirm('Remove {{ addslashes(optional($line->stockItem)->name ?? 'this item') }} from this receiving? The other items on it are kept.');">
                                                                         @csrf @method('DELETE')
-                                                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                                                     </form>
                                                                 @else
                                                                     <span class="text-muted small">—</span>
@@ -416,20 +409,11 @@
     @include('store.stock._searchable')
 
     <style>
-        /* Item lines table — same treatment as Record Issue. */
-        .gx-line-scroll { overflow-x: auto; }
-        .gx-line-table { border-collapse: separate; border-spacing: 0; }
-        .gx-line-table thead th {
-            font-size: .68rem; text-transform: uppercase; letter-spacing: .04em;
-            font-weight: 750; color: #64748b; background: #f8fafc;
-            border-bottom: 1px solid #e2e8f0; padding: .6rem .55rem; white-space: nowrap;
-        }
-        .gx-line-table thead th:first-child { border-top-left-radius: 10px; }
-        .gx-line-table thead th:last-child { border-top-right-radius: 10px; }
-        .gx-line-table tbody td { padding: .55rem; border-bottom: 1px solid #eef2f7; vertical-align: top; }
-        .gx-line-table tbody tr:nth-child(even) td { background: #fcfdff; }
-        .gx-line-no { font-size: .78rem; font-weight: 700; color: #94a3b8; padding-top: .95rem !important; }
-        .gx-line-action { padding-left: 1.25rem !important; }
+        {{-- The item-lines table (.gx-line-scroll / .gx-line-table / .gx-line-no
+             / .gx-line-action) was declared here AND on the Record Issue screen,
+             and the two copies had already drifted — one had a row hover, the
+             other did not. Both now read the one definition in _stock-ui. Only
+             what is genuinely local to this screen is left below. --}}
 
         /* The expanded lines of one receiving. */
         .gx-rv-detail > td { border-bottom: 0 !important; background: #f8fafc !important; }

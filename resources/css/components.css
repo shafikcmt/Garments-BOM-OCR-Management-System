@@ -1142,3 +1142,113 @@ button:focus-visible,
     .sidebar-collapse-btn .sidebar-icon i,
     body.sidebar-collapsed [data-tip]::after { transition: none; }
 }
+
+/* --- Pagination -----------------------------------------------------------
+ * Drawn by resources/views/vendor/pagination/gx.blade.php, which
+ * AppServiceProvider registers as the default paginator view for every
+ * paginated screen. Replaces Laravel's stock Tailwind paginator, which was
+ * being rendered inside this Bootstrap-5 UI and carried a border radius, a
+ * focus ring and a set of dark-mode variants that appear nowhere else here.
+ */
+.gx-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    /* The summary and the controls read as one statement, so they sit together
+       with a normal gap. Laravel's view spread them to opposite edges with
+       justify-between, which on a container-fluid table left a hand's width of
+       nothing between "of 105" and the page buttons. */
+    justify-content: flex-end;
+    gap: .5rem 1rem;
+    /* No margin-top: most screens already wrap links() in an .mt-3, and adding
+       another rem here would double the gap on every one of them. The rule and
+       its padding are what separate this from the table. */
+    padding-top: .9rem;
+    border-top: 1px solid #eef2f7;
+}
+
+/* Takes the slack, so the summary stays left and the controls stay right —
+   but the two only separate as far as the row actually needs. */
+.gx-pagination-summary {
+    margin: 0;
+    margin-right: auto;
+    font-size: .78rem;
+    color: #64748b;
+}
+.gx-pagination-summary strong {
+    font-weight: 700;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+}
+
+.gx-pagination-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .3rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.gx-page {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 .6rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    background: #fff;
+    color: #475569;
+    font-size: .8rem;
+    font-weight: 650;
+    text-decoration: none;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+    transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+}
+a.gx-page:hover { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; }
+a.gx-page:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
+
+/* The page you are on. Solid rather than outlined, so it is findable at a
+   glance in a row of otherwise identical buttons. */
+.gx-page.is-active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
+}
+
+/* Prev on page 1, Next on the last page. Rendered as a <span>, so it is already
+   unreachable by keyboard; this is what says so to the eye. */
+.gx-page.is-disabled {
+    background: #f8fafc;
+    color: #cbd5e1;
+    border-color: #eef2f7;
+    cursor: default;
+}
+
+/* The "..." gap, and the narrow-screen page position. Not a control. */
+.gx-page.is-gap {
+    border-color: transparent;
+    background: transparent;
+    color: #94a3b8;
+}
+
+/* The page position stands in for the numbers only where they are hidden. */
+.gx-page-of { display: none; }
+
+@media (max-width: 575.98px) {
+    /* Seven numbers plus two arrows do not fit a phone without wrapping into a
+       block, so the numbers give way to "3 / 5" and the arrows do the paging. */
+    .gx-page-number { display: none; }
+    .gx-page-of { display: inline-flex; }
+
+    .gx-pagination { justify-content: center; }
+    .gx-pagination-summary {
+        margin-right: 0;
+        flex: 1 1 100%;
+        text-align: center;
+    }
+}

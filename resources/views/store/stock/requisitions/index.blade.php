@@ -26,31 +26,23 @@
         ['label' => 'Purchase Requisition'],
     ]" />
 
-    <div class="app-hero-card p-4 mb-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon gx-stock-hero-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
-                <div>
-                    <div class="app-hero-eyebrow">General Stock</div>
-                    <h3 class="app-hero-title mb-0">Purchase Requisition</h3>
-                    <p class="app-hero-copy mb-0">What the departments have asked to be bought, and where each request stands.</p>
-                </div>
-            </div>
-            <div class="d-flex flex-wrap gap-2">
-                <a href="{{ route('store.stock.requisitions.report') }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Monthly Report
-                </a>
-                {{-- One entry form covers both cases: a one-item requisition is
-                     simply this form with a single line, so there is nothing for
-                     a separate "Single Item" button to open. --}}
-                <a href="{{ route('store.stock.requisitions.create') }}" class="btn btn-primary">
-                    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>New Requisition
-                </a>
-            </div>
-        </div>
-    </div>
-
     @include('store.stock._stock-ui')
+
+    <x-page-header icon="clipboard-check" eyebrow="General Stock" title="Purchase Requisition"
+                   copy="What the departments have asked to be bought, and where each request stands.">
+        <x-slot:actions>
+            <a href="{{ route('store.stock.requisitions.report') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Monthly Report
+            </a>
+            {{-- One entry form covers both cases: a one-item requisition is
+                 simply this form with a single line, so there is nothing for
+                 a separate "Single Item" button to open. --}}
+            <a href="{{ route('store.stock.requisitions.create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>New Requisition
+            </a>
+        </x-slot:actions>
+    </x-page-header>
+
     @include('store._flash')
 
     <div class="card gx-stock-card">
@@ -86,8 +78,8 @@
                     <label class="form-label" for="search">Search</label>
                     <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Requisition no, requester or item">
                 </div>
-                <div class="col-12 col-xl-2 d-flex gap-2">
-                    <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
+                <div class="col-12 col-xl-2 gx-stock-filter-actions">
+                    <button class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
                     @if($hasFilters)
                         <a href="{{ route('store.stock.requisitions.index') }}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear</a>
                     @endif
@@ -130,11 +122,11 @@
                                     <span class="badge {{ $class }}"><i class="bi {{ $icon }} me-1" aria-hidden="true"></i>{{ $statusLabels[$r->status] ?? $r->status }}</span>
                                 </td>
                                 <td class="text-end gx-stock-actions">
-                                    <a href="{{ route('store.stock.requisitions.show', $r) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                                    <a href="{{ route('store.stock.requisitions.show', $r) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-eye me-1" aria-hidden="true"></i>View
                                     </a>
                                     @if($r->isEditable())
-                                        <a href="{{ route('store.stock.requisitions.edit', $r) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                                        <a href="{{ route('store.stock.requisitions.edit', $r) }}" class="btn btn-sm btn-outline-secondary">
                                             <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
                                         </a>
                                     @endif

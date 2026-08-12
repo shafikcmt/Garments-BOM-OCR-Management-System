@@ -45,15 +45,23 @@ a.gx-stat:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(15, 
    pointer rather than only its outline. */
 .gx-stat:not(a):hover .gx-stat-icon { background: var(--gx-tone, var(--gx-secondary)); color: #fff; }
 
-.gx-stat-head {
+/* Icon, figure and label on one row. The icon used to sit in a row of its own
+   (.gx-stat-head, 12px above the number), which left it reading as a badge
+   floating over the tile rather than as the label for the figure beside it. */
+.gx-stat-main {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 14px;
 }
 
+/* min-width:0 lets a long label — "Pending purchase requisitions" — wrap inside
+   the tile. Without it a flex child refuses to shrink below its content and the
+   label would push the icon out of shape instead. */
+.gx-stat-text { min-width: 0; }
+
 .gx-stat-icon {
+    /* Fixed basis, so the circle keeps its shape next to a label that wraps. */
+    flex: 0 0 42px;
     width: 42px;
     height: 42px;
     border-radius: 13px;
@@ -67,6 +75,9 @@ a.gx-stat:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(15, 
 }
 
 .gx-stat-delta {
+    /* Sits at the far end of the row, clear of the figure. */
+    margin-left: auto;
+    align-self: flex-start;
     display: inline-flex;
     align-items: center;
     font-size: 12px;

@@ -9,11 +9,14 @@
     // thresholds behind them, come from GeneralStockReportService — this array
     // only decides how each one is drawn. Labels match the Stock Report word
     // for word so the two screens never call the same state two things.
+    // `tone` names the health bar's colour class in _stock-ui rather than
+    // repeating the hex inline on every row — the bar and the badge beside it
+    // describe the same state, so they read the state from one place.
     $statusMeta = [
-        StockStatus::STATUS_OUT => ['label' => 'Out of Stock', 'badge' => 'bg-danger text-white', 'bar' => '#dc2626'],
-        StockStatus::STATUS_PLACE_ORDER => ['label' => 'Place Order', 'badge' => 'bg-danger-subtle text-danger', 'bar' => '#dc2626'],
-        StockStatus::STATUS_LOW => ['label' => 'Low Stock', 'badge' => 'bg-warning-subtle text-warning-emphasis', 'bar' => '#d97706'],
-        StockStatus::STATUS_OK => ['label' => 'Ok', 'badge' => 'bg-success-subtle text-success', 'bar' => '#16a34a'],
+        StockStatus::STATUS_OUT => ['label' => 'Out of Stock', 'badge' => 'bg-danger text-white', 'tone' => 'danger'],
+        StockStatus::STATUS_PLACE_ORDER => ['label' => 'Place Order', 'badge' => 'bg-danger-subtle text-danger', 'tone' => 'danger'],
+        StockStatus::STATUS_LOW => ['label' => 'Low Stock', 'badge' => 'bg-warning-subtle text-warning-emphasis', 'tone' => 'warning'],
+        StockStatus::STATUS_OK => ['label' => 'Ok', 'badge' => 'bg-success-subtle text-success', 'tone' => 'success'],
     ];
 
     // Trailing zeros trimmed so a whole-number qty reads "15", not "15.0000".
@@ -33,25 +36,16 @@
         ['label' => 'Item Master'],
     ]" />
 
-    <div class="app-hero-card p-4 mb-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <span class="app-stat-icon gx-stock-hero-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
-                <div>
-                    <div class="app-hero-eyebrow">General Stock</div>
-                    <h3 class="app-hero-title mb-0">Item Master</h3>
-                </div>
-            </div>
-            <div class="d-flex gap-2">
-                <a href="{{ route('store.stock.ledger') }}" class="btn btn-outline-secondary"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>Stock Report</a>
-                <a href="{{ route('store.stock.purchases.index') }}" class="btn btn-outline-secondary"><i class="bi bi-truck me-1" aria-hidden="true"></i>Receiving</a>
-                <a href="{{ route('store.stock.issues.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Issues</a>
-            </div>
-        </div>
-    </div>
-
     @include('store.stock._stock-ui')
 
+    <x-page-header icon="box-seam" eyebrow="General Stock" title="Item Master"
+                   copy="Every consumable the store carries, with what is on the shelf against its re-order level.">
+        <x-slot:actions>
+            <a href="{{ route('store.stock.ledger') }}" class="btn btn-outline-secondary"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>Stock Report</a>
+            <a href="{{ route('store.stock.purchases.index') }}" class="btn btn-outline-secondary"><i class="bi bi-truck me-1" aria-hidden="true"></i>Receiving</a>
+            <a href="{{ route('store.stock.issues.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>Issues</a>
+        </x-slot:actions>
+    </x-page-header>
 
     @include('store._flash')
 
@@ -77,9 +71,11 @@
         @endif
     @endforeach
 
-    {{-- Toolbar. Adding an item is now a button rather than a form that is
-         always open, which gives the list below the full page width. --}}
-    <div class="card gx-stock-card mb-3">
+    {{-- One card for the list: toolbar, then the filters that narrow it, then
+         the rows. The toolbar used to sit in a card of its own directly above
+         this one, which drew a seam across the screen between a heading and the
+         table it heads, and spent a second card's padding saying nothing. --}}
+    <div class="card gx-stock-card">
         <div class="gx-stock-card-body">
             <div class="gx-stock-toolbar mb-3">
                 <h5>Item Master</h5>
@@ -90,7 +86,7 @@
                 @foreach ([StockStatus::STATUS_OUT, StockStatus::STATUS_PLACE_ORDER, StockStatus::STATUS_LOW] as $chip)
                     @if(($statusCounts[$chip] ?? 0) > 0)
                         <a href="{{ route('store.stock.items.index', array_merge($activeFilters, ['status' => $chip])) }}"
-                           class="badge {{ $statusMeta[$chip]['badge'] }} text-decoration-none"
+                           class="badge gx-stock-chip {{ $statusMeta[$chip]['badge'] }}"
                            @if(($filters['status'] ?? '') === $chip) aria-current="true" @endif>
                             {{ $statusCounts[$chip] }} {{ $statusMeta[$chip]['label'] }}
                         </a>
@@ -107,7 +103,7 @@
                 </button>
             </div>
 
-            <form method="GET" class="row g-3 gx-stock-filter">
+            <form method="GET" class="row g-3 gx-stock-filter mb-4">
                 <div class="col-12 col-md-4">
                     <label class="form-label" for="itemFilterSearch">Search</label>
                     <input id="itemFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control"
@@ -132,18 +128,14 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-12 col-md-2 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
+                <div class="col-12 col-md-2 gx-stock-filter-actions">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
                     @if($hasFilters)
-                        <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary">Clear</a>
+                        <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear</a>
                     @endif
                 </div>
             </form>
-        </div>
-    </div>
 
-    <div class="card gx-stock-card">
-        <div class="gx-stock-card-body">
             <div class="table-responsive">
                 <table class="table align-middle gx-stock-table">
                     <thead>
@@ -181,8 +173,12 @@
                                     <div class="fw-bold text-slate-900">{{ $item->name }}</div>
                                     {{-- Category · Brand · Size on one line, blanks
                                          dropped so a sparse item does not read as
-                                         a row of dashes. --}}
-                                    <div class="small text-muted">
+                                         a row of dashes. Set with the section's
+                                         shared secondary-detail size, the same as
+                                         the specification under it and the same as
+                                         the Stock Report — it was a size larger
+                                         than the line below it in the same cell. --}}
+                                    <div class="gx-stock-micro">
                                         {{ collect([$item->category, $item->brand, $item->size])->filter()->implode(' · ') ?: '—' }}
                                     </div>
                                     @if($item->specification)
@@ -194,9 +190,9 @@
                                 <td class="text-end">
                                     <div class="fw-bold text-slate-900">{{ $qty($current) }}</div>
                                     @if($fill !== null)
-                                        <div class="gx-stock-health ms-auto"
+                                        <div class="gx-stock-health gx-stock-health--{{ $statusMeta[$status]['tone'] }} ms-auto"
                                              title="{{ $qty($current) }} against a re-order level of {{ $qty($reorder) }}">
-                                            <i style="width:{{ $fill }}%; background:{{ $statusMeta[$status]['bar'] }};"></i>
+                                            <i style="width:{{ $fill }}%;"></i>
                                         </div>
                                     @endif
                                 </td>
@@ -206,25 +202,30 @@
                                     {{ $item->reorder_level !== null ? $qty($item->reorder_level) : '—' }}
                                 </td>
                                 <td>
-                                    <span class="badge {{ $statusMeta[$status]['badge'] }}">{{ $statusMeta[$status]['label'] }}</span>
-                                    {{-- An inactive item still has a stock level, so
-                                         the two are shown together rather than one
-                                         replacing the other. --}}
-                                    @unless($item->is_active)
-                                        <div class="mt-1"><span class="badge bg-secondary-subtle text-secondary">Inactive</span></div>
-                                    @endunless
+                                    <div class="gx-stock-pills">
+                                        <span class="badge {{ $statusMeta[$status]['badge'] }}">{{ $statusMeta[$status]['label'] }}</span>
+                                        {{-- An inactive item still has a stock level, so
+                                             the two are shown together rather than one
+                                             replacing the other. Beside the status
+                                             rather than under it — on its own line it
+                                             set the height of every row in the table
+                                             for the sake of the rare inactive one. --}}
+                                        @unless($item->is_active)
+                                            <span class="badge bg-secondary-subtle text-secondary">Inactive</span>
+                                        @endunless
+                                    </div>
                                 </td>
                                 {{-- Edit and Delete are Admin / Management rights
                                      (store.edit / store.delete); both controller
                                      methods enforce the same check server-side. --}}
                                 <td class="text-end gx-stock-actions">
                                     @if($canEdit)
-                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#editItem{{ $item->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editItem{{ $item->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
                                     @endif
                                     @if($canDelete)
                                         <form method="POST" action="{{ route('store.stock.items.destroy', $item) }}" class="d-inline" onsubmit="return confirm('Remove this item?');">
                                             @csrf @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                         </form>
                                     @endif
                                     @if(! $canEdit && ! $canDelete)

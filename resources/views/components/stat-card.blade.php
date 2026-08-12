@@ -33,8 +33,25 @@
 <{{ $tag }} @if($href) href="{{ $href }}" @endif
     {{ $attributes->merge(['class' => 'gx-stat gx-stat--'.$tone]) }}>
 
-    <div class="gx-stat-head">
+    {{-- Icon, then the figure it belongs to, on one row. The icon used to sit
+         in a row of its own above the number, which read as a badge floating
+         over the tile rather than as part of what the tile says. --}}
+    <div class="gx-stat-main">
         <span class="gx-stat-icon" aria-hidden="true"><i class="bi bi-{{ $icon }}"></i></span>
+
+        <div class="gx-stat-text">
+            {{-- data-count-to drives the count-up; the text is already the final
+                 value so it stays correct with JS off or reduced motion on. --}}
+            <div class="gx-stat-value" @if($numeric) data-count-to="{{ $value }}" @endif>
+                {{ $numeric ? number_format((float) $value) : $value }}
+            </div>
+
+            <div class="gx-stat-label">{{ $label }}</div>
+
+            @if($delta !== null && $deltaLabel)
+                <div class="gx-stat-sub">{{ $deltaLabel }}</div>
+            @endif
+        </div>
 
         @if($delta !== null)
             <span class="gx-stat-delta {{ $isUp ? 'is-up' : 'is-down' }}">
@@ -42,18 +59,6 @@
             </span>
         @endif
     </div>
-
-    {{-- data-count-to drives the count-up; the text is already the final value
-         so it stays correct with JS off or reduced motion on. --}}
-    <div class="gx-stat-value" @if($numeric) data-count-to="{{ $value }}" @endif>
-        {{ $numeric ? number_format((float) $value) : $value }}
-    </div>
-
-    <div class="gx-stat-label">{{ $label }}</div>
-
-    @if($delta !== null && $deltaLabel)
-        <div class="gx-stat-sub">{{ $deltaLabel }}</div>
-    @endif
 
     @if(count($spark) > 1)
         <x-sparkline :points="$spark" :tone="$tone" />

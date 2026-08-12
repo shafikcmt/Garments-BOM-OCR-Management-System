@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,6 +22,27 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        /*
+         * Pagination is drawn in this application's own language.
+         *
+         * Laravel's default is `pagination::tailwind`, and it was never
+         * overridden — so every `{{ $rows->links() }}` in a Bootstrap-5 UI
+         * emitted a Tailwind paginator. It worked, because tailwind.config.js
+         * scans the vendor pagination views, but it looked like nothing else in
+         * the app and its `justify-between` left a hand's width of empty space
+         * between the record count and the page buttons on a wide screen.
+         *
+         * Set here rather than per screen, so all seventeen paginated screens
+         * agree without any of them carrying pagination markup of its own.
+         */
+        /*
+         * Deliberately resources/views/pagination, not the conventional
+         * resources/views/vendor/pagination: .gitignore carries a bare
+         * `vendor/`, which git matches at any depth, so a view published to the
+         * conventional path is ignored and would never reach the server.
+         */
+        Paginator::defaultView('pagination.gx');
+
         /*
          * The admin role passes every permission check.
          *
