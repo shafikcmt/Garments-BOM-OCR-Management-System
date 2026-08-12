@@ -177,14 +177,13 @@
                                 </div>
                             </div>
 
-                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                                <div>
-                                    <h6 class="gx-stock-subhead mb-0">Items</h6>
-                                    <span class="gx-stock-help">Pick a category to narrow the item list, then choose the item.</span>
-                                </div>
-                                <button type="button" class="btn btn-sm btn-outline-primary js-add-line" id="addIssueLine">
-                                    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Another Item
-                                </button>
+                            {{-- One "Add Another Item", under the last line —
+                                 the same as Record Receiving. It used to appear
+                                 here as well, which meant two buttons doing the
+                                 identical thing on one form. --}}
+                            <div class="mb-2">
+                                <h6 class="gx-stock-subhead mb-0">Items</h6>
+                                <span class="gx-stock-help">Pick a category to narrow the item list, then choose the item.</span>
                             </div>
 
                             {{-- Shortfall summary. Filled by the server when it
@@ -239,12 +238,13 @@
                                 </table>
                             </div>
 
-                            {{-- The same button again, under the last line, so a
-                                 long issue does not send the operator back to the
-                                 heading after every item. Same handler as the top
-                                 button — see the .js-add-line binding below. --}}
+                            {{-- Directly under the last line, which is where the
+                                 operator is looking once they have filled one in.
+                                 Bound by class — see the .js-add-line binding
+                                 below — so this works whether there is one of
+                                 them or several. --}}
                             <div class="mt-2">
-                                <button type="button" class="btn btn-sm btn-outline-primary js-add-line">
+                                <button type="button" class="btn btn-sm btn-outline-primary js-add-line" id="addIssueLine">
                                     <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Another Item
                                 </button>
                             </div>

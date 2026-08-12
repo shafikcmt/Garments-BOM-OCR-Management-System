@@ -85,14 +85,17 @@
                             <input type="date" name="rcv_date" id="rcvDate" value="{{ old('rcv_date', now()->toDateString()) }}" class="form-control" required>
                         </div>
                         <div class="col-6 col-md-3 col-xl-1">
-                            <label class="form-label" for="monthLabel">Month</label>
+                            {{-- Follows the Challan Date. The "auto" tag says so on
+                                 the label, because the muted fill alone was not
+                                 stopping people clicking in and waiting. --}}
+                            <label class="form-label" for="monthLabel">Month <span class="gx-stock-auto">auto</span></label>
                             <input type="text" id="monthLabel" class="form-control gx-stock-readonly" readonly tabindex="-1">
                         </div>
                         <div class="col-6 col-md-3 col-xl-2">
                             {{-- Allocated by the system on save. Shown as a preview,
                                  never typed: whoever saves first takes this number,
                                  so it is not promised to this form. --}}
-                            <label class="form-label" for="rvPreview">GRN No</label>
+                            <label class="form-label" for="rvPreview">GRN No <span class="gx-stock-auto">auto</span></label>
                             <input type="text" id="rvPreview" class="form-control gx-stock-readonly" readonly tabindex="-1" value="{{ $nextRv }}">
                         </div>
                         <div class="col-6 col-md-4 col-xl-2">
@@ -117,14 +120,14 @@
                         </div>
                     </div>
 
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                        <div>
-                            <h6 class="gx-stock-subhead mb-0">Items</h6>
-                            <span class="gx-stock-help">Everything received on this challan. All lines share the GRN No above.</span>
-                        </div>
-                        <button type="button" class="btn btn-sm btn-outline-primary js-add-line" id="addPurchaseLine">
-                            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Another Item
-                        </button>
+                    {{-- One "Add Another Item", not two. It sits under the last
+                         line rather than up here, because that is where the
+                         operator's cursor already is once a line is filled in —
+                         a button by this heading sends them back up the form
+                         after every item. --}}
+                    <div class="mb-2">
+                        <h6 class="gx-stock-subhead mb-0">Items</h6>
+                        <span class="gx-stock-help">Everything received on this challan. All lines share the GRN No above.</span>
                     </div>
 
                     {{-- Scrolls sideways on a narrow screen. The row dropdowns are
@@ -146,8 +149,8 @@
                                 <tr>
                                     <th class="text-center">#</th>
                                     <th>Item Name <span class="text-danger">*</span></th>
-                                    <th>Uom</th>
-                                    <th>Category</th>
+                                    <th>Uom <span class="gx-stock-auto">auto</span></th>
+                                    <th>Category <span class="gx-stock-auto">auto</span></th>
                                     <th>Purchased Qty <span class="text-danger">*</span></th>
                                     <th>Unit Price</th>
                                     <th>Remarks</th>
@@ -155,24 +158,29 @@
                                 </tr>
                             </thead>
                             <tbody id="purchaseLines"></tbody>
+                            {{-- The sum sits in the Unit Price column, where the
+                                 money on every line above it already is. It used
+                                 to span the last three columns, which made the
+                                 box twice the width of anything it was totalling
+                                 and left the label stranded far to its left. --}}
                             <tfoot>
                                 <tr>
                                     <td colspan="5" class="text-end gx-stock-total-label">Total Value</td>
-                                    <td colspan="3">
-                                        <input type="text" id="grandTotal" class="form-control form-control-sm gx-stock-readonly fw-bold" readonly tabindex="-1" value="0.00">
+                                    <td>
+                                        <input type="text" id="grandTotal" class="form-control form-control-sm gx-stock-readonly fw-bold text-end" readonly tabindex="-1" value="0.00">
                                     </td>
+                                    <td colspan="2"></td>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
 
-                    {{-- The same button again, under the last line. Adding ten
-                         items meant scrolling back up to the heading after each
-                         one; this puts the next "add" where the operator's eyes
-                         already are. Same handler as the top button — see the
-                         .js-add-line binding in the script below. --}}
+                    {{-- Directly under the last line, which is where the operator
+                         is looking once they have filled one in. Bound by class —
+                         see the .js-add-line binding in the script below — so this
+                         still works whether there is one of them or several. --}}
                     <div class="mt-2">
-                        <button type="button" class="btn btn-sm btn-outline-primary js-add-line">
+                        <button type="button" class="btn btn-sm btn-outline-primary js-add-line" id="addPurchaseLine">
                             <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Another Item
                         </button>
                     </div>
@@ -415,30 +423,28 @@
              other did not. Both now read the one definition in _stock-ui. Only
              what is genuinely local to this screen is left below. --}}
 
-        /* The expanded lines of one receiving. */
-        .gx-rv-detail > td { border-bottom: 0 !important; background: #f8fafc !important; }
-        .gx-rv-detail-body { padding: .85rem 1rem 1.1rem; }
+        {{-- The expanded lines of one receiving.
 
-        /* components.css styles every `.table` under .content, and additionally
-           centres every cell of a row that holds a colspan cell (it assumes
-           such a row is an "empty state" banner). This detail row uses colspan
-           to span the full width, so both reach into the lines table: item
-           names and money columns come out centred, and each cell is drawn as
-           its own bordered pill. That selector carries a very high specificity,
-           so !important is what it takes to put back the alignment and the flat
-           rows this table was written with. Scoped to .gx-rv-detail only. */
-        .gx-rv-detail .gx-line-table th,
-        .gx-rv-detail .gx-line-table td { text-align: left !important; }
-        .gx-rv-detail .gx-line-table th.text-end,
-        .gx-rv-detail .gx-line-table td.text-end { text-align: right !important; }
-        .gx-rv-detail .gx-line-table tbody td {
-            border-radius: 0 !important;
-            border-top: 0 !important;
-            border-left: 0 !important;
-            border-right: 0 !important;
-            box-shadow: none !important;
-            background: transparent !important;
+             This block used to be six rules of !important, all of them fighting
+             the app-wide table rule in components.css: the bordered pill on each
+             cell, the drop shadow, the white fill, the centred text, the hover
+             lift. Both .gx-line-table and .gx-stock-table are now listed in that
+             rule's own opt-out chain, so none of that reaches here any more and
+             the workarounds are gone with it. What is left is only what this
+             screen actually wants. --}}
+
+        /* Written as a child of .gx-stock-table so it outweighs that table's own
+           row rules in _stock-ui without needing !important to do it. */
+        .gx-stock-table > tbody > tr.gx-rv-detail > td {
+            border-bottom: 0;
+            background: #f8fafc;
         }
+
+        .gx-rv-detail-body { padding: .55rem .35rem .65rem; }
+
+        /* The lines sit on the panel's own grey rather than a white band. */
+        .gx-rv-detail .gx-line-table > tbody > tr > td { background: transparent; }
+        .gx-rv-detail .gx-line-table > tbody > tr:hover > td { background: rgba(255, 255, 255, .6); }
     </style>
 
     <script>

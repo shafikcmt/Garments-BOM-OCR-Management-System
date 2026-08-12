@@ -274,7 +274,23 @@
      * Generalises the treatment proven on the Record Issue line grid so every
      * General Stock table scans the same way.
      */
-    .gx-stock-table { border-collapse: separate; border-spacing: 0; margin-bottom: 0; }
+    .gx-stock-table {
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-bottom: 0;
+
+        /* Carried over from the app-wide table rule in components.css, which
+           .gx-stock-table is now listed out of. Everything else that rule gave
+           this table was the thing being opted out of; these two are not.
+           --bs-table-bg neutralises Bootstrap's own row painting, without which
+           a `table-danger` row re-tints itself over the backgrounds set below,
+           and the min-width is what makes a wide table scroll inside its
+           .table-responsive on a narrow screen instead of crushing its columns
+           to fit. */
+        --bs-table-bg: transparent;
+        --bs-table-hover-bg: transparent;
+        min-width: 760px;
+    }
 
     .gx-stock-table > thead > tr > th {
         font-size: .68rem;
@@ -329,7 +345,8 @@
     .gx-stock-table > tfoot > tr > td:last-child { border-bottom-right-radius: 10px; }
     /* The word "Total" itself is a label, not a figure — set like the column
        headers so it does not compete with the numbers beside it. */
-    .gx-stock-table > tfoot .gx-stock-total-label {
+    .gx-stock-table > tfoot .gx-stock-total-label,
+    .gx-line-table > tfoot .gx-stock-total-label {
         font-size: .68rem;
         font-weight: 750;
         text-transform: uppercase;
@@ -369,7 +386,12 @@
        the icon-button opt-out further down this file, which sets a 9px radius
        with !important; the extra class on the left does that. */
     .content .gx-stock-scope td.gx-stock-actions :is(a, button).btn:has(> i.bi),
-    .content .gx-stock-scope td.gx-stock-actions :is(a, button).btn {
+    .content .gx-stock-scope td.gx-stock-actions :is(a, button).btn,
+    /* The Remove button on an editable item line. It lives in .gx-line-action,
+       not .gx-stock-actions, so it was the one row action in the section still
+       drawing itself as a square. */
+    .content .gx-stock-scope td.gx-line-action :is(a, button).btn:has(> i.bi),
+    .content .gx-stock-scope td.gx-line-action :is(a, button).btn {
         border-radius: 999px !important;
         padding-left: .85rem !important;
         padding-right: .85rem !important;
@@ -386,7 +408,7 @@
 
     .gx-line-table { border-collapse: separate; border-spacing: 0; }
 
-    .gx-line-table thead th {
+    .gx-line-table > thead > tr > th {
         font-size: .68rem;
         text-transform: uppercase;
         letter-spacing: .04em;
@@ -397,18 +419,18 @@
         padding: .6rem .55rem;
         white-space: nowrap;
     }
-    .gx-line-table thead th:first-child { border-top-left-radius: 10px; }
-    .gx-line-table thead th:last-child { border-top-right-radius: 10px; }
+    .gx-line-table > thead > tr > th:first-child { border-top-left-radius: 10px; }
+    .gx-line-table > thead > tr > th:last-child { border-top-right-radius: 10px; }
 
-    .gx-line-table tbody td {
+    .gx-line-table > tbody > tr > td {
         padding: .55rem;
         border-bottom: 1px solid #eef2f7;
         vertical-align: top;
     }
     /* Alternating tint so a long list stays scannable, and a hover so the line
        being typed into is obvious. */
-    .gx-line-table tbody tr:nth-child(even) td { background: #fcfdff; }
-    .gx-line-table tbody tr:hover td { background: #f5f9ff; }
+    .gx-line-table > tbody > tr:nth-child(even) > td { background: #fcfdff; }
+    .gx-line-table > tbody > tr:hover > td { background: #f5f9ff; }
 
     .gx-line-no {
         font-size: .78rem;
@@ -422,6 +444,41 @@
 
     .gx-line-table .js-line-alert:empty { display: none; }
     .gx-line-table .js-line-alert .badge { font-weight: 650; }
+
+    /* Totals row on an item-line grid. The footer treatment was written only for
+       .gx-stock-table, so Record Receiving's "Total Value" row inherited nothing
+       at all — no band, no rule, and .gx-stock-total-label below did not reach
+       it either. It read as one more editable line rather than as the sum of
+       the lines above it. */
+    .gx-line-table > tfoot > tr > td {
+        padding: .6rem .55rem;
+        background: #f8fafc;
+        border-top: 2px solid #e2e8f0;
+        border-bottom: 0;
+        vertical-align: middle;
+    }
+    .gx-line-table > tfoot > tr > td:first-child { border-bottom-left-radius: 10px; }
+    .gx-line-table > tfoot > tr > td:last-child { border-bottom-right-radius: 10px; }
+
+    /* --- Auto-filled marker ----------------------------------------------
+     * A tag beside the label of a field the form fills in for you. The muted
+     * .gx-stock-readonly fill says "not editable" quietly; on a dense row of
+     * eight fields, quietly was not enough — people still clicked into Month
+     * and GRN No and waited for a cursor.
+     */
+    .gx-stock-auto {
+        display: inline-block;
+        margin-left: .3rem;
+        padding: .05em .4em;
+        border-radius: 5px;
+        background: #f1f5f9;
+        color: #94a3b8;
+        font-size: .6rem;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        vertical-align: middle;
+    }
 
     /* --- Sideways scrolling ----------------------------------------------
      * The Stock Report is 21 columns wide, so it always scrolls. The browser

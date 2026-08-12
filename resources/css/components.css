@@ -704,20 +704,20 @@ a { text-decoration: none; }
 .content .card > .card-body.table-responsive::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
 .content .card > .card-body.table-responsive::-webkit-scrollbar-track { background: transparent; }
 
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) {
     --bs-table-bg: transparent;
     --bs-table-hover-bg: transparent;
     min-width: 760px;
     border-collapse: separate !important;
     border-spacing: 0 10px !important;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table).table-bordered > :not(caption) > * {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table).table-bordered > :not(caption) > * {
     border-width: 0 !important;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table).table-bordered > :not(caption) > * > * {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table).table-bordered > :not(caption) > * > * {
     border-width: 0 !important;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) thead th {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) thead th {
     padding: 10px 12px !important;
     border: 0 !important;
     background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%) !important;
@@ -728,17 +728,17 @@ a { text-decoration: none; }
     text-transform: uppercase;
     vertical-align: middle;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) thead th:first-child {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) thead th:first-child {
     border-radius: 15px 0 0 15px;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) thead th:last-child {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) thead th:last-child {
     border-radius: 0 15px 15px 0;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody tr {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) tbody tr {
     position: relative;
     transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody td {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) tbody td {
     padding: 10px !important;
     border-top: 1px solid #e6eef8 !important;
     border-bottom: 1px solid #e6eef8 !important;
@@ -749,25 +749,25 @@ a { text-decoration: none; }
     vertical-align: middle;
     box-shadow: 0 10px 24px rgba(15, 23, 42, .035);
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody td:first-child {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) tbody td:first-child {
     border-left: 1px solid #e6eef8 !important;
     border-radius: 16px 0 0 16px;
     color: #2563eb !important;
     font-weight: 800;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody td:last-child {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) tbody td:last-child {
     border-right: 1px solid #e6eef8 !important;
     border-radius: 0 16px 16px 0;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody tr:hover td {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) tbody tr:hover td {
     background: #f8fbff !important;
     border-color: #bfdbfe !important;
     box-shadow: 0 16px 34px rgba(37, 99, 235, .08);
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody tr:hover {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) tbody tr:hover {
     transform: translateY(-1px);
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) tbody tr:has(td[colspan]) td {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) tbody tr:has(td[colspan]) td {
     border-radius: 16px !important;
     text-align: center;
     color: #64748b !important;
@@ -775,7 +775,7 @@ a { text-decoration: none; }
     box-shadow: none;
     background: #f8fafc !important;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) .badge {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) .badge {
     min-height: 22px;
     display: inline-flex;
     align-items: center;
@@ -786,15 +786,15 @@ a { text-decoration: none; }
     font-weight: 850;
     box-shadow: inset 0 1px 0 rgba(255,255,255,.32);
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) td:last-child .d-flex,
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) td:last-child form.d-inline {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) td:last-child .d-flex,
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) td:last-child form.d-inline {
     align-items: center;
     gap: 8px !important;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) td:last-child form {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) td:last-child form {
     margin: 0;
 }
-.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table) td:last-child .btn-sm {
+.content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) td:last-child .btn-sm {
     min-width: 34px;
     height: 34px;
     border-radius: 12px !important;
