@@ -5,14 +5,18 @@ use App\Imports\ReceivingImport;
 use App\Models\StockItem;
 
 /**
- * Brand, Size and Specification on the receiving bulk upload.
+ * Brand/Specification on the receiving bulk upload.
  *
- * They are reference columns, not data the file writes: the item already
- * exists by the time a row is read — the importer refuses unknown item names
- * rather than inventing an item — so the master is the authority, exactly as
- * it already is for Uom and Category. What these assert is therefore mostly
- * what does NOT happen: a mismatch does not block the delivery, and it does
- * not change the item.
+ * It is a reference column, not data the file writes: the item already exists
+ * by the time a row is read — the importer refuses unknown item names rather
+ * than inventing an item — so the master is the authority, exactly as it
+ * already is for Uom and Category. What these assert is therefore mostly what
+ * does NOT happen: a mismatch does not block the delivery, and it does not
+ * change the item.
+ *
+ * Brand, Size and Specification used to be three separate columns. A file
+ * written to that older template is still accepted, so the last tests here are
+ * about what happens to one.
  *
  * In-memory sqlite. No real record touched.
  */
@@ -22,9 +26,7 @@ function receivingItem(array $attributes = []): StockItem
         'name' => 'Sewing Needle',
         'uom' => 'Pkt',
         'category' => 'Needle',
-        'brand' => 'Groz-Beckert',
-        'size' => 'DBx1 90/14',
-        'specification' => 'Ball point, chrome',
+        'brand' => 'Groz-Beckert DBx1 90/14',
         'opening_qty' => 0,
     ], $attributes));
 }
@@ -49,7 +51,7 @@ function receivingRow(array $values): array
     return $row;
 }
 
-it('places the three columns between Item Name and Uom', function () {
+it('carries one merged reference column between Item Name and Uom', function () {
     $columns = ReceivingImport::COLUMNS;
 
     expect($columns)->toBe([
@@ -60,9 +62,7 @@ it('places the three columns between Item Name and Uom', function () {
         'Challan No/Invoice No',
         'Supplier Name',
         'Item Name*',
-        'Brand',
-        'Size',
-        'Specification',
+        'Brand/Specification',
         'Uom',
         'Category',
         'Purchased Qty*',
@@ -82,14 +82,13 @@ it('gives the downloadable template the same headings and a full sample row', fu
 
     $at = fn (string $h) => array_search($h, ReceivingImport::COLUMNS, true);
 
-    expect(ReceivingImport::SAMPLE_ROW[$at('Brand')])->toBe('Groz-Beckert')
-        ->and(ReceivingImport::SAMPLE_ROW[$at('Size')])->toBe('DBx1 90/14')
-        ->and(ReceivingImport::SAMPLE_ROW[$at('Specification')])->toBe('Ball point, chrome');
+    expect(ReceivingImport::SAMPLE_ROW[$at('Brand/Specification')])
+        ->toBe('Groz-Beckert DBx1 90/14, ball point');
 });
 
-it('keeps the second example row aligned after the column insert', function () {
-    // The regression this guards: the indexes were hardcoded, so inserting
-    // three columns put the quantity under Specification.
+it('keeps the second example row aligned with the columns', function () {
+    // The regression this guards: the indexes were hardcoded, so changing the
+    // columns put the quantity under the wrong heading.
     [$first, $second] = (new ReceivingTemplateExport())->array();
 
     $at = fn (string $h) => array_search($h, ReceivingImport::COLUMNS, true);
@@ -98,14 +97,13 @@ it('keeps the second example row aligned after the column insert', function () {
         ->and($second[$at('Purchased Qty*')])->toBe(5)
         ->and($second[$at('Unit Price')])->toBe(20)
         ->and($second[$at('Total Value')])->toBe(100)
-        // ...and the new columns still carry their own sample, not a number.
-        ->and($second[$at('Brand')])->toBe('Groz-Beckert')
-        ->and($second[$at('Specification')])->toBe('Ball point, chrome');
+        // ...and the reference column still carries its own sample, not a number.
+        ->and($second[$at('Brand/Specification')])->toBe('Groz-Beckert DBx1 90/14, ball point');
 
     expect($first)->toBe(ReceivingImport::SAMPLE_ROW);
 });
 
-it('imports a row with all three filled and matching, without a note', function () {
+it('imports a row with the column filled and matching, without a note', function () {
     receivingItem();
 
     $result = ReceivingImport::parse(receivingSheet([
@@ -113,9 +111,7 @@ it('imports a row with all three filled and matching, without a note', function 
             'Challan Date*' => '2026-08-01',
             'Challan No/Invoice No' => 'CH-100',
             'Item Name*' => 'Sewing Needle',
-            'Brand' => 'Groz-Beckert',
-            'Size' => 'DBx1 90/14',
-            'Specification' => 'Ball point, chrome',
+            'Brand/Specification' => 'Groz-Beckert DBx1 90/14',
             'Purchased Qty*' => 10,
         ]),
     ]));
@@ -125,7 +121,7 @@ it('imports a row with all three filled and matching, without a note', function 
         ->and($result['notes'])->toBeEmpty();
 });
 
-it('imports a row with all three blank, since they are optional', function () {
+it('imports a row with the column blank, since it is optional', function () {
     receivingItem();
 
     $result = ReceivingImport::parse(receivingSheet([
@@ -150,9 +146,7 @@ it('notes a mismatch but still imports the delivery', function () {
             'Challan Date*' => '2026-08-01',
             'Challan No/Invoice No' => 'CH-102',
             'Item Name*' => 'Sewing Needle',
-            'Brand' => 'Organ',
-            'Size' => '80/12',
-            'Specification' => 'Sharp point',
+            'Brand/Specification' => 'Organ 80/12 sharp point',
             'Purchased Qty*' => 4,
         ]),
     ]));
@@ -163,15 +157,11 @@ it('notes a mismatch but still imports the delivery', function () {
 
     $notes = implode(' | ', $result['notes']);
 
-    expect($notes)->toContain('Brand in the file is "Organ"')
-        ->and($notes)->toContain('Size in the file is "80/12"')
-        ->and($notes)->toContain('Specification in the file is "Sharp point"')
+    expect($notes)->toContain('Brand/Specification in the file is "Organ 80/12 sharp point"')
         ->and($notes)->toContain('The item master was used.');
 
     // And the master is genuinely untouched.
-    expect($item->fresh()->brand)->toBe('Groz-Beckert')
-        ->and($item->fresh()->size)->toBe('DBx1 90/14')
-        ->and($item->fresh()->specification)->toBe('Ball point, chrome');
+    expect($item->fresh()->brand)->toBe('Groz-Beckert DBx1 90/14');
 });
 
 it('ignores case and surrounding space when comparing', function () {
@@ -182,7 +172,7 @@ it('ignores case and surrounding space when comparing', function () {
             'Challan Date*' => '2026-08-01',
             'Challan No/Invoice No' => 'CH-103',
             'Item Name*' => 'Sewing Needle',
-            'Brand' => '  groz-beckert  ',
+            'Brand/Specification' => '  groz-beckert dbx1 90/14  ',
             'Purchased Qty*' => 3,
         ]),
     ]));
@@ -194,14 +184,14 @@ it('ignores case and surrounding space when comparing', function () {
 it('says nothing when the master itself has no value to compare', function () {
     // An item with no brand recorded: the file's value is not a contradiction,
     // so a note would be noise.
-    receivingItem(['brand' => null, 'size' => null, 'specification' => null]);
+    receivingItem(['brand' => null]);
 
     $result = ReceivingImport::parse(receivingSheet([
         receivingRow([
             'Challan Date*' => '2026-08-01',
             'Challan No/Invoice No' => 'CH-104',
             'Item Name*' => 'Sewing Needle',
-            'Brand' => 'Organ',
+            'Brand/Specification' => 'Organ',
             'Purchased Qty*' => 2,
         ]),
     ]));
@@ -218,7 +208,7 @@ it('still refuses an unknown item, unchanged by this work', function () {
             'Challan Date*' => '2026-08-01',
             'Challan No/Invoice No' => 'CH-105',
             'Item Name*' => 'Not In The Master',
-            'Brand' => 'Organ',
+            'Brand/Specification' => 'Organ',
             'Purchased Qty*' => 1,
         ]),
     ]));
@@ -226,7 +216,7 @@ it('still refuses an unknown item, unchanged by this work', function () {
     expect($result['challans'])->toBeEmpty();
     expect(implode(' ', $result['errors']))->toContain('is not in the item master');
 
-    // The three columns must not have become a back door to creating one.
+    // The column must not have become a back door to creating one.
     expect(StockItem::where('name', 'Not In The Master')->exists())->toBeFalse();
 });
 
@@ -234,15 +224,13 @@ it('accepts the header spellings a legacy workbook uses', function () {
     receivingItem();
 
     $headings = ReceivingImport::COLUMNS;
-    $headings[array_search('Brand', $headings, true)] = 'Brand Name';
-    $headings[array_search('Specification', $headings, true)] = 'Specs';
+    $headings[array_search('Brand/Specification', $headings, true)] = 'Brand Name';
 
     $row = receivingRow([
         'Challan Date*' => '2026-08-01',
         'Challan No/Invoice No' => 'CH-106',
         'Item Name*' => 'Sewing Needle',
-        'Brand' => 'Organ',
-        'Specification' => 'Sharp point',
+        'Brand/Specification' => 'Organ',
         'Purchased Qty*' => 6,
     ]);
 
@@ -250,8 +238,54 @@ it('accepts the header spellings a legacy workbook uses', function () {
 
     expect($result['challans'])->toHaveCount(1);
 
-    $notes = implode(' | ', $result['notes']);
+    expect(implode(' | ', $result['notes']))->toContain('Brand/Specification in the file is "Organ"');
+});
 
-    expect($notes)->toContain('Brand in the file is "Organ"')
-        ->and($notes)->toContain('Specification in the file is "Sharp point"');
+it('imports a file written to the old three-column template', function () {
+    // Exactly what someone still has on their desk: Brand, Size and
+    // Specification as separate columns. It must upload as it always did —
+    // Brand is read, Size is ignored, and the delivery is not lost.
+    receivingItem();
+
+    $headings = [
+        'Challan Date*', 'RCV Date', 'Month', 'GRN No', 'Challan No/Invoice No',
+        'Supplier Name', 'Item Name*', 'Brand', 'Size', 'Specification', 'Uom',
+        'Category', 'Purchased Qty*', 'Unit Price', 'Total Value', 'Remarks',
+    ];
+
+    // No supplier name: an unknown supplier raises a note of its own, which
+    // would say nothing about the columns under test.
+    $row = [
+        '2026-08-01', '2026-08-02', 'Aug-26', '', 'CH-107', '',
+        'Sewing Needle', 'Groz-Beckert DBx1 90/14', '90/14', 'Ball point',
+        'Pkt', 'Needle', 9, 145, 1305, '',
+    ];
+
+    $result = ReceivingImport::parse([$headings, $row]);
+
+    expect($result['errors'])->toBeEmpty()
+        ->and($result['challans'])->toHaveCount(1)
+        ->and($result['challans'][0]['lines'])->toHaveCount(1)
+        // Brand matched the master, so nothing is flagged — and the old Size
+        // and Specification cells raise no note of their own.
+        ->and($result['notes'])->toBeEmpty();
+});
+
+it('falls back to an old file\'s Specification column when it has no Brand', function () {
+    receivingItem(['brand' => 'Ball point']);
+
+    $headings = [
+        'Challan Date*', 'Challan No/Invoice No', 'Item Name*', 'Specification', 'Purchased Qty*',
+    ];
+
+    $result = ReceivingImport::parse([
+        $headings,
+        ['2026-08-01', 'CH-108', 'Sewing Needle', 'Ball point', 4],
+    ]);
+
+    // Read as the Brand/Specification value, so it matches the master and the
+    // delivery imports without a note.
+    expect($result['errors'])->toBeEmpty()
+        ->and($result['challans'])->toHaveCount(1)
+        ->and($result['notes'])->toBeEmpty();
 });

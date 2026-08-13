@@ -30,7 +30,7 @@
     // The item list handed to the script. Built here rather than inline in
     // @json, which cannot parse a multi-line array argument.
     $itemOptions = $items->map(function ($it) {
-        $suffix = collect([$it->brand, $it->size])->filter()->implode(' ');
+        $suffix = trim((string) $it->brand);
 
         return [
             'value' => (string) $it->id,
@@ -272,7 +272,7 @@
                                         @foreach($items as $it)
                                             <option value="{{ $it->id }}"
                                                     data-uom="{{ $it->uom }}"
-                                                    data-category-id="{{ $it->item_category_id }}">{{ $it->name }}@if($it->brand || $it->size) ({{ collect([$it->brand, $it->size])->filter()->implode(' ') }})@endif</option>
+                                                    data-category-id="{{ $it->item_category_id }}">{{ $it->name }}@if($it->brand) ({{ $it->brand }})@endif</option>
                                         @endforeach
                                     </select>
                                     <div class="js-line-alert mt-1"></div>

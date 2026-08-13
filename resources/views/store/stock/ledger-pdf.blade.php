@@ -33,7 +33,7 @@
         .filters { margin: 10px 0 6px; font-size: 8.5px; font-weight: 700; letter-spacing: .02em; }
         .legend { font-size: 7.5px; font-weight: 600; color: #33439e; margin-bottom: 7px; line-height: 1.4; }
 
-        /* 19 columns on A4 landscape: fixed layout so long consumable names
+        /* 20 columns on A4 landscape: fixed layout so long consumable names
            wrap inside their cell instead of pushing columns off the page. */
         .report-table { table-layout: fixed; color: #111827; }
         .report-table th {
@@ -42,7 +42,7 @@
         }
         .report-table th.col-sl, .report-table th.col-flag { text-align: center; }
         .report-table th.col-name, .report-table th.col-txt,
-        .report-table th.col-brand, .report-table th.col-size, .report-table th.col-spec { text-align: left; }
+        .report-table th.col-brand { text-align: left; }
         .report-table td {
             border: 1px solid #e2e6ef; padding: 3px 2px; font-size: 6px; line-height: 1.2;
             vertical-align: middle; word-wrap: break-word; word-break: break-word;
@@ -54,22 +54,21 @@
         .report-table tfoot .grand td {
             background: #eaf0fb; color: #000b6f; font-size: 7px; font-weight: 800; padding: 5px 3px;
         }
-        /* 21 columns on A4 landscape. Widths are budgeted to total under 100%
-           with table-layout:fixed, so a long item name or specification wraps
-           inside its own cell — the row grows taller rather than pushing a
-           column off the page. */
-        /* 22 columns: 1 flag + 1 sl + name + brand + size + spec + 5 text + 11
-           numeric. Balance B/F made an eleventh numeric column, so the budget
-           was rebalanced: the two widest text columns gave up 1.5% between them
-           rather than shrinking every figure column, because a wrapped item
-           name is readable and a wrapped quantity is not.
-           5 + 2 + 9.5 + 4.5 + 3 + 7 + (5 x 4) + (11 x 4.4) = 99.4%. */
+        /* Widths are budgeted to total under 100% with table-layout:fixed, so a
+           long item name or brand/specification wraps inside its own cell — the
+           row grows taller rather than pushing a column off the page.
+
+           20 columns: 1 flag + 1 sl + name + brand + 5 text + 11 numeric. Size
+           and Specification merged into Brand/Specification, and the 10% they
+           held between them went where the text actually needs it: the merged
+           column carries all three values now, and the item name gets the rest.
+           A wrapped item name is readable and a wrapped quantity is not, so the
+           figure columns were left alone.
+           5 + 2 + 12 + 12.5 + (5 x 4) + (11 x 4.4) = 99.9%. */
         .report-table .col-flag { width: 5%; }
         .report-table .col-sl { width: 2%; }
-        .report-table .col-name { width: 9.5%; }
-        .report-table .col-brand { width: 4.5%; }
-        .report-table .col-size { width: 3%; }
-        .report-table .col-spec { width: 7%; }
+        .report-table .col-name { width: 12%; }
+        .report-table .col-brand { width: 12.5%; }
         .report-table .col-txt { width: 4%; }
         .report-table th.num, .report-table td.num { width: 4.4%; }
 
@@ -126,7 +125,7 @@
          Same four heading lines the reference workbook prints above its Stock
          sheet — company, address, department, then the report and its month. --}}
     @php
-        $columns = 22;
+        $columns = 20;
         $labelSpan = 5;
         $valueSpan = $columns - $labelSpan;
     @endphp

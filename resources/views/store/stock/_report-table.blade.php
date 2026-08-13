@@ -21,9 +21,7 @@
             <th class="col-flag">Whether to place order or not</th>
             <th class="col-sl">Sl</th>
             <th class="col-name">Item Name</th>
-            <th class="col-brand">Brand</th>
-            <th class="col-size">Size</th>
-            <th class="col-spec">Specification</th>
+            <th class="col-brand">Brand/Specification</th>
             <th class="col-txt">Uom</th>
             <th class="col-txt">Category</th>
             {{-- Opening Stock is the counted Item Master figure and never moves.
@@ -53,8 +51,6 @@
                 <td class="col-sl">{{ $index + 1 }}</td>
                 <td>{{ $r['item']->name }}</td>
                 <td>{{ $r['item']->brand }}</td>
-                <td>{{ $r['item']->size }}</td>
-                <td>{{ $r['item']->specification }}</td>
                 <td>{{ $r['item']->uom }}</td>
                 <td>{{ $r['item']->category }}</td>
                 {{-- Blank before the item was counted: no count had happened,
@@ -75,16 +71,16 @@
                 <td>{{ $r['remarks'] }}</td>
             </tr>
         @empty
-            <tr><td colspan="22" class="empty">No items match this filter.</td></tr>
+            <tr><td colspan="20" class="empty">No items match this filter.</td></tr>
         @endforelse
     </tbody>
     @if($rows->isNotEmpty())
         <tfoot>
-            {{-- 14, not 13: Balance B/F sits inside the leading span and is
+            {{-- 12, not 11: Balance B/F sits inside the leading span and is
                  deliberately not totalled — summing a brought-forward balance
                  across unrelated items says nothing. --}}
             <tr class="grand">
-                <td colspan="14">Sub-Total</td>
+                <td colspan="12">Sub-Total</td>
                 <td class="num">{{ $qty($summary['addition']) }}</td>
                 <td></td>
                 <td class="num">{{ $qty($summary['consumption']) }}</td>

@@ -177,8 +177,8 @@ class GeneralStockReportService
                 $like = '%'.$search.'%';
                 $q->where(fn ($w) => $w->where('name', 'like', $like)
                     ->orWhere('category', 'like', $like)
-                    ->orWhere('brand', 'like', $like)
-                    ->orWhere('size', 'like', $like));
+                    // The merged Brand/Specification field.
+                    ->orWhere('brand', 'like', $like));
             })
             ->orderBy('name')
             ->get();

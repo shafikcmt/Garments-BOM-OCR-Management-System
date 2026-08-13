@@ -202,10 +202,8 @@
                         @foreach($items as $it)
                             <option value="{{ $it->id }}"
                                     data-uom="{{ $it->uom }}"
-                                    data-specification="{{ $it->specification }}"
                                     data-brand="{{ $it->brand }}"
-                                    data-size="{{ $it->size }}"
-                                    data-category-id="{{ $it->item_category_id }}">{{ $it->name }}@if($it->brand || $it->size) ({{ collect([$it->brand, $it->size])->filter()->implode(' ') }})@endif</option>
+                                    data-category-id="{{ $it->item_category_id }}">{{ $it->name }}@if($it->brand) ({{ $it->brand }})@endif</option>
                         @endforeach
                     </select>
                 </div>
@@ -579,10 +577,10 @@
                is on file has to be typed again.
              *
              * Only fields that genuinely exist on stock_items are touched:
-             * Uom, Category (item_category_id) and Specification — with Brand
-             * and Size standing in when the item carries no specification of
-             * its own. Type and User Dept. are NOT item attributes; they are
-             * decisions about this particular request, so they stay manual.
+             * Uom, Category (item_category_id) and the item master's merged
+             * Brand/Specification, which pre-fills this line's Specification.
+             * Type and User Dept. are NOT item attributes; they are decisions
+             * about this particular request, so they stay manual.
              *
              * Nothing already typed is overwritten: a requester who asked for a
              * specific brand on this line keeps what they wrote. */
@@ -592,13 +590,7 @@
 
                 var spec = row.querySelector('.js-line-spec');
                 if (!spec.value) {
-                    var fromMaster = data.specification || '';
-
-                    if (!fromMaster && option) {
-                        fromMaster = [option.dataset.brand, option.dataset.size]
-                            .filter(function (part) { return part; })
-                            .join(' ');
-                    }
+                    var fromMaster = data.specification || (option ? option.dataset.brand : '') || '';
 
                     if (fromMaster) { spec.value = fromMaster; }
                 }

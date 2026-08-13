@@ -107,7 +107,7 @@
                 <div class="col-12 col-md-4">
                     <label class="form-label" for="itemFilterSearch">Search</label>
                     <input id="itemFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control"
-                           placeholder="Item, brand, size or category">
+                           placeholder="Item, brand/specification or category">
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label" for="itemFilterCategory">Category</label>
@@ -171,20 +171,14 @@
                             <tr @class(['table-danger' => $status === StockStatus::STATUS_OUT])>
                                 <td>
                                     <div class="fw-bold text-slate-900">{{ $item->name }}</div>
-                                    {{-- Category · Brand · Size on one line, blanks
-                                         dropped so a sparse item does not read as
-                                         a row of dashes. Set with the section's
-                                         shared secondary-detail size, the same as
-                                         the specification under it and the same as
-                                         the Stock Report — it was a size larger
-                                         than the line below it in the same cell. --}}
+                                    {{-- Category · Brand/Specification on one line,
+                                         blanks dropped so a sparse item does not
+                                         read as a row of dashes. Set with the
+                                         section's shared secondary-detail size,
+                                         the same as the Stock Report. --}}
                                     <div class="gx-stock-micro">
-                                        {{ collect([$item->category, $item->brand, $item->size])->filter()->implode(' · ') ?: '—' }}
+                                        {{ collect([$item->category, $item->brand])->filter()->implode(' · ') ?: '—' }}
                                     </div>
-                                    @if($item->specification)
-                                        <div class="gx-stock-spec text-truncate"
-                                             title="{{ $item->specification }}">{{ $item->specification }}</div>
-                                    @endif
                                 </td>
                                 <td class="small">{{ $item->uom ?: '—' }}</td>
                                 <td class="text-end">

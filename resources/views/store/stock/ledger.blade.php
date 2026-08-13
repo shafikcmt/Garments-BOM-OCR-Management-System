@@ -108,7 +108,7 @@
                 </div>
                 <div class="col-12 col-md-4 col-xl-2">
                     <label class="form-label" for="ledgerFilterSearch">Search</label>
-                    <input id="ledgerFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item or brand">
+                    <input id="ledgerFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item or brand/spec.">
                 </div>
                 <div class="col-6 col-md-4 col-xl-2">
                     <label class="form-label" for="ledgerFilterCategory">Category</label>
@@ -145,7 +145,7 @@
                 </div>
             </form>
 
-            {{-- 19 columns, same order as the reference sheet. The wrapper
+            {{-- 20 columns, same order as the reference sheet. The wrapper
                  scrolls on its own so the page body never scrolls sideways. --}}
             <div class="table-responsive">
                 <table class="table align-middle gx-stock-table">
@@ -154,9 +154,7 @@
                             <th style="min-width:110px;">Order?</th>
                             <th class="text-end">Sl</th>
                             <th style="min-width:200px;">Item Name</th>
-                            <th>Brand</th>
-                            <th>Size</th>
-                            <th style="min-width:140px;">Specification</th>
+                            <th style="min-width:140px;">Brand/Specification</th>
                             <th>Uom</th>
                             <th>Category</th>
                             {{-- Opening is the counted Item Master figure and never
@@ -190,8 +188,6 @@
                                     <div class="fw-semibold text-slate-900">{{ $r['item']->name }}</div>
                                 </td>
                                 <td>{{ $r['item']->brand ?: '—' }}</td>
-                                <td>{{ $r['item']->size ?: '—' }}</td>
-                                <td class="gx-stock-micro">{{ $r['item']->specification ?: '—' }}</td>
                                 <td>{{ $r['item']->uom ?: '—' }}</td>
                                 <td>{{ $r['item']->category ?: '—' }}</td>
                                 {{-- "—" before the item was counted: no count had
@@ -218,7 +214,7 @@
                                 <td class="gx-stock-micro">{{ $r['remarks'] ?: '—' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="22" class="gx-stock-empty">
+                            <tr><td colspan="20" class="gx-stock-empty">
                                             <span class="gx-stock-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>
                                             <div class="gx-stock-empty-title">Nothing to show</div>
                                             <div class="gx-stock-empty-hint">Try a different month, category or status.</div>
@@ -228,11 +224,11 @@
                     @if($rows->isNotEmpty())
                         <tfoot>
                             <tr>
-                                {{-- 14, not 13: Balance B/F sits inside this span and
+                                {{-- 12, not 11: Balance B/F sits inside this span and
                                      is deliberately not totalled — summing a
                                      brought-forward balance across unrelated items
                                      says nothing. --}}
-                                <td colspan="14" class="text-end gx-stock-total-label">Total</td>
+                                <td colspan="12" class="text-end gx-stock-total-label">Total</td>
                                 <td class="text-end text-success">{{ $qty($summary['addition']) }}</td>
                                 <td></td>
                                 <td class="text-end text-danger">{{ $qty($summary['consumption']) }}</td>

@@ -88,7 +88,7 @@ class StockIssueController extends Controller
         return view('store.stock.issues', [
             'issues' => $issues,
             'items' => StockItem::where('is_active', true)->orderBy('name')
-                ->get(['id', 'name', 'uom', 'item_category_id', 'brand', 'size']),
+                ->get(['id', 'name', 'uom', 'item_category_id', 'brand']),
             'sections' => IndentSection::selectable()->get(['id', 'name']),
             'persons' => IndentPerson::selectable()->get(['id', 'name']),
             'approvers' => IssueApprover::selectable()->get(['id', 'name']),

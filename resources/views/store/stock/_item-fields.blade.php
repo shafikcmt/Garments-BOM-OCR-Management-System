@@ -1,6 +1,6 @@
 {{--
-    The twelve Item Master fields, shared by the Add and the Edit modal so the
-    two can never drift apart.
+    The Item Master fields, shared by the Add and the Edit modal so the two can
+    never drift apart.
 
     Parameters
         $item        StockItem|null — null on the Add form.
@@ -35,23 +35,12 @@
     <input name="name" value="{{ $value('name', $item?->name) }}" class="form-control mb-3" required
            @if(! $item) autofocus @endif>
 
-    <div class="row g-3 mb-3">
-        <div class="col-7">
-            <label class="form-label">Brand</label>
-            <input name="brand" value="{{ $value('brand', $item?->brand) }}" class="form-control" maxlength="255"
-                   placeholder="Organ / Groz-Beckert">
-        </div>
-        <div class="col-5">
-            {{-- Text, not a number: "14", "M" and "40/2" are all valid sizes. --}}
-            <label class="form-label">Size</label>
-            <input name="size" value="{{ $value('size', $item?->size) }}" class="form-control" maxlength="100"
-                   placeholder="14 / M / 40-2">
-        </div>
-    </div>
-
-    <label class="form-label">Specification</label>
-    <textarea name="specification" rows="2" class="form-control mb-3" maxlength="2000"
-              placeholder="Any detail that separates this item from a similar one">{{ $value('specification', $item?->specification) }}</textarea>
+    {{-- One field, not three. Brand, Size and Specification were filled
+         inconsistently and read as a single line anyway, so the store keeps
+         them together here: "Organ 14", "Groz-Beckert DBx1 90/14 ball point". --}}
+    <label class="form-label">Brand/Specification</label>
+    <input name="brand" value="{{ $value('brand', $item?->brand) }}" class="form-control mb-3" maxlength="255"
+           placeholder="Organ DPX17-14 / Groz-Beckert, chrome">
 
     <div class="row g-3">
         <div class="col-5">

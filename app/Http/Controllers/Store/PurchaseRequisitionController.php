@@ -281,7 +281,9 @@ class PurchaseRequisitionController extends Controller
         // the display date the form puts straight into a read-only box.
         return response()->json(array_merge($snapshot, [
             'uom' => $stockItem->uom,
-            'specification' => $stockItem->specification,
+            // The item master's merged Brand/Specification field. The line's
+            // own Specification stays editable — this only pre-fills it.
+            'specification' => $stockItem->brand,
             'item_category_id' => $stockItem->item_category_id,
             'last_purchase_date' => $snapshot['last_purchase_date']
                 ? Carbon::parse($snapshot['last_purchase_date'])->format('d-M-y')
@@ -455,7 +457,7 @@ class PurchaseRequisitionController extends Controller
                 'item_category_id' => $stockItem?->item_category_id,
                 'sort_order' => $index,
                 'uom_snapshot' => $stockItem?->uom,
-                'specification' => $line['specification'] ?? $stockItem?->specification,
+                'specification' => $line['specification'] ?? $stockItem?->brand,
                 'type' => $line['type'] ?? null,
                 'user_dept' => $line['user_dept'] ?? null,
                 'qty_requested' => $qty,

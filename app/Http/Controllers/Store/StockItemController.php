@@ -41,10 +41,10 @@ class StockItemController extends Controller
             ->withSum('issues as issued_qty', 'qty');
 
         if ($search = $filters['search'] ?? null) {
-            // Same four fields the Stock Report searches, so a term that finds
+            // Same three fields the Stock Report searches, so a term that finds
             // an item there finds it here too.
             $query->where(function ($q) use ($search) {
-                foreach (['name', 'brand', 'size', 'category'] as $column) {
+                foreach (['name', 'brand', 'category'] as $column) {
                     $q->orWhere($column, 'like', '%'.$search.'%');
                 }
             });
@@ -231,10 +231,10 @@ class StockItemController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            // The single "Brand/Specification" field. `size` and `specification`
+            // are no longer written from anywhere — they stay on the table
+            // carrying their old values and are simply not accepted here.
             'brand' => ['nullable', 'string', 'max:255'],
-            // Free text: "14", "M" and "40/2" are labels, not numbers.
-            'size' => ['nullable', 'string', 'max:100'],
-            'specification' => ['nullable', 'string', 'max:2000'],
             'uom' => ['nullable', 'string', 'max:50'],
             // Accepts an existing master id or "new:<name>", like the four
             // dropdowns on the Issue form.
@@ -248,7 +248,7 @@ class StockItemController extends Controller
             'lead_time_days' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
             'remarks' => ['nullable', 'string', 'max:1000'],
-        ], [], ['item_category_id' => 'category']);
+        ], [], ['item_category_id' => 'category', 'brand' => 'brand/specification']);
 
         $data['item_category_id'] = $this->resolveMasterValue(ItemCategory::class, $data['item_category_id'] ?? null);
 
