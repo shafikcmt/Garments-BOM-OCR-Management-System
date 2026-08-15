@@ -91,8 +91,18 @@
         <label class="form-label">Item Type</label>
         <select name="item_type" class="form-select @error('item_type') is-invalid @enderror">
             @php
-                $itemTypes = ['Fabric', 'Zipper', 'Hook & Bar', 'Trim', 'Interlining', 'Scrim'];
+                // General leads because it is what all but a handful of vendors
+                // are; Thread, Elastic and Lining are the other types already in
+                // use that the list had never offered.
+                $itemTypes = ['General', 'Fabric', 'Zipper', 'Hook & Bar', 'Trim', 'Interlining', 'Scrim', 'Thread', 'Elastic', 'Lining'];
                 $selectedItemType = old('item_type', $supplier->item_type ?? '');
+
+                // Same guard as Incoterm and Ship Mode above: a value this list
+                // does not know stays selectable on its own record, so editing a
+                // vendor for any other reason cannot silently blank its type.
+                if ($selectedItemType !== '' && ! in_array($selectedItemType, $itemTypes, true)) {
+                    $itemTypes[] = $selectedItemType;
+                }
             @endphp
 
             <option value="">Select Item Type</option>
