@@ -83,6 +83,20 @@ class SupplierController extends Controller
 
         $data['is_active'] = $request->boolean('is_active');
 
+        // An empty code is no code, and has to be stored as null rather than "".
+        // The unique index counts empty strings as equal to each other, so a
+        // second vendor saved without a code would fail on a duplicate key;
+        // MySQL treats NULLs as distinct, which is the behaviour wanted here.
+        //
+        // On a normal request ConvertEmptyStringsToNull has already done this.
+        // Stated here anyway so the rule holds for any caller that does not run
+        // the HTTP middleware - a console command, a test, a future API route.
+        //
+        // Compared against "" rather than using ?:, which would also null a
+        // supplier legitimately coded "0".
+        $code = trim((string) ($data['supplier_code'] ?? ''));
+        $data['supplier_code'] = $code === '' ? null : $code;
+
         return $data;
     }
 }
