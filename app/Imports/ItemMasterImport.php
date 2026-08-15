@@ -118,11 +118,13 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
         $errors = [];
         $skipped = [];
 
-        // Existing names, compared case-insensitively — one query, not one per row.
-        $existing = StockItem::pluck('name')
-            ->mapWithKeys(fn ($name) => [mb_strtolower(trim($name)) => true]);
+        // Existing items, by name AND brand — one query, not one per row. Brand
+        // is part of the comparison because the same item name genuinely exists
+        // under several makes, and each one's stock is counted separately.
+        $existing = StockItem::get(['name', 'brand'])
+            ->mapWithKeys(fn ($item) => [self::identity($item->name, $item->brand) => true]);
 
-        // Names claimed earlier in this same file, so a file that lists an item
+        // Items claimed earlier in this same file, so a file that lists one
         // twice reports it rather than inserting it twice.
         $seen = [];
 
@@ -160,21 +162,34 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
                 continue;
             }
 
-            $key = mb_strtolower($name);
-
-            // The template's own example row, left in place by the user.
-            if (str_starts_with($key, self::EXAMPLE_PREFIX)) {
+            // The template's own example row, left in place by the user. Matched
+            // on the name alone — the example carries a brand too, and folding
+            // it into the key would stop the prefix from matching.
+            if (str_starts_with(mb_strtolower($name), self::EXAMPLE_PREFIX)) {
                 $skipped[] = 'Row '.$line.': the template example row was ignored.';
                 continue;
             }
 
+            // Read before the key is built, because the key is made of both.
+            // A file written to the older template carries the wording in its
+            // Specification column instead, so it is used when the Brand column
+            // has nothing. Its Size column is not read.
+            $brand = self::text($cell('brand')) ?? self::text($cell('legacy_specification'));
+
+            // Name and brand together. A blank brand is part of the identity
+            // rather than a wildcard: it matches other blank-brand rows of the
+            // same name and nothing else, so one unbranded row cannot claim
+            // every make of that item.
+            $key = self::identity($name, $brand);
+            $label = '"'.$name.'" ('.($brand !== null ? $brand : 'no brand').')';
+
             if (isset($existing[$key])) {
-                $skipped[] = 'Row '.$line.': "'.$name.'" already exists in the item master.';
+                $skipped[] = 'Row '.$line.': '.$label.' already exists in the item master.';
                 continue;
             }
 
             if (isset($seen[$key])) {
-                $skipped[] = 'Row '.$line.': "'.$name.'" is listed more than once in this file.';
+                $skipped[] = 'Row '.$line.': '.$label.' is listed more than once in this file.';
                 continue;
             }
 
@@ -212,10 +227,7 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
 
             $items[] = [
                 'name' => mb_substr($name, 0, 255),
-                // A file written to the older template carries the wording in
-                // its Specification column instead, so it is used when the
-                // Brand column has nothing. Its Size column is not read.
-                'brand' => self::text($cell('brand')) ?? self::text($cell('legacy_specification')),
+                'brand' => $brand,
                 'category' => mb_substr($category, 0, 100),
                 'uom' => mb_substr($uom, 0, 50),
                 // Blank opening means nothing on the shelf, counted today.
@@ -311,6 +323,26 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
             'lead_time_days' => 8,
             'remarks' => 9,
         ];
+    }
+
+    /**
+     * What makes one stock item the same as another: its name and its brand,
+     * compared without regard to case or spacing.
+     *
+     * Name alone is not enough. "B/T Needle Hole Plate-2.3mm" is stocked under
+     * several makes and each one is counted separately, so matching on the name
+     * would refuse the second make as a duplicate of the first.
+     *
+     * Internal runs of whitespace collapse, so "Circuit  Breaker" and "Circuit
+     * Breaker" are one item - a double space is a typing slip, not a different
+     * part. A blank brand normalises to an empty string and is compared like
+     * any other value, never as a wildcard.
+     */
+    private static function identity(?string $name, ?string $brand): string
+    {
+        $norm = fn ($value) => preg_replace('/\s+/', ' ', mb_strtolower(trim((string) $value)));
+
+        return $norm($name).'|'.$norm($brand);
     }
 
     /** A heading reduced to letters and digits, so spacing and "*" cannot matter. */
