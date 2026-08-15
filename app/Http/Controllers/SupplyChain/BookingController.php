@@ -2828,6 +2828,17 @@ BIN: 005635381-0406 TIN: 780096271681",
         $lookupName = $this->cleanText($previousVendorName ?: $bookingPo->vendor_name);
         $toName = $this->cleanText($data['to'] ?? null);
         $supplierName = $this->cleanText($data['supplier'] ?? null);
+
+        // A placeholder names nobody. Treated as absent so it can neither become
+        // a vendor's name nor bring a new vendor record into existence.
+        if ($this->isDocumentPlaceholder($toName)) {
+            $toName = null;
+        }
+
+        if ($this->isDocumentPlaceholder($supplierName)) {
+            $supplierName = null;
+        }
+
         $lookupName = $lookupName ?: ($supplierName ?: $toName);
 
         if (! $lookupName && ! $toName) {
@@ -2850,7 +2861,13 @@ BIN: 005635381-0406 TIN: 780096271681",
             'ship_mode' => 'ship_mode',
         ] as $supplierKey => $dataKey) {
             if (array_key_exists($dataKey, $data)) {
-                $supplier->{$supplierKey} = $this->cleanText($data[$dataKey]);
+                $value = $this->cleanText($data[$dataKey]);
+
+                if ($this->isDocumentPlaceholder($value)) {
+                    continue; // leave whatever the master already holds
+                }
+
+                $supplier->{$supplierKey} = $value;
             }
         }
 
@@ -2861,6 +2878,19 @@ BIN: 005635381-0406 TIN: 780096271681",
 
         $supplier->is_active = true;
         $supplier->save();
+    }
+
+    /**
+     * True when a value is one of the bracketed hints the PO document shows in
+     * place of a field nobody filled in - "[Contact person]", "[Supplier email]"
+     * and the rest. They exist to make the printed PO readable; they are not
+     * data, and must never travel back into the supplier master.
+     */
+    protected function isDocumentPlaceholder(?string $value): bool
+    {
+        $value = trim((string) $value);
+
+        return $value !== '' && str_starts_with($value, '[') && str_ends_with($value, ']');
     }
 
     protected function tolerancePercentFromText($value): ?float
