@@ -111,8 +111,17 @@
         <label class="form-label">Incoterm</label>
         <select name="incoterm" class="form-select @error('incoterm') is-invalid @enderror">
             @php
-                $incoterms = ['FOB', 'CIF', 'CFR', 'Ex-Works'];
+                $incoterms = ['FOB', 'CIF', 'CFR', 'Ex-Works', 'CPT', 'EXW', 'CNF'];
                 $selectedIncoterm = old('incoterm', $supplier->incoterm ?? '');
+
+                // Whatever this vendor already holds stays selectable, even if it is
+                // not one of the terms above. Without this, opening the form to fix a
+                // phone number would blank the incoterm on save, and that value is
+                // printed straight onto the PO/PI. Keeping it record-local means an
+                // odd legacy value cannot spread to the other vendors' dropdowns.
+                if ($selectedIncoterm !== '' && ! in_array($selectedIncoterm, $incoterms, true)) {
+                    $incoterms[] = $selectedIncoterm;
+                }
             @endphp
 
             <option value="">Select Incoterm</option>
@@ -131,8 +140,15 @@
         <label class="form-label">Ship Mode</label>
         <select name="ship_mode" class="form-select @error('ship_mode') is-invalid @enderror">
             @php
-                $shipModes = ['Sea', 'Air', 'Courier', 'Truck'];
+                // Upper case throughout: that is how all but a handful of the stored
+                // values are already written, so the canonical list matches the data
+                // instead of shadowing it with a second casing of the same mode.
+                $shipModes = ['SEA', 'AIR', 'ROAD', 'COURIER', 'TRUCK', 'AIR + SEA', 'SEA + AIR'];
                 $selectedShipMode = old('ship_mode', $supplier->ship_mode ?? '');
+
+                if ($selectedShipMode !== '' && ! in_array($selectedShipMode, $shipModes, true)) {
+                    $shipModes[] = $selectedShipMode;
+                }
             @endphp
 
             <option value="">Select Ship Mode</option>
