@@ -40,6 +40,38 @@ class PurchaseSetupController extends Controller
         return view('store.stock.purchase-setup', compact('suppliers', 'canEdit', 'canDelete'));
     }
 
+    /**
+     * One supplier: its contact details, and every General Stock purchase
+     * recorded against it.
+     *
+     * Read-only reporting over rows that already exist. Purchases are linked by
+     * `general_stock_supplier_id`; the ones recorded before that link existed
+     * carry only a `supplier_name` string and are deliberately NOT matched by
+     * name here — a guessed match would put someone else's purchase on this
+     * vendor's page.
+     */
+    public function show(GeneralStockSupplier $supplier)
+    {
+        ['edit' => $canEdit] = $this->storeCorrectionAbilities();
+
+        $purchases = $supplier->purchases()
+            ->with('stockItem:id,name,uom')
+            ->orderByDesc('purchase_date')
+            ->orderByDesc('id')
+            ->get();
+
+        // qty * unit_price rather than a stored total: stock_purchases has no
+        // amount column, and the line total is shown the same way.
+        $summary = [
+            'lines' => $purchases->count(),
+            'deliveries' => $purchases->pluck('rv_no')->filter()->unique()->count(),
+            'total' => $purchases->sum(fn ($p) => (float) $p->qty * (float) $p->unit_price),
+            'last_date' => optional($purchases->first())->purchase_date,
+        ];
+
+        return view('store.stock.supplier-detail', compact('supplier', 'purchases', 'summary', 'canEdit'));
+    }
+
     public function store(Request $request)
     {
         $data = $this->validated($request);
@@ -174,6 +206,12 @@ class PurchaseSetupController extends Controller
                 // block re-adding it, which is why this is not a DB index.
                 Rule::unique('general_stock_suppliers', 'name')->whereNull('deleted_at')->ignore($ignoreId),
             ],
+            // Contact details, all optional. A supplier the store has only ever
+            // been given a name for must still be addable.
+            'contact_person' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address' => ['nullable', 'string', 'max:1000'],
             // is_active is an edit-time toggle only — it decides whether the
             // supplier still appears in the Record Purchase dropdown.
             'is_active' => ['nullable', 'boolean'],

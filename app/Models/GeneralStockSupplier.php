@@ -21,11 +21,16 @@ class GeneralStockSupplier extends Model
     use HasFactory, SoftDeletes;
 
     /**
-     * Name only. The store just needs to say which vendor a challan came from;
-     * contact details are not recorded here.
+     * Name, plus the contact details the store needs to reach a vendor before
+     * placing a purchase. All optional - Name is the only thing required to
+     * add a supplier, and the list predates these fields.
      */
     protected $fillable = [
         'name',
+        'contact_person',
+        'phone',
+        'email',
+        'address',
         'is_active',
         'created_by',
     ];

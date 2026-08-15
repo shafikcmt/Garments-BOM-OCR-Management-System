@@ -227,6 +227,10 @@ Route::prefix('store')
             // Declared before /{supplier} so "bulk-delete" is never taken for a
             // supplier id by the DELETE route below.
             Route::delete('/purchase-setup/bulk-delete', [PurchaseSetupController::class, 'bulkDestroy'])->name('purchase-setup.bulk-delete');
+            // One supplier: contact details and its purchase history. Read-only,
+            // so it needs nothing beyond reaching the Setup section. Declared
+            // after "template" and "import" so neither is taken for an id.
+            Route::get('/purchase-setup/{supplier}', [PurchaseSetupController::class, 'show'])->name('purchase-setup.show');
             Route::put('/purchase-setup/{supplier}', [PurchaseSetupController::class, 'update'])->name('purchase-setup.update');
             Route::delete('/purchase-setup/{supplier}', [PurchaseSetupController::class, 'destroy'])->name('purchase-setup.destroy');
             });

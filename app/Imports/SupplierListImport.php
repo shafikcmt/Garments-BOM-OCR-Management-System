@@ -23,11 +23,19 @@ class SupplierListImport implements ToArray, WithCustomCsvSettings
      */
     public const COLUMNS = [
         'Supplier Name*',
+        'Contact Person',
+        'Phone',
+        'Email',
+        'Address',
     ];
 
     /** One example row, skipped on import (see EXAMPLE_PREFIX). */
     public const SAMPLE_ROW = [
         'EXAMPLE — delete this row',
+        'Rahim Uddin',
+        '+8801711000000',
+        'rahim@example.com',
+        '12 Station Road, Tangail',
     ];
 
     /** Supplier names starting with this are treated as template placeholders. */
@@ -105,11 +113,16 @@ class SupplierListImport implements ToArray, WithCustomCsvSettings
 
             $seen[$key] = true;
 
-            // Only the first column is read. Anything else in the file is
-            // ignored rather than rejected, so a list exported from someone's
-            // own spreadsheet still imports.
+            // Name is the only column required. The contact columns are read
+            // when present and simply come out null when they are not, so a
+            // one-column file written to the older template - or a list
+            // exported from someone's own spreadsheet - still imports.
             $suppliers[] = [
                 'name' => $name,
+                'contact_person' => self::text($row[1] ?? null),
+                'phone' => self::text($row[2] ?? null, 50),
+                'email' => self::text($row[3] ?? null),
+                'address' => self::text($row[4] ?? null, 1000),
                 'is_active' => true,
             ];
         }

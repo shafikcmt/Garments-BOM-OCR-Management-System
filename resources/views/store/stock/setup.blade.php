@@ -117,6 +117,23 @@
                                            maxlength="{{ $isSuppliers($key) ? 255 : 150 }}" required
                                            placeholder="{{ $tab['placeholder'] }}">
 
+                                    {{-- Contact details, suppliers only and all optional.
+                                         Editing them lives on the supplier's own page, so
+                                         this is the one place they are typed in bulk. --}}
+                                    @if($isSuppliers($key))
+                                        <label class="form-label" for="contact_person-{{ $key }}">Contact Person</label>
+                                        <input id="contact_person-{{ $key }}" name="contact_person" class="form-control mb-3" maxlength="255">
+
+                                        <label class="form-label" for="phone-{{ $key }}">Phone</label>
+                                        <input id="phone-{{ $key }}" name="phone" class="form-control mb-3" maxlength="50">
+
+                                        <label class="form-label" for="email-{{ $key }}">Email</label>
+                                        <input id="email-{{ $key }}" type="email" name="email" class="form-control mb-3" maxlength="255">
+
+                                        <label class="form-label" for="address-{{ $key }}">Address</label>
+                                        <textarea id="address-{{ $key }}" name="address" rows="2" class="form-control mb-3" maxlength="1000"></textarea>
+                                    @endif
+
                                     {{-- Suppliers has no remarks column. --}}
                                     @if($tab['has_remarks'])
                                         <label class="form-label" for="remarks-{{ $key }}">Remarks</label>
@@ -240,6 +257,13 @@
                                                          (store.edit / store.delete); both controller
                                                          methods enforce the same check server-side. --}}
                                                     <td class="text-end gx-stock-actions">
+                                                        {{-- Suppliers have a page of their own: contact
+                                                             details and what has been bought from them.
+                                                             Read-only, so no permission beyond this screen. --}}
+                                                        @if($isSuppliers($key))
+                                                            <a href="{{ route('store.stock.purchase-setup.show', $row->id) }}"
+                                                               class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</a>
+                                                        @endif
                                                         @if($canEdit)
                                                             <button type="button" class="btn btn-sm btn-outline-primary"
                                                                     data-bs-toggle="modal" data-bs-target="#edit-{{ $key }}-{{ $row->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
@@ -251,7 +275,7 @@
                                                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                                             </form>
                                                         @endif
-                                                        @if(! $canEdit && ! $canDelete)
+                                                        @if(! $canEdit && ! $canDelete && ! $isSuppliers($key))
                                                             <span class="text-muted small">—</span>
                                                         @endif
                                                     </td>
