@@ -126,7 +126,7 @@
                 </div>
                 <div class="col-12 col-md-6 col-xl-3">
                     <label class="form-label" for="search">Search</label>
-                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item, challan, RV, supplier">
+                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item, challan, GRN, supplier">
                 </div>
                 <div class="col-12 col-md-6 col-xl-3 d-flex gap-2 align-items-end">
                     <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>

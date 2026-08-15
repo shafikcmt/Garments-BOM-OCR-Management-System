@@ -292,7 +292,7 @@ class StockPurchaseController extends Controller
 
         return back()
             ->with('success', $count.' '.($count === 1 ? 'delivery' : 'deliveries')
-                .' imported under '.$count.' new RV '.($count === 1 ? 'number' : 'numbers')
+                .' imported under '.$count.' new GRN '.($count === 1 ? 'number' : 'numbers')
                 .', covering '.$lineCount.' item line(s).')
             // Errors are not a failure here — they name the challans that were
             // left out while the rest went in, so they stay on screen.

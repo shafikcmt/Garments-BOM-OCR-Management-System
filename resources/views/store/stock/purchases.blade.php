@@ -247,7 +247,7 @@
                 <div class="col-6 col-md-7">
                     <label class="form-label" for="purchaseFilterSearch">Search</label>
                     <input id="purchaseFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control"
-                           placeholder="Item, challan, RV, supplier">
+                           placeholder="Item, challan, GRN, supplier">
                 </div>
                 <div class="col-12 col-md-2 gx-stock-filter-actions">
                     <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
@@ -290,7 +290,7 @@
                                 <td>
                                     <div class="fw-bold text-slate-900">{{ $group->rv_no ?: '—' }}</div>
                                     @if($isLegacy && $group->rv_no)
-                                        <div class="gx-stock-spec">entered before RV numbering</div>
+                                        <div class="gx-stock-spec">entered before GRN numbering</div>
                                     @endif
                                 </td>
                                 <td class="small">{{ $group->challan_no ?: '—' }}</td>
@@ -401,7 +401,7 @@
                             Challan Date, Item Name and Purchased Qty are required on every row. Item names must
                             already exist under Items. Blank RCV Date follows the Challan Date. The file's GRN No,
                             Month, Uom, Category and Total Value are read for checking only — the item master and
-                            this system's own RV numbering are used. A delivery already in Purchase History is
+                            this system's own GRN numbering are used. A delivery already in Purchase History is
                             skipped, so re-uploading a corrected file is safe.
                         </p>
                     </form>
