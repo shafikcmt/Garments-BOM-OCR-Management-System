@@ -217,6 +217,10 @@
                                                     </th>
                                                 @endif
                                                 <th style="min-width:200px;">Name</th>
+                                                {{-- Suppliers only: the other masters are a name and nothing else. --}}
+                                                @if($isSuppliers($key))
+                                                    <th style="min-width:150px;">Contact</th>
+                                                @endif
                                                 <th>Status</th>
                                                 <th class="text-end">Used On</th>
                                                 <th>{{ $tab['has_remarks'] ? 'Remarks' : 'Added' }}</th>
@@ -228,7 +232,12 @@
                                                 @php $used = (int) ($row->{$usedCount} ?? 0); @endphp
                                                 {{-- The name is carried on the row so the search matches the
                                                      stored value, not whatever the cell happens to render. --}}
-                                                <tr data-setup-row="{{ $key }}" data-row-name="{{ \Illuminate\Support\Str::lower($row->name) }}">
+                                                <tr data-setup-row="{{ $key }}" data-row-name="{{ \Illuminate\Support\Str::lower($row->name) }}"
+                                                    @if($isSuppliers($key))
+                                                        {{-- Anything else the row shows that is worth searching by.
+                                                             A phone number nobody can search for is half a column. --}}
+                                                        data-row-extra="{{ \Illuminate\Support\Str::lower(trim($row->contact_person.' '.$row->phone)) }}"
+                                                    @endif>
                                                     @if($canBulkDelete)
                                                         <td>
                                                             {{-- form= lets the checkbox live in the table while
@@ -240,6 +249,20 @@
                                                         </td>
                                                     @endif
                                                     <td class="fw-semibold text-slate-900">{{ $row->name }}</td>
+                                                    {{-- Contact person over phone, the same shape the Buyer/Style
+                                                         vendor list uses, so one column carries both. --}}
+                                                    @if($isSuppliers($key))
+                                                        <td>
+                                                            @if($row->contact_person || $row->phone)
+                                                                <div class="text-slate-900">{{ $row->contact_person ?: '—' }}</div>
+                                                                @if($row->phone)
+                                                                    <div class="gx-stock-spec"><i class="bi bi-telephone me-1" aria-hidden="true"></i>{{ $row->phone }}</div>
+                                                                @endif
+                                                            @else
+                                                                <span class="text-muted">—</span>
+                                                            @endif
+                                                        </td>
+                                                    @endif
                                                     <td>
                                                         @if($row->is_active)
                                                             <span class="badge bg-success-subtle text-success">Active</span>
@@ -318,7 +341,7 @@
                                                     </div>
                                                 @endif
                                             @empty
-                                                <tr><td colspan="{{ $canBulkDelete ? 6 : 5 }}" class="gx-stock-empty">
+                                                <tr><td colspan="{{ ($canBulkDelete ? 6 : 5) + ($isSuppliers($key) ? 1 : 0) }}" class="gx-stock-empty">
                                                         <span class="gx-stock-empty-icon"><i class="bi {{ $tab['icon'] }}" aria-hidden="true"></i></span>
                                                         <div class="gx-stock-empty-title">No {{ strtolower($tab['label']) }} yet</div>
                                                         <div class="gx-stock-empty-hint">Add one on the left, or import a list.</div>
@@ -327,7 +350,7 @@
 
                                             {{-- Shown by the search only when a term matches nothing. --}}
                                             <tr data-no-match="{{ $key }}" hidden>
-                                                <td colspan="{{ $canBulkDelete ? 6 : 5 }}" class="gx-stock-empty">
+                                                <td colspan="{{ ($canBulkDelete ? 6 : 5) + ($isSuppliers($key) ? 1 : 0) }}" class="gx-stock-empty">
                                                     <span class="gx-stock-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>
                                                     <div class="gx-stock-empty-title">No match</div>
                                                     <div class="gx-stock-empty-hint">No {{ strtolower($tab['label']) }} name contains <strong data-no-match-term="{{ $key }}"></strong>.</div>
@@ -440,7 +463,9 @@
                     var shown = 0;
 
                     rows.forEach(function (tr) {
-                        var hit = term === '' || (tr.dataset.rowName || '').indexOf(term) !== -1;
+                        var hit = term === ''
+                            || (tr.dataset.rowName || '').indexOf(term) !== -1
+                            || (tr.dataset.rowExtra || '').indexOf(term) !== -1;
                         tr.hidden = !hit;
 
                         // Clear the tick on anything that just left the screen,

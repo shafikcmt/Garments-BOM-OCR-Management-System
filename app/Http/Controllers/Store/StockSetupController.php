@@ -73,8 +73,13 @@ class StockSetupController extends Controller
                 'has_remarks' => false,
                 'blocks_delete_when_used' => false,
                 'import_help' => 'Upload many suppliers at once. Start from the sample template so the columns line up.',
+                // Contact person and phone come along for the list's Contact
+                // column — the point of holding them is being able to reach a
+                // vendor without opening each one in turn. Email and address
+                // stay on the supplier's own page; they are too long to sit in
+                // a table row.
                 'rows' => GeneralStockSupplier::withCount('purchases')->orderBy('name')
-                    ->get(['id', 'name', 'is_active', 'created_at']),
+                    ->get(['id', 'name', 'contact_person', 'phone', 'is_active', 'created_at']),
             ],
         ];
 
