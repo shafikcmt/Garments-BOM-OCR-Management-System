@@ -12,6 +12,7 @@ function initTable(root) {
     const tbody = root.querySelector('tbody');
     const search = root.querySelector('[data-file-search]');
     const status = root.querySelector('[data-file-status]');
+    const buyer = root.querySelector('[data-file-buyer]');
     const clearBtn = root.querySelector('[data-file-clear]');
     const exportBtn = root.querySelector('[data-file-export]');
     const exportCount = root.querySelector('[data-file-export-count]');
@@ -37,6 +38,10 @@ function initTable(root) {
             chips.push(['search', 'Search: "' + search.value.trim() + '"']);
         }
 
+        if (buyer?.value) {
+            chips.push(['buyer', 'Buyer: ' + buyer.options[buyer.selectedIndex].text]);
+        }
+
         if (status.value) {
             chips.push(['status', 'Status: ' + status.value]);
         }
@@ -56,11 +61,16 @@ function initTable(root) {
     function applyFilters() {
         const term = search.value.trim().toLowerCase();
         const wanted = status.value.toLowerCase();
+        const wantedBuyer = (buyer?.value || '').toLowerCase();
 
         rows().forEach((row) => {
             const haystack = row.dataset.search || '';
             const rowStatus = (row.dataset.status || '').toLowerCase();
-            const matches = (!term || haystack.includes(term)) && (!wanted || rowStatus === wanted);
+            const rowBuyer = (row.dataset.buyer || '').toLowerCase();
+            const matches =
+                (!term || haystack.includes(term)) &&
+                (!wanted || rowStatus === wanted) &&
+                (!wantedBuyer || rowBuyer === wantedBuyer);
 
             row.classList.toggle('d-none', !matches);
 
@@ -134,10 +144,12 @@ function initTable(root) {
     // --- Events -----------------------------------------------------------
     search.addEventListener('input', applyFilters);
     status.addEventListener('change', applyFilters);
+    buyer?.addEventListener('change', applyFilters);
 
     clearBtn.addEventListener('click', () => {
         search.value = '';
         status.value = '';
+        if (buyer) buyer.value = '';
         applyFilters();
     });
 
@@ -148,6 +160,7 @@ function initTable(root) {
 
         if (key === 'search') search.value = '';
         if (key === 'status') status.value = '';
+        if (key === 'buyer' && buyer) buyer.value = '';
 
         applyFilters();
     });

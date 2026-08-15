@@ -102,9 +102,9 @@ it('does not load rows beyond the first', function () {
     $queries = DB::getQueryLog();
     DB::disableQueryLog();
 
-    // Three targeted lookups: first rows, headers, cells. The point is that it
-    // is a fixed number regardless of how large the BOM is.
-    expect(count($queries))->toBeLessThanOrEqual(3);
+    // Four targeted lookups: assigned buyers, first rows, headers, cells. The
+    // point is that it is a fixed number regardless of how large the BOM is.
+    expect(count($queries))->toBeLessThanOrEqual(4);
 });
 
 it('returns blanks for a file with no rows rather than failing', function () {

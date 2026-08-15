@@ -21,6 +21,8 @@ class User extends Authenticatable
         'password',
         'status',
         'is_department_admin',
+        'buyer_id',
+        'can_upload',
         'profile_photo',
         'signature_path',
         'last_login_at',
@@ -35,6 +37,7 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'last_login_at' => 'datetime',
         'is_department_admin' => 'boolean',
+        'can_upload' => 'boolean',
         'password' => 'hashed',
     ];
 
@@ -75,6 +78,80 @@ class User extends Authenticatable
     public function isDepartmentAdmin(): bool
     {
         return $this->is_department_admin === true && $this->departmentKey() !== null;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Buyer scoping — Merchandising only
+    |--------------------------------------------------------------------------
+    |
+    | Buyer scoping exists for one department. Every method below asks
+    | isMerchantDepartment() first and answers null/false for everybody else,
+    | so Commercial, Store, Accounts, Supply Chain, Production and the super
+    | admin never reach a buyer comparison at all.
+    */
+
+    /** The buyer a normal merchant user was created under. */
+    public function buyer()
+    {
+        return $this->belongsTo(Buyer::class);
+    }
+
+    /** The buyer this user owns as its Merchant department-admin, if any. */
+    public function ownedBuyer()
+    {
+        return $this->hasOne(Buyer::class, 'department_admin_id');
+    }
+
+    /**
+     * Whether buyer scoping applies to this user at all.
+     *
+     * The super admin is excluded here rather than at each call site: they
+     * oversee every department and hold no buyer, and treating them as a
+     * scoped merchant is how the one account that must never be locked out
+     * gets locked out.
+     */
+    public function isMerchantDepartment(): bool
+    {
+        return ! $this->hasRole('admin') && $this->departmentKey() === 'merchandising';
+    }
+
+    /**
+     * The buyer this merchant is confined to, or null when unconfined.
+     *
+     * Two sources, because the assignment is recorded in two places for two
+     * different kinds of user: a department-admin owns a buyer
+     * (buyers.department_admin_id), a normal user inherits one at creation
+     * (users.buyer_id). Null means unscoped — the state of every user that
+     * existed before buyer scoping, and deliberately unrestricted.
+     */
+    public function merchantBuyerId(): ?int
+    {
+        if (! $this->isMerchantDepartment()) {
+            return null;
+        }
+
+        if ($this->isDepartmentAdmin()) {
+            return $this->ownedBuyer()->value('id');
+        }
+
+        return $this->buyer_id;
+    }
+
+    /**
+     * Whether this merchant may upload a BOM file.
+     *
+     * Unscoped users keep today's behaviour. A scoped department-admin uploads
+     * for the buyer they own. A scoped normal user uploads only where their
+     * own department-admin has granted the override.
+     */
+    public function mayUploadBom(): bool
+    {
+        if ($this->merchantBuyerId() === null) {
+            return true;
+        }
+
+        return $this->isDepartmentAdmin() || $this->can_upload === true;
     }
 
     /**

@@ -11,6 +11,16 @@
     $fileSummaries = $fileSummaries ?? [];
 
     $statusOptions = collect($files)->pluck('status')->filter()->unique()->sort()->values();
+
+    // Built from the buyer names already resolved for the rows on this page, so
+    // the dropdown can never offer a buyer the list cannot show. Display-only:
+    // every department still receives every file from the controller.
+    $buyerOptions = collect($fileSummaries)
+        ->pluck('Buyer Name')
+        ->filter()
+        ->unique()
+        ->sort()
+        ->values();
 @endphp
 
 <div class="card shadow-sm border-0 gx-card" data-file-table>
@@ -19,7 +29,7 @@
              suits a list this size and keeps the lock/permission logic below
              server-rendered. --}}
         <div class="row g-2 align-items-end mb-3">
-            <div class="col-12 col-lg-5">
+            <div class="col-12 col-lg-4">
                 <label class="form-label small fw-semibold mb-1" for="fileSearch">Search</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
@@ -29,6 +39,16 @@
             </div>
 
             <div class="col-6 col-lg-3">
+                <label class="form-label small fw-semibold mb-1" for="fileBuyer">Buyer</label>
+                <select id="fileBuyer" class="form-select" data-file-buyer>
+                    <option value="">All buyers</option>
+                    @foreach($buyerOptions as $option)
+                        <option value="{{ strtolower($option) }}">{{ $option }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="col-6 col-lg-2">
                 <label class="form-label small fw-semibold mb-1" for="fileStatus">Status</label>
                 <select id="fileStatus" class="form-select" data-file-status>
                     <option value="">All statuses</option>
@@ -38,7 +58,7 @@
                 </select>
             </div>
 
-            <div class="col-6 col-lg-4 d-flex gap-2">
+            <div class="col-12 col-lg-3 d-flex gap-2">
                 <button type="button" class="btn btn-outline-secondary" data-file-clear>Clear</button>
                 <button type="button" class="btn btn-outline-primary" data-file-export disabled>
                     <i class="bi bi-download me-1" aria-hidden="true"></i>Export <span data-file-export-count></span>
@@ -105,6 +125,7 @@
                     <tr class="{{ $isLockedForCurrentUser ? 'table-warning' : '' }}"
                         data-file-row
                         data-status="{{ $status }}"
+                        data-buyer="{{ strtolower($summary['Buyer Name']) }}"
                         data-search="{{ strtolower(collect($summary)->filter()->implode(' ')) }}">
                         <td>
                             <input type="checkbox" class="form-check-input" data-file-check

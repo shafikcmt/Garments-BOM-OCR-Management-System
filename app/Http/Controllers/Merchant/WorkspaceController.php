@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Merchant;
 
 use App\Http\Controllers\Controller;
+use App\Models\Buyer;
 use App\Models\ExcelFile;
 use App\Models\ExcelHeader;
 use Spatie\Permission\Models\Role;
@@ -30,6 +31,21 @@ class WorkspaceController extends Controller
                 ->get()
             : collect();
 
-        return view('merchant.workspace', compact('files', 'merchantInputHeaders', 'fileSummaries'));
+        // Only active buyers are offered on upload. Inactive ones stay valid on
+        // files already tagged with them.
+        $buyers = Buyer::active()->orderBy('buyer_name')->get();
+
+        // Buyer scoping, Merchandising only. All three are null/true for an
+        // unscoped merchant, which is every merchant that exists today, so the
+        // upload panel renders exactly as it does now for them.
+        $user = auth()->user();
+        $scopedBuyer = $user?->merchantBuyerId()
+            ? $buyers->firstWhere('id', $user->merchantBuyerId()) ?? Buyer::find($user->merchantBuyerId())
+            : null;
+        $canUpload = $user?->mayUploadBom() ?? false;
+
+        return view('merchant.workspace', compact(
+            'files', 'merchantInputHeaders', 'fileSummaries', 'buyers', 'scopedBuyer', 'canUpload'
+        ));
     }
 }

@@ -877,6 +877,16 @@
         </div>
     @endif
 
+    {{-- A second, independent reason this file can be read-only: it belongs to
+         another buyer. Shown separately from the admin lock above because the
+         cause and the remedy are different ones. --}}
+    @if($isBuyerLockedForUser ?? false)
+        <div class="alert alert-warning py-2 px-3 mb-3 rounded-3">
+            <div class="fw-bold"><i class="bi bi-bag-check me-1" aria-hidden="true"></i>This file belongs to another buyer.</div>
+            <div class="small">You can view it in full, but only the buyer's own team can edit cells or add rows.</div>
+        </div>
+    @endif
+
     @if(!empty($highlightBatchId) && isset($highlightedCellKeys) && $highlightedCellKeys->count() > 0)
     <div class="alert notification-highlight-alert py-2 px-3 mb-3">
         Merchant updated {{ $highlightedCellKeys->count() }} cell(s). Highlighted cells show the specific changes from this notification.
@@ -1101,7 +1111,7 @@
                                         || in_array($header->header_key, $calculatedHeaderKeys ?? [], true);
                                     $roleClass = $headerRoleClass($header);
                                     $roleLabel = ucfirst(str_replace('_', ' ', optional($header->ownerRole)->name ?? 'N/A'));
-                                    $canEditHeaderColumn = in_array($header->id, $editableHeaderIds, true) && !($isFileLockedForUser ?? false) && !$isHeaderCalculated;
+                                    $canEditHeaderColumn = in_array($header->id, $editableHeaderIds, true) && !($isFileLockedForUser ?? false) && !($isBuyerLockedForUser ?? false) && !$isHeaderCalculated;
                                 @endphp
                                 <th
                                     class="role-column {{ $roleClass }} {{ $isHeaderCalculated ? 'formula-header-cell' : '' }}"
@@ -1180,7 +1190,7 @@
                                     $value = $cell->value ?? '';
                                     $isCalculated = in_array($header->id, $calculatedHeaderIds ?? [], true)
                                         || in_array($header->header_key, $calculatedHeaderKeys ?? [], true);
-                                    $editable = in_array($header->id, $editableHeaderIds, true) && !$isCalculated && !$isPoRowLocked && !($isFileLockedForUser ?? false);
+                                    $editable = in_array($header->id, $editableHeaderIds, true) && !$isCalculated && !$isPoRowLocked && !($isFileLockedForUser ?? false) && !($isBuyerLockedForUser ?? false);
                                     $cellHighlightKey = $row->id . '-' . $header->id;
                                     $isHighlightedCell = isset($highlightedCellKeys) && $highlightedCellKeys->contains($cellHighlightKey);
                                     $roleClass = $headerRoleClass($header);

@@ -181,6 +181,75 @@
                             </div>
                         @endif
 
+                        {{-- Buyer assignment, shown but never edited here. The
+                             owning column lives on the buyer, so Admin > Buyers
+                             is the one screen that sets it; showing it read-only
+                             answers "which buyer is this person on" where you
+                             would look for it.
+
+                             A department admin with no buyer yet gets a pointer
+                             to that screen rather than blank space: ticking the
+                             Department Admin flag is only half the setup, and
+                             an empty section reads as "nothing to do here". A
+                             normal user without a buyer still shows nothing —
+                             they inherit one at creation and have nothing to
+                             act on. --}}
+                        @if($assignedBuyer)
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold d-block">Assigned Buyer</label>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                    <i class="bi bi-tag-fill me-1" aria-hidden="true"></i>{{ $assignedBuyer->buyer_name }}
+                                </span>
+                                <div class="form-text">
+                                    @if($user->isDepartmentAdmin())
+                                        Owns this buyer. Change it from
+                                        <a href="{{ route('admin.buyers.index') }}">Admin &rsaquo; Buyers</a>.
+                                    @else
+                                        Inherited from the department admin who created this account.
+                                    @endif
+                                </div>
+                            </div>
+                        @elseif($user->isDepartmentAdmin())
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold d-block">Assigned Buyer</label>
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">
+                                    <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>Not assigned yet
+                                </span>
+                                <div class="form-text">
+                                    This department admin owns no buyer yet — assign one from
+                                    <a href="{{ route('admin.buyers.index') }}">Admin &rsaquo; Buyers</a>.
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- BOM upload override — Merchandising only, and the
+                             one control on this form that belongs to a
+                             department admin rather than a super admin. A
+                             merchant scoped to a buyer does not upload unless
+                             the admin who owns that buyer says so.
+
+                             Same hidden-marker reasoning as above: the control
+                             is absent for everyone else, so its absence must
+                             read as "not shown", never as "untick it". --}}
+                        @can('setCanUpload', $user)
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold d-block">BOM Upload</label>
+                                <input type="hidden" name="can_upload_control" value="1">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch"
+                                           id="canUploadSwitch" name="can_upload" value="1"
+                                           @checked(old('can_upload', $user->can_upload))>
+                                    <label class="form-check-label" for="canUploadSwitch">
+                                        Can upload BOM files for {{ $user->buyer?->buyer_name }}
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Off by default. Turn this on for team members who prepare and upload
+                                    BOM files themselves. It applies to your buyer only.
+                                </div>
+                            </div>
+                        @endcan
+
                         {{-- Additional permissions, saved by this same form so
                              role and permissions can never be posted apart. --}}
                         <div class="border-top pt-4 mb-4">

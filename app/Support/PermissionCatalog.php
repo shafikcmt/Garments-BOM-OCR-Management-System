@@ -119,13 +119,23 @@ class PermissionCatalog
     /**
      * Every permission, grouped for display.
      *
+     * $only narrows the catalog to a named set — the permissions the person
+     * doing the editing holds themselves. A module left with nothing in it
+     * disappears entirely, which is the point: a department admin should not be
+     * reading the names of modules they have no rights in off a grant form.
+     * Null means the whole catalog (super admin), which is not the same as an
+     * empty list and must not be flattened into one.
+     *
+     * @param  list<string>|null  $only
      * @return Collection<string, array{label: string, rows: array<int, array{
      *     section: string|null, actions: array<string, array{id: int, name: string, label: string}>
      * }>}>
      */
-    public function grouped(): Collection
+    public function grouped(?array $only = null): Collection
     {
-        return Permission::orderBy('name')->get()
+        return Permission::orderBy('name')
+            ->when($only !== null, fn ($q) => $q->whereIn('name', $only))
+            ->get()
             ->groupBy(fn (Permission $p) => $this->moduleKeyOf($p->name))
             ->map(function (Collection $permissions, string $moduleKey) {
                 $rows = $permissions
@@ -219,11 +229,13 @@ class PermissionCatalog
      * The action columns actually in use, so the matrix does not draw ten empty
      * columns on an install that only uses four.
      *
+     * @param  list<string>|null  $only
      * @return array<int, string>
      */
-    public function actionColumns(): array
+    public function actionColumns(?array $only = null): array
     {
-        $used = Permission::pluck('name')
+        $used = Permission::when($only !== null, fn ($q) => $q->whereIn('name', $only))
+            ->pluck('name')
             ->map(fn (string $name) => $this->actionKeyOf($name))
             ->unique()
             ->all();

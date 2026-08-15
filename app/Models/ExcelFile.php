@@ -14,6 +14,7 @@ class ExcelFile extends Model
         'original_file_name',
         'file_path',
         'uploaded_by',
+        'buyer_id',
         'upload_batch_no',
         'total_rows',
         'status',
@@ -41,6 +42,11 @@ class ExcelFile extends Model
     public function uploader()
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    public function buyer()
+    {
+        return $this->belongsTo(Buyer::class);
     }
 
     public function lockedBy()
@@ -93,6 +99,45 @@ class ExcelFile extends Model
         }
 
         return true;
+    }
+
+    /**
+     * Whether buyer scoping makes this file read-only for a merchant.
+     *
+     * The sibling of isLockedForUser() above: same question shape, same two
+     * callers (the controller and the workspace view), a different reason. It
+     * is applied IN ADDITION to the admin lock and to canEditHeader — none of
+     * the three replaces another, and a file is editable only when all three
+     * allow it.
+     *
+     * Five ways to be unrestricted, checked before any buyer is compared:
+     *
+     *   no user            nothing to scope.
+     *   super admin        oversees every buyer; never scoped.
+     *   another department Commercial, Store, Accounts, Supply Chain and
+     *                      Production have no buyer concept. This is the line
+     *                      that keeps them provably untouched — they return
+     *                      here, before the file's buyer is ever read.
+     *   unscoped merchant  a merchant with no buyer assignment, which is every
+     *                      merchant that existed before this feature.
+     *   untagged file      a file uploaded before buyer tagging existed. It
+     *                      belongs to no buyer, so no buyer's admin can claim
+     *                      it, and locking everyone out of the entire existing
+     *                      archive is not a scope rule — it is an outage.
+     */
+    public function isBuyerLockedForUser(?User $user = null): bool
+    {
+        if (! $user || ! $user->isMerchantDepartment()) {
+            return false;
+        }
+
+        $theirs = $user->merchantBuyerId();
+
+        if ($theirs === null || $this->buyer_id === null) {
+            return false;
+        }
+
+        return (int) $this->buyer_id !== (int) $theirs;
     }
 
     public function lockScopeLabel(): string

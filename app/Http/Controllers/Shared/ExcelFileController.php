@@ -60,7 +60,12 @@ class ExcelFileController extends Controller
             ->pluck('id')
             ->all();
 
-        $editableHeaderIds = $isFileLockedForUser
+        // Buyer scoping is a second, independent reason a file can be read-only
+        // for a merchant. Rendering it exactly as the admin lock does keeps the
+        // screen honest: a user who cannot save must not be shown inputs.
+        $isBuyerLockedForUser = $excelFile->isBuyerLockedForUser($user);
+
+        $editableHeaderIds = ($isFileLockedForUser || $isBuyerLockedForUser)
             ? []
             : $headers
                 ->filter(fn ($header) => $this->canEditHeader($header, $roleIds))
@@ -145,7 +150,9 @@ class ExcelFileController extends Controller
                 ->update(['read_at' => now()]);
         }
 
-        $canAddRow = ($user->hasRole('admin') || $user->hasRole('merchant')) && ! $isFileLockedForUser;
+        $canAddRow = ($user->hasRole('admin') || $user->hasRole('merchant'))
+            && ! $isFileLockedForUser
+            && ! $isBuyerLockedForUser;
         $canDeleteFile = $user->hasRole('admin') || $user->hasRole('merchant');
 
         // Latest PRA dates per PI No., pre-formatted for the live (client-side)
@@ -196,6 +203,7 @@ class ExcelFileController extends Controller
             'lockedRowIds',
             'lockedRowInfo',
             'isFileLockedForUser',
+            'isBuyerLockedForUser',
             'fileLockInfo',
             'orderInfo',
             'perPage',
@@ -240,6 +248,14 @@ class ExcelFileController extends Controller
             return redirect()
                 ->route('uploaded-files.show', $excelFile->id)
                 ->with('warning', 'This file is locked by admin. You can view it, but you cannot edit or update records.');
+        }
+
+        // In addition to the admin lock above and canEditHeader below — all
+        // three must allow the save, and none of them replaces another.
+        if ($excelFile->isBuyerLockedForUser($user)) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'This file belongs to another buyer. You can view it, but only its own buyer team can edit it.');
         }
 
         $roleIds = $this->getRoleIds();
@@ -405,6 +421,12 @@ class ExcelFileController extends Controller
             return redirect()
                 ->route('uploaded-files.show', $excelFile->id)
                 ->with('warning', 'This file is locked by admin. New rows cannot be added until it is unlocked for your user or role.');
+        }
+
+        if ($excelFile->isBuyerLockedForUser($user)) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'This file belongs to another buyer. Only its own buyer team can add rows to it.');
         }
 
         DB::transaction(function () use ($excelFile, $user) {

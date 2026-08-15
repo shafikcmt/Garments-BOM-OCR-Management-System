@@ -144,12 +144,25 @@ class UserController extends Controller
      * changes — without a round trip, and without the admin having to guess
      * which of the boxes the role already covers.
      *
+     * $grantOnly is off for the read-only profile: that screen reports what a
+     * user actually holds, and trimming it to the viewer's own rights would
+     * quietly under-report someone's access. On the grant forms it is on — see
+     * $visible below.
+     *
      * @return array<string, mixed>
      */
-    private function permissionMatrixData(?User $user = null): array
+    private function permissionMatrixData(?User $user = null, bool $grantOnly = true): array
     {
         $catalog = new PermissionCatalog();
         $scope = $this->scope();
+
+        // The matrix used to list every permission in the system to everybody,
+        // relying on locked checkboxes to stop a department admin granting what
+        // they do not hold. The server still refuses that, but a form should not
+        // offer it at all: an admin with no Accounts rights has no business
+        // being shown the Accounts module on a create-user screen. Null for a
+        // super admin, so their screen is untouched.
+        $visible = $grantOnly ? $scope->grantablePermissions() : null;
 
         // A department admin is offered their own department and no other, so
         // the select has one option and cannot be used to move somebody out.
@@ -163,8 +176,8 @@ class UserController extends Controller
             );
 
         return [
-            'permissionGroups' => $catalog->grouped(),
-            'actionColumns' => $catalog->actionColumns(),
+            'permissionGroups' => $catalog->grouped($visible),
+            'actionColumns' => $catalog->actionColumns($visible),
             'catalog' => $catalog,
             'departments' => $departments,
             'scope' => $scope,
@@ -283,6 +296,55 @@ class UserController extends Controller
     }
 
     /**
+     * The buyer a newly created user inherits.
+     *
+     * Read from the ACTOR, never from the request: there is no buyer field on
+     * the create form, and there must not be one. A department admin creating
+     * a user is creating one of their own team, so the buyer is a fact about
+     * who is doing the creating rather than a choice they make.
+     *
+     * Null for everyone else — a super admin's new users are unscoped, exactly
+     * as every user is today. The new role is checked too, so a merchant admin
+     * who somehow creates a non-merchant user does not scope them to a buyer
+     * their department cannot see.
+     */
+    private function inheritedBuyerId(Request $request): ?int
+    {
+        $actor = auth()->user();
+
+        if (! $actor?->isMerchantDepartment() || ! $actor->isDepartmentAdmin()) {
+            return null;
+        }
+
+        if (DepartmentRoles::departmentOf($request->input('role')) !== 'merchandising') {
+            return null;
+        }
+
+        return $actor->merchantBuyerId();
+    }
+
+    /**
+     * The value to store for can_upload.
+     *
+     * Same hidden-marker shape as is_department_admin: the control is only on
+     * the page for the owning department admin, so its absence must mean "not
+     * shown" rather than "unticked". Gated by UserPolicy::setCanUpload, which
+     * is where the rule about WHO may grant it actually lives.
+     */
+    private function canUploadFlag(Request $request, User $user): bool
+    {
+        if (! $request->has('can_upload_control')) {
+            return (bool) $user->can_upload;
+        }
+
+        if (! auth()->user()?->can('setCanUpload', $user)) {
+            return (bool) $user->can_upload;
+        }
+
+        return $request->boolean('can_upload');
+    }
+
+    /**
      * The value to store for is_department_admin.
      *
      * A checkbox posts nothing when unticked, so the form carries a hidden
@@ -371,6 +433,7 @@ class UserController extends Controller
             'password' => Hash::make($data['password']),
             'status' => $data['status'],
             'is_department_admin' => $this->departmentAdminFlag($request),
+            'buyer_id' => $this->inheritedBuyerId($request),
         ]);
 
         $user->syncRoles([$data['role']]);
@@ -385,7 +448,7 @@ class UserController extends Controller
 
         return view('admin.users.show', array_merge(
             compact('user'),
-            $this->permissionMatrixData($user)
+            $this->permissionMatrixData($user, grantOnly: false)
         ));
     }
 
@@ -395,8 +458,13 @@ class UserController extends Controller
 
         $roles = $this->scope()->assignableRoles();
 
+        // A department admin owns their buyer; everyone else inherits one.
+        // Resolved here rather than in the view so the screen does no
+        // relationship work of its own.
+        $assignedBuyer = $user->isDepartmentAdmin() ? $user->ownedBuyer : $user->buyer;
+
         return view('admin.users.edit', array_merge(
-            compact('user', 'roles'),
+            compact('user', 'roles', 'assignedBuyer'),
             $this->permissionMatrixData($user)
         ));
     }
@@ -427,6 +495,7 @@ class UserController extends Controller
         $user->email = $data['email'];
         $user->status = $data['status'];
         $user->is_department_admin = $this->departmentAdminFlag($request, $user);
+        $user->can_upload = $this->canUploadFlag($request, $user);
 
         if ($request->hasFile('profile_photo')) {
             if ($user->profile_photo) {

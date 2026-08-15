@@ -33,12 +33,16 @@
 
         <span class="gx-dropzone-icon" aria-hidden="true"><i class="bi bi-cloud-arrow-up" aria-hidden="true"></i></span>
 
-        <span class="gx-dropzone-title">Drag a file here, or click to browse</span>
+        {{-- Title and hint are one block so they stay a pair when the row
+             spreads across the card. --}}
+        <span class="gx-dropzone-body">
+            <span class="gx-dropzone-title">Drag a file here, or click to browse</span>
 
-        <span class="gx-dropzone-hint">
-            {{ $hint ?? 'Excel or CSV' }}
-            <span class="text-muted">&middot;</span>
-            up to {{ $maxMb }} MB
+            <span class="gx-dropzone-hint">
+                {{ $hint ?? 'Excel or CSV' }}
+                <span class="text-muted">&middot;</span>
+                up to {{ $maxMb }} MB
+            </span>
         </span>
 
         <span class="gx-dropzone-formats">
@@ -72,7 +76,7 @@
 
     {{ $slot }}
 
-    <div class="d-flex align-items-center gap-2 mt-3">
+    <div class="gx-upload-actions">
         <button type="submit" class="btn btn-primary px-4" data-upload-submit>
             <span data-upload-submit-label><i class="bi bi-upload me-1" aria-hidden="true"></i>Upload File</span>
         </button>

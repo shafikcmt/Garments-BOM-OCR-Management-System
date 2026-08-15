@@ -640,6 +640,72 @@ a { text-decoration: none; }
     font-weight: 700;
 }
 .nav-tabs .nav-link.active { color: #1d4ed8 !important; background: #eff6ff !important; border-color: #bfdbfe !important; }
+
+/* --- Segmented control ---------------------------------------------------
+ * A variant of the pill tabs above, for screens where the two tabs are two
+ * modes of one workspace rather than two destinations. The pill version puts
+ * a pale blue tab next to a white one on a white page, so the active state is
+ * carried by a tint that barely separates from its neighbour. Here the whole
+ * control sits in a recessed track and the active tab is the raised white
+ * surface inside it — the same cue a physical switch uses, readable at a
+ * glance and without relying on colour alone.
+ *
+ * Applied per screen with .gx-segmented; .nav-tabs everywhere else is
+ * deliberately left exactly as it was.
+ */
+.nav-tabs.gx-segmented {
+    display: inline-flex;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 14px;
+    background: #f1f5f9;
+    border: 1px solid #e6ecf4 !important;
+    max-width: 100%;
+}
+
+.nav-tabs.gx-segmented .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 0 !important;
+    border-radius: 10px !important;
+    background: transparent !important;
+    color: var(--gx-text-muted) !important;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 650;
+    white-space: nowrap;
+    transition: color .15s ease, background .15s ease;
+}
+
+.nav-tabs.gx-segmented .nav-link:hover { color: var(--gx-text) !important; }
+
+.nav-tabs.gx-segmented .nav-link.active {
+    background: var(--gx-card) !important;
+    color: var(--gx-text) !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .08), 0 0 0 1px rgba(15, 23, 42, .04);
+}
+
+.nav-tabs.gx-segmented .nav-link i { font-size: 14px; opacity: .75; }
+.nav-tabs.gx-segmented .nav-link.active i { opacity: 1; color: var(--gx-secondary-600); }
+
+/* Two tabs, one long label each: on a narrow phone they share the row evenly
+   rather than overflowing the track. */
+@media (max-width: 575.98px) {
+    .nav-tabs.gx-segmented { display: flex; width: 100%; }
+    .nav-tabs.gx-segmented .nav-item { flex: 1 1 0; }
+    .nav-tabs.gx-segmented .nav-link {
+        width: 100%;
+        justify-content: center;
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-tabs.gx-segmented .nav-link { transition: none; }
+}
+
 .dropdown-menu { border: 1px solid #e2e8f0 !important; border-radius: 16px !important; box-shadow: 0 18px 45px rgba(15, 23, 42, .14) !important; padding: 8px !important; }
 .dropdown-item { border-radius: 10px; font-size: 13px; font-weight: 600; }
 .dropdown-item:hover { background: #f1f5f9; }

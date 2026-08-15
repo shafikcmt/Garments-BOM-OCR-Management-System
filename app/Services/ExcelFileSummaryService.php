@@ -50,6 +50,18 @@ class ExcelFileSummaryService
 
         $summaries = $fileIds->mapWithKeys(fn ($id) => [$id => $blank])->all();
 
+        // 0. The buyer assigned to the file itself. Files uploaded before the
+        //    buyers master existed have no buyer_id, so they fall through to
+        //    the first-row cell below and keep reading exactly as before.
+        $assignedBuyers = ExcelFile::query()
+            ->join('buyers', 'buyers.id', '=', 'excel_files.buyer_id')
+            ->whereIn('excel_files.id', $fileIds->all())
+            ->pluck('buyers.buyer_name', 'excel_files.id');
+
+        foreach ($assignedBuyers as $fileId => $buyerName) {
+            $summaries[$fileId]['Buyer Name'] = (string) $buyerName;
+        }
+
         // 1. The first row of each file, by row_number. Only ids are selected,
         //    so this stays cheap however many rows a file has.
         $firstRowByFile = ExcelRow::query()

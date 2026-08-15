@@ -230,10 +230,24 @@ it('renders the create and edit screens for a store admin, offering store roles 
     $create->assertDontSee('name="is_department_admin"', false)
         ->assertDontSee('name="department_admin_control"', false);
 
-    // Permissions they cannot pass on are shown locked rather than hidden.
-    $create->assertSee('not yours to grant');
+    // The matrix offers what this admin holds and nothing else — a module they
+    // have no rights in is not on the page for them to tick.
+    $edit = $this->actingAs($admin)->get(route('admin.users.edit', $target))->assertOk();
 
-    $this->actingAs($admin)->get(route('admin.users.edit', $target))->assertOk();
+    $held = $admin->getAllPermissions()->pluck('name');
+
+    foreach ([$create, $edit] as $screen) {
+        $offered = collect($screen->viewData('permissionGroups'))
+            ->flatMap(fn (array $group) => collect($group['rows'])->flatMap(
+                fn (array $row) => collect($row['actions'])->merge($row['extra'])->pluck('name')
+            ));
+
+        expect($offered)->not->toBeEmpty()
+            ->and($offered->diff($held))->toBeEmpty();
+        // Nothing is drawn locked-for-reach any more, because nothing out of
+        // reach is drawn at all.
+        $screen->assertDontSee('not yours to grant');
+    }
 
     // The breadcrumb must not point at the admin dashboard, which is still
     // role:admin and would 403 them straight back out.
@@ -287,6 +301,53 @@ it('puts Team Management in the store sidebar and leaves Users & Roles to the ad
         ->and($adminSidebar)->toContain(route('admin.users.index'))
         // No second link to the same screen for the super admin.
         ->and($adminSidebar)->not->toContain('Team Management');
+});
+
+/**
+ * The flag that decides Team Management was never Store-specific, but for a
+ * while the only <li> reading it was — so a Merchant department admin held
+ * access to the screen with no way to reach it. The link belongs wherever the
+ * flag is true.
+ */
+it('puts Team Management in the merchant sidebar too', function () {
+    Role::findOrCreate('merchant', 'web');
+
+    $merchantAdmin = User::factory()->create(['is_department_admin' => true])->assignRole('merchant');
+
+    $sidebar = $this->actingAs($merchantAdmin)
+        ->get(route('merchant.dashboard'))->assertOk()->getContent();
+
+    expect($sidebar)->toContain('Team Management')
+        ->and($sidebar)->toContain(route('admin.users.index'));
+
+    // A plain merchant holds no flag and is offered nothing.
+    $plain = User::factory()->create()->assignRole('merchant');
+
+    expect($this->actingAs($plain)->get(route('merchant.dashboard'))->assertOk()->getContent())
+        ->not->toContain('Team Management');
+});
+
+/**
+ * Ticking Department Admin is only half the setup for Merchandising — the
+ * buyer is assigned on a different screen. An empty section read as "nothing
+ * to do here", so the unassigned state says so and points at the screen.
+ */
+it('tells a super admin when a department admin still has no buyer', function () {
+    Role::findOrCreate('merchant', 'web');
+
+    $unassigned = User::factory()->create(['is_department_admin' => true])->assignRole('merchant');
+
+    $html = $this->actingAs(scopedSuperAdmin())
+        ->get(route('admin.users.edit', $unassigned))->assertOk()->getContent();
+
+    expect($html)->toContain('Not assigned yet')
+        ->and($html)->toContain(route('admin.buyers.index'));
+
+    // A plain user has nothing to assign and is told nothing.
+    $plain = User::factory()->create()->assignRole('merchant');
+
+    expect($this->actingAs(scopedSuperAdmin())->get(route('admin.users.edit', $plain))->getContent())
+        ->not->toContain('Not assigned yet');
 });
 
 it('keeps a plain store user out of the screen entirely', function () {
@@ -362,6 +423,38 @@ it('leaves the super admin screen exactly as it was', function () {
     // And they still see everybody, including the departments and the roleless.
     $this->actingAs($admin)->get(route('admin.users.index'))->assertOk();
     $this->actingAs($admin)->get(route('admin.users.edit', scopedCommercialMember()))->assertOk();
+});
+
+it('still offers a super admin the whole permission catalogue', function () {
+    $admin = scopedSuperAdmin();
+
+    $groups = $this->actingAs($admin)->get(route('admin.users.create'))
+        ->assertOk()
+        ->viewData('permissionGroups');
+
+    $offered = collect($groups)->flatMap(fn (array $group) => collect($group['rows'])->flatMap(
+        fn (array $row) => collect($row['actions'])->merge($row['extra'])->pluck('name')
+    ));
+
+    expect($offered->sort()->values()->all())
+        ->toBe(Permission::orderBy('name')->pluck('name')->all());
+});
+
+it('still reports a user\'s full access on the read-only profile', function () {
+    $admin = scopedStoreAdmin();
+    $target = scopedStoreMember();
+
+    // Granting is one thing, reporting is another: trimming this screen to the
+    // viewer's own rights would under-report what the user actually holds.
+    $groups = $this->actingAs($admin)->get(route('admin.users.show', $target))
+        ->assertOk()
+        ->viewData('permissionGroups');
+
+    $offered = collect($groups)->flatMap(fn (array $group) => collect($group['rows'])->flatMap(
+        fn (array $row) => collect($row['actions'])->merge($row['extra'])->pluck('name')
+    ));
+
+    expect($offered->diff($admin->getAllPermissions()->pluck('name')))->not->toBeEmpty();
 });
 
 it('lets a super admin demote a department admin but never loses the flag on an unrelated save', function () {

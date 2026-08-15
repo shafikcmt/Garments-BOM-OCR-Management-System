@@ -109,7 +109,12 @@ it('offers Workspace as an unlocked checkbox in the matrix, under General Stock'
 
         foreach (explode('<label', $html) as $chunk) {
             if (str_contains($chunk, 'value="'.WS.'"')) {
-                $chip = $chunk;
+                // Stop at the label's own closing tag. Splitting on '<label'
+                // alone runs the last chip's chunk to the end of the document,
+                // which swallows the matrix's inline script — and that script
+                // contains both "disabled" and "is-locked" as ordinary code,
+                // so the assertions below would read a lock that is not there.
+                $chip = Str::before($chunk, '</label>');
                 break;
             }
         }

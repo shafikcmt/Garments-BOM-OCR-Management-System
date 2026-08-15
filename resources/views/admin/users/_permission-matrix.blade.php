@@ -24,6 +24,13 @@
 
     Nothing here enforces anything. It records who is allowed what.
 
+    $permissionGroups arrives already narrowed on the grant forms: a department
+    admin is sent only the modules they hold themselves, so a module they have
+    no rights in is not on the page at all. The read-only profile still gets the
+    whole catalog, because that screen reports access rather than offering it.
+    The locked "not yours to grant" state below therefore only shows up there —
+    it stays as the backstop it always was.
+
     Expects: $permissionGroups, $catalog, $rolePermissions, $directPermissions,
              $readonly (true on the profile page). $actionColumns is accepted
              for compatibility but each card uses its own $group['columns'].
@@ -37,6 +44,24 @@
     $roleGranted = collect($rolePermissions[$selectedRole] ?? []);
     $direct = collect(old('permissions', $directPermissions ?? []));
 @endphp
+
+@if($permissionGroups->isEmpty())
+    {{-- A department admin whose own account carries no permissions has nothing
+         to hand out. Say so plainly rather than drawing an empty grid with a
+         search box over it. --}}
+    <p class="gx-perm-none">You have no permissions of your own to grant. Ask a system administrator to extend your access first.</p>
+    <style>
+        .gx-perm-none {
+            margin: 0;
+            padding: 1.25rem;
+            border: 1px dashed var(--gx-surface-border, #e2e8f0);
+            border-radius: var(--gx-radius-sm, 10px);
+            background: #f8fafc;
+            font-size: .85rem;
+            color: var(--gx-text-muted, #64748B);
+        }
+    </style>
+@else
 
 <div class="gx-perm" data-role-permissions='@json($rolePermissions)'>
 
@@ -527,3 +552,4 @@
         refresh();
     })();
 </script>
+@endif

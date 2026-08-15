@@ -80,6 +80,44 @@ class UserPolicy
     }
 
     /**
+     * Who may grant a scoped merchant the BOM upload override.
+     *
+     * Deliberately NOT the super admin's field. This is the one control on the
+     * user form that belongs to a department admin instead: the buyer's owner
+     * decides who on their own team may upload for it. A super admin already
+     * bypasses buyer scoping entirely, so there is nothing here for them to
+     * set, and offering it to them would put two different authorities on one
+     * checkbox.
+     *
+     * Three conditions, and each one is a hole if left out:
+     *
+     *   actor owns a buyer   an admin of no buyer grants nothing.
+     *   target is theirs     the target must be scoped to the actor's own
+     *                        buyer, or one buyer's admin could hand out upload
+     *                        rights on another buyer's team.
+     *   not yourself         a department admin already uploads by virtue of
+     *                        owning the buyer; letting them tick their own box
+     *                        is a self-grant with no meaning.
+     */
+    public function setCanUpload(User $actor, User $target): bool
+    {
+        if (! $actor->isMerchantDepartment() || ! $actor->isDepartmentAdmin()) {
+            return false;
+        }
+
+        if ($actor->id === $target->id) {
+            return false;
+        }
+
+        $buyerId = $actor->merchantBuyerId();
+
+        return $buyerId !== null
+            && ! $target->isDepartmentAdmin()
+            && $target->isMerchantDepartment()
+            && (int) $target->buyer_id === (int) $buyerId;
+    }
+
+    /**
      * Whether a department admin's scope covers this user.
      *
      * Three ways to fall outside it, and each one is a hole if it is left out:

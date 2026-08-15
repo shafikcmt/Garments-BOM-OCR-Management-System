@@ -196,12 +196,18 @@ class ExcelUploadController extends Controller
         $path = $file->storeAs('excel_uploads', $fileName);
         $userId = auth()->id();
 
-        $excelFile = DB::transaction(function () use ($request, $file, $fileName, $path, $allHeaders, $preparedRows, $savedRows, $userId) {
+        // A merchant scoped to a buyer uploads for that buyer and no other, so
+        // the tag comes from their own assignment rather than the form. Anyone
+        // unscoped still picks from the dropdown, as before.
+        $buyerId = auth()->user()->merchantBuyerId() ?? $request->integer('buyer_id');
+
+        $excelFile = DB::transaction(function () use ($request, $file, $fileName, $path, $allHeaders, $preparedRows, $savedRows, $userId, $buyerId) {
             $excelFile = ExcelFile::create([
                 'file_name' => $fileName,
                 'original_file_name' => $file->getClientOriginalName(),
                 'file_path' => $path,
                 'uploaded_by' => $userId,
+                'buyer_id' => $buyerId,
                 'upload_batch_no' => 'BATCH-' . now()->format('YmdHis'),
                 'total_rows' => 0,
                 'status' => 'pending',
