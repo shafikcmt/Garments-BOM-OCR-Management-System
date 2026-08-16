@@ -3,6 +3,7 @@
 use App\Exports\ReceivingTemplateExport;
 use App\Imports\ReceivingImport;
 use App\Models\StockItem;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 /**
  * Brand/Specification on the receiving bulk upload.
@@ -73,7 +74,7 @@ it('carries one merged reference column between Item Name and Uom', function () 
 });
 
 it('gives the downloadable template the same headings and a full sample row', function () {
-    $export = new ReceivingTemplateExport();
+    $export = new ReceivingTemplateExport;
 
     expect($export->headings())->toBe(ReceivingImport::COLUMNS);
 
@@ -89,7 +90,7 @@ it('gives the downloadable template the same headings and a full sample row', fu
 it('keeps the second example row aligned with the columns', function () {
     // The regression this guards: the indexes were hardcoded, so changing the
     // columns put the quantity under the wrong heading.
-    [$first, $second] = (new ReceivingTemplateExport())->array();
+    [$first, $second] = (new ReceivingTemplateExport)->array();
 
     $at = fn (string $h) => array_search($h, ReceivingImport::COLUMNS, true);
 
@@ -100,7 +101,60 @@ it('keeps the second example row aligned with the columns', function () {
         // ...and the reference column still carries its own sample, not a number.
         ->and($second[$at('Brand/Specification')])->toBe('Groz-Beckert DBx1 90/14, ball point');
 
-    expect($first)->toBe(ReceivingImport::SAMPLE_ROW);
+    expect($first)->toHaveCount(count(ReceivingImport::COLUMNS));
+});
+
+/**
+ * Both date columns have to be real Excel dates, not the look of one. Written
+ * as text they come back from the user as text, and the date is lost on
+ * re-upload — which is what this pair of tests exists to stop happening again.
+ */
+it('writes both date columns as real Excel date values, formatted, with Month derived', function () {
+    $export = new ReceivingTemplateExport;
+
+    $at = fn (string $h) => array_search($h, ReceivingImport::COLUMNS, true);
+
+    [$first, $second] = $export->array();
+
+    foreach (['Challan Date*', 'RCV Date'] as $heading) {
+        $serial = $first[$at($heading)];
+
+        expect($serial)->toBeNumeric()
+            ->and(Date::excelToDateTimeObject((float) $serial)->format('Y-m-d'))
+            ->toBe(ReceivingImport::SAMPLE_ROW[$at($heading)])
+            // Both example rows are ONE challan, so both dates must match.
+            ->and($second[$at($heading)])->toBe($serial);
+    }
+
+    // Derived from the Challan Date, so it can never disagree with it.
+    expect($first[$at('Month')])->toBe('=TEXT(A2,"MMM-YY")')
+        ->and($second[$at('Month')])->toBe('=TEXT(A3,"MMM-YY")');
+
+    // And the columns carry a date format, or the serials show as 46235.
+    expect($export->columnFormats())->toBe([
+        'A2:A1000' => ReceivingTemplateExport::DATE_FORMAT,
+        'B2:B1000' => ReceivingTemplateExport::DATE_FORMAT,
+    ]);
+});
+
+it('reads the template date serials back as the same days on re-upload', function () {
+    receivingItem();
+
+    $at = fn (string $h) => array_search($h, ReceivingImport::COLUMNS, true);
+
+    // The row exactly as the template writes it — serial dates and all — with
+    // only the example marker replaced by a real item.
+    $row = (new ReceivingTemplateExport)->array()[0];
+    $row[$at('Item Name*')] = 'Sewing Needle';
+
+    $result = ReceivingImport::parse([ReceivingImport::COLUMNS, $row]);
+
+    expect($result['errors'])->toBe([])
+        ->and($result['challans'])->toHaveCount(1)
+        ->and($result['challans'][0]['purchase_date'])
+        ->toBe(ReceivingImport::SAMPLE_ROW[$at('Challan Date*')])
+        ->and($result['challans'][0]['rcv_date'])
+        ->toBe(ReceivingImport::SAMPLE_ROW[$at('RCV Date')]);
 });
 
 it('imports a row with the column filled and matching, without a note', function () {

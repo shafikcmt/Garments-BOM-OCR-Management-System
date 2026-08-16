@@ -6,9 +6,13 @@ use App\Models\IndentPerson;
 use App\Models\IndentSection;
 use App\Models\IssueApprover;
 use App\Models\ItemCategory;
-use App\Models\StockItem;
 use App\Models\StockIssue;
+use App\Models\StockItem;
 use App\Models\StockPurchase;
+use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
+use Spatie\Permission\Models\Permission;
 
 /**
  * Bulk consumption upload.
@@ -179,7 +183,7 @@ it('accepts the brand header spellings a legacy workbook uses', function () {
 });
 
 it('gives the template the same headings and two aligned example rows', function () {
-    $export = new IssueTemplateExport();
+    $export = new IssueTemplateExport;
 
     expect($export->headings())->toBe(IssueImport::COLUMNS)
         ->and(IssueImport::SAMPLE_ROW)->toHaveCount(count(IssueImport::COLUMNS));
@@ -188,13 +192,62 @@ it('gives the template the same headings and two aligned example rows', function
 
     $at = fn (string $h) => array_search($h, IssueImport::COLUMNS, true);
 
-    expect($first)->toBe(IssueImport::SAMPLE_ROW)
+    expect($first)->toHaveCount(count(IssueImport::COLUMNS))
         ->and($second[$at('Item Name*')])->toBe('EXAMPLE — a second item on the SAME requisition')
         ->and($second[$at('Issued Qty*')])->toBe(2)
         ->and($second[$at('Type')])->toBe('Replace')
         // Header fields are identical on both rows: that is what makes them
         // one requisition.
         ->and($second[$at('Requisition Number')])->toBe($first[$at('Requisition Number')]);
+});
+
+/**
+ * The template's Issue Date has to be a real Excel date, not the look of one.
+ * Written as text it comes back from the user as text, and the date is lost on
+ * re-upload — which is what this pair of tests exists to stop happening again.
+ */
+it('writes Issue Date as a real Excel date value, formatted, with Month derived from it', function () {
+    $export = new IssueTemplateExport;
+
+    $at = fn (string $h) => array_search($h, IssueImport::COLUMNS, true);
+
+    [$first, $second] = $export->array();
+
+    $serial = $first[$at('Issue Date*')];
+
+    expect($serial)->toBeNumeric()
+        ->and(Date::excelToDateTimeObject((float) $serial)->format('Y-m-d'))
+        ->toBe(IssueImport::SAMPLE_ROW[$at('Issue Date*')])
+        ->and($second[$at('Issue Date*')])->toBe($serial)
+        // Derived, so it can never disagree with the date beside it.
+        ->and($first[$at('Month')])->toBe('=TEXT(A2,"MMM-YY")')
+        ->and($second[$at('Month')])->toBe('=TEXT(A3,"MMM-YY")');
+
+    // And the column carries a date format, or the serial shows as 46235.
+    expect($export->columnFormats())->toBe(['A2:A1000' => IssueTemplateExport::DATE_FORMAT]);
+});
+
+it('reads the template date serial back as the same day on re-upload', function () {
+    $at = fn (string $h) => array_search($h, IssueImport::COLUMNS, true);
+
+    issueItem();
+    IndentSection::create(['name' => 'Cutting']);
+    IndentPerson::create(['name' => 'Rafiq Islam']);
+    IssueApprover::create(['name' => 'Store Manager']);
+    ItemCategory::create(['name' => 'Needle']);
+    stockOnHand(StockItem::first(), 100);
+
+    // The row exactly as the template writes it — serial date and all — with
+    // only the example marker replaced by a real item.
+    $row = (new IssueTemplateExport)->array()[0];
+    $row[$at('Item Name*')] = 'Sewing Needle';
+
+    $result = IssueImport::parse([IssueImport::COLUMNS, $row]);
+
+    expect($result['errors'])->toBe([])
+        ->and($result['requisitions'])->toHaveCount(1)
+        ->and($result['requisitions'][0]['issue_date'])
+        ->toBe(IssueImport::SAMPLE_ROW[$at('Issue Date*')]);
 });
 
 it('groups rows sharing the five header fields into one requisition', function () {
@@ -691,10 +744,10 @@ it('uploading the same file twice through the screen issues nothing extra', func
 
     // Both rights: the section guard needs view to enter Issues at all, and
     // the import route needs create on top of it.
-    \Spatie\Permission\Models\Permission::findOrCreate('store.issues.view', 'web');
-    \Spatie\Permission\Models\Permission::findOrCreate('store.issues.create', 'web');
+    Permission::findOrCreate('store.issues.view', 'web');
+    Permission::findOrCreate('store.issues.create', 'web');
 
-    $user = \App\Models\User::factory()->create(['status' => 1]);
+    $user = User::factory()->create(['status' => 1]);
     $user->givePermissionTo(['store.issues.view', 'store.issues.create']);
 
     // Built through issueRow() rather than typed as a comma string: a
@@ -710,7 +763,7 @@ it('uploading the same file twice through the screen issues nothing extra', func
 
     $upload = fn () => $this->actingAs($user)->post(
         route('store.stock.issues.import'),
-        ['file' => \Illuminate\Http\UploadedFile::fake()->createWithContent('issues.csv', $csv)]
+        ['file' => UploadedFile::fake()->createWithContent('issues.csv', $csv)]
     );
 
     $upload()->assertRedirect()->assertSessionHas('success');
@@ -736,13 +789,13 @@ it('records imported issues through the controller, scoped by permission', funct
     $item = issueItem();
     stockOnHand($item, 100);
 
-    \Spatie\Permission\Models\Permission::findOrCreate('store.issues.view', 'web');
-    \Spatie\Permission\Models\Permission::findOrCreate('store.issues.create', 'web');
+    Permission::findOrCreate('store.issues.view', 'web');
+    Permission::findOrCreate('store.issues.create', 'web');
 
-    $viewer = \App\Models\User::factory()->create(['status' => 1]);
+    $viewer = User::factory()->create(['status' => 1]);
     $viewer->givePermissionTo('store.issues.view');
 
-    $creator = \App\Models\User::factory()->create(['status' => 1]);
+    $creator = User::factory()->create(['status' => 1]);
     $creator->givePermissionTo(['store.issues.view', 'store.issues.create']);
 
     $csv = implode(',', IssueImport::COLUMNS)."\n"
@@ -753,7 +806,7 @@ it('records imported issues through the controller, scoped by permission', funct
             'Issued Qty*' => 7,
         ]))."\n";
 
-    $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('issues.csv', $csv);
+    $file = UploadedFile::fake()->createWithContent('issues.csv', $csv);
 
     // View-only cannot import.
     $this->actingAs($viewer)
@@ -762,7 +815,7 @@ it('records imported issues through the controller, scoped by permission', funct
 
     expect(StockIssue::count())->toBe(0);
 
-    $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('issues.csv', $csv);
+    $file = UploadedFile::fake()->createWithContent('issues.csv', $csv);
 
     $this->actingAs($creator)
         ->post(route('store.stock.issues.import'), ['file' => $file])
