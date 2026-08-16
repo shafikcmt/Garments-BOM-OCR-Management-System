@@ -90,17 +90,17 @@ class ExcelFileController extends Controller
 
         if ($globalSearch !== '') {
             $rowsQuery->where(function ($query) use ($globalSearch, $visibleHeaderIds) {
-                $query->where('row_number', 'like', '%' . $globalSearch . '%')
+                $query->whereLike('row_number', '%' . $globalSearch . '%')
                     ->orWhereHas('cells', function ($cellQuery) use ($globalSearch, $visibleHeaderIds) {
                         $cellQuery->whereIn('header_id', $visibleHeaderIds)
-                            ->where('value', 'like', '%' . $globalSearch . '%');
+                            ->whereLike('value', '%' . $globalSearch . '%');
                     });
             });
         }
 
         foreach ($columnFilters as $filterKey => $filterValue) {
             if ($filterKey === '__row') {
-                $rowsQuery->where('row_number', 'like', '%' . $filterValue . '%');
+                $rowsQuery->whereLike('row_number', '%' . $filterValue . '%');
                 continue;
             }
 
@@ -112,7 +112,7 @@ class ExcelFileController extends Controller
 
             $rowsQuery->whereHas('cells', function ($cellQuery) use ($headerId, $filterValue) {
                 $cellQuery->where('header_id', $headerId)
-                    ->where('value', 'like', '%' . $filterValue . '%');
+                    ->whereLike('value', '%' . $filterValue . '%');
             });
         }
 

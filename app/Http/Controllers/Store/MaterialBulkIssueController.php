@@ -197,9 +197,12 @@ class MaterialBulkIssueController extends Controller
             return;
         }
 
+        // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE is
+        // case-sensitive and quietly returns less than it should. This search
+        // also feeds the tab badge counts, so a miss here understates them too.
         $query->where(function ($w) use ($q) {
             foreach (['po_no', 'buyer_name', 'style_name', 'material_name', 'material_description', 'sap_code', 'indent_person', 'requisition_number'] as $col) {
-                $w->orWhere($col, 'like', '%'.$q.'%');
+                $w->orWhereLike($col, '%'.$q.'%');
             }
         });
     }

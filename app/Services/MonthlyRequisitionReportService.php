@@ -201,10 +201,13 @@ class MonthlyRequisitionReportService
             ))
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $like = '%'.$search.'%';
-                $q->where(fn ($w) => $w->where('user_dept', 'like', $like)
-                    ->orWhere('specification', 'like', $like)
-                    ->orWhereHas('stockItem', fn ($i) => $i->where('name', 'like', $like))
-                    ->orWhereHas('requisition', fn ($r) => $r->where('requisition_no', 'like', $like)));
+                // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE
+                // is case-sensitive and quietly returns less than it should. A
+                // miss here reads as a requisition that never happened.
+                $q->where(fn ($w) => $w->whereLike('user_dept', $like)
+                    ->orWhereLike('specification', $like)
+                    ->orWhereHas('stockItem', fn ($i) => $i->whereLike('name', $like))
+                    ->orWhereHas('requisition', fn ($r) => $r->whereLike('requisition_no', $like)));
             })
             ->get();
     }

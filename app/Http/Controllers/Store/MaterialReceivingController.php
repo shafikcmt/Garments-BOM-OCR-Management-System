@@ -174,8 +174,9 @@ class MaterialReceivingController extends Controller
             ->when($filters['invoice_no'] ?? null, function ($q, $term) {
                 // Partial match on the GRN's own invoice_no. LIKE wildcards in
                 // the term are escaped so a typed "%" searches for a literal %
-                // instead of matching everything.
-                $q->where('invoice_no', 'like', '%'.addcslashes($term, '%_\\').'%');
+                // instead of matching everything. whereLike compiles to ILIKE on
+                // PostgreSQL, where a plain LIKE is case-sensitive.
+                $q->whereLike('invoice_no', '%'.addcslashes($term, '%_\\').'%');
             })
             ->latest('receive_date')
             ->latest('id');
@@ -491,9 +492,11 @@ class MaterialReceivingController extends Controller
             ->where('style_name', '!=', '');
 
         if ($term !== '') {
+            // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE is
+            // case-sensitive. Buyer and style names are typed in mixed case.
             $query->where(function ($q) use ($term) {
-                $q->where('style_name', 'like', '%'.$term.'%')
-                    ->orWhere('buyer_name', 'like', '%'.$term.'%');
+                $q->whereLike('style_name', '%'.$term.'%')
+                    ->orWhereLike('buyer_name', '%'.$term.'%');
             });
         }
 

@@ -284,9 +284,11 @@ class StoreReportService
         }
 
         if ($material = ($filters['material'] ?? null)) {
+            // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE is
+            // case-sensitive and quietly returns less than it should.
             $query->where(function ($q) use ($material) {
-                $q->where('material_description', 'like', "%{$material}%")
-                    ->orWhere('sap_code', 'like', "%{$material}%");
+                $q->whereLike('material_description', "%{$material}%")
+                    ->orWhereLike('sap_code', "%{$material}%");
             });
         }
 

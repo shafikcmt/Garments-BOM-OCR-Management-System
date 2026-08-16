@@ -2604,11 +2604,15 @@ BIN: 005635381-0406 TIN: 780096271681",
         return Supplier::query()
             ->where('is_active', true)
             ->where(function ($query) use ($vendorName) {
+                // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE
+                // is case-sensitive. The exact matches above stay as they are:
+                // changing those would widen how a vendor is resolved, which is
+                // a behaviour change rather than an engine fix.
                 $query->where('supplier_name', $vendorName)
                     ->orWhere('legal_name', $vendorName)
                     ->orWhere('supplier_code', $vendorName)
-                    ->orWhere('supplier_name', 'like', '%' . $vendorName . '%')
-                    ->orWhere('legal_name', 'like', '%' . $vendorName . '%');
+                    ->orWhereLike('supplier_name', '%' . $vendorName . '%')
+                    ->orWhereLike('legal_name', '%' . $vendorName . '%');
             })
             ->first();
     }

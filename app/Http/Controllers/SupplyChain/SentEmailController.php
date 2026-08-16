@@ -47,12 +47,15 @@ class SentEmailController extends Controller
 
         if ($filters['search'] !== '') {
             $term = '%' . $filters['search'] . '%';
+            // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE is
+            // case-sensitive. Subjects and email addresses are mixed case, so
+            // searching an audit trail by them needs it.
             $query->where(function ($q) use ($term) {
-                $q->where('subject', 'like', $term)
-                    ->orWhere('recipients', 'like', $term)
-                    ->orWhere('cc', 'like', $term)
-                    ->orWhereHas('paymentRequest', fn ($sub) => $sub->where('request_no', 'like', $term))
-                    ->orWhereHas('bookingPo', fn ($sub) => $sub->where('po_no', 'like', $term));
+                $q->whereLike('subject', $term)
+                    ->orWhereLike('recipients', $term)
+                    ->orWhereLike('cc', $term)
+                    ->orWhereHas('paymentRequest', fn ($sub) => $sub->whereLike('request_no', $term))
+                    ->orWhereHas('bookingPo', fn ($sub) => $sub->whereLike('po_no', $term));
             });
         }
 

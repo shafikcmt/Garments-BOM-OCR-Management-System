@@ -39,11 +39,14 @@ class MaterialStockLedgerController extends Controller
             $query->where('gmts_color_name', $gmtsColor);
         }
         if ($search = $request->input('q')) {
+            // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE is
+            // case-sensitive and quietly returns less than it should. SAP codes
+            // and colour names are mixed case, so this matters here.
             $query->where(function ($q) use ($search) {
-                $q->where('material_description', 'like', "%{$search}%")
-                    ->orWhere('sap_code', 'like', "%{$search}%")
-                    ->orWhere('po_no', 'like', "%{$search}%")
-                    ->orWhere('material_color', 'like', "%{$search}%");
+                $q->whereLike('material_description', "%{$search}%")
+                    ->orWhereLike('sap_code', "%{$search}%")
+                    ->orWhereLike('po_no', "%{$search}%")
+                    ->orWhereLike('material_color', "%{$search}%");
             });
         }
 
