@@ -215,20 +215,31 @@
                                  unclipped at the same time. --}}
                             <div class="gx-line-scroll">
                                 <table class="table align-middle mb-0 gx-line-table">
+                                    {{-- Widths are load-bearing here: the table is
+                                         table-layout:fixed and its headers are
+                                         white-space:nowrap, so a column narrower than
+                                         its own heading does not clip or wrap — the
+                                         text spills into the next cell and the two
+                                         headings read as one word.
+
+                                         Measured on the rendered page, the headings
+                                         need: Brand/Specification + its auto badge
+                                         202px, Remarks 72px. Brand is set to 210 and
+                                         the two percentage columns give up four points
+                                         each to pay for it, which also lifts Remarks
+                                         (the leftover column) from 51px to 100px. The
+                                         table's total is unchanged, so this costs no
+                                         extra sideways scrolling. --}}
                                     <colgroup>
-                                        <col style="width:44px;">
-                                        <col style="width:30%;">
-                                        <col style="width:88px;">
-                                        <col style="width:20%;">
-                                        {{-- Brand/Specification. table-layout is fixed,
-                                             so a column without a <col> of its own takes
-                                             the next one's width and pushes every column
-                                             after it out of line. --}}
-                                        <col style="width:150px;">
-                                        <col style="width:130px;">
-                                        <col style="width:116px;">
-                                        <col>
-                                        <col style="width:104px;">
+                                        <col style="width:44px;">   {{-- # --}}
+                                        <col style="width:26%;">    {{-- Item Name --}}
+                                        <col style="width:88px;">   {{-- Uom --}}
+                                        <col style="width:16%;">    {{-- Category --}}
+                                        <col style="width:210px;">  {{-- Brand/Specification --}}
+                                        <col style="width:130px;">  {{-- Issued Qty --}}
+                                        <col style="width:116px;">  {{-- Type --}}
+                                        <col>                       {{-- Remarks, takes the remainder --}}
+                                        <col style="width:104px;">  {{-- Action --}}
                                     </colgroup>
                                     <thead>
                                         <tr>
