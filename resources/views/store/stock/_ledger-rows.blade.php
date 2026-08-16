@@ -15,11 +15,14 @@
     $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
     $date = fn ($v) => $v ? $v->format('d-M-y') : '—';
 
+    // Only the statuses that need buying get a pill. "ok" is absent on purpose:
+    // it is the common case, and a badge on nine rows in ten is decoration that
+    // makes the handful of rows that matter harder to find. It renders as a
+    // muted dot and word instead — see .gx-ledger-ok.
     $badges = [
         'out' => ['bg-danger text-white', 'bi-x-octagon'],
         'place_order' => ['bg-danger-subtle text-danger', 'bi-cart-plus'],
         'low' => ['bg-warning-subtle text-warning-emphasis', 'bi-exclamation-triangle'],
-        'ok' => ['bg-success-subtle text-success', 'bi-check2'],
     ];
 
     // Figures that live outside this fragment — the card heading's count badge,
@@ -50,26 +53,28 @@
     <table class="table align-middle gx-stock-table">
         <thead>
             <tr>
-                <th style="min-width:110px;">Order?</th>
-                <th class="text-end">Sl</th>
-                <th style="min-width:200px;">Item Name</th>
+                {{-- Tier classes carry the hierarchy. The column ORDER is the
+                     reference sheet's and does not move. --}}
+                <th class="gx-ledger-primary" style="min-width:110px;">Order?</th>
+                <th class="text-end gx-ledger-quiet">Sl</th>
+                <th class="gx-ledger-primary" style="min-width:200px;">Item Name</th>
                 <th style="min-width:140px;">Brand/Specification</th>
-                <th>Uom</th>
+                <th class="gx-ledger-quiet">Uom</th>
                 <th>Category</th>
                 {{-- Opening is the counted Item Master figure and never
                      moves. Balance B/F is last month's closing — the
                      figure this month's arithmetic actually builds on. --}}
                 <th class="text-end" title="Counted stock from the Item Master — never changed by a purchase or an issue">Opening</th>
                 <th class="text-end" title="Balance brought forward — last month's closing stock">Balance B/F</th>
-                <th class="text-end" title="Last month consumption pattern (per day)">Cons./Day</th>
+                <th class="text-end gx-ledger-quiet" title="Last month consumption pattern (per day)">Cons./Day</th>
                 <th class="text-end" title="Safety Stock Level (7 days stock)">Safety</th>
                 <th class="text-end" title="Safety stock + (consumption per day x (lead time + time to place order))">Re-order</th>
-                <th class="text-end" title="Lead time in days">Lead</th>
+                <th class="text-end gx-ledger-quiet" title="Lead time in days">Lead</th>
                 <th class="text-end">Addition</th>
-                <th title="Date of last addition">Last Add.</th>
+                <th class="gx-ledger-quiet" title="Date of last addition">Last Add.</th>
                 <th class="text-end">Consumption</th>
-                <th title="Date of last consumption">Last Cons.</th>
-                <th class="text-end">Stock as on Date</th>
+                <th class="gx-ledger-quiet" title="Date of last consumption">Last Cons.</th>
+                <th class="text-end gx-ledger-primary">Stock as on Date</th>
                 <th class="text-end">Unit Price</th>
                 <th class="text-end">Closing Value</th>
                 <th style="min-width:120px;">Remarks</th>
@@ -77,25 +82,38 @@
         </thead>
         <tbody>
             @forelse($pageRows as $index => $r)
-                @php [$badgeClass, $badgeIcon] = $badges[$r['status']]; @endphp
-                <tr @class(['table-danger' => $r['status'] === 'out'])>
+                @php $needsAction = $r['status'] !== 'ok'; @endphp
+                <tr @class([
+                    'table-danger' => $r['status'] === 'out',
+                    // Paints the left-edge spine, so the rows that need buying
+                    // are findable down the side of the table rather than by
+                    // reading the Order? column one row at a time.
+                    'gx-ledger-flag-'.$r['status'] => $needsAction,
+                ])>
                     <td>
-                        <span class="badge {{ $badgeClass }}"><i class="bi {{ $badgeIcon }} me-1" aria-hidden="true"></i>{{ $statusLabels[$r['status']] }}</span>
+                        @if($needsAction)
+                            @php [$badgeClass, $badgeIcon] = $badges[$r['status']]; @endphp
+                            <span class="badge {{ $badgeClass }}"><i class="bi {{ $badgeIcon }} me-1" aria-hidden="true"></i>{{ $statusLabels[$r['status']] }}</span>
+                        @else
+                            {{-- Still says "Ok" in words — the state must never be
+                                 carried by colour alone. --}}
+                            <span class="gx-ledger-ok">{{ $statusLabels[$r['status']] }}</span>
+                        @endif
                     </td>
                     {{-- Serial runs across the whole report, so page 2
                          starts at 101 rather than back at 1. --}}
-                    <td class="text-end text-muted">{{ $pageRows->firstItem() + $index }}</td>
-                    <td>
+                    <td class="text-end gx-ledger-quiet">{{ $pageRows->firstItem() + $index }}</td>
+                    <td class="gx-ledger-primary">
                         <div class="fw-semibold text-slate-900">{{ $r['item']->name }}</div>
                     </td>
                     <td>{{ $r['item']->brand ?: '—' }}</td>
-                    <td>{{ $r['item']->uom ?: '—' }}</td>
+                    <td class="gx-ledger-quiet">{{ $r['item']->uom ?: '—' }}</td>
                     <td>{{ $r['item']->category ?: '—' }}</td>
                     {{-- "—" before the item was counted: no count had
                          happened, which is not the same as zero. --}}
                     <td class="text-end">{{ $qty($r['opening']) }}</td>
                     <td class="text-end fw-semibold">{{ $qty($r['balance_bf']) }}</td>
-                    <td class="text-end text-muted">{{ number_format($r['consumption_per_day'], 2) }}</td>
+                    <td class="text-end gx-ledger-quiet">{{ number_format($r['consumption_per_day'], 2) }}</td>
                     <td class="text-end">
                         {{ $qty($r['safety']) }}
                         @if($r['safety_is_manual'])<i class="bi bi-pin-angle-fill text-primary ms-1" title="Set by hand in the item master" aria-hidden="true"></i>@endif
@@ -104,12 +122,14 @@
                         {{ $r['reorder'] === null ? '—' : $qty($r['reorder']) }}
                         @if($r['reorder_is_manual'])<i class="bi bi-pin-angle-fill text-primary ms-1" title="Set by hand in the item master" aria-hidden="true"></i>@endif
                     </td>
-                    <td class="text-end text-muted">{{ $r['lead_time_days'] }}</td>
+                    <td class="text-end gx-ledger-quiet">{{ $r['lead_time_days'] }}</td>
                     <td class="text-end text-success">{{ $qty($r['addition']) }}</td>
+                    {{-- gx-stock-micro is already the quiet treatment; adding
+                         gx-ledger-quiet on top would only fight it. --}}
                     <td class="gx-stock-micro">{{ $date($r['last_addition_date']) }}</td>
                     <td class="text-end text-danger">{{ $qty($r['consumption']) }}</td>
                     <td class="gx-stock-micro">{{ $date($r['last_consumption_date']) }}</td>
-                    <td class="text-end fw-bold text-slate-900">{{ $qty($r['stock_as_on']) }}</td>
+                    <td class="text-end fw-bold text-slate-900 gx-ledger-primary">{{ $qty($r['stock_as_on']) }}</td>
                     <td class="text-end">{{ $money($r['unit_price']) }}</td>
                     <td class="text-end fw-semibold">{{ $money($r['closing_value']) }}</td>
                     <td class="gx-stock-micro">{{ $r['remarks'] ?: '—' }}</td>
@@ -146,7 +166,7 @@
      line stays useful either way, so it is not hidden with the
      links: it says how much of the month is on screen. --}}
 @if($pageRows->total() > 0)
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 gx-ledger-pager">
         <div class="small text-muted">
             Showing {{ number_format($pageRows->firstItem()) }}–{{ number_format($pageRows->lastItem()) }}
             of {{ number_format($pageRows->total()) }} items.

@@ -14,7 +14,10 @@
 @endphp
 
 @section('content')
-<div class="container-fluid gx-stock-scope">
+{{-- gx-ledger scopes _ledger-ui to this screen. Nothing else carries it, which
+     is what keeps the restyle off the other thirteen General Store pages that
+     share _stock-ui. --}}
+<div class="container-fluid gx-stock-scope gx-ledger">
     <x-breadcrumb :items="[
         ['label' => 'Store', 'url' => route('store.dashboard')],
         ['label' => 'General Stock'],
@@ -22,6 +25,7 @@
     ]" />
 
     @include('store.stock._stock-ui')
+    @include('store.stock._ledger-ui')
 
     <x-page-header icon="journal-text" eyebrow="General Stock" title="Stock Report"
                    copy="Opening + Addition − Consumption = Stock as on Date · {{ $monthLabel }}">
@@ -75,7 +79,7 @@
          re-creating the banner from JS would mean keeping a copy of its markup
          in two places. --}}
     @if(empty($filters['status']))
-        <div class="alert alert-warning border-0 shadow-sm rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2 {{ $actionList->isEmpty() ? 'd-none' : '' }}"
+        <div class="alert alert-warning border-0 shadow-sm rounded-3 d-flex flex-wrap align-items-center justify-content-between gap-2 gx-ledger-action-alert {{ $actionList->isEmpty() ? 'd-none' : '' }}"
              data-ledger-action-alert>
             <span>
                 <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
@@ -166,11 +170,17 @@
                 @include("store.stock._ledger-rows")
             </div>
 
-            <p class="gx-stock-help mt-3">
-                Safety Stock = last month's consumption ÷ {{ config('stock.general_stock.working_days_per_month') }} working days ×
-                {{ config('stock.general_stock.safety_stock_days') }} days. Re-order Level adds the lead-time cover on top. A value
-                <i class="bi bi-pin-angle-fill text-primary" aria-hidden="true"></i> pinned in the Item Master overrides the calculated one.
-            </p>
+            {{-- Reference material, not running commentary: given its own quiet
+                 panel and clear air, rather than trailing the pager as loose
+                 grey text. --}}
+            <div class="gx-ledger-legend">
+                <div class="gx-ledger-legend-title">How these levels are worked out</div>
+                <p class="gx-stock-help">
+                    Safety Stock = last month's consumption ÷ {{ config('stock.general_stock.working_days_per_month') }} working days ×
+                    {{ config('stock.general_stock.safety_stock_days') }} days. Re-order Level adds the lead-time cover on top. A value
+                    <i class="bi bi-pin-angle-fill text-primary" aria-hidden="true"></i> pinned in the Item Master overrides the calculated one.
+                </p>
+            </div>
         </div>
     </div>
 

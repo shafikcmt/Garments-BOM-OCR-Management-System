@@ -60,6 +60,34 @@ it('applies the search filter to the partial', function () {
         ->assertDontSee('Carton Box Large');
 });
 
+/**
+ * The report's signal is inverted on purpose: an item that is fine is the
+ * common case, so it gets no badge and no colour, and only a row that needs
+ * buying is allowed either. A green pill returning to every healthy row would
+ * quietly undo the point of the whole layout.
+ */
+it('renders a healthy row as quiet text, not a green badge', function () {
+    StockItem::create([
+        'name' => 'Cotton Thread White',
+        'uom' => 'PCS',
+        'is_active' => true,
+        'opening_qty' => 5000,
+        'opening_as_on' => now()->subYear(),
+    ]);
+
+    $response = $this->actingAs(ledgerUser())
+        ->get(route('store.stock.ledger', ['partial' => 1]))
+        ->assertOk();
+
+    // Still says "Ok" in words — the state is never carried by colour alone.
+    $response->assertSee('gx-ledger-ok', false);
+    $response->assertSee('Ok');
+
+    // The old green pill is gone, and a healthy row gets no action spine.
+    $response->assertDontSee('bg-success-subtle', false);
+    $response->assertDontSee('gx-ledger-flag-ok', false);
+});
+
 it('keeps the transport flag out of the pagination links', function () {
     // A "next page" href has to stay a real URL someone can open or share, so
     // `partial` must not survive into it.
