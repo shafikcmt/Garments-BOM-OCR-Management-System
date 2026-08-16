@@ -75,12 +75,107 @@ it('has the agreed columns in the agreed order', function () {
         'Approved By',
         'Requisition Number',
         'Item Name*',
+        'Brand/Specification',
         'Uom',
         'Category',
         'Issued Qty*',
         'Type',
         'Remarks',
     ]);
+});
+
+/**
+ * Brand/Specification on the issue bulk upload — the same reference column the
+ * receiving template already carries, and the same rules: the item master is
+ * the authority, a mismatch is a note rather than a refusal, and the column can
+ * never create or change an item.
+ */
+it('notes a brand mismatch but still imports the issue', function () {
+    $item = issueItem();
+    $item->update(['brand' => 'Groz-Beckert DBx1 90/14']);
+    stockOnHand($item, 50);
+
+    $result = IssueImport::parse(issueSheet([
+        issueRow([
+            'Issue Date*' => now()->startOfMonth()->toDateString(),
+            'Item Name*' => 'Sewing Needle',
+            'Brand/Specification' => 'Organ 80/12 sharp point',
+            'Issued Qty*' => 4,
+        ]),
+    ]));
+
+    expect($result['errors'])->toBeEmpty();
+
+    $notes = implode(' | ', $result['notes']);
+
+    expect($notes)->toContain('Brand/Specification in the file is "Organ 80/12 sharp point"')
+        ->and($notes)->toContain('The item master was used.');
+
+    // The column is reference-only: the master must be untouched.
+    expect($item->fresh()->brand)->toBe('Groz-Beckert DBx1 90/14');
+});
+
+it('says nothing when the brand matches, is blank, or the master has none', function () {
+    $item = issueItem();
+    $item->update(['brand' => 'Groz-Beckert DBx1 90/14']);
+    stockOnHand($item, 50);
+
+    // Matching, ignoring case and surrounding space.
+    $matched = IssueImport::parse(issueSheet([
+        issueRow([
+            'Issue Date*' => now()->startOfMonth()->toDateString(),
+            'Item Name*' => 'Sewing Needle',
+            'Brand/Specification' => '  groz-beckert dbx1 90/14  ',
+            'Issued Qty*' => 1,
+        ]),
+    ]));
+
+    // Left blank — the column is optional.
+    $blank = IssueImport::parse(issueSheet([
+        issueRow([
+            'Issue Date*' => now()->startOfMonth()->toDateString(),
+            'Item Name*' => 'Sewing Needle',
+            'Issued Qty*' => 1,
+        ]),
+    ]));
+
+    expect($matched['notes'])->toBeEmpty()
+        ->and($blank['notes'])->toBeEmpty();
+
+    // Master has no brand recorded: the file's value contradicts nothing, so a
+    // note would be noise.
+    $item->update(['brand' => null]);
+
+    $noMaster = IssueImport::parse(issueSheet([
+        issueRow([
+            'Issue Date*' => now()->startOfMonth()->toDateString(),
+            'Item Name*' => 'Sewing Needle',
+            'Brand/Specification' => 'Organ',
+            'Issued Qty*' => 1,
+        ]),
+    ]));
+
+    expect($noMaster['notes'])->toBeEmpty();
+});
+
+it('accepts the brand header spellings a legacy workbook uses', function () {
+    $item = issueItem();
+    $item->update(['brand' => 'Groz-Beckert DBx1 90/14']);
+    stockOnHand($item, 50);
+
+    $headings = IssueImport::COLUMNS;
+    $headings[array_search('Brand/Specification', $headings, true)] = 'Brand Name';
+
+    $row = issueRow([
+        'Issue Date*' => now()->startOfMonth()->toDateString(),
+        'Item Name*' => 'Sewing Needle',
+        'Brand/Specification' => 'Organ',
+        'Issued Qty*' => 2,
+    ]);
+
+    $result = IssueImport::parse(array_merge([$headings], [$row]));
+
+    expect(implode(' | ', $result['notes']))->toContain('Brand/Specification in the file is "Organ"');
 });
 
 it('gives the template the same headings and two aligned example rows', function () {
@@ -602,8 +697,16 @@ it('uploading the same file twice through the screen issues nothing extra', func
     $user = \App\Models\User::factory()->create(['status' => 1]);
     $user->givePermissionTo(['store.issues.view', 'store.issues.create']);
 
+    // Built through issueRow() rather than typed as a comma string: a
+    // hand-counted row silently puts the quantity under the wrong heading the
+    // next time a column is added.
     $csv = implode(',', IssueImport::COLUMNS)."\n"
-        .'2026-08-01,,,,,REQ-77,Sewing Needle,,,12,,'."\n";
+        .implode(',', issueRow([
+            'Issue Date*' => '2026-08-01',
+            'Requisition Number' => 'REQ-77',
+            'Item Name*' => 'Sewing Needle',
+            'Issued Qty*' => 12,
+        ]))."\n";
 
     $upload = fn () => $this->actingAs($user)->post(
         route('store.stock.issues.import'),
@@ -643,7 +746,12 @@ it('records imported issues through the controller, scoped by permission', funct
     $creator->givePermissionTo(['store.issues.view', 'store.issues.create']);
 
     $csv = implode(',', IssueImport::COLUMNS)."\n"
-        .'2026-08-01,,,,,REQ-9,Sewing Needle,,,7,,'."\n";
+        .implode(',', issueRow([
+            'Issue Date*' => '2026-08-01',
+            'Requisition Number' => 'REQ-9',
+            'Item Name*' => 'Sewing Needle',
+            'Issued Qty*' => 7,
+        ]))."\n";
 
     $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('issues.csv', $csv);
 

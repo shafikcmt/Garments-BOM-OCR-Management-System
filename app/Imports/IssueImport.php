@@ -58,6 +58,10 @@ class IssueImport implements ToArray, WithCustomCsvSettings
         'Approved By',
         'Requisition Number',
         'Item Name*',
+        // A reference column, matching the Receiving template. It describes the
+        // ITEM, not the issue, and the item master stays the authority for it —
+        // see the cross-check in parse().
+        'Brand/Specification',
         'Uom',
         'Category',
         'Issued Qty*',
@@ -81,6 +85,8 @@ class IssueImport implements ToArray, WithCustomCsvSettings
         'approver' => ['approvedby', 'approver', 'approval'],
         'requisition_no' => ['requisitionnumber', 'requisitionno', 'reqno', 'requisition'],
         'item_name' => ['itemname', 'nameofitem', 'nameofitems', 'item', 'particulars'],
+        // Same spellings ReceivingImport accepts, so one workbook can feed both.
+        'brand' => ['brandspecification', 'brand', 'brandname', 'make', 'specification'],
         'uom' => ['uom', 'unit'],
         'category' => ['category', 'itemcategory'],
         'qty' => ['issuedqty', 'qty', 'quantity', 'issueqty'],
@@ -98,7 +104,8 @@ class IssueImport implements ToArray, WithCustomCsvSettings
      */
     public const SAMPLE_ROW = [
         '2026-08-01', 'Aug-26', 'Cutting', 'Rafiq Islam', 'Store Manager', 'REQ-1042',
-        'EXAMPLE — delete this row', 'Pkt', 'Needle', 5, 'New', 'Optional note',
+        'EXAMPLE — delete this row', 'Groz-Beckert DBx1 90/14, ball point',
+        'Pkt', 'Needle', 5, 'New', 'Optional note',
     ];
 
     /** Item names starting with this are treated as template placeholders. */
@@ -150,7 +157,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
         }
 
         // One query each, not one per row.
-        $items = StockItem::get(['id', 'name', 'uom', 'category'])
+        $items = StockItem::get(['id', 'name', 'uom', 'category', 'brand'])
             ->keyBy(fn (StockItem $item) => mb_strtolower(trim($item->name)));
 
         $masters = [
@@ -355,6 +362,19 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             if ($fileUom !== null && $item->uom && mb_strtolower($fileUom) !== mb_strtolower(trim($item->uom))) {
                 $group['notes'][] = 'Row '.$line.': Uom in the file is "'.$fileUom.'" but "'.$itemName
                     .'" is held in '.$item->uom.'. The item master was used.';
+            }
+
+            // Brand is reference-only for the same reason, and gets the same
+            // treatment as Uom above: a difference is worth telling somebody
+            // about, never worth losing a requisition over. Matching the
+            // wording ReceivingImport already uses.
+            $fileBrand = self::text($cell('brand'), 190);
+            $masterBrand = $item->brand;
+
+            if ($fileBrand !== null && $masterBrand
+                && mb_strtolower($fileBrand) !== mb_strtolower(trim($masterBrand))) {
+                $group['notes'][] = 'Row '.$line.': Brand/Specification in the file is "'.$fileBrand.'" but "'
+                    .$itemName.'" is held as '.trim($masterBrand).'. The item master was used.';
             }
 
             $group['lines'][] = [

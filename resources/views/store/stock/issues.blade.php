@@ -37,6 +37,9 @@
             'text' => $it->name.($suffix !== '' ? ' ('.$suffix.')' : ''),
             'uom' => (string) ($it->uom ?? ''),
             'category_id' => $it->item_category_id ? (string) $it->item_category_id : '',
+            // Shown read-only on the line, so the brand stays visible after the
+            // dropdown closes and its "Name (Brand)" label is out of sight.
+            'brand' => $suffix,
         ];
     })->values();
 
@@ -228,6 +231,11 @@
                                             <th>Item Name <span class="text-danger">*</span></th>
                                             <th>Uom</th>
                                             <th>Category</th>
+                                            {{-- Two brands can share an item name. The
+                                                 dropdown label carries the brand in
+                                                 brackets, but only while the list is
+                                                 open — this keeps it on the row. --}}
+                                            <th style="min-width:140px;">Brand/Specification <span class="gx-stock-auto">auto</span></th>
                                             <th>Issued Qty <span class="text-danger">*</span></th>
                                             <th>Type</th>
                                             <th>Remarks</th>
@@ -288,6 +296,10 @@
                                         @endforeach
                                     </select>
                                 </td>
+                                {{-- Derived from the item, never posted — the same
+                                     read-only treatment as Uom. Category above is a
+                                     real input here, so Uom is the pattern to copy. --}}
+                                <td><input type="text" class="form-control form-control-sm js-line-brand gx-stock-readonly" readonly tabindex="-1" placeholder="—"></td>
                                 <td><input type="number" step="0.0001" min="0" class="form-control form-control-sm text-end js-line-qty" name="items[__INDEX__][qty]" required placeholder="0"></td>
                                 {{-- New / Replace, per line. Left as a plain select
                                      (no TomSelect): two fixed options need no search
@@ -727,6 +739,9 @@
                 var info = value ? itemInfo(value) : null;
 
                 row.querySelector('.js-line-uom').value = info ? (info.uom || '') : '';
+                // Blank brand leaves the box empty, so its placeholder shows the
+                // em dash — the same as Uom.
+                row.querySelector('.js-line-brand').value = info ? (info.brand || '') : '';
 
                 // Back-fill the category from the chosen item when the row's
                 // filter was left on "All categories".

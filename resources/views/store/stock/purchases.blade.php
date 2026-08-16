@@ -151,6 +151,10 @@
                                     <th>Item Name <span class="text-danger">*</span></th>
                                     <th>Uom <span class="gx-stock-auto">auto</span></th>
                                     <th>Category <span class="gx-stock-auto">auto</span></th>
+                                    {{-- Two brands can share an item name, so without
+                                         this the operator cannot tell which one they
+                                         picked until after saving. --}}
+                                    <th style="min-width:140px;">Brand/Specification <span class="gx-stock-auto">auto</span></th>
                                     <th>Purchased Qty <span class="text-danger">*</span></th>
                                     <th>Unit Price</th>
                                     <th>Remarks</th>
@@ -165,7 +169,9 @@
                                  and left the label stranded far to its left. --}}
                             <tfoot>
                                 <tr>
-                                    <td colspan="5" class="text-end gx-stock-total-label">Total Value</td>
+                                    {{-- 6, not 5: the Brand/Specification column
+                                         sits inside this span. --}}
+                                    <td colspan="6" class="text-end gx-stock-total-label">Total Value</td>
                                     <td>
                                         <input type="text" id="grandTotal" class="form-control form-control-sm gx-stock-readonly fw-bold text-end" readonly tabindex="-1" value="0.00">
                                     </td>
@@ -194,13 +200,14 @@
                                 <select class="form-select form-select-sm js-line-item js-searchable" name="items[__INDEX__][stock_item_id]" required>
                                     <option value="">Select item…</option>
                                     @foreach($items as $it)
-                                        <option value="{{ $it->id }}" data-uom="{{ $it->uom }}" data-category="{{ $it->category }}">{{ $it->name }}</option>
+                                        <option value="{{ $it->id }}" data-uom="{{ $it->uom }}" data-category="{{ $it->category }}" data-brand="{{ $it->brand }}">{{ $it->name }}</option>
                                     @endforeach
                                 </select>
                             </td>
                             {{-- Derived from the item, never posted. --}}
                             <td><input type="text" class="form-control form-control-sm js-line-uom gx-stock-readonly text-center" readonly tabindex="-1" placeholder="—"></td>
                             <td><input type="text" class="form-control form-control-sm js-line-category gx-stock-readonly" readonly tabindex="-1" placeholder="—"></td>
+                            <td><input type="text" class="form-control form-control-sm js-line-brand gx-stock-readonly" readonly tabindex="-1" placeholder="—"></td>
                             <td><input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm js-line-qty" name="items[__INDEX__][qty]" required placeholder="0"></td>
                             <td><input type="number" step="0.0001" min="0" class="form-control form-control-sm js-line-price" name="items[__INDEX__][unit_price]" placeholder="0.00"></td>
                             <td><input type="text" class="form-control form-control-sm" name="items[__INDEX__][remarks]" maxlength="1000" placeholder="Optional"></td>
@@ -511,12 +518,16 @@
                 var select = row.querySelector('.js-line-item');
                 var uom = row.querySelector('.js-line-uom');
                 var category = row.querySelector('.js-line-category');
+                var brand = row.querySelector('.js-line-brand');
 
-                // Uom and Category follow the item; both are display-only.
+                // Uom, Category and Brand follow the item; all three are
+                // display-only. An item with no brand leaves the box empty and
+                // its placeholder shows the em dash, same as the other two.
                 select.addEventListener('change', function () {
                     var opt = select.options[select.selectedIndex];
                     uom.value = opt ? (opt.dataset.uom || '') : '';
                     category.value = opt ? (opt.dataset.category || '') : '';
+                    brand.value = opt ? (opt.dataset.brand || '') : '';
                 });
 
                 row.querySelector('.js-line-qty').addEventListener('input', total);
