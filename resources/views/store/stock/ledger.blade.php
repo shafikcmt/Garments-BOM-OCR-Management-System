@@ -146,8 +146,10 @@
             </form>
 
             {{-- 20 columns, same order as the reference sheet. The wrapper
-                 scrolls on its own so the page body never scrolls sideways. --}}
-            <div class="table-responsive">
+                 scrolls on its own so the page body never scrolls sideways.
+                 gx-stock-scroll caps its height as well, which is what lets the
+                 column headers stay pinned while a long month is read down. --}}
+            <div class="table-responsive gx-stock-scroll">
                 <table class="table align-middle gx-stock-table">
                     <thead>
                         <tr>
@@ -177,13 +179,15 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($rows as $index => $r)
+                        @forelse($pageRows as $index => $r)
                             @php [$badgeClass, $badgeIcon] = $badges[$r['status']]; @endphp
                             <tr @class(['table-danger' => $r['status'] === 'out'])>
                                 <td>
                                     <span class="badge {{ $badgeClass }}"><i class="bi {{ $badgeIcon }} me-1" aria-hidden="true"></i>{{ $statusLabels[$r['status']] }}</span>
                                 </td>
-                                <td class="text-end text-muted">{{ $index + 1 }}</td>
+                                {{-- Serial runs across the whole report, so page 2
+                                     starts at 101 rather than back at 1. --}}
+                                <td class="text-end text-muted">{{ $pageRows->firstItem() + $index }}</td>
                                 <td>
                                     <div class="fw-semibold text-slate-900">{{ $r['item']->name }}</div>
                                 </td>
@@ -240,6 +244,22 @@
                     @endif
                 </table>
             </div>
+
+            {{-- Only shown once the report is longer than one page. The count
+                 line stays useful either way, so it is not hidden with the
+                 links: it says how much of the month is on screen. --}}
+            @if($pageRows->total() > 0)
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+                    <div class="small text-muted">
+                        Showing {{ number_format($pageRows->firstItem()) }}–{{ number_format($pageRows->lastItem()) }}
+                        of {{ number_format($pageRows->total()) }} items.
+                        Totals above cover the full month.
+                    </div>
+                    @if($pageRows->hasPages())
+                        <div>{{ $pageRows->links() }}</div>
+                    @endif
+                </div>
+            @endif
 
             <p class="gx-stock-help mt-3">
                 Safety Stock = last month's consumption ÷ {{ config('stock.general_stock.working_days_per_month') }} working days ×

@@ -308,6 +308,34 @@
     .gx-stock-table > thead > tr > th:first-child { border-top-left-radius: 10px; }
     .gx-stock-table > thead > tr > th:last-child { border-top-right-radius: 10px; }
 
+    /* --- Pinned column headers -------------------------------------------
+     * Opt-in, on the long reports only. A .table-responsive wrapper is already
+     * a scroll container, so a header pinned to the page would never move
+     * relative to it — the wrapper has to own the vertical scroll too, which
+     * is what the height cap does. The header then stays put while a hundred
+     * rows of a twenty-column sheet go past, so "Consumption" still has a name
+     * at row eighty.
+     */
+    .gx-stock-scroll {
+        max-height: 72vh;
+        overflow: auto;
+    }
+    .gx-stock-scroll > .gx-stock-table > thead > tr > th {
+        position: sticky;
+        top: 0;
+        /* Above the row backgrounds, which are painted per-cell. */
+        z-index: 2;
+        /* The header background is already opaque (#f8fafc); without it the
+           rows would read straight through the pinned row. */
+    }
+    /* Short viewports — a laptop with the browser bar and the page header
+       taking their share — would be left scrolling a sliver of a pane. Below
+       that, let the table run at its natural height and scroll with the page. */
+    @media (max-height: 640px) {
+        .gx-stock-scroll { max-height: none; }
+        .gx-stock-scroll > .gx-stock-table > thead > tr > th { position: static; }
+    }
+
     .gx-stock-table > tbody > tr > td {
         padding: .6rem .55rem;
         border-bottom: 1px solid #eef2f7;

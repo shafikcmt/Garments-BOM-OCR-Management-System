@@ -6,6 +6,8 @@ use App\Exports\GeneralStockReportExport;
 use App\Http\Controllers\Controller;
 use App\Services\GeneralStockReportService;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -21,6 +23,13 @@ use Maatwebsite\Excel\Facades\Excel;
  */
 class GeneralStockLedgerController extends Controller
 {
+    /**
+     * Rows per screen page. The report is read top-to-bottom rather than
+     * clicked through, so the page is set long enough that a normal month's
+     * item list is one or two pages — short pages would only add clicks.
+     */
+    private const PER_PAGE = 100;
+
     public function __construct(private readonly GeneralStockReportService $report)
     {
     }
@@ -33,7 +42,31 @@ class GeneralStockLedgerController extends Controller
             'categories' => $this->report->categories(),
             'statusLabels' => GeneralStockReportService::statusLabels(),
             'actionList' => $this->report->actionList($data['rows']),
+            'pageRows' => $this->paginateRows($data['rows'], $request),
         ]);
+    }
+
+    /**
+     * Screen-only paging. The report is computed row by row in PHP, not by a
+     * query, so the page is sliced off the finished collection. `rows` itself
+     * stays whole on purpose: the summary tiles, the totals row, the PDF and
+     * the Excel must keep covering every item in the month, not just the
+     * hundred currently on screen.
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return LengthAwarePaginator<int, array<string, mixed>>
+     */
+    private function paginateRows(Collection $rows, Request $request): LengthAwarePaginator
+    {
+        $page = LengthAwarePaginator::resolveCurrentPage();
+
+        return new LengthAwarePaginator(
+            $rows->forPage($page, self::PER_PAGE)->values(),
+            $rows->count(),
+            self::PER_PAGE,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()],
+        );
     }
 
     public function pdf(Request $request)
