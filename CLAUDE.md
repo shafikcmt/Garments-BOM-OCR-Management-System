@@ -22,6 +22,18 @@ Always prioritize:
 
 This is a Laravel-based business management application with Blade views, PHP controllers, database migrations, PDF/export features, role-based access, dashboards, and workflow screens.
 
+> **Two database engines. Read this before writing any query.**
+>
+> Local development runs on **MySQL**. The live/production server runs on
+> **PostgreSQL**. A query that passes locally can silently return the wrong rows
+> on live. The most common trap: `LIKE` is case-insensitive on MySQL's default
+> collation and **case-sensitive on PostgreSQL**, so `where('name', 'like', '%num%')`
+> finds "Numbering Machine" locally and nothing at all on live.
+>
+> Use `whereLike()` / `orWhereLike()` for text search — Laravel compiles those to
+> `ILIKE` on PostgreSQL and `LIKE` on MySQL. See the [Database Rules](#database-rules)
+> section for the full rule on raw SQL, string and date functions.
+
 Common work types:
 
 - UI polish and dashboard improvement
@@ -187,6 +199,45 @@ Before adding or changing database fields:
 - Prefer additive migrations instead of editing old migrations if project is already in use.
 - Do not assume table/column names. Inspect first.
 - If production data may exist, use safe nullable/default fields.
+
+### MySQL / PostgreSQL compatibility
+
+Local development database is MySQL; the live/production server uses
+PostgreSQL. Any new query using `LIKE`, string functions, date functions, or
+raw SQL (`whereRaw` / `DB::raw` / `selectRaw` / `orderByRaw`) must be verified
+for PostgreSQL compatibility, not just tested against local MySQL.
+
+Prefer Laravel's database-agnostic query builder methods over raw SQL wherever
+possible. When raw SQL is unavoidable, use Laravel's connection-aware
+conditionals (`DB::getDriverName()` / `DB::connection()->getDriverName()`) to
+branch between MySQL and PostgreSQL syntax rather than assuming one engine.
+
+Specifics that have already bitten this project:
+
+- **Case-sensitive `LIKE`.** MySQL's default collation matches case-insensitively;
+  PostgreSQL's `LIKE` does not. Use `whereLike()` / `orWhereLike()`, which compile
+  to `ILIKE` on PostgreSQL and `LIKE` on MySQL. Never hand-write `ILIKE` — it is
+  a syntax error on MySQL.
+- **`COALESCE(<date column>, '')`.** PostgreSQL resolves the type to `date` and
+  rejects `''`; MySQL coerces to text and accepts it. Cast the date to text first
+  — see `StockPurchase::dateKeyExpr()`, which branches per driver.
+- **Date formatting.** `DATE_FORMAT()` is MySQL-only. PostgreSQL uses `TO_CHAR()`,
+  SQLite uses `STRFTIME()`.
+- **`CONCAT()`.** Fine on MySQL and PostgreSQL, but absent on SQLite — which the
+  test suite uses, so a raw `CONCAT` shows up as failing tests rather than as a
+  production bug.
+- Test-suite note: the tests run on in-memory **SQLite**, a third dialect. Green
+  tests are not evidence a raw query works on PostgreSQL, and a test failing on
+  SQLite does not prove production is broken. Check the dialect that matters.
+
+To verify a query against PostgreSQL without a PostgreSQL server, compile it
+through the real grammar and read the SQL — `toSql()` needs no connection:
+
+```php
+Config::set('database.connections.pg', ['driver' => 'pgsql', /* … */]);
+DB::connection('pg')->table('stock_items')->whereLike('name', '%num%')->toSql();
+// => select * from "stock_items" where "name"::text ilike ?
+```
 
 ## Build / Check Commands
 

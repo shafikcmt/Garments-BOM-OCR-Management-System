@@ -43,10 +43,12 @@ class StockItemController extends Controller
 
         if ($search = $filters['search'] ?? null) {
             // Same three fields the Stock Report searches, so a term that finds
-            // an item there finds it here too.
+            // an item there finds it here too — including the case-insensitivity.
+            // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE is
+            // case-sensitive and quietly returns less than it should.
             $query->where(function ($q) use ($search) {
                 foreach (['name', 'brand', 'category'] as $column) {
-                    $q->orWhere($column, 'like', '%'.$search.'%');
+                    $q->orWhereLike($column, '%'.$search.'%');
                 }
             });
         }

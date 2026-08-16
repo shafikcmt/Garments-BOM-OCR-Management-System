@@ -186,10 +186,18 @@ class GeneralStockReportService
             ->when($filters['category'] ?? null, fn ($q, $category) => $q->where('category', $category))
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $like = '%'.$search.'%';
-                $q->where(fn ($w) => $w->where('name', 'like', $like)
-                    ->orWhere('category', 'like', $like)
+                // whereLike, not where(..., 'like', ...): PostgreSQL's LIKE is
+                // case-sensitive, so "num" would not find "Numbering Machine"
+                // and the report answered "Nothing to show" on the live server
+                // for a term that worked in development. The framework's
+                // whereLike compiles to ILIKE on Postgres and stays LIKE on
+                // MySQL/MariaDB and SQLite, where LIKE is already
+                // case-insensitive. Same treatment as the receiving, issue and
+                // requisition searches.
+                $q->where(fn ($w) => $w->whereLike('name', $like)
+                    ->orWhereLike('category', $like)
                     // The merged Brand/Specification field.
-                    ->orWhere('brand', 'like', $like));
+                    ->orWhereLike('brand', $like));
             })
             ->orderBy('name')
             ->get();
