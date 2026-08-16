@@ -332,13 +332,15 @@
        recede — blanking the table on every keystroke reads as the report
        breaking. Pointer events go off so a pagination link cannot be clicked
        against rows that are about to be replaced. */
-    [data-ledger-table].is-loading {
+    [data-ledger-table].is-loading,
+    [data-list-table].is-loading {
         opacity: .55;
         transition: opacity .15s ease-in;
         pointer-events: none;
     }
     @media (prefers-reduced-motion: reduce) {
-        [data-ledger-table].is-loading { transition: none; }
+        [data-ledger-table].is-loading,
+        [data-list-table].is-loading { transition: none; }
     }
 
     /* Short viewports — a laptop with the browser bar and the page header

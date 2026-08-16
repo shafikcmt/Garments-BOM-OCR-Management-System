@@ -79,18 +79,25 @@
         <div class="gx-stock-card-body">
             <div class="gx-stock-toolbar mb-3">
                 <h5>Item Master</h5>
-                <span class="badge bg-primary-subtle text-primary">{{ $items->total() }} items</span>
+                <span class="badge bg-primary-subtle text-primary"><span data-list-count>{{ $items->total() }}</span> items</span>
+                {{-- Sits beside the count it belongs to, so the feedback is where
+                     the user is already looking while typing. --}}
+                <span class="spinner-border spinner-border-sm text-primary d-none" role="status" data-list-spinner>
+                    <span class="visually-hidden">Updating the list…</span>
+                </span>
 
                 {{-- Counts across the whole master, not this page. Each one
-                     re-runs the list filtered to itself. --}}
+                     re-runs the list filtered to itself. Always rendered, and
+                     hidden while zero: a live filter can empty one and fill it
+                     again, and rebuilding the chip from JS would mean keeping a
+                     copy of its markup in two places. --}}
                 @foreach ([StockStatus::STATUS_OUT, StockStatus::STATUS_PLACE_ORDER, StockStatus::STATUS_LOW] as $chip)
-                    @if(($statusCounts[$chip] ?? 0) > 0)
-                        <a href="{{ route('store.stock.items.index', array_merge($activeFilters, ['status' => $chip])) }}"
-                           class="badge gx-stock-chip {{ $statusMeta[$chip]['badge'] }}"
-                           @if(($filters['status'] ?? '') === $chip) aria-current="true" @endif>
-                            {{ $statusCounts[$chip] }} {{ $statusMeta[$chip]['label'] }}
-                        </a>
-                    @endif
+                    <a href="{{ route('store.stock.items.index', array_merge($activeFilters, ['status' => $chip])) }}"
+                       class="badge gx-stock-chip {{ $statusMeta[$chip]['badge'] }} {{ ($statusCounts[$chip] ?? 0) > 0 ? '' : 'd-none' }}"
+                       data-list-chip="{{ $chip }}"
+                       @if(($filters['status'] ?? '') === $chip) aria-current="true" @endif>
+                        <span data-list-chip-count>{{ $statusCounts[$chip] ?? 0 }}</span> {{ $statusMeta[$chip]['label'] }}
+                    </a>
                 @endforeach
 
                 <span class="gx-stock-toolbar-gap"></span>
@@ -103,7 +110,11 @@
                 </button>
             </div>
 
-            <form method="GET" class="row g-3 gx-stock-filter mb-4">
+            {{-- Stays a plain GET form with a working Filter button. The live
+                 search is an enhancement on top: with JS off, or if a fetch
+                 fails, submitting still reloads the page with the same filters. --}}
+            <form method="GET" class="row g-3 gx-stock-filter mb-4" data-list-filters
+                  action="{{ route('store.stock.items.index') }}">
                 <div class="col-12 col-md-4">
                     <label class="form-label" for="itemFilterSearch">Search</label>
                     <input id="itemFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control"
@@ -136,113 +147,12 @@
                 </div>
             </form>
 
-            <div class="table-responsive">
-                <table class="table align-middle gx-stock-table">
-                    <thead>
-                        <tr>
-                            <th>Item</th>
-                            <th>UOM</th>
-                            <th class="text-end">Current Stock</th>
-                            <th class="text-end">Safety / Re-order</th>
-                            <th>Status</th>
-                            <th class="text-end gx-stock-actions">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($items as $item)
-                            {{-- Lifetime balance: counted opening + everything
-                                 received − everything issued. --}}
-                            @php
-                                $current = (float) $item->opening_qty + (float) $item->purchased_qty - (float) $item->issued_qty;
-
-                                $status = StockStatus::statusFor(
-                                    $current,
-                                    $item->safety_stock_qty !== null ? (float) $item->safety_stock_qty : null,
-                                    $item->reorder_level !== null ? (float) $item->reorder_level : null,
-                                );
-
-                                // Only drawn against a real re-order level. Where
-                                // that is blank the level is calculated later from
-                                // consumption, and a bar against a denominator we
-                                // invented here would read as fact.
-                                $reorder = $item->reorder_level !== null ? (float) $item->reorder_level : null;
-                                $fill = $reorder > 0 ? max(0, min(100, ($current / $reorder) * 100)) : null;
-                            @endphp
-                            <tr @class(['table-danger' => $status === StockStatus::STATUS_OUT])>
-                                <td>
-                                    <div class="fw-bold text-slate-900">{{ $item->name }}</div>
-                                    {{-- Category · Brand/Specification on one line,
-                                         blanks dropped so a sparse item does not
-                                         read as a row of dashes. Set with the
-                                         section's shared secondary-detail size,
-                                         the same as the Stock Report. --}}
-                                    <div class="gx-stock-micro">
-                                        {{ collect([$item->category, $item->brand])->filter()->implode(' · ') ?: '—' }}
-                                    </div>
-                                </td>
-                                <td class="small">{{ $item->uom ?: '—' }}</td>
-                                <td class="text-end">
-                                    <div class="fw-bold text-slate-900">{{ $qty($current) }}</div>
-                                    @if($fill !== null)
-                                        <div class="gx-stock-health gx-stock-health--{{ $statusMeta[$status]['tone'] }} ms-auto"
-                                             title="{{ $qty($current) }} against a re-order level of {{ $qty($reorder) }}">
-                                            <i style="width:{{ $fill }}%;"></i>
-                                        </div>
-                                    @endif
-                                </td>
-                                <td class="text-end small text-muted">
-                                    {{ $item->safety_stock_qty !== null ? $qty($item->safety_stock_qty) : '—' }}
-                                    /
-                                    {{ $item->reorder_level !== null ? $qty($item->reorder_level) : '—' }}
-                                </td>
-                                <td>
-                                    <div class="gx-stock-pills">
-                                        <span class="badge {{ $statusMeta[$status]['badge'] }}">{{ $statusMeta[$status]['label'] }}</span>
-                                        {{-- An inactive item still has a stock level, so
-                                             the two are shown together rather than one
-                                             replacing the other. Beside the status
-                                             rather than under it — on its own line it
-                                             set the height of every row in the table
-                                             for the sake of the rare inactive one. --}}
-                                        @unless($item->is_active)
-                                            <span class="badge bg-secondary-subtle text-secondary">Inactive</span>
-                                        @endunless
-                                    </div>
-                                </td>
-                                {{-- Edit and Delete are Admin / Management rights
-                                     (store.edit / store.delete); both controller
-                                     methods enforce the same check server-side. --}}
-                                <td class="text-end gx-stock-actions">
-                                    @if($canEdit)
-                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editItem{{ $item->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
-                                    @endif
-                                    @if($canDelete)
-                                        <form method="POST" action="{{ route('store.stock.items.destroy', $item) }}" class="d-inline" onsubmit="return confirm('Remove this item?');">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
-                                        </form>
-                                    @endif
-                                    @if(! $canEdit && ! $canDelete)
-                                        <span class="text-muted small">—</span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="6" class="gx-stock-empty">
-                                    <span class="gx-stock-empty-icon"><i class="bi bi-{{ $hasFilters ? 'search' : 'box-seam' }}" aria-hidden="true"></i></span>
-                                    @if($hasFilters)
-                                        <div class="gx-stock-empty-title">No items match this filter</div>
-                                        <div class="gx-stock-empty-hint">Try a different search, category or status.</div>
-                                    @else
-                                        <div class="gx-stock-empty-title">No stock items yet</div>
-                                        <div class="gx-stock-empty-hint">Use Add Item above, or import a list.</div>
-                                    @endif
-                                </td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
+            {{-- Everything the filters change lives in this container: the JS
+                 swaps it for the same Blade re-rendered server-side. The Edit
+                 modals ride along inside it — see _items-list. --}}
+            <div id="stockItemsList" data-list-table>
+                @include("store.stock._items-list")
             </div>
-            <div class="mt-3">{{ $items->links() }}</div>
         </div>
     </div>
 
@@ -308,34 +218,6 @@
             </div>
         </div>
     </div>
-
-    {{-- Edit. Same fields, same grouping, same partial as Add. Not rendered at
-         all for a role that cannot submit it, so the markup carries no action a
-         non-admin could replay. --}}
-    @if($canEdit)
-        @foreach($items as $item)
-            <div class="modal fade" id="editItem{{ $item->id }}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-                    <div class="modal-content gx-stock-card">
-                        <form method="POST" action="{{ route('store.stock.items.update', $item) }}">
-                            @csrf @method('PUT')
-                            <div class="modal-header">
-                                <h5 class="modal-title">Edit Item</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                @include('store.stock._item-fields', ['item' => $item])
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Update</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        @endforeach
-    @endif
 
     @include('store.stock._searchable')
 

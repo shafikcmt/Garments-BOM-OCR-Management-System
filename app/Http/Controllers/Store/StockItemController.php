@@ -11,6 +11,7 @@ use App\Models\ItemCategory;
 use App\Models\StockItem;
 use App\Services\GeneralStockReportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -68,7 +69,10 @@ class StockItemController extends Controller
             $query->whereIn('id', $wanted->keys());
         }
 
-        $items = $query->orderBy('name')->paginate(25)->withQueryString();
+        // `partial` is a transport flag, not a filter — kept out of the pager
+        // links so a "next page" href stays a real, shareable URL.
+        $items = $query->orderBy('name')->paginate(25)
+            ->appends(Arr::except($request->query(), ['partial', 'page']));
 
         ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
 
@@ -77,6 +81,18 @@ class StockItemController extends Controller
         // Counts for the toolbar chips. Whole master, not the current page —
         // "3 out of stock" has to mean three items, not three on this page.
         $statusCounts = $statuses->countBy();
+
+        // Live search / filter change: the same action, returning only the part
+        // of the page the filters affect. Sharing the action rather than adding
+        // a second endpoint is what guarantees the AJAX result and the full page
+        // come off the identical query and the identical paging.
+        if ($request->boolean('partial')) {
+            // `categories` too: the Edit modals ride inside this fragment and
+            // their _item-fields include needs the category list.
+            return view('store.stock._items-list', compact(
+                'items', 'categories', 'canEdit', 'canDelete', 'filters', 'statusCounts'
+            ));
+        }
 
         return view('store.stock.items', compact(
             'items', 'categories', 'canEdit', 'canDelete', 'filters', 'statusCounts'
