@@ -83,6 +83,33 @@
 
     @include('store._flash')
 
+    {{-- What the bulk upload has to say for itself, in the same two bands the
+         receiving screen uses. import_errors is deliberately absent: the layout
+         already prints it for every screen, and repeating it here would show
+         the same list twice.
+
+         "Skipped" and "notes" had nowhere to appear on this screen before, so
+         the importer's own account of what it did — including the Issue Setup
+         entries a file created — was being thrown away. --}}
+    @foreach ([
+        ['key' => 'import_skipped', 'tone' => 'warning', 'icon' => 'exclamation-triangle-fill', 'heading' => 'These were skipped:'],
+        ['key' => 'import_notes', 'tone' => 'info', 'icon' => 'info-circle-fill', 'heading' => 'Imported, with these notes:'],
+    ] as $report)
+        @if(session($report['key']))
+            <div class="alert alert-{{ $report['tone'] }} d-flex align-items-start gap-2" role="alert">
+                <i class="bi bi-{{ $report['icon'] }}" aria-hidden="true"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-semibold mb-1">{{ $report['heading'] }}</div>
+                    <ul class="mb-0 ps-3 small" style="max-height:220px; overflow-y:auto;">
+                        @foreach(session($report['key']) as $line)
+                            <li>{{ $line }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        @endif
+    @endforeach
+
     {{-- Per-item stock warnings raised by the submission just saved, so a
          multi-line requisition names exactly which items need reordering. --}}
     @if(session('issue_stock_warnings'))

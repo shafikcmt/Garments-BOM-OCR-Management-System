@@ -313,29 +313,116 @@ it('rejects an unknown item without creating it', function () {
     expect(StockItem::where('name', 'Not In The Master')->exists())->toBeFalse();
 });
 
-it('rejects unknown Section, Person, Approver and Category without creating them', function () {
+/**
+ * The three header masters are created on demand, the way the manual form
+ * creates them; Item and Category are still matched strictly. This pair of
+ * tests is the line between the two, and the reasoning is in the class comment
+ * on IssueImport.
+ */
+it('creates an unknown Section, Person and Approver instead of rejecting the requisition', function () {
     $item = issueItem();
     stockOnHand($item, 100);
 
-    foreach ([
-        ['Indent Section' => 'No Such Section', 'expect' => 'Indent Section', 'model' => IndentSection::class, 'name' => 'No Such Section'],
-        ['Indent Person' => 'No Such Person', 'expect' => 'Indent Person', 'model' => IndentPerson::class, 'name' => 'No Such Person'],
-        ['Approved By' => 'No Such Approver', 'expect' => 'Approved By', 'model' => IssueApprover::class, 'name' => 'No Such Approver'],
-        ['Category' => 'No Such Category', 'expect' => 'Category', 'model' => ItemCategory::class, 'name' => 'No Such Category'],
-    ] as $case) {
-        $expect = $case['expect'];
-        $model = $case['model'];
-        $name = $case['name'];
-        unset($case['expect'], $case['model'], $case['name']);
+    $result = IssueImport::parse(issueSheet([
+        issueRow([
+            'Issue Date*' => '2026-08-01',
+            'Indent Section' => 'Finishing-2',
+            'Indent Person' => 'Mr. Niranjan- Quality Inspection',
+            'Approved By' => 'Md. Rasel (Store In-charge)',
+            'Item Name*' => 'Sewing Needle',
+            'Issued Qty*' => 1,
+        ]),
+    ]));
 
-        $result = IssueImport::parse(issueSheet([
-            issueRow($case + ['Issue Date*' => '2026-08-01', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 1]),
-        ]));
+    expect($result['errors'])->toBe([])
+        ->and($result['requisitions'])->toHaveCount(1);
 
-        expect($result['requisitions'])->toBeEmpty("{$expect} should have blocked the requisition");
-        expect(implode(' ', $result['errors']))->toContain('is not in the '.$expect.' list');
-        expect($model::where('name', $name)->exists())->toBeFalse("{$expect} must not be auto-created");
-    }
+    $section = IndentSection::where('name', 'Finishing-2')->first();
+    $person = IndentPerson::where('name', 'Mr. Niranjan- Quality Inspection')->first();
+    $approver = IssueApprover::where('name', 'Md. Rasel (Store In-charge)')->first();
+
+    // Created, active, and actually attached to the requisition.
+    expect($section?->is_active)->toBeTrue()
+        ->and($person?->is_active)->toBeTrue()
+        ->and($approver?->is_active)->toBeTrue()
+        ->and($result['requisitions'][0]['indent_section_id'])->toBe($section->id)
+        ->and($result['requisitions'][0]['indent_person_id'])->toBe($person->id)
+        ->and($result['requisitions'][0]['issue_approver_id'])->toBe($approver->id);
+
+    // ...and the file says so, naming each one.
+    $notes = implode(' | ', $result['notes']);
+
+    expect($notes)->toContain('1 new Indent Section entry was added to Issue Setup')
+        ->and($notes)->toContain('Finishing-2')
+        ->and($notes)->toContain('Mr. Niranjan- Quality Inspection')
+        ->and($notes)->toContain('Md. Rasel (Store In-charge)');
+});
+
+it('still refuses an unknown Category, and never creates one', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    $result = IssueImport::parse(issueSheet([
+        issueRow([
+            'Issue Date*' => '2026-08-01',
+            'Category' => 'No Such Category',
+            'Item Name*' => 'Sewing Needle',
+            'Issued Qty*' => 1,
+        ]),
+    ]));
+
+    expect($result['requisitions'])->toBeEmpty()
+        ->and(implode(' ', $result['errors']))->toContain('is not in the Category list')
+        ->and(ItemCategory::where('name', 'No Such Category')->exists())->toBeFalse();
+});
+
+it('creates one master however many rows and files name it', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    // Same approver, three spellings that differ only by case and spacing, on
+    // three separate requisitions.
+    $sheet = issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1', 'Approved By' => 'Md. Rasel (Store In-charge)', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 1]),
+        issueRow(['Issue Date*' => '2026-08-02', 'Requisition Number' => 'REQ-2', 'Approved By' => 'md. rasel (store in-charge)', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 1]),
+        issueRow(['Issue Date*' => '2026-08-03', 'Requisition Number' => 'REQ-3', 'Approved By' => '  Md.  Rasel   (Store In-charge)  ', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 1]),
+    ]);
+
+    $first = IssueImport::parse($sheet);
+
+    expect($first['requisitions'])->toHaveCount(3)
+        ->and(IssueApprover::count())->toBe(1);
+
+    // Every requisition points at the one row.
+    $ids = array_unique(array_column($first['requisitions'], 'issue_approver_id'));
+    expect($ids)->toHaveCount(1);
+
+    // Re-uploading the same file adds nothing and claims nothing.
+    $second = IssueImport::parse($sheet);
+
+    expect(IssueApprover::count())->toBe(1)
+        ->and(implode(' ', $second['notes']))->not->toContain('added to Issue Setup');
+});
+
+it('brings a deactivated master back rather than making a second one', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    $approver = IssueApprover::create(['name' => 'Store Manager', 'is_active' => false]);
+
+    $result = IssueImport::parse(issueSheet([
+        issueRow([
+            'Issue Date*' => '2026-08-01',
+            'Approved By' => 'store manager',
+            'Item Name*' => 'Sewing Needle',
+            'Issued Qty*' => 1,
+        ]),
+    ]));
+
+    expect($result['requisitions'])->toHaveCount(1)
+        ->and(IssueApprover::count())->toBe(1)
+        ->and($approver->fresh()->is_active)->toBeTrue()
+        ->and($result['requisitions'][0]['issue_approver_id'])->toBe($approver->id);
 });
 
 it('stores Category as data, unlike Uom which only cross-checks', function () {

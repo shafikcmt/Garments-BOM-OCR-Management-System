@@ -6,8 +6,10 @@ use App\Models\IndentPerson;
 use App\Models\IndentSection;
 use App\Models\IssueApprover;
 use App\Models\ItemCategory;
+use App\Models\StockIssue;
 use App\Models\StockItem;
 use App\Services\GeneralStockReportService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\ToArray;
 use Maatwebsite\Excel\Concerns\WithCustomCsvSettings;
@@ -31,11 +33,29 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
  * is therefore accumulated across the whole file before anything is accepted —
  * see settle().
  *
- * Masters are matched, never created. The manual form does create them, because
- * a user typing a new Indent Section there has said so explicitly and the
- * browser marks it. A spreadsheet carries no such signal, so a misspelling would
- * become a permanent section nobody chose — the same reasoning that stops an
- * unknown item name becoming an item.
+ * The three HEADER masters — Indent Section, Indent Person, Approved By — are
+ * created when the file names one that does not exist, the same as the manual
+ * form does. They used to be matched strictly, on the reasoning that the manual
+ * form only creates when the browser marks a value as newly typed and a
+ * spreadsheet carries no such signal. That reasoning held, but the cost did
+ * not: a requisition is all-or-nothing, so one unrecognised approver rejected
+ * every line under it, and a file naming four new approvers imported nothing at
+ * all. Store staff were blocked before importing anything by names that were
+ * perfectly correct — just new.
+ *
+ * The data-quality concern behind the old rule is answered instead by SAYING
+ * what was created: every new master is reported in the notes the screen shows
+ * after the import, so a misspelling is reviewable straight afterwards rather
+ * than silently permanent. Names are matched case-insensitively and with
+ * internal whitespace collapsed, so re-importing the same file adds nothing a
+ * second time.
+ *
+ * ITEM and CATEGORY are deliberately NOT part of that change and are still
+ * matched strictly. An invented item would appear in the Stock Report as real
+ * stock with no uom, category or safety level behind it; a category is a
+ * reporting bucket that only means anything if it is one of the agreed set.
+ * Neither is a name a store clerk can legitimately coin while typing a
+ * requisition, which is exactly what the three header masters are.
  */
 class IssueImport implements ToArray, WithCustomCsvSettings
 {
@@ -96,6 +116,19 @@ class IssueImport implements ToArray, WithCustomCsvSettings
 
     /** Fields without which a row cannot be read at all. */
     private const REQUIRED_HEADINGS = ['issue_date', 'item_name', 'qty'];
+
+    /**
+     * The header masters, and the label each is called by on screen. These are
+     * the three the import creates on demand; Category is absent on purpose —
+     * see the class comment.
+     *
+     * @var array<string, array{0: class-string<Model>, 1: string}>
+     */
+    private const HEADER_MASTERS = [
+        'indent_section' => [IndentSection::class, 'Indent Section'],
+        'indent_person' => [IndentPerson::class, 'Indent Person'],
+        'approver' => [IssueApprover::class, 'Approved By'],
+    ];
 
     /**
      * One example row, so the template shows the expected shape. Marked with
@@ -166,6 +199,11 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             'approver' => self::masterIndex(IssueApprover::class),
             'category' => self::masterIndex(ItemCategory::class),
         ];
+
+        // Header masters this file brought into existence, reported at the end
+        // so a typo is reviewable rather than silently permanent.
+        // Shape: field => [normalised key => name as written].
+        $created = [];
 
         $alreadyRecorded = self::recordedRequisitionKeys();
 
@@ -250,39 +288,23 @@ class IssueImport implements ToArray, WithCustomCsvSettings
                 continue;
             }
 
-            // Header masters. Matched, never created — see the class comment.
-            // Resolved on the group rather than the line because they are one
-            // per requisition, and reported once for the same reason.
+            // Header masters. Matched, and created when the file names one that
+            // does not exist yet — see the class comment. Resolved on the group
+            // rather than the line because they are one per requisition.
             $headerMasters = [
-                'indent_section' => ['Indent Section', $sectionName, 'indent_section_id'],
-                'indent_person' => ['Indent Person', $personName, 'indent_person_id'],
-                'approver' => ['Approved By', $approverName, 'issue_approver_id'],
+                'indent_section' => [$sectionName, 'indent_section_id'],
+                'indent_person' => [$personName, 'indent_person_id'],
+                'approver' => [$approverName, 'issue_approver_id'],
             ];
 
-            $headerFailed = false;
-
-            foreach ($headerMasters as $field => [$label, $name, $target]) {
+            foreach ($headerMasters as $field => [$name, $target]) {
                 if ($name === null) {
                     continue;
                 }
 
-                $id = $masters[$field][mb_strtolower(trim($name))] ?? null;
-
-                if ($id === null) {
-                    $group['errors'][] = 'Row '.$line.': "'.$name.'" is not in the '.$label
-                        .' list. Add it under Issue Setup first, or correct the spelling.';
-                    $headerFailed = true;
-
-                    continue;
-                }
-
-                $group[$target] = $id;
-            }
-
-            if ($headerFailed) {
-                unset($group);
-
-                continue;
+                // $masters and $created are threaded through so one name is
+                // looked up once and created once, however many rows carry it.
+                $group[$target] = self::resolveMaster($field, $name, $masters, $created);
             }
 
             $item = $items->get(mb_strtolower($itemName));
@@ -321,7 +343,10 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             $categoryId = null;
 
             if ($categoryName !== null) {
-                $categoryId = $masters['category'][mb_strtolower($categoryName)] ?? null;
+                // Still matched strictly — a category is never created from a
+                // file. Only the LOOKUP is normalised the same way the header
+                // masters are, so spacing alone cannot fail a real category.
+                $categoryId = $masters['category'][self::masterKey($categoryName)] ?? null;
 
                 if ($categoryId === null) {
                     $group['errors'][] = 'Row '.$line.': "'.$categoryName.'" is not in the Category list. Add it under Issue Setup first, or correct the spelling.';
@@ -336,7 +361,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             if ($type !== null) {
                 $matched = null;
 
-                foreach (\App\Models\StockIssue::REQUISITION_TYPES as $allowed) {
+                foreach (StockIssue::REQUISITION_TYPES as $allowed) {
                     if (mb_strtolower($type) === mb_strtolower($allowed)) {
                         $matched = $allowed;
                         break;
@@ -345,7 +370,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
 
                 if ($matched === null) {
                     $group['errors'][] = 'Row '.$line.': Type must be '
-                        .implode(' or ', \App\Models\StockIssue::REQUISITION_TYPES).', or blank.';
+                        .implode(' or ', StockIssue::REQUISITION_TYPES).', or blank.';
                     unset($group);
 
                     continue;
@@ -390,7 +415,13 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             unset($group);
         }
 
-        return self::settle($groups, $alreadyRecorded, $skipped);
+        $result = self::settle($groups, $alreadyRecorded, $skipped);
+
+        // Ahead of the per-row notes: what the file added to Issue Setup is the
+        // thing somebody has to act on if it is wrong.
+        $result['notes'] = array_merge(self::creationNotes($created), $result['notes']);
+
+        return $result;
     }
 
     /**
@@ -576,7 +607,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
      */
     private static function recordedRequisitionKeys(): array
     {
-        $keys = \App\Models\StockIssue::query()
+        $keys = StockIssue::query()
             ->whereNotNull('requisition_no')
             ->where('requisition_no', '<>', '')
             ->select('requisition_no', 'issue_date', 'indent_section_id', 'indent_person_id', 'issue_approver_id')
@@ -593,7 +624,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             ])
             ->all();
 
-        $unnumbered = \App\Models\StockIssue::query()
+        $unnumbered = StockIssue::query()
             ->where(fn ($q) => $q->whereNull('requisition_no')->orWhere('requisition_no', ''))
             ->get(['requisition_no', 'issue_date', 'indent_section_id', 'indent_person_id', 'issue_approver_id', 'stock_item_id'])
             ->groupBy(fn ($row) => implode('|', [
@@ -656,7 +687,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
      * resolved their item through the master, so an id cannot disagree with
      * itself over spelling or letter case the way a name can.
      *
-     * @param  array<int, array<string, mixed>|\App\Models\StockIssue>  $lines
+     * @param  array<int, array<string, mixed>|StockIssue>  $lines
      */
     private static function itemSetKey(array $lines): string
     {
@@ -690,17 +721,103 @@ class IssueImport implements ToArray, WithCustomCsvSettings
     }
 
     /**
-     * name (lowercased) => id, for one of the Issue Setup masters.
+     * normalised name => id, for one of the Issue Setup masters.
      *
-     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @param  class-string<Model>  $model
      * @return array<string, int>
      */
     private static function masterIndex(string $model): array
     {
         return $model::query()
             ->get(['id', 'name'])
-            ->mapWithKeys(fn ($row) => [mb_strtolower(trim((string) $row->name)) => (int) $row->id])
+            ->mapWithKeys(fn ($row) => [self::masterKey((string) $row->name) => (int) $row->id])
             ->all();
+    }
+
+    /**
+     * One header master name turned into an id, creating the master when the
+     * name is new to the system.
+     *
+     * Both the index and this lookup go through masterKey(), so "Mr. Niranjan-
+     * Quality Inspection" written twice with different spacing or capitals is
+     * one approver, and re-uploading a file creates nothing a second time.
+     *
+     * @param  array<string, array<string, int>>  $masters  index, added to in place
+     * @param  array<string, array<string, string>>  $created  names created, collected in place
+     */
+    private static function resolveMaster(string $field, string $name, array &$masters, array &$created): int
+    {
+        $key = self::masterKey($name);
+        $existingId = $masters[$field][$key] ?? null;
+
+        [$model] = self::HEADER_MASTERS[$field];
+
+        if ($existingId !== null) {
+            // Naming something previously deactivated brings it back, which is
+            // what the file plainly meant by using it — the same thing the
+            // manual form does when the name is typed into its dropdown.
+            $model::query()->whereKey($existingId)->where('is_active', false)->update(['is_active' => true]);
+
+            return $existingId;
+        }
+
+        $row = $model::create([
+            // Stored as written, minus the collapsing: the key is what matches,
+            // the name is what people read.
+            'name' => mb_substr(self::tidy($name), 0, 150),
+            'is_active' => true,
+            'created_by' => auth()->id(),
+        ]);
+
+        // Both indexes updated so a later row carrying the same name reuses
+        // this row rather than making another.
+        $masters[$field][$key] = (int) $row->id;
+        $created[$field][$key] = $row->name;
+
+        return (int) $row->id;
+    }
+
+    /**
+     * What the file added to Issue Setup, one line per master, named in full.
+     *
+     * Named rather than counted: "3 new Approved By entries were created" tells
+     * nobody which three, and the whole point of reporting them is that a
+     * misspelling can be recognised and merged.
+     *
+     * @param  array<string, array<string, string>>  $created
+     * @return list<string>
+     */
+    private static function creationNotes(array $created): array
+    {
+        $notes = [];
+
+        // HEADER_MASTERS order, not insertion order, so the summary reads the
+        // same way round every time.
+        foreach (self::HEADER_MASTERS as $field => [, $label]) {
+            $names = array_values($created[$field] ?? []);
+
+            if (! $names) {
+                continue;
+            }
+
+            $notes[] = count($names).' new '.$label.' '.(count($names) === 1 ? 'entry was' : 'entries were')
+                .' added to Issue Setup from this file: '.implode(', ', $names)
+                .'. Check the spelling under Issue Setup and merge any duplicates.';
+        }
+
+        return $notes;
+    }
+
+    /** A master name reduced to what identifies it: case- and spacing-blind. */
+    private static function masterKey(string $name): string
+    {
+        return mb_strtolower(self::tidy($name));
+    }
+
+    /** Trimmed, with runs of internal whitespace collapsed to one space. */
+    private static function tidy(string $name): string
+    {
+        return trim(preg_replace('/\s+/u', ' ', $name) ?? $name);
     }
 
     /**
