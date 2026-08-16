@@ -135,6 +135,26 @@
      * from here rather than edited in _stock-ui, which thirteen other screens
      * share.
      */
+    /* What made the sticky pane below inert until now.
+     *
+     * main.content carries `overflow-x: hidden` on desktop. A box cannot clip
+     * one axis and leave the other visible, so overflow-y computes to `auto`
+     * and .content becomes a scroll container. position:sticky resolves against
+     * the nearest scroll container, so the pane was sticking to .content — and
+     * .content never scrolls, the document does. The offset therefore never
+     * engaged and the pane rode the page straight up behind the nav.
+     *
+     * `clip` clips without making a scroll container, so sticky falls through
+     * to the viewport where it belongs, and the page still cannot scroll
+     * sideways. Applied through :has() so it lands on this screen only and
+     * .content keeps its existing behaviour everywhere else. Where :has() is
+     * unsupported the rule is skipped and the page behaves as it does today.
+     */
+    body:has(.gx-ledger) main.content {
+        overflow-x: clip;
+        overflow-y: visible;
+    }
+
     .gx-ledger .gx-stock-scroll {
         /* The pane pins its own header at the pane's top edge, so the pane's top
            edge is the thing that has to stay on screen. .header is fixed at the
