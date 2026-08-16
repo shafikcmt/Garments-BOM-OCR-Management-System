@@ -167,7 +167,7 @@
      links: it says how much of the month is on screen. --}}
 @if($pageRows->total() > 0)
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 gx-ledger-pager">
-        <div class="small text-muted">
+        <div class="small text-muted gx-ledger-pager-count">
             Showing {{ number_format($pageRows->firstItem()) }}–{{ number_format($pageRows->lastItem()) }}
             of {{ number_format($pageRows->total()) }} items.
             Totals above cover the full month.

@@ -170,16 +170,25 @@
                 @include("store.stock._ledger-rows")
             </div>
 
-            {{-- Reference material, not running commentary: given its own quiet
-                 panel and clear air, rather than trailing the pager as loose
-                 grey text. --}}
-            <div class="gx-ledger-legend">
-                <div class="gx-ledger-legend-title">How these levels are worked out</div>
-                <p class="gx-stock-help">
-                    Safety Stock = last month's consumption ÷ {{ config('stock.general_stock.working_days_per_month') }} working days ×
-                    {{ config('stock.general_stock.safety_stock_days') }} days. Re-order Level adds the lead-time cover on top. A value
-                    <i class="bi bi-pin-angle-fill text-primary" aria-hidden="true"></i> pinned in the Item Master overrides the calculated one.
-                </p>
+            {{-- Reference material: read once, then not again. Closed by default
+                 so it costs one line instead of a panel, using the same
+                 Bootstrap collapse the receiving list uses. Icon plus a visible
+                 label — never icon-only. --}}
+            <div class="gx-ledger-legend-wrap">
+                <button type="button" class="btn btn-sm gx-ledger-legend-toggle"
+                        data-bs-toggle="collapse" data-bs-target="#ledgerLegend"
+                        aria-expanded="false" aria-controls="ledgerLegend">
+                    <i class="bi bi-chevron-right me-1" aria-hidden="true"></i>How these levels are worked out
+                </button>
+                <div class="collapse" id="ledgerLegend">
+                    <div class="gx-ledger-legend-body">
+                        <p class="gx-stock-help">
+                            Safety Stock = last month's consumption ÷ {{ config('stock.general_stock.working_days_per_month') }} working days ×
+                            {{ config('stock.general_stock.safety_stock_days') }} days. Re-order Level adds the lead-time cover on top. A value
+                            <i class="bi bi-pin-angle-fill text-primary" aria-hidden="true"></i> pinned in the Item Master overrides the calculated one.
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

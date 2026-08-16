@@ -111,15 +111,57 @@
        the numbers it introduces. */
     .gx-ledger .gx-stock-table > tfoot > tr > td.gx-stock-total-label { color: #64748b; }
 
+    /* --- Pinned header ----------------------------------------------------
+     * _stock-ui pins the header inside the scroll pane, and below 641px of
+     * viewport height it switches the pinning off entirely to avoid leaving a
+     * sliver of a pane. That threshold is the machine this report is actually
+     * read on: a 1366x768 laptop, less the browser chrome and the taskbar,
+     * lands right around 640px — so the guard was disabling the header on
+     * exactly the screens that needed it most.
+     *
+     * The pane is sized off the viewport instead, with a floor, so a short
+     * screen gives up pane height rather than giving up the header. Overridden
+     * from here rather than edited in _stock-ui, which thirteen other screens
+     * share.
+     */
+    .gx-ledger .gx-stock-scroll {
+        max-height: calc(100vh - 240px);
+        min-height: 320px;
+    }
+    .gx-ledger .gx-stock-scroll > .gx-stock-table > thead > tr > th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        /* Reads as a header floating over the rows rather than a row that
+           happens to be at the top. The inset keeps the hairline the base rule
+           draws; the outer shadow only appears where rows pass beneath. */
+        box-shadow: inset 0 -1px 0 #e2e8f0, 0 6px 10px -8px rgba(15, 23, 42, .35);
+    }
+    @media (max-height: 640px) {
+        .gx-ledger .gx-stock-scroll {
+            max-height: calc(100vh - 160px);
+            min-height: 260px;
+        }
+        /* Explicitly restated: this is the case _stock-ui turns sticky off in,
+           and it is the case that needs it. */
+        .gx-ledger .gx-stock-scroll > .gx-stock-table > thead > tr > th { position: sticky; }
+    }
+
     /* --- Pagination -------------------------------------------------------
      * The project's own control (components.css), refined rather than
      * replaced: same rounded blue shape, minus the gradient the house rules ban.
      */
     .gx-ledger .pagination { gap: 4px; margin-bottom: 0; }
     .gx-ledger .page-link {
-        min-width: 34px;
-        text-align: center;
-        padding: .35rem .6rem;
+        /* Flex-centred at a fixed height so every button — digits, Prev, Next,
+           the ellipsis — is the same size and sits on one line with the count
+           text beside it. */
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 .55rem;
         box-shadow: none;
         transition: background-color .14s ease, border-color .14s ease, color .14s ease;
     }
@@ -129,8 +171,9 @@
         border-color: #2563eb;
         color: #fff;
         /* A ring instead of a shadow: it reads as "you are here" without
-           lifting the button off the page. */
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, .16);
+           lifting the button off the page. Tight, so it marks the button
+           rather than haloing it. */
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, .18);
     }
     .gx-ledger .page-item.disabled .page-link {
         color: #cbd5e1;
@@ -145,28 +188,52 @@
     .gx-ledger .pagination { font-variant-numeric: tabular-nums; }
 
     /* --- Legend -----------------------------------------------------------
-     * The safety-stock formula was loose text pressed against the pager. It is
-     * reference material, consulted occasionally, so it gets a quiet panel of
-     * its own and clear air above it.
+     * The formula is reference material — read once, then never again by the
+     * same person. As an always-open panel it cost about a hundred pixels of
+     * every screenful, on the one page where vertical room is what makes the
+     * pinned header work. It is now closed by default behind a labelled
+     * toggle, using the same Bootstrap collapse the receiving list already
+     * uses for its item rows.
      */
-    .gx-ledger .gx-ledger-legend {
-        margin-top: 1.25rem;
-        padding: .85rem 1rem;
+    .gx-ledger .gx-ledger-legend-toggle {
+        padding: .1rem 0;
+        font-size: .74rem;
+        font-weight: 600;
+        color: #64748b;
+        text-decoration: none;
+        border: 0;
+        background: none;
+    }
+    .gx-ledger .gx-ledger-legend-toggle:hover { color: #2563eb; }
+    .gx-ledger .gx-ledger-legend-toggle:focus-visible {
+        outline: 2px solid #2563eb;
+        outline-offset: 3px;
+        border-radius: 4px;
+    }
+    /* The caret turns to match the open state — the only movement on the page,
+       and it reports something true rather than decorating. */
+    .gx-ledger .gx-ledger-legend-toggle .bi-chevron-right {
+        transition: transform .15s ease;
+        font-size: .7em;
+    }
+    .gx-ledger .gx-ledger-legend-toggle[aria-expanded="true"] .bi-chevron-right {
+        transform: rotate(90deg);
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .gx-ledger .gx-ledger-legend-toggle .bi-chevron-right { transition: none; }
+    }
+    .gx-ledger .gx-ledger-legend-body {
+        padding: .6rem .8rem;
+        margin-top: .4rem;
         background: #f8fafc;
         border: 1px solid #e2e8f0;
-        border-radius: 12px;
+        border-radius: 10px;
     }
-    .gx-ledger .gx-ledger-legend-title {
-        font-size: .66rem;
-        font-weight: 750;
-        letter-spacing: .06em;
-        text-transform: uppercase;
-        color: #94a3b8;
-        margin-bottom: .3rem;
-    }
-    .gx-ledger .gx-ledger-legend .gx-stock-help { color: #64748b; }
+    .gx-ledger .gx-ledger-legend-body .gx-stock-help { color: #64748b; }
 
-    /* The pager sits on its own line above the legend now, so the count line
-       and the buttons have the row to themselves. */
-    .gx-ledger .gx-ledger-pager { margin-top: .9rem; }
+    /* Count text and buttons on one line, tight. The count is set in tabular
+       figures so it does not shuffle as the page changes. */
+    .gx-ledger .gx-ledger-pager { margin-top: .6rem; }
+    .gx-ledger .gx-ledger-pager-count { font-variant-numeric: tabular-nums; }
+    .gx-ledger .gx-ledger-legend-wrap { margin-top: .55rem; }
 </style>
