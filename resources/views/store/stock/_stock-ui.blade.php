@@ -328,6 +328,19 @@
         /* The header background is already opaque (#f8fafc); without it the
            rows would read straight through the pinned row. */
     }
+    /* While a live filter is fetching. The old figures stay legible and simply
+       recede — blanking the table on every keystroke reads as the report
+       breaking. Pointer events go off so a pagination link cannot be clicked
+       against rows that are about to be replaced. */
+    [data-ledger-table].is-loading {
+        opacity: .55;
+        transition: opacity .15s ease-in;
+        pointer-events: none;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        [data-ledger-table].is-loading { transition: none; }
+    }
+
     /* Short viewports — a laptop with the browser bar and the page header
        taking their share — would be left scrolling a sliver of a pane. Below
        that, let the table run at its natural height and scroll with the page. */

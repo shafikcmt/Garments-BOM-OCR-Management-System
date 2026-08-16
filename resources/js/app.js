@@ -6,6 +6,7 @@ import { initFileTable } from './modules/file-table';
 import { initUserTable } from './modules/user-table';
 import { initSubmitButtons } from './modules/submit-button';
 import { initBulkIssueTable } from './modules/bulk-issue-table';
+import { initStockLedgerTable } from './modules/stock-ledger-table';
 
 import Alpine from 'alpinejs';
 import AOS from 'aos';
@@ -40,3 +41,6 @@ document.addEventListener('DOMContentLoaded', initSubmitButtons);
 
 // Bulk Issue history: server-driven tabs/search/sort, bulk actions, slide-in.
 document.addEventListener('DOMContentLoaded', initBulkIssueTable);
+
+// Stock Report: live search, filters and paging without a page reload.
+document.addEventListener('DOMContentLoaded', initStockLedgerTable);

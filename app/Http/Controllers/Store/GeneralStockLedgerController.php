@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Services\GeneralStockReportService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
@@ -38,11 +39,22 @@ class GeneralStockLedgerController extends Controller
     {
         $data = $this->build($request);
 
+        $data += [
+            'statusLabels' => GeneralStockReportService::statusLabels(),
+            'pageRows' => $this->paginateRows($data['rows'], $request),
+        ];
+
+        // Live search / filter change: the same action, returning only the part
+        // of the page the filters affect. Sharing the action rather than adding
+        // a second endpoint is what guarantees the AJAX result and the full page
+        // come off the identical rows() call and the identical paging.
+        if ($request->boolean('partial')) {
+            return view('store.stock._ledger-rows', $data);
+        }
+
         return view('store.stock.ledger', $data + [
             'categories' => $this->report->categories(),
-            'statusLabels' => GeneralStockReportService::statusLabels(),
             'actionList' => $this->report->actionList($data['rows']),
-            'pageRows' => $this->paginateRows($data['rows'], $request),
         ]);
     }
 
@@ -65,7 +77,9 @@ class GeneralStockLedgerController extends Controller
             $rows->count(),
             self::PER_PAGE,
             $page,
-            ['path' => $request->url(), 'query' => $request->query()],
+            // `partial` is a transport flag, not a filter — kept out of the
+            // pager links so a "next page" href stays a real, shareable URL.
+            ['path' => $request->url(), 'query' => Arr::except($request->query(), ['partial'])],
         );
     }
 

@@ -1,0 +1,70 @@
+<?php
+
+use App\Models\StockItem;
+use App\Models\User;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+
+/**
+ * The Stock Report's live search swaps a server-rendered fragment in place of
+ * the table. The contract that makes that safe is narrow but easy to break by
+ * accident: ?partial=1 must return the table only — no layout, no filter form —
+ * while the same action without the flag keeps returning the whole page. If the
+ * partial ever starts carrying the page chrome, every keystroke nests another
+ * copy of the report inside the last one.
+ */
+function ledgerUser(): User
+{
+    Role::findOrCreate('store', 'web')->givePermissionTo(
+        Permission::findOrCreate('store.workspace.view', 'web')
+    );
+
+    return User::factory()->create()->assignRole('store');
+}
+
+it('returns only the table fragment when asked for a partial', function () {
+    $response = $this->actingAs(ledgerUser())
+        ->get(route('store.stock.ledger', ['partial' => 1]))
+        ->assertOk();
+
+    // The fragment's own marker is there...
+    $response->assertSee('data-ledger-meta', false);
+
+    // ...and none of the page around it, which is what stops the swap from
+    // nesting a second report inside the first.
+    $response->assertDontSee('data-ledger-filters', false);
+    $response->assertDontSee('<body', false);
+});
+
+it('still returns the full page without the partial flag', function () {
+    $this->actingAs(ledgerUser())
+        ->get(route('store.stock.ledger'))
+        ->assertOk()
+        ->assertSee('data-ledger-filters', false)
+        ->assertSee('data-ledger-meta', false);
+});
+
+it('applies the search filter to the partial', function () {
+    // Created directly: StockItem has no factory, and the report only needs a
+    // name and an active flag to list a row.
+    StockItem::create(['name' => 'Cotton Thread White', 'uom' => 'PCS', 'is_active' => true]);
+    StockItem::create(['name' => 'Carton Box Large', 'uom' => 'PCS', 'is_active' => true]);
+
+    $user = ledgerUser();
+
+    // A mid-word substring, which is the case the live search exists for.
+    $this->actingAs($user)
+        ->get(route('store.stock.ledger', ['partial' => 1, 'search' => 'otton']))
+        ->assertOk()
+        ->assertSee('Cotton Thread White')
+        ->assertDontSee('Carton Box Large');
+});
+
+it('keeps the transport flag out of the pagination links', function () {
+    // A "next page" href has to stay a real URL someone can open or share, so
+    // `partial` must not survive into it.
+    $this->actingAs(ledgerUser())
+        ->get(route('store.stock.ledger', ['partial' => 1, 'search' => 'x']))
+        ->assertOk()
+        ->assertDontSee('partial=1', false);
+});
