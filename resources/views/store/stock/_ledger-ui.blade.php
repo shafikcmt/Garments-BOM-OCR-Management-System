@@ -210,50 +210,6 @@
     /* Digits stop the buttons resizing as the page number gains a digit. */
     .gx-ledger .pagination { font-variant-numeric: tabular-nums; }
 
-    /* --- Legend -----------------------------------------------------------
-     * The formula is reference material — read once, then never again by the
-     * same person. As an always-open panel it cost about a hundred pixels of
-     * every screenful, on the one page where vertical room is what makes the
-     * pinned header work. It is now closed by default behind a labelled
-     * toggle, using the same Bootstrap collapse the receiving list already
-     * uses for its item rows.
-     */
-    .gx-ledger .gx-ledger-legend-toggle {
-        padding: .1rem 0;
-        font-size: .74rem;
-        font-weight: 600;
-        color: #64748b;
-        text-decoration: none;
-        border: 0;
-        background: none;
-    }
-    .gx-ledger .gx-ledger-legend-toggle:hover { color: #2563eb; }
-    .gx-ledger .gx-ledger-legend-toggle:focus-visible {
-        outline: 2px solid #2563eb;
-        outline-offset: 3px;
-        border-radius: 4px;
-    }
-    /* The caret turns to match the open state — the only movement on the page,
-       and it reports something true rather than decorating. */
-    .gx-ledger .gx-ledger-legend-toggle .bi-chevron-right {
-        transition: transform .15s ease;
-        font-size: .7em;
-    }
-    .gx-ledger .gx-ledger-legend-toggle[aria-expanded="true"] .bi-chevron-right {
-        transform: rotate(90deg);
-    }
-    @media (prefers-reduced-motion: reduce) {
-        .gx-ledger .gx-ledger-legend-toggle .bi-chevron-right { transition: none; }
-    }
-    .gx-ledger .gx-ledger-legend-body {
-        padding: .6rem .8rem;
-        margin-top: .4rem;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-    }
-    .gx-ledger .gx-ledger-legend-body .gx-stock-help { color: #64748b; }
-
     /* Count text and buttons on one line, tight. The count is set in tabular
        figures so it does not shuffle as the page changes. */
     .gx-ledger .gx-ledger-pager { margin-top: .6rem; }
@@ -262,6 +218,10 @@
         color: #64748b;
     }
     .gx-ledger .gx-ledger-pager-count strong { color: #0f172a; font-weight: 700; }
+    /* The pager is the last thing in the card now, so it carries the bottom
+       gap the legend used to sit in. Without this the buttons sit hard against
+       the card edge. */
+    .gx-ledger .gx-ledger-pager { margin-bottom: .15rem; }
 
     /* --- Figure cards -----------------------------------------------------
      * Total Stock Qty and Closing Stock Value. Same tile shape as the four
@@ -282,5 +242,4 @@
         line-height: 1.25;
         margin-top: .15rem;
     }
-    .gx-ledger .gx-ledger-legend-wrap { margin-top: .55rem; }
 </style>
