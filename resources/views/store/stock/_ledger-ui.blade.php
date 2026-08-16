@@ -106,6 +106,17 @@
         font-weight: 750;
         color: #0f172a;
     }
+    /* Says what the Total Qty figure spans when it spans more than one unit of
+       measure. Set small and quiet: it qualifies the number above it, it does
+       not compete with it. */
+    .gx-ledger .gx-ledger-total-caveat {
+        font-size: .62rem;
+        font-weight: 600;
+        letter-spacing: .02em;
+        color: #94a3b8;
+        line-height: 1.2;
+        margin-top: .1rem;
+    }
     /* "Total" is a label, not a figure. The base rule sets it quiet on purpose
        and the darker ink above would otherwise override it into competing with
        the numbers it introduces. */

@@ -88,6 +88,63 @@ it('renders a healthy row as quiet text, not a green badge', function () {
     $response->assertDontSee('gx-ledger-flag-ok', false);
 });
 
+/**
+ * The total row is hand-built from colspans, so a figure added or moved can
+ * silently shift every other total one column sideways — the kind of error that
+ * looks like a plausible number rather than a broken page. This counts the
+ * footer back against the header.
+ */
+it('keeps the total row aligned with the twenty header columns', function () {
+    StockItem::create([
+        'name' => 'Cotton Thread White',
+        'uom' => 'PCS',
+        'is_active' => true,
+        'opening_qty' => 5000,
+        'opening_as_on' => now()->subYear(),
+    ]);
+
+    $html = $this->actingAs(ledgerUser())
+        ->get(route('store.stock.ledger', ['partial' => 1]))
+        ->assertOk()
+        ->getContent();
+
+    $doc = new DOMDocument();
+    libxml_use_internal_errors(true);
+    $doc->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+    libxml_clear_errors();
+    $xpath = new DOMXPath($doc);
+
+    $headCols = $xpath->query('//thead/tr/th')->length;
+
+    $footCols = 0;
+    foreach ($xpath->query('//tfoot/tr/td') as $td) {
+        $footCols += max(1, (int) $td->getAttribute('colspan'));
+    }
+
+    expect($headCols)->toBe(20);
+    expect($footCols)->toBe($headCols);
+});
+
+it('totals the closing stock quantity, not the brought-forward balance', function () {
+    StockItem::create([
+        'name' => 'Cotton Thread White', 'uom' => 'PCS', 'is_active' => true,
+        'opening_qty' => 5000, 'opening_as_on' => now()->subYear(),
+    ]);
+    StockItem::create([
+        'name' => 'Carton Box Large', 'uom' => 'PCS', 'is_active' => true,
+        'opening_qty' => 1200, 'opening_as_on' => now()->subYear(),
+    ]);
+
+    $rows = app(\App\Services\GeneralStockReportService::class)
+        ->rows(now()->startOfMonth(), ['only_active' => true]);
+
+    $summary = app(\App\Services\GeneralStockReportService::class)->summary($rows);
+
+    expect($summary['stock_as_on'])->toBe($rows->sum('stock_as_on') * 1.0);
+    // Both items are PCS, so the figure is sound and carries no caveat.
+    expect($summary['uom_count'])->toBe(1);
+});
+
 it('keeps the transport flag out of the pagination links', function () {
     // A "next page" href has to stay a real URL someone can open or share, so
     // `partial` must not survive into it.

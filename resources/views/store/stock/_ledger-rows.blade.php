@@ -153,7 +153,20 @@
                     <td class="text-end text-success">{{ $qty($summary['addition']) }}</td>
                     <td></td>
                     <td class="text-end text-danger">{{ $qty($summary['consumption']) }}</td>
-                    <td colspan="3"></td>
+                    <td></td>
+                    {{-- Total Qty, under the column it totals. Stock as on Date
+                         is what Closing Value is priced from, so the quantity
+                         and its money sit on the same row as a pair. --}}
+                    <td class="text-end" title="Total closing stock quantity across the filtered items">
+                        {{ $qty($summary['stock_as_on']) }}
+                        @if(($summary['uom_count'] ?? 0) > 1)
+                            {{-- Only when the figure actually spans more than one
+                                 unit. Filter down to a single UoM and the caveat
+                                 disappears, because then the total is sound. --}}
+                            <div class="gx-ledger-total-caveat">across {{ $summary['uom_count'] }} units</div>
+                        @endif
+                    </td>
+                    <td></td>
                     <td class="text-end">{{ $money($summary['closing_value']) }}</td>
                     <td></td>
                 </tr>

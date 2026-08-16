@@ -124,6 +124,17 @@ class GeneralStockReportService
             'closing_value' => (float) $rows->sum('closing_value'),
             'addition' => (float) $rows->sum('addition'),
             'consumption' => (float) $rows->sum('consumption'),
+
+            // Closing stock quantity. This is the figure Total Value is priced
+            // from — closing_value is this column times unit price — so the two
+            // belong beside each other.
+            'stock_as_on' => (float) $rows->sum('stock_as_on'),
+
+            // How many different units of measure the filtered set spans. A
+            // single quantity total only means anything when they all share
+            // one: 5,000 PCS plus 200 KG is 5,200 of nothing. The report says
+            // so on screen when this is above 1.
+            'uom_count' => $rows->map(fn ($r) => $r['item']->uom)->filter()->unique()->count(),
         ];
     }
 
