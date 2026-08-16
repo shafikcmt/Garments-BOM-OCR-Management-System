@@ -79,7 +79,14 @@ export function initStockLedgerTable() {
 
         document.querySelectorAll('[data-ledger-tile]').forEach((tile) => {
             const key = tile.getAttribute('data-ledger-tile');
-            if (meta[key] !== undefined) tile.textContent = Number(meta[key]).toLocaleString();
+            if (meta[key] === undefined) return;
+            // The status counts arrive as numbers and are grouped here; the two
+            // money/quantity cards arrive already formatted by the server, so
+            // they are written through untouched rather than run back through
+            // toLocaleString and losing their decimals.
+            tile.textContent = typeof meta[key] === 'number'
+                ? meta[key].toLocaleString()
+                : meta[key];
         });
 
         if (actionAlert) {

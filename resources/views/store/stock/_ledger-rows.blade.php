@@ -35,7 +35,10 @@
         'out' => $summary['out'],
         'place_order' => $summary['place_order'],
         'low' => $summary['low'],
+        // Already formatted: the cards show them as text, so the server does the
+        // number formatting once rather than the JS re-deriving it.
         'closing_value' => $money($summary['closing_value']),
+        'stock_qty' => $qty($summary['stock_as_on']),
         'month_label' => $monthLabel,
         // Anything not "ok" — the same set the purchase-action banner counts.
         'attention' => $summary['out'] + $summary['place_order'] + $summary['low'],
@@ -175,18 +178,16 @@
     </table>
 </div>
 
-{{-- Only shown once the report is longer than one page. The count
-     line stays useful either way, so it is not hidden with the
-     links: it says how much of the month is on screen. --}}
-@if($pageRows->total() > 0)
+{{-- Compact pager. onEachSide(1) collapses the run of page buttons to
+     "1 … 6 7 8 … 9" instead of printing every page, and the count sits
+     inline beside it rather than as a second line repeating what the
+     page numbers already say. --}}
+@if($pageRows->hasPages())
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 gx-ledger-pager">
-        <div class="small text-muted gx-ledger-pager-count">
-            Showing {{ number_format($pageRows->firstItem()) }}–{{ number_format($pageRows->lastItem()) }}
-            of {{ number_format($pageRows->total()) }} items.
-            Totals above cover the full month.
+        <div class="small gx-ledger-pager-count">
+            <strong>{{ number_format($pageRows->total()) }}</strong> items · page
+            {{ number_format($pageRows->currentPage()) }} of {{ number_format($pageRows->lastPage()) }}
         </div>
-        @if($pageRows->hasPages())
-            <div>{{ $pageRows->links() }}</div>
-        @endif
+        <div>{{ $pageRows->onEachSide(1)->links() }}</div>
     </div>
 @endif

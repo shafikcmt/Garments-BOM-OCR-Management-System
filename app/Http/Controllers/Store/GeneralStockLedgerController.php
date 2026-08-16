@@ -27,9 +27,16 @@ class GeneralStockLedgerController extends Controller
     /**
      * Rows per screen page. The report is read top-to-bottom rather than
      * clicked through, so the page is set long enough that a normal month's
-     * item list is one or two pages — short pages would only add clicks.
+     * item list is a handful of pages — short pages would only add clicks.
+     *
+     * Measured against the live 1,240-item set: building the rows costs ~127ms
+     * and does not vary with this number, while rendering the fragment is 2-10ms
+     * whether the page holds 100, 150 or 200. The server is indifferent, so the
+     * limit is how much DOM the browser has to swap on a live filter — 150 rows
+     * of a twenty-column table is ~258KB, which stays comfortable on the office
+     * laptops this runs on.
      */
-    private const PER_PAGE = 100;
+    private const PER_PAGE = 150;
 
     public function __construct(private readonly GeneralStockReportService $report)
     {

@@ -220,6 +220,11 @@
                                         <col style="width:30%;">
                                         <col style="width:88px;">
                                         <col style="width:20%;">
+                                        {{-- Brand/Specification. table-layout is fixed,
+                                             so a column without a <col> of its own takes
+                                             the next one's width and pushes every column
+                                             after it out of line. --}}
+                                        <col style="width:150px;">
                                         <col style="width:130px;">
                                         <col style="width:116px;">
                                         <col>
@@ -348,7 +353,11 @@
                                of crushing them. */
                             .gx-line-table {
                                 table-layout: fixed;
-                                min-width: 1216px !important;
+                                /* 1216 + the 150 the Brand/Specification column
+                                   adds. Without the increase the fixed layout
+                                   squeezes the same total into the old width and
+                                   the columns run into each other. */
+                                min-width: 1366px !important;
                             }
 
                             {{-- The row's auto-filled Uom uses the shared

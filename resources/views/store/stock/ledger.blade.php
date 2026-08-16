@@ -6,6 +6,8 @@
     // The row formatters and the status badge map moved into _ledger-rows with
     // the table itself, so an AJAX render has them without a parent view.
     $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
+    // Same trimming the table uses, so the card and the Total row agree.
+    $qty = fn ($v) => $v === null ? '—' : rtrim(rtrim(number_format((float) $v, 4, '.', ','), '0'), '.');
 
     // Drives the Clear button only — the filtering itself is the controller's.
     // ->filter() with no callback so an unticked "include inactive" (false) and
@@ -52,7 +54,7 @@
             ['label' => 'Low Stock', 'value' => $summary['low'], 'status' => 'low', 'tone' => 'warning', 'icon' => 'bi-exclamation-triangle'],
         ] as $tile)
             @php $tileIsActive = ($filters['status'] ?? '') === (string) $tile['status'] && $tile['status'] !== null; @endphp
-            <div class="col-6 col-lg-3">
+            <div class="col-6 col-lg-4 col-xl-2">
                 <a href="{{ route('store.stock.ledger', array_merge(request()->query(), ['status' => $tile['status']])) }}"
                    class="card gx-stock-card gx-stock-tile h-100 {{ $tileIsActive ? 'is-active' : '' }}"
                    @if($tileIsActive) aria-current="true" @endif>
@@ -70,6 +72,32 @@
                         </div>
                     </div>
                 </a>
+            </div>
+        @endforeach
+
+        {{-- The two money/quantity figures. Same tile shape as the four counts
+             beside them, but not links: there is no "filter by total". Both
+             cover the whole filtered month, exactly like the report's Total
+             row, not the page on screen. --}}
+        @foreach ([
+            ['label' => 'Total Stock Qty', 'key' => 'stock_qty', 'tone' => 'primary', 'icon' => 'bi-boxes',
+             'value' => $qty($summary['stock_as_on']), 'hint' => 'Sum of Stock as on Date'],
+            ['label' => 'Closing Stock Value', 'key' => 'closing_value', 'tone' => 'success', 'icon' => 'bi-cash-stack',
+             'value' => $money($summary['closing_value']), 'hint' => 'Stock as on Date x unit price'],
+        ] as $tile)
+            <div class="col-6 col-lg-4 col-xl-2">
+                <div class="card gx-stock-card h-100">
+                    <div class="gx-stock-tile-body">
+                        <span class="gx-stock-tile-icon bg-{{ $tile['tone'] }}-subtle text-{{ $tile['tone'] }}">
+                            <i class="bi {{ $tile['icon'] }}" aria-hidden="true"></i>
+                        </span>
+                        <div class="gx-ledger-figure">
+                            <div class="gx-stock-tile-label">{{ $tile['label'] }}</div>
+                            <div class="gx-stock-tile-value gx-ledger-figure-value" data-ledger-tile="{{ $tile['key'] }}">{{ $tile['value'] }}</div>
+                            <div class="gx-ledger-figure-hint">{{ $tile['hint'] }}</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         @endforeach
     </div>
@@ -103,9 +131,9 @@
                         <span class="visually-hidden">Updating the report…</span>
                     </span>
                 </h5>
-                <div class="small text-muted">
-                    Closing Stock Value: <strong class="text-slate-900" data-ledger-closing>{{ $money($summary['closing_value']) }}</strong>
-                </div>
+                {{-- Closing Stock Value moved up into a summary card with Total
+                     Stock Qty, so the two figures sit together instead of one
+                     being a line of text in a heading. --}}
             </div>
 
             {{-- Filters sit inside the card they narrow, the same as every other

@@ -136,12 +136,24 @@
      * share.
      */
     .gx-ledger .gx-stock-scroll {
-        max-height: calc(100vh - 240px);
+        /* The pane pins its own header at the pane's top edge, so the pane's top
+           edge is the thing that has to stay on screen. .header is fixed at the
+           viewport top, 60px tall and only 76% opaque, so a pane allowed to
+           scroll past it puts the pinned row behind translucent chrome — which
+           is exactly the "header slides under the top bar" this fixes. Sticky
+           here stops the pane rising above the nav in the first place. */
+        position: sticky;
+        top: calc(var(--app-header, 60px) + .5rem);
+        /* Leaves room under the pane for the pager, which follows it in flow. */
+        max-height: calc(100vh - var(--app-header, 60px) - 7rem);
         min-height: 320px;
     }
     .gx-ledger .gx-stock-scroll > .gx-stock-table > thead > tr > th {
         position: sticky;
         top: 0;
+        /* Above the row backgrounds and nothing else. .header sits at 1015, so
+           the global nav always paints over this — which is the correct order;
+           the bug was never stacking, it was where the pane could travel. */
         z-index: 2;
         /* Reads as a header floating over the rows rather than a row that
            happens to be at the top. The inset keeps the hairline the base rule
@@ -150,8 +162,8 @@
     }
     @media (max-height: 640px) {
         .gx-ledger .gx-stock-scroll {
-            max-height: calc(100vh - 160px);
-            min-height: 260px;
+            max-height: calc(100vh - var(--app-header, 60px) - 4rem);
+            min-height: 240px;
         }
         /* Explicitly restated: this is the case _stock-ui turns sticky off in,
            and it is the case that needs it. */
@@ -245,6 +257,30 @@
     /* Count text and buttons on one line, tight. The count is set in tabular
        figures so it does not shuffle as the page changes. */
     .gx-ledger .gx-ledger-pager { margin-top: .6rem; }
-    .gx-ledger .gx-ledger-pager-count { font-variant-numeric: tabular-nums; }
+    .gx-ledger .gx-ledger-pager-count {
+        font-variant-numeric: tabular-nums;
+        color: #64748b;
+    }
+    .gx-ledger .gx-ledger-pager-count strong { color: #0f172a; font-weight: 700; }
+
+    /* --- Figure cards -----------------------------------------------------
+     * Total Stock Qty and Closing Stock Value. Same tile shape as the four
+     * status counts, but they are read rather than clicked, so they carry no
+     * hover lift and no link affordance. The value is set a step smaller than
+     * a count: "5,740.00" is a longer string than "61" and at the count's size
+     * it wraps out of its card.
+     */
+    .gx-ledger .gx-ledger-figure { min-width: 0; }
+    .gx-ledger .gx-ledger-figure-value {
+        font-size: 1.25rem;
+        overflow-wrap: anywhere;
+    }
+    .gx-ledger .gx-ledger-figure-hint {
+        font-size: .62rem;
+        font-weight: 600;
+        color: #94a3b8;
+        line-height: 1.25;
+        margin-top: .15rem;
+    }
     .gx-ledger .gx-ledger-legend-wrap { margin-top: .55rem; }
 </style>
