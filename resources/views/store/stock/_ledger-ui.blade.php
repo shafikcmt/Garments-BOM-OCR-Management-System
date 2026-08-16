@@ -191,57 +191,17 @@
     }
 
     /* --- Pagination -------------------------------------------------------
-     * The project's own control (components.css), refined rather than
-     * replaced: same rounded blue shape, minus the gradient the house rules ban.
+     * Nothing to declare. The paginator is the project's own .gx-pagination
+     * control, styled once in components.css, and the ledger uses it as it
+     * comes — a local copy here would only drift from every other paginated
+     * screen. The rules that used to sit here targeted Bootstrap's
+     * .pagination / .page-link, which this project never renders.
+     *
+     * The pager is the last thing in the card, so it carries the bottom gap
+     * the legend used to sit in. Without this the buttons sit hard against
+     * the card edge.
      */
-    .gx-ledger .pagination { gap: 4px; margin-bottom: 0; }
-    .gx-ledger .page-link {
-        /* Flex-centred at a fixed height so every button — digits, Prev, Next,
-           the ellipsis — is the same size and sits on one line with the count
-           text beside it. */
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 32px;
-        height: 32px;
-        padding: 0 .55rem;
-        box-shadow: none;
-        transition: background-color .14s ease, border-color .14s ease, color .14s ease;
-    }
-    .gx-ledger .page-link:hover { background: #eff6ff; border-color: #bfdbfe; }
-    .gx-ledger .page-item.active .page-link {
-        background: #2563eb;
-        border-color: #2563eb;
-        color: #fff;
-        /* A ring instead of a shadow: it reads as "you are here" without
-           lifting the button off the page. Tight, so it marks the button
-           rather than haloing it. */
-        box-shadow: 0 0 0 2px rgba(37, 99, 235, .18);
-    }
-    .gx-ledger .page-item.disabled .page-link {
-        color: #cbd5e1;
-        border-color: #eef2f7;
-        background: #fff;
-    }
-    .gx-ledger .page-link:focus-visible {
-        outline: 2px solid #2563eb;
-        outline-offset: 2px;
-    }
-    /* Digits stop the buttons resizing as the page number gains a digit. */
-    .gx-ledger .pagination { font-variant-numeric: tabular-nums; }
-
-    /* Count text and buttons on one line, tight. The count is set in tabular
-       figures so it does not shuffle as the page changes. */
-    .gx-ledger .gx-ledger-pager { margin-top: .6rem; }
-    .gx-ledger .gx-ledger-pager-count {
-        font-variant-numeric: tabular-nums;
-        color: #64748b;
-    }
-    .gx-ledger .gx-ledger-pager-count strong { color: #0f172a; font-weight: 700; }
-    /* The pager is the last thing in the card now, so it carries the bottom
-       gap the legend used to sit in. Without this the buttons sit hard against
-       the card edge. */
-    .gx-ledger .gx-ledger-pager { margin-bottom: .15rem; }
+    .gx-ledger .gx-ledger-pager { margin-top: .6rem; margin-bottom: .15rem; }
 
     /* --- Figure cards -----------------------------------------------------
      * Total Stock Qty and Closing Stock Value. Same tile shape as the four

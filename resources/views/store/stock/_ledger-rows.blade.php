@@ -179,15 +179,12 @@
 </div>
 
 {{-- Compact pager. onEachSide(1) collapses the run of page buttons to
-     "1 … 6 7 8 … 9" instead of printing every page, and the count sits
-     inline beside it rather than as a second line repeating what the
-     page numbers already say. --}}
+     "1 … 6 7 8 … 9" instead of printing every page.
+
+     No count beside it: the .gx-pagination view already prints
+     "Showing 1–100 of 480" inside the pagination area, and that is what
+     every other paginated screen in the project shows. A second count here
+     said the same thing in different words. --}}
 @if($pageRows->hasPages())
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 gx-ledger-pager">
-        <div class="small gx-ledger-pager-count">
-            <strong>{{ number_format($pageRows->total()) }}</strong> items · page
-            {{ number_format($pageRows->currentPage()) }} of {{ number_format($pageRows->lastPage()) }}
-        </div>
-        <div>{{ $pageRows->onEachSide(1)->links() }}</div>
-    </div>
+    <div class="gx-ledger-pager">{{ $pageRows->onEachSide(1)->links() }}</div>
 @endif

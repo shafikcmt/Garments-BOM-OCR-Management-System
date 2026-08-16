@@ -167,8 +167,13 @@ export function initStockLedgerTable() {
 
     // Pagination is delegated to the container, so links that arrive with a
     // swapped fragment work without re-binding anything.
+    //
+    // .gx-pagination, not Bootstrap's .pagination: this project sets its own
+    // paginator view through Paginator::defaultView('pagination.gx'), and that
+    // view renders .gx-pagination / .gx-page. A .pagination selector matches
+    // nothing here and the click falls through to a full page load.
     container.addEventListener('click', (e) => {
-        const link = e.target.closest('.pagination a');
+        const link = e.target.closest('.gx-pagination a');
         if (!link) return;
         e.preventDefault();
 
