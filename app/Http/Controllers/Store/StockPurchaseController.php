@@ -15,6 +15,7 @@ use App\Services\GeneralStockReportService;
 use App\Services\RvNumberGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
@@ -143,7 +144,14 @@ class StockPurchaseController extends Controller
             ->orderByDesc('purchase_date')
             ->orderByDesc(DB::raw('MAX(id)'))
             ->paginate(25)
-            ->withQueryString();
+            // The filters are carried onto the page links by hand rather than
+            // with withQueryString(), because `partial` is a transport flag and
+            // not a filter. withQueryString() copies the WHOLE query string and
+            // appends() merges into it rather than replacing it, so the two
+            // together still leave partial=1 on every href — and a plain click
+            // on page 2 with JS off would then answer with a bare fragment
+            // instead of a page.
+            ->appends(Arr::except($request->query(), ['partial', 'page']));
 
         // Every line of the groups on THIS page, so a group is never split
         // across a page boundary.
@@ -165,6 +173,20 @@ class StockPurchaseController extends Controller
         // The RV No the next save will take. A preview, not a reservation:
         // whoever saves first gets it, so the form labels it as such.
         $nextRv = app(RvNumberGenerator::class)->preview();
+
+        // Live search / paging: the same action, returning only the part of the
+        // page the filters affect. Sharing the action rather than adding a
+        // second endpoint is what guarantees the AJAX result and the full page
+        // come off the identical query and the identical paging.
+        //
+        // `suppliers` is in here too: the per-line Edit dialogs ride inside the
+        // swapped fragment — they are keyed by line id and must be replaced
+        // with the rows — and their supplier dropdown needs the list.
+        if ($request->boolean('partial')) {
+            return view('store.stock._purchases-list', compact(
+                'groups', 'lines', 'suppliers', 'filters', 'canEdit', 'canDelete'
+            ));
+        }
 
         // This user's own half-finished forms. Nothing here touches stock —
         // see the store_form_drafts migration.
