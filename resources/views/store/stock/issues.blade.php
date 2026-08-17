@@ -563,49 +563,85 @@
          coin a new Section, and Issue Setup is one click away. --}}
     @if($canEdit)
         @foreach($issues as $i)
+            {{-- old() is global, so without this marker a rejected edit would
+                 repopulate EVERY modal on the page with the failed row's values.
+                 Same idiom the Item Master modals use.
+
+                 Written in the INLINE php form on purpose, never the block
+                 form. Blade pairs raw PHP blocks by matching an opening php
+                 directive to the next closing one, and this file already uses
+                 the inline form further up — so one closing directive added
+                 below it pairs with THAT opener and swallows the whole page
+                 in between. The same reason this note spells the directives
+                 out rather than writing them. --}}
+            @php($formKey = 'edit:'.$i->id)
+            @php($wasSubmitted = old('form') === $formKey)
+            @php($value = fn ($field, $stored = null) => $wasSubmitted ? old($field, $stored) : $stored)
+            @php($qtyValue = rtrim(rtrim(number_format((float) $i->qty, 4, '.', ''), '0'), '.'))
             <div class="modal fade" id="editIssue{{ $i->id }}" tabindex="-1" aria-labelledby="editIssueLabel{{ $i->id }}" aria-hidden="true">
                 <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                     <div class="modal-content gx-stock-card">
                         <form method="POST" action="{{ route('store.stock.issues.update', $i) }}">
                             @csrf @method('PUT')
+                            <input type="hidden" name="form" value="{{ $formKey }}">
                             <div class="modal-header">
                                 <h5 class="modal-title" id="editIssueLabel{{ $i->id }}">Edit Issue</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
+                                {{-- The refusal, where the user is looking. The page
+                                     banner behind this dialog says the same thing,
+                                     but it is out of sight once the modal reopens. --}}
+                                @if($wasSubmitted && $errors->any())
+                                    <div class="gx-edit-alert mb-3" role="alert">
+                                        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                                        <div>
+                                            <div class="gx-edit-alert-title">This change was not saved</div>
+                                            <div class="gx-edit-alert-body">
+                                                @foreach($errors->all() as $error)
+                                                    <span>{{ $error }}</span>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+
                                 <div class="row g-3">
                                     <div class="col-12">
-                                        <label class="form-label">Item</label>
-                                        <input type="text" class="form-control gx-stock-readonly" readonly tabindex="-1"
-                                               value="{{ optional($i->stockItem)->name ?? '—' }}">
-                                        <div class="form-text">
-                                            To move this issue to a different item, delete it and record it again.
+                                        <label class="form-label">Item<span class="gx-lock-tag">Locked</span></label>
+                                        <div class="gx-edit-locked">
+                                            <i class="bi bi-lock-fill" aria-hidden="true"></i>
+                                            <span class="gx-edit-locked-value">{{ optional($i->stockItem)->name ?? '—' }}</span>
+                                        </div>
+                                        <div class="gx-edit-hint">
+                                            Moving this issue to another item changes two stock balances, so it is a
+                                            delete and a fresh entry rather than an edit.
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-4">
                                         <label class="form-label" for="editIssueDate{{ $i->id }}">Issue Date <span class="text-danger">*</span></label>
-                                        <input type="date" id="editIssueDate{{ $i->id }}" name="issue_date" class="form-control" required
-                                               value="{{ optional($i->issue_date)->toDateString() }}">
+                                        <input type="date" id="editIssueDate{{ $i->id }}" name="issue_date" class="form-control @if($wasSubmitted && $errors->has('issue_date')) is-invalid @endif" required
+                                               value="{{ $value('issue_date', optional($i->issue_date)->toDateString()) }}">
                                     </div>
                                     <div class="col-6 col-md-4">
                                         <label class="form-label" for="editIssueQty{{ $i->id }}">Issued Qty <span class="text-danger">*</span></label>
-                                        <input type="number" step="0.0001" min="0.0001" id="editIssueQty{{ $i->id }}" name="qty" class="form-control" required
-                                               value="{{ rtrim(rtrim(number_format((float) $i->qty, 4, '.', ''), '0'), '.') }}">
-                                        <div class="form-text">
-                                            {{ optional($i->stockItem)->uom ? 'In '.$i->stockItem->uom.'. ' : '' }}An issue cannot take this item below zero.
+                                        <input type="number" step="0.0001" min="0.0001" id="editIssueQty{{ $i->id }}" name="qty" class="form-control @if($wasSubmitted && $errors->has('qty')) is-invalid @endif" required
+                                               value="{{ $value('qty', $qtyValue) }}">
+                                        <div class="gx-edit-hint">
+                                            {{ optional($i->stockItem)->uom ? 'In '.$i->stockItem->uom.'. ' : '' }}Cannot take this item below zero.
                                         </div>
                                     </div>
                                     <div class="col-12 col-md-4">
                                         <label class="form-label" for="editIssueReqNo{{ $i->id }}">Requisition Number</label>
                                         <input type="text" id="editIssueReqNo{{ $i->id }}" name="requisition_no" class="form-control" maxlength="100"
-                                               value="{{ $i->requisition_no }}">
+                                               value="{{ $value('requisition_no', $i->requisition_no) }}">
                                     </div>
                                     <div class="col-12 col-md-4">
                                         <label class="form-label" for="editIssueSection{{ $i->id }}">Indent Section</label>
                                         <select id="editIssueSection{{ $i->id }}" name="indent_section_id" class="form-select">
                                             <option value="">—</option>
                                             @foreach($sections as $s)
-                                                <option value="{{ $s->id }}" @selected($i->indent_section_id == $s->id)>{{ $s->name }}</option>
+                                                <option value="{{ $s->id }}" @selected($value('indent_section_id', $i->indent_section_id) == $s->id)>{{ $s->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -614,7 +650,7 @@
                                         <select id="editIssuePerson{{ $i->id }}" name="indent_person_id" class="form-select">
                                             <option value="">—</option>
                                             @foreach($persons as $p)
-                                                <option value="{{ $p->id }}" @selected($i->indent_person_id == $p->id)>{{ $p->name }}</option>
+                                                <option value="{{ $p->id }}" @selected($value('indent_person_id', $i->indent_person_id) == $p->id)>{{ $p->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -623,7 +659,7 @@
                                         <select id="editIssueApprover{{ $i->id }}" name="issue_approver_id" class="form-select">
                                             <option value="">—</option>
                                             @foreach($approvers as $a)
-                                                <option value="{{ $a->id }}" @selected($i->issue_approver_id == $a->id)>{{ $a->name }}</option>
+                                                <option value="{{ $a->id }}" @selected($value('issue_approver_id', $i->issue_approver_id) == $a->id)>{{ $a->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -632,7 +668,7 @@
                                         <select id="editIssueCategory{{ $i->id }}" name="item_category_id" class="form-select">
                                             <option value="">—</option>
                                             @foreach($categories as $c)
-                                                <option value="{{ $c->id }}" @selected($i->item_category_id == $c->id)>{{ $c->name }}</option>
+                                                <option value="{{ $c->id }}" @selected($value('item_category_id', $i->item_category_id) == $c->id)>{{ $c->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -641,13 +677,13 @@
                                         <select id="editIssueType{{ $i->id }}" name="requisition_type" class="form-select">
                                             <option value="">—</option>
                                             @foreach($requisitionTypes as $type)
-                                                <option value="{{ $type }}" @selected($i->requisition_type === $type)>{{ $type }}</option>
+                                                <option value="{{ $type }}" @selected($value('requisition_type', $i->requisition_type) === $type)>{{ $type }}</option>
                                             @endforeach
                                         </select>
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label" for="editIssueRemarks{{ $i->id }}">Remarks</label>
-                                        <textarea id="editIssueRemarks{{ $i->id }}" name="remarks" class="form-control" rows="2" maxlength="1000">{{ $i->remarks }}</textarea>
+                                        <textarea id="editIssueRemarks{{ $i->id }}" name="remarks" class="form-control" rows="2" maxlength="1000">{{ $value('remarks', $i->remarks) }}</textarea>
                                     </div>
                                 </div>
                             </div>
@@ -1108,5 +1144,22 @@
             }
         })();
     </script>
+
+    {{-- A refused correction is redirected back, which closes the dialog the
+         user was typing in. Reopen it, still carrying what they entered and
+         showing why it was refused. Same arrangement as the Item Master modals;
+         the hidden `form` field says which one was submitted. --}}
+    @php($reopenEdit = str_starts_with((string) old('form'), 'edit:') ? 'editIssue'.substr((string) old('form'), 5) : null)
+
+    @if($errors->any() && $reopenEdit)
+        <script>
+            (function () {
+                var el = document.getElementById(@json($reopenEdit));
+                if (el && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(el).show();
+                }
+            })();
+        </script>
+    @endif
 </div>
 @endsection

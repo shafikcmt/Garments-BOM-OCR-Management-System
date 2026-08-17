@@ -823,6 +823,119 @@
     .gx-stock-dl > dt:nth-last-of-type(1),
     .gx-stock-dl > dd:nth-last-of-type(1) { border-bottom: 0; }
 
+    /* --- Correction modals -----------------------------------------------
+     * The Edit dialogs on Issue History and Purchase History. Both mix fields
+     * that can be changed with fields that identify the record and cannot, and
+     * the distinction has to survive a glance — a correction screen is used
+     * rarely, under mild pressure, by someone who has just noticed a mistake.
+     *
+     * A greyed-out <input> was not enough. Disabled inputs are how a broken
+     * form looks, so a locked field styled as one invites a support call
+     * ("the item box won't let me type"). These are not inputs at all: a flat
+     * slate panel with a lock and the word LOCKED, which reads as a stated fact
+     * about the record rather than a control that is failing to respond.
+     */
+    .gx-edit-locked {
+        border: 1px solid #eef2f7;
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: .5rem .7rem;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        min-height: 38px;
+    }
+    .gx-edit-locked > .bi {
+        color: #94a3b8;
+        font-size: .85rem;
+        flex: 0 0 auto;
+    }
+    .gx-edit-locked-value {
+        color: #475569;
+        font-weight: 600;
+        font-size: .875rem;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+
+    /* Same shape as .gx-stock-auto, different word: that one means "we filled
+     * this in", this one means "this cannot change". */
+    .gx-lock-tag {
+        display: inline-block;
+        margin-left: .3rem;
+        padding: .05em .4em;
+        border-radius: 5px;
+        background: #f1f5f9;
+        color: #94a3b8;
+        font-size: .6rem;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        vertical-align: middle;
+    }
+
+    /* Marks a field whose change is written to every line of the delivery, not
+     * just the one being edited. Amber rather than grey: it is not a warning,
+     * but it IS a consequence beyond the row the user opened. */
+    .gx-edit-scope {
+        display: inline-block;
+        margin-left: .3rem;
+        padding: .05em .4em;
+        border-radius: 5px;
+        background: #fef3c7;
+        color: #b45309;
+        font-size: .6rem;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        vertical-align: middle;
+    }
+
+    /* The refusal, shown inside the dialog the user was typing in rather than
+     * only as a banner at the top of a page they have been redirected to and
+     * cannot see behind the reopened modal.
+     *
+     * Deliberately not .alert-danger. A refused correction is a normal, expected
+     * answer — "there is not enough stock for that" — and a red slab overstates
+     * it. Amber, a rule down the side, and the number they need in the sentence.
+     */
+    .gx-edit-alert {
+        border: 1px solid #fde68a;
+        border-left: 3px solid #f59e0b;
+        background: #fffbeb;
+        border-radius: 10px;
+        padding: .6rem .75rem;
+        display: flex;
+        gap: .55rem;
+        align-items: flex-start;
+    }
+    .gx-edit-alert > .bi {
+        color: #d97706;
+        font-size: .95rem;
+        line-height: 1.35;
+        flex: 0 0 auto;
+    }
+    .gx-edit-alert-title {
+        font-weight: 700;
+        font-size: .8rem;
+        color: #92400e;
+        letter-spacing: .01em;
+    }
+    .gx-edit-alert-body {
+        font-size: .8rem;
+        color: #78350f;
+        line-height: 1.45;
+    }
+    .gx-edit-alert-body > span { display: block; }
+
+    /* A quiet note under a field, for the sentence that explains a lock. */
+    .gx-edit-hint {
+        font-size: .75rem;
+        color: #94a3b8;
+        margin-top: .3rem;
+        line-height: 1.4;
+    }
+
     /* --- Responsive ------------------------------------------------------ */
     @media (max-width: 991.98px) {
         .gx-stock-card > .gx-stock-card-body { padding: 1.15rem; }

@@ -9,6 +9,7 @@ use App\Imports\ReceivingImport;
 use App\Models\GeneralStockSupplier;
 use App\Models\StockItem;
 use App\Models\StockPurchase;
+use App\Services\GeneralStockReportService;
 use App\Services\RvNumberGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -321,6 +322,157 @@ class StockPurchaseController extends Controller
         }
 
         return $attributes;
+    }
+
+    /**
+     * Correct one line of a recorded receiving.
+     *
+     * THE DELIVERY'S IDENTITY IS LOCKED: RV No, Challan No and Challan Date are
+     * not editable, and are not accepted from the request either. Those three
+     * are StockPurchase::groupKeyExpr() — what makes a set of rows one delivery.
+     * Changing any of them on ONE line would silently lift that line out of its
+     * receiving, or merge it into an unrelated one, and both Purchase History
+     * and the Receiving Report group on exactly that key. A genuinely wrong
+     * challan number is a different delivery, so it is a delete and a re-entry.
+     *
+     * TWO SCOPES, deliberately, because this table stores a header on every row:
+     *
+     *   - Qty, Unit Price and Remarks belong to the LINE and change only here.
+     *   - RCV Date and Supplier describe the DELIVERY and are written to every
+     *     line of it. They were entered once and copied down by store(); letting
+     *     one line disagree would leave the grouped Purchase History row showing
+     *     MAX(rcv_date) and MAX(supplier_name) — a figure matching no line. The
+     *     modal says which fields do this.
+     *
+     * Stock needs no recalculation — nothing stores a balance; the Consumable
+     * Stock Report sums this table and stock_issues at read time. But a RECEIPT
+     * can be corrected downward, and if the goods have since been issued that
+     * takes the item below zero, so the same rule Issues enforces applies here
+     * in reverse. See assertReceiptCovers().
+     */
+    public function update(Request $request, StockPurchase $stockPurchase)
+    {
+        $this->authorizeStoreEdit('stock purchase');
+
+        $data = $request->validate([
+            // Compared against the LOCKED challan date on the record, not one
+            // from the request — the request cannot carry it.
+            'rcv_date' => ['required', 'date', 'after_or_equal:'.$stockPurchase->purchase_date->toDateString()],
+            'qty' => ['required', 'numeric', 'min:0.0001'],
+            'unit_price' => ['nullable', 'numeric', 'min:0'],
+            'general_stock_supplier_id' => ['nullable', 'exists:general_stock_suppliers,id'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'rcv_date.after_or_equal' => 'The RCV date cannot be earlier than the challan date ('
+                .$stockPurchase->purchase_date->format('d-M-Y').').',
+        ], [
+            'rcv_date' => 'RCV date',
+            'qty' => 'purchased qty',
+            'unit_price' => 'unit price',
+            'general_stock_supplier_id' => 'supplier',
+        ]);
+
+        $supplierId = $data['general_stock_supplier_id'] ?? null;
+
+        DB::transaction(function () use ($data, $supplierId, $stockPurchase) {
+            $this->assertReceiptCovers($stockPurchase, (float) $data['qty']);
+
+            $stockPurchase->update([
+                'qty' => $data['qty'],
+                'unit_price' => $data['unit_price'] ?? null,
+                'remarks' => $data['remarks'] ?? null,
+            ]);
+
+            // The delivery-wide fields, written to every line of this receiving
+            // including the one above. supplier_name is copied rather than
+            // joined, exactly as store() does it, so the challan still reads
+            // correctly if the supplier is later renamed or deactivated.
+            $this->deliveryLines($stockPurchase)->update([
+                'rcv_date' => $data['rcv_date'],
+                'general_stock_supplier_id' => $supplierId,
+                'supplier_name' => $supplierId
+                    ? GeneralStockSupplier::find($supplierId)?->name
+                    : null,
+            ]);
+        });
+
+        return back()->with('success', 'Receiving line updated.');
+    }
+
+    /**
+     * Every line of the delivery a given line belongs to, itself included.
+     *
+     * Matched on the same three columns groupKeyExpr() groups by, so "the same
+     * delivery" means here what it means on the screen. Written as three
+     * wheres rather than through that expression because this has to be an
+     * updatable query, and the NULL-safe comparison a raw key would need is
+     * spelled differently on each database engine.
+     */
+    private function deliveryLines(StockPurchase $line): \Illuminate\Database\Eloquent\Builder
+    {
+        return StockPurchase::query()
+            ->where(fn ($q) => $line->rv_no === null
+                ? $q->whereNull('rv_no')
+                : $q->where('rv_no', $line->rv_no))
+            ->where(fn ($q) => $line->challan_no === null
+                ? $q->whereNull('challan_no')
+                : $q->where('challan_no', $line->challan_no))
+            ->whereDate('purchase_date', $line->purchase_date);
+    }
+
+    /**
+     * Refuse a correction that would leave this item's balance below zero.
+     *
+     * The mirror of the rule the Issue screen enforces, and the same
+     * self-exclusion: the balance already counts this receipt's CURRENT
+     * quantity as received, so the question is what the figure becomes once the
+     * old quantity is undone and the new one applied —
+     *
+     *     stock_as_on - old_qty + new_qty >= 0
+     *
+     * Cutting a receipt of 100 to 10 when 60 have already been issued is the
+     * case this stops: the goods are gone, and a book balance of -50 is
+     * something no report can present honestly.
+     *
+     * A receipt dated beyond this month's end is outside the window
+     * stock_as_on sums, so it cannot be part of the balance being protected and
+     * is left alone. purchase_date is locked, so that cannot change underneath.
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    private function assertReceiptCovers(StockPurchase $purchase, float $newQty): void
+    {
+        if (! $purchase->purchase_date || $purchase->purchase_date->gt(now()->endOfMonth())) {
+            return;
+        }
+
+        $row = app(GeneralStockReportService::class)
+            ->rows(now()->startOfMonth(), [
+                'item_ids' => [(int) $purchase->stock_item_id],
+                'only_active' => false,
+            ])
+            ->first();
+
+        $stock = $row ? (float) $row['stock_as_on'] : 0.0;
+        $after = $stock - (float) $purchase->qty + $newQty;
+
+        // A whisker of tolerance, matching the import's own stock check, so a
+        // stored decimal cannot refuse an exactly-balancing correction.
+        if ($after >= -0.00001) {
+            return;
+        }
+
+        $format = fn ($v) => rtrim(rtrim(number_format((float) $v, 4, '.', ','), '0'), '.');
+
+        $name = $row ? $row['item']->name : 'This item';
+        $uom = $row && $row['item']->uom ? ' '.$row['item']->uom : '';
+        $lowest = (float) $purchase->qty - $stock;
+
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'qty' => $name.' — this receipt cannot be reduced to '.$format($newQty).$uom
+                .'. '.$format($stock).$uom.' is in stock, so the lowest it can go is '
+                .$format(max($lowest, 0)).$uom.'; the rest has already been issued.',
+        ]);
     }
 
     public function destroy(StockPurchase $stockPurchase)

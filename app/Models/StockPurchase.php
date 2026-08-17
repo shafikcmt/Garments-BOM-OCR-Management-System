@@ -45,10 +45,26 @@ class StockPurchase extends Model
      * Lives on the model rather than in a controller because it describes how
      * THIS TABLE groups, and both Purchase History and the Receiving Report
      * have to group identically. One definition, so they cannot drift.
+     *
+     * CONCAT() is fine on MySQL and PostgreSQL, the two engines this runs on,
+     * and absent on SQLite — which is what the test suite uses. So every test
+     * that rendered Purchase History failed on "no such function: CONCAT" while
+     * production was perfectly healthy, and the screen was effectively untested.
+     * SQLite gets the || spelling; MySQL and PostgreSQL get the SQL they always
+     * got, character for character, so no production query changes.
+     *
+     * || is deliberately NOT used for everyone even though PostgreSQL accepts
+     * it: on MySQL || is OR by default, which would silently return 0 or 1 as
+     * the group key and merge every delivery into one.
      */
     public static function groupKeyExpr(): string
     {
-        return "CONCAT(COALESCE(rv_no,''),'|',COALESCE(challan_no,''),'|',".self::dateKeyExpr('purchase_date').')';
+        $date = self::dateKeyExpr('purchase_date');
+
+        return match (\Illuminate\Support\Facades\DB::getDriverName()) {
+            'sqlite' => "(COALESCE(rv_no,'')||'|'||COALESCE(challan_no,'')||'|'||{$date})",
+            default => "CONCAT(COALESCE(rv_no,''),'|',COALESCE(challan_no,''),'|',{$date})",
+        };
     }
 
     /**

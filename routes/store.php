@@ -251,6 +251,10 @@ Route::prefix('store')
 
             Route::get('/purchases', [StockPurchaseController::class, 'index'])->name('purchases.index');
             Route::post('/purchases', [StockPurchaseController::class, 'store'])->middleware($act('store.receiving.create'))->name('purchases.store');
+            // Correct one line of a recorded receiving. No matching GET, for the
+            // reason the issues.update route gives. RV No / Challan No / Challan
+            // Date are not accepted here at all — they identify the delivery.
+            Route::put('/purchases/{stockPurchase}', [StockPurchaseController::class, 'update'])->name('purchases.update');
             Route::delete('/purchases/{stockPurchase}', [StockPurchaseController::class, 'destroy'])->name('purchases.destroy');
             });
 

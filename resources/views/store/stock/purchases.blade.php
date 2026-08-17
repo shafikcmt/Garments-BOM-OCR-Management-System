@@ -344,18 +344,24 @@
                                                             <td class="text-end small">{{ $line->unit_price !== null ? number_format((float) $line->unit_price, 2) : '—' }}</td>
                                                             <td class="text-end fw-semibold">{{ number_format($line->total_value, 2) }}</td>
                                                             <td class="small text-muted">{{ $line->remarks ?: '—' }}</td>
-                                                            {{-- Delete is an Admin / Management right
-                                                                 (store.delete); the controller enforces
-                                                                 the same check server-side. Removes this
-                                                                 one line, not the whole receiving. --}}
+                                                            {{-- Edit and Delete are Admin / Management
+                                                                 rights (store.receiving.edit / .delete,
+                                                                 or the flat store.edit / store.delete);
+                                                                 the controller enforces the same checks
+                                                                 server-side. Both act on this one line,
+                                                                 not the whole receiving. --}}
                                                             <td class="text-end gx-stock-actions">
+                                                                @if($canEdit)
+                                                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPurchase{{ $line->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
+                                                                @endif
                                                                 @if($canDelete)
                                                                     <form method="POST" action="{{ route('store.stock.purchases.destroy', $line) }}" class="d-inline"
                                                                           onsubmit="return confirm('Remove {{ addslashes(optional($line->stockItem)->name ?? 'this item') }} from this receiving? The other items on it are kept.');">
                                                                         @csrf @method('DELETE')
                                                                         <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                                                     </form>
-                                                                @else
+                                                                @endif
+                                                                @if(! $canEdit && ! $canDelete)
                                                                     <span class="text-muted small">—</span>
                                                                 @endif
                                                             </td>
@@ -380,6 +386,148 @@
             <div class="mt-3">{{ $groups->links() }}</div>
         </div>
     </div>
+
+    {{-- Correct one line of a recorded receiving.
+
+         Rendered outside the history table rather than inside the collapse pane
+         each Edit button sits in: a dialog nested in a <td> inherits the table's
+         own overflow and stacking, and the pane it lives in can be collapsed
+         while the dialog is open.
+
+         THREE FIELDS IDENTIFY THE DELIVERY and are shown locked — GRN No,
+         Challan No and Challan Date are what group these lines into one
+         receiving, on this screen and in the Receiving Report alike. Two more,
+         RCV Date and Supplier, describe the delivery rather than the line and
+         are written to every line of it; they are marked so nobody is surprised
+         by a change reaching rows they did not open. --}}
+    @if($canEdit)
+        @foreach($lines->flatten() as $line)
+            @php
+                // old() is global; this marker keeps a rejected edit from
+                // repopulating every other dialog on the page.
+                $formKey = 'edit:'.$line->id;
+                $wasSubmitted = old('form') === $formKey;
+                $value = fn (string $field, $stored = null) => $wasSubmitted ? old($field, $stored) : $stored;
+                $lineQty = rtrim(rtrim(number_format((float) $line->qty, 4, '.', ''), '0'), '.');
+                $siblingCount = $lines->get($line->group_key)?->count() ?? 1;
+            @endphp
+            <div class="modal fade" id="editPurchase{{ $line->id }}" tabindex="-1" aria-labelledby="editPurchaseLabel{{ $line->id }}" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content gx-stock-card">
+                        <form method="POST" action="{{ route('store.stock.purchases.update', $line) }}">
+                            @csrf @method('PUT')
+                            <input type="hidden" name="form" value="{{ $formKey }}">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="editPurchaseLabel{{ $line->id }}">Edit Receiving Line</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                @if($wasSubmitted && $errors->any())
+                                    <div class="gx-edit-alert mb-3" role="alert">
+                                        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                                        <div>
+                                            <div class="gx-edit-alert-title">This change was not saved</div>
+                                            <div class="gx-edit-alert-body">
+                                                @foreach($errors->all() as $error)
+                                                    <span>{{ $error }}</span>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label">Item<span class="gx-lock-tag">Locked</span></label>
+                                        <div class="gx-edit-locked">
+                                            <i class="bi bi-lock-fill" aria-hidden="true"></i>
+                                            <span class="gx-edit-locked-value">{{ optional($line->stockItem)->name ?? '—' }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label">GRN No<span class="gx-lock-tag">Locked</span></label>
+                                        <div class="gx-edit-locked">
+                                            <i class="bi bi-lock-fill" aria-hidden="true"></i>
+                                            <span class="gx-edit-locked-value">{{ $line->rv_no ?: '—' }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label">Challan No<span class="gx-lock-tag">Locked</span></label>
+                                        <div class="gx-edit-locked">
+                                            <i class="bi bi-lock-fill" aria-hidden="true"></i>
+                                            <span class="gx-edit-locked-value">{{ $line->challan_no ?: '—' }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label">Challan Date<span class="gx-lock-tag">Locked</span></label>
+                                        <div class="gx-edit-locked">
+                                            <i class="bi bi-lock-fill" aria-hidden="true"></i>
+                                            <span class="gx-edit-locked-value">{{ optional($line->purchase_date)->format('d-M-Y') ?: '—' }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="gx-edit-hint">
+                                            These three identify the delivery and group its items together. To correct
+                                            one of them, delete this receiving and enter it again.
+                                        </div>
+                                    </div>
+
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label" for="editPurchaseQty{{ $line->id }}">Purchased Qty <span class="text-danger">*</span></label>
+                                        <input type="number" step="0.0001" min="0.0001" id="editPurchaseQty{{ $line->id }}" name="qty" class="form-control @if($wasSubmitted && $errors->has('qty')) is-invalid @endif" required
+                                               value="{{ $value('qty', $lineQty) }}">
+                                        <div class="gx-edit-hint">
+                                            {{ optional($line->stockItem)->uom ? 'In '.$line->stockItem->uom.'. ' : '' }}Cannot be cut below what has already been issued.
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label" for="editPurchasePrice{{ $line->id }}">Unit Price</label>
+                                        <input type="number" step="0.0001" min="0" id="editPurchasePrice{{ $line->id }}" name="unit_price" class="form-control @if($wasSubmitted && $errors->has('unit_price')) is-invalid @endif"
+                                               value="{{ $value('unit_price', $line->unit_price !== null ? rtrim(rtrim(number_format((float) $line->unit_price, 4, '.', ''), '0'), '.') : '') }}">
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="editPurchaseRcv{{ $line->id }}">
+                                            RCV Date <span class="text-danger">*</span>
+                                            @if($siblingCount > 1)<span class="gx-edit-scope">All {{ $siblingCount }} items</span>@endif
+                                        </label>
+                                        <input type="date" id="editPurchaseRcv{{ $line->id }}" name="rcv_date" class="form-control @if($wasSubmitted && $errors->has('rcv_date')) is-invalid @endif" required
+                                               value="{{ $value('rcv_date', optional($line->rcv_date)->toDateString()) }}">
+                                    </div>
+                                    <div class="col-12 col-md-8">
+                                        <label class="form-label" for="editPurchaseSupplier{{ $line->id }}">
+                                            Supplier
+                                            @if($siblingCount > 1)<span class="gx-edit-scope">All {{ $siblingCount }} items</span>@endif
+                                        </label>
+                                        <select id="editPurchaseSupplier{{ $line->id }}" name="general_stock_supplier_id" class="form-select">
+                                            <option value="">—</option>
+                                            @foreach($suppliers as $supplier)
+                                                <option value="{{ $supplier->id }}" @selected($value('general_stock_supplier_id', $line->general_stock_supplier_id) == $supplier->id)>{{ $supplier->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        @if($siblingCount > 1)
+                                            <div class="gx-edit-hint">
+                                                RCV Date and Supplier describe the whole delivery, so a change here is
+                                                written to all {{ $siblingCount }} items received under this GRN.
+                                            </div>
+                                        @endif
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="editPurchaseRemarks{{ $line->id }}">Remarks</label>
+                                        <textarea id="editPurchaseRemarks{{ $line->id }}" name="remarks" class="form-control" rows="2" maxlength="1000">{{ $value('remarks', $line->remarks) }}</textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Update Line</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    @endif
 
     {{-- Bulk receiving upload. Same shape as the item-master import modal, so
          the two screens are learnt once. --}}
@@ -578,5 +726,25 @@
             });
         })();
     </script>
+
+    {{-- A refused correction closes the dialog it was typed in. Reopen it,
+         still carrying what was entered and saying why it was refused. The
+         hidden `form` field names which one. --}}
+    @php
+        $reopenEdit = str_starts_with((string) old('form'), 'edit:')
+            ? 'editPurchase'.substr((string) old('form'), 5)
+            : null;
+    @endphp
+
+    @if($errors->any() && $reopenEdit)
+        <script>
+            (function () {
+                var el = document.getElementById(@json($reopenEdit));
+                if (el && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(el).show();
+                }
+            })();
+        </script>
+    @endif
 </div>
 @endsection
