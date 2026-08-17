@@ -164,9 +164,40 @@
            here stops the pane rising above the nav in the first place. */
         position: sticky;
         top: calc(var(--app-header, 60px) + .5rem);
-        /* Leaves room under the pane for the pager, which follows it in flow. */
-        max-height: calc(100vh - var(--app-header, 60px) - 7rem);
+        /* Room under the pane for everything that follows it in flow.
+         *
+         * 7rem was not enough and the arithmetic is worth writing down, because
+         * "it looks like plenty" is how it was got wrong. A sticky pane keeps
+         * its PAINTED box at the top of the viewport while its FLOW box scrolls
+         * away, so at the bottom of the page the pager rises to meet content
+         * that is no longer where the layout thinks it is. What has to fit
+         * below the pinned pane is not just the pager but everything under it:
+         *
+         *     pager 50px + footer 60px + the card's own bottom padding ~44px
+         *
+         * At 7rem the pane measured 840px where 791px was the most that could
+         * clear the pager — 49px of overlap, which is the whole pager. The
+         * reserve is now 11rem, which leaves ~15px of slack at 1012px tall and
+         * more as the viewport grows. */
+        max-height: calc(100vh - var(--app-header, 60px) - var(--gx-pane-reserve, 11rem));
         min-height: 320px;
+    }
+
+    /* The pager paints ABOVE the pane, and this is the part that actually
+     * guarantees the fix.
+     *
+     * The height budget above is measured against a footer and a card padding
+     * that some later change is free to alter, and min-height can win over
+     * max-height on a short enough viewport — so geometry alone is a fix that
+     * works until it quietly does not. The pane is sticky and therefore
+     * positioned, so it paints over a static sibling whatever their boxes do;
+     * giving the pager a position and a higher z-index reverses that for good.
+     * If the two ever do overlap again the pager stays clickable, and its
+     * background keeps it readable instead of showing table rows through it. */
+    .gx-ledger .gx-ledger-pager {
+        position: relative;
+        z-index: 3;
+        background: #fff;
     }
     .gx-ledger .gx-stock-scroll > .gx-stock-table > thead > tr > th {
         position: sticky;
@@ -182,7 +213,10 @@
     }
     @media (max-height: 640px) {
         .gx-ledger .gx-stock-scroll {
-            max-height: calc(100vh - var(--app-header, 60px) - 4rem);
+            /* Same reserve as above — what sits below the pane does not shrink
+               with the viewport, so a short screen needs it MORE, not less.
+               4rem here was the same mistake in a smaller window. */
+            max-height: calc(100vh - var(--app-header, 60px) - var(--gx-pane-reserve, 11rem));
             min-height: 240px;
         }
         /* Explicitly restated: this is the case _stock-ui turns sticky off in,
