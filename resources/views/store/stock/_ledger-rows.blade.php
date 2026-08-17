@@ -133,7 +133,10 @@
                     <td class="text-end text-danger">{{ $qty($r['consumption']) }}</td>
                     <td class="gx-stock-micro">{{ $date($r['last_consumption_date']) }}</td>
                     <td class="text-end fw-bold text-slate-900 gx-ledger-primary">{{ $qty($r['stock_as_on']) }}</td>
-                    <td class="text-end">{{ $money($r['unit_price']) }}</td>
+                    {{-- Marked the same way as on the Stock Report: a standard
+                         price from the item master is not the challan price
+                         this column normally shows. --}}
+                    <td class="text-end">{{ $money($r['unit_price']) }}@if($r['unit_price_is_standard'])<i class="bi bi-tag text-muted ms-1" title="Standard price from the item master — nothing has been received against this item with a price on the challan" aria-hidden="true"></i>@endif</td>
                     <td class="text-end fw-semibold">{{ $money($r['closing_value']) }}</td>
                     <td class="gx-stock-micro">{{ $r['remarks'] ?: '—' }}</td>
                 </tr>

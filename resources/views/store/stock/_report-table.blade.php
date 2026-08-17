@@ -66,7 +66,12 @@
                 <td class="num">{{ $qty($r['consumption']) }}</td>
                 <td>{{ $date($r['last_consumption_date']) }}</td>
                 <td class="num">{{ $qty($r['stock_as_on']) }}</td>
-                <td class="num">{{ $money($r['unit_price']) }}</td>
+                {{-- A standard price off the item master is marked, because it
+                     is not what this report's price column has always meant.
+                     The figure here is normally the last challan price — money
+                     somebody actually paid — and presenting a standard rate the
+                     same way would quietly change what the column asserts. --}}
+                <td class="num">{{ $money($r['unit_price']) }}@if($r['unit_price_is_standard'])<i class="bi bi-tag text-muted ms-1" title="Standard price from the item master — nothing has been received against this item with a price on the challan" aria-hidden="true"></i>@endif</td>
                 <td class="num">{{ $money($r['closing_value']) }}</td>
                 <td>{{ $r['remarks'] }}</td>
             </tr>

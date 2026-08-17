@@ -312,7 +312,28 @@ class GeneralStockReportService
             : null;
         $reorder = $item->reorder_level !== null ? (float) $item->reorder_level : $reorderAuto;
 
-        $unitPrice = isset($movements['unit_price'][$item->id]) ? (float) $movements['unit_price'][$item->id] : null;
+        // Excel column R: the price on the most recent challan. That stays the
+        // answer whenever there is one, so no figure this report has ever
+        // produced changes.
+        //
+        // The item master's standard price is the FALLBACK, for the item that
+        // has never been received with a price on the challan. That is not a
+        // rare case here: of 1,240 items, five have such a price, so the Value
+        // column was empty for almost every row and the report's own total
+        // described a fraction of the store. A standard price is a worse
+        // number than a real one and a far better number than none.
+        $challanPrice = isset($movements['unit_price'][$item->id])
+            ? (float) $movements['unit_price'][$item->id]
+            : null;
+
+        $masterPrice = $item->unit_price !== null ? (float) $item->unit_price : null;
+
+        $unitPrice = $challanPrice ?? $masterPrice;
+
+        // Which of the two this is, so the screen can say so rather than
+        // presenting a standard price as though something had been bought at
+        // it. Only meaningful when there is a price at all.
+        $priceIsStandard = $challanPrice === null && $masterPrice !== null;
 
         return [
             'item' => $item,
@@ -332,6 +353,7 @@ class GeneralStockReportService
             'last_consumption_date' => $this->toDate($movements['last_consumption'][$item->id] ?? null),
             'stock_as_on' => $stockAsOn,
             'unit_price' => $unitPrice,
+            'unit_price_is_standard' => $priceIsStandard,
             'closing_value' => $unitPrice !== null ? $stockAsOn * $unitPrice : null,
             'status' => $this->status($stockAsOn, $safety, $reorder),
             'remarks' => $item->remarks,
