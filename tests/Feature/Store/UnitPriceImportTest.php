@@ -289,6 +289,41 @@ it('round-trips the export into the price importer', function () {
         ->and($result['updates'][0]['id'])->toBe($item->id);
 });
 
+it('takes the full export file as-is, without the other columns being trimmed off', function () {
+    // The workflow people will actually use: export, fill in the Unit Price
+    // column, upload the whole 11-column file. Headings are matched by NAME, so
+    // Uom, Category, Opening Stock and the rest are simply never looked up.
+    //
+    // Asserted because it is a guarantee somebody is relying on for 1,241 rows:
+    // rename a column in the export and this path breaks silently, leaving a
+    // file that looks right and updates nothing.
+    $needle = pricedItem('Sewing Needle', 'Organ');
+    $thread = pricedItem('Sewing Thread', null);
+
+    $at = fn (string $h) => (int) array_search($h, ItemMasterImport::COLUMNS, true);
+
+    $rows = (new ItemMasterExport)->array();
+
+    // Price one row, leave the other blank, exactly as a first pass would.
+    foreach ($rows as $i => $row) {
+        if ($row[$at('Item Name*')] === 'Sewing Needle') {
+            $rows[$i][$at('Unit Price')] = 12.5;
+        }
+    }
+
+    // The FULL export headings, not the price importer's three.
+    $result = UnitPriceImport::parse(array_merge([ItemMasterImport::COLUMNS], $rows));
+
+    expect($result['errors'])->toBeEmpty()
+        ->and($result['updates'])->toHaveCount(1)
+        ->and($result['updates'][0]['id'])->toBe($needle->id)
+        ->and($result['updates'][0]['unit_price'])->toBe(12.5)
+        // The unpriced row is left alone, not cleared.
+        ->and(implode(' ', $result['skipped']))->toContain('Sewing Thread');
+
+    expect($thread->fresh()->unit_price)->toBeNull();
+});
+
 it('lets anyone who can see items download the export', function () {
     pricedItem('Sewing Needle', 'Organ');
 
