@@ -1,7 +1,9 @@
 <?php
 
+use App\Exports\IssueTemplateExport;
 use App\Exports\ItemMasterTemplateExport;
 use App\Imports\ItemMasterImport;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 /**
  * The item-master bulk upload after Brand, Size and Specification became one
@@ -129,7 +131,45 @@ it('writes the template Unit Price as a formatted number, not text', function ()
 
     // And the column carries a number format, over a range that covers the
     // empty rows the user is going to fill in.
-    expect($export->columnFormats())->toBe(['J2:J1000' => '0.00']);
+    expect($export->columnFormats()['J2:J1000'])->toBe('0.00');
+});
+
+/**
+ * Counted On had the same text-date fault the issue and receiving templates
+ * were fixed for: the example was written as the string '2026-08-01', so Excel
+ * treated the column as text and every date typed under it came back as text.
+ */
+it('writes the template Counted On as a real Excel date value, formatted', function () {
+    $export = new ItemMasterTemplateExport;
+
+    $at = (int) array_search('Counted On', ItemMasterImport::COLUMNS, true);
+
+    [$row] = $export->array();
+
+    $serial = $row[$at];
+
+    expect($serial)->toBeNumeric()
+        ->and(Date::excelToDateTimeObject((float) $serial)->format('Y-m-d'))
+        ->toBe(ItemMasterImport::SAMPLE_ROW[$at]);
+
+    // ...and the column carries the same date format the other two use, or the
+    // serial shows to the user as 46235.
+    expect($export->columnFormats()['F2:F1000'])->toBe(IssueTemplateExport::DATE_FORMAT);
+});
+
+it('reads the template date serial back as the same day on re-upload', function () {
+    // The round trip the fix exists for: what the template writes, the importer
+    // must read as the day it means.
+    $row = (new ItemMasterTemplateExport)->array()[0];
+    $row[0] = 'Sewing Needle';
+
+    $result = ItemMasterImport::parse([ItemMasterImport::COLUMNS, $row]);
+
+    $at = (int) array_search('Counted On', ItemMasterImport::COLUMNS, true);
+
+    expect($result['errors'])->toBeEmpty()
+        ->and($result['items'])->toHaveCount(1)
+        ->and($result['items'][0]['opening_as_on'])->toBe(ItemMasterImport::SAMPLE_ROW[$at]);
 });
 
 it('still reads a file that predates the Unit Price column', function () {

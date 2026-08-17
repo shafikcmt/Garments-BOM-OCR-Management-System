@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Imports\ItemMasterImport;
+use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
@@ -10,6 +11,7 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
@@ -46,9 +48,16 @@ class ItemMasterTemplateExport implements FromArray, ShouldAutoSize, WithColumnF
      */
     public function columnFormats(): array
     {
-        $letter = self::columnLetter('Unit Price');
+        $price = self::columnLetter('Unit Price');
+        $date = self::columnLetter('Counted On');
 
-        return [$letter.'2:'.$letter.'1000' => NumberFormat::FORMAT_NUMBER_00];
+        return [
+            $price.'2:'.$price.'1000' => NumberFormat::FORMAT_NUMBER_00,
+            // Counted On is a REAL Excel date, formatted the way the issue and
+            // receiving templates format theirs, so the three read alike and a
+            // date typed here cannot come back as text.
+            $date.'2:'.$date.'1000' => IssueTemplateExport::DATE_FORMAT,
+        ];
     }
 
     /** A column's letter, found by heading rather than counted. */
@@ -64,7 +73,25 @@ class ItemMasterTemplateExport implements FromArray, ShouldAutoSize, WithColumnF
     {
         // One filled example row, so the expected format is obvious. Blank
         // Safety Stock / Re-order Level show that leaving them empty is allowed.
-        return [ItemMasterImport::SAMPLE_ROW];
+        $row = ItemMasterImport::SAMPLE_ROW;
+
+        // Counted On is written as a real Excel date — the serial number the
+        // format in columnFormats() then displays — not as the text the
+        // constant holds. Written as text, Excel treats what the user types
+        // under it as text too, and the file comes back with dates that no date
+        // function, sort or filter understands. The same fix the issue and
+        // receiving templates carry, applied here last.
+        //
+        // The serial is produced here rather than in SAMPLE_ROW because that
+        // constant is also the readable reference for the file's shape, and a
+        // bare 46235 documents nothing.
+        $dateColumn = (int) array_search('Counted On', ItemMasterImport::COLUMNS, true);
+
+        $row[$dateColumn] = ExcelDate::PHPToExcel(
+            Carbon::parse(ItemMasterImport::SAMPLE_ROW[$dateColumn])->startOfDay()
+        );
+
+        return [$row];
     }
 
     public function title(): string
