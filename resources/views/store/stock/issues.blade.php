@@ -508,16 +508,22 @@
                                         <td><div class="fw-semibold">{{ optional($i->stockItem)->name ?? '—' }}</div></td>
                                         <td class="small text-muted">{{ optional($i->itemCategory)->name ?: (optional($i->stockItem)->category ?: '—') }}</td>
                                         <td class="text-end fw-bold">{{ $qty($i->qty) }}</td>
-                                        {{-- Delete is an Admin / Management right
-                                             (store.delete); the controller enforces
-                                             the same check server-side. --}}
+                                        {{-- Edit and Delete are Admin / Management
+                                             rights (store.issues.edit / .delete, or
+                                             the flat store.edit / store.delete); the
+                                             controller enforces the same checks
+                                             server-side. --}}
                                         <td class="text-end gx-stock-actions">
+                                            @if($canEdit)
+                                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editIssue{{ $i->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
+                                            @endif
                                             @if($canDelete)
                                                 <form method="POST" action="{{ route('store.stock.issues.destroy', $i) }}" onsubmit="return confirm('Remove this issue?');">
                                                     @csrf @method('DELETE')
                                                     <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                                 </form>
-                                            @else
+                                            @endif
+                                            @if(! $canEdit && ! $canDelete)
                                                 <span class="text-muted small">—</span>
                                             @endif
                                         </td>
@@ -541,6 +547,120 @@
             </div>
         </div>
     </div>
+
+    {{-- Correct one recorded issue. Keyed by issue id and rendered only for a
+         role that can submit it, the same arrangement the Item Master edit
+         modals use — markup that carries no action a non-admin could replay.
+
+         ONE ROW, not the requisition. A requisition is several rows sharing a
+         header and the table lists it a row at a time, so this edits the row the
+         user clicked and leaves its siblings alone.
+
+         The Item is shown but not editable: moving an issue to another item is
+         one balance undone and another created, which is a delete and a
+         re-record, not a correction. The masters are plain dropdowns rather than
+         the create form's type-to-add ones — a correction is not the place to
+         coin a new Section, and Issue Setup is one click away. --}}
+    @if($canEdit)
+        @foreach($issues as $i)
+            <div class="modal fade" id="editIssue{{ $i->id }}" tabindex="-1" aria-labelledby="editIssueLabel{{ $i->id }}" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content gx-stock-card">
+                        <form method="POST" action="{{ route('store.stock.issues.update', $i) }}">
+                            @csrf @method('PUT')
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="editIssueLabel{{ $i->id }}">Edit Issue</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label">Item</label>
+                                        <input type="text" class="form-control gx-stock-readonly" readonly tabindex="-1"
+                                               value="{{ optional($i->stockItem)->name ?? '—' }}">
+                                        <div class="form-text">
+                                            To move this issue to a different item, delete it and record it again.
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label" for="editIssueDate{{ $i->id }}">Issue Date <span class="text-danger">*</span></label>
+                                        <input type="date" id="editIssueDate{{ $i->id }}" name="issue_date" class="form-control" required
+                                               value="{{ optional($i->issue_date)->toDateString() }}">
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <label class="form-label" for="editIssueQty{{ $i->id }}">Issued Qty <span class="text-danger">*</span></label>
+                                        <input type="number" step="0.0001" min="0.0001" id="editIssueQty{{ $i->id }}" name="qty" class="form-control" required
+                                               value="{{ rtrim(rtrim(number_format((float) $i->qty, 4, '.', ''), '0'), '.') }}">
+                                        <div class="form-text">
+                                            {{ optional($i->stockItem)->uom ? 'In '.$i->stockItem->uom.'. ' : '' }}An issue cannot take this item below zero.
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="editIssueReqNo{{ $i->id }}">Requisition Number</label>
+                                        <input type="text" id="editIssueReqNo{{ $i->id }}" name="requisition_no" class="form-control" maxlength="100"
+                                               value="{{ $i->requisition_no }}">
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="editIssueSection{{ $i->id }}">Indent Section</label>
+                                        <select id="editIssueSection{{ $i->id }}" name="indent_section_id" class="form-select">
+                                            <option value="">—</option>
+                                            @foreach($sections as $s)
+                                                <option value="{{ $s->id }}" @selected($i->indent_section_id == $s->id)>{{ $s->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="editIssuePerson{{ $i->id }}">Indent Person</label>
+                                        <select id="editIssuePerson{{ $i->id }}" name="indent_person_id" class="form-select">
+                                            <option value="">—</option>
+                                            @foreach($persons as $p)
+                                                <option value="{{ $p->id }}" @selected($i->indent_person_id == $p->id)>{{ $p->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="editIssueApprover{{ $i->id }}">Approved By</label>
+                                        <select id="editIssueApprover{{ $i->id }}" name="issue_approver_id" class="form-select">
+                                            <option value="">—</option>
+                                            @foreach($approvers as $a)
+                                                <option value="{{ $a->id }}" @selected($i->issue_approver_id == $a->id)>{{ $a->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="editIssueCategory{{ $i->id }}">Category</label>
+                                        <select id="editIssueCategory{{ $i->id }}" name="item_category_id" class="form-select">
+                                            <option value="">—</option>
+                                            @foreach($categories as $c)
+                                                <option value="{{ $c->id }}" @selected($i->item_category_id == $c->id)>{{ $c->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label" for="editIssueType{{ $i->id }}">Type</label>
+                                        <select id="editIssueType{{ $i->id }}" name="requisition_type" class="form-select">
+                                            <option value="">—</option>
+                                            @foreach($requisitionTypes as $type)
+                                                <option value="{{ $type }}" @selected($i->requisition_type === $type)>{{ $type }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="editIssueRemarks{{ $i->id }}">Remarks</label>
+                                        <textarea id="editIssueRemarks{{ $i->id }}" name="remarks" class="form-control" rows="2" maxlength="1000">{{ $i->remarks }}</textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Update Issue</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    @endif
 
     {{-- Bulk consumption upload. Same shape as the receiving import modal, so
          the two screens are learnt once. --}}

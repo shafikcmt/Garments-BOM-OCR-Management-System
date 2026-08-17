@@ -278,6 +278,12 @@ Route::prefix('store')
             // user's own session and is only reachable by whoever just ran the
             // import that produced it.
             Route::get('/issues/import/skipped-rows', [StockIssueController::class, 'skippedRows'])->middleware($act('store.issues.create'))->name('issues.skipped-rows');
+            // Correct one recorded issue. No matching GET: the form is a modal
+            // prefilled from the row already on screen, so an edit page would be
+            // an endpoint nothing calls. Gated inside the controller on
+            // store.issues.edit / store.edit, the same pair the Delete below
+            // uses for its own action.
+            Route::put('/issues/{stockIssue}', [StockIssueController::class, 'update'])->name('issues.update');
             Route::delete('/issues/{stockIssue}', [StockIssueController::class, 'destroy'])->name('issues.destroy');
             });
 
