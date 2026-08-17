@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Store;
 
+use App\Exports\ItemMasterExport;
 use App\Exports\ItemMasterTemplateExport;
+use App\Exports\UnitPriceTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Http\Controllers\Concerns\ResolvesIssueSetupMasters;
 use App\Imports\ItemMasterImport;
+use App\Imports\UnitPriceImport;
 use App\Models\ItemCategory;
 use App\Models\StockItem;
 use App\Services\GeneralStockReportService;
@@ -133,6 +136,85 @@ class StockItemController extends Controller
     public function template()
     {
         return Excel::download(new ItemMasterTemplateExport, 'Item-Master-Bulk-Upload-Template.xlsx');
+    }
+
+    /**
+     * The item master as it stands, for reading and for building a price file.
+     *
+     * Read-only, so it rides the section's own view guard rather than a create
+     * or edit right. NOT a round trip: re-uploading it through import() writes
+     * nothing, because that importer only creates and every row already exists.
+     */
+    public function export()
+    {
+        return Excel::download(new ItemMasterExport, 'Item-Master-'.now()->format('Y-m-d').'.xlsx');
+    }
+
+    /** The blank three-column workbook for the Unit Price import. */
+    public function priceTemplate()
+    {
+        return Excel::download(new UnitPriceTemplateExport, 'Unit-Price-Upload-Template.xlsx');
+    }
+
+    /**
+     * Set Unit Price across many items at once.
+     *
+     * Writes ONE FIELD and creates nothing. That is the whole safety argument:
+     * a stale file cannot reach Uom, Category, Opening Stock or Safety Stock,
+     * because this never writes them, and a row matching no item is reported
+     * rather than turned into a phantom item carrying a price and nothing else.
+     *
+     * All-or-nothing on errors, like the item import it sits beside: an
+     * unmatched name is usually a column out of step or a wrong brand, and
+     * applying the half of the file that happened to match would leave the user
+     * unable to tell what had landed.
+     */
+    public function importPrices(Request $request)
+    {
+        $this->authorizeStoreEdit('unit price');
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt,xlsx,xls', 'max:8192'],
+        ], [], ['file' => 'upload file']);
+
+        try {
+            $sheets = Excel::toArray(new UnitPriceImport, $request->file('file'));
+        } catch (\Throwable $e) {
+            return back()->with('warning', 'That file could not be read. Please upload a CSV or Excel file based on the sample template.');
+        }
+
+        ['updates' => $updates, 'errors' => $errors, 'skipped' => $skipped] = UnitPriceImport::parse($sheets[0] ?? []);
+
+        if ($errors) {
+            return back()
+                ->with('warning', 'Nothing was updated. Please correct '.count($errors).' row(s) and upload the file again.')
+                ->with('import_errors', $errors)
+                ->with('import_skipped', $skipped);
+        }
+
+        if (empty($updates)) {
+            return back()
+                ->with('warning', $skipped
+                    ? 'No prices were updated. See the skipped rows below.'
+                    : 'No priced rows were found in that file. Please use the sample template.')
+                ->with('import_skipped', $skipped);
+        }
+
+        DB::transaction(function () use ($updates) {
+            foreach ($updates as $update) {
+                // Only the one column. Written with the query builder rather
+                // than a model save so nothing else on the row can be carried
+                // along by accident.
+                StockItem::whereKey($update['id'])->update(['unit_price' => $update['unit_price']]);
+            }
+        });
+
+        $count = count($updates);
+
+        return back()
+            ->with('success', $count.' item'.($count === 1 ? '' : 's').' updated with a unit price.'
+                .($skipped ? ' '.count($skipped).' row(s) were skipped.' : ''))
+            ->with('import_skipped', $skipped);
     }
 
     /**

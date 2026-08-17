@@ -208,6 +208,13 @@ Route::prefix('store')
             Route::get('/items', [StockItemController::class, 'index'])->name('items.index');
             // Bulk item upload + its blank sample template.
             Route::get('/items/template', [StockItemController::class, 'template'])->name('items.template');
+            // The current list, for reading and for building a price file.
+            // Read-only, so the section's view guard is the right one.
+            Route::get('/items/export', [StockItemController::class, 'export'])->name('items.export');
+            // Unit Price only. Guarded on the correction right rather than
+            // create, because it CHANGES existing items and creates none.
+            Route::get('/items/prices/template', [StockItemController::class, 'priceTemplate'])->name('items.prices.template');
+            Route::post('/items/prices', [StockItemController::class, 'importPrices'])->name('items.prices.import');
             Route::post('/items/import', [StockItemController::class, 'import'])->middleware($act('store.items.create'))->name('items.import');
             Route::post('/items', [StockItemController::class, 'store'])->middleware($act('store.items.create'))->name('items.store');
             Route::put('/items/{stockItem}', [StockItemController::class, 'update'])->name('items.update');
