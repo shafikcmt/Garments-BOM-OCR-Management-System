@@ -136,6 +136,25 @@
                      being a line of text in a heading. --}}
             </div>
 
+            {{-- Why two columns near the left show the same number.
+
+                 Opening is the counted figure and never moves; Balance B/F is
+                 last month's closing. They are equal exactly once per item — in
+                 the month it was counted, when there is no earlier movement to
+                 carry forward — and differ from then on. With every record in
+                 the system currently dated inside one month, that "exactly
+                 once" is every row on the screen, which reads as a duplicated
+                 column rather than as two figures that happen to agree.
+
+                 Said here rather than in _report-table: that partial is shared
+                 with the PDF and the Excel export, and a note belongs on the
+                 screen somebody is puzzling at, not in a management document. --}}
+            <p class="gx-stock-help mb-3">
+                <strong>Opening</strong> is the counted figure from the Item Master and never changes.
+                <strong>Balance B/F</strong> is last month's closing stock. The two match until the item
+                has movement in an earlier month, then Balance B/F carries forward and Opening stays put.
+            </p>
+
             {{-- Filters sit inside the card they narrow, the same as every other
                  General Stock list. As a separate card above they read as their
                  own step and cost a full card's padding of vertical room. --}}
