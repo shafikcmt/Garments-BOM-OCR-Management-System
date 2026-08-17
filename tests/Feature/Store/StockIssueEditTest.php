@@ -259,6 +259,31 @@ it('does not light up the Record Issue form s own warning when an edit is refuse
         ->assertSessionMissing('issue_stock_errors');
 });
 
+// --- Deleting an issue needs no balance guard --------------------------------
+
+it('always allows an issue to be deleted, because it can only raise the balance', function () {
+    // Asserted rather than assumed, because the Receiving side DOES need a
+    // guard and the asymmetry looks like an oversight until it is stated.
+    // Deleting an issue removes consumption, so the balance goes UP: there is
+    // no arrangement of records in which it can go negative.
+    $item = editableItem();
+    editStockOnHand($item, 100);
+
+    // Everything received has been issued — the balance is at zero.
+    $issue = recordedIssue($item, 100);
+
+    expect(issueBalance($item))->toBe(0.0);
+
+    $this->actingAs(issueEditor(['store.issues.view', 'store.delete']))
+        ->delete(route('store.stock.issues.destroy', $issue))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    // Up to 100, never below zero.
+    expect(StockIssue::find($issue->id))->toBeNull()
+        ->and(issueBalance($item))->toBe(100.0);
+});
+
 // --- What may and may not change --------------------------------------------
 
 it('ignores an attempt to move the issue to another item', function () {

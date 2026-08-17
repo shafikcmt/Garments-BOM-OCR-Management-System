@@ -342,6 +342,84 @@ it('refuses cutting a receipt below what has already been issued', function () {
     expect(purchaseBalance($item))->toBe(0.0);
 });
 
+// --- Deleting a receipt obeys the same balance rule as reducing one ----------
+
+it('refuses to remove a receipt whose stock has already been issued', function () {
+    // 100 received, 60 issued. Removing the receipt leaves -60, which is the
+    // same outcome Edit already refuses when the figure is cut to 10 — the two
+    // doors must not disagree.
+    $item = purchaseItem();
+    $line = recordedPurchase($item, 100);
+
+    StockIssue::create([
+        'stock_item_id' => $item->id,
+        'issue_date' => now()->startOfMonth()->toDateString(),
+        'qty' => 60,
+    ]);
+
+    $this->actingAs(purchaseEditor(['store.receiving.view', 'store.delete']))
+        ->from(route('store.stock.purchases.index'))
+        ->delete(route('store.stock.purchases.destroy', $line))
+        ->assertRedirect()
+        ->assertSessionHas('warning');
+
+    // Still there, balance untouched.
+    expect(StockPurchase::find($line->id))->not->toBeNull()
+        ->and(purchaseBalance($item))->toBe(40.0);
+
+    expect(session('warning'))
+        ->toContain('Sewing Needle')
+        ->toContain('cannot be removed')
+        // Names the figure it could be reduced to instead of just refusing.
+        ->toContain('60');
+});
+
+it('removes a receipt whose stock is all still on the shelf', function () {
+    $item = purchaseItem();
+    $line = recordedPurchase($item, 100);
+
+    $this->actingAs(purchaseEditor(['store.receiving.view', 'store.delete']))
+        ->delete(route('store.stock.purchases.destroy', $line))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect(StockPurchase::find($line->id))->toBeNull()
+        ->and(purchaseBalance($item))->toBe(0.0);
+});
+
+it('removes a receipt when other stock covers what was issued', function () {
+    // Two receipts of 100, 60 issued. Removing one leaves 100 - 60 = 40, which
+    // is fine — the check is about the balance, not about this row's own qty.
+    $item = purchaseItem();
+    $first = recordedPurchase($item, 100);
+    recordedPurchase($item, 100, ['rv_no' => 'GRN-002', 'challan_no' => 'CH-88']);
+
+    StockIssue::create([
+        'stock_item_id' => $item->id,
+        'issue_date' => now()->startOfMonth()->toDateString(),
+        'qty' => 60,
+    ]);
+
+    $this->actingAs(purchaseEditor(['store.receiving.view', 'store.delete']))
+        ->delete(route('store.stock.purchases.destroy', $first))
+        ->assertSessionHas('success');
+
+    expect(purchaseBalance($item))->toBe(40.0);
+});
+
+it('lets an exactly-balancing removal through', function () {
+    // 100 received, 100 still on the shelf: removing it lands on zero, not
+    // below it, so it is allowed. The boundary, asserted.
+    $item = purchaseItem();
+    $line = recordedPurchase($item, 100);
+
+    $this->actingAs(purchaseEditor(['store.receiving.view', 'store.delete']))
+        ->delete(route('store.stock.purchases.destroy', $line))
+        ->assertSessionHas('success');
+
+    expect(purchaseBalance($item))->toBe(0.0);
+});
+
 // --- Line scope vs delivery scope -------------------------------------------
 
 it('changes qty, price and remarks on the edited line only', function () {

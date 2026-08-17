@@ -497,8 +497,41 @@ class StockPurchaseController extends Controller
      */
     private function assertReceiptCovers(StockPurchase $purchase, float $newQty): void
     {
-        if (! $purchase->purchase_date || $purchase->purchase_date->gt(now()->endOfMonth())) {
+        $short = $this->receiptShortfall($purchase, $newQty);
+
+        if (! $short) {
             return;
+        }
+
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'qty' => $short['item'].' — this receipt cannot be reduced to '.$short['asked'].$short['uom']
+                .'. '.$short['stock'].$short['uom'].' is in stock, so the lowest it can go is '
+                .$short['lowest'].$short['uom'].'; the rest has already been issued.',
+        ]);
+    }
+
+    /**
+     * What is wrong with taking a receipt down to $newQty, or null if nothing.
+     *
+     * The arithmetic behind both the edit check and the delete check, in one
+     * place so the two cannot disagree about what "would go negative" means:
+     *
+     *     stock_as_on - old_qty + new_qty >= 0
+     *
+     * Deleting is simply the case where the new quantity is zero, so removing a
+     * receipt of 100 against which 60 has been issued is refused exactly as
+     * cutting it to 10 would be.
+     *
+     * A receipt dated beyond this month's end sits outside the window
+     * stock_as_on sums, so it is not part of the balance being protected and is
+     * left alone.
+     *
+     * @return array{item: string, uom: string, stock: string, asked: string, lowest: string}|null
+     */
+    private function receiptShortfall(StockPurchase $purchase, float $newQty): ?array
+    {
+        if (! $purchase->purchase_date || $purchase->purchase_date->gt(now()->endOfMonth())) {
+            return null;
         }
 
         $row = app(GeneralStockReportService::class)
@@ -514,28 +547,55 @@ class StockPurchaseController extends Controller
         // A whisker of tolerance, matching the import's own stock check, so a
         // stored decimal cannot refuse an exactly-balancing correction.
         if ($after >= -0.00001) {
-            return;
+            return null;
         }
 
         $format = fn ($v) => rtrim(rtrim(number_format((float) $v, 4, '.', ','), '0'), '.');
 
-        $name = $row ? $row['item']->name : 'This item';
-        $uom = $row && $row['item']->uom ? ' '.$row['item']->uom : '';
-        $lowest = (float) $purchase->qty - $stock;
-
-        throw \Illuminate\Validation\ValidationException::withMessages([
-            'qty' => $name.' — this receipt cannot be reduced to '.$format($newQty).$uom
-                .'. '.$format($stock).$uom.' is in stock, so the lowest it can go is '
-                .$format(max($lowest, 0)).$uom.'; the rest has already been issued.',
-        ]);
+        return [
+            'item' => $row ? $row['item']->name : 'This item',
+            'uom' => $row && $row['item']->uom ? ' '.$row['item']->uom : '',
+            'stock' => $format($stock),
+            'asked' => $format($newQty),
+            'lowest' => $format(max((float) $purchase->qty - $stock, 0)),
+        ];
     }
 
+    /**
+     * Remove one line of a receiving.
+     *
+     * REFUSED WHEN IT WOULD TAKE THE ITEM BELOW ZERO — the same rule Edit
+     * enforces, and the same arithmetic, because deleting a receipt is
+     * reducing it to nothing. Without this, removing a receipt of 100 against
+     * which 60 had already been issued left the balance at -60, and the screen
+     * offered no hint that it would: a correction the system refuses through
+     * one door should not be waved through the next one along.
+     *
+     * A warning rather than a validation error, because there is no field on a
+     * form to attach it to — the user pressed Remove on a table row.
+     */
     public function destroy(StockPurchase $stockPurchase)
     {
         $this->authorizeStoreDelete('stock purchase');
 
+        $short = $this->receiptShortfall($stockPurchase, 0.0);
+
+        if ($short) {
+            return back()->with('warning',
+                $short['item'].' — this receiving cannot be removed. '.$short['stock'].$short['uom']
+                .' is in stock and this receipt brought in '.$this->fmtQty($stockPurchase->qty).$short['uom']
+                .', so removing it would leave the balance below zero. Reduce it to '
+                .$short['lowest'].$short['uom'].' instead, or remove what was issued against it first.');
+        }
+
         $stockPurchase->delete();
 
         return back()->with('success', 'Purchase entry removed.');
+    }
+
+    /** A quantity as the screens write it: trimmed of trailing zeros. */
+    private function fmtQty(mixed $value): string
+    {
+        return rtrim(rtrim(number_format((float) $value, 4, '.', ','), '0'), '.');
     }
 }
