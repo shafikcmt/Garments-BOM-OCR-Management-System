@@ -764,6 +764,50 @@
         background: #eef2f7;
     }
 
+    /* A fieldset heading that is also the control that opens it.
+     *
+     * Drawn as the heading it replaces — same uppercase micro-label, same
+     * hairline rule running off to the right — so a folded section reads as one
+     * more group on the form rather than a button somebody left on it. The only
+     * additions are a chevron that turns, and a cursor. */
+    .gx-advanced-toggle {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        width: 100%;
+        padding: 0;
+        border: 0;
+        background: none;
+        font-size: .66rem;
+        font-weight: 750;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        color: #94a3b8;
+        text-align: left;
+        cursor: pointer;
+    }
+    .gx-advanced-toggle:hover { color: #64748b; }
+    .gx-advanced-toggle::after {
+        content: "";
+        flex: 1 1 auto;
+        height: 1px;
+        background: #eef2f7;
+    }
+    .gx-advanced-toggle > .bi {
+        font-size: .8rem;
+        transition: transform .15s ease;
+        flex: 0 0 auto;
+    }
+    /* Bootstrap puts .collapsed on the toggle while the panel is shut, so the
+     * chevron points down when open and right when closed without any script. */
+    .gx-advanced-toggle:not(.collapsed) > .bi { transform: rotate(90deg); }
+    .gx-advanced-toggle > .gx-edit-scope { margin-left: 0; flex: 0 0 auto; }
+    .gx-advanced-toggle:focus-visible {
+        outline: 2px solid #93c5fd;
+        outline-offset: 3px;
+        border-radius: 4px;
+    }
+
     /* --- Segmented tab strip ---------------------------------------------
      * Master Setup switches five master lists. Rendered as one control with
      * five states — a grey trough with the active tab raised on white — rather

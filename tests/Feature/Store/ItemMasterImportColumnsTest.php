@@ -42,6 +42,7 @@ it('offers one merged column in place of the three', function () {
         'Safety Stock',
         'Re-order Level',
         'Lead Time',
+        'Unit Price',
         'Remarks',
     ]);
 
@@ -52,7 +53,7 @@ it('offers one merged column in place of the three', function () {
 
 it('reads a file written to the current template', function () {
     $result = ItemMasterImport::parse(itemSheet([
-        ['Sewing Needle', 'Organ DPX17-14', 'Pkt', 'Needle', 25, '2026-08-01', '', '', 7, 'Note'],
+        ['Sewing Needle', 'Organ DPX17-14', 'Pkt', 'Needle', 25, '2026-08-01', '', '', 7, 12.5, 'Note'],
     ]));
 
     expect($result['errors'])->toBeEmpty()
@@ -67,7 +68,88 @@ it('reads a file written to the current template', function () {
         ->and($item['opening_qty'])->toBe(25.0)
         ->and($item['opening_as_on'])->toBe('2026-08-01')
         ->and($item['lead_time_days'])->toBe(7)
+        ->and($item['unit_price'])->toBe(12.5)
         ->and($item['remarks'])->toBe('Note');
+});
+
+/**
+ * Unit Price on the item master. Optional like every other number on this
+ * import, and kept as a real number — the template writes a numeric example and
+ * formats the column, so what comes back is not text that no arithmetic
+ * understands.
+ */
+it('keeps a blank Unit Price blank rather than storing zero', function () {
+    $result = ItemMasterImport::parse(itemSheet([
+        ['Sewing Needle', 'Organ', 'Pkt', 'Needle', 25, '2026-08-01', '', '', 7, '', 'Note'],
+    ]));
+
+    // Null, not 0. An item whose price is not settled is ordinary; a stored 0
+    // would read as "this costs nothing".
+    expect($result['errors'])->toBeEmpty()
+        ->and($result['items'][0]['unit_price'])->toBeNull();
+});
+
+it('refuses a Unit Price that is not a number, or is negative', function () {
+    $bad = ItemMasterImport::parse(itemSheet([
+        ['Sewing Needle', 'Organ', 'Pkt', 'Needle', 25, '2026-08-01', '', '', 7, 'about ten', 'Note'],
+    ]));
+
+    $negative = ItemMasterImport::parse(itemSheet([
+        ['Sewing Thread', 'Organ', 'Cone', 'Needle', 25, '2026-08-01', '', '', 7, -5, 'Note'],
+    ]));
+
+    expect(implode(' ', $bad['errors']))->toContain('Unit Price must be a number')
+        ->and(implode(' ', $negative['errors']))->toContain('Unit Price must be a number')
+        ->and($bad['items'])->toBeEmpty()
+        ->and($negative['items'])->toBeEmpty();
+});
+
+it('accepts the price header spellings a hand-typed file uses', function () {
+    $headings = ItemMasterImport::COLUMNS;
+    $headings[array_search('Unit Price', $headings, true)] = 'Rate';
+
+    $result = ItemMasterImport::parse([
+        $headings,
+        ['Sewing Needle', 'Organ', 'Pkt', 'Needle', 25, '2026-08-01', '', '', 7, 9.75, 'Note'],
+    ]);
+
+    expect($result['errors'])->toBeEmpty()
+        ->and($result['items'][0]['unit_price'])->toBe(9.75);
+});
+
+it('writes the template Unit Price as a formatted number, not text', function () {
+    $export = new ItemMasterTemplateExport;
+
+    $at = (int) array_search('Unit Price', ItemMasterImport::COLUMNS, true);
+
+    // The example is a real number, so Excel does not treat the column as text
+    // and turn what the user types under it into text as well.
+    expect(ItemMasterImport::SAMPLE_ROW[$at])->toBeNumeric()
+        ->and(ItemMasterImport::SAMPLE_ROW[$at])->not->toBeString();
+
+    // And the column carries a number format, over a range that covers the
+    // empty rows the user is going to fill in.
+    expect($export->columnFormats())->toBe(['J2:J1000' => '0.00']);
+});
+
+it('still reads a file that predates the Unit Price column', function () {
+    // Ten columns, no price. Headings are matched by name, so the older file
+    // simply has one the importer does not find, and every other value still
+    // lands in the right field.
+    $headings = [
+        'Item Name*', 'Brand/Specification', 'Uom*', 'Category*', 'Opening Stock',
+        'Counted On', 'Safety Stock', 'Re-order Level', 'Lead Time', 'Remarks',
+    ];
+
+    $result = ItemMasterImport::parse([
+        $headings,
+        ['Sewing Needle', 'Organ', 'Pkt', 'Needle', 25, '2026-08-01', '', '', 7, 'Note'],
+    ]);
+
+    expect($result['errors'])->toBeEmpty()
+        ->and($result['items'][0]['remarks'])->toBe('Note')
+        ->and($result['items'][0]['lead_time_days'])->toBe(7)
+        ->and($result['items'][0]['unit_price'])->toBeNull();
 });
 
 it('reads a file written to the old three-column template', function () {

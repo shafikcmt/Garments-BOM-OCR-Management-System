@@ -258,7 +258,17 @@ class StockItemController extends Controller
             // dropdowns on the Issue form.
             'item_category_id' => ['nullable', 'string', 'max:160'],
             'opening_qty' => ['nullable', 'numeric'],
-            'opening_as_on' => ['nullable', 'date', 'required_with:opening_qty'],
+            // No longer required_with:opening_qty. A quantity still needs a date
+            // to be meaningful — the Stock Report uses it to decide which months
+            // the counted figure appears in — but refusing the form was the
+            // wrong way to get one, because the answer is almost always "today"
+            // and the form now prefills exactly that. Left blank anyway, today
+            // is filled in below, which is what the bulk import has always done.
+            'opening_as_on' => ['nullable', 'date'],
+            // Optional, like every other number on this form: plenty of items
+            // are set up before a price is settled, and requiring one would
+            // block a bulk import of items priced later.
+            'unit_price' => ['nullable', 'numeric', 'min:0'],
             // Optional overrides — left blank, the Stock Report calculates
             // these from last month's consumption the way the Excel does.
             'safety_stock_qty' => ['nullable', 'numeric', 'min:0'],
@@ -267,6 +277,13 @@ class StockItemController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'remarks' => ['nullable', 'string', 'max:1000'],
         ], [], ['item_category_id' => 'category', 'brand' => 'brand/specification']);
+
+        // A counted quantity with no date would sit outside every month the
+        // report can place it, so today stands in — the same fallback
+        // ItemMasterImport applies to a blank Counted On column.
+        if (filled($data['opening_qty'] ?? null) && blank($data['opening_as_on'] ?? null)) {
+            $data['opening_as_on'] = now()->toDateString();
+        }
 
         $data['item_category_id'] = $this->resolveMasterValue(ItemCategory::class, $data['item_category_id'] ?? null);
 

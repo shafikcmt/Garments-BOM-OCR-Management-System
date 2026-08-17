@@ -22,6 +22,11 @@ class StockItem extends Model
         'item_category_id',
         'opening_qty',
         'opening_as_on',
+        // Standard price per unit. Deliberately NOT what the Stock Report's
+        // Value column reads — that takes the price off the most recent
+        // challan, as the Excel did. This is the master figure a later change
+        // can fall back to for an item that has never been received with one.
+        'unit_price',
         'safety_stock_qty',
         'reorder_level',
         'lead_time_days',
@@ -33,6 +38,7 @@ class StockItem extends Model
     protected $casts = [
         'opening_qty' => 'decimal:4',
         'opening_as_on' => 'date',
+        'unit_price' => 'decimal:4',
         'safety_stock_qty' => 'decimal:4',
         'reorder_level' => 'decimal:4',
         'lead_time_days' => 'integer',

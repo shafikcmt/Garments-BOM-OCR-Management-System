@@ -43,6 +43,11 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
         'Safety Stock',
         'Re-order Level',
         'Lead Time',
+        // Appended before Remarks. Files WITH a heading row are unaffected —
+        // headings are matched by name, not position — so only a headerless
+        // file relying on column order shifts, which the positions() map below
+        // accounts for.
+        'Unit Price',
         'Remarks',
     ];
 
@@ -68,6 +73,7 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
         'safety_stock_qty' => ['safetystock', 'safety', 'safetystocklevel'],
         'reorder_level' => ['reorderlevel', 'reorder'],
         'lead_time_days' => ['leadtime', 'leadtimedays', 'lead'],
+        'unit_price' => ['unitprice', 'price', 'rate', 'unitrate'],
         'remarks' => ['remarks', 'remark', 'note', 'notes'],
     ];
 
@@ -79,7 +85,7 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
      */
     public const SAMPLE_ROW = [
         'EXAMPLE — delete this row', 'Organ DPX17-14 FFG, chrome',
-        'Pkt', 'Needle', 25, '2026-08-01', '', '', 7, 'Optional note',
+        'Pkt', 'Needle', 25, '2026-08-01', '', '', 7, 12.5, 'Optional note',
     ];
 
     /** Item names starting with this are treated as template placeholders. */
@@ -223,6 +229,17 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
                 continue;
             }
 
+            // A number, never negative. Blank stays blank rather than becoming
+            // zero: an item whose price is not settled yet is ordinary, and a
+            // stored 0 would read as "this costs nothing" instead of "nobody
+            // has said what it costs".
+            $unitPrice = self::number($cell('unit_price'));
+            if ($unitPrice === false || ($unitPrice !== null && $unitPrice < 0)) {
+                $errors[] = 'Row '.$line.': Unit Price must be a number of 0 or more, or blank.';
+
+                continue;
+            }
+
             $seen[$key] = true;
 
             $items[] = [
@@ -241,6 +258,7 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
                 'lead_time_days' => $leadTime !== null
                     ? (int) $leadTime
                     : (int) config('stock.general_stock.default_lead_time_days', 7),
+                'unit_price' => $unitPrice,
                 'remarks' => self::text($cell('remarks'), 1000),
                 'is_active' => true,
             ];
@@ -321,7 +339,8 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
             'safety_stock_qty' => 6,
             'reorder_level' => 7,
             'lead_time_days' => 8,
-            'remarks' => 9,
+            'unit_price' => 9,
+            'remarks' => 10,
         ];
     }
 
