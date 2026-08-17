@@ -97,8 +97,15 @@ class IssueTemplateExport implements FromArray, ShouldAutoSize, WithColumnFormat
         return [$letter.'2:'.$letter.'1000' => self::DATE_FORMAT];
     }
 
-    /** The Issue Date column's letter, found by heading rather than assumed. */
-    private static function dateColumnLetter(): string
+    /**
+     * The Issue Date column's letter, found by heading rather than assumed.
+     *
+     * Public because SkippedIssueRowsExport writes the same column, in the same
+     * format, and the two must not drift apart — the skipped-rows file is
+     * re-uploaded, so a date that lands there as text is the same bug this
+     * class was fixed for.
+     */
+    public static function dateColumnLetter(): string
     {
         return Coordinate::stringFromColumnIndex(
             (int) array_search('Issue Date*', IssueImport::COLUMNS, true) + 1

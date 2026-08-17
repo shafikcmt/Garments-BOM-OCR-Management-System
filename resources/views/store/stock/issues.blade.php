@@ -110,6 +110,39 @@
         @endif
     @endforeach
 
+    {{-- The rows that did not go in, as a file to fix and upload again.
+
+         Sits under the error and skipped lists because it is what the user does
+         about them: a 754-row upload with 39 unusable rows is not something
+         anybody should have to find by reading the list above against the
+         original spreadsheet.
+
+         The count is of ROWS, which is larger than the number of complaints
+         above — a requisition is imported whole or not at all, so its clean
+         lines are in the file too. Saying so here stops the difference reading
+         as a bug. --}}
+    @if(session('import_skipped_rows'))
+        @php($skippedRowCount = session('import_skipped_row_count', count(session('import_skipped_rows'))))
+        @php($skippedRowsInFile = count(session('import_skipped_rows')))
+        <div class="alert alert-secondary d-flex flex-wrap align-items-center gap-3" role="alert">
+            <i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i>
+            <div class="flex-grow-1 small">
+                <div class="fw-semibold">{{ $skippedRowCount }} {{ $skippedRowCount === 1 ? 'row was' : 'rows were' }} not imported.</div>
+                Download them as a spreadsheet in the upload format, correct them, and upload that
+                file again. Every row of an affected requisition is included, with the reason in the
+                last column.
+                @if($skippedRowsInFile < $skippedRowCount)
+                    <span class="text-danger d-block mt-1">
+                        Only the first {{ $skippedRowsInFile }} are in the file. Correct these and upload again to see the rest.
+                    </span>
+                @endif
+            </div>
+            <a href="{{ route('store.stock.issues.skipped-rows') }}" class="btn btn-sm btn-outline-dark">
+                <i class="bi bi-download me-1" aria-hidden="true"></i>Download Skipped Rows
+            </a>
+        </div>
+    @endif
+
     {{-- Per-item stock warnings raised by the submission just saved, so a
          multi-line requisition names exactly which items need reordering. --}}
     @if(session('issue_stock_warnings'))

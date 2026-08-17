@@ -56,6 +56,17 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
  * reporting bucket that only means anything if it is one of the agreed set.
  * Neither is a name a store clerk can legitimately coin while typing a
  * requisition, which is exactly what the three header masters are.
+ *
+ * Because those two are never invented, a file WILL come back with rows in it
+ * that could not be imported, and the answer to that is the fourth thing parse()
+ * returns: `skipped_rows`, every row that did not land, in template shape, with
+ * the reason attached. SkippedIssueRowsExport turns it into a workbook the user
+ * fixes and re-uploads, rather than hunting 39 bad lines through 754.
+ *
+ * A rejected requisition contributes ALL of its rows, not only the offending
+ * one. The requisition is the unit of success, so its clean lines were not
+ * imported either; handing back only the flagged line would have the re-upload
+ * silently split one slip in two.
  */
 class IssueImport implements ToArray, WithCustomCsvSettings
 {
@@ -114,6 +125,32 @@ class IssueImport implements ToArray, WithCustomCsvSettings
         'remarks' => ['remarks', 'remark', 'note', 'notes'],
     ];
 
+    /**
+     * Which field fills each template column, for rebuilding a row in template
+     * shape after it has been read.
+     *
+     * A file may name its columns anything HEADINGS accepts and put them in any
+     * order, so a skipped row cannot be handed back by copying the source cells
+     * across — it has to be written out through this map. Month is absent
+     * because nothing reads it; SkippedIssueRowsExport derives it from the date.
+     *
+     * @var array<string, string> template column => field
+     */
+    public const COLUMN_FIELDS = [
+        'Issue Date*' => 'issue_date',
+        'Indent Section' => 'indent_section',
+        'Indent Person' => 'indent_person',
+        'Approved By' => 'approver',
+        'Requisition Number' => 'requisition_no',
+        'Item Name*' => 'item_name',
+        'Brand/Specification' => 'brand',
+        'Uom' => 'uom',
+        'Category' => 'category',
+        'Issued Qty*' => 'qty',
+        'Type' => 'type',
+        'Remarks' => 'remarks',
+    ];
+
     /** Fields without which a row cannot be read at all. */
     private const REQUIRED_HEADINGS = ['issue_date', 'item_name', 'qty'];
 
@@ -166,11 +203,11 @@ class IssueImport implements ToArray, WithCustomCsvSettings
      * Parse and validate a sheet into ready-to-write requisitions.
      *
      * @param  array<int, array<int, mixed>>  $rows
-     * @return array{requisitions: list<array<string, mixed>>, errors: list<string>, skipped: list<string>, notes: list<string>}
+     * @return array{requisitions: list<array<string, mixed>>, errors: list<string>, skipped: list<string>, notes: list<string>, skipped_rows: list<array<string, mixed>>}
      */
     public static function parse(array $rows): array
     {
-        $blank = ['requisitions' => [], 'errors' => [], 'skipped' => [], 'notes' => []];
+        $blank = ['requisitions' => [], 'errors' => [], 'skipped' => [], 'notes' => [], 'skipped_rows' => []];
 
         [$headerIndex, $map] = self::locateHeader($rows);
 
@@ -268,14 +305,30 @@ class IssueImport implements ToArray, WithCustomCsvSettings
                     'lines' => [],
                     'errors' => [],
                     'notes' => [],
+                    'rows' => [],
                 ];
             }
 
             $group = &$groups[$groupKey];
             $group['last_line'] = $line;
 
+            // The row kept in template shape, before any of the checks below can
+            // reject it. Held on the GROUP rather than in a flat list because a
+            // requisition is accepted or refused whole — see settle(), which
+            // takes either all of a group's rows or none.
+            $group['rows'][] = [
+                'line' => $line,
+                'date' => is_string($issueDate) ? $issueDate : null,
+                'values' => self::rowValues($cell),
+                'reason' => null,
+            ];
+
+            // Which of this group's rows the checks below are talking about.
+            $at = array_key_last($group['rows']);
+
             if ($issueDate === false) {
                 $group['errors'][] = 'Row '.$line.': Issue Date is not a valid date. Use YYYY-MM-DD.';
+                $group['rows'][$at]['reason'] = 'Issue Date is not a valid date. Use YYYY-MM-DD.';
                 unset($group);
 
                 continue;
@@ -283,6 +336,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
 
             if ($issueDate === null) {
                 $group['errors'][] = 'Row '.$line.': Issue Date is required.';
+                $group['rows'][$at]['reason'] = 'Issue Date is required.';
                 unset($group);
 
                 continue;
@@ -314,6 +368,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
                 // item invented from a typo would carry no uom, category or
                 // safety level and would appear in the Stock Report as real.
                 $group['errors'][] = 'Row '.$line.': "'.$itemName.'" is not in the item master. Add it under Items first, or correct the spelling.';
+                $group['rows'][$at]['reason'] = 'Item not in item master. Add it under Items first, or correct the spelling.';
                 unset($group);
 
                 continue;
@@ -323,6 +378,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
 
             if ($qty === false) {
                 $group['errors'][] = 'Row '.$line.': Issued Qty must be a number.';
+                $group['rows'][$at]['reason'] = 'Issued Qty must be a number.';
                 unset($group);
 
                 continue;
@@ -330,6 +386,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
 
             if ($qty === null || $qty <= 0) {
                 $group['errors'][] = 'Row '.$line.': Issued Qty must be greater than zero ("'.$itemName.'").';
+                $group['rows'][$at]['reason'] = 'Issued Qty must be greater than zero.';
                 unset($group);
 
                 continue;
@@ -350,6 +407,7 @@ class IssueImport implements ToArray, WithCustomCsvSettings
 
                 if ($categoryId === null) {
                     $group['errors'][] = 'Row '.$line.': "'.$categoryName.'" is not in the Category list. Add it under Issue Setup first, or correct the spelling.';
+                    $group['rows'][$at]['reason'] = 'Category not in the Category list. Add it under Issue Setup first, or correct the spelling.';
                     unset($group);
 
                     continue;
@@ -370,6 +428,8 @@ class IssueImport implements ToArray, WithCustomCsvSettings
 
                 if ($matched === null) {
                     $group['errors'][] = 'Row '.$line.': Type must be '
+                        .implode(' or ', StockIssue::REQUISITION_TYPES).', or blank.';
+                    $group['rows'][$at]['reason'] = 'Type must be '
                         .implode(' or ', StockIssue::REQUISITION_TYPES).', or blank.';
                     unset($group);
 
@@ -437,13 +497,14 @@ class IssueImport implements ToArray, WithCustomCsvSettings
      * @param  array<string, array<string, mixed>>  $groups
      * @param  array<string, true>  $alreadyRecorded
      * @param  list<string>  $skipped
-     * @return array{requisitions: list<array<string, mixed>>, errors: list<string>, skipped: list<string>, notes: list<string>}
+     * @return array{requisitions: list<array<string, mixed>>, errors: list<string>, skipped: list<string>, notes: list<string>, skipped_rows: list<array<string, mixed>>}
      */
     private static function settle(array $groups, array $alreadyRecorded, array $skipped): array
     {
         $requisitions = [];
         $errors = [];
         $notes = [];
+        $skippedRows = [];
 
         // Only groups that are otherwise sound can consume stock, so the
         // balance is read for their items alone.
@@ -476,6 +537,8 @@ class IssueImport implements ToArray, WithCustomCsvSettings
                     $errors[] = '   '.$message;
                 }
 
+                self::collectSkippedRows($skippedRows, $group);
+
                 continue;
             }
 
@@ -499,6 +562,12 @@ class IssueImport implements ToArray, WithCustomCsvSettings
 
             if (isset($alreadyRecorded[$recordedKey])) {
                 $skipped[] = $label.' is already recorded in Issue History and was skipped.';
+
+                // Included in the download alongside the genuine errors, so one
+                // file accounts for everything that did not go in. Re-uploading
+                // these will correctly skip them again — the Reason column says
+                // so, and they are here to be read, not to be fixed.
+                self::collectSkippedRows($skippedRows, $group, 'Already recorded in Issue History.');
 
                 continue;
             }
@@ -537,6 +606,15 @@ class IssueImport implements ToArray, WithCustomCsvSettings
                     $errors[] = $message;
                 }
 
+                // The shortfall is a property of the requisition as a whole, so
+                // every row of it carries the same reason — trimmed of the
+                // indent the on-screen list uses.
+                self::collectSkippedRows(
+                    $skippedRows,
+                    $group,
+                    'Not enough stock. '.implode(' ', array_map('trim', $shortfalls))
+                );
+
                 continue;
             }
 
@@ -559,7 +637,56 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             ];
         }
 
-        return ['requisitions' => $requisitions, 'errors' => $errors, 'skipped' => $skipped, 'notes' => $notes];
+        // File order, not group order: the user is going to read this next to
+        // the original spreadsheet.
+        usort($skippedRows, fn ($a, $b) => $a['line'] <=> $b['line']);
+
+        return [
+            'requisitions' => $requisitions,
+            'errors' => $errors,
+            'skipped' => $skipped,
+            'notes' => $notes,
+            'skipped_rows' => $skippedRows,
+        ];
+    }
+
+    /**
+     * Add every row of a requisition that did not land to the download set.
+     *
+     * ALL of them, including the ones nothing was wrong with: the requisition
+     * is the unit of success, so a clean line under a rejected one was not
+     * imported either. Handing back only the flagged line would have the
+     * re-upload record half a slip and leave the rest missing for good.
+     *
+     * Rows without a fault of their own are told whose fault it was, so the
+     * user knows which line to actually look at.
+     *
+     * @param  list<array<string, mixed>>  $into  collected in place
+     * @param  array<string, mixed>  $group
+     * @param  string|null  $reason  applied to every row; null keeps each row's own
+     */
+    private static function collectSkippedRows(array &$into, array $group, ?string $reason = null): void
+    {
+        // Which line to point the blameless rows at — the first that actually
+        // failed, since that is the one the user has to correct.
+        $culprit = null;
+
+        foreach ($group['rows'] as $row) {
+            if ($row['reason'] !== null) {
+                $culprit = $row['line'];
+                break;
+            }
+        }
+
+        foreach ($group['rows'] as $row) {
+            $row['reason'] = $reason
+                ?? $row['reason']
+                ?? ($culprit !== null
+                    ? 'Not imported because row '.$culprit.' of the same requisition was rejected.'
+                    : 'Not imported.');
+
+            $into[] = $row;
+        }
     }
 
     /**
@@ -806,6 +933,37 @@ class IssueImport implements ToArray, WithCustomCsvSettings
         }
 
         return $notes;
+    }
+
+    /**
+     * One source row rewritten in template shape, so a skipped row can be
+     * handed back as a file the importer will read again.
+     *
+     * Written through COLUMN_FIELDS rather than copied cell for cell: the file
+     * being read may have used legacy headings, or ordered its columns
+     * differently, and what comes back has to be in the template's order under
+     * the template's names or the second upload is a fresh guessing game.
+     *
+     * Values are taken RAW, exactly as typed. This is the one place that must
+     * not tidy anything — the user is about to look at these cells to work out
+     * what was wrong with them, and a corrected copy of a typo hides it.
+     *
+     * @param  callable(string): mixed  $cell
+     * @return array<int, mixed> indexed by position in COLUMNS
+     */
+    private static function rowValues(callable $cell): array
+    {
+        $values = array_fill(0, count(self::COLUMNS), null);
+
+        foreach (self::COLUMN_FIELDS as $heading => $field) {
+            $index = array_search($heading, self::COLUMNS, true);
+
+            if ($index !== false) {
+                $values[$index] = $cell($field);
+            }
+        }
+
+        return $values;
     }
 
     /** A master name reduced to what identifies it: case- and spacing-blind. */

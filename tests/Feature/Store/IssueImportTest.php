@@ -1,6 +1,7 @@
 <?php
 
 use App\Exports\IssueTemplateExport;
+use App\Exports\SkippedIssueRowsExport;
 use App\Imports\IssueImport;
 use App\Models\IndentPerson;
 use App\Models\IndentSection;
@@ -870,6 +871,388 @@ it('uploading the same file twice through the screen issues nothing extra', func
     // Nothing added, nothing issued twice.
     expect(StockIssue::count())->toBe(1)
         ->and((float) StockIssue::sum('qty'))->toBe(12.0);
+});
+
+/**
+ * The skipped-rows download: the rows an import could not take, handed back in
+ * the upload's own format so they can be fixed and uploaded again.
+ *
+ * The load-bearing guarantee is the ROUND TRIP — this file's whole purpose is
+ * to be re-uploaded, so the tests that matter most are the ones that read it
+ * back in rather than the ones that inspect its cells.
+ */
+it('hands back every row of a rejected requisition, not only the faulty one', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    $result = IssueImport::parse(issueSheet([
+        // One requisition, three lines, one of them unknown. All three were
+        // refused, so all three have to come back — re-uploading only the bad
+        // line would record a third of a slip.
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1',
+            'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 5]),
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1',
+            'Item Name*' => 'Ghost Item', 'Issued Qty*' => 2]),
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1',
+            'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 1]),
+    ]));
+
+    expect($result['requisitions'])->toBeEmpty()
+        ->and($result['skipped_rows'])->toHaveCount(3);
+
+    $reasons = array_column($result['skipped_rows'], 'reason');
+
+    // The offending line says what is wrong with it; the other two are told
+    // which line to go and look at.
+    expect($reasons[1])->toContain('Item not in item master')
+        ->and($reasons[0])->toContain('row 3 of the same requisition was rejected')
+        ->and($reasons[2])->toContain('row 3 of the same requisition was rejected');
+
+    // In file order, whatever order the groups were settled in.
+    expect(array_column($result['skipped_rows'], 'line'))->toBe([2, 3, 4]);
+});
+
+it('leaves an imported requisition out of the skipped rows entirely', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    $result = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'GOOD',
+            'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 5]),
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'BAD',
+            'Item Name*' => 'Ghost Item', 'Issued Qty*' => 5]),
+    ]));
+
+    expect($result['requisitions'])->toHaveCount(1)
+        ->and($result['skipped_rows'])->toHaveCount(1)
+        ->and($result['skipped_rows'][0]['line'])->toBe(3);
+});
+
+it('includes duplicates and shortfalls, each saying which it is', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+    IndentSection::create(['name' => 'Cutting']);
+
+    // Recorded first, so the same requisition comes back as a duplicate.
+    $recorded = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'OLD',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 60]),
+    ]));
+
+    recordParsed($recorded['requisitions']);
+
+    $result = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Requisition Number' => 'OLD',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 60]),
+        // 100 in stock, 60 already gone: this cannot be afforded.
+        issueRow(['Issue Date*' => '2026-08-02', 'Requisition Number' => 'TOO-BIG',
+            'Indent Section' => 'Cutting', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 90]),
+    ]));
+
+    expect($result['skipped_rows'])->toHaveCount(2);
+
+    $reasons = array_column($result['skipped_rows'], 'reason');
+
+    expect($reasons[0])->toBe('Already recorded in Issue History.')
+        ->and($reasons[1])->toContain('Not enough stock')
+        ->and($reasons[1])->toContain('Sewing Needle');
+});
+
+it('keeps the template example row out of the skipped rows', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    $result = IssueImport::parse(issueSheet([
+        IssueImport::SAMPLE_ROW,
+        issueRow(['Issue Date*' => '2026-08-01', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 1]),
+    ]));
+
+    // Reported on screen as skipped, but never offered back for re-upload:
+    // it is placeholder junk, not something to fix.
+    expect(implode(' ', $result['skipped']))->toContain('example row was ignored')
+        ->and($result['skipped_rows'])->toBeEmpty();
+});
+
+it('rewrites a skipped row under the template headings whatever the file used', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    // A legacy workbook: its own heading spellings, and only some of the
+    // columns. What comes back must still be in template shape.
+    $headings = ['Date', 'Particulars', 'Qty', 'Department'];
+
+    $result = IssueImport::parse([
+        $headings,
+        ['2026-08-01', 'Ghost Item', 4, 'Cutting'],
+    ]);
+
+    expect($result['skipped_rows'])->toHaveCount(1);
+
+    $values = $result['skipped_rows'][0]['values'];
+    $at = fn (string $h) => array_search($h, IssueImport::COLUMNS, true);
+
+    expect($values)->toHaveCount(count(IssueImport::COLUMNS))
+        ->and($values[$at('Item Name*')])->toBe('Ghost Item')
+        ->and($values[$at('Issued Qty*')])->toBe(4)
+        ->and($values[$at('Indent Section')])->toBe('Cutting')
+        ->and($values[$at('Remarks')])->toBeNull();
+});
+
+it('writes the skipped-rows file as the template plus a reason column', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    $result = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Item Name*' => 'Ghost Item', 'Issued Qty*' => 3]),
+    ]));
+
+    $export = new SkippedIssueRowsExport($result['skipped_rows']);
+
+    // Same columns as the upload template, in the same order, with the reason
+    // APPENDED — so the importer, which maps by name, simply ignores it and the
+    // user need not delete it before uploading.
+    expect($export->headings())->toBe([...IssueImport::COLUMNS, 'Reason Skipped']);
+
+    [$row] = $export->array();
+    $at = fn (string $h) => array_search($h, IssueImport::COLUMNS, true);
+
+    expect($row)->toHaveCount(count(IssueImport::COLUMNS) + 1)
+        ->and(end($row))->toContain('Item not in item master')
+        ->and($row[$at('Item Name*')])->toBe('Ghost Item');
+
+    // The date is a real Excel value carrying the template's own format, not
+    // text — this file exists to be re-uploaded, and text dates are the exact
+    // bug the template was fixed for.
+    expect($row[$at('Issue Date*')])->toBeNumeric()
+        ->and(Date::excelToDateTimeObject((float) $row[$at('Issue Date*')])->format('Y-m-d'))->toBe('2026-08-01')
+        ->and($row[$at('Month')])->toBe('=TEXT(A2,"MMM-YY")')
+        ->and($export->columnFormats())->toBe(['A2:A2' => IssueTemplateExport::DATE_FORMAT]);
+});
+
+it('leaves an unreadable date exactly as the user typed it', function () {
+    issueItem();
+
+    $result = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => 'not a date', 'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 1]),
+    ]));
+
+    [$row] = (new SkippedIssueRowsExport($result['skipped_rows']))->array();
+    $at = fn (string $h) => array_search($h, IssueImport::COLUMNS, true);
+
+    // Not blanked and not guessed at: that cell is the fault, and the user has
+    // to be able to see what they wrote to correct it.
+    expect($row[$at('Issue Date*')])->toBe('not a date')
+        ->and(end($row))->toContain('Issue Date is not a valid date');
+});
+
+it('offers the skipped rows for download after an import, and not before', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    Permission::findOrCreate('store.issues.view', 'web');
+    Permission::findOrCreate('store.issues.create', 'web');
+
+    $user = User::factory()->create(['status' => 1]);
+    $user->givePermissionTo(['store.issues.view', 'store.issues.create']);
+
+    // Nothing imported yet, so nothing to hand back.
+    $this->actingAs($user)
+        ->get(route('store.stock.issues.skipped-rows'))
+        ->assertRedirect()
+        ->assertSessionHas('warning');
+
+    $csv = implode(',', IssueImport::COLUMNS)."\n"
+        .implode(',', issueRow([
+            'Issue Date*' => '2026-08-01', 'Requisition Number' => 'GOOD',
+            'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 5,
+        ]))."\n"
+        .implode(',', issueRow([
+            'Issue Date*' => '2026-08-01', 'Requisition Number' => 'BAD',
+            'Item Name*' => 'Ghost Item', 'Issued Qty*' => 5,
+        ]))."\n";
+
+    $page = $this->actingAs($user)
+        ->from(route('store.stock.issues.index'))
+        ->post(
+            route('store.stock.issues.import'),
+            ['file' => UploadedFile::fake()->createWithContent('issues.csv', $csv)]
+        )
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    // The good one went in; the bad one is waiting to be downloaded.
+    expect(StockIssue::count())->toBe(1)
+        ->and(session('import_skipped_rows'))->toHaveCount(1)
+        ->and(session('import_skipped_row_count'))->toBe(1);
+
+    // And the screen the user lands on offers it, with a visible label rather
+    // than a bare icon.
+    $this->actingAs($user)->get($page->headers->get('Location'))
+        ->assertOk()
+        ->assertSee('1 row was not imported.')
+        ->assertSee('Download Skipped Rows')
+        ->assertSee(route('store.stock.issues.skipped-rows'), false);
+
+    $this->actingAs($user)
+        ->get(route('store.stock.issues.skipped-rows'))
+        ->assertOk()
+        ->assertDownload();
+
+    // A clean import clears it, so a stale file is never offered.
+    $clean = implode(',', IssueImport::COLUMNS)."\n"
+        .implode(',', issueRow([
+            'Issue Date*' => '2026-08-05', 'Requisition Number' => 'CLEAN',
+            'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 1,
+        ]))."\n";
+
+    $this->actingAs($user)->post(
+        route('store.stock.issues.import'),
+        ['file' => UploadedFile::fake()->createWithContent('clean.csv', $clean)]
+    )->assertRedirect();
+
+    expect(session('import_skipped_rows'))->toBeNull();
+});
+
+it('needs the create right to download the skipped rows', function () {
+    Permission::findOrCreate('store.issues.view', 'web');
+    Permission::findOrCreate('store.issues.create', 'web');
+
+    $viewer = User::factory()->create(['status' => 1]);
+    $viewer->givePermissionTo('store.issues.view');
+
+    $this->actingAs($viewer)
+        ->get(route('store.stock.issues.skipped-rows'))
+        ->assertForbidden();
+});
+
+/**
+ * The round trip, end to end, and the reason this feature exists: fix the
+ * downloaded file, upload it, and the rows land — WITHOUT the Issue Setup
+ * entries the first pass created being created a second time.
+ *
+ * That last part is the risk worth asserting. The first import auto-creates
+ * Section, Person and Approver from names the file introduced; the download
+ * carries those same names back out, and the re-upload looks them up again. If
+ * the normalised matching did not hold, every skipped-rows re-upload would
+ * quietly double the Issue Setup lists.
+ */
+it('re-imports a fixed skipped-rows file without duplicating Issue Setup entries', function () {
+    $needle = issueItem();
+    stockOnHand($needle, 200);
+
+    // Nothing in Issue Setup to begin with: the file introduces all three.
+    expect(IndentSection::count())->toBe(0)
+        ->and(IndentPerson::count())->toBe(0)
+        ->and(IssueApprover::count())->toBe(0);
+
+    $header = [
+        'Indent Section' => 'Finishing-2',
+        'Indent Person' => 'Mr. Niranjan- Quality Inspection',
+        'Approved By' => 'Md. Rasel (Store In-charge)',
+    ];
+
+    // Pass one: one requisition imports, one is rejected for an unknown item.
+    $first = IssueImport::parse(issueSheet([
+        issueRow($header + ['Issue Date*' => '2026-08-01', 'Requisition Number' => 'REQ-1',
+            'Item Name*' => 'Sewing Needle', 'Issued Qty*' => 5]),
+        issueRow($header + ['Issue Date*' => '2026-08-02', 'Requisition Number' => 'REQ-2',
+            'Item Name*' => 'Sewing Neddle', 'Issued Qty*' => 7]),
+    ]));
+
+    recordParsed($first['requisitions']);
+
+    expect($first['requisitions'])->toHaveCount(1)
+        ->and($first['skipped_rows'])->toHaveCount(1);
+
+    // The three masters exist now, created by that first pass.
+    expect(IndentSection::count())->toBe(1)
+        ->and(IndentPerson::count())->toBe(1)
+        ->and(IssueApprover::count())->toBe(1);
+
+    $sectionId = IndentSection::first()->id;
+    $personId = IndentPerson::first()->id;
+    $approverId = IssueApprover::first()->id;
+
+    // The downloaded file, read back exactly as Excel would hand it over.
+    $download = (new SkippedIssueRowsExport($first['skipped_rows']))->array();
+    $sheet = array_merge(
+        [[...IssueImport::COLUMNS, SkippedIssueRowsExport::REASON_COLUMN]],
+        $download
+    );
+
+    $at = fn (string $h) => array_search($h, IssueImport::COLUMNS, true);
+
+    // The fix the user makes: correct the typo that caused the skip.
+    expect($sheet[1][$at('Item Name*')])->toBe('Sewing Neddle');
+    $sheet[1][$at('Item Name*')] = 'Sewing Needle';
+
+    // The Month cell is a formula in the file; Excel hands over its VALUE.
+    $sheet[1][$at('Month')] = 'Aug-26';
+
+    $second = IssueImport::parse($sheet);
+
+    // It imports, on the date the serial carried — the round trip's whole point.
+    expect($second['errors'])->toBe([])
+        ->and($second['requisitions'])->toHaveCount(1)
+        ->and($second['requisitions'][0]['issue_date'])->toBe('2026-08-02')
+        ->and($second['requisitions'][0]['requisition_no'])->toBe('REQ-2')
+        ->and($second['skipped_rows'])->toBeEmpty();
+
+    // THE CHECK THAT MATTERS: the same three masters, matched, not remade.
+    expect(IndentSection::count())->toBe(1)
+        ->and(IndentPerson::count())->toBe(1)
+        ->and(IssueApprover::count())->toBe(1)
+        ->and($second['requisitions'][0]['indent_section_id'])->toBe($sectionId)
+        ->and($second['requisitions'][0]['indent_person_id'])->toBe($personId)
+        ->and($second['requisitions'][0]['issue_approver_id'])->toBe($approverId);
+
+    // ...and the second pass claims to have created nothing.
+    expect(implode(' ', $second['notes']))->not->toContain('added to Issue Setup');
+
+    recordParsed($second['requisitions']);
+
+    // Both requisitions are now recorded, each exactly once.
+    expect(StockIssue::count())->toBe(2)
+        ->and((float) StockIssue::sum('qty'))->toBe(12.0);
+});
+
+it('creates a master only for a name the user genuinely changed while fixing the file', function () {
+    // The other half of the rule: matching must not be so eager that a real
+    // correction is swallowed into the wrong entry.
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    $first = IssueImport::parse(issueSheet([
+        issueRow(['Issue Date*' => '2026-08-01', 'Indent Section' => 'Finishing-2',
+            'Item Name*' => 'Ghost Item', 'Issued Qty*' => 1]),
+    ]));
+
+    expect(IndentSection::count())->toBe(1)
+        ->and($first['skipped_rows'])->toHaveCount(1);
+
+    $sheet = array_merge(
+        [[...IssueImport::COLUMNS, SkippedIssueRowsExport::REASON_COLUMN]],
+        (new SkippedIssueRowsExport($first['skipped_rows']))->array()
+    );
+
+    $at = fn (string $h) => array_search($h, IssueImport::COLUMNS, true);
+
+    $sheet[1][$at('Item Name*')] = 'Sewing Needle';
+    // Case and spacing differ — the same section, so no second row.
+    $sheet[1][$at('Indent Section')] = '  finishing-2 ';
+
+    IssueImport::parse($sheet);
+
+    expect(IndentSection::count())->toBe(1);
+
+    // A genuinely different name, though, is a genuinely new section.
+    $sheet[1][$at('Indent Section')] = 'Finishing-3';
+    $sheet[1][$at('Requisition Number')] = 'REQ-NEW';
+
+    IssueImport::parse($sheet);
+
+    expect(IndentSection::count())->toBe(2)
+        ->and(IndentSection::where('name', 'Finishing-3')->exists())->toBeTrue();
 });
 
 it('records imported issues through the controller, scoped by permission', function () {

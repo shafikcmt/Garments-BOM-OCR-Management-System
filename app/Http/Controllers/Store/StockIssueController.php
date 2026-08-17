@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Http\Controllers\Concerns\ResolvesIssueSetupMasters;
 use App\Exports\IssueTemplateExport;
+use App\Exports\SkippedIssueRowsExport;
 use App\Imports\IssueImport;
 use App\Models\IndentPerson;
 use App\Models\IndentSection;
@@ -244,7 +245,10 @@ class StockIssueController extends Controller
             'errors' => $errors,
             'skipped' => $skipped,
             'notes' => $notes,
+            'skipped_rows' => $skippedRows,
         ] = IssueImport::parse($sheets[0] ?? []);
+
+        $this->holdSkippedRows($skippedRows);
 
         if (empty($requisitions)) {
             return back()
@@ -303,6 +307,67 @@ class StockIssueController extends Controller
             ->with('import_errors', $errors)
             ->with('import_skipped', $skipped)
             ->with('import_notes', $notes);
+    }
+
+    /**
+     * How many skipped rows are kept for the download.
+     *
+     * A bound rather than a business rule. The rows live in the session, whose
+     * driver is the database, and the whole payload is read and written on
+     * every subsequent request — so a pathological file where nothing at all
+     * imports must not leave a quarter of a megabyte riding on each page load.
+     * A real file is nowhere near this: the 754-row upload this was built for
+     * skipped 39.
+     */
+    private const SKIPPED_ROW_LIMIT = 500;
+
+    /**
+     * Keep the rows an import could not take, for the download button on the
+     * screen the user is about to be redirected to.
+     *
+     * put() rather than flash(): the download is a separate request made AFTER
+     * the page has rendered, which is one request too late for flash data. It
+     * is overwritten by the next import and cleared when an import skips
+     * nothing, so at most one file's worth is ever held.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function holdSkippedRows(array $rows): void
+    {
+        if (empty($rows)) {
+            session()->forget(['import_skipped_rows', 'import_skipped_row_count']);
+
+            return;
+        }
+
+        session()->put('import_skipped_rows', array_slice($rows, 0, self::SKIPPED_ROW_LIMIT));
+
+        // The true count, kept separately, so the screen can say when the file
+        // holds fewer rows than were actually skipped.
+        session()->put('import_skipped_row_count', count($rows));
+    }
+
+    /**
+     * Download the rows the last import could not take, as a workbook in the
+     * template's own format.
+     *
+     * The point is the round trip: fix the rows in this file, upload this file.
+     * It carries every row of every requisition that did not land — not only
+     * the faulty lines — because a requisition is imported whole or not at all,
+     * so re-uploading a fragment of one would record half a slip.
+     */
+    public function skippedRows()
+    {
+        $rows = session('import_skipped_rows', []);
+
+        if (empty($rows)) {
+            return back()->with('warning', 'There are no skipped rows to download. Please run the import again.');
+        }
+
+        return Excel::download(
+            new SkippedIssueRowsExport($rows),
+            'Issue-Skipped-Rows-'.now()->format('Y-m-d-Hi').'.xlsx'
+        );
     }
 
     /**

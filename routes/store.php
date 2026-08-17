@@ -273,6 +273,11 @@ Route::prefix('store')
             // is issuing.
             Route::get('/issues/template', [StockIssueController::class, 'template'])->name('issues.template');
             Route::post('/issues/import', [StockIssueController::class, 'import'])->middleware($act('store.issues.create'))->name('issues.import');
+            // The rows the last import could not take, to fix and upload again.
+            // Guarded with create rather than view: it is held in the importing
+            // user's own session and is only reachable by whoever just ran the
+            // import that produced it.
+            Route::get('/issues/import/skipped-rows', [StockIssueController::class, 'skippedRows'])->middleware($act('store.issues.create'))->name('issues.skipped-rows');
             Route::delete('/issues/{stockIssue}', [StockIssueController::class, 'destroy'])->name('issues.destroy');
             });
 
