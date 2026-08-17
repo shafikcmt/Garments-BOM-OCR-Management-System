@@ -513,14 +513,14 @@
                                              the flat store.edit / store.delete); the
                                              controller enforces the same checks
                                              server-side. --}}
-                                        <td class="text-end gx-stock-actions">
+                                        <td class="text-end gx-stock-actions gx-row-actions">
                                             @if($canEdit)
                                                 <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editIssue{{ $i->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
                                             @endif
                                             @if($canDelete)
-                                                <form method="POST" action="{{ route('store.stock.issues.destroy', $i) }}" onsubmit="return confirm('Remove this issue?');">
+                                                <form method="POST" action="{{ route('store.stock.issues.destroy', $i) }}" class="d-inline" onsubmit="return confirm('Remove this issue?');">
                                                     @csrf @method('DELETE')
-                                                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                                 </form>
                                             @endif
                                             @if(! $canEdit && ! $canDelete)

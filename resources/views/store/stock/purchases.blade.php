@@ -350,7 +350,7 @@
                                                                  the controller enforces the same checks
                                                                  server-side. Both act on this one line,
                                                                  not the whole receiving. --}}
-                                                            <td class="text-end gx-stock-actions">
+                                                            <td class="text-end gx-stock-actions gx-row-actions">
                                                                 @if($canEdit)
                                                                     <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPurchase{{ $line->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
                                                                 @endif

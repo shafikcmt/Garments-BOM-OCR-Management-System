@@ -139,6 +139,27 @@ it('hides the Edit button from a user who cannot use it', function () {
         ->assertSee('>Edit', false);
 });
 
+it('lays the row actions out side by side, not stacked', function () {
+    // A <form> is display:block, so the Delete form sitting next to the Edit
+    // button pushed itself onto a second line and doubled every row's height.
+    // Asserted rather than left to the eye: it is invisible in a diff and it
+    // came back once already.
+    $item = editableItem();
+    editStockOnHand($item, 100);
+    recordedIssue($item, 10);
+
+    $html = $this->actingAs(issueEditor(['store.issues.view', 'store.edit', 'store.delete']))
+        ->get(route('store.stock.issues.index'))
+        ->assertOk()
+        ->getContent();
+
+    // The delete form is laid out inline...
+    expect($html)->toContain('class="d-inline"');
+
+    // ...and the cell opts into the compact history-row action sizing.
+    expect($html)->toContain('gx-stock-actions gx-row-actions');
+});
+
 // --- The balance rule -------------------------------------------------------
 
 it('lets an edit raise a quantity when the stock is genuinely there', function () {

@@ -418,9 +418,29 @@
        the last input cannot land on a destructive button. */
     .gx-stock-table td.gx-stock-actions,
     .gx-stock-table th.gx-stock-actions { padding-left: 1.25rem; white-space: nowrap; }
-    .gx-stock-table td.gx-stock-actions .btn + .btn,
-    .gx-stock-table td.gx-stock-actions .btn + form,
-    .gx-stock-table td.gx-stock-actions form + form { margin-left: .4rem; }
+
+    /* Spacing between the actions in a cell.
+     *
+     * Was three sibling-margin rules — .btn + .btn, .btn + form, form + form —
+     * which is a list of the shapes an action was expected to take, and a list
+     * like that is only ever one entry short. A DELETE action is a whole <form>
+     * (it needs a CSRF token and a method override), so an Edit button beside
+     * one is a button next to a BLOCK element: the two stacked vertically and
+     * the row grew to two button-heights. The margin rule meant to separate
+     * them never applied, because it was written for a form the screen had
+     * remembered to mark `d-inline` and this one had not.
+     *
+     * Both halves are fixed here rather than on each screen. The form is laid
+     * out inline whether or not anybody remembers the class, and the gap is a
+     * universal adjacent-sibling rule that does not care what shape the actions
+     * are. Deliberately NOT display:flex on the cell — that would take the td
+     * out of table layout, and this rule covers every General Stock table. */
+    .gx-stock-table td.gx-stock-actions > form {
+        display: inline-block;
+        margin: 0;
+        vertical-align: middle;
+    }
+    .gx-stock-table td.gx-stock-actions > * + * { margin-left: .4rem; }
 
     /* Row actions — View / Edit / Delete — are pills, so they read as a set and
        never as the table's own borders. Every screen was writing this as
@@ -439,6 +459,35 @@
         padding-left: .85rem !important;
         padding-right: .85rem !important;
     }
+
+    /* Row actions on the two HISTORY tables — Issue History and the item lines
+     * inside a receiving. Same pill, one size down.
+     *
+     * Those two are the densest tables in the section: nine and seven columns
+     * of .small text, twenty-five rows to a page. A pill sized for the Item
+     * Master's roomier rows reads as the heaviest thing on the row there, and
+     * two of them per row set the row height, which is what made the table feel
+     * bottom-heavy against its own pagination.
+     *
+     * An opt-in class on those cells, not a change to the shared pill: Item
+     * Master, Issue Setup and Purchase Setup are not dense and are left alone. */
+    .content .gx-stock-scope td.gx-row-actions :is(a, button).btn:has(> i.bi),
+    .content .gx-stock-scope td.gx-row-actions :is(a, button).btn {
+        padding-left: .7rem !important;
+        padding-right: .7rem !important;
+        padding-top: .2rem !important;
+        padding-bottom: .2rem !important;
+        font-size: .75rem;
+        line-height: 1.35;
+    }
+    /* The icon shrinks with the label rather than staying at its own size and
+     * becoming the loudest part of a smaller button. */
+    .content .gx-stock-scope td.gx-row-actions .btn > i.bi {
+        font-size: .8em;
+        margin-right: .3rem !important;
+    }
+    /* Tighter than the .4rem the roomier tables use, in proportion. */
+    .gx-stock-table td.gx-row-actions > * + * { margin-left: .3rem; }
 
     /* --- Item line grid --------------------------------------------------
      * The editable table inside Record Receiving and Record Issue. Both screens
