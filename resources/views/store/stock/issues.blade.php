@@ -227,6 +227,11 @@
                              consumption report are unchanged. --}}
                         <form method="POST" action="{{ route('store.stock.issues.store') }}" id="issueForm">
                             @csrf
+                            {{-- Which draft this form came from, so saving again
+                                 updates it instead of leaving a second copy, and
+                                 recording it for real clears it away. Empty on a
+                                 form that was not resumed. --}}
+                            <input type="hidden" name="draft_id" value="{{ old('draft_id') }}">
 
                             <div class="row g-3 mb-4">
                                 <div class="col-6 col-md-3 col-xl-2">
@@ -380,7 +385,19 @@
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Record Issue
                                 </button>
-                                <p class="gx-stock-help" style="max-width:640px;">
+                                {{-- Same form, a different action. formaction
+                                     sends this one press to the draft endpoint,
+                                     and formnovalidate lets a half-filled form
+                                     through — which is the entire point, since
+                                     a draft exists because somebody was
+                                     interrupted. Nothing on that path writes
+                                     stock. --}}
+                                <button type="submit" class="btn btn-outline-secondary"
+                                        formaction="{{ route('store.stock.issues.drafts.save') }}"
+                                        formnovalidate>
+                                    <i class="bi bi-bookmark me-1" aria-hidden="true"></i>Save Draft
+                                </button>
+                                <p class="gx-stock-help" style="max-width:600px;">
                                     Section, Person and Approved By accept a new value — type it in and it is saved to the list
                                     for next time. Each item line is recorded as its own issue under this requisition.
                                 </p>
@@ -488,6 +505,69 @@
                 </div>
             </div>
         </div>
+
+        {{-- Half-finished forms, this user's own.
+
+             Between the form and the history on purpose: it belongs to the act
+             of recording an issue, not to the record of ones already made. Only
+             rendered when there is something in it, so the screen is unchanged
+             for anybody who has never saved one.
+
+             A draft is NOT an issue. Nothing here has touched stock, and the
+             wording says so — these are forms, described by what was typed into
+             them, not by a requisition number they do not own yet. --}}
+        @if($drafts->isNotEmpty())
+            <div class="col-12">
+                <div class="card gx-stock-card">
+                    <div class="gx-stock-card-body">
+                        <div class="gx-stock-card-head">
+                            <h5>Saved Drafts <span class="badge bg-secondary-subtle text-secondary ms-1">{{ $drafts->count() }}</span></h5>
+                        </div>
+                        <p class="gx-edit-hint mt-0 mb-3">
+                            Unfinished Record Issue forms you saved. Nothing here has been issued and no stock
+                            has moved — resume one to carry on where you left off.
+                        </p>
+                        <div class="table-responsive">
+                            <table class="table align-middle gx-stock-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="min-width:220px;">Draft</th>
+                                        <th>Last saved</th>
+                                        <th class="text-end gx-stock-actions">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($drafts as $draft)
+                                        <tr>
+                                            <td class="fw-semibold text-slate-900">{{ $draft->label ?: 'Untitled draft' }}</td>
+                                            <td class="small text-muted">{{ $draft->updated_at?->format('d-M-Y H:i') }}</td>
+                                            <td class="text-end gx-stock-actions gx-row-actions">
+                                                {{-- POST, not a link: it changes what the
+                                                     form will show, and a prefetcher must
+                                                     not trigger it. --}}
+                                                <form method="POST" action="{{ route('store.stock.issues.drafts.resume', $draft) }}" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Resume
+                                                    </button>
+                                                </form>
+                                                <form method="POST" action="{{ route('store.stock.issues.drafts.destroy', $draft) }}" class="d-inline"
+                                                      onsubmit="return confirm(@js('Delete this draft? '.($draft->label ?: 'Untitled draft').' has not been issued, so nothing recorded is affected — but what was typed into it is gone.'));">
+                                                    @csrf @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
 
         <div class="col-12">
             <div class="card gx-stock-card">

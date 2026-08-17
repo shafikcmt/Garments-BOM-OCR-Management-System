@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Store;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
+use App\Http\Controllers\Concerns\ManagesFormDrafts;
 use App\Http\Controllers\Concerns\ResolvesIssueSetupMasters;
 use App\Exports\IssueTemplateExport;
 use App\Exports\SkippedIssueRowsExport;
@@ -14,6 +15,7 @@ use App\Models\IssueApprover;
 use App\Models\ItemCategory;
 use App\Models\StockItem;
 use App\Models\StockIssue;
+use App\Models\StoreFormDraft;
 use App\Services\GeneralStockReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,11 +39,46 @@ use Maatwebsite\Excel\Facades\Excel;
  */
 class StockIssueController extends Controller
 {
-    use AuthorizesStoreCorrections, ResolvesIssueSetupMasters;
+    use AuthorizesStoreCorrections, ManagesFormDrafts, ResolvesIssueSetupMasters;
 
     /** Section this controller belongs to, for the section-scoped correction
      *  permissions. The flat store.edit / store.delete still apply too. */
     protected string $storeSection = 'store.issues';
+
+    /** Which form ManagesFormDrafts is saving for. */
+    protected string $draftForm = StoreFormDraft::FORM_ISSUE;
+
+    /** Where resuming a draft lands. */
+    protected function draftReturnUrl(): string
+    {
+        return route('store.stock.issues.index');
+    }
+
+    /**
+     * A draft is the same act as recording an issue, half-done, so it carries
+     * the same right — and the route middleware asks for it too. Checked here
+     * as well because the trait is shared and must not depend on every route
+     * that reaches it being guarded.
+     */
+    protected function authorizeDraftAction(): void
+    {
+        abort_unless(auth()->user()?->can('store.issues.create') ?? false, 403,
+            'You do not have permission to record issues.');
+    }
+
+    /** How a saved issue draft is described in the list. */
+    protected function draftLabel(array $payload): string
+    {
+        $lines = count($payload['items'] ?? []);
+
+        $parts = array_filter([
+            $payload['requisition_no'] ?? null,
+            $payload['issue_date'] ?? null,
+            $lines ? $lines.' item'.($lines === 1 ? '' : 's') : 'no items yet',
+        ]);
+
+        return mb_substr(implode(' · ', $parts) ?: 'Untitled draft', 0, 255);
+    }
 
     /**
      * Header dropdowns, entered once per transaction. Each accepts an existing
@@ -98,6 +135,9 @@ class StockIssueController extends Controller
             'filters' => $filters,
             'canEdit' => $canEdit,
             'canDelete' => $canDelete,
+            // This user's own half-finished forms. Nothing here touches stock —
+            // see the store_form_drafts migration.
+            'drafts' => $this->myDrafts(),
         ]);
     }
 
@@ -182,6 +222,11 @@ class StockIssueController extends Controller
                 $itemIds[] = (int) $line['stock_item_id'];
             }
         });
+
+        // The real record is written, so the draft it came from has served its
+        // purpose. After the transaction, never before — a rejected submission
+        // must leave the draft where it was.
+        $this->discardDraftAfterSubmit($request);
 
         $count = count($data['items']);
         $message = $count === 1 ? 'Issue recorded.' : $count.' item(s) issued on this requisition.';

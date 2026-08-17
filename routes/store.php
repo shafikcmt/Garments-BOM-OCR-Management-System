@@ -275,6 +275,13 @@ Route::prefix('store')
             // is: the blank template rides the section's own guard, and the
             // upload itself needs the create right, because importing issues
             // is issuing.
+            // Half-finished Record Issue forms. Guarded with the create right,
+            // because a draft is that same act left half-done — and nothing
+            // here writes stock; see the store_form_drafts migration.
+            Route::post('/issues/drafts', [StockIssueController::class, 'saveDraft'])->middleware($act('store.issues.create'))->name('issues.drafts.save');
+            Route::post('/issues/drafts/{storeFormDraft}/resume', [StockIssueController::class, 'resumeDraft'])->middleware($act('store.issues.create'))->name('issues.drafts.resume');
+            Route::delete('/issues/drafts/{storeFormDraft}', [StockIssueController::class, 'destroyDraft'])->middleware($act('store.issues.create'))->name('issues.drafts.destroy');
+
             Route::get('/issues/template', [StockIssueController::class, 'template'])->name('issues.template');
             Route::post('/issues/import', [StockIssueController::class, 'import'])->middleware($act('store.issues.create'))->name('issues.import');
             // The rows the last import could not take, to fix and upload again.
