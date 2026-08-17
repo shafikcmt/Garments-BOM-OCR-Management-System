@@ -434,10 +434,16 @@
      * out inline whether or not anybody remembers the class, and the gap is a
      * universal adjacent-sibling rule that does not care what shape the actions
      * are. Deliberately NOT display:flex on the cell — that would take the td
-     * out of table layout, and this rule covers every General Stock table. */
+     * out of table layout, and this rule covers every General Stock table.
+     *
+     * The vertical margins are zeroed and the horizontal ones deliberately
+     * LEFT ALONE: `margin: 0` here would out-specify the sibling rule below —
+     * two classes and two elements against two classes and one — and silently
+     * cancel the gap it exists to create. */
     .gx-stock-table td.gx-stock-actions > form {
         display: inline-block;
-        margin: 0;
+        margin-top: 0;
+        margin-bottom: 0;
         vertical-align: middle;
     }
     .gx-stock-table td.gx-stock-actions > * + * { margin-left: .4rem; }
@@ -461,13 +467,20 @@
     }
 
     /* Row actions on the two HISTORY tables — Issue History and the item lines
-     * inside a receiving. Same pill, one size down.
+     * inside a receiving. Same pill, drawn tighter.
      *
      * Those two are the densest tables in the section: nine and seven columns
-     * of .small text, twenty-five rows to a page. A pill sized for the Item
-     * Master's roomier rows reads as the heaviest thing on the row there, and
-     * two of them per row set the row height, which is what made the table feel
-     * bottom-heavy against its own pagination.
+     * of .small text, twenty-five rows to a page. A pill padded for the Item
+     * Master's roomier rows is the widest thing on the row there, and two of
+     * them per row set the row height.
+     *
+     * PADDING AND GAP ONLY. Type size is not touched, because the section pins
+     * it deliberately: an icon button is 13px with a 14px icon, declared
+     * !important further down this file so every icon button in the app matches
+     * whatever Bootstrap size class it happens to carry. Shrinking the label
+     * here would mean out-shouting that with more !important, which is how a
+     * design system stops being one. The row is tightened by the space around
+     * the words, not by making the words smaller.
      *
      * An opt-in class on those cells, not a change to the shared pill: Item
      * Master, Issue Setup and Purchase Setup are not dense and are left alone. */
@@ -477,14 +490,6 @@
         padding-right: .7rem !important;
         padding-top: .2rem !important;
         padding-bottom: .2rem !important;
-        font-size: .75rem;
-        line-height: 1.35;
-    }
-    /* The icon shrinks with the label rather than staying at its own size and
-     * becoming the loudest part of a smaller button. */
-    .content .gx-stock-scope td.gx-row-actions .btn > i.bi {
-        font-size: .8em;
-        margin-right: .3rem !important;
     }
     /* Tighter than the .4rem the roomier tables use, in proportion. */
     .gx-stock-table td.gx-row-actions > * + * { margin-left: .3rem; }
