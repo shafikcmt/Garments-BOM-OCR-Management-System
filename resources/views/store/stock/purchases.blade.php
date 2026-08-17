@@ -323,6 +323,25 @@
                                 <td colspan="9" class="p-0">
                                     <div class="collapse" id="{{ $paneId }}">
                                         <div class="gx-rv-detail-body">
+                                            {{-- What the actions below reach.
+
+                                                 A "delivery" is not a record — it is these rows,
+                                                 grouped by GRN, challan and challan date. So every
+                                                 action in this pane is per LINE, while two of the
+                                                 fields on show above are shared by all of them. The
+                                                 Edit dialog already says so once it is open; this
+                                                 says it before anything is clicked, in the same
+                                                 amber the dialog uses for the identical point. --}}
+                                            @if($groupLines->count() > 1)
+                                                <div class="gx-line-scope mb-2">
+                                                    <span class="gx-edit-scope">All {{ $groupLines->count() }} items</span>
+                                                    <span>
+                                                        RCV Date and Supplier are shared by every item on this GRN.
+                                                        Qty, Unit Price and Remarks belong to one line, and so do
+                                                        Edit and Remove below.
+                                                    </span>
+                                                </div>
+                                            @endif
                                             <table class="table align-middle mb-0 gx-line-table">
                                                 <thead>
                                                     <tr>
@@ -355,10 +374,32 @@
                                                                     <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPurchase{{ $line->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
                                                                 @endif
                                                                 @if($canDelete)
+                                                                    {{-- "Remove", not "Delete": this takes one item
+                                                                         OUT OF a delivery, and Delete beside a GRN
+                                                                         number reads as removing the whole thing.
+                                                                         Issue History keeps "Delete" — an issue is a
+                                                                         record in its own right, not part of a set.
+
+                                                                         The confirm has to branch, because on the LAST
+                                                                         line the old wording was simply untrue. There
+                                                                         is no delivery record to keep: the group is
+                                                                         these rows, so removing the last one takes the
+                                                                         GRN and challan with it. --}}
+                                                                    @php
+                                                                        $itemLabel = optional($line->stockItem)->name ?? 'this item';
+                                                                        $grnLabel = $line->rv_no ?: 'this receiving';
+                                                                        $others = $groupLines->count() - 1;
+
+                                                                        $confirmText = $others > 0
+                                                                            ? 'Remove '.$itemLabel.' from GRN '.$grnLabel.'? The other '
+                                                                                .($others === 1 ? 'item on this receiving is kept.' : $others.' items on this receiving are kept.')
+                                                                            : $itemLabel.' is the only item on GRN '.$grnLabel
+                                                                                .'. Removing it deletes the whole receiving, including its GRN and challan record. Continue?';
+                                                                    @endphp
                                                                     <form method="POST" action="{{ route('store.stock.purchases.destroy', $line) }}" class="d-inline"
-                                                                          onsubmit="return confirm('Remove {{ addslashes(optional($line->stockItem)->name ?? 'this item') }} from this receiving? The other items on it are kept.');">
+                                                                          onsubmit="return confirm(@js($confirmText));">
                                                                         @csrf @method('DELETE')
-                                                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Remove</button>
                                                                     </form>
                                                                 @endif
                                                                 @if(! $canEdit && ! $canDelete)

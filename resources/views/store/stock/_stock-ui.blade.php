@@ -977,6 +977,20 @@
     }
     .gx-edit-alert-body > span { display: block; }
 
+    /* The same point the Edit dialog's scope chip makes, said once above a
+     * delivery's item list so it is read BEFORE anything is clicked rather than
+     * after. Deliberately the dialog's own chip and the dialog's own muted
+     * grey, not a second visual language for one idea. */
+    .gx-line-scope {
+        display: flex;
+        align-items: baseline;
+        gap: .5rem;
+        font-size: .75rem;
+        color: #94a3b8;
+        line-height: 1.45;
+    }
+    .gx-line-scope > .gx-edit-scope { margin-left: 0; flex: 0 0 auto; }
+
     /* A quiet note under a field, for the sentence that explains a lock. */
     .gx-edit-hint {
         font-size: .75rem;

@@ -125,6 +125,83 @@ it('hides the Edit button from a user who cannot use it', function () {
         ->assertSee('Locked');
 });
 
+// --- Saying what the per-line actions actually reach -------------------------
+
+it('labels the per-line action Remove, not Delete', function () {
+    // "Delete" beside a GRN number reads as removing the whole delivery. This
+    // takes one item OUT OF one, and the label has to say so. Issue History
+    // keeps "Delete" — an issue is a record in its own right.
+    $item = purchaseItem();
+    recordedPurchase($item, 100);
+
+    $this->actingAs(purchaseEditor(['store.receiving.view', 'store.edit', 'store.delete']))
+        ->get(route('store.stock.purchases.index'))
+        ->assertOk()
+        ->assertSee('>Remove', false)
+        ->assertDontSee('>Delete', false);
+});
+
+it('promises to keep the other items only when there are other items', function () {
+    $needle = purchaseItem();
+    $thread = purchaseItem('Sewing Thread', 'Cone');
+
+    recordedPurchase($needle, 100);
+    recordedPurchase($thread, 50);
+
+    $html = $this->actingAs(purchaseEditor(['store.receiving.view', 'store.edit', 'store.delete']))
+        ->get(route('store.stock.purchases.index'))
+        ->assertOk()
+        ->getContent();
+
+    // Two lines on the GRN, so removing one leaves one — singular.
+    expect($html)->toContain('The other item on this receiving is kept.')
+        ->and($html)->toContain('GRN-001');
+
+    // And the scope caption says which fields the delivery shares.
+    expect($html)->toContain('All 2 items')
+        ->and($html)->toContain('RCV Date and Supplier are shared by every item on this GRN.');
+});
+
+it('warns that removing the last line deletes the whole delivery', function () {
+    // There is no delivery record to keep: the group IS these rows, so the last
+    // one takes the GRN and challan with it. The old wording promised the
+    // opposite, which was simply untrue in this case.
+    $item = purchaseItem();
+    recordedPurchase($item, 100);
+
+    $html = $this->actingAs(purchaseEditor(['store.receiving.view', 'store.edit', 'store.delete']))
+        ->get(route('store.stock.purchases.index'))
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('is the only item on GRN GRN-001')
+        ->and($html)->toContain('deletes the whole receiving, including its GRN and challan record')
+        // The multi-line promise must not appear anywhere on a single-line GRN.
+        ->and($html)->not->toContain('are kept.')
+        ->and($html)->not->toContain('is kept.');
+
+    // One line, so no shared-fields caption either — there is nothing to share.
+    expect($html)->not->toContain('All 1 items');
+});
+
+it('still removes only the line it was asked to remove', function () {
+    // The labels changed; the behaviour did not.
+    $needle = purchaseItem();
+    $thread = purchaseItem('Sewing Thread', 'Cone');
+
+    $first = recordedPurchase($needle, 100);
+    $second = recordedPurchase($thread, 50);
+
+    $this->actingAs(purchaseEditor(['store.receiving.view', 'store.delete']))
+        ->delete(route('store.stock.purchases.destroy', $first))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect(StockPurchase::find($first->id))->toBeNull()
+        ->and(StockPurchase::find($second->id))->not->toBeNull()
+        ->and((float) $second->fresh()->qty)->toBe(50.0);
+});
+
 // --- The delivery's identity is locked --------------------------------------
 
 it('ignores an attempt to change the GRN, challan or challan date', function () {
