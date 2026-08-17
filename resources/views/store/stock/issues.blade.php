@@ -124,7 +124,17 @@
     @if(session('import_skipped_rows'))
         @php($skippedRowCount = session('import_skipped_row_count', count(session('import_skipped_rows'))))
         @php($skippedRowsInFile = count(session('import_skipped_rows')))
-        <div class="alert alert-secondary d-flex flex-wrap align-items-center gap-3" role="alert">
+        {{-- Unlike the flash messages above it, this notice is held in the
+             SESSION rather than flashed — the download is a separate request
+             made after the page has rendered, which is one request too late for
+             flash data. So it survives reloads and navigation, and closing it
+             has to tell the server, or it is back on the next page load.
+
+             The X posts. The Download link only fades it, because a download
+             reports that it started and never that it finished — see
+             dismissSkippedRows(). --}}
+        <div class="alert alert-secondary d-flex flex-wrap align-items-center gap-3" role="alert"
+             id="skippedRowsNotice">
             <i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i>
             <div class="flex-grow-1 small">
                 <div class="fw-semibold">{{ $skippedRowCount }} {{ $skippedRowCount === 1 ? 'row was' : 'rows were' }} not imported.</div>
@@ -137,10 +147,43 @@
                     </span>
                 @endif
             </div>
-            <a href="{{ route('store.stock.issues.skipped-rows') }}" class="btn btn-sm btn-outline-dark">
+            <a href="{{ route('store.stock.issues.skipped-rows') }}" class="btn btn-sm btn-outline-dark"
+               data-skipped-download>
                 <i class="bi bi-download me-1" aria-hidden="true"></i>Download Skipped Rows
             </a>
+            {{-- Same control the flash banners carry, and the same aria-label
+                 wording, so the two read as one convention. It submits rather
+                 than hiding, so the notice stays gone. --}}
+            <form method="POST" action="{{ route('store.stock.issues.skipped-rows.dismiss') }}" class="d-inline">
+                @csrf
+                <button type="submit" class="btn-close" aria-label="Dismiss this message"></button>
+            </form>
         </div>
+
+        <script>
+            (function () {
+                var notice = document.getElementById('skippedRowsNotice');
+                var download = notice && notice.querySelector('[data-skipped-download]');
+
+                if (! notice || ! download) { return; }
+
+                // Fades the notice once the file has been asked for — its whole
+                // purpose is served by then, and it should not sit there for the
+                // rest of the day.
+                //
+                // VISUAL ONLY. The rows stay in the session, because the click
+                // says the download started and nothing says it arrived. If it
+                // failed, a reload brings the notice and the file back. Only the
+                // X, which the user presses deliberately, actually discards them.
+                download.addEventListener('click', function () {
+                    setTimeout(function () {
+                        notice.style.transition = 'opacity .4s ease';
+                        notice.style.opacity = '0';
+                        setTimeout(function () { notice.classList.add('d-none'); }, 400);
+                    }, 5000);
+                });
+            })();
+        </script>
     @endif
 
     {{-- Per-item stock warnings raised by the submission just saved, so a

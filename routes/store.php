@@ -282,6 +282,10 @@ Route::prefix('store')
             // user's own session and is only reachable by whoever just ran the
             // import that produced it.
             Route::get('/issues/import/skipped-rows', [StockIssueController::class, 'skippedRows'])->middleware($act('store.issues.create'))->name('issues.skipped-rows');
+            // Closing the notice. POST rather than GET because it changes
+            // server state — a GET here would be followed by a link prefetcher
+            // and throw the rows away before the user had touched anything.
+            Route::post('/issues/import/skipped-rows/dismiss', [StockIssueController::class, 'dismissSkippedRows'])->middleware($act('store.issues.create'))->name('issues.skipped-rows.dismiss');
             // Correct one recorded issue. No matching GET: the form is a modal
             // prefilled from the row already on screen, so an edit page would be
             // an endpoint nothing calls. Gated inside the controller on

@@ -371,6 +371,34 @@ class StockIssueController extends Controller
     }
 
     /**
+     * Put the skipped-rows notice away.
+     *
+     * It is held in the session rather than flashed, because the download is a
+     * separate request made after the page has already rendered. That is what
+     * the notice needs to work at all, and it is also why it cannot be closed
+     * by hiding it: it would be back on the next page load.
+     *
+     * So dismissing CLEARS THE ROWS, it does not merely mark them read. The
+     * notice is the only route to the Download button, so rows kept past it are
+     * unreachable — and they are re-read out of the session on every subsequent
+     * request until something clears them. Unrecoverable except by running the
+     * import again, which is what a deliberate press of a close button on a
+     * notice about a file you have already downloaded should mean.
+     *
+     * Deliberately NOT called when the Download button is clicked. A download
+     * link reports no completion, only that it was started, so clearing there
+     * would throw the rows away on the strength of an event that may have
+     * failed. The screen fades the notice on that click and leaves the session
+     * alone, so a reload brings it back.
+     */
+    public function dismissSkippedRows()
+    {
+        session()->forget(['import_skipped_rows', 'import_skipped_row_count']);
+
+        return back();
+    }
+
+    /**
      * Reject the whole submission unless every line is covered by the stock
      * actually on hand.
      *

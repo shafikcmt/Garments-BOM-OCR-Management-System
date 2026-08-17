@@ -1113,6 +1113,99 @@ it('offers the skipped rows for download after an import, and not before', funct
     expect(session('import_skipped_rows'))->toBeNull();
 });
 
+/**
+ * Closing the skipped-rows notice.
+ *
+ * It is held in the session, not flashed, so it survives reloads — which is
+ * what makes it useful and also what makes hiding it client-side useless. The X
+ * therefore posts, and clears the rows: the notice is the only route to the
+ * Download button, so rows kept past it are unreachable and would just be
+ * re-read out of the session on every later request.
+ */
+it('clears the skipped rows when the notice is dismissed', function () {
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    Permission::findOrCreate('store.issues.view', 'web');
+    Permission::findOrCreate('store.issues.create', 'web');
+
+    $user = User::factory()->create(['status' => 1]);
+    $user->givePermissionTo(['store.issues.view', 'store.issues.create']);
+
+    $csv = implode(',', IssueImport::COLUMNS)."\n"
+        .implode(',', issueRow([
+            'Issue Date*' => '2026-08-01', 'Requisition Number' => 'BAD',
+            'Item Name*' => 'Ghost Item', 'Issued Qty*' => 5,
+        ]))."\n";
+
+    $this->actingAs($user)->post(
+        route('store.stock.issues.import'),
+        ['file' => UploadedFile::fake()->createWithContent('issues.csv', $csv)]
+    )->assertRedirect();
+
+    expect(session('import_skipped_rows'))->toHaveCount(1);
+
+    $this->actingAs($user)
+        ->from(route('store.stock.issues.index'))
+        ->post(route('store.stock.issues.skipped-rows.dismiss'))
+        ->assertRedirect();
+
+    // Gone from the session, so it cannot come back on the next page load.
+    expect(session('import_skipped_rows'))->toBeNull()
+        ->and(session('import_skipped_row_count'))->toBeNull();
+
+    // And the screen no longer offers it.
+    $this->actingAs($user)->get(route('store.stock.issues.index'))
+        ->assertOk()
+        ->assertDontSee('skippedRowsNotice', false);
+});
+
+it('leaves the rows alone when they are only downloaded', function () {
+    // The download says it started, never that it finished. Clearing here would
+    // discard the file on the strength of an event that may have failed, so the
+    // screen only fades the notice and the session is untouched.
+    $item = issueItem();
+    stockOnHand($item, 100);
+
+    Permission::findOrCreate('store.issues.view', 'web');
+    Permission::findOrCreate('store.issues.create', 'web');
+
+    $user = User::factory()->create(['status' => 1]);
+    $user->givePermissionTo(['store.issues.view', 'store.issues.create']);
+
+    $csv = implode(',', IssueImport::COLUMNS)."\n"
+        .implode(',', issueRow([
+            'Issue Date*' => '2026-08-01', 'Requisition Number' => 'BAD',
+            'Item Name*' => 'Ghost Item', 'Issued Qty*' => 5,
+        ]))."\n";
+
+    $this->actingAs($user)->post(
+        route('store.stock.issues.import'),
+        ['file' => UploadedFile::fake()->createWithContent('issues.csv', $csv)]
+    )->assertRedirect();
+
+    $this->actingAs($user)->get(route('store.stock.issues.skipped-rows'))->assertOk();
+
+    // Still there, so a failed download is recoverable with a reload.
+    expect(session('import_skipped_rows'))->toHaveCount(1);
+
+    $this->actingAs($user)->get(route('store.stock.issues.index'))
+        ->assertOk()
+        ->assertSee('skippedRowsNotice', false);
+});
+
+it('needs the create right to dismiss the notice', function () {
+    Permission::findOrCreate('store.issues.view', 'web');
+    Permission::findOrCreate('store.issues.create', 'web');
+
+    $viewer = User::factory()->create(['status' => 1]);
+    $viewer->givePermissionTo('store.issues.view');
+
+    $this->actingAs($viewer)
+        ->post(route('store.stock.issues.skipped-rows.dismiss'))
+        ->assertForbidden();
+});
+
 it('needs the create right to download the skipped rows', function () {
     Permission::findOrCreate('store.issues.view', 'web');
     Permission::findOrCreate('store.issues.create', 'web');
