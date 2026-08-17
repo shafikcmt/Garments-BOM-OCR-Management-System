@@ -8,6 +8,18 @@
 
     // Drives the Clear button only — the filtering itself is the controller's.
     $hasFilters = collect($filters)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
+
+    // Item lines as they were last submitted, so a rejected receiving comes
+    // back filled in rather than blank — and so a resumed draft, which is put
+    // into old() by the same route, brings its lines with it.
+    $oldPurchaseLines = collect(old('items', []))
+        ->map(fn ($line) => [
+            'stock_item_id' => $line['stock_item_id'] ?? '',
+            'qty' => $line['qty'] ?? '',
+            'unit_price' => $line['unit_price'] ?? '',
+            'remarks' => $line['remarks'] ?? '',
+        ])
+        ->values();
 @endphp
 
 @section('content')
@@ -73,6 +85,11 @@
                 <p class="text-muted small mb-0">Add a stock item first — a purchase must be received against an item in the master.</p>
             @else
                 <form method="POST" action="{{ route('store.stock.purchases.store') }}" id="purchaseForm">
+                    {{-- Which draft this form came from, so saving again updates
+                         it instead of leaving a second copy, and recording it for
+                         real clears it away. Empty on a form that was not
+                         resumed. --}}
+                    <input type="hidden" name="draft_id" value="{{ old('draft_id') }}">
                     @csrf
 
                     <div class="row g-3 mb-4">
@@ -225,7 +242,16 @@
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Record Receiving
                         </button>
-                        <p class="gx-stock-help mb-0" style="max-width:640px;">
+                        {{-- Same form, a different action. formnovalidate lets a
+                             half-filled form through, which is the point: a
+                             draft exists because somebody was interrupted.
+                             Nothing on that path writes stock or takes a GRN. --}}
+                        <button type="submit" class="btn btn-outline-secondary"
+                                formaction="{{ route('store.stock.purchases.drafts.save') }}"
+                                formnovalidate>
+                            <i class="bi bi-bookmark me-1" aria-hidden="true"></i>Save Draft
+                        </button>
+                        <p class="gx-stock-help mb-0" style="max-width:600px;">
                             The GRN No is generated on save and shared by every line on this challan.
                             Each line is recorded as its own purchase against its item.
                         </p>
@@ -234,6 +260,65 @@
             @endif
         </div>
     </div>
+
+    {{-- Half-finished forms, this user's own.
+
+         Between the form and the history on purpose: it belongs to the act of
+         recording a receiving, not to the record of ones already made. Only
+         rendered when there is something in it.
+
+         A draft is NOT a receiving. Nothing here has touched stock and nothing
+         here holds a GRN — the number is taken on save, so a draft has none to
+         show and is named by the challan instead. --}}
+    @if($drafts->isNotEmpty())
+        <div class="card gx-stock-card mb-4">
+            <div class="gx-stock-card-body">
+                <div class="gx-stock-card-head">
+                    <h5>Saved Drafts <span class="badge bg-secondary-subtle text-secondary ms-1">{{ $drafts->count() }}</span></h5>
+                </div>
+                <p class="gx-edit-hint mt-0 mb-3">
+                    Unfinished Record Receiving forms you saved. Nothing here has been received, no stock
+                    has moved, and no GRN has been taken — resume one to carry on where you left off.
+                </p>
+                <div class="table-responsive">
+                    <table class="table align-middle gx-stock-table mb-0">
+                        <thead>
+                            <tr>
+                                <th style="min-width:240px;">Draft</th>
+                                <th>Last saved</th>
+                                <th class="text-end gx-stock-actions">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($drafts as $draft)
+                                <tr>
+                                    <td class="fw-semibold text-slate-900">{{ $draft->label ?: 'Untitled draft' }}</td>
+                                    <td class="small text-muted">{{ $draft->updated_at?->format('d-M-Y H:i') }}</td>
+                                    <td class="text-end gx-stock-actions gx-row-actions">
+                                        {{-- POST, not a link: it changes what the form
+                                             will show, and a prefetcher must not fire it. --}}
+                                        <form method="POST" action="{{ route('store.stock.purchases.drafts.resume', $draft) }}" class="d-inline">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Resume
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="{{ route('store.stock.purchases.drafts.destroy', $draft) }}" class="d-inline"
+                                              onsubmit="return confirm(@js('Delete this draft? '.($draft->label ?: 'Untitled draft').' has not been received, so nothing recorded is affected — but what was typed into it is gone.'));">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- ------------------------------------------------------------------
          Purchase History — one row per goods-receiving event, expandable.
@@ -672,6 +757,10 @@
             var addBtns = form.querySelectorAll('.js-add-line');
             var grand = document.getElementById('grandTotal');
 
+            // The lines to open with: what a rejected submission carried, or
+            // what a resumed draft was saved with. Both arrive through old().
+            var oldLines = @json($oldPurchaseLines);
+
             function rows() {
                 return Array.prototype.slice.call(body.querySelectorAll('tr.purchase-line'));
             }
@@ -733,25 +822,63 @@
                 if (window.gxInitSearchable) { window.gxInitSearchable(row); }
             }
 
-            function addRow() {
+            function addRow(values) {
                 var index = rows().length;
                 var html = tpl.innerHTML.replace(/__INDEX__/g, index);
                 var holder = document.createElement('tbody');
                 holder.innerHTML = html.trim();
 
                 var row = holder.querySelector('tr');
+
+                // Values go in BEFORE wire(), because wire() hands the item
+                // select to TomSelect and it reads whatever is selected at that
+                // moment as its starting value.
+                if (values) {
+                    var set = function (selector, value) {
+                        var field = row.querySelector(selector);
+                        if (field && value !== undefined && value !== null && value !== '') {
+                            field.value = value;
+                        }
+                    };
+
+                    set('.js-line-item', values.stock_item_id);
+                    set('.js-line-qty', values.qty);
+                    set('.js-line-price', values.unit_price);
+                    set('[name$="[remarks]"]', values.remarks);
+                }
+
                 body.appendChild(row);
                 wire(row);
+
+                // Uom, Category and Brand follow the item through its change
+                // event, and setting .value in code does not fire one — so a
+                // resumed line showed its item with the three boxes beside it
+                // still empty. Nudged once, after wiring, so a restored row
+                // reads exactly like one the user picked.
+                if (values && values.stock_item_id) {
+                    row.querySelector('.js-line-item').dispatchEvent(new Event('change', { bubbles: true }));
+                }
+
                 renumber();
                 total();
 
                 return row;
             }
 
-            addBtns.forEach(function (btn) { btn.addEventListener('click', addRow); });
+            addBtns.forEach(function (btn) { btn.addEventListener('click', function () { addRow(); }); });
 
-            // Start with one empty line, the way the single-item form opened.
-            addRow();
+            // Come back with the lines that were typed, not an empty grid.
+            //
+            // This form used to open with one blank row whatever had just
+            // happened, so a rejected receiving lost every line the operator had
+            // entered and a resumed draft would have come back with only its
+            // header. Both are fixed by the same few lines: old() carries a
+            // rejected submission, and a resumed draft is put into old() too.
+            if (oldLines.length) {
+                oldLines.forEach(function (line) { addRow(line); });
+            } else {
+                addRow();
+            }
         })();
 
         // "View Items" / "Hide Items" — the label has to say what the button

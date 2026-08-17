@@ -249,6 +249,12 @@ Route::prefix('store')
             Route::get('/purchases/report/pdf', [ReceivingReportController::class, 'pdf'])->name('purchases.report.pdf');
             Route::get('/purchases/report/excel', [ReceivingReportController::class, 'excel'])->name('purchases.report.excel');
 
+            // Half-finished Record Receiving forms. Same guard as recording
+            // one, and nothing on this path writes stock.
+            Route::post('/purchases/drafts', [StockPurchaseController::class, 'saveDraft'])->middleware($act('store.receiving.create'))->name('purchases.drafts.save');
+            Route::post('/purchases/drafts/{storeFormDraft}/resume', [StockPurchaseController::class, 'resumeDraft'])->middleware($act('store.receiving.create'))->name('purchases.drafts.resume');
+            Route::delete('/purchases/drafts/{storeFormDraft}', [StockPurchaseController::class, 'destroyDraft'])->middleware($act('store.receiving.create'))->name('purchases.drafts.destroy');
+
             Route::get('/purchases', [StockPurchaseController::class, 'index'])->name('purchases.index');
             Route::post('/purchases', [StockPurchaseController::class, 'store'])->middleware($act('store.receiving.create'))->name('purchases.store');
             // Correct one line of a recorded receiving. No matching GET, for the

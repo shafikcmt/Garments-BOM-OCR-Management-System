@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Store;
 use App\Exports\ReceivingTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
+use App\Http\Controllers\Concerns\ManagesFormDrafts;
 use App\Imports\ReceivingImport;
 use App\Models\GeneralStockSupplier;
 use App\Models\StockItem;
 use App\Models\StockPurchase;
+use App\Models\StoreFormDraft;
 use App\Services\GeneralStockReportService;
 use App\Services\RvNumberGenerator;
 use Illuminate\Http\Request;
@@ -34,11 +36,55 @@ use Maatwebsite\Excel\Facades\Excel;
  */
 class StockPurchaseController extends Controller
 {
-    use AuthorizesStoreCorrections;
+    use AuthorizesStoreCorrections, ManagesFormDrafts;
 
     /** Section this controller belongs to, for the section-scoped correction
      *  permissions. The flat store.edit / store.delete still apply too. */
     protected string $storeSection = 'store.receiving';
+
+    /** Which form ManagesFormDrafts is saving for. */
+    protected string $draftForm = StoreFormDraft::FORM_RECEIVING;
+
+    /** Where resuming a draft lands. */
+    protected function draftReturnUrl(): string
+    {
+        return route('store.stock.purchases.index');
+    }
+
+    /** A draft is recording a receiving, half-done, so it carries that right. */
+    protected function authorizeDraftAction(): void
+    {
+        abort_unless(auth()->user()?->can('store.receiving.create') ?? false, 403,
+            'You do not have permission to record receivings.');
+    }
+
+    /**
+     * How a saved receiving draft is described in the list.
+     *
+     * The GRN No is deliberately NOT used, even though it is the most prominent
+     * thing on the form: it is a preview of the number the next save would
+     * take, not a number this draft owns. Whoever records a receiving first
+     * takes it, so labelling a draft with one would name a GRN that ends up
+     * belonging to somebody else's delivery. The challan identifies it instead,
+     * which is what the supplier's paperwork actually says.
+     */
+    protected function draftLabel(array $payload): string
+    {
+        $lines = count($payload['items'] ?? []);
+
+        $supplier = ($payload['general_stock_supplier_id'] ?? null)
+            ? GeneralStockSupplier::find($payload['general_stock_supplier_id'])?->name
+            : null;
+
+        $parts = array_filter([
+            ($payload['challan_no'] ?? null) ? 'Challan '.$payload['challan_no'] : null,
+            $payload['purchase_date'] ?? null,
+            $supplier,
+            $lines ? $lines.' item'.($lines === 1 ? '' : 's') : 'no items yet',
+        ]);
+
+        return mb_substr(implode(' · ', $parts) ?: 'Untitled draft', 0, 255);
+    }
 
     public function index(Request $request)
     {
@@ -119,8 +165,12 @@ class StockPurchaseController extends Controller
         // whoever saves first gets it, so the form labels it as such.
         $nextRv = app(RvNumberGenerator::class)->preview();
 
+        // This user's own half-finished forms. Nothing here touches stock —
+        // see the store_form_drafts migration.
+        $drafts = $this->myDrafts();
+
         return view('store.stock.purchases', compact(
-            'groups', 'lines', 'items', 'suppliers', 'filters', 'canEdit', 'canDelete', 'nextRv'
+            'groups', 'lines', 'items', 'suppliers', 'filters', 'canEdit', 'canDelete', 'nextRv', 'drafts'
         ));
     }
 
@@ -199,6 +249,11 @@ class StockPurchaseController extends Controller
                 ]);
             }
         });
+
+        // The real record is written, so the draft it came from has served its
+        // purpose. After the transaction, never before — a rejected submission
+        // must leave the draft where it was.
+        $this->discardDraftAfterSubmit($request);
 
         $count = count($data['items']);
 
