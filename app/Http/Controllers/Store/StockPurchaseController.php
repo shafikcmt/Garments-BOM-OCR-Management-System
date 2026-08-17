@@ -13,6 +13,7 @@ use App\Models\StockPurchase;
 use App\Models\StoreFormDraft;
 use App\Services\GeneralStockReportService;
 use App\Services\RvNumberGenerator;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -260,6 +261,64 @@ class StockPurchaseController extends Controller
         return back()->with('success', $count === 1
             ? 'Purchase recorded under GRN No '.$rvNo.'.'
             : $count.' item(s) received under GRN No '.$rvNo.'.');
+    }
+
+    /**
+     * Deliveries already recorded under a challan number.
+     *
+     * Read-only, and called by the Record Receiving form as the challan number
+     * is typed. It exists because nothing else catches a challan entered twice:
+     * every submission takes a fresh GRN by design — the same challan can
+     * legitimately arrive in two batches — so two identical entries become two
+     * deliveries and two additions to stock, with the screen saying nothing.
+     *
+     * WARNS, NEVER BLOCKS. A repeated challan number is ordinary in a partial
+     * receipt, so the answer is to show what is already recorded and let the
+     * operator decide, not to refuse the entry.
+     *
+     * whereLike, not where(..., 'like', ...): PostgreSQL's LIKE is
+     * case-sensitive, so "ch158" would not find "CH158" and the check would
+     * quietly pass on live while working locally. No wildcards — this is an
+     * exact match done case-insensitively.
+     */
+    public function challanStatus(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'challan_no' => ['nullable', 'string', 'max:100'],
+            'general_stock_supplier_id' => ['nullable', 'integer'],
+        ]);
+
+        $challan = trim((string) ($data['challan_no'] ?? ''));
+
+        if ($challan === '') {
+            return response()->json(['matches' => []]);
+        }
+
+        $matches = StockPurchase::query()
+            ->whereLike('challan_no', $challan)
+            // Scoped to the supplier when one is chosen: the same challan
+            // number from two different suppliers is a coincidence, not a
+            // repeat, and warning about it would train people to ignore this.
+            ->when($data['general_stock_supplier_id'] ?? null,
+                fn ($q, $id) => $q->where('general_stock_supplier_id', $id))
+            ->with('stockItem:id,name')
+            ->orderByDesc('purchase_date')
+            ->orderByDesc('id')
+            ->get(['id', 'rv_no', 'challan_no', 'purchase_date', 'rcv_date', 'supplier_name', 'stock_item_id', 'qty'])
+            // One entry per delivery, not per line — the operator is being told
+            // about receivings, and a three-item challan is one of them.
+            ->groupBy('rv_no')
+            ->map(fn ($lines) => [
+                'rv_no' => $lines->first()->rv_no,
+                'purchase_date' => $lines->first()->purchase_date?->format('d-M-Y'),
+                'supplier_name' => $lines->first()->supplier_name,
+                'lines' => $lines->count(),
+                'qty' => (float) $lines->sum('qty'),
+                'items' => $lines->take(3)->map(fn ($l) => $l->stockItem?->name)->filter()->values(),
+            ])
+            ->values();
+
+        return response()->json(['matches' => $matches]);
     }
 
     /** The blank sample workbook for the bulk receiving upload. */

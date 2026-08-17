@@ -117,7 +117,9 @@
                         </div>
                         <div class="col-6 col-md-4 col-xl-2">
                             <label class="form-label" for="challanNo">Challan / Invoice No</label>
-                            <input name="challan_no" id="challanNo" value="{{ old('challan_no') }}" class="form-control" maxlength="100">
+                            <input name="challan_no" id="challanNo" value="{{ old('challan_no') }}" class="form-control" maxlength="100"
+                                   data-challan-status-url="{{ route('store.stock.purchases.challan-status') }}"
+                                   autocomplete="off">
                         </div>
                         <div class="col-12 col-md-8 col-xl-3">
                             <label class="form-label" for="supplierSelect">Supplier Name</label>
@@ -134,6 +136,29 @@
                                     @endforeach
                                 </select>
                             @endif
+                        </div>
+                    </div>
+
+                    {{-- Already recorded under this challan number.
+
+                         Nothing else catches a delivery entered twice: every
+                         submission takes a fresh GRN by design, because the same
+                         challan can genuinely arrive in two batches, so two
+                         identical entries become two receivings and two
+                         additions to stock with no complaint from anywhere.
+
+                         WARNS, NEVER BLOCKS, and says so — a partial receipt
+                         against a challan already recorded is a real thing to be
+                         doing. Filled by the script at the foot of this file. --}}
+                    <div id="challanDuplicateNotice" class="gx-edit-alert mb-3 d-none" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                        <div>
+                            <div class="gx-edit-alert-title">This challan number is already recorded</div>
+                            <div class="gx-edit-alert-body" data-challan-matches></div>
+                            <div class="gx-edit-alert-body mt-1">
+                                Carry on if this is a further delivery against the same challan. If it is the
+                                same goods being entered a second time, the stock will be counted twice.
+                            </div>
                         </div>
                     </div>
 
@@ -892,6 +917,98 @@
                 target.addEventListener('shown.bs.collapse', function () { label.textContent = 'Hide Items'; });
                 target.addEventListener('hidden.bs.collapse', function () { label.textContent = 'View Items'; });
             });
+        })();
+    </script>
+
+    {{-- Warn when the challan number has been recorded before.
+
+         Debounced, because it fires as the number is typed and a challan is
+         short enough that every keystroke would otherwise be a request. Scoped
+         to the chosen supplier when there is one — the same number from two
+         different suppliers is a coincidence, and warning about it would teach
+         people to ignore this.
+
+         A failed lookup shows nothing. This is advice on top of the form, and
+         it must never be the reason a delivery cannot be recorded. --}}
+    <script>
+        (function () {
+            var input = document.getElementById('challanNo');
+            var notice = document.getElementById('challanDuplicateNotice');
+
+            if (!input || !notice) { return; }
+
+            var body = notice.querySelector('[data-challan-matches]');
+            var supplier = document.getElementById('supplierSelect');
+            var timer = null;
+            var seq = 0;
+
+            function hide() { notice.classList.add('d-none'); }
+
+            function show(matches) {
+                body.innerHTML = '';
+
+                matches.forEach(function (m) {
+                    var line = document.createElement('span');
+                    var bits = ['GRN ' + m.rv_no];
+
+                    if (m.purchase_date) { bits.push(m.purchase_date); }
+                    if (m.supplier_name) { bits.push(m.supplier_name); }
+                    bits.push(m.lines + ' item' + (m.lines === 1 ? '' : 's') + ', qty ' + m.qty);
+
+                    // textContent, not innerHTML: these are supplier and item
+                    // names out of the database.
+                    line.textContent = bits.join(' · ');
+                    body.appendChild(line);
+                });
+
+                notice.classList.remove('d-none');
+            }
+
+            function check() {
+                var value = input.value.trim();
+
+                if (!value) { hide(); return; }
+
+                var mine = ++seq;
+                var url = new URL(input.dataset.challanStatusUrl, window.location.origin);
+
+                url.searchParams.set('challan_no', value);
+
+                var supplierId = supplier
+                    ? (supplier.tomselect ? supplier.tomselect.getValue() : supplier.value)
+                    : '';
+
+                if (supplierId) { url.searchParams.set('general_stock_supplier_id', supplierId); }
+
+                fetch(url, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                })
+                    .then(function (res) { return res.ok ? res.json() : null; })
+                    .then(function (data) {
+                        // A slower earlier request must not overwrite a newer answer.
+                        if (mine !== seq) { return; }
+
+                        if (data && data.matches && data.matches.length) { show(data.matches); }
+                        else { hide(); }
+                    })
+                    // Advice only — a lookup that fails says nothing at all.
+                    .catch(hide);
+            }
+
+            function queue() {
+                window.clearTimeout(timer);
+                timer = window.setTimeout(check, 400);
+            }
+
+            input.addEventListener('input', queue);
+            input.addEventListener('blur', check);
+
+            if (supplier) { supplier.addEventListener('change', check); }
+
+            // A form that came back filled in — rejected, or resumed from a
+            // draft — should show the warning without waiting to be retyped.
+            if (input.value.trim()) { check(); }
         })();
     </script>
 

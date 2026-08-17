@@ -249,6 +249,12 @@ Route::prefix('store')
             Route::get('/purchases/report/pdf', [ReceivingReportController::class, 'pdf'])->name('purchases.report.pdf');
             Route::get('/purchases/report/excel', [ReceivingReportController::class, 'excel'])->name('purchases.report.excel');
 
+            // Read-only: what is already recorded under a challan number. The
+            // Record Receiving form calls it as the number is typed, to warn
+            // before a delivery is entered twice. Declared above /purchases so
+            // the path is not read as a {stockPurchase}.
+            Route::get('/purchases/challan-status', [StockPurchaseController::class, 'challanStatus'])->name('purchases.challan-status');
+
             // Half-finished Record Receiving forms. Same guard as recording
             // one, and nothing on this path writes stock.
             Route::post('/purchases/drafts', [StockPurchaseController::class, 'saveDraft'])->middleware($act('store.receiving.create'))->name('purchases.drafts.save');
