@@ -343,3 +343,39 @@ it('falls back to an old file\'s Specification column when it has no Brand', fun
         ->and($result['challans'])->toHaveCount(1)
         ->and($result['notes'])->toBeEmpty();
 });
+
+/**
+ * The same defect IssueImport carried, from the same copy: both messages about
+ * an unreadable heading row were returned through `$blank + ['errors' => ...]`,
+ * and PHP's + keeps the LEFT side on a duplicate key — so $blank's empty errors
+ * won and the explanation was thrown away.
+ */
+it('explains a sheet with no heading row', function () {
+    $result = ReceivingImport::parse([
+        ['Delivery notes, August'],
+        ['Sewing Needle', 4],
+    ]);
+
+    expect($result['challans'])->toBeEmpty()
+        ->and($result['errors'])->toHaveCount(1);
+
+    expect($result['errors'][0])->toContain('No heading row was found')
+        ->toContain('download the sample template');
+});
+
+it('explains a heading row that is missing a required column', function () {
+    // No Purchased Qty among the headings. locateHeader() only accepts a row
+    // carrying ALL the required headings, so the same message answers this —
+    // which is why it names the three columns rather than just saying that no
+    // headings were found.
+    $result = ReceivingImport::parse([
+        ['Challan Date*', 'Item Name*', 'Challan No/Invoice No'],
+        ['2026-08-01', 'Sewing Needle', 'CH-1'],
+    ]);
+
+    expect($result['challans'])->toBeEmpty()
+        ->and($result['errors'])->toHaveCount(1);
+
+    expect($result['errors'][0])->toContain('No heading row was found')
+        ->toContain('Challan Date, Item Name and Purchased Qty');
+});

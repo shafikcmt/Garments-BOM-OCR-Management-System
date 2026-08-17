@@ -151,23 +151,27 @@ class ReceivingImport implements ToArray, WithCustomCsvSettings
      */
     public static function parse(array $rows): array
     {
+        // array_merge, NOT the + operator: on a duplicate key + keeps the LEFT
+        // side, so `$blank + ['errors' => [...]]` returned $blank's empty errors
+        // and threw the message away. Same bug as IssueImport carried, from the
+        // same copy.
         $blank = ['challans' => [], 'errors' => [], 'skipped' => [], 'notes' => []];
 
         [$headerIndex, $map] = self::locateHeader($rows);
 
         if ($headerIndex === null) {
-            return $blank + ['errors' => [
+            return array_merge($blank, ['errors' => [
                 'No heading row was found. The sheet needs a row naming at least Challan Date, Item Name and Purchased Qty — download the sample template to see the expected columns.',
-            ]];
+            ]]);
         }
 
         $missing = array_values(array_diff(self::REQUIRED_HEADINGS, array_keys($map)));
 
         if ($missing) {
-            return $blank + ['errors' => [
+            return array_merge($blank, ['errors' => [
                 'The heading row is missing these required columns: '
                     .implode(', ', array_map(fn ($f) => self::label($f), $missing)).'.',
-            ]];
+            ]]);
         }
 
         // One query each, not one per row.

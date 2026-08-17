@@ -1255,6 +1255,61 @@ it('creates a master only for a name the user genuinely changed while fixing the
         ->and(IndentSection::where('name', 'Finishing-3')->exists())->toBeTrue();
 });
 
+/**
+ * The two failures where the message IS the help: a file whose headings the
+ * importer cannot find at all. Both used to return their message through
+ * `$blank + ['errors' => ...]`, and PHP's + keeps the LEFT side on a duplicate
+ * key — so the empty array in $blank won and the explanation was discarded,
+ * leaving the screen saying only that nothing was imported.
+ */
+it('explains a sheet with no heading row', function () {
+    $result = IssueImport::parse([
+        ['Some notes about this workbook'],
+        ['Sewing Needle', 5],
+    ]);
+
+    expect($result['requisitions'])->toBeEmpty()
+        ->and($result['errors'])->toHaveCount(1);
+
+    expect($result['errors'][0])->toContain('No heading row was found')
+        ->toContain('download the sample template');
+});
+
+it('explains a heading row that is missing a required column', function () {
+    // Real headings, but no Issued Qty among them. locateHeader() only accepts
+    // a row carrying ALL the required headings, so this is not recognised as a
+    // heading row at all and the same message answers it — which is why the
+    // message names the three columns rather than just saying "no headings".
+    $result = IssueImport::parse([
+        ['Issue Date*', 'Item Name*', 'Remarks'],
+        ['2026-08-01', 'Sewing Needle', 'note'],
+    ]);
+
+    expect($result['requisitions'])->toBeEmpty()
+        ->and($result['errors'])->toHaveCount(1);
+
+    expect($result['errors'][0])->toContain('No heading row was found')
+        ->toContain('Issue Date, Item Name and Issued Qty');
+});
+
+it('shows the heading-row error on screen instead of a bare failure notice', function () {
+    Permission::findOrCreate('store.issues.view', 'web');
+    Permission::findOrCreate('store.issues.create', 'web');
+
+    $user = User::factory()->create(['status' => 1]);
+    $user->givePermissionTo(['store.issues.view', 'store.issues.create']);
+
+    // A perfectly readable CSV that simply is not the template.
+    $csv = "Product,Amount\nSewing Needle,5\n";
+
+    $this->actingAs($user)->post(
+        route('store.stock.issues.import'),
+        ['file' => UploadedFile::fake()->createWithContent('wrong.csv', $csv)]
+    )->assertRedirect()->assertSessionHas('import_errors');
+
+    expect(implode(' ', session('import_errors')))->toContain('No heading row was found');
+});
+
 it('records imported issues through the controller, scoped by permission', function () {
     $item = issueItem();
     stockOnHand($item, 100);
