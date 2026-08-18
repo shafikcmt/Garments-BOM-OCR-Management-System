@@ -91,10 +91,28 @@ class User extends Authenticatable
     | admin never reach a buyer comparison at all.
     */
 
-    /** The buyer a normal merchant user was created under. */
+    /**
+     * The PRIMARY buyer a normal merchant user was created under.
+     *
+     * Kept as the default even now that buyers() exists: it is what a new
+     * account inherits, what the upload form preselects, and what every query
+     * written before the pivot still reads.
+     */
     public function buyer()
     {
         return $this->belongsTo(Buyer::class);
+    }
+
+    /**
+     * Every buyer a normal merchant team member is assigned to.
+     *
+     * Department admins do not use this — they own buyers through
+     * buyers.department_admin_id instead. Assignment and ownership are
+     * different things and are stored separately on purpose.
+     */
+    public function buyers()
+    {
+        return $this->belongsToMany(Buyer::class)->orderBy('buyers.id');
     }
 
     /**
@@ -152,7 +170,24 @@ class User extends Authenticatable
             return $this->ownedBuyers()->pluck('id')->map(fn ($id) => (int) $id)->all();
         }
 
-        return $this->buyer_id ? [(int) $this->buyer_id] : [];
+        // A team member's assignments live in the buyer_user pivot; their
+        // users.buyer_id is the primary one and is listed FIRST, so
+        // merchantBuyerId() below still answers with the column every existing
+        // caller has always read. The rest follow in id order.
+        //
+        // Union rather than pivot-only: the column is authoritative on its own
+        // for anyone whose pivot row is missing — a user created before the
+        // backfill ran, or one added straight to the table — and dropping them
+        // to unscoped would quietly hand them access to every buyer.
+        $assigned = $this->buyers()->pluck('buyers.id')->map(fn ($id) => (int) $id)->all();
+
+        if (! $this->buyer_id) {
+            return $assigned;
+        }
+
+        $primary = (int) $this->buyer_id;
+
+        return array_values(array_merge([$primary], array_diff($assigned, [$primary])));
     }
 
     /**
