@@ -109,12 +109,21 @@ class UserPolicy
             return false;
         }
 
-        $buyerId = $actor->merchantBuyerId();
+        // THE SUBSET RULE. An admin may grant upload only on buyers they hold
+        // themselves, so an admin with two buyers reaches both their teams and
+        // no further. Read as a set on both sides: the actor's whole holding,
+        // and every buyer the target is assigned to — a target on any buyer
+        // outside the actor's set is not theirs to grant on.
+        $mine = $actor->merchantBuyerIds();
+        $theirs = $target->merchantBuyerIds();
 
-        return $buyerId !== null
-            && ! $target->isDepartmentAdmin()
+        if ($mine === [] || $theirs === []) {
+            return false;
+        }
+
+        return ! $target->isDepartmentAdmin()
             && $target->isMerchantDepartment()
-            && (int) $target->buyer_id === (int) $buyerId;
+            && array_diff($theirs, $mine) === [];
     }
 
     /**

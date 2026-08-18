@@ -126,9 +126,9 @@ it('shows every owned buyer on the user edit screen', function () {
         ->assertSee('Assigned Buyers')
         ->assertSee('Hugo Boss')
         ->assertSee('Zara Group')
-        // The comparison sites still read one buyer, and the screen has to say
-        // so rather than let an admin wonder why the second is read-only.
-        ->assertSee('File editing and upload tagging currently use');
+        // The caveat is gone: every owned buyer now carries full editing and
+        // upload rights, so there is nothing left to warn about.
+        ->assertDontSee('File editing and upload tagging currently use');
 });
 
 it('keeps the singular label and no caveat for a one-buyer admin', function () {

@@ -123,6 +123,69 @@ it('reports no buyers for any other department, even with a buyer_id set', funct
     expect(buyerScopeUser($role, ['buyer_id' => $this->buyerA->id])->merchantBuyerIds())->toBe([]);
 })->with(['commercial', 'store', 'account', 'supply_chain', 'production', 'management', 'admin']);
 
+// --- The lock reads every buyer, not just the primary ---------------------
+
+it('lets a department admin edit files of EITHER buyer they own', function () {
+    $admin = buyerScopeUser('merchant', ['is_department_admin' => true]);
+    $this->buyerA->update(['department_admin_id' => $admin->id]);
+    $this->buyerB->update(['department_admin_id' => $admin->id]);
+
+    // buyerB is not the primary — under the old single-value comparison this
+    // was locked, while the screen said the admin owned it.
+    expect(buyerScopeFile($this->buyerA->id)->isBuyerLockedForUser($admin))->toBeFalse()
+        ->and(buyerScopeFile($this->buyerB->id)->isBuyerLockedForUser($admin))->toBeFalse();
+});
+
+it('still locks a department admin out of a buyer they do not own', function () {
+    $admin = buyerScopeUser('merchant', ['is_department_admin' => true]);
+    $this->buyerA->update(['department_admin_id' => $admin->id]);
+
+    $outside = Buyer::create(['buyer_name' => 'Buyer C']);
+
+    expect(buyerScopeFile($outside->id)->isBuyerLockedForUser($admin))->toBeTrue();
+});
+
+it('lets a team member edit files of any buyer assigned to them', function () {
+    $user = buyerScopeUser('merchant', ['buyer_id' => $this->buyerA->id]);
+    $user->buyers()->attach([$this->buyerA->id, $this->buyerB->id]);
+
+    expect(buyerScopeFile($this->buyerB->id)->isBuyerLockedForUser($user->fresh()))->toBeFalse();
+});
+
+it('still locks a team member out of a buyer nobody assigned them', function () {
+    $user = buyerScopeUser('merchant', ['buyer_id' => $this->buyerA->id]);
+    $user->buyers()->attach($this->buyerA->id);
+
+    expect(buyerScopeFile($this->buyerB->id)->isBuyerLockedForUser($user->fresh()))->toBeTrue();
+});
+
+/**
+ * The lock has to STOP the write, not just describe it. Same standard the
+ * upload validation is held to: assert the data did not change.
+ */
+it('refuses the save itself, not just with a warning', function () {
+    $user = buyerScopeUser('merchant', ['buyer_id' => $this->buyerA->id]);
+    $file = buyerScopeFile($this->buyerB->id);
+
+    $this->actingAs($user)
+        ->post(route('uploaded-files.rows.store', $file->id))
+        ->assertRedirect(route('uploaded-files.show', $file->id))
+        ->assertSessionHas('warning');
+
+    expect($file->rows()->count())->toBe(0);
+});
+
+it('allows that same write once the buyer is one of theirs', function () {
+    $user = buyerScopeUser('merchant', ['buyer_id' => $this->buyerA->id]);
+    $user->buyers()->attach([$this->buyerA->id, $this->buyerB->id]);
+    $file = buyerScopeFile($this->buyerB->id);
+
+    $this->actingAs($user->fresh())
+        ->post(route('uploaded-files.rows.store', $file->id));
+
+    expect($file->rows()->count())->toBe(1);
+});
+
 // --- Nothing breaks retroactively -----------------------------------------
 
 it('leaves an unscoped merchant unrestricted', function () {
@@ -200,6 +263,65 @@ it('refuses a department admin granting upload on another buyer team', function 
     $outsider = buyerScopeUser('merchant', ['buyer_id' => $this->buyerB->id]);
 
     expect($admin->can('setCanUpload', $outsider))->toBeFalse();
+});
+
+// --- The subset rule, restated for several buyers -------------------------
+
+it('lets an admin grant upload on a team member of their SECOND buyer', function () {
+    $admin = buyerScopeUser('merchant', ['is_department_admin' => true]);
+    $this->buyerA->update(['department_admin_id' => $admin->id]);
+    $this->buyerB->update(['department_admin_id' => $admin->id]);
+
+    // Under the old single-value comparison this member was out of reach,
+    // because buyerB is not the admin's primary.
+    $member = buyerScopeUser('merchant', ['buyer_id' => $this->buyerB->id]);
+
+    expect($admin->fresh()->can('setCanUpload', $member))->toBeTrue();
+});
+
+/**
+ * The subset rule itself. Widening the actor's side to a set must not widen
+ * the target's — an admin still reaches only buyers they hold.
+ */
+it('still refuses an admin granting upload on a buyer they do not own', function () {
+    $admin = buyerScopeUser('merchant', ['is_department_admin' => true]);
+    $this->buyerA->update(['department_admin_id' => $admin->id]);
+
+    $outside = Buyer::create(['buyer_name' => 'Buyer C']);
+    $outsider = buyerScopeUser('merchant', ['buyer_id' => $outside->id]);
+
+    expect($admin->fresh()->can('setCanUpload', $outsider))->toBeFalse();
+});
+
+/**
+ * The hole the set comparison could have opened. A target assigned to one of
+ * the admin's buyers AND one outside it is not wholly theirs — granting upload
+ * would hand rights that reach a buyer the admin has no claim on. Overlap is
+ * not enough; the target's whole set must sit inside the actor's.
+ */
+it('refuses when the target also holds a buyer outside the admins own', function () {
+    $admin = buyerScopeUser('merchant', ['is_department_admin' => true]);
+    $this->buyerA->update(['department_admin_id' => $admin->id]);
+
+    $outside = Buyer::create(['buyer_name' => 'Buyer C']);
+    $member = buyerScopeUser('merchant', ['buyer_id' => $this->buyerA->id]);
+    $member->buyers()->attach([$this->buyerA->id, $outside->id]);
+
+    expect($admin->fresh()->can('setCanUpload', $member->fresh()))->toBeFalse();
+});
+
+it('refuses an admin who owns no buyer at all', function () {
+    $admin = buyerScopeUser('merchant', ['is_department_admin' => true]);
+    $member = buyerScopeUser('merchant', ['buyer_id' => $this->buyerA->id]);
+
+    expect($admin->can('setCanUpload', $member))->toBeFalse();
+});
+
+it('refuses granting upload to an unscoped merchant', function () {
+    $admin = buyerScopeUser('merchant', ['is_department_admin' => true]);
+    $this->buyerA->update(['department_admin_id' => $admin->id]);
+
+    expect($admin->fresh()->can('setCanUpload', buyerScopeUser('merchant')))->toBeFalse();
 });
 
 it('refuses a normal merchant granting upload to anyone, including themselves', function () {

@@ -100,14 +100,37 @@
                              workspace list and its buyer filter read. --}}
                         @if($scopedBuyer)
                             {{-- Scoped to one buyer, so there is nothing to choose:
-                                 the server tags the file from this user's own
-                                 assignment and ignores any posted buyer_id. --}}
+                                 ExcelUploadRequest fills the field in from this
+                                 user's own assignment. Unchanged from before
+                                 multi-buyer — this is still most people. --}}
                             <div>
                                 <label class="form-label d-block mb-1">Buyer</label>
                                 <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
                                     <i class="bi bi-tag-fill me-1" aria-hidden="true"></i>{{ $scopedBuyer->buyer_name }}
                                 </span>
                                 <div class="form-text">Tagged to your assigned buyer automatically.</div>
+                            </div>
+                        @elseif($scopedBuyers->isNotEmpty())
+                            {{-- Several buyers, so the file has to say which one.
+                                 No pre-selection: picking one for them is how a
+                                 file ends up tagged to a buyer nobody chose.
+
+                                 The list is narrowed for convenience only. The
+                                 request refuses any buyer outside this same set,
+                                 so a hand-made post gains nothing by naming one. --}}
+                            <div>
+                                <label class="form-label" for="merchantUploadBuyer">Buyer <span class="text-danger">*</span></label>
+                                <select name="buyer_id" id="merchantUploadBuyer"
+                                        class="form-select @error('buyer_id') is-invalid @enderror" required>
+                                    <option value="">Select buyer</option>
+                                    @foreach($scopedBuyers as $buyer)
+                                        <option value="{{ $buyer->id }}" {{ (int) old('buyer_id') === (int) $buyer->id ? 'selected' : '' }}>
+                                            {{ $buyer->buyer_name }}{{ $buyer->buyer_code ? ' (' . $buyer->buyer_code . ')' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('buyer_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="form-text">You are assigned to {{ $scopedBuyers->count() }} buyers. Choose the one this file is for.</div>
                             </div>
                         @else
                             <div>

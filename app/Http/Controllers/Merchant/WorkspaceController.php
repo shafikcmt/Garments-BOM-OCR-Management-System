@@ -35,17 +35,33 @@ class WorkspaceController extends Controller
         // files already tagged with them.
         $buyers = Buyer::active()->orderBy('buyer_name')->get();
 
-        // Buyer scoping, Merchandising only. All three are null/true for an
-        // unscoped merchant, which is every merchant that exists today, so the
-        // upload panel renders exactly as it does now for them.
+        // Buyer scoping, Merchandising only. Three states, and the upload
+        // panel renders differently for each:
+        //
+        //   none      unscoped — the full dropdown of active buyers, which is
+        //             what every merchant sees today.
+        //   one       a read-only chip. Nothing to choose, so nothing is asked;
+        //             ExcelUploadRequest fills the field in server-side.
+        //   several   a dropdown limited to THEIRS. The request rejects
+        //             anything outside the same set, so the narrowed list is a
+        //             convenience and not the control.
         $user = auth()->user();
-        $scopedBuyer = $user?->merchantBuyerId()
-            ? $buyers->firstWhere('id', $user->merchantBuyerId()) ?? Buyer::find($user->merchantBuyerId())
-            : null;
+        $scopedIds = $user?->merchantBuyerIds() ?? [];
+
+        // Inactive buyers are excluded from the general list but kept when one
+        // is assigned: a merchant scoped to a buyer since deactivated must
+        // still be able to upload for it.
+        $scopedBuyers = $scopedIds === []
+            ? collect()
+            : Buyer::whereIn('id', $scopedIds)->orderBy('buyer_name')->get();
+
+        $scopedBuyer = $scopedBuyers->count() === 1 ? $scopedBuyers->first() : null;
+
         $canUpload = $user?->mayUploadBom() ?? false;
 
         return view('merchant.workspace', compact(
-            'files', 'merchantInputHeaders', 'fileSummaries', 'buyers', 'scopedBuyer', 'canUpload'
+            'files', 'merchantInputHeaders', 'fileSummaries', 'buyers',
+            'scopedBuyer', 'scopedBuyers', 'canUpload'
         ));
     }
 }

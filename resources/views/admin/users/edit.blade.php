@@ -210,16 +210,6 @@
                                     @if($user->isDepartmentAdmin())
                                         Owns {{ $assignedBuyers->count() > 1 ? 'these buyers' : 'this buyer' }}. Change from
                                         <a href="{{ route('admin.buyers.index') }}">Admin &rsaquo; Buyers</a>.
-                                        {{-- Says plainly which buyer the file rules use while the
-                                             rest of the system still reads one. Without this an
-                                             admin holding two buyers finds the second one's files
-                                             read-only and has nothing telling them why. --}}
-                                        @if($assignedBuyers->count() > 1)
-                                            <span class="d-block text-warning-emphasis mt-1">
-                                                File editing and upload tagging currently use
-                                                <strong>{{ $assignedBuyers->first()->buyer_name }}</strong> only.
-                                            </span>
-                                        @endif
                                     @else
                                         Inherited from the department admin who created this account.
                                     @endif

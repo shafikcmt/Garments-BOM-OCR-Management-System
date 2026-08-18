@@ -221,7 +221,11 @@ class User extends Authenticatable
      */
     public function mayUploadBom(): bool
     {
-        if ($this->merchantBuyerId() === null) {
+        // Empty means unscoped, and unscoped keeps today's behaviour. Asked as
+        // a set so that "has no buyers" cannot be confused with "has several
+        // and therefore no single primary" — the confusion that made the old
+        // upload fallthrough dangerous.
+        if ($this->merchantBuyerIds() === []) {
             return true;
         }
 

@@ -131,13 +131,17 @@ class ExcelFile extends Model
             return false;
         }
 
-        $theirs = $user->merchantBuyerId();
+        // EVERY buyer they hold, not just the primary. A department admin
+        // owning two buyers is scoped to both, and comparing against one would
+        // lock them out of the other's files while the screen told them they
+        // owned it.
+        $theirs = $user->merchantBuyerIds();
 
-        if ($theirs === null || $this->buyer_id === null) {
+        if ($theirs === [] || $this->buyer_id === null) {
             return false;
         }
 
-        return (int) $this->buyer_id !== (int) $theirs;
+        return ! in_array((int) $this->buyer_id, $theirs, true);
     }
 
     public function lockScopeLabel(): string
