@@ -45,8 +45,8 @@
             @if($merchantAdmins->isEmpty())
                 No Merchant department admin exists yet. Create one from Admin &gt; Users first.
             @else
-                The Merchandising admin who owns this buyer. One admin owns one buyer — assigning
-                them here releases any buyer they held before.
+                The Merchandising admin who owns this buyer. An admin may own several buyers —
+                assigning them here does not affect any other buyer they already hold.
             @endif
         </div>
     </div>
