@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer;
 use App\Models\User;
+use App\Support\BuyerScope;
 use App\Support\DepartmentRoles;
 use App\Support\PermissionCatalog;
 use App\Support\UserAdministrationScope;
@@ -384,9 +385,35 @@ class UserController extends Controller
         }
 
         return [
+            // `required` + `min:1` is also THE INVARIANT that keeps
+            // buyer_scope_mode = 'specific' with an empty buyer set
+            // unreachable. That state denies the user every tagged record
+            // while the screen shows them as assigned, so it is refused at the
+            // point of entry rather than handled downstream.
             'buyer_ids' => ['required', 'array', 'min:1'],
             'buyer_ids.*' => ['integer', Rule::in($assignable)],
         ];
+    }
+
+    /**
+     * Guard for the same invariant on the path validation cannot see.
+     *
+     * buyerAssignmentRules() only fires when the actor has two or more buyers
+     * to offer — a single-buyer admin posts no buyer_ids at all, and a super
+     * admin has no picker. So the rules alone do not prove the invariant holds
+     * for every caller. This does, and it is deliberately an exception rather
+     * than a silent correction: a request that would create an assigned-but-
+     * unconfined user is a bug in the caller, and quietly rewriting it to
+     * 'all' would hide the bug behind a user who has less access than their
+     * record says.
+     *
+     * @param  list<int>  $assignedBuyerIds
+     */
+    private function assertBuyerScopeCoherent(string $mode, array $assignedBuyerIds): void
+    {
+        if ($mode === BuyerScope::MODE_SPECIFIC && $assignedBuyerIds === []) {
+            abort(422, 'A user confined to specific buyers must be assigned at least one.');
+        }
     }
 
     /**
@@ -495,6 +522,12 @@ class UserController extends Controller
 
         $assignedBuyerIds = $this->assignedBuyerIds($request);
 
+        $buyerScopeMode = $assignedBuyerIds === []
+            ? BuyerScope::MODE_ALL
+            : BuyerScope::MODE_SPECIFIC;
+
+        $this->assertBuyerScopeCoherent($buyerScopeMode, $assignedBuyerIds);
+
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
@@ -505,6 +538,11 @@ class UserController extends Controller
             // below. Both, so a user created here is read the same way as one
             // the Phase 2 backfill produced.
             'buyer_id' => $assignedBuyerIds[0] ?? null,
+            // Said explicitly, never left to the column default. A user given
+            // buyers who stayed on 'all' would be assigned and unconfined at
+            // the same time — the assignment recorded, and every one of its
+            // restrictions silently not applied.
+            'buyer_scope_mode' => $buyerScopeMode,
         ]);
 
         if ($assignedBuyerIds !== []) {
