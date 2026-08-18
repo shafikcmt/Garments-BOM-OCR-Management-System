@@ -196,10 +196,16 @@ class ExcelUploadController extends Controller
         $path = $file->storeAs('excel_uploads', $fileName);
         $userId = auth()->id();
 
-        // A merchant scoped to a buyer uploads for that buyer and no other, so
-        // the tag comes from their own assignment rather than the form. Anyone
-        // unscoped still picks from the dropdown, as before.
-        $buyerId = auth()->user()->merchantBuyerId() ?? $request->integer('buyer_id');
+        // Already checked against this user's own merchantBuyerIds() by
+        // ExcelUploadRequest, which also fills the field in for the merchant
+        // who holds one buyer and is never shown a chooser.
+        //
+        // This used to read `merchantBuyerId() ?? $request->integer('buyer_id')`.
+        // A null scope meant "unscoped, may tag anything", so a multi-buyer
+        // merchant — who has no single answer to return — would have fallen
+        // through to unvalidated request input and been able to tag a file to
+        // ANY buyer in the system. Raw input is not read here any more.
+        $buyerId = $request->validated('buyer_id');
 
         $excelFile = DB::transaction(function () use ($request, $file, $fileName, $path, $allHeaders, $preparedRows, $savedRows, $userId, $buyerId) {
             $excelFile = ExcelFile::create([
