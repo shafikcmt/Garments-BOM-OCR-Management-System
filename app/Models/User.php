@@ -97,10 +97,22 @@ class User extends Authenticatable
         return $this->belongsTo(Buyer::class);
     }
 
-    /** The buyer this user owns as its Merchant department-admin, if any. */
-    public function ownedBuyer()
+    /**
+     * The buyers this user owns as their Merchant department-admin.
+     *
+     * hasMany, not hasOne. `buyers.department_admin_id` always described one
+     * admin per buyer and said nothing about how many buyers an admin may
+     * hold — the single-buyer rule lived in application code, in a
+     * BuyerController hook that nulled an admin's other buyers whenever one
+     * was saved. That hook silently discarded a real assignment, so it is
+     * gone and the relationship now reads the column for what it is.
+     *
+     * Ordered, because merchantBuyerId() picks the first of these and an
+     * unordered "first" is whatever the database felt like returning.
+     */
+    public function ownedBuyers()
     {
-        return $this->hasOne(Buyer::class, 'department_admin_id');
+        return $this->hasMany(Buyer::class, 'department_admin_id')->orderBy('id');
     }
 
     /**
@@ -117,25 +129,52 @@ class User extends Authenticatable
     }
 
     /**
-     * The buyer this merchant is confined to, or null when unconfined.
+     * Every buyer this merchant is confined to. Empty means unscoped.
      *
      * Two sources, because the assignment is recorded in two places for two
-     * different kinds of user: a department-admin owns a buyer
+     * different kinds of user: a department-admin owns buyers
      * (buyers.department_admin_id), a normal user inherits one at creation
-     * (users.buyer_id). Null means unscoped — the state of every user that
-     * existed before buyer scoping, and deliberately unrestricted.
+     * (users.buyer_id). An empty array means unscoped — the state of every
+     * user that existed before buyer scoping, and deliberately unrestricted.
+     *
+     * THIS IS THE ONE TO COMPARE AGAINST. merchantBuyerId() below answers a
+     * narrower question and cannot see an admin's second buyer.
+     *
+     * @return list<int>
      */
-    public function merchantBuyerId(): ?int
+    public function merchantBuyerIds(): array
     {
         if (! $this->isMerchantDepartment()) {
-            return null;
+            return [];
         }
 
         if ($this->isDepartmentAdmin()) {
-            return $this->ownedBuyer()->value('id');
+            return $this->ownedBuyers()->pluck('id')->map(fn ($id) => (int) $id)->all();
         }
 
-        return $this->buyer_id;
+        return $this->buyer_id ? [(int) $this->buyer_id] : [];
+    }
+
+    /**
+     * The PRIMARY buyer this merchant is confined to, or null when unconfined.
+     *
+     * "Primary" means the lowest-numbered buyer they hold — the oldest
+     * assignment. That is a deterministic answer to a question that no longer
+     * has a single true one, and it is deliberately kept rather than deleted:
+     * every existing caller wants one buyer, and changing what they all read
+     * in one go is how a scope rule quietly stops matching.
+     *
+     * A merchant holding exactly one buyer — which is everyone today — gets
+     * the same answer from this as from merchantBuyerIds(), so nothing about
+     * their access changes.
+     *
+     * DO NOT reach for this in new code. An admin owning several buyers is
+     * scoped to all of them, and a comparison against this one silently locks
+     * them out of the rest. Use merchantBuyerIds().
+     */
+    public function merchantBuyerId(): ?int
+    {
+        return $this->merchantBuyerIds()[0] ?? null;
     }
 
     /**

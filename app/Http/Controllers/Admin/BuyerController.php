@@ -26,9 +26,7 @@ class BuyerController extends Controller
 
     public function store(Request $request)
     {
-        $buyer = Buyer::create($this->validatedData($request));
-
-        $this->releaseAdminFromOtherBuyers($buyer);
+        Buyer::create($this->validatedData($request));
 
         return redirect()
             ->route('admin.buyers.index')
@@ -46,8 +44,6 @@ class BuyerController extends Controller
     public function update(Request $request, Buyer $buyer)
     {
         $buyer->update($this->validatedData($request, $buyer));
-
-        $this->releaseAdminFromOtherBuyers($buyer);
 
         return redirect()
             ->route('admin.buyers.index')
@@ -107,25 +103,24 @@ class BuyerController extends Controller
         return $data;
     }
 
-    /**
-     * One admin owns one buyer.
+    /*
+     * An admin may own SEVERAL buyers. There used to be a
+     * releaseAdminFromOtherBuyers() here, called after every create and
+     * update, which nulled department_admin_id on every other buyer the
+     * chosen admin held. It was written to protect User::merchantBuyerId()
+     * from having to choose between two buyers.
      *
-     * The column enforces "a buyer has at most one admin" by being a single
-     * column; nothing stops the same admin being named on two buyers, and if
-     * that happened User::merchantBuyerId() would silently pick whichever came
-     * back first — the user would be scoped to a buyer nobody chose. Assigning
-     * an admin here therefore releases them from any buyer they held before.
+     * The protection cost more than it bought. Assigning an admin to a second
+     * buyer silently unassigned the first — no warning, no confirmation, and
+     * nothing on screen to say it had happened. A super admin setting up two
+     * buyers for one merchant admin destroyed their own first assignment by
+     * doing the second.
+     *
+     * The choice it was protecting against is answered properly now:
+     * merchantBuyerIds() returns all of them, and merchantBuyerId() picks the
+     * lowest id deterministically rather than whatever the database returned
+     * first.
      */
-    private function releaseAdminFromOtherBuyers(Buyer $buyer): void
-    {
-        if (! $buyer->department_admin_id) {
-            return;
-        }
-
-        Buyer::where('department_admin_id', $buyer->department_admin_id)
-            ->whereKeyNot($buyer->id)
-            ->update(['department_admin_id' => null]);
-    }
 
     /**
      * The chosen owner, or null. Rejects anyone who is not a Merchant

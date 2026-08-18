@@ -194,16 +194,32 @@
                              normal user without a buyer still shows nothing —
                              they inherit one at creation and have nothing to
                              act on. --}}
-                        @if($assignedBuyer)
+                        @if($assignedBuyers->isNotEmpty())
                             <div class="mb-4">
-                                <label class="form-label fw-semibold d-block">Assigned Buyer</label>
-                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
-                                    <i class="bi bi-tag-fill me-1" aria-hidden="true"></i>{{ $assignedBuyer->buyer_name }}
-                                </span>
+                                <label class="form-label fw-semibold d-block">
+                                    {{ $assignedBuyers->count() > 1 ? 'Assigned Buyers' : 'Assigned Buyer' }}
+                                </label>
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach($assignedBuyers as $assignedBuyer)
+                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                            <i class="bi bi-tag-fill me-1" aria-hidden="true"></i>{{ $assignedBuyer->buyer_name }}
+                                        </span>
+                                    @endforeach
+                                </div>
                                 <div class="form-text">
                                     @if($user->isDepartmentAdmin())
-                                        Owns this buyer. Change it from
+                                        Owns {{ $assignedBuyers->count() > 1 ? 'these buyers' : 'this buyer' }}. Change from
                                         <a href="{{ route('admin.buyers.index') }}">Admin &rsaquo; Buyers</a>.
+                                        {{-- Says plainly which buyer the file rules use while the
+                                             rest of the system still reads one. Without this an
+                                             admin holding two buyers finds the second one's files
+                                             read-only and has nothing telling them why. --}}
+                                        @if($assignedBuyers->count() > 1)
+                                            <span class="d-block text-warning-emphasis mt-1">
+                                                File editing and upload tagging currently use
+                                                <strong>{{ $assignedBuyers->first()->buyer_name }}</strong> only.
+                                            </span>
+                                        @endif
                                     @else
                                         Inherited from the department admin who created this account.
                                     @endif

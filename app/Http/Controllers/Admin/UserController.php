@@ -458,13 +458,19 @@ class UserController extends Controller
 
         $roles = $this->scope()->assignableRoles();
 
-        // A department admin owns their buyer; everyone else inherits one.
+        // A department admin owns their buyers; everyone else inherits one.
         // Resolved here rather than in the view so the screen does no
         // relationship work of its own.
-        $assignedBuyer = $user->isDepartmentAdmin() ? $user->ownedBuyer : $user->buyer;
+        //
+        // A collection either way, because an admin may own several and the
+        // screen has to show all of them — an admin looking at one badge when
+        // they hold two has no way to tell the second was ever saved.
+        $assignedBuyers = $user->isDepartmentAdmin()
+            ? $user->ownedBuyers
+            : collect([$user->buyer])->filter()->values();
 
         return view('admin.users.edit', array_merge(
-            compact('user', 'roles', 'assignedBuyer'),
+            compact('user', 'roles', 'assignedBuyers'),
             $this->permissionMatrixData($user)
         ));
     }

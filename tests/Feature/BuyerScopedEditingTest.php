@@ -62,6 +62,67 @@ it('scopes a department admin by the buyer they own, not by users.buyer_id', fun
         ->and(buyerScopeFile($this->buyerA->id)->isBuyerLockedForUser($admin))->toBeFalse();
 });
 
+// --- An admin may own several buyers --------------------------------------
+//
+// The column always allowed it; a BuyerController hook used to null the
+// others out. With that hook gone, these pin what the model now answers.
+
+it('reports every buyer a department admin owns', function () {
+    $admin = buyerScopeUser('merchant', ['is_department_admin' => true]);
+    $this->buyerA->update(['department_admin_id' => $admin->id]);
+    $this->buyerB->update(['department_admin_id' => $admin->id]);
+
+    expect($admin->merchantBuyerIds())->toBe([$this->buyerA->id, $this->buyerB->id]);
+});
+
+/**
+ * merchantBuyerId() has to keep answering something while the comparison
+ * sites still read it, and "whichever the database returned first" is not an
+ * answer — it could differ between MySQL and PostgreSQL, or after a reindex.
+ */
+it('picks the lowest-numbered buyer as the primary, whatever order they were assigned', function () {
+    $admin = buyerScopeUser('merchant', ['is_department_admin' => true]);
+
+    // Deliberately assigned newest-first.
+    $this->buyerB->update(['department_admin_id' => $admin->id]);
+    $this->buyerA->update(['department_admin_id' => $admin->id]);
+
+    expect($admin->merchantBuyerId())->toBe($this->buyerA->id);
+});
+
+it('leaves a single-buyer admin answering exactly as before', function () {
+    $admin = buyerScopeUser('merchant', ['is_department_admin' => true]);
+    $this->buyerA->update(['department_admin_id' => $admin->id]);
+
+    expect($admin->merchantBuyerIds())->toBe([$this->buyerA->id])
+        ->and($admin->merchantBuyerId())->toBe($this->buyerA->id);
+});
+
+it('reports the one inherited buyer for a normal scoped merchant', function () {
+    $user = buyerScopeUser('merchant', ['buyer_id' => $this->buyerA->id]);
+
+    expect($user->merchantBuyerIds())->toBe([$this->buyerA->id]);
+});
+
+it('reports no buyers at all for an unscoped merchant', function () {
+    expect(buyerScopeUser('merchant')->merchantBuyerIds())->toBe([]);
+});
+
+it('reports no buyers for a department admin who owns none', function () {
+    $admin = buyerScopeUser('merchant', ['is_department_admin' => true]);
+
+    expect($admin->merchantBuyerIds())->toBe([])
+        ->and($admin->merchantBuyerId())->toBeNull();
+});
+
+/**
+ * The same guarantee the single-buyer version carries, restated for the new
+ * method: the departments with no buyer concept must not acquire one.
+ */
+it('reports no buyers for any other department, even with a buyer_id set', function (string $role) {
+    expect(buyerScopeUser($role, ['buyer_id' => $this->buyerA->id])->merchantBuyerIds())->toBe([]);
+})->with(['commercial', 'store', 'account', 'supply_chain', 'production', 'management', 'admin']);
+
 // --- Nothing breaks retroactively -----------------------------------------
 
 it('leaves an unscoped merchant unrestricted', function () {
