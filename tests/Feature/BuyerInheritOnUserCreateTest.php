@@ -84,3 +84,142 @@ it('does not scope a non-merchant user a merchant admin somehow creates', functi
 
     expect(User::where('email', 'new.person@example.com')->value('buyer_id'))->toBeNull();
 });
+
+// --- Choosing a subset, once the admin has more than one buyer ------------
+
+it('still assigns silently when the admin has only one buyer', function () {
+    $this->actingAs($this->deptAdmin)
+        ->post(route('admin.users.store'), createUserPayload())
+        ->assertRedirect();
+
+    $new = User::where('email', 'new.person@example.com')->first();
+
+    // Column and pivot agree, so this user reads the same as a backfilled one.
+    expect($new->buyer_id)->toBe($this->buyerA->id)
+        ->and($new->buyers->pluck('id')->all())->toBe([$this->buyerA->id]);
+});
+
+it('assigns only the buyers the admin ticked', function () {
+    $this->buyerB->update(['department_admin_id' => $this->deptAdmin->id]);
+
+    $this->actingAs($this->deptAdmin->fresh())
+        ->post(route('admin.users.store'), createUserPayload([
+            'buyer_ids' => [$this->buyerB->id],
+        ]))
+        ->assertRedirect();
+
+    $new = User::where('email', 'new.person@example.com')->first();
+
+    expect($new->buyers->pluck('id')->all())->toBe([$this->buyerB->id])
+        ->and($new->buyer_id)->toBe($this->buyerB->id)
+        ->and($new->merchantBuyerIds())->toBe([$this->buyerB->id]);
+});
+
+it('assigns both when both are ticked, primary being the lower id', function () {
+    $this->buyerB->update(['department_admin_id' => $this->deptAdmin->id]);
+
+    $this->actingAs($this->deptAdmin->fresh())
+        ->post(route('admin.users.store'), createUserPayload([
+            // Posted highest-first on purpose.
+            'buyer_ids' => [$this->buyerB->id, $this->buyerA->id],
+        ]))
+        ->assertRedirect();
+
+    $new = User::where('email', 'new.person@example.com')->first();
+
+    expect($new->buyer_id)->toBe($this->buyerA->id)
+        ->and($new->merchantBuyerIds())->toBe([$this->buyerA->id, $this->buyerB->id]);
+});
+
+/**
+ * THE SUBSET RULE AT CREATION. Refused, not silently dropped — the same
+ * standard the upload tag is held to.
+ */
+it('REFUSES a buyer the creating admin does not own', function () {
+    $this->buyerB->update(['department_admin_id' => $this->deptAdmin->id]);
+    $outside = Buyer::create(['buyer_name' => 'Somebody Elses']);
+
+    $this->actingAs($this->deptAdmin->fresh())
+        ->post(route('admin.users.store'), createUserPayload([
+            'buyer_ids' => [$outside->id],
+        ]))
+        ->assertSessionHasErrors('buyer_ids.0');
+
+    expect(User::where('email', 'new.person@example.com')->exists())->toBeFalse();
+});
+
+it('refuses a mix of one of theirs and one outside, rather than taking the good half', function () {
+    $this->buyerB->update(['department_admin_id' => $this->deptAdmin->id]);
+    $outside = Buyer::create(['buyer_name' => 'Somebody Elses']);
+
+    $this->actingAs($this->deptAdmin->fresh())
+        ->post(route('admin.users.store'), createUserPayload([
+            'buyer_ids' => [$this->buyerA->id, $outside->id],
+        ]))
+        ->assertSessionHasErrors();
+
+    expect(User::where('email', 'new.person@example.com')->exists())->toBeFalse();
+});
+
+it('makes a multi-buyer admin choose at least one', function () {
+    $this->buyerB->update(['department_admin_id' => $this->deptAdmin->id]);
+
+    $this->actingAs($this->deptAdmin->fresh())
+        ->post(route('admin.users.store'), createUserPayload())
+        ->assertSessionHasErrors('buyer_ids');
+
+    expect(User::where('email', 'new.person@example.com')->exists())->toBeFalse();
+});
+
+it('offers the picker only when there is a choice to make', function () {
+    // One buyer — nothing to decide, so no field.
+    $this->actingAs($this->deptAdmin)
+        ->get(route('admin.users.create'))
+        ->assertOk()
+        ->assertDontSee('buyer_ids[]', false);
+
+    $this->buyerB->update(['department_admin_id' => $this->deptAdmin->id]);
+
+    $this->actingAs($this->deptAdmin->fresh())
+        ->get(route('admin.users.create'))
+        ->assertOk()
+        ->assertSee('buyer_ids[]', false)
+        ->assertSee('Buyer A')
+        ->assertSee('Buyer B');
+});
+
+it('offers no picker to a super admin, whose users stay unscoped', function () {
+    $super = User::factory()->create()->assignRole('admin');
+
+    $this->actingAs($super)
+        ->get(route('admin.users.create'))
+        ->assertOk()
+        ->assertDontSee('buyer_ids[]', false);
+
+    $this->actingAs($super)
+        ->post(route('admin.users.store'), createUserPayload(['email' => 'unscoped@example.com']));
+
+    $new = User::where('email', 'unscoped@example.com')->first();
+
+    expect($new->buyer_id)->toBeNull()
+        ->and($new->buyers)->toHaveCount(0);
+});
+
+it('ignores buyer_ids posted for a non-merchant new user', function () {
+    $this->buyerB->update(['department_admin_id' => $this->deptAdmin->id]);
+
+    $this->actingAs($this->deptAdmin->fresh())
+        ->post(route('admin.users.store'), createUserPayload([
+            'department' => 'commercial',
+            'role' => 'commercial',
+            'buyer_ids' => [$this->buyerA->id],
+        ]));
+
+    $new = User::where('email', 'new.person@example.com')->first();
+
+    // Either the create was refused outright or the user exists unscoped —
+    // both are correct. What must never happen is a buyer being attached to a
+    // department that has no buyer concept.
+    expect($new?->buyer_id)->toBeNull()
+        ->and(DB::table('buyer_user')->count())->toBe(0);
+});

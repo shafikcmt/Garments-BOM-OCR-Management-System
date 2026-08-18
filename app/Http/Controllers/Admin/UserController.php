@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Buyer;
 use App\Models\User;
 use App\Support\DepartmentRoles;
 use App\Support\PermissionCatalog;
@@ -130,8 +131,16 @@ class UserController extends Controller
 
         $roles = $this->scope()->assignableRoles();
 
+        // The buyers this admin may put a new team member on. Only offered
+        // when there is a choice: an admin with one buyer still passes it on
+        // silently, which is what every merchant admin does today.
+        $actor = auth()->user();
+        $assignableBuyers = $actor?->isMerchantDepartment() && $actor->isDepartmentAdmin()
+            ? Buyer::whereIn('id', $actor->merchantBuyerIds())->orderBy('buyer_name')->get()
+            : collect();
+
         return view('admin.users.create', array_merge(
-            compact('roles'),
+            compact('roles', 'assignableBuyers'),
             $this->permissionMatrixData()
         ));
     }
@@ -296,31 +305,88 @@ class UserController extends Controller
     }
 
     /**
-     * The buyer a newly created user inherits.
+     * THE SUBSET RULE AT CREATION. The buyers a new team member is assigned to.
      *
-     * Read from the ACTOR, never from the request: there is no buyer field on
-     * the create form, and there must not be one. A department admin creating
-     * a user is creating one of their own team, so the buyer is a fact about
-     * who is doing the creating rather than a choice they make.
+     * Never the posted list on its own. Whatever arrives is intersected with
+     * the ACTOR's own buyers, so a hand-made post naming a buyer the admin does
+     * not hold assigns nothing — the same standard ExcelUploadRequest holds the
+     * upload tag to, and for the same reason. The form is narrowed to match,
+     * but the form is not the control.
      *
-     * Null for everyone else — a super admin's new users are unscoped, exactly
+     * @return list<int>  ascending, so the first is the primary buyer_id
+     */
+    private function assignedBuyerIds(Request $request): array
+    {
+        $assignable = $this->assignableBuyerIds($request);
+
+        if ($assignable === []) {
+            return [];
+        }
+
+        // One buyer: inherited silently, exactly as before. No field is shown
+        // for it because there is nothing to decide.
+        if (count($assignable) === 1) {
+            return $assignable;
+        }
+
+        $posted = array_map('intval', array_filter((array) $request->input('buyer_ids', [])));
+
+        // array_intersect keeps $assignable's ascending order, so the primary
+        // is deterministic rather than whatever order the checkboxes posted in.
+        return array_values(array_intersect($assignable, $posted));
+    }
+
+    /**
+     * The buyers this actor may assign at all — their own, and only when the
+     * new user is Merchandising.
+     *
+     * Read from the ACTOR, never from the request. A department admin creating
+     * a user is creating one of their own team, so the candidate set is a fact
+     * about who is doing the creating.
+     *
+     * Empty for everyone else — a super admin's new users are unscoped, exactly
      * as every user is today. The new role is checked too, so a merchant admin
      * who somehow creates a non-merchant user does not scope them to a buyer
      * their department cannot see.
+     *
+     * @return list<int>
      */
-    private function inheritedBuyerId(Request $request): ?int
+    private function assignableBuyerIds(Request $request): array
     {
         $actor = auth()->user();
 
         if (! $actor?->isMerchantDepartment() || ! $actor->isDepartmentAdmin()) {
-            return null;
+            return [];
         }
 
         if (DepartmentRoles::departmentOf($request->input('role')) !== 'merchandising') {
-            return null;
+            return [];
         }
 
-        return $actor->merchantBuyerId();
+        return $actor->merchantBuyerIds();
+    }
+
+    /**
+     * Validation for the buyer picker, which only exists when the actor has
+     * more than one buyer to offer.
+     *
+     * Rule::in is the backend half of the subset rule: the narrowed dropdown
+     * stops an honest mistake, this stops a crafted post. Both, never one.
+     *
+     * @return array<string, list<mixed>>
+     */
+    private function buyerAssignmentRules(Request $request): array
+    {
+        $assignable = $this->assignableBuyerIds($request);
+
+        if (count($assignable) < 2) {
+            return [];
+        }
+
+        return [
+            'buyer_ids' => ['required', 'array', 'min:1'],
+            'buyer_ids.*' => ['integer', Rule::in($assignable)],
+        ];
     }
 
     /**
@@ -425,7 +491,9 @@ class UserController extends Controller
             'status' => ['required', 'in:0,1'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
-        ] + $this->departmentRules());
+        ] + $this->departmentRules() + $this->buyerAssignmentRules($request));
+
+        $assignedBuyerIds = $this->assignedBuyerIds($request);
 
         $user = User::create([
             'name' => $data['name'],
@@ -433,8 +501,15 @@ class UserController extends Controller
             'password' => Hash::make($data['password']),
             'status' => $data['status'],
             'is_department_admin' => $this->departmentAdminFlag($request),
-            'buyer_id' => $this->inheritedBuyerId($request),
+            // The primary stays on the column; the full set goes to the pivot
+            // below. Both, so a user created here is read the same way as one
+            // the Phase 2 backfill produced.
+            'buyer_id' => $assignedBuyerIds[0] ?? null,
         ]);
+
+        if ($assignedBuyerIds !== []) {
+            $user->buyers()->sync($assignedBuyerIds);
+        }
 
         $user->syncRoles([$data['role']]);
         $this->syncDirectPermissions($user, $request);
