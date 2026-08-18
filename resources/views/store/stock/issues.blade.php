@@ -573,14 +573,35 @@
             <div class="card gx-stock-card">
                 <div class="gx-stock-card-body">
                     <div class="gx-stock-card-head">
-                        <h5>Issue History <span class="badge bg-primary-subtle text-primary ms-1">{{ $issues->total() }}</span></h5>
+                        <h5>
+                            Issue History
+                            <span class="badge bg-primary-subtle text-primary ms-1"><span data-list-count>{{ $issues->total() }}</span></span>
+                            {{-- Beside the count it belongs to, so the feedback is
+                                 where the user is already looking while typing. --}}
+                            <span class="spinner-border spinner-border-sm text-primary ms-2 d-none" role="status" data-list-spinner>
+                                <span class="visually-hidden">Updating the list…</span>
+                            </span>
+                        </h5>
                     </div>
 
                     {{-- Same labelled filter row as the Item Master and the
                          Consumable Stock Report: full-size controls, a visible
                          label over each, and the shared .gx-stock-filter rules
-                         doing the alignment. --}}
-                    <form method="GET" class="row g-3 gx-stock-filter mb-4">
+                         doing the alignment.
+
+                         Stays a plain GET form with a working Filter button:
+                         with JS off, or if a fetch fails, submitting reloads the
+                         page with the same filters. The script is an enhancement
+                         on top of it, and it reads this form as the single
+                         source of truth for the query — so a control added here
+                         later needs no JS change.
+
+                         The action is named explicitly. A GET form with none
+                         posts back to the current URL, query string and all,
+                         which would fold the previous page number into every new
+                         search. --}}
+                    <form method="GET" action="{{ route('store.stock.issues.index') }}"
+                          class="row g-3 gx-stock-filter mb-4" data-list-filters>
                         <div class="col-6 col-md-3">
                             <label class="form-label" for="issueFilterMonth">Month</label>
                             <input type="month" id="issueFilterMonth" name="month" value="{{ $filters['month'] ?? '' }}" class="form-control">
@@ -600,226 +621,17 @@
                         </div>
                     </form>
 
-                    <div class="table-responsive">
-                        <table class="table align-middle gx-stock-table">
-                            <thead>
-                                <tr>
-                                    <th>Date</th><th>Section</th><th>Person</th><th>Approved By</th>
-                                    <th>Req No</th><th>Type</th>
-                                    <th style="min-width:160px;">Item</th>
-                                    <th>Category</th>
-                                    <th class="text-end">Issued Qty</th>
-                                    <th class="text-end gx-stock-actions">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($issues as $i)
-                                    <tr>
-                                        <td class="small">{{ optional($i->issue_date)->format('d-M-Y') ?? '—' }}</td>
-                                        {{-- Fall back to the older free-text columns so
-                                             records entered before the masters existed
-                                             still show who indented them. --}}
-                                        <td class="small">{{ optional($i->indentSection)->name ?: ($i->department ?: '—') }}</td>
-                                        <td class="small">{{ optional($i->indentPerson)->name ?: ($i->issued_to ?: '—') }}</td>
-                                        <td class="small text-muted">{{ optional($i->approver)->name ?: '—' }}</td>
-                                        <td class="small">{{ $i->requisition_no ?: '—' }}</td>
-                                        <td class="small">
-                                            @if($i->requisition_type)
-                                                <span class="badge bg-secondary-subtle text-secondary">{{ $i->requisition_type }}</span>
-                                            @else — @endif
-                                        </td>
-                                        <td><div class="fw-semibold">{{ optional($i->stockItem)->name ?? '—' }}</div></td>
-                                        <td class="small text-muted">{{ optional($i->itemCategory)->name ?: (optional($i->stockItem)->category ?: '—') }}</td>
-                                        <td class="text-end fw-bold">{{ $qty($i->qty) }}</td>
-                                        {{-- Edit and Delete are Admin / Management
-                                             rights (store.issues.edit / .delete, or
-                                             the flat store.edit / store.delete); the
-                                             controller enforces the same checks
-                                             server-side. --}}
-                                        <td class="text-end gx-stock-actions gx-row-actions">
-                                            @if($canEdit)
-                                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editIssue{{ $i->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
-                                            @endif
-                                            @if($canDelete)
-                                                <form method="POST" action="{{ route('store.stock.issues.destroy', $i) }}" class="d-inline" onsubmit="return confirm('Remove this issue?');">
-                                                    @csrf @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
-                                                </form>
-                                            @endif
-                                            @if(! $canEdit && ! $canDelete)
-                                                <span class="text-muted small">—</span>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @empty
-                                    {{-- Says which of the two empties this is, the
-                                         same as every other General Stock list:
-                                         "nothing matched" and "nothing yet" call
-                                         for different next steps. --}}
-                                    <tr><td colspan="10" class="gx-stock-empty">
-                                            <span class="gx-stock-empty-icon"><i class="bi bi-{{ $hasFilters ? 'search' : 'box-arrow-up' }}" aria-hidden="true"></i></span>
-                                            <div class="gx-stock-empty-title">{{ $hasFilters ? 'No issues match this filter' : 'No issues recorded yet' }}</div>
-                                            <div class="gx-stock-empty-hint">{{ $hasFilters ? 'Try a different month or search.' : 'Record an issue using the form above.' }}</div>
-                                        </td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+                    {{-- Swapped wholesale by stock-list-table.js. Everything
+                         keyed to the rows on screen — including the per-issue
+                         Edit dialogs — lives inside the partial, so a filter or
+                         a page change replaces them together. --}}
+                    <div data-list-table>
+                        @include('store.stock._issues-list')
                     </div>
-                    <div class="mt-3">{{ $issues->links() }}</div>
                 </div>
             </div>
         </div>
     </div>
-
-    {{-- Correct one recorded issue. Keyed by issue id and rendered only for a
-         role that can submit it, the same arrangement the Item Master edit
-         modals use — markup that carries no action a non-admin could replay.
-
-         ONE ROW, not the requisition. A requisition is several rows sharing a
-         header and the table lists it a row at a time, so this edits the row the
-         user clicked and leaves its siblings alone.
-
-         The Item is shown but not editable: moving an issue to another item is
-         one balance undone and another created, which is a delete and a
-         re-record, not a correction. The masters are plain dropdowns rather than
-         the create form's type-to-add ones — a correction is not the place to
-         coin a new Section, and Issue Setup is one click away. --}}
-    @if($canEdit)
-        @foreach($issues as $i)
-            {{-- old() is global, so without this marker a rejected edit would
-                 repopulate EVERY modal on the page with the failed row's values.
-                 Same idiom the Item Master modals use.
-
-                 Written in the INLINE php form on purpose, never the block
-                 form. Blade pairs raw PHP blocks by matching an opening php
-                 directive to the next closing one, and this file already uses
-                 the inline form further up — so one closing directive added
-                 below it pairs with THAT opener and swallows the whole page
-                 in between. The same reason this note spells the directives
-                 out rather than writing them. --}}
-            @php($formKey = 'edit:'.$i->id)
-            @php($wasSubmitted = old('form') === $formKey)
-            @php($value = fn ($field, $stored = null) => $wasSubmitted ? old($field, $stored) : $stored)
-            @php($qtyValue = rtrim(rtrim(number_format((float) $i->qty, 4, '.', ''), '0'), '.'))
-            <div class="modal fade" id="editIssue{{ $i->id }}" tabindex="-1" aria-labelledby="editIssueLabel{{ $i->id }}" aria-hidden="true">
-                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-                    <div class="modal-content gx-stock-card">
-                        <form method="POST" action="{{ route('store.stock.issues.update', $i) }}">
-                            @csrf @method('PUT')
-                            <input type="hidden" name="form" value="{{ $formKey }}">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="editIssueLabel{{ $i->id }}">Edit Issue</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                {{-- The refusal, where the user is looking. The page
-                                     banner behind this dialog says the same thing,
-                                     but it is out of sight once the modal reopens. --}}
-                                @if($wasSubmitted && $errors->any())
-                                    <div class="gx-edit-alert mb-3" role="alert">
-                                        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
-                                        <div>
-                                            <div class="gx-edit-alert-title">This change was not saved</div>
-                                            <div class="gx-edit-alert-body">
-                                                @foreach($errors->all() as $error)
-                                                    <span>{{ $error }}</span>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endif
-
-                                <div class="row g-3">
-                                    <div class="col-12">
-                                        <label class="form-label">Item<span class="gx-lock-tag">Locked</span></label>
-                                        <div class="gx-edit-locked">
-                                            <i class="bi bi-lock-fill" aria-hidden="true"></i>
-                                            <span class="gx-edit-locked-value">{{ optional($i->stockItem)->name ?? '—' }}</span>
-                                        </div>
-                                        <div class="gx-edit-hint">
-                                            Moving this issue to another item changes two stock balances, so it is a
-                                            delete and a fresh entry rather than an edit.
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-md-4">
-                                        <label class="form-label" for="editIssueDate{{ $i->id }}">Issue Date <span class="text-danger">*</span></label>
-                                        <input type="date" id="editIssueDate{{ $i->id }}" name="issue_date" class="form-control @if($wasSubmitted && $errors->has('issue_date')) is-invalid @endif" required
-                                               value="{{ $value('issue_date', optional($i->issue_date)->toDateString()) }}">
-                                    </div>
-                                    <div class="col-6 col-md-4">
-                                        <label class="form-label" for="editIssueQty{{ $i->id }}">Issued Qty <span class="text-danger">*</span></label>
-                                        <input type="number" step="0.0001" min="0.0001" id="editIssueQty{{ $i->id }}" name="qty" class="form-control @if($wasSubmitted && $errors->has('qty')) is-invalid @endif" required
-                                               value="{{ $value('qty', $qtyValue) }}">
-                                        <div class="gx-edit-hint">
-                                            {{ optional($i->stockItem)->uom ? 'In '.$i->stockItem->uom.'. ' : '' }}Cannot take this item below zero.
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label" for="editIssueReqNo{{ $i->id }}">Requisition Number</label>
-                                        <input type="text" id="editIssueReqNo{{ $i->id }}" name="requisition_no" class="form-control" maxlength="100"
-                                               value="{{ $value('requisition_no', $i->requisition_no) }}">
-                                    </div>
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label" for="editIssueSection{{ $i->id }}">Indent Section</label>
-                                        <select id="editIssueSection{{ $i->id }}" name="indent_section_id" class="form-select">
-                                            <option value="">—</option>
-                                            @foreach($sections as $s)
-                                                <option value="{{ $s->id }}" @selected($value('indent_section_id', $i->indent_section_id) == $s->id)>{{ $s->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label" for="editIssuePerson{{ $i->id }}">Indent Person</label>
-                                        <select id="editIssuePerson{{ $i->id }}" name="indent_person_id" class="form-select">
-                                            <option value="">—</option>
-                                            @foreach($persons as $p)
-                                                <option value="{{ $p->id }}" @selected($value('indent_person_id', $i->indent_person_id) == $p->id)>{{ $p->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label" for="editIssueApprover{{ $i->id }}">Approved By</label>
-                                        <select id="editIssueApprover{{ $i->id }}" name="issue_approver_id" class="form-select">
-                                            <option value="">—</option>
-                                            @foreach($approvers as $a)
-                                                <option value="{{ $a->id }}" @selected($value('issue_approver_id', $i->issue_approver_id) == $a->id)>{{ $a->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label" for="editIssueCategory{{ $i->id }}">Category</label>
-                                        <select id="editIssueCategory{{ $i->id }}" name="item_category_id" class="form-select">
-                                            <option value="">—</option>
-                                            @foreach($categories as $c)
-                                                <option value="{{ $c->id }}" @selected($value('item_category_id', $i->item_category_id) == $c->id)>{{ $c->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label" for="editIssueType{{ $i->id }}">Type</label>
-                                        <select id="editIssueType{{ $i->id }}" name="requisition_type" class="form-select">
-                                            <option value="">—</option>
-                                            @foreach($requisitionTypes as $type)
-                                                <option value="{{ $type }}" @selected($value('requisition_type', $i->requisition_type) === $type)>{{ $type }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-12">
-                                        <label class="form-label" for="editIssueRemarks{{ $i->id }}">Remarks</label>
-                                        <textarea id="editIssueRemarks{{ $i->id }}" name="remarks" class="form-control" rows="2" maxlength="1000">{{ $value('remarks', $i->remarks) }}</textarea>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Update Issue</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        @endforeach
-    @endif
 
     {{-- Bulk consumption upload. Same shape as the receiving import modal, so
          the two screens are learnt once. --}}

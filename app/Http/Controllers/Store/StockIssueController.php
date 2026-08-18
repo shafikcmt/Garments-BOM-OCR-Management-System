@@ -19,6 +19,7 @@ use App\Models\StoreFormDraft;
 use App\Services\GeneralStockReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
@@ -119,9 +120,40 @@ class StockIssueController extends Controller
             ->latest('issue_date')
             ->latest('id')
             ->paginate(25)
-            ->withQueryString();
+            // The filters are carried onto the page links by hand rather than
+            // with withQueryString(), because `partial` is a transport flag and
+            // not a filter. withQueryString() copies the WHOLE query string and
+            // appends() merges into it rather than replacing it, so the two
+            // together still leave partial=1 on every href — and a plain click
+            // on page 2 with JS off would then answer with a bare fragment
+            // instead of a page.
+            ->appends(Arr::except($request->query(), ['partial', 'page']));
 
         ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
+
+        // Live search / paging: the same action, returning only the part of the
+        // page the filters affect. Sharing the action rather than adding a
+        // second endpoint is what guarantees the AJAX result and the full page
+        // come off the identical query and the identical paging.
+        //
+        // Placed BEFORE the item master and the drafts are read: neither is in
+        // the fragment, and pulling 1,200-odd items on every keystroke would
+        // make the live search slower than the page it replaces. The four
+        // Issue Setup lists ARE needed, because the per-issue Edit dialogs ride
+        // inside the swapped fragment and their dropdowns read them.
+        if ($request->boolean('partial')) {
+            return view('store.stock._issues-list', [
+                'issues' => $issues,
+                'filters' => $filters,
+                'canEdit' => $canEdit,
+                'canDelete' => $canDelete,
+                'sections' => IndentSection::selectable()->get(['id', 'name']),
+                'persons' => IndentPerson::selectable()->get(['id', 'name']),
+                'approvers' => IssueApprover::selectable()->get(['id', 'name']),
+                'categories' => ItemCategory::selectable()->get(['id', 'name']),
+                'requisitionTypes' => StockIssue::REQUISITION_TYPES,
+            ]);
+        }
 
         return view('store.stock.issues', [
             'issues' => $issues,

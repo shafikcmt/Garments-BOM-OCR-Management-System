@@ -29,6 +29,12 @@
     // moment the fragment was fetched by itself.
     $qty = fn ($v) => $v === null ? '—' : rtrim(rtrim(number_format((float) $v, 4, '.', ','), '0'), '.');
     $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
+
+    // Same reason, and it was missed the first time: $hasFilters is the parent
+    // view's, so a swapped-in empty list read it as unset and said "No
+    // purchases recorded yet" to someone who had just searched for something
+    // that matched nothing. The two empties call for different next steps.
+    $hasFilters = collect($filters)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
 @endphp
 
 {{-- Figures the screen shows outside the swapped region. --}}
