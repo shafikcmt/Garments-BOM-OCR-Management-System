@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Support\BuyerScope;
 use App\Support\DepartmentRoles;
 use App\Support\PiAlertSettings;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +23,7 @@ class User extends Authenticatable
         'status',
         'is_department_admin',
         'buyer_id',
+        'buyer_scope_mode',
         'can_upload',
         'profile_photo',
         'signature_path',
@@ -82,13 +84,18 @@ class User extends Authenticatable
 
     /*
     |--------------------------------------------------------------------------
-    | Buyer scoping — Merchandising only
+    | Buyer scoping
     |--------------------------------------------------------------------------
     |
-    | Buyer scoping exists for one department. Every method below asks
-    | isMerchantDepartment() first and answers null/false for everybody else,
-    | so Commercial, Store, Accounts, Supply Chain, Production and the super
-    | admin never reach a buyer comparison at all.
+    | Every method below asks isBuyerScopedDepartment() first and answers
+    | null/false/empty for everybody else, so a department that scoping is not
+    | switched on for — and the super admin — never reach a buyer comparison
+    | at all.
+    |
+    | WHICH departments those are is BuyerScope::SCOPED_DEPARTMENTS, not a
+    | literal in here. Today that list holds Merchandising alone, so every
+    | answer below is identical to what it was when this read
+    | `departmentKey() === 'merchandising'` in six separate places.
     */
 
     /**
@@ -104,11 +111,16 @@ class User extends Authenticatable
     }
 
     /**
-     * Every buyer a normal merchant team member is assigned to.
+     * Every buyer a normal team member is assigned to.
      *
      * Department admins do not use this — they own buyers through
      * buyers.department_admin_id instead. Assignment and ownership are
      * different things and are stored separately on purpose.
+     *
+     * The pivot carries no department and no module: a row means "assigned",
+     * full stop. That is what makes it reusable by a second department without
+     * a migration, and it is also why a per-module scope would need real
+     * storage rather than an extra argument on a method.
      */
     public function buyers()
     {
@@ -138,31 +150,46 @@ class User extends Authenticatable
      *
      * The super admin is excluded here rather than at each call site: they
      * oversee every department and hold no buyer, and treating them as a
-     * scoped merchant is how the one account that must never be locked out
-     * gets locked out.
+     * scoped user is how the one account that must never be locked out gets
+     * locked out.
      */
-    public function isMerchantDepartment(): bool
+    public function isBuyerScopedDepartment(): bool
     {
-        return ! $this->hasRole('admin') && $this->departmentKey() === 'merchandising';
+        return ! $this->hasRole('admin') && BuyerScope::appliesTo($this->departmentKey());
     }
 
     /**
-     * Every buyer this merchant is confined to. Empty means unscoped.
+     * @deprecated Use isBuyerScopedDepartment(). Kept because renaming a
+     * security gate and moving its call sites in one commit is how one gets
+     * missed; the call sites move separately, against a green suite.
+     */
+    public function isMerchantDepartment(): bool
+    {
+        return $this->isBuyerScopedDepartment();
+    }
+
+    /**
+     * Every buyer this user is confined to.
      *
      * Two sources, because the assignment is recorded in two places for two
      * different kinds of user: a department-admin owns buyers
-     * (buyers.department_admin_id), a normal user inherits one at creation
-     * (users.buyer_id). An empty array means unscoped — the state of every
-     * user that existed before buyer scoping, and deliberately unrestricted.
+     * (buyers.department_admin_id), a normal user is assigned them
+     * (users.buyer_id + the buyer_user pivot).
+     *
+     * DO NOT read an empty result as "unscoped" in new code. Ask
+     * isBuyerConfined(), or better, ask hasBuyerAccess() and let it decide.
+     * The two coincide today; from Phase 4b a team member's confinement is
+     * decided by buyer_scope_mode, and a 'specific' user with an empty set is
+     * confined to NOTHING rather than free of confinement.
      *
      * THIS IS THE ONE TO COMPARE AGAINST. merchantBuyerId() below answers a
      * narrower question and cannot see an admin's second buyer.
      *
      * @return list<int>
      */
-    public function merchantBuyerIds(): array
+    public function scopedBuyerIds(): array
     {
-        if (! $this->isMerchantDepartment()) {
+        if (! $this->isBuyerScopedDepartment()) {
             return [];
         }
 
@@ -188,6 +215,97 @@ class User extends Authenticatable
         $primary = (int) $this->buyer_id;
 
         return array_values(array_merge([$primary], array_diff($assigned, [$primary])));
+    }
+
+    /**
+     * @deprecated Use scopedBuyerIds(). Alias only — same body, same answer.
+     *
+     * @return list<int>
+     */
+    public function merchantBuyerIds(): array
+    {
+        return $this->scopedBuyerIds();
+    }
+
+    /**
+     * Whether this user is confined to a SET of buyers, as opposed to working
+     * across every buyer.
+     *
+     * The question scopedBuyerIds() cannot answer on its own, and the reason
+     * this method exists at all. "Empty set" and "not confined" used to be the
+     * same thing; with an explicit mode they are not, and conflating them is
+     * the one mistake in this design that silently unscopes everybody.
+     *
+     *   department admin  confined by what they OWN. Mode is not consulted —
+     *                     applying it would let a mode value cancel an
+     *                     ownership the Buyers screen still shows them holding.
+     *   team member       confined when their mode says so, OR when they hold
+     *                     buyers regardless of the mode. See the comment on
+     *                     that expression — the "or" is what makes an unset or
+     *                     stale mode fail closed instead of open.
+     */
+    public function isBuyerConfined(): bool
+    {
+        if (! $this->isBuyerScopedDepartment()) {
+            return false;
+        }
+
+        if ($this->isDepartmentAdmin()) {
+            return $this->scopedBuyerIds() !== [];
+        }
+
+        // EITHER, and the "or" is the safety. Both halves widen confinement;
+        // neither can cancel the other.
+        //
+        //   mode says so    a 'specific' user holding nothing is confined to
+        //                   NOTHING — refused on every tagged record — rather
+        //                   than waved through as unscoped.
+        //   they hold some  holding buyers confines you whatever the mode
+        //                   says. 'all' + assignments is a contradiction the
+        //                   user form cannot produce (it writes 'specific'
+        //                   whenever it assigns), and this resolves it the
+        //                   safe way round: an unset or stale mode on a user
+        //                   who plainly holds buyers must not hand them every
+        //                   buyer in the system.
+        //
+        // The second half is also why the existing suite needed no edits: a
+        // user built with buyer_id and no mode is confined here exactly as the
+        // old empty-set rule confined them.
+        return $this->buyer_scope_mode === BuyerScope::MODE_SPECIFIC
+            || $this->scopedBuyerIds() !== [];
+    }
+
+    /**
+     * THE BUYER ACCESS PREDICATE. Every department's controllers ask this
+     * instead of writing their own comparison.
+     *
+     * Returns true — ALLOWED — by default, and that default is right for a
+     * lock and wrong for a list. Four ways to be allowed, and each is
+     * deliberate:
+     *
+     *   unscoped department  scoping is not switched on for them.
+     *   unconfined user      mode 'all', or an admin owning nothing.
+     *   untagged record      belongs to no buyer, so no buyer's team can claim
+     *                        it, and locking everyone out of the whole existing
+     *                        archive is not a scope rule — it is an outage.
+     *   theirs               the ordinary case.
+     *
+     * DO NOT use this to filter a query result in PHP. Records whose buyer is
+     * null pass it, which for a list means "show everything" — the opposite of
+     * what a filter is for. Narrow lists in SQL, with the null branch written
+     * out where it can be read.
+     */
+    public function hasBuyerAccess(?int $buyerId): bool
+    {
+        if (! $this->isBuyerConfined()) {
+            return true;
+        }
+
+        if ($buyerId === null) {
+            return true;
+        }
+
+        return in_array($buyerId, $this->scopedBuyerIds(), true);
     }
 
     /**
@@ -221,11 +339,12 @@ class User extends Authenticatable
      */
     public function mayUploadBom(): bool
     {
-        // Empty means unscoped, and unscoped keeps today's behaviour. Asked as
-        // a set so that "has no buyers" cannot be confused with "has several
-        // and therefore no single primary" — the confusion that made the old
-        // upload fallthrough dangerous.
-        if ($this->merchantBuyerIds() === []) {
+        // Unconfined keeps today's behaviour. Asked as a confinement rather
+        // than an empty set so that "has no buyers" cannot be confused with
+        // "has several and therefore no single primary" — the confusion that
+        // made the old upload fallthrough dangerous — and so that a 'specific'
+        // user holding nothing is refused rather than waved through.
+        if (! $this->isBuyerConfined()) {
             return true;
         }
 

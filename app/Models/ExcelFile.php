@@ -114,34 +114,36 @@ class ExcelFile extends Model
      *
      *   no user            nothing to scope.
      *   super admin        oversees every buyer; never scoped.
-     *   another department Commercial, Store, Accounts, Supply Chain and
-     *                      Production have no buyer concept. This is the line
-     *                      that keeps them provably untouched — they return
-     *                      here, before the file's buyer is ever read.
-     *   unscoped merchant  a merchant with no buyer assignment, which is every
-     *                      merchant that existed before this feature.
+     *   another department a department buyer scoping is not switched on for
+     *                      has no buyer concept. This is the line that keeps
+     *                      them provably untouched — they answer here, before
+     *                      the file's buyer is ever read.
+     *   unconfined user    no buyer assignment, which is every merchant that
+     *                      existed before this feature.
      *   untagged file      a file uploaded before buyer tagging existed. It
      *                      belongs to no buyer, so no buyer's admin can claim
      *                      it, and locking everyone out of the entire existing
      *                      archive is not a scope rule — it is an outage.
+     *
+     * All five now live in User::hasBuyerAccess(), which every department's
+     * controllers ask directly. This stays as the file's own way of putting
+     * the question — its four call sites and three Blade usages read a lock,
+     * not an access — and because inverting a boolean at seven call sites to
+     * save one method is a poor trade.
      */
     public function isBuyerLockedForUser(?User $user = null): bool
     {
-        if (! $user || ! $user->isMerchantDepartment()) {
+        if (! $user) {
             return false;
         }
 
         // EVERY buyer they hold, not just the primary. A department admin
         // owning two buyers is scoped to both, and comparing against one would
         // lock them out of the other's files while the screen told them they
-        // owned it.
-        $theirs = $user->merchantBuyerIds();
-
-        if ($theirs === [] || $this->buyer_id === null) {
-            return false;
-        }
-
-        return ! in_array((int) $this->buyer_id, $theirs, true);
+        // owned it. hasBuyerAccess() reads the whole set.
+        return ! $user->hasBuyerAccess(
+            $this->buyer_id === null ? null : (int) $this->buyer_id
+        );
     }
 
     public function lockScopeLabel(): string
