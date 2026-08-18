@@ -20,8 +20,16 @@
  * The fragment carries a [data-list-meta] JSON blob for the figures that sit
  * outside the swapped region.
  *
- * Whether this stays shared or a screen needs its own is decided per screen —
- * Receiving's grouped rows are the next test of it.
+ * It stays shared. All four General Store lists are on it — Stock Report,
+ * Item Master, Purchase History and Issue History — and the two that were meant
+ * to test whether it generalised both needed ZERO change here: Receiving's
+ * grouped, collapsible rows opted in with data attributes alone, and Issue
+ * History's flat ones did the same.
+ *
+ * What those two did need was on the Blade side, and it is the same note twice:
+ * anything keyed to a row id — per-line Edit dialogs above all — belongs INSIDE
+ * the swapped fragment, or it goes on describing the rows it was rendered for.
+ * A fifth screen should start there rather than here.
  */
 export function initStockListTable() {
     document.querySelectorAll('[data-list-table]').forEach(setup);
