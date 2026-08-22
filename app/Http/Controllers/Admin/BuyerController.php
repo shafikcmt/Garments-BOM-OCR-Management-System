@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer;
 use App\Models\User;
+use App\Support\BuyerScope;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -38,7 +39,153 @@ class BuyerController extends Controller
         return view('admin.buyers.edit', [
             'buyer' => $buyer,
             'merchantAdmins' => $this->merchantDepartmentAdmins(),
+            'assignedUsers' => $this->assignedUsers($buyer),
+            'assignableUsers' => $this->assignableUsers($buyer),
         ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Who works on this buyer
+    |--------------------------------------------------------------------------
+    |
+    | The other half of Phase 4d. The User edit screen answers "which buyers is
+    | this person on"; this answers "who is on this buyer", which is the
+    | question an admin actually arrives at the Buyers screen holding.
+    |
+    | ONE ASYMMETRY CARRIES THE SAFETY: this screen never writes
+    | buyer_scope_mode. Adding an 'all'-mode user to a buyer here would read as
+    | granting them something and would in fact CONFINE them to this one buyer,
+    | because isBuyerConfined() answers "mode is specific OR they hold buyers".
+    | So the picker offers only users already on 'specific', and detaching a
+    | user's last buyer is refused rather than silently producing 'specific'
+    | with an empty set — the state that denies a user every tagged record
+    | while the screen still shows them as assigned. Both of those send the
+    | admin to Admin > Users, where the mode does change.
+    |
+    | Ownership is a different column and is untouched here. A department admin
+    | owns buyers through buyers.department_admin_id, set by the field on the
+    | form above; they are listed as the owner and never appear in the pivot.
+    */
+
+    /**
+     * The team members assigned to this buyer, owner excluded.
+     *
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    private function assignedUsers(Buyer $buyer)
+    {
+        return $buyer->users()
+            ->where('is_department_admin', false)
+            ->orderBy('name')
+            ->get(['users.id', 'users.name', 'users.email', 'users.buyer_id', 'users.buyer_scope_mode'])
+            ->filter(fn (User $user) => $user->isBuyerScopedDepartment())
+            ->values();
+    }
+
+    /**
+     * The users who may be added to this buyer.
+     *
+     * Deliberately includes ordinary team members, not only administrators —
+     * a buyer's page that listed nobody but its owner would answer a question
+     * nobody asks, and the admin would still have to open each user in turn to
+     * find out who works on it.
+     *
+     * Three exclusions, each one a hole if left out:
+     *
+     *   already assigned    nothing to add.
+     *   department admin    owns buyers through the other column; adding one
+     *                       here would put two columns behind one screen.
+     *   mode is 'all'       THE TRAP. Attaching them would confine somebody who
+     *                       works across every buyer, while reading on screen
+     *                       as a grant. Set their mode from Admin > Users
+     *                       first, which is the only place it changes.
+     *
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    private function assignableUsers(Buyer $buyer)
+    {
+        return User::query()
+            ->where('is_department_admin', false)
+            ->where('buyer_scope_mode', BuyerScope::MODE_SPECIFIC)
+            ->whereDoesntHave('buyers', fn ($query) => $query->where('buyers.id', $buyer->id))
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (User $user) => $user->isBuyerScopedDepartment())
+            ->values();
+    }
+
+    /**
+     * Put a user on this buyer.
+     *
+     * The picker is narrowed to match, but the picker is not the control: every
+     * rule is re-asked here, because a hand-made POST never saw the form.
+     */
+    public function attachUser(Request $request, Buyer $buyer)
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $user = User::findOrFail($data['user_id']);
+
+        if (! $this->assignableUsers($buyer)->contains('id', $user->id)) {
+            return redirect()
+                ->route('admin.buyers.edit', $buyer)
+                ->with('error', 'That user cannot be added here. A user who works across all buyers must be set to specific buyers from Admin > Users first.');
+        }
+
+        $buyer->users()->syncWithoutDetaching([$user->id]);
+
+        // users.buyer_id is the PRIMARY of the set and scopedBuyerIds() lists it
+        // first, so a user whose column is empty would otherwise hold a buyer
+        // the column denies. Only filled when empty — repointing somebody's
+        // primary is not what "add to this buyer" means.
+        if (! $user->buyer_id) {
+            $user->forceFill(['buyer_id' => $buyer->id])->save();
+        }
+
+        return redirect()
+            ->route('admin.buyers.edit', $buyer)
+            ->with('success', $user->name . ' now works on ' . $buyer->buyer_name . '.');
+    }
+
+    /**
+     * Take a user off this buyer.
+     *
+     * Refused when it is their last one. That would leave buyer_scope_mode at
+     * 'specific' with an empty set, which denies them every tagged record while
+     * the screen still shows them as a scoped user — the invariant
+     * UserController::assertBuyerScopeCoherent() holds on the other side.
+     */
+    public function detachUser(Buyer $buyer, User $user)
+    {
+        $remaining = $user->buyers()
+            ->where('buyers.id', '!=', $buyer->id)
+            ->pluck('buyers.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if ($remaining === []) {
+            return redirect()
+                ->route('admin.buyers.edit', $buyer)
+                ->with('error', $user->name . ' works on no other buyer. Give them another buyer, or set them to all buyers from Admin > Users, before removing this one.');
+        }
+
+        $buyer->users()->detach($user->id);
+
+        sort($remaining);
+
+        // The primary follows the set, exactly as it does on the User screen.
+        // Left pointing at the buyer just removed it would hand back the access
+        // this action took away.
+        if ((int) $user->buyer_id === $buyer->id) {
+            $user->forceFill(['buyer_id' => $remaining[0]])->save();
+        }
+
+        return redirect()
+            ->route('admin.buyers.edit', $buyer)
+            ->with('success', $user->name . ' no longer works on ' . $buyer->buyer_name . '.');
     }
 
     public function update(Request $request, Buyer $buyer)

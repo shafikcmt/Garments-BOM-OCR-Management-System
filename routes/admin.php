@@ -47,6 +47,11 @@ Route::prefix('admin')
 
         Route::resource('suppliers', SupplierController::class)->except(['show']);
         Route::resource('buyers', BuyerController::class)->except(['show']);
+
+        // Who works on a buyer. Assignment only — buyer_scope_mode is never
+        // written here; Admin > Users is the one screen that changes it.
+        Route::post('buyers/{buyer}/users', [BuyerController::class, 'attachUser'])->name('buyers.users.attach');
+        Route::delete('buyers/{buyer}/users/{user}', [BuyerController::class, 'detachUser'])->name('buyers.users.detach');
         Route::resource('booking-delivery-destinations', BookingDeliveryDestinationController::class)->except(['show']);
         Route::resource('booking-instructions', BookingInstructionController::class)->except(['show']);
 

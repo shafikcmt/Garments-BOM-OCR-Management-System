@@ -41,5 +41,10 @@
             </form>
         </div>
     </div>
+
+    {{-- Its own card, and outside the form above on purpose: assignment posts
+         to its own routes, so a half-filled buyer form can never be saved by
+         adding somebody to the team, and vice versa. --}}
+    @include('admin.buyers._assigned-users')
 </div>
 @endsection

@@ -52,6 +52,18 @@ class Buyer extends Model
         return $this->belongsTo(User::class, 'department_admin_id');
     }
 
+    /**
+     * The team members assigned to this buyer.
+     *
+     * The inverse of User::buyers(). Assignment and ownership are two different
+     * columns for two different kinds of user — a department admin OWNS buyers
+     * through departmentAdmin() above and never appears here.
+     */
+    public function users()
+    {
+        return $this->belongsToMany(User::class)->orderBy('users.id');
+    }
+
     public function excelFiles()
     {
         return $this->hasMany(ExcelFile::class);
