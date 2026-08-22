@@ -416,6 +416,252 @@ class UserController extends Controller
         }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Buyer assignment on the EDIT screen
+    |--------------------------------------------------------------------------
+    |
+    | Until now the buyer set could only be decided once, at creation, and the
+    | edit screen showed it as a read-only badge. That made every correction a
+    | delete-and-recreate: a merchant moved to a second buyer, or taken off one
+    | they no longer work on, had no path through the screen at all.
+    |
+    | THIS IS THE ONLY PLACE buyer_scope_mode CHANGES. The Buyer screen adds and
+    | removes assignments but never touches the mode, because adding an
+    | 'all'-mode user to one buyer there would read as granting access and
+    | actually restrict them to that single buyer.
+    |
+    | The helpers below are deliberately separate from assignableBuyerIds() and
+    | friends above, which serve creation. Creation reads the department off the
+    | POSTED role because the user does not exist yet; editing reads it off the
+    | stored user. Sharing one helper between the two would mean one of them
+    | asking the wrong question.
+    */
+
+    /**
+     * Whether the buyer-assignment widget belongs on this user's edit screen.
+     *
+     * Four gates, and each one is a hole if left out:
+     *
+     *   target is an owner    a department admin holds buyers through
+     *                         buyers.department_admin_id, which is the Buyer
+     *                         screen's field. Offering this widget for them
+     *                         would put two different columns behind one
+     *                         control and let the losing one look authoritative.
+     *   department unscoped   nothing reads a buyer set for Commercial, Store
+     *                         or Accounts. Assigning one there is a field that
+     *                         does nothing, which is worse than no field.
+     *   actor is nobody       a guest reaching a controller method.
+     *   actor is not an admin the screen is already behind UserPolicy::update,
+     *                         but the ability to CHANGE somebody's scope is not
+     *                         the same as the ability to edit their name.
+     */
+    private function mayAssignBuyers(User $target): bool
+    {
+        $actor = auth()->user();
+
+        if (! $actor) {
+            return false;
+        }
+
+        if ($target->is_department_admin) {
+            return false;
+        }
+
+        if (! BuyerScope::appliesTo($target->departmentKey())) {
+            return false;
+        }
+
+        if ($actor->hasRole('admin')) {
+            return true;
+        }
+
+        return $actor->isDepartmentAdmin()
+            && $actor->isBuyerScopedDepartment()
+            && $actor->id !== $target->id;
+    }
+
+    /**
+     * The buyers this actor may tick for this target, in display order.
+     *
+     * Two branches, each explicit rather than inferred from an empty set:
+     *
+     *   unconfined actor   a super admin, or a department admin who works
+     *                      across every buyer themselves, chooses from every
+     *                      ACTIVE buyer. An inactive one is not offered - it is
+     *                      a buyer the company has stopped working with, and
+     *                      assigning somebody to it grants nothing.
+     *   confined actor     their own holding and no further. THE SUBSET RULE,
+     *                      the same standard as creation: an admin may hand out
+     *                      only what they hold.
+     *
+     * @return \Illuminate\Support\Collection<int, Buyer>
+     */
+    private function assignableBuyersForEdit(User $target)
+    {
+        if (! $this->mayAssignBuyers($target)) {
+            return collect();
+        }
+
+        $actor = auth()->user();
+
+        if ($actor->hasRole('admin') || ! $actor->isBuyerConfined()) {
+            return Buyer::where('is_active', true)->orderBy('buyer_name')->get();
+        }
+
+        return Buyer::whereIn('id', $actor->scopedBuyerIds())->orderBy('buyer_name')->get();
+    }
+
+    /**
+     * @return list<int>  ascending, so the primary buyer_id is deterministic
+     */
+    private function assignableBuyerIdsForEdit(User $target): array
+    {
+        $ids = $this->assignableBuyersForEdit($target)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        sort($ids);
+
+        return array_values($ids);
+    }
+
+    /**
+     * Whether this actor may set a user to 'all' - that is, un-confine them.
+     *
+     * Super admin only, and NOT the unconfined department admin who is offered
+     * every buyer above. Those two look alike and are not: offering every buyer
+     * hands out access the actor already has, one buyer at a time, and stays
+     * inside the subset rule. Un-confining hands out every buyer that will EVER
+     * exist, including ones created after the click. That is authority rather
+     * than access, and it belongs with the flag that confers authority - see
+     * UserPolicy::setDepartmentAdmin, gated the same way and for the same
+     * reason.
+     */
+    private function mayUnconfineBuyers(User $target): bool
+    {
+        return $this->mayAssignBuyers($target) && (bool) auth()->user()?->hasRole('admin');
+    }
+
+    /**
+     * The mode this request is asking for. Falls to 'specific' for an actor who
+     * may not un-confine, whatever they posted - the field is not theirs, so it
+     * goes unread rather than being refused, exactly as can_upload does.
+     */
+    private function postedBuyerScopeMode(Request $request, User $user): string
+    {
+        if (! $this->mayUnconfineBuyers($user)) {
+            return BuyerScope::MODE_SPECIFIC;
+        }
+
+        return $request->input('buyer_scope_mode') === BuyerScope::MODE_ALL
+            ? BuyerScope::MODE_ALL
+            : BuyerScope::MODE_SPECIFIC;
+    }
+
+    /**
+     * Validation for the edit widget. Only fires when the widget was on the
+     * page AND this actor may use it, so a crafted post naming buyer_ids on a
+     * screen that never showed them validates nothing and syncs nothing.
+     *
+     * @return array<string, list<mixed>>
+     */
+    private function buyerEditRules(Request $request, User $user): array
+    {
+        if (! $request->has('buyer_assignment_control') || ! $this->mayAssignBuyers($user)) {
+            return [];
+        }
+
+        $assignable = $this->assignableBuyerIdsForEdit($user);
+
+        if ($assignable === []) {
+            return [];
+        }
+
+        $rules = [];
+
+        if ($this->mayUnconfineBuyers($user)) {
+            $rules['buyer_scope_mode'] = ['required', Rule::in(BuyerScope::modes())];
+        }
+
+        // 'specific' is the assumed mode for anyone who cannot choose one, so a
+        // department admin always posts a non-empty set. min:1 here is the same
+        // INVARIANT creation holds: 'specific' with no buyers denies the user
+        // every tagged record while the screen shows them as assigned.
+        if ($this->postedBuyerScopeMode($request, $user) === BuyerScope::MODE_SPECIFIC) {
+            $rules['buyer_ids'] = ['required', 'array', 'min:1'];
+            $rules['buyer_ids.*'] = ['integer', Rule::in($assignable)];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Write the new buyer set and mode.
+     *
+     * Same hidden-marker shape as is_department_admin and can_upload: the
+     * widget is absent for most targets, so its absence must read as "not
+     * shown" and never as "clear their buyers".
+     */
+    private function syncBuyerAssignment(Request $request, User $user): void
+    {
+        if (! $request->has('buyer_assignment_control') || ! $this->mayAssignBuyers($user)) {
+            return;
+        }
+
+        $assignable = $this->assignableBuyerIdsForEdit($user);
+
+        if ($assignable === []) {
+            return;
+        }
+
+        // 'all' MUST clear the assignments. isBuyerConfined() answers "mode is
+        // specific OR they hold buyers", so a user left on 'all' with rows in
+        // buyer_user is still confined and the mode change did nothing - a
+        // control that reports success and changes no access.
+        if ($this->postedBuyerScopeMode($request, $user) === BuyerScope::MODE_ALL) {
+            $user->buyers()->sync([]);
+            $user->forceFill([
+                'buyer_id' => null,
+                'buyer_scope_mode' => BuyerScope::MODE_ALL,
+            ])->save();
+
+            return;
+        }
+
+        $posted = array_map('intval', array_filter((array) $request->input('buyer_ids', [])));
+
+        // array_intersect keeps $assignable's ascending order, so the primary
+        // is deterministic rather than whatever order the checkboxes posted in.
+        $chosen = array_values(array_intersect($assignable, $posted));
+
+        // Buyers the target holds that this actor cannot reach are not the
+        // actor's to remove. Without this, a confined admin opening a shared
+        // team member's screen and saving would strip every buyer another admin
+        // had assigned - through a form that never showed those fields.
+        $untouched = array_values(array_diff(
+            $user->buyers()->pluck('buyers.id')->map(fn ($id) => (int) $id)->all(),
+            $assignable
+        ));
+
+        $final = array_values(array_unique(array_merge($chosen, $untouched)));
+        sort($final);
+
+        $this->assertBuyerScopeCoherent(BuyerScope::MODE_SPECIFIC, $final);
+
+        $user->buyers()->sync($final);
+
+        // buyer_id stays the LOWEST id held, matching creation and matching
+        // what scopedBuyerIds() lists first. Recomputing it here is what keeps
+        // the column and the pivot from disagreeing when the old primary is the
+        // buyer being removed.
+        $user->forceFill([
+            'buyer_id' => $final[0],
+            'buyer_scope_mode' => BuyerScope::MODE_SPECIFIC,
+        ])->save();
+    }
+
     /**
      * The value to store for can_upload.
      *
@@ -578,12 +824,36 @@ class UserController extends Controller
         // A collection either way, because an admin may own several and the
         // screen has to show all of them — an admin looking at one badge when
         // they hold two has no way to tell the second was ever saved.
+        // A team member's set is the pivot PLUS users.buyer_id, in that union
+        // and not either alone: the pivot is the real set, but a row written
+        // before the pivot existed - or by a seeder or a manual fix - lives
+        // only in the column, and showing no badge for it would say "assigned
+        // to nobody" about a user who is confined.
         $assignedBuyers = $user->isDepartmentAdmin()
             ? $user->ownedBuyers
-            : collect([$user->buyer])->filter()->values();
+            : $user->buyers()->get()->concat(collect([$user->buyer])->filter())
+                ->unique('id')->sortBy('id')->values();
+
+        // The editable widget, when this actor may change the set at all.
+        // Empty for everyone else, and the view falls back to the read-only
+        // badges it has always shown.
+        $assignableBuyers = $this->assignableBuyersForEdit($user);
+        $mayUnconfineBuyers = $this->mayUnconfineBuyers($user);
+        $currentBuyerIds = $assignedBuyers->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $currentBuyerScopeMode = $user->isBuyerConfined()
+            ? BuyerScope::MODE_SPECIFIC
+            : BuyerScope::MODE_ALL;
 
         return view('admin.users.edit', array_merge(
-            compact('user', 'roles', 'assignedBuyers'),
+            compact(
+                'user',
+                'roles',
+                'assignedBuyers',
+                'assignableBuyers',
+                'mayUnconfineBuyers',
+                'currentBuyerIds',
+                'currentBuyerScopeMode'
+            ),
             $this->permissionMatrixData($user)
         ));
     }
@@ -600,7 +870,7 @@ class UserController extends Controller
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
-        ] + $this->departmentRules());
+        ] + $this->departmentRules() + $this->buyerEditRules($request, $user));
 
         $isSelf = $user->id === auth()->id();
 
@@ -626,6 +896,18 @@ class UserController extends Controller
         }
 
         $user->save();
+
+        // BEFORE syncRoles, deliberately. mayAssignBuyers() reads the target's
+        // department off their role, and buyerEditRules() above asked the same
+        // question against the role as it stood when the request arrived. Run
+        // after the role change and validation would have judged one department
+        // while the write judged another - a save that validates buyer_ids and
+        // then ignores them, or the reverse. Whether the user is about to leave
+        // Merchandising does not change what the form in front of the admin
+        // was; a set written for a department that stops being scoped is inert,
+        // which is the harmless half of the disagreement.
+        $this->syncBuyerAssignment($request, $user);
+
         $user->syncRoles([$data['role']]);
 
         // Same reasoning as the role and status guard above: an admin editing

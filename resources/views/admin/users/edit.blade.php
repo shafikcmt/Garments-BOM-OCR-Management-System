@@ -181,20 +181,99 @@
                             </div>
                         @endif
 
-                        {{-- Buyer assignment, shown but never edited here. The
-                             owning column lives on the buyer, so Admin > Buyers
-                             is the one screen that sets it; showing it read-only
-                             answers "which buyer is this person on" where you
-                             would look for it.
+                        {{-- Buyer assignment.
 
-                             A department admin with no buyer yet gets a pointer
-                             to that screen rather than blank space: ticking the
-                             Department Admin flag is only half the setup, and
-                             an empty section reads as "nothing to do here". A
-                             normal user without a buyer still shows nothing —
-                             they inherit one at creation and have nothing to
-                             act on. --}}
-                        @if($assignedBuyers->isNotEmpty())
+                             EDITABLE for a team member whose department is
+                             buyer-scoped, when the person editing may change
+                             the set. This is the only screen in the system that
+                             changes buyer_scope_mode; the Buyer screen adds and
+                             removes assignments but never the mode.
+
+                             READ-ONLY otherwise, exactly as it has always been.
+                             A department admin OWNS their buyers through
+                             buyers.department_admin_id, which is the Buyer
+                             screen's field — so they keep the badges and the
+                             pointer to that screen, and never get the widget.
+                             Two columns behind one control would let the losing
+                             one look authoritative.
+
+                             The list here is what the actor may hand out, not
+                             what exists. Narrowing it stops the honest mistake;
+                             Rule::in on the server stops the crafted post. Both,
+                             never one. --}}
+                        @if($assignableBuyers->isNotEmpty())
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold d-block mb-1">Buyer Access</label>
+
+                                {{-- The hidden marker says the widget was on the
+                                     page. Without it a save from a form that
+                                     never showed these fields would read as
+                                     "clear their buyers". --}}
+                                <input type="hidden" name="buyer_assignment_control" value="1">
+
+                                @if($mayUnconfineBuyers)
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="buyer_scope_mode"
+                                               id="buyerScopeModeAll" value="all"
+                                               @checked(old('buyer_scope_mode', $currentBuyerScopeMode) === 'all')>
+                                        <label class="form-check-label" for="buyerScopeModeAll">
+                                            All buyers
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="radio" name="buyer_scope_mode"
+                                               id="buyerScopeModeSpecific" value="specific"
+                                               @checked(old('buyer_scope_mode', $currentBuyerScopeMode) === 'specific')>
+                                        <label class="form-check-label" for="buyerScopeModeSpecific">
+                                            Specific buyers only
+                                        </label>
+                                    </div>
+                                    <div class="form-text mb-2">
+                                        Choosing <strong>All buyers</strong> clears the ticks below and lets this
+                                        person work on every buyer, including ones added later.
+                                    </div>
+                                    @error('buyer_scope_mode')<div class="text-danger small mb-2">{{ $message }}</div>@enderror
+                                @else
+                                    <div class="form-text mb-2">
+                                        Tick the buyers this person works on. They can edit files for the buyers
+                                        you tick, and no others.
+                                    </div>
+                                @endif
+
+                                @foreach($assignableBuyers as $assignableBuyer)
+                                    <div class="form-check">
+                                        <input class="form-check-input @error('buyer_ids') is-invalid @enderror"
+                                               type="checkbox" name="buyer_ids[]" value="{{ $assignableBuyer->id }}"
+                                               id="editBuyer{{ $assignableBuyer->id }}"
+                                               @checked(in_array(
+                                                   (string) $assignableBuyer->id,
+                                                   array_map('strval', (array) old('buyer_ids', $currentBuyerIds)),
+                                                   true
+                                               ))>
+                                        <label class="form-check-label" for="editBuyer{{ $assignableBuyer->id }}">
+                                            {{ $assignableBuyer->buyer_name }}{{ $assignableBuyer->buyer_code ? ' (' . $assignableBuyer->buyer_code . ')' : '' }}
+                                        </label>
+                                    </div>
+                                @endforeach
+
+                                @error('buyer_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                @error('buyer_ids.*')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+
+                                {{-- Buyers assigned by another admin are not in
+                                     the list above and are not touched by a save
+                                     here. Saying so stops this reading as the
+                                     person's whole access. --}}
+                                @php($beyondReach = $assignedBuyers->reject(fn ($b) => $assignableBuyers->contains('id', $b->id)))
+                                @if($beyondReach->isNotEmpty())
+                                    <div class="form-text mt-2">
+                                        Also assigned to
+                                        {{ $beyondReach->pluck('buyer_name')->implode(', ') }},
+                                        which {{ $beyondReach->count() > 1 ? 'are' : 'is' }} outside your own buyers.
+                                        Saving here leaves {{ $beyondReach->count() > 1 ? 'them' : 'it' }} unchanged.
+                                    </div>
+                                @endif
+                            </div>
+                        @elseif($assignedBuyers->isNotEmpty())
                             <div class="mb-4">
                                 <label class="form-label fw-semibold d-block">
                                     {{ $assignedBuyers->count() > 1 ? 'Assigned Buyers' : 'Assigned Buyer' }}
