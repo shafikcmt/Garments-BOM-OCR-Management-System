@@ -163,13 +163,46 @@
                  submitting still reloads the page with the same filters. --}}
             <form method="GET" class="row g-3 gx-stock-filter mb-4" data-ledger-filters
                   action="{{ route('store.stock.ledger') }}">
-                {{-- Six controls, so the row is laid out as 3 + 3 at tablet width
-                     and a single run of 6 at desktop. Each breakpoint adds to a
+                {{-- Nine controls, laid out as 3 + 3 + 3 at tablet width and
+                     two runs of 6 at desktop. Each breakpoint still adds to a
                      full 12, which is what stops the last column stranding a
                      third of the card empty. --}}
                 <div class="col-6 col-md-4 col-xl-2">
                     <label class="form-label" for="ledgerFilterMonth">Month</label>
                     <input type="month" id="ledgerFilterMonth" name="month" value="{{ $month }}" class="form-control">
+                </div>
+                {{-- From / To move the whole ledger window: Balance B/F becomes
+                     everything before From, Addition and Consumption become
+                     what moved between the two dates, and Stock as on Date
+                     becomes the balance at To.
+
+                     They sit NEXT TO Month rather than replacing it because
+                     Month is what every existing link, bookmark and export
+                     filename is written in. Leave them blank and the report is
+                     the month, exactly as it has always been. The helper text
+                     under them says which one is winning, so the pair can never
+                     read as two controls quietly fighting. --}}
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="ledgerFilterFrom">From Date</label>
+                    <input type="date" id="ledgerFilterFrom" name="from" value="{{ $filters['from'] ?? '' }}"
+                           class="form-control @error('from') is-invalid @enderror">
+                    @error('from')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="ledgerFilterTo">To Date</label>
+                    <input type="date" id="ledgerFilterTo" name="to" value="{{ $filters['to'] ?? '' }}"
+                           class="form-control @error('to') is-invalid @enderror">
+                    @error('to')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <label class="form-label" for="ledgerFilterSupplier">Supplier</label>
+                    <select id="ledgerFilterSupplier" name="supplier_id" class="form-select js-searchable">
+                        <option value="">All</option>
+                        @foreach($suppliers as $supplier)
+                            <option value="{{ $supplier->id }}"
+                                @selected((int) ($filters['supplier_id'] ?? 0) === (int) $supplier->id)>{{ $supplier->name }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="col-12 col-md-4 col-xl-2">
                     <label class="form-label" for="ledgerFilterSearch">Search</label>
@@ -202,6 +235,27 @@
                         <label class="form-check-label" for="includeInactive">Include inactive items</label>
                     </div>
                 </div>
+                {{-- Says which of Month and the date range is actually in force,
+                     and what Supplier did. Two controls that both look like
+                     "the period" need the screen to state the answer rather
+                     than leaving the reader to work it out from the figures. --}}
+                @if($period['is_range'] || ! empty($filters['supplier_id']))
+                    <div class="col-12">
+                        <div class="form-text mb-0">
+                            @if($period['is_range'])
+                                Showing <strong>{{ $monthLabel }}</strong> — the date range is in use, so the Month
+                                box is ignored. Safety Stock, Re-order Level and Status still read the consumption
+                                pattern of {{ $period['end']->copy()->subMonthNoOverflow()->format('F Y') }}, so they
+                                match the Item Master.
+                            @endif
+                            @if(! empty($filters['supplier_id']))
+                                Supplier narrows which items are listed. Every figure shown is still the item's
+                                whole-store figure, not that supplier's share.
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
                 <div class="col-12 col-md-4 col-xl-2 gx-stock-filter-actions">
                     <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
                     @if($hasFilters)

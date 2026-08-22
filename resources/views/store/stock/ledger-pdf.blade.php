@@ -8,10 +8,18 @@
     $activeFilters = collect([
         'Search' => $filters['search'] ?? null,
         'Category' => $filters['category'] ?? null,
+        // Named, not just implied by a shorter item list. A printed report that
+        // covers one vendor's items and does not say so reads as the whole
+        // store, and the totals on it would be quoted as the whole store.
+        'Supplier' => $supplierName ?? null,
         'Status' => ($filters['status'] ?? null) === 'attention'
             ? 'Needs Attention'
             : (($filters['status'] ?? null) ? \App\Services\GeneralStockReportService::statusLabels()[$filters['status']] : null),
     ])->filter()->map(fn ($v, $k) => $k.': '.$v)->implode('  |  ');
+
+    // "Month" is wrong the moment a custom range is in force, and this line is
+    // the only thing on the page that says what the figures cover.
+    $periodCaption = ($period['is_range'] ?? false) ? 'Period' : 'Month';
 @endphp
 <!doctype html>
 <html>
@@ -110,7 +118,7 @@
         </tr>
     </table>
 
-    <div class="filters">Month: {{ $monthLabel }}@if($activeFilters)  |  {{ $activeFilters }}@endif</div>
+    <div class="filters">{{ $periodCaption }}: {{ $monthLabel }}@if($activeFilters)  |  {{ $activeFilters }}@endif</div>
     <div class="legend">
         Stock as on Date = Opening Stock + Addition &minus; Consumption.
         "Place Order" is raised when Stock as on Date falls below the Safety Stock Level;
@@ -141,9 +149,19 @@
             <td colspan="{{ $valueSpan }}">Department of Store.</td>
         </tr>
         <tr>
-            <td colspan="{{ $labelSpan }}">Month</td>
+            <td colspan="{{ $labelSpan }}">{{ $periodCaption }}</td>
             <td colspan="{{ $valueSpan }}">{{ $monthLabel }}</td>
         </tr>
+        {{-- Only when something is narrowing the sheet. A workbook that covers
+             one supplier's items, or one category, and does not say so on its
+             own face gets quoted as the whole store once it leaves this
+             system. --}}
+        @if($activeFilters)
+            <tr>
+                <td colspan="{{ $labelSpan }}">Filters</td>
+                <td colspan="{{ $valueSpan }}">{{ $activeFilters }}</td>
+            </tr>
+        @endif
         <tr><td colspan="{{ $columns }}"></td></tr>
     </table>
 @endunless

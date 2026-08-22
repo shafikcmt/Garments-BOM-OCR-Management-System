@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\GeneralStockSupplier;
 use App\Models\StockIssue;
 use App\Models\StockItem;
 use App\Models\StockPurchase;
@@ -75,28 +76,84 @@ class GeneralStockReportService
     }
 
     /**
-     * One report row per stock item for the given month.
+     * The window the report's arithmetic covers.
      *
-     * @param  array{search?: string|null, category?: string|null, status?: string|null, only_active?: bool, item_ids?: list<int>|int|null}  $filters
+     * A month by default — every figure this report has ever produced comes off
+     * that path, unchanged. `from` / `to` move the window to an arbitrary
+     * range: Balance B/F becomes everything before `from`, Addition and
+     * Consumption become what moved between the two dates, and Stock as on Date
+     * becomes the balance at `to`.
+     *
+     * A HALF-FILLED RANGE COMPLETES ITSELF FROM THE MONTH OF THE DATE THAT WAS
+     * TYPED, not from the Month picker. Anchoring the missing end to the picker
+     * can produce a backwards range (From in September, Month set to August),
+     * and a filter that can be driven into an impossible state by two controls
+     * that look unrelated is a support call.
+     *
+     * @return array{start: Carbon, end: Carbon, is_range: bool}
+     */
+    public function resolvePeriod(Carbon $monthStart, ?string $from = null, ?string $to = null): array
+    {
+        $monthStart = $monthStart->copy()->startOfMonth();
+
+        $fromDate = $this->toDate($from);
+        $toDate = $this->toDate($to);
+
+        if (! $fromDate && ! $toDate) {
+            return [
+                'start' => $monthStart,
+                'end' => $monthStart->copy()->endOfMonth(),
+                'is_range' => false,
+            ];
+        }
+
+        $start = $fromDate ? $fromDate->copy()->startOfDay() : $toDate->copy()->startOfMonth();
+        $end = $toDate ? $toDate->copy()->endOfDay() : $fromDate->copy()->endOfMonth();
+
+        return ['start' => $start, 'end' => $end, 'is_range' => true];
+    }
+
+    /**
+     * One report row per stock item for the given period.
+     *
+     * @param  array{search?: string|null, category?: string|null, status?: string|null, only_active?: bool, item_ids?: list<int>|int|null, supplier_id?: int|null, from?: string|null, to?: string|null}  $filters
      * @return Collection<int, array<string, mixed>>
      */
     public function rows(Carbon $monthStart, array $filters = []): Collection
     {
-        $monthStart = $monthStart->copy()->startOfMonth();
-        $monthEnd = $monthStart->copy()->endOfMonth();
-        $prevStart = $monthStart->copy()->subMonthNoOverflow()->startOfMonth();
+        $period = $this->resolvePeriod($monthStart, $filters['from'] ?? null, $filters['to'] ?? null);
+
+        $periodStart = $period['start'];
+        $periodEnd = $period['end'];
+
+        // THE RATE COLUMNS STAY ON CALENDAR MONTHS, whatever the period is.
+        //
+        // Column I is the Excel's "Last Month Consumption pattern" —
+        // SUMIFS(previous month's issues) / 26 working days — and it feeds
+        // Safety Stock (I x 7), Re-order Level and therefore Status. Those
+        // thresholds are shared with the Item Master screen and the dashboard
+        // through statusFor().
+        //
+        // Divide a five-day window's consumption by 26 and the rate collapses,
+        // safety stock collapses with it, and this report starts calling an
+        // item Ok while the Item Master calls it Place Order — the same item,
+        // two answers. So the pattern is read from the calendar month BEFORE
+        // the month the period ends in. With no range that is the month before
+        // the picked one, which is exactly what it has always been.
+        $rateMonth = $periodEnd->copy()->startOfMonth();
+        $prevStart = $rateMonth->copy()->subMonthNoOverflow()->startOfMonth();
         $prevEnd = $prevStart->copy()->endOfMonth();
 
-        $items = $this->items($filters);
+        $items = $this->items($filters, $periodEnd);
 
         if ($items->isEmpty()) {
             return collect();
         }
 
         $ids = $items->pluck('id')->all();
-        $movements = $this->movements($ids, $monthStart, $monthEnd, $prevStart, $prevEnd);
+        $movements = $this->movements($ids, $periodStart, $periodEnd, $prevStart, $prevEnd);
 
-        $rows = $items->map(fn (StockItem $item) => $this->row($item, $monthStart, $movements));
+        $rows = $items->map(fn (StockItem $item) => $this->row($item, $periodStart, $movements));
 
         // Status filter is applied after the row is built, because status is
         // derived and cannot be expressed in the item query.
@@ -154,6 +211,39 @@ class GeneralStockReportService
             ->values();
     }
 
+    /**
+     * Active General Stock suppliers, for the filter dropdown.
+     *
+     * GeneralStockSupplier, deliberately not the Buyer/Style `Supplier` model —
+     * they are separate lists for separate relationships and share no table.
+     * An inactive supplier is left out: the list is for narrowing a live report,
+     * not for browsing history. A report already filtered to one that has since
+     * been deactivated still resolves, because the filter is an id.
+     *
+     * @return Collection<int, GeneralStockSupplier>
+     */
+    public function suppliers(): Collection
+    {
+        return GeneralStockSupplier::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    /**
+     * The name behind a supplier filter, for the screen note and the export
+     * headings. Not read out of suppliers() — that lists active suppliers only,
+     * and a report filtered to one since deactivated is still filtered by it.
+     */
+    public function supplierName(int|string|null $supplierId): ?string
+    {
+        if (! $supplierId) {
+            return null;
+        }
+
+        return GeneralStockSupplier::withTrashed()->find((int) $supplierId)?->name;
+    }
+
     /** Distinct categories, for the filter dropdown. */
     public function categories(): Collection
     {
@@ -175,7 +265,7 @@ class GeneralStockReportService
      * @param  array<string, mixed>  $filters
      * @return Collection<int, StockItem>
      */
-    private function items(array $filters): Collection
+    private function items(array $filters, ?Carbon $periodEnd = null): Collection
     {
         return StockItem::query()
             // Narrow to specific items — lets a caller that needs one item's
@@ -183,6 +273,30 @@ class GeneralStockReportService
             // without computing the whole report.
             ->when($filters['item_ids'] ?? null, fn ($q, $ids) => $q->whereIn('id', (array) $ids))
             ->when($filters['only_active'] ?? true, fn ($q) => $q->where('is_active', true))
+            // SUPPLIER NARROWS WHICH ITEMS ARE LISTED. It does not narrow the
+            // figures on them, and it must not: stock_issues carries no
+            // supplier, so consumption cannot be attributed to a vendor. Filter
+            // Addition to one supplier while Balance B/F and Consumption still
+            // count everyone's and the row stops tying — Opening + Addition −
+            // Consumption would no longer equal Stock as on Date, and Closing
+            // Stock Value would be priced off a balance that never existed.
+            //
+            // So the question this answers is "what is my stock position on the
+            // things I buy from this vendor", with every figure still the true
+            // whole-store one. A supplier-wise breakdown of receipts is a
+            // different report, and the Receiving Report already is it.
+            //
+            // Bounded at the period end for the same reason last_addition and
+            // the unit price are: a receipt entered after the period being
+            // viewed is not part of that period's history.
+            ->when($filters['supplier_id'] ?? null, fn ($q, $supplierId) => $q->whereIn(
+                'id',
+                StockPurchase::query()
+                    ->select('stock_item_id')
+                    ->where('general_stock_supplier_id', $supplierId)
+                    ->whereNotNull('purchase_date')
+                    ->when($periodEnd, fn ($p, $end) => $p->whereDate('purchase_date', '<=', $end))
+            ))
             ->when($filters['category'] ?? null, fn ($q, $category) => $q->where('category', $category))
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $like = '%'.$search.'%';
@@ -210,8 +324,13 @@ class GeneralStockReportService
      * @param  list<int>  $ids
      * @return array<string, \Illuminate\Support\Collection>
      */
-    private function movements(array $ids, Carbon $monthStart, Carbon $monthEnd, Carbon $prevStart, Carbon $prevEnd): array
+    private function movements(array $ids, Carbon $periodStart, Carbon $periodEnd, Carbon $prevStart, Carbon $prevEnd): array
     {
+        // Local aliases so the query bodies below read unchanged. The bounds
+        // are a month when no range is set, which is every call this had before.
+        $monthStart = $periodStart;
+        $monthEnd = $periodEnd;
+
         $purchase = fn () => StockPurchase::query()->whereIn('stock_item_id', $ids)->whereNotNull('purchase_date');
         $issue = fn () => StockIssue::query()->whereIn('stock_item_id', $ids)->whereNotNull('issue_date');
 
@@ -220,12 +339,33 @@ class GeneralStockReportService
         $max = fn ($query, string $column) => $query->selectRaw("stock_item_id, MAX({$column}) as agg")
             ->groupBy('stock_item_id')->pluck('agg', 'stock_item_id');
 
+        /**
+         * An INCLUSIVE window on both ends, expressed as two whereDate calls
+         * rather than one whereBetween.
+         *
+         * The three engines do not agree here. MySQL and PostgreSQL store these
+         * as real DATE columns, so `col BETWEEN '2026-08-01' AND '2026-08-31'`
+         * includes the 31st and always has — no figure this report has produced
+         * on either engine moves. SQLite, which only the test suite runs on,
+         * keeps the value as the text "2026-08-31 00:00:00", and that string
+         * compares GREATER than the bare bound "2026-08-31", so the last day of
+         * every window silently dropped out.
+         *
+         * whereDate wraps the column in each dialect's own date cast, so all
+         * three now answer the same question. This matters far more with a
+         * custom range than it did with a month: "5 Aug to 9 Aug" that quietly
+         * means "5 Aug to 8 Aug" is a report nobody can reconcile.
+         */
+        $between = fn ($query, string $column, Carbon $start, Carbon $end) => $query
+            ->whereDate($column, '>=', $start)
+            ->whereDate($column, '<=', $end);
+
         return [
             'purchase_before' => $sum($purchase()->whereDate('purchase_date', '<', $monthStart)),
-            'purchase_in_month' => $sum($purchase()->whereBetween('purchase_date', [$monthStart->toDateString(), $monthEnd->toDateString()])),
+            'purchase_in_month' => $sum($between($purchase(), 'purchase_date', $monthStart, $monthEnd)),
             'issue_before' => $sum($issue()->whereDate('issue_date', '<', $monthStart)),
-            'issue_in_month' => $sum($issue()->whereBetween('issue_date', [$monthStart->toDateString(), $monthEnd->toDateString()])),
-            'issue_prev_month' => $sum($issue()->whereBetween('issue_date', [$prevStart->toDateString(), $prevEnd->toDateString()])),
+            'issue_in_month' => $sum($between($issue(), 'issue_date', $monthStart, $monthEnd)),
+            'issue_prev_month' => $sum($between($issue(), 'issue_date', $prevStart, $prevEnd)),
             'last_addition' => $max($purchase()->whereDate('purchase_date', '<=', $monthEnd), 'purchase_date'),
             'last_consumption' => $max($issue()->whereDate('issue_date', '<=', $monthEnd), 'issue_date'),
             'unit_price' => $this->latestUnitPrices($ids, $monthEnd),
