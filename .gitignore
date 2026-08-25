@@ -37,3 +37,6 @@ public/build/
 public/storage/
 .claude/settings.local.json
 .claude/
+# Reference BOM workbooks kept locally for lookup. Real buyer data, read by
+# nothing in the application — no test, seeder or import path opens them.
+docs/OCR Files/
