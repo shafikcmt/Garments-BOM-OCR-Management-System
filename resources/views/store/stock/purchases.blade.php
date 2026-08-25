@@ -238,9 +238,16 @@
                          is looking once they have filled one in. Bound by class —
                          see the .js-add-line binding in the script below — so this
                          still works whether there is one of them or several. --}}
-                    <div class="mt-2">
+                    <div class="mt-2 d-flex flex-wrap gap-2">
                         <button type="button" class="btn btn-sm btn-outline-primary js-add-line" id="addPurchaseLine">
                             <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Another Item
+                        </button>
+                        {{-- Beside the single-item button, not instead of it.
+                             One item at a time is still the quicker way to add
+                             one item; this is for the delivery that arrives with
+                             a dozen. --}}
+                        <button type="button" class="btn btn-sm btn-outline-secondary js-add-many" id="addPurchaseLines">
+                            <i class="bi bi-list-check me-1" aria-hidden="true"></i>Add Multiple Items
                         </button>
                     </div>
 
@@ -261,8 +268,25 @@
                             <td><input type="text" class="form-control form-control-sm js-line-uom gx-stock-readonly text-center" readonly tabindex="-1" placeholder="—"></td>
                             <td><input type="text" class="form-control form-control-sm js-line-category gx-stock-readonly" readonly tabindex="-1" placeholder="—"></td>
                             <td><input type="text" class="form-control form-control-sm js-line-brand gx-stock-readonly" readonly tabindex="-1" placeholder="—"></td>
-                            <td><input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm js-line-qty" name="items[__INDEX__][qty]" required placeholder="0"></td>
-                            <td><input type="number" step="0.0001" min="0" class="form-control form-control-sm js-line-price" name="items[__INDEX__][unit_price]" placeholder="0.00"></td>
+                            {{-- Numeric, but NOT type="number".
+                                 A number input refuses to report a caret
+                                 position — selectionStart reads null and
+                                 setSelectionRange throws — so there is no way to
+                                 tell "cursor is at the end of the figure" from
+                                 "cursor is in the middle of it", and Left/Right
+                                 could not move between fields without breaking
+                                 the typing of a figure.
+                                 The three guards that type="number" was giving
+                                 are kept: `required` is still native, `pattern`
+                                 refuses a value that is not a plain figure, and
+                                 data-min / data-step are enforced by the shared
+                                 script in _line-grid, which also blocks a
+                                 non-numeric keystroke before it lands. The
+                                 SERVER's rules are untouched and remain the
+                                 thing that actually decides. inputmode keeps the
+                                 numeric keypad on a tablet. --}}
+                            <td><input type="text" inputmode="decimal" pattern="\d*\.?\d*" data-step="0.0001" data-min="0.0001" class="form-control form-control-sm js-line-qty js-numeric" name="items[__INDEX__][qty]" required placeholder="0"></td>
+                            <td><input type="text" inputmode="decimal" pattern="\d*\.?\d*" data-step="0.0001" data-min="0" class="form-control form-control-sm js-line-price js-numeric" name="items[__INDEX__][unit_price]" placeholder="0.00"></td>
                             {{-- Qty x Unit Price. No name attribute — it is
                                  derived on the server from the two fields that
                                  ARE posted, so posting it would invite the two to
@@ -460,6 +484,7 @@
     </div>
 
     @include('store.stock._searchable')
+    @include('store.stock._line-grid')
 
     <style>
         {{-- The item-lines table (.gx-line-scroll / .gx-line-table / .gx-line-no
@@ -652,6 +677,61 @@
             }
 
             addBtns.forEach(function (btn) { btn.addEventListener('click', function () { addRow(); }); });
+
+            /*
+             * Add several items in one go.
+             *
+             * The picker hands back one id at a time and each goes through
+             * addRow({stock_item_id}) — the same call a resumed draft uses, and
+             * the one that already nudges the item select's change event so Uom,
+             * Category and Brand fill in exactly as they do for a hand-picked
+             * item. Qty, Unit Price and Remarks are left blank, and the running
+             * total is recalculated by addRow itself.
+             *
+             * Single-item search on the row is untouched: this is a second way
+             * in, not a replacement.
+             *
+             * The list is read from the row template's own <option> elements
+             * rather than from a second copy of the item master, so the picker
+             * cannot offer something the row select does not have. Brand comes
+             * from data-brand because the option's LABEL here is the bare name —
+             * two brands of one item look identical in the dropdown, and in a
+             * list of tick boxes that is how the wrong one gets added.
+             */
+            if (window.gxItemPicker) {
+                window.gxItemPicker({
+                    trigger: form.querySelectorAll('.js-add-many'),
+                    title: 'Add Multiple Items',
+                    items: function () {
+                        return Array.prototype.slice
+                            .call(tpl.content.querySelectorAll('.js-line-item option'))
+                            .filter(function (option) { return option.value !== ''; })
+                            .map(function (option) {
+                                return {
+                                    value: option.value,
+                                    name: option.textContent.trim(),
+                                    brand: option.dataset.brand || '',
+                                    uom: option.dataset.uom || '',
+                                    category: option.dataset.category || '',
+                                };
+                            });
+                    },
+                    onPick: function (id) { addRow({ stock_item_id: id }); },
+                });
+            }
+
+            // Spreadsheet-style arrow keys, in the order Tab already visits the
+            // fields. Uom, Category, Brand and Amount are readonly with
+            // tabindex="-1", so they are not in the list for the same reason Tab
+            // skips them. The Tab-to-add-row handler below is a separate
+            // listener and is unaffected.
+            if (window.gxArrowNav) {
+                window.gxArrowNav({
+                    body: body,
+                    row: 'tr.purchase-line',
+                    fields: ['.js-line-item', '.js-line-qty', '.js-line-price', '.js-line-remarks'],
+                });
+            }
 
             /*
              * Tab out of the last line's Remarks to start the next line.

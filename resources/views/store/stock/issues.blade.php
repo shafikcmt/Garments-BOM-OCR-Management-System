@@ -29,12 +29,20 @@
 
     // The item list handed to the script. Built here rather than inline in
     // @json, which cannot parse a multi-line array argument.
-    $itemOptions = $items->map(function ($it) {
+    // Category names, for the multi-item picker's Category column. The lines
+    // themselves only ever need the id.
+    $categoryNames = $categories->pluck('name', 'id');
+
+    $itemOptions = $items->map(function ($it) use ($categoryNames) {
         $suffix = trim((string) $it->brand);
 
         return [
             'value' => (string) $it->id,
             'text' => $it->name.($suffix !== '' ? ' ('.$suffix.')' : ''),
+            // The bare name, beside the combined label above. The picker shows
+            // brand in a column of its own, so it needs the two apart.
+            'name' => (string) $it->name,
+            'category' => (string) ($categoryNames[$it->item_category_id] ?? ''),
             'uom' => (string) ($it->uom ?? ''),
             'category_id' => $it->item_category_id ? (string) $it->item_category_id : '',
             // Shown read-only on the line, so the brand stays visible after the
@@ -375,9 +383,16 @@
                                  Bound by class — see the .js-add-line binding
                                  below — so this works whether there is one of
                                  them or several. --}}
-                            <div class="mt-2">
+                            <div class="mt-2 d-flex flex-wrap gap-2">
                                 <button type="button" class="btn btn-sm btn-outline-primary js-add-line" id="addIssueLine">
                                     <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Another Item
+                                </button>
+                                {{-- Beside the single-item button, not instead of
+                                     it. A requisition listing a dozen items is
+                                     the case this saves; one item is still
+                                     quicker typed straight into the line. --}}
+                                <button type="button" class="btn btn-sm btn-outline-secondary js-add-many" id="addIssueLines">
+                                    <i class="bi bi-list-check me-1" aria-hidden="true"></i>Add Multiple Items
                                 </button>
                             </div>
 
@@ -436,7 +451,16 @@
                                      read-only treatment as Uom. Category above is a
                                      real input here, so Uom is the pattern to copy. --}}
                                 <td><input type="text" class="form-control form-control-sm js-line-brand gx-stock-readonly" readonly tabindex="-1" placeholder="—"></td>
-                                <td><input type="number" step="0.0001" min="0" class="form-control form-control-sm text-end js-line-qty" name="items[__INDEX__][qty]" required placeholder="0"></td>
+                                {{-- Numeric, but NOT type="number" — the same
+                                     reason as Record Receiving's Qty: a number
+                                     input reports no caret position, so
+                                     Left/Right could not tell the end of a
+                                     figure from the middle of one. required and
+                                     pattern stay native; data-min / data-step
+                                     and the keystroke filter live in the shared
+                                     script in _line-grid. Server rules
+                                     unchanged. --}}
+                                <td><input type="text" inputmode="decimal" pattern="\d*\.?\d*" data-step="0.0001" data-min="0" class="form-control form-control-sm text-end js-line-qty js-numeric" name="items[__INDEX__][qty]" required placeholder="0"></td>
                                 {{-- New / Replace, per line. Left as a plain select
                                      (no TomSelect): two fixed options need no search
                                      box, and it keeps the column narrow. --}}
@@ -677,6 +701,7 @@
     @endcan
 
     @include('store.stock._searchable')
+    @include('store.stock._line-grid')
 
     <script>
         (function () {
@@ -1032,6 +1057,64 @@
             document.querySelectorAll('.js-add-line').forEach(function (btn) {
                 btn.addEventListener('click', function () { addLine(); });
             });
+
+            /*
+             * Add several items in one go.
+             *
+             * Each ticked id goes through addLine({stock_item_id}) — the same
+             * call that restores a rejected submission — so a line created here
+             * is wired, filtered and loaded exactly like a hand-picked one:
+             * loadStatus() fills Uom and Brand, back-fills the row's Category
+             * from the item, and fetches the stock-position badge. Qty,
+             * Requisition Type and Remarks are left blank.
+             *
+             * The row's own single-item search is untouched.
+             *
+             * allItems is the same list the row select is built from, so the
+             * picker cannot offer an item the line could not hold. It carries
+             * name and brand separately for the picker's two columns: many names
+             * are stocked under more than one brand, and a tick list showing
+             * only the name is how the wrong one gets added.
+             */
+            if (window.gxItemPicker) {
+                window.gxItemPicker({
+                    trigger: document.querySelectorAll('.js-add-many'),
+                    title: 'Add Multiple Items',
+                    items: function () {
+                        return allItems.map(function (entry) {
+                            return {
+                                value: entry.value,
+                                name: entry.name || entry.text,
+                                brand: entry.brand || '',
+                                uom: entry.uom || '',
+                                category: entry.category || '',
+                            };
+                        });
+                    },
+                    onPick: function (id) { addLine({ stock_item_id: id }); },
+                });
+            }
+
+            // Spreadsheet-style arrow keys, in the order Tab already visits the
+            // fields. Uom and Brand are readonly with tabindex="-1" and so are
+            // not listed, for the same reason Tab skips them. Category and
+            // Requisition Type ARE real inputs on this form and are included;
+            // Up/Down inside either is left to the control itself, which is what
+            // a select uses those keys for. The Tab-to-add-row handler below is
+            // a separate listener and is unaffected.
+            if (window.gxArrowNav) {
+                window.gxArrowNav({
+                    body: body,
+                    row: 'tr.issue-line',
+                    fields: [
+                        '.js-line-item',
+                        '.js-line-category',
+                        '.js-line-qty',
+                        '.js-line-type',
+                        '.js-line-remarks',
+                    ],
+                });
+            }
 
             /*
              * Tab out of the last line's Remarks to start the next line.
