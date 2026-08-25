@@ -448,7 +448,7 @@
                                         @endforeach
                                     </select>
                                 </td>
-                                <td><input type="text" class="form-control form-control-sm" name="items[__INDEX__][remarks]" maxlength="1000" placeholder="Optional"></td>
+                                <td><input type="text" class="form-control form-control-sm js-line-remarks" name="items[__INDEX__][remarks]" maxlength="1000" placeholder="Optional"></td>
                                 {{-- Padded away from the Remarks field so a fast
                                      click on the input cannot land on Remove. --}}
                                 <td class="text-end gx-line-action">
@@ -1031,6 +1031,59 @@
             // by class so the two can never drift apart.
             document.querySelectorAll('.js-add-line').forEach(function (btn) {
                 btn.addEventListener('click', function () { addLine(); });
+            });
+
+            /*
+             * Tab out of the last line's Remarks to start the next line.
+             *
+             * The same keystroke, the same four conditions and the same reason
+             * as Record Receiving — an operator working down a requisition ends
+             * each line at Remarks and wants the next one without reaching for
+             * the mouse. Kept as its own copy rather than shared: these two
+             * forms have separate inline scripts with their own row classes and
+             * helpers, and threading one shared helper through both would be a
+             * larger change to this screen than the feature is.
+             *
+             *   plain Tab       Shift+Tab still moves backwards and never adds
+             *                   a row; modifier combinations belong to the
+             *                   browser.
+             *   Remarks         the last field of the line; every other field
+             *                   tabs within the row as before.
+             *   the LAST row    an earlier row's Remarks still tabs into its own
+             *                   Remove button, unchanged.
+             *   nothing pending no IME composition in progress.
+             *
+             * The "+ Add Another Item" button is untouched; both call addLine().
+             */
+            body.addEventListener('keydown', function (event) {
+                if (event.key !== 'Tab' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) {
+                    return;
+                }
+
+                if (event.isComposing) { return; }
+
+                var field = event.target;
+                if (!field || !field.classList || !field.classList.contains('js-line-remarks')) { return; }
+
+                var row = field.closest('tr.issue-line');
+                var all = rows();
+                if (!row || row !== all[all.length - 1]) { return; }
+
+                event.preventDefault();
+
+                var added = addLine();
+
+                // A plain <select> here, not a TomSelect — this form leaves the
+                // item list unsearchable — so focus() reaches it directly. The
+                // guard stays in case that changes.
+                var select = added && added.querySelector('.js-line-item');
+                if (!select) { return; }
+
+                if (select.tomselect) {
+                    select.tomselect.focus();
+                } else {
+                    select.focus();
+                }
             });
 
             /**

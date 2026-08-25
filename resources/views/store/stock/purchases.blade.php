@@ -185,6 +185,10 @@
                                 <col style="width:110px;">
                                 <col style="width:120px;">
                                 <col>
+                                {{-- Amount. Same width as Purchased Qty, so the
+                                     two figures either side of Unit Price line
+                                     up rather than one column drifting wider. --}}
+                                <col style="width:120px;">
                                 <col style="width:104px;">
                             </colgroup>
                             <thead>
@@ -199,21 +203,28 @@
                                     <th style="min-width:140px;">Brand/Specification <span class="gx-stock-auto">auto</span></th>
                                     <th>Purchased Qty <span class="text-danger">*</span></th>
                                     <th>Unit Price</th>
+                                    {{-- Qty x Unit Price, filled in by the script.
+                                         Carries the same "auto" badge as Uom,
+                                         Category and Brand: it is derived and
+                                         read-only, and that badge is already how
+                                         this form says so. --}}
+                                    <th class="text-end">Amount <span class="gx-stock-auto">auto</span></th>
                                     <th>Remarks</th>
                                     <th class="text-end gx-stock-actions">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="purchaseLines"></tbody>
-                            {{-- The sum sits in the Unit Price column, where the
-                                 money on every line above it already is. It used
-                                 to span the last three columns, which made the
-                                 box twice the width of anything it was totalling
-                                 and left the label stranded far to its left. --}}
+                            {{-- The sum sits under Amount, the column it actually
+                                 totals. It used to sit under Unit Price, which
+                                 was the nearest money column before Amount
+                                 existed; a total standing under the per-unit rate
+                                 rather than under the line values it adds up now
+                                 reads as the wrong sum. --}}
                             <tfoot>
                                 <tr>
-                                    {{-- 6, not 5: the Brand/Specification column
-                                         sits inside this span. --}}
-                                    <td colspan="6" class="text-end gx-stock-total-label">Total Value</td>
+                                    {{-- 7, not 6: Unit Price joined the span when
+                                         the total moved one column right. --}}
+                                    <td colspan="7" class="text-end gx-stock-total-label">Total Value</td>
                                     <td>
                                         <input type="text" id="grandTotal" class="form-control form-control-sm gx-stock-readonly fw-bold text-end" readonly tabindex="-1" value="0.00">
                                     </td>
@@ -252,7 +263,14 @@
                             <td><input type="text" class="form-control form-control-sm js-line-brand gx-stock-readonly" readonly tabindex="-1" placeholder="—"></td>
                             <td><input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm js-line-qty" name="items[__INDEX__][qty]" required placeholder="0"></td>
                             <td><input type="number" step="0.0001" min="0" class="form-control form-control-sm js-line-price" name="items[__INDEX__][unit_price]" placeholder="0.00"></td>
-                            <td><input type="text" class="form-control form-control-sm" name="items[__INDEX__][remarks]" maxlength="1000" placeholder="Optional"></td>
+                            {{-- Qty x Unit Price. No name attribute — it is
+                                 derived on the server from the two fields that
+                                 ARE posted, so posting it would invite the two to
+                                 disagree. readonly + tabindex="-1" matches Uom,
+                                 Category and Brand: display only, and skipped by
+                                 Tab so it never interrupts typing a line. --}}
+                            <td><input type="text" class="form-control form-control-sm js-line-amount gx-stock-readonly text-end" readonly tabindex="-1" value="0.00"></td>
+                            <td><input type="text" class="form-control form-control-sm js-line-remarks" name="items[__INDEX__][remarks]" maxlength="1000" placeholder="Optional"></td>
                             {{-- Padded away from Remarks so a fast click on the
                                  input cannot land on Remove. --}}
                             <td class="text-end gx-line-action">
@@ -528,13 +546,35 @@
                 rows().forEach(function (row) { row.querySelector('.js-line-remove').disabled = only; });
             }
 
+            // Every line's Amount, then the sum of them.
+            //
+            // ONE pass, deliberately: the row figures and the total are computed
+            // from the same multiplication in the same loop, so the column can
+            // never add up to something other than the box under it. The total
+            // used to be its own sum of q * p with no per-row figure to check it
+            // against; now the operator can see both, which means they have to
+            // agree.
+            //
+            // Rounding happens once, at display. Each Amount is rounded to two
+            // decimals for the screen, but the SUM is taken from the unrounded
+            // products — totalling the rounded figures instead would drift by a
+            // paisa or two over a long receiving and leave a total that does not
+            // match the column the operator can add up by hand. Two decimals
+            // throughout, matching Unit Price and the existing Total Value.
             function total() {
                 var sum = 0;
+
                 rows().forEach(function (row) {
                     var q = parseFloat(row.querySelector('.js-line-qty').value) || 0;
                     var p = parseFloat(row.querySelector('.js-line-price').value) || 0;
-                    sum += q * p;
+                    var amount = q * p;
+
+                    sum += amount;
+
+                    var box = row.querySelector('.js-line-amount');
+                    if (box) { box.value = amount.toFixed(2); }
                 });
+
                 grand.value = sum.toFixed(2);
             }
 
@@ -612,6 +652,75 @@
             }
 
             addBtns.forEach(function (btn) { btn.addEventListener('click', function () { addRow(); }); });
+
+            /*
+             * Tab out of the last line's Remarks to start the next line.
+             *
+             * For an operator typing a delivery note straight in, the row ends
+             * at Remarks and the next thing they want is another row — reaching
+             * for the mouse to click "Add Another Item" between every line is
+             * the slow part of this screen.
+             *
+             * FOUR conditions, and each one is what keeps normal tabbing intact:
+             *
+             *   plain Tab       no Shift, no Ctrl/Alt/Meta. Shift+Tab must move
+             *                   backwards as it always has and must never add a
+             *                   row; a modifier combination belongs to the
+             *                   browser.
+             *   Remarks         the last field of the line. Tab anywhere else
+             *                   moves within the row, untouched.
+             *   the LAST row    tabbing out of an earlier row's Remarks still
+             *                   moves into that row's Remove button exactly as
+             *                   before. Only the bottom of the grid grows.
+             *   nothing pending no IME composition in progress.
+             *
+             * Delegated from the tbody rather than bound per row, so a row added
+             * by this handler, by the button, or by a resumed draft all behave
+             * the same with nothing to re-bind.
+             *
+             * The button is untouched and still works; both call addRow().
+             */
+            body.addEventListener('keydown', function (event) {
+                if (event.key !== 'Tab' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) {
+                    return;
+                }
+
+                if (event.isComposing) { return; }
+
+                var field = event.target;
+                if (!field || !field.classList || !field.classList.contains('js-line-remarks')) { return; }
+
+                var row = field.closest('tr.purchase-line');
+                var all = rows();
+                if (!row || row !== all[all.length - 1]) { return; }
+
+                // Only from here on is the browser's own Tab replaced.
+                event.preventDefault();
+
+                focusItem(addRow());
+            });
+
+            /**
+             * Put the cursor in a new row's Item Name.
+             *
+             * The select is a TomSelect on this form, and a TomSelect hides the
+             * original <select> — calling focus() on it puts the cursor nowhere
+             * and the operator's next keystroke goes to the page. The instance
+             * hangs off the element as .tomselect once initialised, so ask it
+             * when it is there and fall back to the plain element when it is not.
+             */
+            function focusItem(row) {
+                var select = row && row.querySelector('.js-line-item');
+                if (!select) { return; }
+
+                if (select.tomselect) {
+                    select.tomselect.focus();
+
+                    return;
+                }
+
+                select.focus();
+            }
 
             // Come back with the lines that were typed, not an empty grid.
             //
