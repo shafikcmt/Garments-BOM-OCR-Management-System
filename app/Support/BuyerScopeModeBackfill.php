@@ -101,6 +101,74 @@ final class BuyerScopeModeBackfill
     }
 
     /**
+     * Users in ONE department who hold a buyer, whether or not that department
+     * is scoped yet.
+     *
+     * The question strayBuyerHolders() cannot answer on its own: it reports
+     * every holder outside the frozen role list at once, which says WHO would
+     * be affected somewhere but not what switching on one particular department
+     * would do. This narrows it to the department actually being considered, so
+     * the decision can be made one at a time.
+     *
+     * Three sources, because a user can be confined by any of them:
+     *
+     *   users.buyer_id   the original column.
+     *   buyer_user       a team member's multi-buyer assignments.
+     *   owned buyers     a department admin holds buyers through
+     *                    buyers.department_admin_id and no row in either of the
+     *                    above. Omitting this would report a department admin
+     *                    who owns three buyers as unaffected.
+     *
+     * Reads the department's roles from DepartmentRoles, so it answers for a
+     * department whether or not BuyerScope lists it — which is the entire point.
+     *
+     * @return array<int, object>
+     */
+    public function buyerHoldersInDepartment(string $departmentKey): array
+    {
+        $roleNames = DepartmentRoles::rolesFor($departmentKey);
+
+        if ($roleNames === []) {
+            return [];
+        }
+
+        $roleIds = DB::table('roles')->whereIn('name', $roleNames)->pluck('id');
+
+        if ($roleIds->isEmpty()) {
+            return [];
+        }
+
+        $inDepartment = DB::table('model_has_roles')
+            ->where('model_type', \App\Models\User::class)
+            ->whereIn('role_id', $roleIds)
+            ->pluck('model_id');
+
+        if ($inDepartment->isEmpty()) {
+            return [];
+        }
+
+        $holders = DB::table('users')
+            ->whereIn('id', $inDepartment)
+            ->whereNotNull('buyer_id')
+            ->pluck('id')
+            ->concat(DB::table('buyer_user')->whereIn('user_id', $inDepartment)->pluck('user_id'))
+            ->concat(DB::table('buyers')->whereIn('department_admin_id', $inDepartment)->pluck('department_admin_id'))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($holders->isEmpty()) {
+            return [];
+        }
+
+        return DB::table('users')
+            ->whereIn('id', $holders)
+            ->orderBy('id')
+            ->get(['id', 'name', 'email', 'buyer_id', 'buyer_scope_mode', 'is_department_admin'])
+            ->all();
+    }
+
+    /**
      * Users holding a buyer whose department buyer scoping does NOT apply to.
      *
      * Not used by run() — this is the production audit that must be read

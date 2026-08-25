@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Support\BuyerScope;
 use App\Support\BuyerScopeModeBackfill;
+use App\Support\DepartmentRoles;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -29,12 +30,16 @@ use Illuminate\Support\Facades\DB;
  */
 class AuditBuyerScope extends Command
 {
-    protected $signature = 'buyer:audit-scope';
+    protected $signature = 'buyer:audit-scope {--department= : Report what switching THIS department on would confine, whether or not it is scoped yet}';
 
     protected $description = 'Report buyer assignments held by users outside the scoped departments (read-only)';
 
     public function handle(): int
     {
+        if ($this->option('department') !== null) {
+            return $this->auditDepartment((string) $this->option('department'));
+        }
+
         $this->newLine();
         $this->info('Buyer scope audit');
         $this->line('Departments scoped today: ' . implode(', ', BuyerScope::SCOPED_DEPARTMENTS));
@@ -86,6 +91,95 @@ class AuditBuyerScope extends Command
         // Always 0: this reports, it does not gate a pipeline. A non-zero exit
         // would make it a check that someone eventually passes a flag to skip.
         return self::SUCCESS;
+    }
+
+    /**
+     * --department=<key>: what confinement would look like for ONE department.
+     *
+     * The default audit answers "is anybody, anywhere, holding a buyer their
+     * department cannot use". This answers the narrower question a switch-on
+     * decision actually turns on: if BuyerScope listed THIS department
+     * tomorrow, who becomes confined, and to what?
+     *
+     * It reads the department's roles from DepartmentRoles rather than from
+     * BuyerScope, so it works for a department that is not scoped yet — which
+     * is the only time the question is worth asking. Run it BEFORE editing the
+     * const, and again on production before deploying that edit.
+     *
+     * WRITES NOTHING, like the default audit. Exit code is always 0: this
+     * informs a person, it does not gate a pipeline.
+     */
+    private function auditDepartment(string $departmentKey): int
+    {
+        $departments = DepartmentRoles::departments();
+
+        if (! array_key_exists($departmentKey, $departments)) {
+            $this->error('Unknown department "'.$departmentKey.'".');
+            $this->line('Known departments: '.implode(', ', array_keys($departments)));
+
+            return self::SUCCESS;
+        }
+
+        $label = $departments[$departmentKey];
+        $roles = DepartmentRoles::rolesFor($departmentKey);
+        $isScoped = BuyerScope::appliesTo($departmentKey);
+
+        $this->newLine();
+        $this->info('Buyer scope audit - '.$label);
+        $this->line('Department key: '.$departmentKey);
+        $this->line('Roles in this department: '.(implode(', ', $roles) ?: '(none)'));
+        $this->line($isScoped
+            ? 'Status: ALREADY SCOPED - the holders below are confined right now.'
+            : 'Status: NOT SCOPED - the holders below would become confined if it were listed.');
+        $this->newLine();
+
+        $holders = (new BuyerScopeModeBackfill())->buyerHoldersInDepartment($departmentKey);
+
+        if ($holders === []) {
+            $this->info('PASS - no user in this department holds a buyer.');
+            $this->line($isScoped
+                ? 'Nobody in it is confined today.'
+                : 'Adding it to BuyerScope::SCOPED_DEPARTMENTS would confine nobody by itself.');
+
+            return self::SUCCESS;
+        }
+
+        $this->warn(count($holders).' user(s) in this department hold a buyer.');
+        $this->newLine();
+
+        $this->table(
+            ['ID', 'Name', 'Email', 'Role(s)', 'Dept admin', 'buyer_id', 'Pivot buyers', 'Owns buyers', 'Mode'],
+            collect($holders)->map(fn ($user) => [
+                $user->id,
+                $user->name,
+                $user->email,
+                $this->rolesFor($user->id) ?: '(none)',
+                $user->is_department_admin ? 'yes' : '-',
+                $user->buyer_id ?? '-',
+                $this->pivotBuyersFor($user->id) ?: '-',
+                $this->ownedBuyersFor($user->id) ?: '-',
+                $user->buyer_scope_mode,
+            ])->all()
+        );
+
+        if (! $isScoped) {
+            $this->line('Before switching this department on, decide for each:');
+            $this->line('  - the assignment is intended, so the confinement is wanted, or');
+            $this->line('  - the value is stray and should be cleared first.');
+            $this->newLine();
+            $this->line('A department admin listed under "Owns buyers" is confined by what they');
+            $this->line('own on the Buyers screen, which no buyer_scope_mode value overrides.');
+        }
+
+        return self::SUCCESS;
+    }
+
+    private function ownedBuyersFor(int $userId): string
+    {
+        return DB::table('buyers')
+            ->where('department_admin_id', $userId)
+            ->pluck('buyer_name')
+            ->implode(', ');
     }
 
     private function rolesFor(int $userId): string

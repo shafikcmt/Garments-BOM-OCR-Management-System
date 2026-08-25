@@ -44,6 +44,35 @@ class ExcelFile extends Model
         return $this->belongsTo(User::class, 'uploaded_by');
     }
 
+    /**
+     * The buyer this file belongs to. Nullable — files uploaded before buyer
+     * tagging existed have none, and that is a supported state everywhere.
+     *
+     * KNOWN LIMITATION, logged deliberately rather than solved.
+     *
+     * buyer_id is FILE-level; "Buyer Name" is a ROW-level cell. That works only
+     * while a file holds one buyer. A BOM file mixing several — one already
+     * exists in the test data, BOM_FORMAT_50_DUMMY_ROWS.xlsx, with eight buyers
+     * across 50 rows — cannot be represented by this column at all, and there
+     * is no correct value to put in it: any single buyer picked would be wrong
+     * for the other seven.
+     *
+     * What that costs today, concretely:
+     *
+     *   edit-lock         isBuyerLockedForUser() treats a mixed file as
+     *                     untagged, so every scoped merchant may edit all of
+     *                     it, including rows belonging to buyers they do not
+     *                     hold.
+     *   report visibility MerchantReportService's buyer scope leaves it visible
+     *                     to everyone for the same reason.
+     *
+     * Neither is a live problem while such files are only test data, and
+     * buyer:tag-excel-files deliberately refuses to guess at them. It becomes a
+     * real one the first time a production BOM arrives with several buyers in
+     * one workbook. The fix is a decision, not a patch — split such files on
+     * upload, or move the buyer to the row and scope on that instead — so it is
+     * recorded here rather than half-made.
+     */
     public function buyer()
     {
         return $this->belongsTo(Buyer::class);
