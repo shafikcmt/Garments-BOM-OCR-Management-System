@@ -475,6 +475,27 @@ class GeneralStockReportService
         // it. Only meaningful when there is a price at all.
         $priceIsStandard = $challanPrice === null && $masterPrice !== null;
 
+        // The two dates are DERIVED — the most recent purchase and the most
+        // recent issue — so an item carried over from the old Excel sheets,
+        // with no transaction recorded here yet, shows nothing in either
+        // column however much history the store actually has for it.
+        //
+        // The reference dates are the FALLBACK for exactly that item, and only
+        // for it: a real movement always wins, so no imported figure can ever
+        // hide or contradict one. This is the same shape as the price two lines
+        // above, for the same reason — see the migration that adds the columns
+        // for why the derived value cannot simply be written to.
+        $derivedAddition = $this->toDate($movements['last_addition'][$item->id] ?? null);
+        $derivedConsumption = $this->toDate($movements['last_consumption'][$item->id] ?? null);
+
+        $lastAddition = $derivedAddition ?? $this->toDate($item->last_addition_reference);
+        $lastConsumption = $derivedConsumption ?? $this->toDate($item->last_consumption_reference);
+
+        // Which of the two this is, so the screen can mark a reference date
+        // rather than presenting it as evidence that something moved.
+        $lastAdditionIsReference = $derivedAddition === null && $lastAddition !== null;
+        $lastConsumptionIsReference = $derivedConsumption === null && $lastConsumption !== null;
+
         return [
             'item' => $item,
             // Counted figure from the Item Master; null before it was counted.
@@ -488,9 +509,11 @@ class GeneralStockReportService
             'reorder' => $reorder,
             'reorder_is_manual' => $item->reorder_level !== null,
             'addition' => $addition,
-            'last_addition_date' => $this->toDate($movements['last_addition'][$item->id] ?? null),
+            'last_addition_date' => $lastAddition,
+            'last_addition_is_reference' => $lastAdditionIsReference,
             'consumption' => $consumption,
-            'last_consumption_date' => $this->toDate($movements['last_consumption'][$item->id] ?? null),
+            'last_consumption_date' => $lastConsumption,
+            'last_consumption_is_reference' => $lastConsumptionIsReference,
             'stock_as_on' => $stockAsOn,
             'unit_price' => $unitPrice,
             'unit_price_is_standard' => $priceIsStandard,

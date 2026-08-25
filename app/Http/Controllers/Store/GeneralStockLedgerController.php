@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Store;
 
 use App\Exports\GeneralStockReportExport;
+use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Http\Controllers\Controller;
 use App\Services\GeneralStockReportService;
 use Illuminate\Http\Request;
@@ -25,6 +26,16 @@ use Maatwebsite\Excel\Facades\Excel;
  */
 class GeneralStockLedgerController extends Controller
 {
+    /**
+     * Only to decide whether the reference-data Import control is shown.
+     * The import itself lives in StockReferenceImportController and does
+     * its own check — hiding a button is presentation, never a guard.
+     */
+    use AuthorizesStoreCorrections;
+
+    /** Section-scoped correction permission for this screen. */
+    protected string $storeSection = 'store.stock_report';
+
     /**
      * Rows per screen page. The report is read top-to-bottom rather than
      * clicked through, so the page is set long enough that a normal month's
@@ -61,6 +72,7 @@ class GeneralStockLedgerController extends Controller
         }
 
         return view('store.stock.ledger', $data + [
+            'canImport' => $this->storeCorrectionAbilities()['edit'],
             'categories' => $this->report->categories(),
             'suppliers' => $this->report->suppliers(),
             'actionList' => $this->report->actionList($data['rows']),

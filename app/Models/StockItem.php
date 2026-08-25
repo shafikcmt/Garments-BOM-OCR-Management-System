@@ -27,6 +27,14 @@ class StockItem extends Model
         // challan, as the Excel did. This is the master figure a later change
         // can fall back to for an item that has never been received with one.
         'unit_price',
+        // Historical Last Addition / Last Consumption dates for an item
+        // carried over from the Excel sheets. A FALLBACK only: the Stock
+        // Report shows the real transaction-derived date whenever one
+        // exists and reads these solely when it does not. See the
+        // migration that adds them for why the derived columns cannot be
+        // written to directly.
+        'last_addition_reference',
+        'last_consumption_reference',
         'safety_stock_qty',
         'reorder_level',
         'lead_time_days',
@@ -39,6 +47,8 @@ class StockItem extends Model
         'opening_qty' => 'decimal:4',
         'opening_as_on' => 'date',
         'unit_price' => 'decimal:4',
+        'last_addition_reference' => 'date',
+        'last_consumption_reference' => 'date',
         'safety_stock_qty' => 'decimal:4',
         'reorder_level' => 'decimal:4',
         'lead_time_days' => 'integer',

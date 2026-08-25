@@ -2,7 +2,7 @@
 
 namespace App\Imports;
 
-use App\Models\StockItem;
+use App\Imports\Concerns\ReadsItemSheets;
 use Maatwebsite\Excel\Concerns\ToArray;
 use Maatwebsite\Excel\Concerns\WithCustomCsvSettings;
 
@@ -34,6 +34,14 @@ use Maatwebsite\Excel\Concerns\WithCustomCsvSettings;
  */
 class UnitPriceImport implements ToArray, WithCustomCsvSettings
 {
+    /**
+     * Heading location, column mapping and cell reading. Extracted when the
+     * Stock Report's reference import needed the same reading — in particular
+     * the SAME name+brand identity, so a price and a date can never land on
+     * different makes of one item.
+     */
+    use ReadsItemSheets;
+
     /**
      * Three columns. Brand is not optional padding — see the class comment.
      *
@@ -103,10 +111,7 @@ class UnitPriceImport implements ToArray, WithCustomCsvSettings
             ]]);
         }
 
-        // name+brand => id, built the way ItemMasterImport builds its own
-        // lookup so the two agree on what counts as the same item.
-        $items = StockItem::get(['id', 'name', 'brand'])
-            ->mapWithKeys(fn (StockItem $item) => [self::identity($item->name, $item->brand) => (int) $item->id]);
+        $items = self::itemIdentityMap();
 
         $updates = [];
         $errors = [];
@@ -181,103 +186,5 @@ class UnitPriceImport implements ToArray, WithCustomCsvSettings
         }
 
         return ['updates' => $updates, 'errors' => $errors, 'skipped' => $skipped];
-    }
-
-    /**
-     * What makes one item the same as another: name and brand, case- and
-     * spacing-blind. Copied in behaviour from ItemMasterImport::identity() on
-     * purpose — if the two ever disagree, a price lands on the wrong make.
-     */
-    private static function identity(?string $name, ?string $brand): string
-    {
-        $norm = fn ($value) => preg_replace('/\s+/', ' ', mb_strtolower(trim((string) $value)));
-
-        return $norm($name).'|'.$norm($brand);
-    }
-
-    /**
-     * @param  array<int, array<int, mixed>>  $rows
-     * @return array{0: int|null, 1: array<string, int>}
-     */
-    private static function locateHeader(array $rows): array
-    {
-        $limit = min(count($rows), self::HEADER_SEARCH_LIMIT);
-
-        for ($index = 0; $index < $limit; $index++) {
-            $map = self::mapHeadings($rows[$index] ?? []);
-
-            if (count(array_intersect(self::REQUIRED_HEADINGS, array_keys($map))) === count(self::REQUIRED_HEADINGS)) {
-                return [$index, $map];
-            }
-        }
-
-        return [null, []];
-    }
-
-    /**
-     * @param  array<int, mixed>  $row
-     * @return array<string, int>
-     */
-    private static function mapHeadings(array $row): array
-    {
-        $map = [];
-
-        foreach ($row as $column => $heading) {
-            $key = self::key((string) $heading);
-
-            if ($key === '') {
-                continue;
-            }
-
-            foreach (self::HEADINGS as $field => $accepted) {
-                // First column wins, so a sheet repeating a heading later does
-                // not steal the mapping from the real one.
-                if (! isset($map[$field]) && in_array($key, $accepted, true)) {
-                    $map[$field] = $column;
-                    break;
-                }
-            }
-        }
-
-        return $map;
-    }
-
-    /** A heading reduced to letters and digits, so spacing and "*" cannot matter. */
-    private static function key(string $heading): string
-    {
-        return preg_replace('/[^a-z0-9]/', '', mb_strtolower(trim($heading))) ?? '';
-    }
-
-    /** @param array<int, mixed> $row */
-    private static function isBlank(array $row): bool
-    {
-        foreach ($row as $cell) {
-            if (trim((string) $cell) !== '') {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static function text(mixed $value, int $limit = 255): ?string
-    {
-        $value = trim((string) $value);
-
-        return $value === '' ? null : mb_substr($value, 0, $limit);
-    }
-
-    /** @return float|null|false  null when blank, false when not a number */
-    private static function number(mixed $value): float|null|false
-    {
-        $value = trim((string) $value);
-
-        if ($value === '') {
-            return null;
-        }
-
-        $value = str_replace([',', ' '], '', $value);
-
-        return is_numeric($value) ? (float) $value : false;
     }
 }

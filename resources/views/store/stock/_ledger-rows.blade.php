@@ -129,9 +129,13 @@
                     <td class="text-end text-success">{{ $qty($r['addition']) }}</td>
                     {{-- gx-stock-micro is already the quiet treatment; adding
                          gx-ledger-quiet on top would only fight it. --}}
-                    <td class="gx-stock-micro">{{ $date($r['last_addition_date']) }}</td>
+                    {{-- A reference date carried over from the old records is
+                         marked, the same way a standard price is below: this
+                         column normally means "the day something moved", and a
+                         date with no transaction behind it is not that. --}}
+                    <td class="gx-stock-micro">{{ $date($r['last_addition_date']) }}@if($r['last_addition_is_reference'])<i class="bi bi-bookmark text-muted ms-1" title="Reference date carried over from the old records — no receiving has been recorded here for this item yet" aria-hidden="true"></i>@endif</td>
                     <td class="text-end text-danger">{{ $qty($r['consumption']) }}</td>
-                    <td class="gx-stock-micro">{{ $date($r['last_consumption_date']) }}</td>
+                    <td class="gx-stock-micro">{{ $date($r['last_consumption_date']) }}@if($r['last_consumption_is_reference'])<i class="bi bi-bookmark text-muted ms-1" title="Reference date carried over from the old records — no issue has been recorded here for this item yet" aria-hidden="true"></i>@endif</td>
                     <td class="text-end fw-bold text-slate-900 gx-ledger-primary">{{ $qty($r['stock_as_on']) }}</td>
                     {{-- Marked the same way as on the Stock Report: a standard
                          price from the item master is not the challan price

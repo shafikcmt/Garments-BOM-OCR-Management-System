@@ -62,9 +62,14 @@
                 <td class="num">{{ $r['reorder'] === null ? '-' : $qty($r['reorder']) }}</td>
                 <td class="num">{{ $r['lead_time_days'] }}</td>
                 <td class="num">{{ $qty($r['addition']) }}</td>
-                <td>{{ $date($r['last_addition_date']) }}</td>
+                {{-- A reference date is marked, for the same reason a standard
+                     price is: this column normally means "the day something was
+                     received", and a date carried over from the old sheets is
+                     not that. Dropped from the Excel export, where a marker
+                     would only be noise in a cell. --}}
+                <td>{{ $date($r['last_addition_date']) }}@if(! $forExcel && $r['last_addition_is_reference'])<i class="bi bi-bookmark text-muted ms-1" title="Reference date carried over from the old records — no receiving has been recorded here for this item yet" aria-hidden="true"></i>@endif</td>
                 <td class="num">{{ $qty($r['consumption']) }}</td>
-                <td>{{ $date($r['last_consumption_date']) }}</td>
+                <td>{{ $date($r['last_consumption_date']) }}@if(! $forExcel && $r['last_consumption_is_reference'])<i class="bi bi-bookmark text-muted ms-1" title="Reference date carried over from the old records — no issue has been recorded here for this item yet" aria-hidden="true"></i>@endif</td>
                 <td class="num">{{ $qty($r['stock_as_on']) }}</td>
                 {{-- A standard price off the item master is marked, because it
                      is not what this report's price column has always meant.

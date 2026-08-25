@@ -8,6 +8,7 @@ use App\Http\Controllers\Store\StockItemController;
 use App\Http\Controllers\Store\StockPurchaseController;
 use App\Http\Controllers\Store\StockIssueController;
 use App\Http\Controllers\Store\GeneralStockLedgerController;
+use App\Http\Controllers\Store\StockReferenceImportController;
 use App\Http\Controllers\Store\IssueSetupController;
 use App\Http\Controllers\Store\PurchaseSetupController;
 use App\Http\Controllers\Store\StockSetupController;
@@ -178,6 +179,17 @@ Route::prefix('store')
                 Route::get('/ledger', [GeneralStockLedgerController::class, 'index'])->name('ledger');
                 Route::get('/ledger/pdf', [GeneralStockLedgerController::class, 'pdf'])->name('ledger.pdf');
                 Route::get('/ledger/excel', [GeneralStockLedgerController::class, 'excel'])->name('ledger.excel');
+
+                // Backfilling Unit Price and the two reference dates for items
+                // carried over from the Excel sheets. Guarded on the correction
+                // right inside StockReferenceImportController rather than here,
+                // because this section's route middleware admits read-only
+                // viewers of the report too — the same reasoning the Unit Price
+                // import uses. Two steps: preview reads and writes nothing,
+                // apply writes a plan somebody has already seen.
+                Route::get('/ledger/import/template', [StockReferenceImportController::class, 'template'])->name('ledger.import.template');
+                Route::post('/ledger/import', [StockReferenceImportController::class, 'preview'])->name('ledger.import.preview');
+                Route::post('/ledger/import/apply', [StockReferenceImportController::class, 'apply'])->name('ledger.import.apply');
             });
 
             // Master Setup — one screen for every General Stock master list.
