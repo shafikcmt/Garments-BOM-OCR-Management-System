@@ -133,6 +133,18 @@
                         </a>
                     </li>
 
+                    {{-- Each department's own report. Admin is one of the three
+                         roles those routes admit, so they need a way in that is
+                         not a hand-typed URL. --}}
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Merchandising Reports</span>
+                            </span>
+                        </a>
+                    </li>
+
                     <li class="sidebar-group {{ $isAdminStore ? 'is-open' : '' }}">
                         <button type="button" class="sidebar-group-button {{ $isAdminStore ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminStore ? 'true' : 'false' }}">
                             <span class="sidebar-link-main">
@@ -244,6 +256,11 @@
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Reports</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
@@ -499,6 +516,14 @@
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Dashboard</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Merchandising Reports</span>
                             </span>
                         </a>
                     </li>

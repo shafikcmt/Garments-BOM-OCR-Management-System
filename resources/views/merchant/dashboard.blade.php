@@ -62,13 +62,18 @@
     </div>
 
     <div class="row g-3" data-aos="fade-up">
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-4">
             <x-quick-action class="gx-fade-in" style="--gx-delay:600ms" icon="grid-3x3-gap" tone="primary"
                 title="BOM Workspace" description="Fill in the columns you own"
                 :href="route('merchant.workspace')" />
         </div>
-        <div class="col-12 col-md-6">
-            <x-quick-action class="gx-fade-in" style="--gx-delay:700ms" icon="file-earmark-bar-graph" tone="success"
+        <div class="col-12 col-md-4">
+            <x-quick-action class="gx-fade-in" style="--gx-delay:700ms" icon="file-earmark-bar-graph" tone="primary"
+                title="Merchandising Reports" description="Your BOM columns, with PDF and Excel"
+                :href="route('merchant.reports.index')" />
+        </div>
+        <div class="col-12 col-md-4">
+            <x-quick-action class="gx-fade-in" style="--gx-delay:800ms" icon="file-earmark-bar-graph" tone="success"
                 title="Store Reports" description="Receive and issue summaries"
                 :href="route('store.reports.index')" />
         </div>

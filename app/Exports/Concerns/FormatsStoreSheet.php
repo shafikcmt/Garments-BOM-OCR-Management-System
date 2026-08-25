@@ -78,8 +78,15 @@ trait FormatsStoreSheet
      *
      * Matched on whole words, so "No" catches "Art. No" and "GRN/MRN No" while
      * leaving "Nominal" and "Notes" alone.
+     *
+     * "po" and "contract" were added for the Merchandising report, whose
+     * Garments PO and Sales Contract columns are bare digits with no "No" in
+     * the heading to catch them — PO 12458787 printed as "12,458,787" is not a
+     * PO anyone can look up. Every existing export was checked first: the only
+     * heading either word touches is "PO Number", which the "number" rule
+     * already claimed, so no store report's output changes.
      */
-    private const IDENTIFIER_HEADINGS = ['no', 'nos', 'number', 'code', 'id', 'sl', 'style', 'sap', 'ref'];
+    private const IDENTIFIER_HEADINGS = ['no', 'nos', 'number', 'code', 'id', 'sl', 'style', 'sap', 'ref', 'po', 'contract'];
 
     /** Digits, no grouping — what a reference number should look like. */
     private const FORMAT_IDENTIFIER = '0';
