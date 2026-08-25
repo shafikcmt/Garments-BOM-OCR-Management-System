@@ -509,6 +509,23 @@ function refTemplateRows(): array
     return array_slice(refTemplate(), 2);
 }
 
+/**
+ * A date cell of the template read back as an ISO string.
+ *
+ * The two date columns hold REAL Excel dates — serial numbers displayed by
+ * ReceivingTemplateExport::DATE_FORMAT — so that the sheet shows a date the
+ * same way the Receiving and Issue templates do. Asserting on the serial itself
+ * would say nothing readable, so the tests assert on the day it stands for.
+ */
+function refCellDate(mixed $serial): ?string
+{
+    return $serial === null
+        ? null
+        : \Illuminate\Support\Carbon::instance(
+            \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $serial)
+        )->toDateString();
+}
+
 it('puts the note above the headings, where the importer skips it', function () {
     $template = refTemplate();
 
@@ -549,8 +566,71 @@ it('shows the values an item already has and leaves only the missing ones blank'
         ->and($rows[0][0])->toBe('Sewing Needle')
         ->and($rows[0][1])->toBe('Organ')
         ->and((float) $rows[0][2])->toBe(7.25)
-        ->and($rows[0][3])->toBe('2026-03-01')
+        ->and(refCellDate($rows[0][3]))->toBe('2026-03-01')
         ->and($rows[0][4])->toBeNull();
+});
+
+/** The five column widths of a freshly styled template sheet. */
+function refTemplateWidths(): array
+{
+    $sheet = (new PhpOffice\PhpSpreadsheet\Spreadsheet)->getActiveSheet();
+
+    (new App\Exports\StockReferenceTemplateExport)->styles($sheet);
+
+    return collect(range('A', 'E'))
+        ->mapWithKeys(fn (string $letter) => [$letter => $sheet->getColumnDimension($letter)->getWidth()])
+        ->all();
+}
+
+it('sizes Item Name to the item names, never to the instruction note', function () {
+    // The bug: ShouldAutoSize measures EVERY cell in the column, and A1 holds
+    // the ~160-character note, so Item Name came out 190 characters wide and
+    // pushed the other four columns off the screen.
+    $longest = 'Fusing Machine Temperature & Bond Test Report';   // 45, the real maximum
+    refItem($longest, 'Organ');
+    refItem('Tape', 'Generic');
+
+    $widths = refTemplateWidths();
+
+    expect($widths['A'])->toBeLessThan(mb_strlen(refTemplate()[0][0]))
+        // Capped at the same 42 the Store reports use, and the names that pass
+        // it wrap rather than being cut off by the Brand cell beside them.
+        ->and($widths['A'])->toBe(42.0)
+        ->and($widths['A'])->toBeLessThan((float) mb_strlen($longest) + 2);
+});
+
+it('sizes the other four columns to their own content', function () {
+    $item = refItem('Tape', 'Alfesam/Batter Day', ['unit_price' => 7.25]);
+    refPurchase($item, '2026-03-01');
+
+    $widths = refTemplateWidths();
+
+    expect($widths['A'])->toBe(12.0)                    // "Tape" — the 12-character floor
+        ->and($widths['B'])->toBe(20.0)                 // "Alfesam/Batter Day" + 2
+        // Unit Price and the two date columns sit on the floor: their content
+        // is "7.25" and "1/Mar/26", and their long headings wrap instead of
+        // widening the column.
+        ->and($widths['C'])->toBe(12.0)
+        ->and($widths['D'])->toBe(12.0)
+        ->and($widths['E'])->toBe(12.0);
+});
+
+it('writes the date columns as real dates in the Receiving template format', function () {
+    // One date display across the Store module. A pre-filled cell that arrived
+    // as ISO text used to ignore the column format entirely and read
+    // "2026-03-01" beside a Receiving sheet showing "1/Mar/26".
+    $item = refItem('Sewing Needle', 'Organ', ['unit_price' => 7.25]);
+    refPurchase($item, '2026-03-01');
+
+    $formats = (new App\Exports\StockReferenceTemplateExport)->columnFormats();
+    $rows = refTemplateRows();
+
+    expect($rows[0][3])->toBeNumeric()
+        ->and(array_values(array_slice($formats, 1)))
+        ->toBe([
+            App\Exports\ReceivingTemplateExport::DATE_FORMAT,
+            App\Exports\ReceivingTemplateExport::DATE_FORMAT,
+        ]);
 });
 
 it('shows the challan price rather than the master price, as the report does', function () {
@@ -567,7 +647,7 @@ it('shows a reference date for an item that has one but no transaction', functio
 
     $rows = refTemplateRows();
 
-    expect($rows[0][4])->toBe('2025-06-06')
+    expect(refCellDate($rows[0][4]))->toBe('2025-06-06')
         ->and($rows[0][3])->toBeNull();
 });
 
@@ -670,9 +750,12 @@ it('marks a reference date on the Stock Report screen, not just in the PDF', fun
 
     $html = $response->getContent();
 
-    expect($html)->toContain('20-Feb-26')
+    // 'd-M-Y', the format Record Receiving and Issues print — and the SAME
+    // format for both dates below, so a reference is told apart by its marker
+    // and never by how it is written.
+    expect($html)->toContain('20-Feb-2026')
         ->and($html)->toContain('bi-bookmark')
         // The real movement's date carries no marker: one bookmark on the page.
         ->and(substr_count($html, 'bi-bookmark'))->toBe(1)
-        ->and($html)->toContain('11-Aug-26');
+        ->and($html)->toContain('11-Aug-2026');
 });

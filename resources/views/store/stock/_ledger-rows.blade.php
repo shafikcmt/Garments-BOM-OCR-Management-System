@@ -13,7 +13,12 @@
     // Trim trailing zeros so a whole-number qty reads "15", not "15.0000".
     $qty = fn ($v) => $v === null ? '—' : rtrim(rtrim(number_format((float) $v, 4, '.', ','), '0'), '.');
     $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
-    $date = fn ($v) => $v ? $v->format('d-M-y') : '—';
+    // 'd-M-Y', the format every other Store screen prints a date in — Record
+    // Receiving, Issues and both of their reports. Used for the Last Addition
+    // and Last Consumption columns alike, whether the date came from a real
+    // transaction or from an imported reference, so the bookmark icon is the
+    // only thing that tells the two apart.
+    $date = fn ($v) => $v ? $v->format('d-M-Y') : '—';
 
     // Only the statuses that need buying get a pill. "ok" is absent on purpose:
     // it is the common case, and a badge on nine rows in ten is decoration that

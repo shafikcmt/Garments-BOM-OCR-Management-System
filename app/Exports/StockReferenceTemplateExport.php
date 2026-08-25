@@ -4,13 +4,15 @@ namespace App\Exports;
 
 use App\Imports\StockReferenceImport;
 use App\Models\StockItem;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -50,7 +52,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
  * unknown item. The example row is gone: on a sheet of real items it is one
  * more row to explain rather than a clarification.
  */
-class StockReferenceTemplateExport implements FromArray, ShouldAutoSize, WithColumnFormatting, WithStyles, WithTitle
+class StockReferenceTemplateExport implements FromArray, WithColumnFormatting, WithStyles, WithTitle
 {
     /** Sheet row holding the note; the headings follow it, then the data. */
     private const NOTE_ROW = 1;
@@ -58,6 +60,34 @@ class StockReferenceTemplateExport implements FromArray, ShouldAutoSize, WithCol
     private const HEADING_ROW = 2;
 
     private const FIRST_DATA_ROW = 3;
+
+    /**
+     * The two date columns, named by the field they carry in
+     * StockReferenceImport::FIELDS.
+     *
+     * Their cells are written as REAL Excel dates and displayed by
+     * ReceivingTemplateExport::DATE_FORMAT, so this sheet reads exactly like
+     * the Receiving and Issue templates ("1/Aug/26") instead of in a format of
+     * its own.
+     *
+     * @var list<string>
+     */
+    private const DATE_FIELDS = ['last_addition', 'last_consumption'];
+
+    /**
+     * Column width bounds, in Excel character units — the same clamping, and
+     * the same upper bound, that FormatsStoreSheet applies to the Store
+     * reports, so the two downloads are proportioned alike.
+     *
+     * The floor is higher than a report's because every column here is one
+     * somebody types into: a Unit Price column measured on "7.25" alone would
+     * come out four characters wide.
+     */
+    private const WIDTH_MIN = 12;
+
+    private const WIDTH_MAX = 42;
+
+    private const WIDTH_PADDING = 2;
 
     /** Read once and shared by array() and styles(), which must agree exactly. */
     private ?array $rows = null;
@@ -129,6 +159,10 @@ class StockReferenceTemplateExport implements FromArray, ShouldAutoSize, WithCol
             foreach (StockReferenceImport::FIELDS as $offset => $field) {
                 $value = $item_state['has'][$field] ? $item_state['current'][$field] : null;
 
+                if ($value !== null && in_array($field, self::DATE_FIELDS, true)) {
+                    $value = self::serial($value);
+                }
+
                 $cells[] = $value;
 
                 // Greyed only where something is actually printed. A field that
@@ -147,13 +181,30 @@ class StockReferenceTemplateExport implements FromArray, ShouldAutoSize, WithCol
         return $this->rows = $rows;
     }
 
+    /**
+     * A stored ISO date as the Excel serial number a real date cell holds.
+     *
+     * Written as a date rather than as text so the sheet DISPLAYS it in the
+     * same format the Receiving and Issue templates use, and so a date
+     * function, sort or filter still understands the column once the user has
+     * typed into the blank cells beside it. The importer already reads a serial
+     * through PhpSpreadsheet — see ReadsItemSheets::date() — so the round trip
+     * is unchanged.
+     */
+    private static function serial(string $iso): float
+    {
+        return (float) ExcelDate::PHPToExcel(Carbon::parse($iso)->startOfDay());
+    }
+
     /** @return array<string, string> */
     public function columnFormats(): array
     {
         return [
             $this->dataRange('Unit Price') => NumberFormat::FORMAT_NUMBER_00,
-            $this->dataRange('Last Addition Date') => NumberFormat::FORMAT_DATE_YYYYMMDD,
-            $this->dataRange('Last Consumption Date') => NumberFormat::FORMAT_DATE_YYYYMMDD,
+            // The Receiving template's format, not a copy of it: one spelling
+            // of the store's date display, changed in one place.
+            $this->dataRange('Last Addition Date') => ReceivingTemplateExport::DATE_FORMAT,
+            $this->dataRange('Last Consumption Date') => ReceivingTemplateExport::DATE_FORMAT,
         ];
     }
 
@@ -207,9 +258,88 @@ class StockReferenceTemplateExport implements FromArray, ShouldAutoSize, WithCol
             }
         }
 
+        $this->sizeColumns($sheet);
+
         return [
             self::NOTE_ROW => ['font' => ['italic' => true, 'color' => ['rgb' => '6B7280']]],
-            self::HEADING_ROW => ['font' => ['bold' => true]],
+            // Wrapped, so a long heading is read on two lines instead of
+            // deciding how wide the column under it has to be. "Last
+            // Consumption Date" is 21 characters over a column of 9-character
+            // dates.
+            self::HEADING_ROW => [
+                'font' => ['bold' => true],
+                'alignment' => ['wrapText' => true, 'vertical' => Alignment::VERTICAL_BOTTOM],
+            ],
         ];
+    }
+
+    /**
+     * Explicit widths, measured from the DATA.
+     *
+     * ShouldAutoSize used to do this and got column A badly wrong: auto-size
+     * measures every cell in the column, and A1 holds the ~190-character
+     * instruction note, so Item Name came out wide enough to hold a sentence
+     * and pushed the other four columns off the screen. Neither the note nor
+     * the headings are measured here for that reason — the note overflows
+     * across the empty cells beside it as it always did, and the headings wrap.
+     *
+     * Same shape as FormatsStoreSheet::sizeColumns(), which reached the same
+     * conclusion about auto-size on the Store reports: measure the content,
+     * clamp it, and turn auto-size off so nothing overrides the result.
+     */
+    private function sizeColumns(Worksheet $sheet): void
+    {
+        $longest = array_fill(0, count(StockReferenceImport::COLUMNS), 0);
+
+        foreach ($this->incompleteItems() as $row) {
+            foreach ($row['cells'] as $column => $value) {
+                $longest[$column] = max($longest[$column], mb_strlen($this->displayed($column, $value)));
+            }
+        }
+
+        foreach ($longest as $column => $width) {
+            $letter = $this->columnLetter($column + 1);
+            $wanted = $width + self::WIDTH_PADDING;
+
+            $sheet->getColumnDimension($letter)
+                ->setAutoSize(false)
+                ->setWidth(max(self::WIDTH_MIN, min(self::WIDTH_MAX, $wanted)));
+
+            // The handful of item names longer than the cap wrap rather than
+            // being cut off by the filled Brand cell beside them.
+            if ($wanted > self::WIDTH_MAX) {
+                $sheet->getStyle($this->dataRange(StockReferenceImport::COLUMNS[$column]))
+                    ->getAlignment()->setWrapText(true);
+            }
+        }
+    }
+
+    /**
+     * A cell as Excel will DRAW it, which is what a column has to be wide
+     * enough for.
+     *
+     * The two date columns hold serial numbers, not text: measuring the stored
+     * 46082 would ask for five characters where the cell shows "15/Mar/26".
+     * Unit Price is stored bare and drawn to two decimals for the same reason.
+     */
+    private function displayed(int $column, mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        // The two identifying columns sit before FIELDS, so they resolve to
+        // null here and are measured as the plain text they are.
+        $field = StockReferenceImport::FIELDS[$column - 2] ?? null;
+
+        if ($field !== null && in_array($field, self::DATE_FIELDS, true)) {
+            return Carbon::instance(ExcelDate::excelToDateTimeObject((float) $value))->format('j/M/y');
+        }
+
+        if ($field === 'unit_price') {
+            return number_format((float) $value, 2);
+        }
+
+        return (string) $value;
     }
 }
