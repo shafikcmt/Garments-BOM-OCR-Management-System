@@ -152,6 +152,14 @@
                             </span>
                         </a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('commercial.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Commercial Reports</span>
+                            </span>
+                        </a>
+                    </li>
 
                     <li class="sidebar-group {{ $isAdminStore ? 'is-open' : '' }}">
                         <button type="button" class="sidebar-group-button {{ $isAdminStore ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminStore ? 'true' : 'false' }}">
@@ -321,6 +329,11 @@
                     <li class="sidebar-item">
                         <a href="{{ route('commercial.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('commercial.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Reports</span></span>
                         </a>
                     </li>
                 </ul>
@@ -548,6 +561,14 @@
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Supply Chain Reports</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('commercial.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Commercial Reports</span>
                             </span>
                         </a>
                     </li>
