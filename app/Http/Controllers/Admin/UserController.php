@@ -136,8 +136,8 @@ class UserController extends Controller
         // when there is a choice: an admin with one buyer still passes it on
         // silently, which is what every merchant admin does today.
         $actor = auth()->user();
-        $assignableBuyers = $actor?->isMerchantDepartment() && $actor->isDepartmentAdmin()
-            ? Buyer::whereIn('id', $actor->merchantBuyerIds())->orderBy('buyer_name')->get()
+        $assignableBuyers = $actor?->isBuyerScopedDepartment() && $actor->isDepartmentAdmin()
+            ? Buyer::whereIn('id', $actor->scopedBuyerIds())->orderBy('buyer_name')->get()
             : collect();
 
         return view('admin.users.create', array_merge(
@@ -339,16 +339,22 @@ class UserController extends Controller
 
     /**
      * The buyers this actor may assign at all — their own, and only when the
-     * new user is Merchandising.
+     * new user belongs to a buyer-scoped department.
      *
      * Read from the ACTOR, never from the request. A department admin creating
      * a user is creating one of their own team, so the candidate set is a fact
      * about who is doing the creating.
      *
      * Empty for everyone else — a super admin's new users are unscoped, exactly
-     * as every user is today. The new role is checked too, so a merchant admin
-     * who somehow creates a non-merchant user does not scope them to a buyer
-     * their department cannot see.
+     * as every user is today. The new role is checked too, so a department admin
+     * who somehow creates a user outside a scoped department does not scope them
+     * to a buyer that department cannot see.
+     *
+     * The role check asks BuyerScope rather than naming a department. It read
+     * `!== 'merchandising'` until Supply Chain was switched on, which was the
+     * last hardcoded department literal in the application and would have
+     * silently refused a Supply Chain admin the buyer picker on the create
+     * form — while the edit form, which already asked BuyerScope, offered it.
      *
      * @return list<int>
      */
@@ -356,15 +362,15 @@ class UserController extends Controller
     {
         $actor = auth()->user();
 
-        if (! $actor?->isMerchantDepartment() || ! $actor->isDepartmentAdmin()) {
+        if (! $actor?->isBuyerScopedDepartment() || ! $actor->isDepartmentAdmin()) {
             return [];
         }
 
-        if (DepartmentRoles::departmentOf($request->input('role')) !== 'merchandising') {
+        if (! BuyerScope::appliesTo(DepartmentRoles::departmentOf($request->input('role')))) {
             return [];
         }
 
-        return $actor->merchantBuyerIds();
+        return $actor->scopedBuyerIds();
     }
 
     /**

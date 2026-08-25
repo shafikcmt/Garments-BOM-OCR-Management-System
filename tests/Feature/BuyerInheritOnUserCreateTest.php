@@ -205,6 +205,74 @@ it('offers no picker to a super admin, whose users stay unscoped', function () {
         ->and($new->buyers)->toHaveCount(0);
 });
 
+/*
+ * Supply Chain, once BuyerScope::SCOPED_DEPARTMENTS listed it.
+ *
+ * The create path used to ask `departmentOf($role) !== 'merchandising'` — the
+ * last hardcoded department literal in the application — which would have given
+ * a Supply Chain admin a create form that silently refused to scope anybody,
+ * while the edit form (already asking BuyerScope) offered the same control. It
+ * asks BuyerScope now, and these pin that the two forms agree.
+ */
+it('gives a new supply chain user the creating supply chain admin buyer', function () {
+    Role::findOrCreate('supply_chain', 'web');
+
+    $scAdmin = User::factory()->create(['is_department_admin' => true])->assignRole('supply_chain');
+    $this->buyerB->update(['department_admin_id' => $scAdmin->id]);
+
+    $this->actingAs($scAdmin->fresh())
+        ->post(route('admin.users.store'), createUserPayload([
+            'department' => 'supply_chain',
+            'role' => 'supply_chain',
+            'email' => 'sc.person@example.com',
+        ]))
+        ->assertRedirect();
+
+    expect(User::where('email', 'sc.person@example.com')->value('buyer_id'))
+        ->toBe($this->buyerB->id);
+});
+
+it('lets a supply chain admin holding several buyers assign a subset on create', function () {
+    Role::findOrCreate('supply_chain', 'web');
+
+    $scAdmin = User::factory()->create(['is_department_admin' => true])->assignRole('supply_chain');
+    $this->buyerA->update(['department_admin_id' => $scAdmin->id]);
+    $this->buyerB->update(['department_admin_id' => $scAdmin->id]);
+
+    $this->actingAs($scAdmin->fresh())
+        ->post(route('admin.users.store'), createUserPayload([
+            'department' => 'supply_chain',
+            'role' => 'supply_chain',
+            'email' => 'sc.multi@example.com',
+            'buyer_ids' => [$this->buyerB->id],
+        ]))
+        ->assertRedirect();
+
+    $new = User::where('email', 'sc.multi@example.com')->first();
+
+    expect($new->buyer_id)->toBe($this->buyerB->id)
+        ->and($new->buyers->pluck('id')->all())->toBe([$this->buyerB->id]);
+});
+
+it('refuses a supply chain admin a buyer they do not hold', function () {
+    Role::findOrCreate('supply_chain', 'web');
+
+    $scAdmin = User::factory()->create(['is_department_admin' => true])->assignRole('supply_chain');
+    $this->buyerA->update(['department_admin_id' => $scAdmin->id]);
+    $this->buyerB->update(['department_admin_id' => $scAdmin->id]);
+
+    $outside = Buyer::create(['buyer_name' => 'Outside Buyer']);
+
+    $this->actingAs($scAdmin->fresh())
+        ->post(route('admin.users.store'), createUserPayload([
+            'department' => 'supply_chain',
+            'role' => 'supply_chain',
+            'email' => 'sc.outside@example.com',
+            'buyer_ids' => [$outside->id],
+        ]))
+        ->assertSessionHasErrors('buyer_ids.0');
+});
+
 it('ignores buyer_ids posted for a non-merchant new user', function () {
     $this->buyerB->update(['department_admin_id' => $this->deptAdmin->id]);
 

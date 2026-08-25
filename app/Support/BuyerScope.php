@@ -26,10 +26,27 @@ final class BuyerScope
     /**
      * Departments where buyer scoping is switched on.
      *
+     * WHAT ADDING A NAME HERE DOES, because it is not a display setting: every
+     * user in that department whose buyer_scope_mode is 'specific', OR who
+     * holds any buyer assignment, becomes CONFINED from the next request.
+     * Confinement narrows what they may edit (ExcelFile::isBuyerLockedForUser)
+     * and what their department's report shows them. A stray buyer_id left on
+     * an account becomes a live restriction the moment its department is
+     * listed — run `php artisan buyer:audit-scope` on production before adding
+     * one, which is exactly what that command exists to answer.
+     *
+     * Admin and Management are never affected: the super admin is excluded by
+     * name in User::isBuyerScopedDepartment(), and Management's department key
+     * is not listed here.
+     *
+     * supply_chain was added once its report carried the same scope rule
+     * Merchandising's does, and the audit came back clean.
+     *
      * @var list<string>
      */
     public const SCOPED_DEPARTMENTS = [
         'merchandising',
+        'supply_chain',
     ];
 
     /** Every buyer — the unrestricted mode, and the default for a new user. */

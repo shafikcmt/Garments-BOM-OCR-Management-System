@@ -144,6 +144,14 @@
                             </span>
                         </a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('supply_chain.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Supply Chain Reports</span>
+                            </span>
+                        </a>
+                    </li>
 
                     <li class="sidebar-group {{ $isAdminStore ? 'is-open' : '' }}">
                         <button type="button" class="sidebar-group-button {{ $isAdminStore ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $isAdminStore ? 'true' : 'false' }}">
@@ -503,6 +511,14 @@
                             </span>
                         </a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('supply_chain.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Reports</span>
+                            </span>
+                        </a>
+                    </li>
                 </ul>
             </div>
             @endrole
@@ -524,6 +540,14 @@
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Merchandising Reports</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('supply_chain.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.reports.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Supply Chain Reports</span>
                             </span>
                         </a>
                     </li>

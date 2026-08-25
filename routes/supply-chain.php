@@ -6,6 +6,20 @@ use App\Http\Controllers\SupplyChain\WorkspaceController;
 use App\Http\Controllers\SupplyChain\BookingController;
 use App\Http\Controllers\SupplyChain\PaymentRequestController;
 use App\Http\Controllers\SupplyChain\SentEmailController;
+use App\Http\Controllers\SupplyChain\ReportController;
+
+// Supply Chain reports — read-only summaries of this department's columns.
+// Kept in their own group because they are shared with Admin / Management,
+// while the main supply chain group below stays supply_chain-only. The download
+// routes re-check the role in ReportController.
+Route::prefix('supply-chain/reports')
+    ->middleware(['auth', 'role:supply_chain,admin,management'])
+    ->name('supply_chain.reports.')
+    ->group(function () {
+        Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('/pdf', [ReportController::class, 'pdf'])->name('pdf');
+        Route::get('/excel', [ReportController::class, 'excel'])->name('excel');
+    });
 
 Route::prefix('supply-chain')
     ->middleware(['auth', 'role:supply_chain'])

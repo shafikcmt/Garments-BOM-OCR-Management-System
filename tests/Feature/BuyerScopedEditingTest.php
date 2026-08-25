@@ -118,10 +118,23 @@ it('reports no buyers for a department admin who owns none', function () {
 /**
  * The same guarantee the single-buyer version carries, restated for the new
  * method: the departments with no buyer concept must not acquire one.
+ *
+ * supply_chain is deliberately NOT in this list. It was, while
+ * BuyerScope::SCOPED_DEPARTMENTS named Merchandising alone; the department is
+ * scoped now and the test below asserts the opposite for it. Adding a
+ * department to that const is expected to move it from this list to that one —
+ * if a role here starts failing, check the const before changing the test.
  */
 it('reports no buyers for any other department, even with a buyer_id set', function (string $role) {
     expect(buyerScopeUser($role, ['buyer_id' => $this->buyerA->id])->merchantBuyerIds())->toBe([]);
-})->with(['commercial', 'store', 'account', 'supply_chain', 'production', 'management', 'admin']);
+})->with(['commercial', 'store', 'account', 'production', 'management', 'admin']);
+
+it('reports the buyers of a scoped department other than Merchandising', function () {
+    $user = buyerScopeUser('supply_chain', ['buyer_id' => $this->buyerA->id]);
+
+    expect($user->scopedBuyerIds())->toBe([$this->buyerA->id])
+        ->and($user->isBuyerConfined())->toBeTrue();
+});
 
 // --- The lock reads every buyer, not just the primary ---------------------
 
@@ -212,15 +225,35 @@ it('never scopes a user with no account at all', function () {
 
 /**
  * The guarantee the rest of the factory depends on. A buyer_id on the user row
- * is meaningless outside Merchandising, and these roles must reach the file
- * untouched even when one is set.
+ * is meaningless outside a buyer-scoped department, and these roles must reach
+ * the file untouched even when one is set.
+ *
+ * supply_chain left this list when it was added to
+ * BuyerScope::SCOPED_DEPARTMENTS — see the pair of tests below.
  */
 it('never scopes any other department', function (string $role) {
     $user = buyerScopeUser($role, ['buyer_id' => $this->buyerA->id]);
 
     expect($user->merchantBuyerId())->toBeNull()
         ->and(buyerScopeFile($this->buyerB->id)->isBuyerLockedForUser($user))->toBeFalse();
-})->with(['commercial', 'store', 'account', 'supply_chain', 'production', 'management']);
+})->with(['commercial', 'store', 'account', 'production', 'management']);
+
+it('locks a scoped supply chain user out of another buyer file, as it does a merchant', function () {
+    $user = buyerScopeUser('supply_chain', ['buyer_id' => $this->buyerA->id]);
+
+    expect(buyerScopeFile($this->buyerB->id)->isBuyerLockedForUser($user))->toBeTrue()
+        ->and(buyerScopeFile($this->buyerA->id)->isBuyerLockedForUser($user))->toBeFalse()
+        // An untagged file stays editable, the rule every scoped department
+        // shares.
+        ->and(buyerScopeFile(null)->isBuyerLockedForUser($user))->toBeFalse();
+});
+
+it('leaves an unassigned supply chain user unscoped, as before', function () {
+    $user = buyerScopeUser('supply_chain');
+
+    expect($user->isBuyerConfined())->toBeFalse()
+        ->and(buyerScopeFile($this->buyerB->id)->isBuyerLockedForUser($user))->toBeFalse();
+});
 
 // --- Upload gate ----------------------------------------------------------
 
