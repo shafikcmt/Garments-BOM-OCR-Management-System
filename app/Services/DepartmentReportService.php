@@ -6,6 +6,7 @@ use App\Models\ExcelCell;
 use App\Models\ExcelHeader;
 use App\Models\ExcelRow;
 use App\Models\User;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Spatie\Permission\Models\Role;
@@ -41,6 +42,8 @@ use Spatie\Permission\Models\Role;
  */
 abstract class DepartmentReportService
 {
+    use ScopesToAssignedBuyers;
+
     /** @var Collection<int, ExcelHeader>|null */
     private ?Collection $columns = null;
 
@@ -350,47 +353,20 @@ abstract class DepartmentReportService
      * Buyer scoping — the read-time half of the rule the scoped departments
      * already enforce when editing.
      *
-     * REUSES the Phase 4 predicate rather than restating it: isBuyerConfined()
-     * decides WHETHER the viewer is confined and scopedBuyerIds() decides to
-     * WHAT. Both live on User and both are what the edit-lock asks. Admin and
-     * Management need no special case here and deliberately get none — both
-     * answer false to isBuyerConfined() at its first line (the super admin is
-     * excluded by name; Management's department is not in
-     * BuyerScope::SCOPED_DEPARTMENTS), so this returns before it can narrow
-     * anything for them. A department that scoping is not switched on for
-     * answers false there too, which is what makes this inert rather than
-     * wrong for an unscoped department's report.
+     * THE RULE ITSELF NOW LIVES IN ScopesToAssignedBuyers, unchanged, because
+     * PO Generate, PRA, the Supply Chain dashboard and its email history apply
+     * the same one, and a scope restated five times is four chances to miss a
+     * department. What stays here is the single fact that differs: the viewer a
+     * report is scoped to is the one set on it, not always the logged-in user,
+     * because Admin and Management drive this class for somebody else.
      *
-     * What is NOT reused is hasBuyerAccess(). Its own docblock forbids it here:
-     * it answers ALLOWED for a null buyer, which is right for a lock and, in a
-     * list, means "show everything". The null branch is written out below in
-     * SQL, where it can be read.
-     *
-     * An untagged file stays VISIBLE. It belongs to no buyer, so no buyer's
-     * team can claim it, and hiding the entire pre-tagging archive from every
-     * scoped user is an outage rather than a scope rule — the same reasoning
-     * ExcelFile::isBuyerLockedForUser() gives for the edit side. The two halves
-     * of the rule therefore agree on every file.
+     * Read the trait for why an untagged file stays visible, why an empty buyer
+     * set narrows rather than widens, and why hasBuyerAccess() is not used to
+     * build the SQL.
      */
-    protected function applyBuyerScope($query): void
+    protected function buyerScopeViewer(): ?User
     {
-        $user = $this->viewer();
-
-        if (! $user?->isBuyerConfined()) {
-            return;
-        }
-
-        $buyerIds = $user->scopedBuyerIds();
-
-        $query->whereHas('excelFile', fn ($file) => $file->where(function ($scope) use ($buyerIds) {
-            $scope->whereNull('buyer_id');
-
-            // A user confined to nothing — mode 'specific', no assignments —
-            // reaches here with an empty set and sees untagged files only.
-            if ($buyerIds !== []) {
-                $scope->orWhereIn('buyer_id', $buyerIds);
-            }
-        }));
+        return $this->viewer();
     }
 
     /**

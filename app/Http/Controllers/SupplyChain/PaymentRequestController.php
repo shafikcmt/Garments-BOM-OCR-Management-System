@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\BookingPoSourceService;
 use App\Services\PraApprovalService;
 use App\Services\StyleBudgetService;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 use App\Support\PaymentRequestSettings;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -25,11 +26,98 @@ use Illuminate\Support\Str;
 
 class PaymentRequestController extends Controller
 {
+    use ScopesToAssignedBuyers;
+
     public function __construct(
         protected BookingPoSourceService $sourceService,
         protected PraApprovalService $approvalService,
         protected StyleBudgetService $budgetService,
     ) {
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Buyer access
+    |--------------------------------------------------------------------------
+    |
+    | A PRA carries no buyer of its own. Its items do — each holds the
+    | excel_file_id of the BOM line its PO came from — so a PRA is within a
+    | user's buyer access when ANY of its items is. Any, not all: a PRA can
+    | combine POs, and refusing the whole document because one line sits with
+    | another buyer would hide work the user genuinely raised.
+    |
+    | NEVER matched on payment_request_items.buyer_name. It is free text copied
+    | from a BOM cell a merchant can edit; the file's buyer_id is the only
+    | trustworthy answer.
+    */
+
+    /**
+     * Narrow a PaymentRequest query to the PRAs this user may see.
+     *
+     * A PRA with no items at all stays visible, for the same reason an untagged
+     * file does: it belongs to no buyer, so no buyer's team can claim it.
+     */
+    protected function applyBuyerScopeToPaymentRequests($query): void
+    {
+        if (! $this->buyerScopeViewer()?->isBuyerConfined()) {
+            return;
+        }
+
+        $query->where(function ($outer) {
+            $outer->whereDoesntHave('items')
+                ->orWhereHas('items', fn ($item) => $this->applyBuyerScope($item));
+        });
+    }
+
+    /**
+     * Role first, then buyer — the choke point for every {paymentRequest}
+     * route. REFUSES rather than hiding: a hand-made request naming another
+     * buyer's PRA id must not read, email or resubmit it.
+     */
+    protected function authorizePaymentRequest(PaymentRequest $paymentRequest): void
+    {
+        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+
+        if (! $this->buyerScopeViewer()?->isBuyerConfined()) {
+            return;
+        }
+
+        $paymentRequest->loadMissing('items.excelFile');
+
+        $reachable = $paymentRequest->items->isEmpty()
+            || $paymentRequest->items->contains(
+                fn (PaymentRequestItem $item) => $this->allowsBuyerAccess(
+                    $item->excelFile?->buyer_id === null ? null : (int) $item->excelFile->buyer_id
+                )
+            );
+
+        abort_if(! $reachable, 403, 'This payment request belongs to a buyer outside your buyer access.');
+    }
+
+    /**
+     * Refuse a PO selection that reaches past this user's buyers.
+     *
+     * Guards both preview and store. The pending list already hides such POs,
+     * so reaching here means the id was supplied by hand — which is exactly the
+     * case that must be refused rather than quietly filtered down to nothing.
+     *
+     * @param  \Illuminate\Support\Collection<int, int>  $selectedIds
+     */
+    protected function assertBuyerAccessForBookingPoIds($selectedIds): void
+    {
+        if (! $this->buyerScopeViewer()?->isBuyerConfined()) {
+            return;
+        }
+
+        BookingPo::query()
+            ->whereIn('id', $selectedIds->all())
+            ->with('excelFile')
+            ->get()
+            ->each(function (BookingPo $bookingPo) {
+                $buyerId = $bookingPo->excelFile?->buyer_id;
+
+                $this->assertBuyerAccess($buyerId === null ? null : (int) $buyerId);
+            });
     }
 
     /**
@@ -69,9 +157,13 @@ class PaymentRequestController extends Controller
 
         [$pendingRows, $filterOptions, $kpis, $activeFilters] = $this->pendingPaymentRows($request);
 
-        $paymentRequests = PaymentRequest::query()
+        $paymentRequestsQuery = PaymentRequest::query()
             ->with(['createdBy'])
-            ->latest('id')
+            ->latest('id');
+
+        $this->applyBuyerScopeToPaymentRequests($paymentRequestsQuery);
+
+        $paymentRequests = $paymentRequestsQuery
             ->paginate(20, ['*'], 'requests_page')
             ->withQueryString();
 
@@ -357,7 +449,7 @@ class PaymentRequestController extends Controller
 
     public function show(PaymentRequest $paymentRequest)
     {
-        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+        $this->authorizePaymentRequest($paymentRequest);
 
         $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy', 'approvals.approver']);
         $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
@@ -404,7 +496,7 @@ class PaymentRequestController extends Controller
      */
     public function resubmit(Request $request, PaymentRequest $paymentRequest)
     {
-        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+        $this->authorizePaymentRequest($paymentRequest);
         abort_if($paymentRequest->created_by !== auth()->id(), 403);
 
         if ($paymentRequest->status !== PaymentRequest::STATUS_REJECTED) {
@@ -495,7 +587,7 @@ class PaymentRequestController extends Controller
 
     public function downloadPdf(PaymentRequest $paymentRequest)
     {
-        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+        $this->authorizePaymentRequest($paymentRequest);
 
         [$approvalRows, $summary] = $this->approvalDataFor($paymentRequest);
 
@@ -518,7 +610,7 @@ class PaymentRequestController extends Controller
      */
     public function sendEmail(Request $request, PaymentRequest $paymentRequest)
     {
-        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+        $this->authorizePaymentRequest($paymentRequest);
 
         $validated = $request->validate([
             'to' => ['required', 'string', 'max:2000'],
@@ -658,7 +750,7 @@ class PaymentRequestController extends Controller
 
     public function downloadExcel(PaymentRequest $paymentRequest)
     {
-        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+        $this->authorizePaymentRequest($paymentRequest);
 
         $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy', 'approvals.approver']);
         $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
@@ -683,6 +775,8 @@ class PaymentRequestController extends Controller
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values();
+
+        $this->assertBuyerAccessForBookingPoIds($selectedIds);
 
         $selectedPoNumbers = BookingPo::query()
             ->whereIn('id', $selectedIds)
@@ -746,9 +840,17 @@ class PaymentRequestController extends Controller
         // "pending" again — otherwise the same PO can be sent for approval twice.
         $consumed = $this->poKeysWithActivePra();
 
-        $baseRows = BookingPo::query()
+        $baseQuery = BookingPo::query()
             ->with(['excelFile.uploader', 'excelRow.cells.header', 'generatedBy'])
-            ->whereNotNull('generated_at')
+            ->whereNotNull('generated_at');
+
+        // IN THE SQL, NOT AFTER IT. Everything below this line filters a
+        // collection that has already been cut to 5000 rows, so a scope applied
+        // there would be applied to somebody else's 5000 rows: a scoped user
+        // could see nothing at all while unscoped POs filled the limit.
+        $this->applyBuyerScope($baseQuery);
+
+        $baseRows = $baseQuery
             ->latest('generated_at')
             ->limit(5000)
             ->get()

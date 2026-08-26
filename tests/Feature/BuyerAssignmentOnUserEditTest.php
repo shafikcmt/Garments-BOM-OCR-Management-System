@@ -17,7 +17,7 @@ use Spatie\Permission\Models\Role;
  * actor does not hold must fail the save, not just be missing from the form.
  */
 beforeEach(function () {
-    foreach (['admin', 'merchant', 'commercial'] as $role) {
+    foreach (['admin', 'merchant', 'commercial', 'supply_chain'] as $role) {
         Role::findOrCreate($role, 'web');
     }
 
@@ -252,4 +252,154 @@ it('shows the mode choice to a super admin', function () {
         ->get(route('admin.users.edit', $this->member))
         ->assertOk()
         ->assertSee('buyerScopeModeAll', false);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Moving somebody INTO a buyer-scoped department
+|--------------------------------------------------------------------------
+|
+| The bug these lock: Buyer Access was rendered only when the department ALREADY
+| ON FILE was scoped. A Commercial user being switched to Supply Chain therefore
+| had no Buyer Access markup in the page at all, so changing the dropdown had
+| nothing to reveal, and the admin had to save, reload, and come back.
+|
+| Both halves are asserted, because fixing one alone is worse than fixing
+| neither: a block that renders and then silently drops every tick reports
+| success while changing nothing.
+*/
+
+it('puts the Buyer Access block in the page for a user in an unscoped department', function () {
+    $commercial = User::factory()->create()->assignRole('commercial');
+
+    $this->actingAs($this->superAdmin)
+        ->get(route('admin.users.edit', $commercial))
+        ->assertOk()
+        ->assertSee('Buyer Access')
+        ->assertSee('buyer_assignment_control', false)
+        ->assertSee('buyerScopeModeAll', false)
+        ->assertSee('buyerScopeModeSpecific', false)
+        ->assertSee('buyer_ids[]', false)
+        // Hidden on the first paint, and the script is told which departments
+        // reveal it. Without the attribute the block could never be shown.
+        ->assertSee('data-scope-departments="merchandising,supply_chain"', false);
+});
+
+it('starts the block open for a user already in a scoped department', function () {
+    $supplyChain = User::factory()->create()->assignRole('supply_chain');
+
+    $html = $this->actingAs($this->superAdmin)
+        ->get(route('admin.users.edit', $supplyChain))
+        ->assertOk()
+        ->getContent();
+
+    // The wrapper carries the scope attribute but NOT `hidden`, so the page is
+    // correct before any script runs.
+    $start = mb_strpos($html, 'js-buyer-access');
+    $openingTag = mb_substr($html, $start, mb_strpos($html, '>', $start) - $start);
+
+    expect($openingTag)->toContain('data-scope-departments')
+        ->and($openingTag)->not->toContain('hidden');
+});
+
+it('assigns buyers in the same save that moves the user into supply chain', function () {
+    $commercial = User::factory()->create()->assignRole('commercial');
+
+    $this->actingAs($this->superAdmin)
+        ->put(route('admin.users.update', $commercial), buyerEditPayload($commercial, [
+            'department' => 'supply_chain',
+            'role' => 'supply_chain',
+            'buyer_assignment_control' => '1',
+            'buyer_scope_mode' => BuyerScope::MODE_SPECIFIC,
+            'buyer_ids' => [$this->buyerA->id],
+        ]))
+        ->assertRedirect();
+
+    $fresh = $commercial->fresh();
+
+    expect($fresh->departmentKey())->toBe('supply_chain')
+        ->and($fresh->scopedBuyerIds())->toBe([$this->buyerA->id])
+        ->and($fresh->buyer_scope_mode)->toBe(BuyerScope::MODE_SPECIFIC)
+        ->and($fresh->isBuyerConfined())->toBeTrue();
+});
+
+/* The mirror: moving somebody OUT is judged by the posted department too, so a
+ * stale form cannot keep writing buyers for a department that stops reading
+ * them. */
+it('ignores buyer_ids in the same save that moves the user out to an unscoped department', function () {
+    $supplyChain = User::factory()->create([
+        'buyer_scope_mode' => BuyerScope::MODE_SPECIFIC,
+    ])->assignRole('supply_chain');
+
+    $this->actingAs($this->superAdmin)
+        ->put(route('admin.users.update', $supplyChain), buyerEditPayload($supplyChain, [
+            'department' => 'commercial',
+            'role' => 'commercial',
+            'buyer_assignment_control' => '1',
+            'buyer_scope_mode' => BuyerScope::MODE_SPECIFIC,
+            'buyer_ids' => [$this->buyerA->id],
+        ]))
+        ->assertRedirect();
+
+    $fresh = $supplyChain->fresh();
+
+    expect($fresh->departmentKey())->toBe('commercial')
+        ->and($fresh->buyers()->count())->toBe(0);
+});
+
+/* Moving somebody between departments is a SUPER ADMIN action. A department
+ * admin naming another department is refused outright by guardScopedSubmission
+ * — 403, not a form error — and the buyer half of the post dies with it. The
+ * new department-aware buyer logic must not have opened a side door around
+ * that guard. */
+it('still refuses a department admin who names another department', function () {
+    $member = User::factory()->create()->assignRole('merchant');
+
+    $this->actingAs($this->deptAdmin)
+        ->put(route('admin.users.update', $member), buyerEditPayload($member, [
+            'department' => 'supply_chain',
+            'role' => 'supply_chain',
+            'buyer_assignment_control' => '1',
+            'buyer_ids' => [$this->buyerA->id],
+        ]))
+        ->assertForbidden();
+
+    expect($member->fresh()->buyers()->count())->toBe(0)
+        ->and($member->fresh()->departmentKey())->toBe('merchandising');
+});
+
+/* The subset rule is unchanged by any of this: within their own department, a
+ * department admin still cannot hand out a buyer they do not hold. */
+it('still refuses a buyer the acting admin does not hold', function () {
+    $member = User::factory()->create()->assignRole('merchant');
+
+    $this->actingAs($this->deptAdmin)
+        ->put(route('admin.users.update', $member), buyerEditPayload($member, [
+            'buyer_assignment_control' => '1',
+            'buyer_ids' => [$this->buyerC->id],
+        ]))
+        ->assertSessionHasErrors('buyer_ids.0');
+
+    expect($member->fresh()->buyers()->count())->toBe(0);
+});
+
+/* A department admin still never gets the All / Specific radio, on any screen
+ * state — un-confining is authority, not access. */
+it('never offers the mode choice to a department admin, even mid-move', function () {
+    $member = User::factory()->create()->assignRole('merchant');
+
+    $this->actingAs($this->deptAdmin)
+        ->get(route('admin.users.edit', $member))
+        ->assertOk()
+        ->assertSee('Buyer Access')
+        ->assertDontSee('buyerScopeModeAll', false);
+});
+
+/* A department admin target still owns buyers through the Buyer screen, so the
+ * widget stays off their edit screen whatever department is selected. */
+it('still keeps the widget off a department admin edit screen', function () {
+    $this->actingAs($this->superAdmin)
+        ->get(route('admin.users.edit', $this->deptAdmin))
+        ->assertOk()
+        ->assertDontSee('buyer_assignment_control', false);
 });

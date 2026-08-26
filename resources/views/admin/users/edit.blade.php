@@ -203,61 +203,28 @@
                              never one. --}}
                         @if($assignableBuyers->isNotEmpty())
                             <div class="mb-4">
-                                <label class="form-label fw-semibold d-block mb-1">Buyer Access</label>
+                                {{-- The widget itself lives in
+                                     _buyer-access.blade.php, shared with the
+                                     create screen, so the two cannot drift
+                                     apart and a new department needs no third
+                                     copy.
 
-                                {{-- The hidden marker says the widget was on the
-                                     page. Without it a save from a form that
-                                     never showed these fields would read as
-                                     "clear their buyers". --}}
-                                <input type="hidden" name="buyer_assignment_control" value="1">
-
-                                @if($mayUnconfineBuyers)
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="buyer_scope_mode"
-                                               id="buyerScopeModeAll" value="all"
-                                               @checked(old('buyer_scope_mode', $currentBuyerScopeMode) === 'all')>
-                                        <label class="form-check-label" for="buyerScopeModeAll">
-                                            All buyers
-                                        </label>
-                                    </div>
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="radio" name="buyer_scope_mode"
-                                               id="buyerScopeModeSpecific" value="specific"
-                                               @checked(old('buyer_scope_mode', $currentBuyerScopeMode) === 'specific')>
-                                        <label class="form-check-label" for="buyerScopeModeSpecific">
-                                            Specific buyers only
-                                        </label>
-                                    </div>
-                                    <div class="form-text mb-2">
-                                        Choosing <strong>All buyers</strong> clears the ticks below and lets this
-                                        person work on every buyer, including ones added later.
-                                    </div>
-                                    @error('buyer_scope_mode')<div class="text-danger small mb-2">{{ $message }}</div>@enderror
-                                @else
-                                    <div class="form-text mb-2">
-                                        Tick the buyers this person works on. They can edit files for the buyers
-                                        you tick, and no others.
-                                    </div>
-                                @endif
-
-                                @foreach($assignableBuyers as $assignableBuyer)
-                                    <div class="form-check">
-                                        <input class="form-check-input @error('buyer_ids') is-invalid @enderror"
-                                               type="checkbox" name="buyer_ids[]" value="{{ $assignableBuyer->id }}"
-                                               id="editBuyer{{ $assignableBuyer->id }}"
-                                               @checked(in_array(
-                                                   (string) $assignableBuyer->id,
-                                                   array_map('strval', (array) old('buyer_ids', $currentBuyerIds)),
-                                                   true
-                                               ))>
-                                        <label class="form-check-label" for="editBuyer{{ $assignableBuyer->id }}">
-                                            {{ $assignableBuyer->buyer_name }}{{ $assignableBuyer->buyer_code ? ' (' . $assignableBuyer->buyer_code . ')' : '' }}
-                                        </label>
-                                    </div>
-                                @endforeach
-
-                                @error('buyer_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
-                                @error('buyer_ids.*')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                     $scopeDepartments IS passed here, which it
+                                     was not before. The department on file used
+                                     to decide whether this block was rendered at
+                                     all, so an admin switching the dropdown to
+                                     Supply Chain saw nothing appear — there was
+                                     no markup to reveal. It is now always in the
+                                     page for an eligible target and the script
+                                     shows it, the same mechanism create uses.
+                                     $startsOpen keeps the first paint correct
+                                     for a user already in a scoped department,
+                                     before any script runs. --}}
+                                @include('admin.users._buyer-access', [
+                                    'mayChooseBuyerScope' => $mayUnconfineBuyers,
+                                    'scopeDepartments' => $buyerScopedDepartments,
+                                    'startsOpen' => $buyerAccessStartsOpen,
+                                ])
 
                                 {{-- Buyers assigned by another admin are not in
                                      the list above and are not touched by a save
@@ -270,6 +237,38 @@
                                         {{ $beyondReach->pluck('buyer_name')->implode(', ') }},
                                         which {{ $beyondReach->count() > 1 ? 'are' : 'is' }} outside your own buyers.
                                         Saving here leaves {{ $beyondReach->count() > 1 ? 'them' : 'it' }} unchanged.
+                                    </div>
+                                @endif
+
+                                {{-- The read-only view of the same fact, shown by
+                                     the shared script exactly while the widget
+                                     above is hidden.
+
+                                     Without this, a user who holds buyers but
+                                     sits in an unscoped department would show
+                                     NEITHER: the editable control hidden by the
+                                     department, and the badges below unreachable
+                                     because this branch already matched. Their
+                                     assignment is inert while they are outside a
+                                     scoped department, but it exists and an admin
+                                     deciding whether to move them needs to see
+                                     it. --}}
+                                @if($assignedBuyers->isNotEmpty())
+                                    <div class="js-buyer-badges" @if($buyerAccessStartsOpen) hidden @endif>
+                                        <label class="form-label fw-semibold d-block">
+                                            {{ $assignedBuyers->count() > 1 ? 'Assigned Buyers' : 'Assigned Buyer' }}
+                                        </label>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            @foreach($assignedBuyers as $assignedBuyer)
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                                    <i class="bi bi-tag-fill me-1" aria-hidden="true"></i>{{ $assignedBuyer->buyer_name }}
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                        <div class="form-text">
+                                            Buyer access is not read for this person's current department.
+                                            Move them to a buyer-scoped department to edit it.
+                                        </div>
                                     </div>
                                 @endif
                             </div>

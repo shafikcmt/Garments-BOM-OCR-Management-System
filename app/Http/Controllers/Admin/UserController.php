@@ -132,16 +132,38 @@ class UserController extends Controller
 
         $roles = $this->scope()->assignableRoles();
 
-        // The buyers this admin may put a new team member on. Only offered
-        // when there is a choice: an admin with one buyer still passes it on
-        // silently, which is what every merchant admin does today.
-        $actor = auth()->user();
-        $assignableBuyers = $actor?->isBuyerScopedDepartment() && $actor->isDepartmentAdmin()
-            ? Buyer::whereIn('id', $actor->scopedBuyerIds())->orderBy('buyer_name')->get()
-            : collect();
+        // The buyers this admin may put a new team member on.
+        //
+        // Two different screens behind one variable, because the two actors ask
+        // different questions:
+        //
+        //   department admin  their own buyers, and the picker only appears when
+        //                     they hold more than one. With a single buyer there
+        //                     is nothing to decide and it is still passed on
+        //                     silently, exactly as it always has been.
+        //   super admin       every active buyer, with the All / Specific choice
+        //                     the edit screen already offers, so Buyer Access can
+        //                     be set when the account is made rather than only
+        //                     after it exists.
+        //
+        // The list narrowed to the actor is the honest-mistake half of the
+        // subset rule; the other half is Rule::in on the server, which refuses a
+        // buyer outside the set whatever the form was made to post.
+        $assignableBuyers = $this->assignableBuyersForCreateForm();
+
+        // Whether this actor picks All / Specific outright. Only a super admin
+        // does: a department admin can never un-confine anyone, because that
+        // hands out buyers that do not exist yet, which is authority rather than
+        // access. The same asymmetry the edit screen enforces.
+        $mayChooseBuyerScope = $this->actorChoosesBuyerScopeAtCreation();
+
+        // Which departments the block applies to, so the form can show and hide
+        // it as the Department select changes rather than offering Buyer Access
+        // for a Store user, where nothing would ever read it.
+        $buyerScopedDepartments = BuyerScope::SCOPED_DEPARTMENTS;
 
         return view('admin.users.create', array_merge(
-            compact('roles', 'assignableBuyers'),
+            compact('roles', 'assignableBuyers', 'mayChooseBuyerScope', 'buyerScopedDepartments'),
             $this->permissionMatrixData()
         ));
     }
@@ -324,6 +346,22 @@ class UserController extends Controller
             return [];
         }
 
+        // A super admin says All or Specific outright, so nothing is inherited
+        // for them. "All buyers" means an empty set here and MODE_ALL below —
+        // and it must not fall through to the single-buyer shortcut, or an
+        // admin choosing All on a system that happens to hold one buyer would
+        // silently create a confined user.
+        if ($this->actorChoosesBuyerScopeAtCreation()) {
+            if ($request->input('buyer_scope_mode') !== BuyerScope::MODE_SPECIFIC) {
+                return [];
+            }
+
+            return array_values(array_intersect(
+                $assignable,
+                array_map('intval', array_filter((array) $request->input('buyer_ids', [])))
+            ));
+        }
+
         // One buyer: inherited silently, exactly as before. No field is shown
         // for it because there is nothing to decide.
         if (count($assignable) === 1) {
@@ -360,17 +398,81 @@ class UserController extends Controller
      */
     private function assignableBuyerIds(Request $request): array
     {
-        $actor = auth()->user();
-
-        if (! $actor?->isBuyerScopedDepartment() || ! $actor->isDepartmentAdmin()) {
-            return [];
-        }
-
+        // The new user's department decides first, for both actors. A role
+        // scoping is not switched on for gets no buyer set at all, so
+        // Commercial, Store and Accounts users are created "All buyers"
+        // whoever creates them — the default, unchanged.
         if (! BuyerScope::appliesTo(DepartmentRoles::departmentOf($request->input('role')))) {
             return [];
         }
 
+        $actor = auth()->user();
+
+        if (! $actor) {
+            return [];
+        }
+
+        // A super admin is confined to nothing, so their candidate set is every
+        // ACTIVE buyer. An inactive one is not offered: it is a buyer the
+        // company has stopped working with, and assigning somebody to it grants
+        // nothing. Same rule, same wording, as assignableBuyersForEdit().
+        if ($actor->hasRole('admin')) {
+            return Buyer::where('is_active', true)
+                ->orderBy('id')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        if (! $actor->isBuyerScopedDepartment() || ! $actor->isDepartmentAdmin()) {
+            return [];
+        }
+
         return $actor->scopedBuyerIds();
+    }
+
+    /**
+     * Whether this actor picks All / Specific outright when creating a user,
+     * rather than passing their own buyers down.
+     *
+     * Super admin only, and deliberately the same rule mayUnconfineBuyers()
+     * applies on the edit screen: a department admin handing out "all buyers"
+     * would be granting every buyer that will ever exist, including ones they
+     * do not hold themselves.
+     */
+    private function actorChoosesBuyerScopeAtCreation(): bool
+    {
+        return (bool) auth()->user()?->hasRole('admin');
+    }
+
+    /**
+     * The buyer list the CREATE FORM renders, before any role is chosen.
+     *
+     * Deliberately not assignableBuyerIds(): that reads the posted role and
+     * there is no role yet on a GET. The form shows the actor's candidates and
+     * hides the whole block until a buyer-scoped department is selected; the
+     * server then re-derives the set from the role that was actually posted, so
+     * a block left visible by a stale page still assigns nothing.
+     *
+     * @return \Illuminate\Support\Collection<int, Buyer>
+     */
+    private function assignableBuyersForCreateForm()
+    {
+        $actor = auth()->user();
+
+        if (! $actor) {
+            return collect();
+        }
+
+        if ($actor->hasRole('admin')) {
+            return Buyer::where('is_active', true)->orderBy('buyer_name')->get();
+        }
+
+        if (! $actor->isBuyerScopedDepartment() || ! $actor->isDepartmentAdmin()) {
+            return collect();
+        }
+
+        return Buyer::whereIn('id', $actor->scopedBuyerIds())->orderBy('buyer_name')->get();
     }
 
     /**
@@ -385,6 +487,26 @@ class UserController extends Controller
     private function buyerAssignmentRules(Request $request): array
     {
         $assignable = $this->assignableBuyerIds($request);
+
+        if ($assignable === []) {
+            return [];
+        }
+
+        // The super admin's form posts the mode itself, so it is validated
+        // itself. buyer_ids is required only under 'specific' — under 'all'
+        // the checkboxes are ignored entirely rather than half-read, which is
+        // what keeps "All buyers" from depending on the state of a hidden
+        // control.
+        if ($this->actorChoosesBuyerScopeAtCreation()) {
+            $rules = ['buyer_scope_mode' => ['required', Rule::in(BuyerScope::modes())]];
+
+            if ($request->input('buyer_scope_mode') === BuyerScope::MODE_SPECIFIC) {
+                $rules['buyer_ids'] = ['required', 'array', 'min:1'];
+                $rules['buyer_ids.*'] = ['integer', Rule::in($assignable)];
+            }
+
+            return $rules;
+        }
 
         if (count($assignable) < 2) {
             return [];
@@ -461,8 +583,35 @@ class UserController extends Controller
      *   actor is not an admin the screen is already behind UserPolicy::update,
      *                         but the ability to CHANGE somebody's scope is not
      *                         the same as the ability to edit their name.
+     *
+     * WHICH DEPARTMENT IS BEING ASKED ABOUT. $departmentKey is the whole reason
+     * this takes an argument: the screen lets an admin MOVE somebody between
+     * departments, so "their department" is two different answers in one
+     * request — the one on file, and the one the form in front of the admin is
+     * asking for. Null means the stored one, which is what a plain read wants.
+     * The save passes the posted one, so validation, the write and the form the
+     * admin actually filled in all judge the same department. Judging the write
+     * by the stored department was the bug that made the widget appear (once the
+     * render stopped asking about the stored one) and then silently drop every
+     * tick.
      */
-    private function mayAssignBuyers(User $target): bool
+    private function mayAssignBuyers(User $target, ?string $departmentKey = null): bool
+    {
+        return $this->mayAssignBuyersToTarget($target)
+            && BuyerScope::appliesTo($departmentKey ?? $target->departmentKey());
+    }
+
+    /**
+     * The same gates MINUS the department one — everything about who is editing
+     * whom, which no dropdown on the page can change.
+     *
+     * Split out so the EDIT SCREEN can render the widget for anyone eligible and
+     * let the department decide only whether it is SHOWN, the same way the
+     * create screen has always worked. Server-side gating on the stored
+     * department cannot do that: the markup never reaches the page, so switching
+     * the dropdown has nothing to reveal.
+     */
+    private function mayAssignBuyersToTarget(User $target): bool
     {
         $actor = auth()->user();
 
@@ -474,10 +623,6 @@ class UserController extends Controller
             return false;
         }
 
-        if (! BuyerScope::appliesTo($target->departmentKey())) {
-            return false;
-        }
-
         if ($actor->hasRole('admin')) {
             return true;
         }
@@ -485,6 +630,28 @@ class UserController extends Controller
         return $actor->isDepartmentAdmin()
             && $actor->isBuyerScopedDepartment()
             && $actor->id !== $target->id;
+    }
+
+    /**
+     * The department a save is asking for, which is not always the stored one.
+     *
+     * Reads the POSTED role, exactly as creation does — departmentRules()
+     * already refuses a role that does not belong to the posted department, so
+     * the two cannot disagree by the time this is asked.
+     *
+     * Falls back to the stored department only when no role was posted at all.
+     * A posted role that maps to no department resolves to null and NOT to the
+     * stored value: that is a user being moved out of every scoped department,
+     * and answering with their old one would keep writing buyers for a
+     * department that no longer reads them.
+     */
+    private function postedDepartmentKey(Request $request, User $user): ?string
+    {
+        if (! $request->has('role')) {
+            return $user->departmentKey();
+        }
+
+        return DepartmentRoles::departmentOf($request->input('role'));
     }
 
     /**
@@ -503,9 +670,40 @@ class UserController extends Controller
      *
      * @return \Illuminate\Support\Collection<int, Buyer>
      */
-    private function assignableBuyersForEdit(User $target)
+    private function assignableBuyersForEdit(User $target, ?string $departmentKey = null)
     {
-        if (! $this->mayAssignBuyers($target)) {
+        if (! $this->mayAssignBuyers($target, $departmentKey)) {
+            return collect();
+        }
+
+        $actor = auth()->user();
+
+        if ($actor->hasRole('admin') || ! $actor->isBuyerConfined()) {
+            return Buyer::where('is_active', true)->orderBy('buyer_name')->get();
+        }
+
+        return Buyer::whereIn('id', $actor->scopedBuyerIds())->orderBy('buyer_name')->get();
+    }
+
+    /**
+     * The list the EDIT SCREEN renders, before the admin has settled on a
+     * department.
+     *
+     * Deliberately not assignableBuyersForEdit(): that asks about a department,
+     * and the screen has two candidate answers at once. The block is built from
+     * the actor's candidates and hidden until a buyer-scoped department is
+     * selected; the save then re-derives the set from the department actually
+     * posted, so a block left visible by a stale page assigns nothing.
+     *
+     * Exactly the shape assignableBuyersForCreateForm() has, and for the same
+     * reason — the two screens now differ only in whether a department is
+     * already on file.
+     *
+     * @return \Illuminate\Support\Collection<int, Buyer>
+     */
+    private function assignableBuyersForEditScreen(User $target)
+    {
+        if (! $this->mayAssignBuyersToTarget($target)) {
             return collect();
         }
 
@@ -521,9 +719,9 @@ class UserController extends Controller
     /**
      * @return list<int>  ascending, so the primary buyer_id is deterministic
      */
-    private function assignableBuyerIdsForEdit(User $target): array
+    private function assignableBuyerIdsForEdit(User $target, ?string $departmentKey = null): array
     {
-        $ids = $this->assignableBuyersForEdit($target)
+        $ids = $this->assignableBuyersForEdit($target, $departmentKey)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -545,9 +743,24 @@ class UserController extends Controller
      * UserPolicy::setDepartmentAdmin, gated the same way and for the same
      * reason.
      */
-    private function mayUnconfineBuyers(User $target): bool
+    private function mayUnconfineBuyers(User $target, ?string $departmentKey = null): bool
     {
-        return $this->mayAssignBuyers($target) && (bool) auth()->user()?->hasRole('admin');
+        return $this->mayAssignBuyers($target, $departmentKey)
+            && (bool) auth()->user()?->hasRole('admin');
+    }
+
+    /**
+     * The render-side twin of mayUnconfineBuyers(), asked without a department.
+     *
+     * The All / Specific radio has to be IN the page before the admin picks the
+     * department, or switching to Supply Chain would reveal a tick list with no
+     * way to say "all buyers" — the control half-built. Whether the radio is
+     * obeyed is still decided on the save, against the department posted there.
+     */
+    private function mayUnconfineBuyersOnScreen(User $target): bool
+    {
+        return $this->mayAssignBuyersToTarget($target)
+            && (bool) auth()->user()?->hasRole('admin');
     }
 
     /**
@@ -557,7 +770,7 @@ class UserController extends Controller
      */
     private function postedBuyerScopeMode(Request $request, User $user): string
     {
-        if (! $this->mayUnconfineBuyers($user)) {
+        if (! $this->mayUnconfineBuyers($user, $this->postedDepartmentKey($request, $user))) {
             return BuyerScope::MODE_SPECIFIC;
         }
 
@@ -575,11 +788,19 @@ class UserController extends Controller
      */
     private function buyerEditRules(Request $request, User $user): array
     {
-        if (! $request->has('buyer_assignment_control') || ! $this->mayAssignBuyers($user)) {
+        // THE POSTED DEPARTMENT, not the stored one. The widget is on the page
+        // for every eligible target now and is shown or hidden by the department
+        // dropdown, so an admin moving somebody into Supply Chain ticks buyers
+        // and saves in one go. Asking about the stored department here would
+        // validate nothing and then sync nothing, and the admin would be told
+        // the save succeeded.
+        $departmentKey = $this->postedDepartmentKey($request, $user);
+
+        if (! $request->has('buyer_assignment_control') || ! $this->mayAssignBuyers($user, $departmentKey)) {
             return [];
         }
 
-        $assignable = $this->assignableBuyerIdsForEdit($user);
+        $assignable = $this->assignableBuyerIdsForEdit($user, $departmentKey);
 
         if ($assignable === []) {
             return [];
@@ -587,7 +808,7 @@ class UserController extends Controller
 
         $rules = [];
 
-        if ($this->mayUnconfineBuyers($user)) {
+        if ($this->mayUnconfineBuyers($user, $departmentKey)) {
             $rules['buyer_scope_mode'] = ['required', Rule::in(BuyerScope::modes())];
         }
 
@@ -612,11 +833,16 @@ class UserController extends Controller
      */
     private function syncBuyerAssignment(Request $request, User $user): void
     {
-        if (! $request->has('buyer_assignment_control') || ! $this->mayAssignBuyers($user)) {
+        // Same department question buyerEditRules() asked, and it MUST be the
+        // same answer — a save that validates buyer_ids and then ignores them,
+        // or the reverse, is the disagreement this pair exists to prevent.
+        $departmentKey = $this->postedDepartmentKey($request, $user);
+
+        if (! $request->has('buyer_assignment_control') || ! $this->mayAssignBuyers($user, $departmentKey)) {
             return;
         }
 
-        $assignable = $this->assignableBuyerIdsForEdit($user);
+        $assignable = $this->assignableBuyerIdsForEdit($user, $departmentKey);
 
         if ($assignable === []) {
             return;
@@ -843,8 +1069,29 @@ class UserController extends Controller
         // The editable widget, when this actor may change the set at all.
         // Empty for everyone else, and the view falls back to the read-only
         // badges it has always shown.
-        $assignableBuyers = $this->assignableBuyersForEdit($user);
-        $mayUnconfineBuyers = $this->mayUnconfineBuyers($user);
+        //
+        // DELIBERATELY NOT GATED ON THIS USER'S STORED DEPARTMENT. This screen
+        // lets an admin MOVE somebody into Supply Chain, and gating the markup
+        // on the department already on file meant the widget was not in the page
+        // at all — so changing the dropdown had nothing to reveal and Buyer
+        // Access simply never appeared. The department now decides only whether
+        // the block is SHOWN, in the shared partial's script, which is how the
+        // create screen has always worked. Every gate that is genuinely about
+        // WHO is being edited still applies here; the save re-derives all of it
+        // from the department actually posted.
+        $assignableBuyers = $this->assignableBuyersForEditScreen($user);
+        $mayUnconfineBuyers = $this->mayUnconfineBuyersOnScreen($user);
+
+        // Which departments the block applies to, so it can be shown and hidden
+        // as the Department select changes rather than offering Buyer Access for
+        // a Store user, where nothing would ever read it.
+        $buyerScopedDepartments = BuyerScope::SCOPED_DEPARTMENTS;
+
+        // Whether the block starts visible. The stored department decides the
+        // FIRST paint so the page is correct before any script runs; the script
+        // takes over from the first change event.
+        $buyerAccessStartsOpen = BuyerScope::appliesTo($user->departmentKey());
+
         $currentBuyerIds = $assignedBuyers->pluck('id')->map(fn ($id) => (int) $id)->all();
         $currentBuyerScopeMode = $user->isBuyerConfined()
             ? BuyerScope::MODE_SPECIFIC
@@ -857,6 +1104,8 @@ class UserController extends Controller
                 'assignedBuyers',
                 'assignableBuyers',
                 'mayUnconfineBuyers',
+                'buyerScopedDepartments',
+                'buyerAccessStartsOpen',
                 'currentBuyerIds',
                 'currentBuyerScopeMode'
             ),
@@ -903,15 +1152,19 @@ class UserController extends Controller
 
         $user->save();
 
-        // BEFORE syncRoles, deliberately. mayAssignBuyers() reads the target's
-        // department off their role, and buyerEditRules() above asked the same
-        // question against the role as it stood when the request arrived. Run
-        // after the role change and validation would have judged one department
-        // while the write judged another - a save that validates buyer_ids and
-        // then ignores them, or the reverse. Whether the user is about to leave
-        // Merchandising does not change what the form in front of the admin
-        // was; a set written for a department that stops being scoped is inert,
-        // which is the harmless half of the disagreement.
+        // Order no longer decides which department is judged - both this and
+        // buyerEditRules() above read the POSTED role through
+        // postedDepartmentKey(), so they agree with each other and with the form
+        // the admin filled in, whichever side of syncRoles they run on.
+        //
+        // Still before syncRoles, because postedDepartmentKey() falls back to
+        // the stored department when no role was posted at all, and that
+        // fallback must mean "unchanged" rather than "already overwritten".
+        //
+        // This is what lets one save move somebody INTO Supply Chain and assign
+        // their buyers at the same time. Judging by the stored department made
+        // the widget - once it was allowed onto the page - validate nothing and
+        // sync nothing, while reporting success.
         $this->syncBuyerAssignment($request, $user);
 
         $user->syncRoles([$data['role']]);

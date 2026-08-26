@@ -4,10 +4,13 @@ namespace App\Http\Controllers\SupplyChain;
 
 use App\Http\Controllers\Controller;
 use App\Models\EmailLog;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 use Illuminate\Http\Request;
 
 class SentEmailController extends Controller
 {
+    use ScopesToAssignedBuyers;
+
     /**
      * Consolidated list of all sent emails (PO Booking + PRA) with light
      * filters. Reuses the shared email-history partial for the table/actions.
@@ -27,6 +30,12 @@ class SentEmailController extends Controller
         $query = EmailLog::query()
             ->with(['sentBy', 'paymentRequest', 'bookingPo'])
             ->latest('id');
+
+        // An email log is an audit trail of a PO or a PRA, so it inherits that
+        // document's buyer. A log attached to neither — there is no such row
+        // today — would be hidden from a scoped user rather than shown, which
+        // is the safe direction for an item with no buyer to trace.
+        $this->applyBuyerScopeToEmailLogs($query);
 
         if ($filters['type'] === 'pra') {
             $query->whereNotNull('payment_request_id');
@@ -62,5 +71,22 @@ class SentEmailController extends Controller
         $emailLogs = $query->paginate(25)->withQueryString();
 
         return view('supply-chain.sent-emails.index', compact('emailLogs', 'filters'));
+    }
+
+    /**
+     * Reach the buyer through whichever document the log belongs to. Both
+     * branches use the shared scope, so the PO half and the PRA half can never
+     * drift apart.
+     */
+    private function applyBuyerScopeToEmailLogs($query): void
+    {
+        if (! $this->buyerScopeViewer()?->isBuyerConfined()) {
+            return;
+        }
+
+        $query->where(function ($outer) {
+            $outer->whereHas('bookingPo', fn ($po) => $this->applyBuyerScope($po))
+                ->orWhereHas('paymentRequest.items', fn ($item) => $this->applyBuyerScope($item));
+        });
     }
 }

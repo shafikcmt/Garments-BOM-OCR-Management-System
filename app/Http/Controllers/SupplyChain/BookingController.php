@@ -15,6 +15,7 @@ use App\Models\ExcelFileChangeLog;
 use App\Models\ExcelHeader;
 use App\Models\ExcelRow;
 use App\Models\Supplier;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +25,8 @@ use Illuminate\Support\Str;
 
 class BookingController extends Controller
 {
+    use ScopesToAssignedBuyers;
+
     protected function bookingRoutePrefix(): string
     {
         return 'supply_chain.bookings';
@@ -592,6 +595,11 @@ class BookingController extends Controller
             if ($leader->bookingPo) {
                 throw new \RuntimeException('Some selected orders already have PO generated.');
             }
+
+            // Every leader is checked, not only the first: a batch is one PO
+            // built from many rows, so one out-of-scope row in the selection
+            // refuses the whole batch rather than being quietly dropped from it.
+            $this->assertBuyerAccessForRow($leader);
         }
 
         // Keep the user-selected order and expand each selection to its pending group.
@@ -941,6 +949,11 @@ class BookingController extends Controller
             ], 422);
         }
 
+        // Refuse the whole request when the selection reaches past this user's
+        // buyers. Completing the in-scope subset silently would report a
+        // success count the user cannot reconcile with what they ticked.
+        $this->assertBuyerAccessForBookingPoIds($poIds->all());
+
         $updated = BookingPo::query()
             ->whereIn('id', $poIds)
             ->where(function ($query) {
@@ -957,6 +970,28 @@ class BookingController extends Controller
             'success' => true,
             'message' => $updated . ' booking order(s) confirmed complete and hidden from pending table.',
         ]);
+    }
+
+    /**
+     * Refuse a bulk action naming any PO outside this user's buyer access.
+     *
+     * One query rather than one per id, and it runs at all only for a confined
+     * user — everyone else returns on the isBuyerConfined() line before a
+     * single PO is loaded.
+     *
+     * @param  list<int>  $poIds
+     */
+    protected function assertBuyerAccessForBookingPoIds(array $poIds): void
+    {
+        if ($poIds === [] || ! auth()->user()?->isBuyerConfined()) {
+            return;
+        }
+
+        BookingPo::query()
+            ->whereIn('id', $poIds)
+            ->with('excelFile')
+            ->get()
+            ->each(fn (BookingPo $po) => $this->assertBuyerAccess($this->buyerIdForBookingPo($po)));
     }
 
     public function show(BookingPo $bookingPo)
@@ -1193,9 +1228,59 @@ class BookingController extends Controller
             ->header('Expires', '0');
     }
 
+    /**
+     * Role first, then buyer.
+     *
+     * The nine {bookingPo} routes — show, update, complete, regenerate, print,
+     * download, downloadExcel, sendEmail — all funnel through here, so the
+     * buyer guard is stated once instead of nine times. A route-model-bound PO
+     * belonging to another buyer is REFUSED, not merely missing from a list: a
+     * hand-made request naming its id must not read or change it.
+     *
+     * A PO whose file is untagged, or that has no file at all, stays open to
+     * everyone — the untagged rule the trait documents.
+     *
+     * PoGenerateControlController overrides this whole method with an
+     * admin-only check, and an admin is never confined, so the Admin PO
+     * Generate Control panel is untouched by any of this.
+     */
     protected function authorizeBookingPo(BookingPo $bookingPo): void
     {
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+
+        $this->assertBuyerAccess($this->buyerIdForBookingPo($bookingPo));
+    }
+
+    /** The buyer a PO belongs to, resolved through its BOM file. */
+    protected function buyerIdForBookingPo(BookingPo $bookingPo): ?int
+    {
+        $bookingPo->loadMissing('excelFile');
+
+        $buyerId = $bookingPo->excelFile?->buyer_id;
+
+        return $buyerId === null ? null : (int) $buyerId;
+    }
+
+    /**
+     * The buyer guard for the row-based half of this screen.
+     *
+     * PO Generate acts on BOM rows before any PO exists, so the {bookingPo}
+     * guard above cannot reach preview or generate. Both funnel through
+     * previewBookingForRow() and generateBookingForRow(), which is where this
+     * is called from.
+     *
+     * NEVER matched on booking_pos.buyer_name. That column is free text copied
+     * from a BOM cell a merchant can edit, so a gate reading it is a gate
+     * anyone can walk through by typing. The file's buyer_id is the only
+     * trustworthy answer.
+     */
+    protected function assertBuyerAccessForRow(ExcelRow $excelRow): void
+    {
+        $excelRow->loadMissing('excelFile');
+
+        $buyerId = $excelRow->excelFile?->buyer_id;
+
+        $this->assertBuyerAccess($buyerId === null ? null : (int) $buyerId);
     }
 
     protected function indexData(Request $request, bool $includeFilters = true): array
@@ -1207,8 +1292,15 @@ class BookingController extends Controller
 
         $this->decoratePendingRows($pendingRows);
 
-        $generatedPos = BookingPo::query()
-            ->with(['excelFile', 'excelRow.cells.header', 'generatedBy', 'completedBy'])
+        $generatedPosQuery = BookingPo::query()
+            ->with(['excelFile', 'excelRow.cells.header', 'generatedBy', 'completedBy']);
+
+        // The pending list and the generated list are two halves of one screen;
+        // scoping one and not the other would show a scoped user PO numbers for
+        // buyers whose source rows they cannot see.
+        $this->applyBuyerScope($generatedPosQuery);
+
+        $generatedPos = $generatedPosQuery
             ->latest('id')
             ->take(50)
             ->get()
@@ -1244,6 +1336,11 @@ class BookingController extends Controller
                     $poQuery->whereNull('status')->orWhere('status', '!=', 'completed');
                 });
             });
+
+        // Buyer scope BEFORE the screen's own filters, so a scoped user's
+        // filter choices narrow what they may already see rather than reach
+        // past it.
+        $this->applyBuyerScope($pendingRowsQuery);
 
         $this->applyHasBookingSourceData($pendingRowsQuery);
         $this->applyCellFilter($pendingRowsQuery, 'buyer', $request->input('buyer'));
@@ -1327,6 +1424,8 @@ class BookingController extends Controller
 
         abort_if(! $excelRow->excelFile, 404);
 
+        $this->assertBuyerAccessForRow($excelRow);
+
         if ($excelRow->bookingPo && $excelRow->bookingPo->status !== 'completed') {
             $bookingPo = $excelRow->bookingPo->loadMissing(['excelFile', 'excelRow.cells.header', 'generatedBy']);
             $bookingPo = $this->refreshBookingPoQtyFromSource($bookingPo);
@@ -1391,6 +1490,8 @@ class BookingController extends Controller
         $excelRow->loadMissing(['excelFile', 'cells.header', 'bookingPo']);
 
         abort_if(! $excelRow->excelFile, 404);
+
+        $this->assertBuyerAccessForRow($excelRow);
 
         return DB::transaction(function () use ($excelRow, $editData, $request) {
             $excelRow = ExcelRow::query()

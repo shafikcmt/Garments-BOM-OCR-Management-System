@@ -2,6 +2,7 @@
 
 use App\Models\Buyer;
 use App\Models\User;
+use App\Support\BuyerScope;
 use Spatie\Permission\Models\Role;
 
 /**
@@ -188,20 +189,113 @@ it('offers the picker only when there is a choice to make', function () {
         ->assertSee('Buyer B');
 });
 
-it('offers no picker to a super admin, whose users stay unscoped', function () {
+/*
+ * A super admin now sets Buyer Access AT CREATION, not only afterwards.
+ *
+ * Their picker is the All / Specific control the edit screen offers, over every
+ * active buyer, because a super admin is confined to nothing and so hands out
+ * from the whole set rather than their own. THE DEFAULT IS UNCHANGED: the form
+ * lands on "All buyers", and a create that leaves it alone produces exactly the
+ * unscoped user it always did.
+ */
+it('offers a super admin the full Buyer Access control on create', function () {
     $super = User::factory()->create()->assignRole('admin');
 
     $this->actingAs($super)
         ->get(route('admin.users.create'))
         ->assertOk()
-        ->assertDontSee('buyer_ids[]', false);
+        ->assertSee('Buyer Access')
+        ->assertSee('buyerScopeModeAll', false)
+        ->assertSee('buyerScopeModeSpecific', false)
+        ->assertSee('buyer_ids[]', false)
+        ->assertSee('Buyer A')
+        ->assertSee('Buyer B');
+});
 
-    $this->actingAs($super)
-        ->post(route('admin.users.store'), createUserPayload(['email' => 'unscoped@example.com']));
+it('creates an unscoped user when a super admin leaves it on all buyers', function () {
+    $super = User::factory()->create()->assignRole('admin');
+
+    $this->actingAs($super)->post(route('admin.users.store'), createUserPayload([
+        'email' => 'unscoped@example.com',
+        'buyer_scope_mode' => 'all',
+    ]));
 
     $new = User::where('email', 'unscoped@example.com')->first();
 
     expect($new->buyer_id)->toBeNull()
+        ->and($new->buyer_scope_mode)->toBe(BuyerScope::MODE_ALL)
+        ->and($new->buyers)->toHaveCount(0)
+        ->and($new->isBuyerConfined())->toBeFalse();
+});
+
+/* The mode is a control, not a label: ticking buyers under 'all' assigns none. */
+it('ignores ticked buyers when the super admin chose all buyers', function () {
+    $super = User::factory()->create()->assignRole('admin');
+
+    $this->actingAs($super)->post(route('admin.users.store'), createUserPayload([
+        'email' => 'ignored@example.com',
+        'buyer_scope_mode' => 'all',
+        'buyer_ids' => [$this->buyerA->id],
+    ]));
+
+    $new = User::where('email', 'ignored@example.com')->first();
+
+    expect($new->buyer_id)->toBeNull()
+        ->and($new->buyer_scope_mode)->toBe(BuyerScope::MODE_ALL)
+        ->and($new->buyers)->toHaveCount(0);
+});
+
+it('confines a new user to the buyers a super admin ticked', function () {
+    $super = User::factory()->create()->assignRole('admin');
+
+    $this->actingAs($super)->post(route('admin.users.store'), createUserPayload([
+        'email' => 'scoped@example.com',
+        'buyer_scope_mode' => 'specific',
+        'buyer_ids' => [$this->buyerB->id, $this->buyerA->id],
+    ]));
+
+    $new = User::where('email', 'scoped@example.com')->first();
+
+    // Ascending, so users.buyer_id is the lowest id held rather than whatever
+    // order the checkboxes posted in.
+    expect($new->buyer_scope_mode)->toBe(BuyerScope::MODE_SPECIFIC)
+        ->and($new->buyer_id)->toBe($this->buyerA->id)
+        ->and($new->buyers->pluck('id')->all())->toBe([$this->buyerA->id, $this->buyerB->id])
+        ->and($new->isBuyerConfined())->toBeTrue();
+});
+
+/* THE INVARIANT: 'specific' with no buyer denies every tagged record while the
+ * screen shows the person as assigned. Refused at the point of entry. */
+it('refuses specific buyers with none ticked', function () {
+    $super = User::factory()->create()->assignRole('admin');
+
+    $this->actingAs($super)
+        ->post(route('admin.users.store'), createUserPayload([
+            'email' => 'incoherent@example.com',
+            'buyer_scope_mode' => 'specific',
+        ]))
+        ->assertSessionHasErrors('buyer_ids');
+
+    expect(User::where('email', 'incoherent@example.com')->exists())->toBeFalse();
+});
+
+/* An unscoped department is untouched: nothing reads a buyer set for Commercial, so
+ * the posted mode is ignored and the user is created "all buyers" as always. */
+it('leaves a commercial user on all buyers whatever the form posts', function () {
+    $super = User::factory()->create()->assignRole('admin');
+
+    $this->actingAs($super)->post(route('admin.users.store'), createUserPayload([
+        'email' => 'commercial.person@example.com',
+        'department' => 'commercial',
+        'role' => 'commercial',
+        'buyer_scope_mode' => 'specific',
+        'buyer_ids' => [$this->buyerA->id],
+    ]));
+
+    $new = User::where('email', 'commercial.person@example.com')->first();
+
+    expect($new->buyer_id)->toBeNull()
+        ->and($new->buyer_scope_mode)->toBe(BuyerScope::MODE_ALL)
         ->and($new->buyers)->toHaveCount(0);
 });
 
