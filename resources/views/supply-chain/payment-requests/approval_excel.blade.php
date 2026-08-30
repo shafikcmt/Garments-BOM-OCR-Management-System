@@ -52,28 +52,34 @@
         <td colspan="3" class="no-border right"><strong>Total PI Amount: $ {{ $money($summary['total_pi_amount'] ?? 0) }}</strong></td>
     </tr>
     <tr>
-        <th>Vendor Name</th>
+        {{-- Same column order as the preview and the PDF. Comments has no
+             counterpart on those two and stays where it was, before the
+             amount. --}}
+        <th>Contract Shipment</th>
         <th>Style</th>
         <th>PCD Required</th>
-        <th>Payment Term</th>
+        <th>Vendor Name</th>
         <th>Material PO Number</th>
         <th>Material PI Number</th>
-        <th>Material Type</th>
-        <th>Contract Shipment</th>
+        <th>Item Name</th>
+        <th>Payment Term</th>
         <th>Committed Ex Mill</th>
         <th>Comments</th>
         <th>PI Amount (USD)</th>
     </tr>
     @forelse($approvalRows as $row)
         <tr>
-            <td>{{ $row['vendor_name'] ?: '-' }}</td>
-            <td>{{ $row['style'] ?: '-' }}</td>
-            <td class="center">{{ $row['pcd_required'] ?: '-' }}</td>
-            <td>{{ $row['payment_term'] ?: '-' }}</td>
-            <td>{{ $row['material_po_number'] ?: '-' }}</td>
-            <td>{{ $row['material_pi_number'] ?: '-' }}</td>
-            <td>{{ $row['material_type'] ?: '-' }}</td>
+            {{-- Centred body, right-aligned amount, matching the preview and PDF.
+                 Comments stays left-aligned: it holds free-text sentences, which
+                 centring makes markedly harder to read. --}}
             <td class="center">{{ $row['contract_shipment'] ?: '-' }}</td>
+            <td class="center">{{ $row['style'] ?: '-' }}</td>
+            <td class="center">{{ $row['pcd_required'] ?: '-' }}</td>
+            <td class="center">{{ $row['vendor_name'] ?: '-' }}</td>
+            <td class="center">{{ $row['material_po_number'] ?: '-' }}</td>
+            <td class="center">{{ $row['material_pi_number'] ?: '-' }}</td>
+            <td class="center">{{ $row['material_type'] ?: '-' }}</td>
+            <td class="center">{{ $row['payment_term'] ?: '-' }}</td>
             <td class="center">{{ $row['committed_ex_mill'] ?: '-' }}</td>
             <td>{{ $row['comments'] ?: '(blank)' }}</td>
             <td class="right">{{ $money($row['pi_amount'] ?? 0) }}</td>

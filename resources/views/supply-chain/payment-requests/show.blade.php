@@ -210,29 +210,42 @@
                 <table class="table table-bordered align-middle pra-table mb-0">
                     <thead>
                         <tr>
-                            <th class="c-vendor">Vendor</th>
-                            <th class="c-style">Style</th>
-                            <th class="c-pcd">PCD Date</th>
-                            <th class="c-term">Pay Term</th>
-                            <th class="c-po">PO No.</th>
-                            <th class="c-pi">PI No.</th>
-                            <th class="c-type">Type</th>
-                            <th class="c-cship">C. Shipment</th>
-                            <th class="c-exmill">Ex Mill</th>
+                            {{-- Column order is business-defined: C. Shipment leads,
+                                 then Style / PCD / Vendor, with Pay Term moved next
+                                 to Ex Mill. The width classes are semantic, so each
+                                 column keeps its own width as it moves. --}}
+                            {{-- Headers follow the body: centred, with the amount
+                                 right-aligned. Left-aligned headers over centred
+                                 values read as a misalignment. --}}
+                            <th class="c-cship text-center">C. Shipment</th>
+                            <th class="c-style text-center">Style</th>
+                            <th class="c-pcd text-center">PCD Date</th>
+                            <th class="c-vendor text-center">Vendor</th>
+                            <th class="c-po text-center">PO No.</th>
+                            <th class="c-pi text-center">PI No.</th>
+                            {{-- Renamed from "Type". Same value: material_type, which
+                                 falls back to the material description. --}}
+                            <th class="c-type text-center">Item Name</th>
+                            <th class="c-term text-center">Pay Term</th>
+                            <th class="c-exmill text-center">Ex Mill</th>
                             <th class="c-amount text-end">PI Amt (USD)</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($approvalRows as $row)
                             <tr>
-                                <td>{{ $row['vendor_name'] ?: '-' }}</td>
-                                <td>{{ $row['style'] ?: '-' }}</td>
-                                <td class="text-center">{{ $row['pcd_required'] ?: '-' }}</td>
-                                <td>{{ $row['payment_term'] ?: '-' }}</td>
-                                <td>{{ $row['material_po_number'] ?: '-' }}</td>
-                                <td>{{ $row['material_pi_number'] ?: '-' }}</td>
-                                <td>{{ $row['material_type'] ?: '-' }}</td>
+                                {{-- Every body cell is centred except the amount,
+                                     which stays right-aligned: a money column
+                                     reads down its decimal point, and centring it
+                                     would break that. --}}
                                 <td class="text-center">{{ $row['contract_shipment'] ?: '-' }}</td>
+                                <td class="text-center">{{ $row['style'] ?: '-' }}</td>
+                                <td class="text-center">{{ $row['pcd_required'] ?: '-' }}</td>
+                                <td class="text-center">{{ $row['vendor_name'] ?: '-' }}</td>
+                                <td class="text-center">{{ $row['material_po_number'] ?: '-' }}</td>
+                                <td class="text-center">{{ $row['material_pi_number'] ?: '-' }}</td>
+                                <td class="text-center">{{ $row['material_type'] ?: '-' }}</td>
+                                <td class="text-center">{{ $row['payment_term'] ?: '-' }}</td>
                                 <td class="text-center">{{ $row['committed_ex_mill'] ?: '-' }}</td>
                                 <td class="text-end fw-bold">$ {{ $money($row['pi_amount'] ?? 0) }}</td>
                             </tr>

@@ -98,14 +98,18 @@
 <table class="report">
     <thead>
         <tr>
-            <th class="w-vendor">Vendor</th>
+            {{-- Same order as the on-screen preview, so the PDF cannot drift
+                 from what was approved. Width classes are semantic and travel
+                 with their column. --}}
+            <th class="w-cship">C. Shipment</th>
             <th class="w-style">Style</th>
             <th class="w-pcd">PCD Date</th>
-            <th class="w-term">Pay Term</th>
+            <th class="w-vendor">Vendor</th>
             <th class="w-po">PO No.</th>
             <th class="w-pi">PI No.</th>
-            <th class="w-type">Type</th>
-            <th class="w-cship">C. Shipment</th>
+            {{-- Renamed from "Type"; same material_type value. --}}
+            <th class="w-type">Item Name</th>
+            <th class="w-term">Pay Term</th>
             <th class="w-exmill">Ex Mill</th>
             <th class="w-amount right">PI Amt (USD)</th>
         </tr>
@@ -113,14 +117,16 @@
     <tbody>
         @forelse($approvalRows as $row)
             <tr>
-                <td>{{ $row['vendor_name'] ?: '-' }}</td>
-                <td>{{ $row['style'] ?: '-' }}</td>
-                <td class="center">{{ $row['pcd_required'] ?: '-' }}</td>
-                <td>{{ $row['payment_term'] ?: '-' }}</td>
-                <td>{{ $row['material_po_number'] ?: '-' }}</td>
-                <td>{{ $row['material_pi_number'] ?: '-' }}</td>
-                <td>{{ $row['material_type'] ?: '-' }}</td>
+                {{-- Centred body, right-aligned amount — identical to the
+                     on-screen preview, so the PDF matches what was approved. --}}
                 <td class="center">{{ $row['contract_shipment'] ?: '-' }}</td>
+                <td class="center">{{ $row['style'] ?: '-' }}</td>
+                <td class="center">{{ $row['pcd_required'] ?: '-' }}</td>
+                <td class="center">{{ $row['vendor_name'] ?: '-' }}</td>
+                <td class="center">{{ $row['material_po_number'] ?: '-' }}</td>
+                <td class="center">{{ $row['material_pi_number'] ?: '-' }}</td>
+                <td class="center">{{ $row['material_type'] ?: '-' }}</td>
+                <td class="center">{{ $row['payment_term'] ?: '-' }}</td>
                 <td class="center">{{ $row['committed_ex_mill'] ?: '-' }}</td>
                 <td class="right">${{ $money($row['pi_amount'] ?? 0) }}</td>
             </tr>

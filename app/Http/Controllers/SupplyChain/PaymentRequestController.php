@@ -52,24 +52,6 @@ class PaymentRequestController extends Controller
     */
 
     /**
-     * Narrow a PaymentRequest query to the PRAs this user may see.
-     *
-     * A PRA with no items at all stays visible, for the same reason an untagged
-     * file does: it belongs to no buyer, so no buyer's team can claim it.
-     */
-    protected function applyBuyerScopeToPaymentRequests($query): void
-    {
-        if (! $this->buyerScopeViewer()?->isBuyerConfined()) {
-            return;
-        }
-
-        $query->where(function ($outer) {
-            $outer->whereDoesntHave('items')
-                ->orWhereHas('items', fn ($item) => $this->applyBuyerScope($item));
-        });
-    }
-
-    /**
      * Role first, then buyer — the choke point for every {paymentRequest}
      * route. REFUSES rather than hiding: a hand-made request naming another
      * buyer's PRA id must not read, email or resubmit it.
@@ -1464,7 +1446,10 @@ class PaymentRequestController extends Controller
         $sheet->getStyle('I10:K10')->getFont()->setBold(true)->setSize(11)->getColor()->setARGB('FF000B6F');
         $sheet->getStyle('I10:K10')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
 
-        $headers = ['Vendor Name', 'Style', 'PCD Required', 'Payment Term', 'Material PO Number', 'Material PI Number', 'Material Type', 'Contract Shipment', 'Committed Ex Mill', 'Comments', 'PI Amount (USD)'];
+        // Column order matches the preview, the PDF and the HTML Excel export.
+        // The row array below is written positionally with fromArray(), so any
+        // change here MUST be mirrored there or every column shifts silently.
+        $headers = ['Contract Shipment', 'Style', 'PCD Required', 'Vendor Name', 'Material PO Number', 'Material PI Number', 'Item Name', 'Payment Term', 'Committed Ex Mill', 'Comments', 'PI Amount (USD)'];
         $tableStart = 11;
         $sheet->fromArray($headers, null, 'A' . $tableStart);
         $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . $tableStart)->applyFromArray([
@@ -1478,14 +1463,15 @@ class PaymentRequestController extends Controller
         $rowNo = $tableStart + 1;
         foreach ($approvalRows as $row) {
             $sheet->fromArray([
-                $row['vendor_name'] ?: '-',
+                // Positional — must stay in step with $headers above.
+                $row['contract_shipment'] ?: '-',
                 $row['style'] ?: '-',
                 $row['pcd_required'] ?: '-',
-                $row['payment_term'] ?: '-',
+                $row['vendor_name'] ?: '-',
                 $row['material_po_number'] ?: '-',
                 $row['material_pi_number'] ?: '-',
                 $row['material_type'] ?: '-',
-                $row['contract_shipment'] ?: '-',
+                $row['payment_term'] ?: '-',
                 $row['committed_ex_mill'] ?: '-',
                 $row['comments'] ?: '(blank)',
                 (float) ($row['pi_amount'] ?? 0),
@@ -1508,8 +1494,23 @@ class PaymentRequestController extends Controller
         ]);
         $sheet->getStyle('K' . ($tableStart + 1) . ':K' . $rowNo)->getNumberFormat()->setFormatCode($moneyFormat);
         $sheet->getStyle('K' . ($tableStart + 1) . ':K' . $rowNo)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
-        $sheet->getStyle('C' . ($tableStart + 1) . ':C' . $rowNo)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle('H' . ($tableStart + 1) . ':I' . $rowNo)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+        // Centre every body column except two, matching the preview and the PDF:
+        //   K (PI Amount)  right-aligned above — a money column reads down its
+        //                  decimal point, so centring it would break that.
+        //   J (Comments)   left-aligned — free-text sentences, which centring
+        //                  makes markedly harder to read.
+        // BODY ROWS ONLY — $rowNo is the Grand Total row by this point, and that
+        // row's A:J is a merged cell holding the words "Grand Total". Including
+        // it would re-centre that label; the total row is left exactly as it was.
+        $lastBodyRow = $rowNo - 1;
+
+        if ($lastBodyRow >= $tableStart + 1) {
+            foreach (['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'] as $centeredColumn) {
+                $sheet->getStyle($centeredColumn . ($tableStart + 1) . ':' . $centeredColumn . $lastBodyRow)
+                    ->getAlignment()
+                    ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            }
+        }
 
         $rowNo += 4;
         // Dynamic Prepared / Checked / Approved By signatures for this PRA, with
@@ -1553,7 +1554,14 @@ class PaymentRequestController extends Controller
             ]);
         }
 
-        $columnWidths = ['A' => 20, 'B' => 16, 'C' => 14, 'D' => 16, 'E' => 18, 'F' => 19, 'G' => 14, 'H' => 16, 'I' => 16, 'J' => 14, 'K' => 15];
+        // Widths follow their COLUMN through the reorder, they are not fixed to
+        // a letter. Vendor Name keeps the 20 it always had (it holds the longest
+        // text) and Contract Shipment keeps the 16 that fits a date — leaving
+        // these as they were would have squeezed Vendor into 16 and given a
+        // date column 20.
+        //   A Contract Shipment · B Style · C PCD · D Vendor · E PO · F PI
+        //   G Item Name · H Payment Term · I Ex Mill · J Comments · K Amount
+        $columnWidths = ['A' => 16, 'B' => 16, 'C' => 14, 'D' => 20, 'E' => 18, 'F' => 19, 'G' => 14, 'H' => 16, 'I' => 16, 'J' => 14, 'K' => 15];
         foreach ($columnWidths as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
