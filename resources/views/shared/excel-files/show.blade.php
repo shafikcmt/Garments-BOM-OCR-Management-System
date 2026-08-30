@@ -396,49 +396,69 @@
         text-overflow: ellipsis;
     }
 
+    /* ==== WORKSHEET SURFACE ==============================================
+     * Retoned onto the PO Generation module's tokens so the worksheet reads as
+     * part of the same product: one blue (#006C9D, the booking sheet's own),
+     * three radii, one shadow. Literal fallbacks throughout — this screen must
+     * not depend on that module's theme partial being loaded.
+     *
+     * Structure is untouched: the sticky header, the sticky first column, the
+     * filter row's 42px offset and the z-index ladder all still work exactly as
+     * they did. Only colour, radius, spacing and type changed.
+     */
     .excel-work-card {
-        border: 1px solid #e8edf4;
-        border-radius:var(--gx-radius);
-        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+        border: 1px solid var(--po-line, #D7E3ED);
+        border-radius: var(--po-r-surface, 14px);
+        box-shadow: var(--po-shadow, 0 14px 34px rgba(11, 43, 60, .06));
         overflow: hidden;
-        background: #fff;
+        background: var(--po-surface, #fff);
     }
 
     .excel-table-wrap {
         overflow: auto;
         max-height: 72vh;
         background: #fff;
-        border-top: 1px solid #edf2f7;
+        border-top: 1px solid var(--po-line-soft, #EEF3F8);
     }
 
     .excel-data-table {
         min-width: 1780px;
         margin-bottom: 0;
         font-size: 12px;
-        border-color: #e8edf4;
+        border-color: var(--po-line-soft, #EEF3F8);
     }
 
+    /* The booking sheet's own tint band, as on every other table in the app. */
     .excel-data-table thead th {
         position: sticky;
         top: 0;
         z-index: 3;
-        background: linear-gradient(180deg, #f6f9fd, #edf3f9);
+        background: var(--po-tint, #E0F2FE);
+        color: var(--po-blue-deep, #004B70);
         vertical-align: middle;
         text-align: center;
-        border-bottom: 1px solid #dce4ee;
+        border-bottom: 1px solid var(--po-line, #D7E3ED);
         min-width: 145px;
-        padding: 5px 8px;
+        padding: 7px 8px;
         white-space: normal;
-        box-shadow: inset 0 -1px 0 #dce4ee;
+        box-shadow: inset 0 -1px 0 var(--po-line, #D7E3ED);
+    }
+
+    .excel-data-table thead th .header-title {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        line-height: 1.25;
     }
 
     .excel-data-table thead tr.filter-row th {
-        top: 42px;
+        top: 46px;
         z-index: 2;
         background: #ffffff;
         padding: 4px 5px;
         min-width: 145px;
-        box-shadow: inset 0 -1px 0 #edf2f7;
+        box-shadow: inset 0 -1px 0 var(--po-line-soft, #EEF3F8);
     }
 
     .excel-data-table thead th:first-child,
@@ -448,14 +468,14 @@
         left: 0;
         z-index: 4;
         background: #fff;
-        min-width: 64px;
-        width: 64px;
+        min-width: 78px;
+        width: 78px;
         text-align: center;
         font-weight: 700;
     }
 
     .excel-data-table thead th:first-child {
-        background: linear-gradient(180deg, #e8eef6, #dde7f2);
+        background: var(--po-tint, #E0F2FE);
     }
 
     .excel-data-table thead tr.filter-row th:first-child {
@@ -485,19 +505,21 @@
     .excel-data-table tbody tr:hover td.role-store { background-color: #eefbf8 !important; }
     .excel-data-table tbody tr:hover td.role-default { background-color: #f6faff !important; }
 
+    /* One cell height and radius across the grid, and a focus ring in the
+       module blue so the active cell is obvious on a 128-column sheet. */
     .excel-data-table input.form-control {
         min-width: 132px;
-        border-radius: 7px;
-        padding: 3px 6px;
+        border-radius: 8px;
+        padding: 4px 7px;
         font-size: 12px;
-        height: 28px;
-        border-color: #d9e2ec;
+        height: 30px;
+        border-color: var(--po-line, #D7E3ED);
         background: rgba(255, 255, 255, 0.96);
     }
 
     .excel-data-table input.form-control:focus {
-        border-color: #b8c7da;
-        box-shadow: 0 0 0 0.1rem rgba(148, 163, 184, 0.12);
+        border-color: var(--po-blue, #006C9D);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
 
     .sheet-pagination {
@@ -581,12 +603,16 @@
 
     .filter-input {
         min-width: 128px;
-        border-radius: 7px;
-        border: 1px solid #dbe3ec;
+        border-radius: 8px;
+        border: 1px solid var(--po-line, #D7E3ED);
         font-size: 12px;
-        height: 28px;
+        height: 30px;
         padding: 3px 6px;
         background: #fff;
+    }
+    .filter-input:focus {
+        border-color: var(--po-blue, #006C9D);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
 
     .server-search-bar {
@@ -594,8 +620,10 @@
         flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
-        gap: 6px;
-        padding: 6px 12px;
+        gap: 8px;
+        padding: 10px 14px;
+        background: var(--po-paper, #F6F9FC);
+        border-bottom: 1px solid var(--po-line-soft, #EEF3F8);
         border-top: 1px solid #edf2f7;
         background: #ffffff;
     }
@@ -682,13 +710,61 @@
     .table-toolbar {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 10px;
         align-items: center;
         justify-content: space-between;
-        padding: 7px 12px;
-        border-bottom: 1px solid #edf2f7;
-        background: #f8fafc;
-        min-height: 46px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--po-line-soft, #EEF3F8);
+        background: linear-gradient(180deg, #FFFFFF 0%, var(--po-paper, #F6F9FC) 100%);
+        min-height: 56px;
+    }
+
+    /* One control height for every button in the toolbar, so Add / Duplicate /
+       Save line up instead of each finding its own size. */
+    .table-toolbar .btn {
+        min-height: 36px;
+        border-radius: var(--po-r-control, 10px);
+        font-weight: 700;
+        font-size: 12px;
+    }
+    .table-toolbar .btn-primary {
+        background: var(--po-blue, #006C9D);
+        border-color: var(--po-blue, #006C9D);
+    }
+    .table-toolbar .btn-primary:hover,
+    .table-toolbar .btn-primary:focus {
+        background: var(--po-blue-deep, #004B70);
+        border-color: var(--po-blue-deep, #004B70);
+    }
+    .table-toolbar .btn-outline-primary {
+        color: var(--po-blue, #006C9D);
+        border-color: var(--po-line, #D7E3ED);
+    }
+    .table-toolbar .btn-outline-primary:hover:not(:disabled) {
+        background: var(--po-blue, #006C9D);
+        border-color: var(--po-blue, #006C9D);
+        color: #fff;
+    }
+    .table-toolbar .section-title {
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: -.01em;
+        color: var(--po-ink, #0B2B3C);
+        margin: 0;
+    }
+
+    /* Pagination as pills, matching the module's lists. */
+    .sheet-pagination .page-link {
+        border-radius: var(--po-r-control, 10px) !important;
+        border-color: var(--po-line, #D7E3ED);
+        color: var(--po-blue, #006C9D);
+        font-weight: 800;
+        font-size: 12px;
+    }
+    .sheet-pagination .page-item.active .page-link {
+        background: var(--po-blue, #006C9D);
+        border-color: var(--po-blue, #006C9D);
+        color: #fff;
     }
 
     .table-toolbar-left {
@@ -711,6 +787,132 @@
         color: #94a3b8;
         margin: 0;
         display: none;
+    }
+
+    /* --- Row duplication controls -------------------------------------------
+     * Colours are the PO Generation module's tokens, with literal fallbacks so
+     * this screen does not depend on that module's theme partial being loaded.
+     */
+    .row-pick {
+        display: inline-flex;
+        align-items: center;
+        margin-right: 6px;
+        vertical-align: middle;
+        cursor: pointer;
+    }
+    .row-pick .form-check-input { cursor: pointer; margin: 0; }
+
+    /* Icon + visible label, never icon-only — the project's button rule. */
+    .row-duplicate-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 4px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--po-line, #D7E3ED);
+        background: #fff;
+        color: var(--po-muted, #5B7383);
+        font-size: 10px;
+        font-weight: 800;
+        line-height: 1;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: .14s ease;
+    }
+    .row-duplicate-btn:hover,
+    .row-duplicate-btn:focus {
+        border-color: #BAE0F2;
+        background: var(--po-tint, #E0F2FE);
+        color: var(--po-blue-deep, #004B70);
+    }
+    .row-duplicate-btn:focus-visible {
+        outline: 2px solid var(--po-blue, #006C9D);
+        outline-offset: 2px;
+    }
+
+    /* A ticked row is tinted across its whole width, so a multi-row selection
+       is readable while scrolled far to the right of a very wide sheet. */
+    .excel-data-table tbody tr.row-is-selected > td {
+        background: var(--po-tint, #E0F2FE) !important;
+    }
+
+    /* --- Persisted duplicate marker -----------------------------------------
+     * Driven by excel_rows.duplicated_at, so it survives a refresh, pagination
+     * and a different session — which a CSS-only highlight never could.
+     *
+     * Amber, not blue: blue already means "selected" on this grid, and a
+     * duplicate is a state that wants attention rather than one the user just
+     * chose. The rail is on the sticky first column, so it stays on screen no
+     * matter how far right the sheet is scrolled.
+     */
+    /* Pale 2px rail, not 3px solid amber. With ten duplicates on screen the old
+       weight read as an alarm rather than a note. */
+    .excel-data-table tbody tr.row-is-duplicate > td:first-child {
+        box-shadow: inset 2px 0 0 #FCD9A5;
+    }
+
+    /* A dot plus light text, no pill and no border. */
+    .row-duplicate-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 3px;
+        padding: 0;
+        background: transparent;
+        border: 0;
+        color: var(--po-warn, #B45309);
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: .02em;
+        line-height: 1.3;
+        white-space: nowrap;
+    }
+    .row-duplicate-badge::before {
+        content: "";
+        flex: 0 0 auto;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--po-warn, #F59E0B);
+    }
+    /* Continuation of a run: the dot and the × stay, the repeated word goes. */
+    .row-duplicate-badge.is-run .row-duplicate-badge-text { display: none; }
+    .row-duplicate-badge-clear {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font-size: 12px;
+        line-height: 1;
+        padding: 0 0 0 2px;
+        cursor: pointer;
+        opacity: .65;
+    }
+    .row-duplicate-badge-clear:hover { opacity: 1; }
+    .row-duplicate-badge-clear:focus-visible {
+        outline: 2px solid var(--po-warn, #F59E0B);
+        outline-offset: 1px;
+    }
+
+    /* The few contract-level cells a new order normally changes. Marked, never
+       blanked — the row is a full copy and the merchant edits what differs. */
+    /* Soft tint plus an inset left accent, instead of a full amber border and a
+       2px outer glow. Still unmistakable against its neighbours, but it no
+       longer competes with the data when several duplicates are on screen. */
+    .excel-data-table tbody td.cell-needs-update input.form-control,
+    .excel-data-table tbody td.cell-needs-update .excel-readonly-cell {
+        border-color: #FCD9A5 !important;
+        background: #FFFBF4 !important;
+        box-shadow: inset 2px 0 0 var(--po-warn, #F59E0B);
+    }
+    /* Focus still wins, so editing the cell reads normally. */
+    .excel-data-table tbody td.cell-needs-update input.form-control:focus {
+        border-color: var(--po-blue, #006C9D) !important;
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .row-duplicate-btn { transition: none; }
     }
 
     .custom-success-alert {
@@ -897,6 +1099,20 @@
         <form method="POST" action="{{ route('uploaded-files.rows.store', $excelFile->id) }}" id="add-row-form" class="d-none">
             @csrf
         </form>
+
+        {{-- Row ids are injected as hidden inputs just before submit, so a single
+             form serves both the per-row Duplicate button and the multi-select
+             toolbar action. --}}
+        <form method="POST" action="{{ route('uploaded-files.rows.duplicate', $excelFile->id) }}" id="duplicate-rows-form" class="d-none">
+            @csrf
+        </form>
+
+        {{-- The action is rewritten per row before submit, so one form serves
+             every "clear duplicate marker" button on the page. --}}
+        <form method="POST" id="dismiss-duplicate-form" class="d-none">
+            @csrf
+            @method('PATCH')
+        </form>
     @endif
 
     @if($canDeleteFile ?? false)
@@ -1038,10 +1254,22 @@
                     <p class="paste-note">Multiple row/column paste supported.</p>
                 </div>
 
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap align-items-center">
                     @if($canAddRow ?? false)
                         <button type="button" id="addRowButton" class="btn btn-outline-primary btn-sm">
                             Add New Row
+                        </button>
+                        {{-- Disabled until something is ticked; the count comes from
+                             the selection so the confirm can name it. --}}
+                        <button type="button" id="duplicateSelectedButton" class="btn btn-outline-primary btn-sm" disabled>
+                            <i class="bi bi-copy me-1" aria-hidden="true"></i>Duplicate Selected (<span id="duplicateSelectedCount">0</span>)
+                        </button>
+                        {{-- Filtering is server-side, so a page holds at most
+                             per_page rows of a possibly larger result set.
+                             Ticking "all visible" therefore selects the PAGE;
+                             this offers the rest of the match. --}}
+                        <button type="button" id="selectAllMatchesButton" class="btn btn-link btn-sm p-0 ms-1 d-none">
+                            Select all <span id="selectAllMatchesCount">0</span> matching rows
                         </button>
                     @endif
 
@@ -1104,7 +1332,20 @@
                 <table class="table table-bordered excel-data-table" id="excelDataTable">
                     <thead>
                         <tr>
-                            <th>Row</th>
+                            {{-- The select-all checkbox lives INSIDE the existing
+                                 Row header, not in a new column. The grid's JS
+                                 addresses cells positionally (data-col-index,
+                                 editableGrid[row][col]) and the empty-state uses
+                                 count($headers) + 1, so inserting a column would
+                                 shift every index and break paste and filtering. --}}
+                            <th>
+                                @if($canAddRow ?? false)
+                                    <label class="row-pick row-pick-all" title="Select all rows on this page">
+                                        <input type="checkbox" id="rowSelectAll" class="form-check-input">
+                                    </label>
+                                @endif
+                                Row
+                            </th>
                             @foreach($headers as $header)
                                 @php
                                     $isHeaderCalculated = in_array($header->id, $calculatedHeaderIds ?? [], true)
@@ -1163,15 +1404,68 @@
                     </thead>
 
                     <tbody>
+                        {{-- Tracks the previous row's source so a run of copies
+                             from one source shows its label only once. --}}
+                        @php
+                            $previousDuplicateSourceId = null;
+                        @endphp
                         @forelse($rows as $row)
                             @php
                                 $cellsByHeaderId = $row->cells->keyBy('header_id');
                                 $rowLockedInfo = ($lockedRowInfo ?? collect())->get($row->id);
                                 $isPoRowLocked = ($lockedRowIds ?? collect())->has($row->id);
                             @endphp
-                            <tr data-row-id="{{ $row->id }}" class="{{ trim(($isFileLockedForUser ?? false ? 'file-row-locked ' : '') . ($isPoRowLocked ? 'po-row-locked' : '')) }}">
+                            @php
+                                // Persisted, so the marker survives refresh and
+                                // pagination — the whole point of the migration.
+                                $isFlaggedDuplicate = $row->duplicated_at !== null;
+
+                                // RUN COLLAPSING. Ten copies of the same source
+                                // used to stack ten identical badges, which read
+                                // as noise rather than information. Only the
+                                // first of a consecutive run carries the text;
+                                // the rest keep the rail and the tooltip, so
+                                // none of them becomes unidentifiable.
+                                $isRunContinuation = $isFlaggedDuplicate
+                                    && $previousDuplicateSourceId !== null
+                                    && $previousDuplicateSourceId === $row->duplicated_from_row_id;
+
+                                $previousDuplicateSourceId = $isFlaggedDuplicate
+                                    ? $row->duplicated_from_row_id
+                                    : null;
+                            @endphp
+                            <tr data-row-id="{{ $row->id }}" class="{{ trim(($isFileLockedForUser ?? false ? 'file-row-locked ' : '') . ($isPoRowLocked ? 'po-row-locked ' : '') . ($isFlaggedDuplicate ? 'row-is-duplicate ' : '') . ($isRunContinuation ? 'row-duplicate-run' : '')) }}">
                                 <td>
+                                    @if($canAddRow ?? false)
+                                        <label class="row-pick" title="Select row {{ $row->row_number }} for duplication">
+                                            <input type="checkbox" class="form-check-input row-select" value="{{ $row->id }}">
+                                        </label>
+                                    @endif
                                     {{ $row->row_number }}
+                                    @if($canAddRow ?? false)
+                                        {{-- Icon + visible label, per the project's button rule. --}}
+                                        <button type="button" class="row-duplicate-btn" data-row-id="{{ $row->id }}" data-row-number="{{ $row->row_number }}">
+                                            <i class="bi bi-copy" aria-hidden="true"></i>Duplicate
+                                        </button>
+                                    @endif
+                                    @if($isFlaggedDuplicate)
+                                        {{-- Read from the database, not from a
+                                             transient CSS class, so it is still
+                                             here after a refresh. A continuation
+                                             row keeps the tooltip and the rail
+                                             but drops the repeated label. --}}
+                                        <div class="row-duplicate-badge {{ $isRunContinuation ? 'is-run' : '' }}"
+                                             title="Created by duplicating row {{ optional($row->duplicatedFrom)->row_number ?? '(source removed)' }} on {{ $row->duplicated_at->format('d M Y H:i') }}">
+                                            <span class="row-duplicate-badge-text">Duplicated</span>
+                                            @if($canAddRow ?? false)
+                                                <button type="button"
+                                                        class="row-duplicate-badge-clear js-dismiss-duplicate"
+                                                        data-row-id="{{ $row->id }}"
+                                                        data-row-number="{{ $row->row_number }}"
+                                                        aria-label="Clear duplicate marker for row {{ $row->row_number }}">&times;</button>
+                                            @endif
+                                        </div>
+                                    @endif
                                     @if($isFileLockedForUser ?? false)
                                         <div class="file-row-lock-badge" title="This workspace file is locked by admin">
                                             <i class="bi bi-lock-fill" aria-hidden="true"></i> File Locked
@@ -1195,6 +1489,13 @@
                                     $isHighlightedCell = isset($highlightedCellKeys) && $highlightedCellKeys->contains($cellHighlightKey);
                                     $roleClass = $headerRoleClass($header);
 
+                                    // "Needs update": only on a still-flagged
+                                    // duplicate, and only for the few
+                                    // contract-level columns a new order
+                                    // normally changes. Clears with the badge.
+                                    $needsUpdate = $isFlaggedDuplicate
+                                        && in_array($header->id, $duplicateNeedsUpdateHeaderIds ?? [], true);
+
                                     $inputType = 'text';
                                     if ($header->field_type === 'number') {
                                         $inputType = 'number';
@@ -1204,7 +1505,8 @@
                                 @endphp
 
                                     <td
-                                        class="role-column {{ $roleClass }} {{ trim(($isCalculated ? 'calculated-cell ' : '') . ($isHighlightedCell ? 'notification-highlight-cell' : '')) }}"
+                                        class="role-column {{ $roleClass }} {{ trim(($isCalculated ? 'calculated-cell ' : '') . ($isHighlightedCell ? 'notification-highlight-cell ' : '') . ($needsUpdate ? 'cell-needs-update' : '')) }}"
+                                        @if($needsUpdate) title="This is a duplicated row — {{ $header->header_name }} usually needs a new value." @endif
                                         data-header-id="{{ $header->id }}"
                                         data-header-key="{{ $header->header_key }}"
                                         data-row-index="{{ $loop->parent->index }}"
@@ -1817,21 +2119,51 @@ document.addEventListener('DOMContentLoaded', function () {
             .split('\n')
             .filter(row => row !== '');
 
+        let droppedRows = 0;
+        let droppedCols = false;
+
         pastedRows.forEach((rowText, rowOffset) => {
             const cols = rowText.split('\t');
+            const targetRow = startRow + rowOffset;
+
+            if (!editableGrid[targetRow]) {
+                droppedRows++;
+                return;
+            }
 
             cols.forEach((cellValue, colOffset) => {
-                const targetRow = startRow + rowOffset;
                 const targetCol = startCol + colOffset;
 
-                if (editableGrid[targetRow] && editableGrid[targetRow][targetCol]) {
+                if (editableGrid[targetRow][targetCol]) {
                     editableGrid[targetRow][targetCol].value = cellValue;
+                } else {
+                    droppedCols = true;
                 }
             });
         });
 
         updateLiveFormulas();
         markWorksheetChanged();
+
+        // Anything that did not fit used to vanish without a word, which is how
+        // a merchant pastes 40 rows from Excel, sees the first 12 land, and has
+        // no idea the rest were lost. Say so, and say what to do about it.
+        if (droppedRows > 0 || droppedCols) {
+            const parts = [];
+
+            if (droppedRows > 0) {
+                parts.push(droppedRows + (droppedRows === 1 ? ' row' : ' rows') + ' did not fit below the cell you pasted into');
+            }
+
+            if (droppedCols) {
+                parts.push('some columns ran past the last column');
+            }
+
+            window.alert(
+                'Pasted, but ' + parts.join(' and ') + '.\n\n'
+                + 'Add or duplicate more rows first, then paste again into the first empty row.'
+            );
+        }
     }
 
 
@@ -2402,6 +2734,179 @@ document.addEventListener('DOMContentLoaded', function () {
             clearDraft();
         });
     }
+
+    /* ---- Row duplication -------------------------------------------------
+     * Duplicating navigates away and the server persists immediately, exactly
+     * as Add New Row does. So it reuses that button's unsaved-changes guard
+     * rather than inventing a second one: without it, pending cell edits would
+     * be silently thrown away by the redirect.
+     */
+    const duplicateRowsForm = document.getElementById('duplicate-rows-form');
+    const duplicateSelectedButton = document.getElementById('duplicateSelectedButton');
+    const duplicateSelectedCount = document.getElementById('duplicateSelectedCount');
+    const rowSelectAll = document.getElementById('rowSelectAll');
+
+    // Every row id the active filter matches, page or not. Ticking a checkbox
+    // cancels the "all matching" mode, because the two would otherwise disagree
+    // about what is selected.
+    const allMatchingRowIds = @json($allMatchingRowIds ?? []).map(String);
+    const selectAllMatchesButton = document.getElementById('selectAllMatchesButton');
+    const selectAllMatchesCount = document.getElementById('selectAllMatchesCount');
+    let allMatchesSelected = false;
+
+    function selectedRowIds() {
+        if (allMatchesSelected) {
+            return allMatchingRowIds;
+        }
+
+        return Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
+    }
+
+    function refreshDuplicateSelection() {
+        const ids = selectedRowIds();
+
+        if (duplicateSelectedCount) duplicateSelectedCount.textContent = ids.length;
+        if (duplicateSelectedButton) duplicateSelectedButton.disabled = ids.length === 0;
+
+        // Offer the rest of the match only when the page is fully ticked and
+        // there is actually more behind it.
+        if (selectAllMatchesButton) {
+            const onPage = document.querySelectorAll('.row-select').length;
+            const tickedOnPage = document.querySelectorAll('.row-select:checked').length;
+            const moreBehind = allMatchingRowIds.length > onPage;
+            const show = !allMatchesSelected && moreBehind && onPage > 0 && tickedOnPage === onPage;
+
+            selectAllMatchesButton.classList.toggle('d-none', !show);
+            if (selectAllMatchesCount) selectAllMatchesCount.textContent = allMatchingRowIds.length;
+        }
+
+        document.querySelectorAll('.row-select').forEach(function (cb) {
+            cb.closest('tr')?.classList.toggle('row-is-selected', cb.checked);
+        });
+
+        if (rowSelectAll) {
+            const all = document.querySelectorAll('.row-select');
+            const checked = ids.length;
+            rowSelectAll.checked = checked > 0 && checked === all.length;
+            // Partial selection reads as indeterminate rather than unchecked.
+            rowSelectAll.indeterminate = checked > 0 && checked < all.length;
+        }
+    }
+
+    document.addEventListener('change', function (event) {
+        if (event.target.classList.contains('row-select')) {
+            // Any manual tick drops back to "what is actually checked".
+            allMatchesSelected = false;
+            refreshDuplicateSelection();
+            return;
+        }
+
+        if (event.target === rowSelectAll) {
+            allMatchesSelected = false;
+            document.querySelectorAll('.row-select').forEach(cb => { cb.checked = rowSelectAll.checked; });
+            refreshDuplicateSelection();
+        }
+    });
+
+    if (selectAllMatchesButton) {
+        selectAllMatchesButton.addEventListener('click', function () {
+            allMatchesSelected = true;
+            document.querySelectorAll('.row-select').forEach(cb => { cb.checked = true; });
+            refreshDuplicateSelection();
+        });
+    }
+
+    // Returns false when the user chose to save first — the form submit is
+    // already under way and this action must not also navigate.
+    function passesUnsavedGuard() {
+        const changed = getChangedFields();
+
+        if (!hasRealChanges(changed)) {
+            return true;
+        }
+
+        const shouldSave = confirm('You have unsaved changes. Press OK to save first, or Cancel to continue without saving.');
+
+        if (shouldSave) {
+            isSubmitting = true;
+            if (form) form.submit();
+            return false;
+        }
+
+        return true;
+    }
+
+    function submitDuplicate(rowIds) {
+        if (!duplicateRowsForm || rowIds.length === 0) return;
+        if (!passesUnsavedGuard()) return;
+
+        duplicateRowsForm.querySelectorAll('input[name="row_ids[]"]').forEach(el => el.remove());
+
+        rowIds.forEach(function (id) {
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'row_ids[]';
+            hidden.value = id;
+            duplicateRowsForm.appendChild(hidden);
+        });
+
+        isSubmitting = true;
+        clearDraft();
+        duplicateRowsForm.submit();
+    }
+
+    // Clearing the badge navigates and saves, so it takes the same unsaved-work
+    // guard as duplicating. The URL is built from a template rather than being
+    // rendered per row, so 550 rows do not each carry their own form.
+    const dismissDuplicateForm = document.getElementById('dismiss-duplicate-form');
+    const dismissDuplicateUrlTemplate = @json(route('uploaded-files.rows.dismiss_duplicate', ['excelFile' => $excelFile->id, 'row' => '__ROW__']));
+
+    document.addEventListener('click', function (event) {
+        const clearBtn = event.target.closest('.js-dismiss-duplicate');
+
+        if (clearBtn && dismissDuplicateForm) {
+            event.preventDefault();
+
+            if (!confirm('Clear the duplicate marker on row ' + clearBtn.dataset.rowNumber + '? The row keeps its data; only the badge is removed.')) {
+                return;
+            }
+
+            if (!passesUnsavedGuard()) return;
+
+            dismissDuplicateForm.action = dismissDuplicateUrlTemplate.replace('__ROW__', clearBtn.dataset.rowId);
+            isSubmitting = true;
+            clearDraft();
+            dismissDuplicateForm.submit();
+            return;
+        }
+
+        const single = event.target.closest('.row-duplicate-btn');
+
+        if (single) {
+            const rowNumber = single.dataset.rowNumber;
+            if (confirm('Duplicate row ' + rowNumber + '? The copy is inserted directly below its source row with the same values.')) {
+                submitDuplicate([single.dataset.rowId]);
+            }
+        }
+    });
+
+    if (duplicateSelectedButton) {
+        duplicateSelectedButton.addEventListener('click', function () {
+            const ids = selectedRowIds();
+
+            if (ids.length === 0) return;
+
+            const message = ids.length === 1
+                ? 'Duplicate 1 selected row? The copy is inserted directly below its source row.'
+                : 'Duplicate ' + ids.length + ' selected rows? Each copy is inserted directly below its own source row.';
+
+            if (confirm(message)) {
+                submitDuplicate(ids);
+            }
+        });
+    }
+
+    refreshDuplicateSelection();
 
     if (addRowButton && addRowForm) {
         addRowButton.addEventListener('click', function () {

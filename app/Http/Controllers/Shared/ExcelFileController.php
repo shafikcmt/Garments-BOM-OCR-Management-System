@@ -116,6 +116,11 @@ class ExcelFileController extends Controller
             });
         }
 
+        // Every row the current filter matches, not just the page. Rows off the
+        // page have no checkbox to tick, so "select all matching" has to be fed
+        // ids directly. Ids only — a few hundred integers.
+        $allMatchingRowIds = (clone $rowsQuery)->orderBy('row_number')->pluck('id')->all();
+
         $rows = $rowsQuery
             ->with(['cells' => function ($query) use ($visibleHeaderIds) {
                 $query->select('id', 'row_id', 'header_id', 'value')
@@ -154,6 +159,9 @@ class ExcelFileController extends Controller
             && ! $isFileLockedForUser
             && ! $isBuyerLockedForUser;
         $canDeleteFile = $user->hasRole('admin') || $user->hasRole('merchant');
+
+        // Which cells carry a "Needs update" marker on a duplicated row.
+        $duplicateNeedsUpdateHeaderIds = $this->duplicateNeedsUpdateHeaderIds();
 
         // Latest PRA dates per PI No., pre-formatted for the live (client-side)
         // formulas. Keyed by normalised PI No. so every row sharing that PI No.
@@ -207,7 +215,9 @@ class ExcelFileController extends Controller
             'fileLockInfo',
             'orderInfo',
             'perPage',
-            'piPraDates'
+            'piPraDates',
+            'duplicateNeedsUpdateHeaderIds',
+            'allMatchingRowIds'
         ));
     }
 
@@ -467,6 +477,308 @@ class ExcelFileController extends Controller
         return redirect()
             ->route('uploaded-files.show', $excelFile->id)
             ->with('success', 'New row added successfully.');
+    }
+
+    /**
+     * Columns left BLANK on a duplicated row, by header_key.
+     *
+     * Empty on purpose. Nothing in the schema forces it: the worksheet is an
+     * EAV store, so every business value lives in excel_cells.value — a
+     * nullable string with no unique index and no validation behind it. The
+     * only unique constraints in play are structural (excel_rows is unique on
+     * excel_file_id + row_number, which the server assigns itself; excel_cells
+     * is unique on row_id + header_id, one cell per column). So a duplicate
+     * cannot violate anything, and which columns "should" be cleared is a
+     * business decision rather than a technical one.
+     *
+     * The decision taken was to copy everything and let the merchant edit what
+     * differs. This list is the single place to change that: add a header_key
+     * here and that cell comes through blank and flagged for attention, with no
+     * other code change. For example:
+     *
+     *     'initial_contract_number', 'sales_contract',
+     *
+     * @var list<string>
+     */
+    private const DUPLICATE_BLANK_HEADER_KEYS = [];
+
+    /**
+     * Cells marked "Needs update" on a freshly duplicated row, by header_key.
+     *
+     * These are NOT blanked — the row is a full copy. The marker is a visual
+     * hint pointing at the handful of fields a new order usually changes, so a
+     * merchant does not have to re-check 128 columns to find the three that
+     * matter.
+     *
+     * HOW THIS LIST WAS CHOSEN, because no metadata could supply it. Every
+     * candidate signal was checked and none discriminates: owner_role marks 35
+     * columns as merchant's, value_mode only separates the 8 formula columns
+     * from the rest, field_type is just text/number/date, and is_required is
+     * YES on all 35. So the list is a business decision, not a derived one.
+     *
+     * What the data DOES say (file #4, 550 rows): initial_contract_number holds
+     * 8 distinct values and contract_shipment_date 5, each shared across dozens
+     * of rows. They are CONTRACT-level fields — they group rows into an order
+     * rather than identify a line — which is exactly what a new order has to
+     * change while line-level values (description, sap_code, bom_quantity,
+     * colour) are correctly carried over.
+     *
+     * Deliberately NOT included yet:
+     *   sales_contract  named by the business, but populated on 2 of 550 rows,
+     *                   so the marker would usually sit on an empty cell.
+     *   garments_po     also order-level, but nobody has confirmed merchants
+     *                   change it per order.
+     *
+     * Add or remove a header_key here and the markers follow, with no other
+     * code change. The surest way to settle the list: duplicated rows now carry
+     * duplicated_from_row_id, so after a few weeks you can compare copies
+     * against their sources and see which cells merchants actually edited.
+     *
+     * @var list<string>
+     */
+    private const DUPLICATE_NEEDS_UPDATE_HEADER_KEYS = [
+        'initial_contract_number',
+        'contract_shipment_date',
+    ];
+
+    /**
+     * Header ids the worksheet should flag on a duplicated row.
+     *
+     * Resolved from header_key so the constant above stays readable and does
+     * not break if ids differ between environments.
+     *
+     * @return list<int>
+     */
+    private function duplicateNeedsUpdateHeaderIds(): array
+    {
+        if (self::DUPLICATE_NEEDS_UPDATE_HEADER_KEYS === []) {
+            return [];
+        }
+
+        return ExcelHeader::whereIn('header_key', self::DUPLICATE_NEEDS_UPDATE_HEADER_KEYS)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * Clear the "Duplicated" badge on one row.
+     *
+     * Clears the FLAG only — duplicated_from_row_id is left alone, so the row
+     * stops being advertised as a duplicate but remains traceable to its
+     * source. Chosen over auto-clearing on save because a merchant editing four
+     * fields saves after the first, which is precisely when the marker is still
+     * needed.
+     */
+    public function dismissDuplicateFlag(ExcelFile $excelFile, ExcelRow $row)
+    {
+        $user = auth()->user();
+
+        if (! $user->hasRole('admin') && ! $user->hasRole('merchant')) {
+            abort(403, 'You are not allowed to change this row.');
+        }
+
+        // Scoped to the file in the URL, so a row id from another workbook
+        // cannot be cleared through this route.
+        if ($row->excel_file_id !== $excelFile->id) {
+            abort(404);
+        }
+
+        $row->forceFill(['duplicated_at' => null])->save();
+
+        return redirect()
+            ->route('uploaded-files.show', $excelFile->id)
+            ->with('success', 'Duplicate marker cleared for row ' . $row->row_number . '.');
+    }
+
+    /**
+     * Duplicate one or more existing rows, values included.
+     *
+     * Deliberately built on addRow()'s shape rather than beside it: identical
+     * role gate, identical lock guards, one transaction, an ActivityLog entry
+     * per new row, then a single recalculate + status refresh at the end. A
+     * merchant pressing Duplicate should get exactly what Add New Row gives
+     * them, only pre-filled — including saving immediately, which is what Add
+     * New Row does today.
+     *
+     * Each copy is inserted DIRECTLY AFTER ITS OWN SOURCE, so a duplicate of
+     * row 41 becomes row 42 and stays with the work it belongs to. Everything
+     * below shifts down. See the transaction body for how that is done without
+     * tripping the unique index on (excel_file_id, row_number).
+     *
+     * Safe to renumber because row_number is ORDER ONLY: every real reference
+     * — booking_pos.excel_row_id, activity_logs.row_id, excel_cells.row_id,
+     * excel_file_change_logs.excel_row_id — points at the row's id, which never
+     * changes here.
+     */
+    public function duplicateRows(Request $request, ExcelFile $excelFile)
+    {
+        $user = auth()->user();
+
+        // The same gate addRow() applies, stated the same way on purpose.
+        if (! $user->hasRole('admin') && ! $user->hasRole('merchant')) {
+            abort(403, 'You are not allowed to duplicate a row.');
+        }
+
+        if ($excelFile->isLockedForUser($user)) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'This file is locked by admin. Rows cannot be duplicated until it is unlocked for your user or role.');
+        }
+
+        if ($excelFile->isBuyerLockedForUser($user)) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'This file belongs to another buyer. Only its own buyer team can duplicate its rows.');
+        }
+
+        $validated = $request->validate([
+            'row_ids' => ['required', 'array', 'min:1'],
+            'row_ids.*' => ['integer'],
+        ]);
+
+        // Scoped to THIS file, so a hand-made request cannot copy rows out of
+        // somebody else's workbook into this one. Ordered so a multi-row
+        // duplicate lands in the same order it was displayed in.
+        $sourceRows = ExcelRow::where('excel_file_id', $excelFile->id)
+            ->whereIn('id', $validated['row_ids'])
+            ->with('cells')
+            ->orderBy('row_number')
+            ->get();
+
+        if ($sourceRows->isEmpty()) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'No matching row was found to duplicate.');
+        }
+
+        $blankHeaderIds = ExcelHeader::whereIn('header_key', self::DUPLICATE_BLANK_HEADER_KEYS)
+            ->pluck('id')
+            ->all();
+
+        DB::transaction(function () use ($excelFile, $user, $sourceRows, $blankHeaderIds) {
+            // Every ACTIVE header, so a duplicate has the same cell coverage as
+            // a fresh row. A source row missing a cell for a newly added column
+            // still gets that column here, blank.
+            $headers = ExcelHeader::where('is_active', true)
+                ->orderBy('position')
+                ->get();
+
+            $sourceIdSet = $sourceRows->keyBy('id');
+            $minPos = (int) $sourceRows->min('row_number');
+
+            /*
+             * THE TARGET ORDER, worked out in PHP before a single row moves.
+             *
+             * Walking existing rows and emitting each one followed by its copy
+             * gives the final sequence in one pass. Shifting per insert instead
+             * would compound offsets — the second insert would have to account
+             * for the first having moved everything — which is exactly where
+             * this kind of code goes wrong.
+             *
+             * Rows at or before $minPos never move, so the sequence starts just
+             * after the earliest source.
+             */
+            $sequence = [];
+
+            $laterRows = ExcelRow::where('excel_file_id', $excelFile->id)
+                ->where('row_number', '>=', $minPos)
+                ->orderBy('row_number')
+                ->get(['id', 'row_number']);
+
+            foreach ($laterRows as $existing) {
+                // The row sitting at $minPos keeps its number; only its copy and
+                // everything after it are renumbered.
+                if ((int) $existing->row_number !== $minPos) {
+                    $sequence[] = ['existing', $existing->id];
+                }
+
+                if ($sourceIdSet->has($existing->id)) {
+                    $sequence[] = ['new', $existing->id];
+                }
+            }
+
+            /*
+             * PARK, then reassign. excel_rows is unique on
+             * (excel_file_id, row_number), and a straight
+             * `SET row_number = row_number + 1` can trip that index mid-statement
+             * — and the workaround differs per engine, since ORDER BY in UPDATE
+             * is MySQL-only. Moving the affected rows into a disjoint number
+             * space first makes a collision arithmetically impossible on MySQL,
+             * PostgreSQL and the SQLite the tests run on alike.
+             *
+             * The offset clears the highest number any row could be assigned:
+             * max + the number of rows being placed + 1000 of headroom.
+             */
+            $maxRowNumber = (int) $excelFile->rows()->max('row_number');
+            $offset = $maxRowNumber + count($sequence) + 1000;
+
+            ExcelRow::where('excel_file_id', $excelFile->id)
+                ->where('row_number', '>', $minPos)
+                ->update(['row_number' => DB::raw('row_number + ' . $offset)]);
+
+            $nextRowNumber = $minPos + 1;
+
+            foreach ($sequence as [$kind, $refId]) {
+                if ($kind === 'existing') {
+                    ExcelRow::where('id', $refId)->update(['row_number' => $nextRowNumber]);
+                    $nextRowNumber++;
+
+                    continue;
+                }
+
+                $sourceRow = $sourceIdSet->get($refId);
+                $sourceValues = $sourceRow->cells->keyBy('header_id');
+
+                $newRow = ExcelRow::create([
+                    'excel_file_id' => $excelFile->id,
+                    'row_number' => $nextRowNumber,
+                    // Lineage is permanent; the timestamp is the badge state and
+                    // is what "Dismiss" clears. See the migration for why both.
+                    'duplicated_from_row_id' => $sourceRow->id,
+                    'duplicated_at' => now(),
+                ]);
+
+                foreach ($headers as $header) {
+                    $value = in_array($header->id, $blankHeaderIds, true)
+                        ? null
+                        : ($sourceValues->get($header->id)->value ?? null);
+
+                    ExcelCell::create([
+                        'row_id' => $newRow->id,
+                        'header_id' => $header->id,
+                        'value' => $value,
+                        'updated_by' => $user->id,
+                    ]);
+                }
+
+                ActivityLog::create([
+                    'excel_file_id' => $excelFile->id,
+                    'row_id' => $newRow->id,
+                    'header_id' => null,
+                    'old_value' => null,
+                    // The source's ORIGINAL number, captured before the shift.
+                    'new_value' => 'Row duplicated from row ' . $sourceRow->row_number,
+                    'action' => 'row_duplicated',
+                    'user_id' => $user->id,
+                ]);
+
+                $nextRowNumber++;
+            }
+
+            // Once for the whole batch, not per row — these are expensive and
+            // the result is the same.
+            $this->recalculateFile($excelFile, $user->id);
+            $this->refreshFileStatus($excelFile);
+        });
+
+        $count = $sourceRows->count();
+
+        return redirect()
+            ->route('uploaded-files.show', $excelFile->id)
+            ->with('success', $count === 1
+                ? 'Row duplicated. The copy was inserted directly below its source row.'
+                : $count . ' rows duplicated. Each copy was inserted directly below its own source row.');
     }
 
     /**

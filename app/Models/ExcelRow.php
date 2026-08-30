@@ -12,7 +12,31 @@ class ExcelRow extends Model
     protected $fillable = [
         'excel_file_id',
         'row_number',
+        'duplicated_from_row_id',
+        'duplicated_at',
     ];
+
+    protected $casts = [
+        'duplicated_at' => 'datetime',
+    ];
+
+    /**
+     * Whether the "Duplicated" badge should show for this row.
+     *
+     * Reads duplicated_at, NOT duplicated_from_row_id: dismissing the badge
+     * clears the timestamp and deliberately keeps the lineage, so a dismissed
+     * duplicate is still traceable but no longer flagged.
+     */
+    public function isFlaggedDuplicate(): bool
+    {
+        return $this->duplicated_at !== null;
+    }
+
+    /** The row this one was copied from, if it still exists. */
+    public function duplicatedFrom()
+    {
+        return $this->belongsTo(self::class, 'duplicated_from_row_id');
+    }
 
     public function excelFile()
     {

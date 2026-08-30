@@ -100,6 +100,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/uploaded-files/{excelFile}', [ExcelFileController::class, 'show'])->name('uploaded-files.show');
     Route::put('/uploaded-files/{excelFile}', [ExcelFileController::class, 'update'])->name('uploaded-files.update');
     Route::post('/uploaded-files/{excelFile}/rows', [ExcelFileController::class, 'addRow'])->name('uploaded-files.rows.store');
+    // Duplicate one or many existing rows. Same guards and same persistence
+    // behaviour as rows.store above — see duplicateRows().
+    Route::post('/uploaded-files/{excelFile}/rows/duplicate', [ExcelFileController::class, 'duplicateRows'])->name('uploaded-files.rows.duplicate');
+    // Clears the "Duplicated" badge on one row; the lineage is kept.
+    Route::patch('/uploaded-files/{excelFile}/rows/{row}/dismiss-duplicate', [ExcelFileController::class, 'dismissDuplicateFlag'])->name('uploaded-files.rows.dismiss_duplicate');
     Route::get('/uploaded-files/{excelFile}/download', [ExcelFileController::class, 'download'])->name('uploaded-files.download');
     Route::delete('/uploaded-files/{excelFile}', [ExcelFileController::class, 'destroy'])->name('uploaded-files.destroy');
     Route::patch('/uploaded-files/{excelFile}/lock', [ExcelFileController::class, 'updateLock'])->name('uploaded-files.lock');
