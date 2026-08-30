@@ -152,10 +152,18 @@ class User extends Authenticatable
      * oversee every department and hold no buyer, and treating them as a
      * scoped user is how the one account that must never be locked out gets
      * locked out.
+     *
+     * Asks appliesToRole(), NOT appliesTo(). The two differ for exactly one
+     * department today: Store is scoped, but its General Stock role is carved
+     * out of it because General Stock data carries no buyer at all. Asking by
+     * department here would confine a General Stock user against tables that
+     * have no buyer column to compare. The method name is now narrower than
+     * what it asks — kept because renaming it would touch every call site for
+     * no behaviour change.
      */
     public function isBuyerScopedDepartment(): bool
     {
-        return ! $this->hasRole('admin') && BuyerScope::appliesTo($this->departmentKey());
+        return ! $this->hasRole('admin') && BuyerScope::appliesToRole($this->primaryRoleName());
     }
 
     /**

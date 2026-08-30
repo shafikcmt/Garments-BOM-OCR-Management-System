@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Models\BookingPo;
 use App\Models\MaterialRequisition;
 use App\Models\StockItem;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 use Illuminate\Http\Request;
 
 /**
@@ -17,6 +18,7 @@ use Illuminate\Http\Request;
 class MaterialRequisitionController extends Controller
 {
     use AuthorizesStoreCorrections;
+    use ScopesToAssignedBuyers;
 
     /** Section this controller belongs to, for the section-scoped correction
      *  permissions. The flat store.edit / store.delete still apply too. */
@@ -26,11 +28,20 @@ class MaterialRequisitionController extends Controller
     {
         $requisitions = MaterialRequisition::with(['requestedBy', 'approvedBy'])
             ->withCount('items')
+            ->tap(fn ($query) => $this->applyBuyerScope($query))
             ->latest('id')
             ->paginate(25)
             ->withQueryString();
 
-        $bookingPos = BookingPo::with('excelFile')->orderByDesc('id')->take(1000)->get();
+        // The PO picker is scoped too, not just the history above it. Leaving it
+        // open would offer a confined user POs they are then refused at save —
+        // a dropdown that lists what it will not accept is worse than one that
+        // never offered it.
+        $bookingPos = BookingPo::with('excelFile')
+            ->tap(fn ($query) => $this->applyBuyerScope($query))
+            ->orderByDesc('id')
+            ->take(1000)
+            ->get();
 
         // Group PO material lines by PO number. Selecting a PO on the form loads
         // its full item list (one row per BOM/PO material) with Required Qty.
@@ -85,10 +96,18 @@ class MaterialRequisitionController extends Controller
         // Authoritative item list = every BOM/PO material line for this PO number.
         // Required Qty and material identity are taken from the server, never the
         // form, so they always match the approved PO data.
-        $pos = BookingPo::where('po_no', $validated['po_no'])->orderBy('id')->get();
+        $pos = BookingPo::with('excelFile')->where('po_no', $validated['po_no'])->orderBy('id')->get();
 
         if ($pos->isEmpty()) {
             return back()->with('warning', 'Selected PO has no material lines.');
+        }
+
+        // EVERY line, not just the first. The header copies its excel_file_id
+        // from $pos->first(), but the items below are created from all of them,
+        // so a po_no whose lines straddle two buyers would pull the second
+        // buyer's materials in behind a header that looks in scope.
+        foreach ($pos as $po) {
+            $this->assertBuyerAccessVia($po);
         }
 
         $submitted = $request->input('items', []);
@@ -152,6 +171,8 @@ class MaterialRequisitionController extends Controller
 
     public function approve(MaterialRequisition $materialRequisition)
     {
+        $this->assertBuyerAccessVia($materialRequisition);
+
         if ($materialRequisition->status !== MaterialRequisition::STATUS_PENDING) {
             return back()->with('warning', 'Only a pending requisition can be approved.');
         }
@@ -168,6 +189,7 @@ class MaterialRequisitionController extends Controller
     public function destroy(MaterialRequisition $materialRequisition)
     {
         $this->authorizeStoreDelete('requisition');
+        $this->assertBuyerAccessVia($materialRequisition);
 
         if ($materialRequisition->status === MaterialRequisition::STATUS_ISSUED) {
             return back()->with('warning', 'An issued requisition cannot be deleted.');

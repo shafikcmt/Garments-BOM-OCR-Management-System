@@ -197,7 +197,9 @@ it('still refuses an unscoped merchant naming a buyer that does not exist', func
  * not find themselves confined by a column that does not apply to them.
  */
 it('treats a non-merchant user as unscoped even with a buyer_id column set', function () {
-    $user = uploadUser(['buyer_id' => $this->mine->id], 'store');
+    // store_general_stock, not store: Store is a scoped department now, and its
+    // General Stock role is the one carved back out of it.
+    $user = uploadUser(['buyer_id' => $this->mine->id], 'store_general_stock');
 
     expect(validateUpload($user, ['buyer_id' => $this->theirs->id])['buyer_id'])->toBe($this->theirs->id);
 });

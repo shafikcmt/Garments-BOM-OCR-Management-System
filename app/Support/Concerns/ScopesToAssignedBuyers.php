@@ -98,6 +98,64 @@ trait ScopesToAssignedBuyers
     }
 
     /**
+     * Narrow a PaymentRequest query to the PRAs this viewer may see.
+     *
+     * A PRA carries no buyer of its own — its ITEMS do, each holding the
+     * excel_file_id of the BOM line its PO came from — so a PRA is in scope
+     * when ANY of its items is. Any, not all: a PRA can combine POs, and
+     * refusing the whole document because one line sits with another buyer
+     * would hide work the user genuinely raised.
+     *
+     * A PRA with no items at all stays visible, for the same reason an untagged
+     * file does: it belongs to no buyer, so no buyer's team can claim it.
+     *
+     * LIVES HERE, not on a controller. Supply Chain's PRA list, Supply Chain's
+     * dashboard and now the Accounts dashboard all ask this same question, and
+     * it was already written twice before Accounts made it three times. A rule
+     * about who may see a PRA has to have one answer.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Relations\Relation  $query
+     */
+    protected function applyBuyerScopeToPaymentRequests($query): void
+    {
+        if (! $this->buyerScopeViewer()?->isBuyerConfined()) {
+            return;
+        }
+
+        $query->where(function ($outer) {
+            $outer->whereDoesntHave('items')
+                ->orWhereHas('items', fn ($item) => $this->applyBuyerScope($item));
+        });
+    }
+
+    /**
+     * Narrow an EmailLog query to the logs this viewer may see.
+     *
+     * An email log is the audit trail of a PO or a PRA, so it inherits that
+     * document's buyer. Both branches use the scope above, so the PO half and
+     * the PRA half can never drift apart.
+     *
+     * A log attached to NEITHER — there is no such row today — is hidden from a
+     * confined viewer rather than shown. That is the opposite of the untagged
+     * rule on purpose: an untagged FILE is a real record that belongs to no
+     * buyer, while a log belonging to no document is a row with no buyer to
+     * trace, and guessing in the permissive direction there would be a leak.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Relations\Relation  $query
+     */
+    protected function applyBuyerScopeToEmailLogs($query): void
+    {
+        if (! $this->buyerScopeViewer()?->isBuyerConfined()) {
+            return;
+        }
+
+        $query->where(function ($outer) {
+            $outer->whereHas('bookingPo', fn ($po) => $this->applyBuyerScope($po))
+                ->orWhereHas('paymentRequest.items', fn ($item) => $this->applyBuyerScope($item));
+        });
+    }
+
+    /**
      * THE WRITE GUARD. Refuse outright rather than quietly returning nothing.
      *
      * A list that silently omits a record and an action that silently does
@@ -110,6 +168,35 @@ trait ScopesToAssignedBuyers
     protected function assertBuyerAccess(?int $buyerId): void
     {
         abort_if(! $this->allowsBuyerAccess($buyerId), 403, 'This record belongs to a buyer outside your buyer access.');
+    }
+
+    /**
+     * THE WRITE GUARD for any record that reaches its buyer through an
+     * ExcelFile relation — a receiving, a requisition, a bulk issue, a BOM row.
+     *
+     * WHY THE RELATION AND NOT THE ROW'S OWN buyer_name. Every one of these
+     * tables denormalises buyer_name off the BOM at write time, and that column
+     * is free text a merchant can edit. A gate reading it is a gate anyone can
+     * walk through by typing, so the guard always hops to the file's buyer_id.
+     *
+     * A record with no file, or a file with a null buyer_id, is ALLOWED — the
+     * untagged rule this trait documents. Every live BOM file carries a null
+     * buyer_id today, so a guard that refused them would lock Store out of its
+     * own screens on the day scoping was switched on.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model|null  $model
+     */
+    protected function assertBuyerAccessVia($model, string $relation = 'excelFile'): void
+    {
+        if (! $this->buyerScopeViewer()?->isBuyerConfined()) {
+            return;
+        }
+
+        $model?->loadMissing($relation);
+
+        $buyerId = $model?->getRelationValue($relation)?->buyer_id;
+
+        $this->assertBuyerAccess($buyerId === null ? null : (int) $buyerId);
     }
 
     /** The same question without the abort, for callers that filter a set. */

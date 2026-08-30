@@ -55,20 +55,14 @@ class DashboardController extends Controller
     }
 
     /**
-     * PRAs this viewer may see. A PRA carries no buyer of its own, so it is
-     * reached through its items — the same rule PaymentRequestController
-     * applies to the list these numbers summarise.
+     * PRAs this viewer may see. The rule itself lives in the trait — this
+     * dashboard, the PRA list it summarises and the Accounts dashboard all ask
+     * it, and three copies of "who may see a PRA" is three chances to disagree.
      */
     private function scopedPaymentRequests()
     {
         $query = PaymentRequest::query();
-
-        if ($this->buyerScopeViewer()?->isBuyerConfined()) {
-            $query->where(function ($outer) {
-                $outer->whereDoesntHave('items')
-                    ->orWhereHas('items', fn ($item) => $this->applyBuyerScope($item));
-            });
-        }
+        $this->applyBuyerScopeToPaymentRequests($query);
 
         return $query;
     }
@@ -77,13 +71,7 @@ class DashboardController extends Controller
     private function scopedEmailLogs()
     {
         $query = EmailLog::query();
-
-        if ($this->buyerScopeViewer()?->isBuyerConfined()) {
-            $query->where(function ($outer) {
-                $outer->whereHas('bookingPo', fn ($po) => $this->applyBuyerScope($po))
-                    ->orWhereHas('paymentRequest.items', fn ($item) => $this->applyBuyerScope($item));
-            });
-        }
+        $this->applyBuyerScopeToEmailLogs($query);
 
         return $query;
     }

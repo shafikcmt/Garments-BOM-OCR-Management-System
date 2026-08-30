@@ -42,11 +42,65 @@ final class BuyerScope
      * supply_chain was added once its report carried the same scope rule
      * Merchandising's does, and the audit came back clean.
      *
+     * commercial and accounts followed, on the same two conditions: their
+     * screens read through the scope, and `buyer:audit-scope --department=<key>`
+     * came back PASS for each. Neither confines anybody by itself — every
+     * existing user in both is on buyer_scope_mode 'all' and holds no buyer, so
+     * nothing changed for anyone until an admin ticks a buyer on purpose.
+     *
+     * THE KEY IS 'accounts', NOT 'account'. 'account' is the ROLE name; the
+     * department key is plural, per DepartmentRoles::MAP. appliesTo() is asked
+     * about a department key, so the singular would silently match nothing and
+     * look like scoping that quietly does not work.
+     *
+     * store is listed, but read UNSCOPED_ROLES below before assuming that means
+     * all of it — Store is the first department where the answer is not the
+     * same for every role in it.
+     *
      * @var list<string>
      */
     public const SCOPED_DEPARTMENTS = [
         'merchandising',
         'supply_chain',
+        'commercial',
+        'accounts',
+        'store',
+    ];
+
+    /**
+     * Roles carved OUT of an otherwise scoped department.
+     *
+     * WHY THIS EXISTS AT ALL. Every other department answers the buyer question
+     * the same way for all of its roles, so a department key was enough. Store
+     * does not: it holds two different businesses behind one department key.
+     *
+     *   Buyer / Style stock   material_receivings, material_bulk_issues,
+     *                         material_requisitions, material_stock_ledgers —
+     *                         every one carries excel_file_id, so every one can
+     *                         be traced to a buyer. Scoping applies.
+     *   General Stock         stock_items, stock_purchases, stock_issues —
+     *                         NOT ONE has an excel_file_id or a buyer column.
+     *                         There is no buyer to scope on. Consumables bought
+     *                         for the factory belong to no order.
+     *
+     * Listing 'store' without this carve-out would make a General Stock user
+     * isBuyerConfined() the moment somebody assigned them a buyer: a Buyer
+     * Access control on their account that changes nothing on any screen they
+     * use, plus a BOM edit-lock they did not have before. A control that does
+     * nothing is worse than no control.
+     *
+     * store_material_stock stays scoped, and so does plain 'store' — the
+     * department admin, who works across both sides and must be confinable on
+     * the side that has buyers.
+     *
+     * A ROLE HERE WINS OVER ITS DEPARTMENT. Ask appliesToRole(), not
+     * appliesTo(), anywhere a role is available; appliesTo() cannot see this
+     * list and will answer for the department as a whole.
+     *
+     * @var list<string>
+     */
+    public const UNSCOPED_ROLES = [
+        'store_general_stock',
     ];
 
     /** Every buyer — the unrestricted mode, and the default for a new user. */
@@ -65,10 +119,36 @@ final class BuyerScope
         return [self::MODE_ALL, self::MODE_SPECIFIC];
     }
 
-    /** Whether buyer scoping applies to this department key at all. */
+    /**
+     * Whether buyer scoping applies to this department key at all.
+     *
+     * DEPARTMENT-WIDE, and therefore blind to UNSCOPED_ROLES. It answers true
+     * for 'store' even though a General Stock user in it is not scoped. Use it
+     * only where a role genuinely is not available — the Users form's
+     * department dropdown, which decides whether the Buyer Access block is
+     * worth showing at all before a role is picked. Everywhere a role IS
+     * available, ask appliesToRole().
+     */
     public static function appliesTo(?string $departmentKey): bool
     {
         return $departmentKey !== null
             && in_array($departmentKey, self::SCOPED_DEPARTMENTS, true);
+    }
+
+    /**
+     * Whether buyer scoping applies to a specific ROLE. The precise question,
+     * and the one every access decision should ask.
+     *
+     * Two gates, in this order and not the other: the role's own carve-out
+     * first, then its department. Reversing them would let a scoped department
+     * re-admit a role that was deliberately excluded from it.
+     */
+    public static function appliesToRole(?string $role): bool
+    {
+        if ($role === null || in_array($role, self::UNSCOPED_ROLES, true)) {
+            return false;
+        }
+
+        return self::appliesTo(DepartmentRoles::departmentOf($role));
     }
 }

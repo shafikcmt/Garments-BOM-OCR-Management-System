@@ -119,22 +119,22 @@ it('reports no buyers for a department admin who owns none', function () {
  * The same guarantee the single-buyer version carries, restated for the new
  * method: the departments with no buyer concept must not acquire one.
  *
- * supply_chain is deliberately NOT in this list. It was, while
- * BuyerScope::SCOPED_DEPARTMENTS named Merchandising alone; the department is
- * scoped now and the test below asserts the opposite for it. Adding a
+ * supply_chain, commercial and account are deliberately NOT in this list. All
+ * three were, while BuyerScope::SCOPED_DEPARTMENTS named fewer departments;
+ * each is scoped now and the test below asserts the opposite for it. Adding a
  * department to that const is expected to move it from this list to that one —
  * if a role here starts failing, check the const before changing the test.
  */
 it('reports no buyers for any other department, even with a buyer_id set', function (string $role) {
     expect(buyerScopeUser($role, ['buyer_id' => $this->buyerA->id])->merchantBuyerIds())->toBe([]);
-})->with(['commercial', 'store', 'account', 'production', 'management', 'admin']);
+})->with(['store_general_stock', 'production', 'management', 'admin']);
 
-it('reports the buyers of a scoped department other than Merchandising', function () {
-    $user = buyerScopeUser('supply_chain', ['buyer_id' => $this->buyerA->id]);
+it('reports the buyers of a scoped department other than Merchandising', function (string $role) {
+    $user = buyerScopeUser($role, ['buyer_id' => $this->buyerA->id]);
 
     expect($user->scopedBuyerIds())->toBe([$this->buyerA->id])
         ->and($user->isBuyerConfined())->toBeTrue();
-});
+})->with(['supply_chain', 'commercial', 'account', 'store', 'store_material_stock']);
 
 // --- The lock reads every buyer, not just the primary ---------------------
 
@@ -228,32 +228,41 @@ it('never scopes a user with no account at all', function () {
  * is meaningless outside a buyer-scoped department, and these roles must reach
  * the file untouched even when one is set.
  *
- * supply_chain left this list when it was added to
- * BuyerScope::SCOPED_DEPARTMENTS — see the pair of tests below.
+ * supply_chain, commercial and account each left this list when their
+ * department was added to BuyerScope::SCOPED_DEPARTMENTS — see the tests below.
+ * What remains here is every department that genuinely has no buyer concept.
  */
 it('never scopes any other department', function (string $role) {
     $user = buyerScopeUser($role, ['buyer_id' => $this->buyerA->id]);
 
     expect($user->merchantBuyerId())->toBeNull()
         ->and(buyerScopeFile($this->buyerB->id)->isBuyerLockedForUser($user))->toBeFalse();
-})->with(['commercial', 'store', 'account', 'production', 'management']);
+})->with(['store_general_stock', 'production', 'management']);
 
-it('locks a scoped supply chain user out of another buyer file, as it does a merchant', function () {
-    $user = buyerScopeUser('supply_chain', ['buyer_id' => $this->buyerA->id]);
+it('locks a scoped user of any scoped department out of another buyer file', function (string $role) {
+    $user = buyerScopeUser($role, ['buyer_id' => $this->buyerA->id]);
 
     expect(buyerScopeFile($this->buyerB->id)->isBuyerLockedForUser($user))->toBeTrue()
         ->and(buyerScopeFile($this->buyerA->id)->isBuyerLockedForUser($user))->toBeFalse()
         // An untagged file stays editable, the rule every scoped department
         // shares.
         ->and(buyerScopeFile(null)->isBuyerLockedForUser($user))->toBeFalse();
-});
+})->with(['supply_chain', 'commercial', 'account', 'store', 'store_material_stock']);
 
-it('leaves an unassigned supply chain user unscoped, as before', function () {
-    $user = buyerScopeUser('supply_chain');
+/* THE DEFAULT, restated per department: switching a department on confines
+ * NOBODY by itself. Every existing user in it holds no buyer and stays
+ * unrestricted until an admin assigns one deliberately. */
+it('leaves an unassigned user of a scoped department unscoped, as before', function (string $role) {
+    $user = buyerScopeUser($role);
 
+    // ->fresh() deliberately: buyer_scope_mode is filled by the COLUMN DEFAULT,
+    // so the in-memory instance the factory just built has not seen it. Reading
+    // it back from the database is the assertion that matters here — it is the
+    // default itself, not the model, that keeps a whole department unconfined.
     expect($user->isBuyerConfined())->toBeFalse()
+        ->and($user->fresh()->buyer_scope_mode)->toBe(\App\Support\BuyerScope::MODE_ALL)
         ->and(buyerScopeFile($this->buyerB->id)->isBuyerLockedForUser($user))->toBeFalse();
-});
+})->with(['supply_chain', 'commercial', 'account', 'store', 'store_material_stock']);
 
 // --- Upload gate ----------------------------------------------------------
 

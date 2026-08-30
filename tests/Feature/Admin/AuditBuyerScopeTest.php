@@ -14,7 +14,7 @@ use Spatie\Permission\Models\Role;
  * answer for a department that is NOT scoped yet, which is the whole point.
  */
 beforeEach(function () {
-    foreach (['admin', 'merchant', 'commercial', 'supply_chain', 'store'] as $role) {
+    foreach (['admin', 'merchant', 'commercial', 'supply_chain', 'store', 'production'] as $role) {
         Role::findOrCreate($role, 'web');
     }
 
@@ -27,12 +27,20 @@ test('the default audit still reports and writes nothing', function () {
         ->assertSuccessful();
 });
 
+/*
+ * The example department has to be one that is genuinely NOT scoped, so it
+ * moves as the list grows: it was 'commercial' until Commercial was switched
+ * on. 'production' is the last department with no scoping and no plan for any,
+ * which makes it the stable choice. The assertion at the top is what fails
+ * loudly, rather than the test quietly passing against a scoped department and
+ * asserting nothing.
+ */
 test('the flag answers for a department that is not scoped yet', function () {
-    expect(BuyerScope::SCOPED_DEPARTMENTS)->not->toContain('commercial');
+    expect(BuyerScope::SCOPED_DEPARTMENTS)->not->toContain('production');
 
-    $holder = User::factory()->create(['buyer_id' => $this->buyerA->id])->assignRole('commercial');
+    $holder = User::factory()->create(['buyer_id' => $this->buyerA->id])->assignRole('production');
 
-    $this->artisan('buyer:audit-scope --department=commercial')
+    $this->artisan('buyer:audit-scope --department=production')
         ->expectsOutputToContain('NOT SCOPED')
         ->expectsOutputToContain($holder->email)
         ->assertSuccessful();

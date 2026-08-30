@@ -72,7 +72,11 @@ it('ignores users with no buyer at all', function () {
  * would mean two places to keep in step.
  */
 it('copies the column without judging the department, which the model does', function () {
-    $storeUser = backfillUser($this->buyerA->id, 'store');
+    // store_general_stock, not store: the Store DEPARTMENT is scoped now, and
+    // this test needs a role the model still refuses to read a buyer for.
+    // General Stock is carved out of Store by BuyerScope::UNSCOPED_ROLES
+    // because its stock carries no buyer at all.
+    $storeUser = backfillUser($this->buyerA->id, 'store_general_stock');
 
     app(BuyerPivotBackfill::class)->run();
 

@@ -248,22 +248,18 @@ test('the excel download carries every column', function () {
 | Buyer scoping
 |--------------------------------------------------------------------------
 |
-| DELIBERATELY PARTIAL, and this is the one place this file departs from
-| SupplyChain/ReportTest.php.
+| NO LONGER PARTIAL. 'commercial' was left out of BuyerScope::SCOPED_DEPARTMENTS
+| pending `php artisan buyer:audit-scope`, and the tests below were written
+| only for viewers whose confinement was already settled — a merchant, an
+| all-buyer viewer, admin and management — rather than written backwards for a
+| decision nobody had made.
 |
-| 'commercial' is not in BuyerScope::SCOPED_DEPARTMENTS. Adding it confines
-| every Commercial user who holds a buyer assignment from the next request, so
-| it waits on `php artisan buyer:audit-scope` against production — the same
-| gate supply_chain went through. Until that audit runs, a test asserting what
-| a COMMERCIAL user is or is not confined to would pin a decision nobody has
-| made, and would have to be inverted the moment it is made. Those tests are
-| left unwritten rather than written backwards.
-|
-| What IS tested below is the scope machinery this report already inherits and
-| runs today, exercised through viewers whose confinement is already settled: a
-| merchant (merchandising IS scoped), an all-buyer viewer, and admin /
-| management. None of these assertions changes when 'commercial' is added to
-| the list, so none of them will need rewriting then.
+| The audit came back PASS for Commercial (no user in the department held a
+| buyer, so switching it on confined nobody), the department was added, and the
+| COMMERCIAL-viewer assertions are now written at the end of this section. As
+| predicted, none of the original assertions needed rewriting — the report
+| inherits its scope from DepartmentReportService, so switching the department
+| on required no change to this service at all.
 */
 
 /** @return array{0: Buyer, 1: Buyer} */
@@ -338,4 +334,68 @@ test('the report falls back to the session user when no viewer is set', function
     $this->actingAs(cmReportUser('merchant', ['buyer_id' => $buyerA->id]));
 
     expect(app(CommercialReportService::class)->count([]))->toBe(3);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Commercial's own viewers, now that the department is scoped
+|--------------------------------------------------------------------------
+|
+| Three buyer states, because they are three code paths and the dangerous one
+| is the middle: one buyer, several buyers, all buyers. The untagged line is in
+| every fixture on purpose — every live BOM file carries a null buyer_id, so a
+| scope that drops untagged rows empties the whole report.
+*/
+
+test('a confined commercial viewer sees their own buyer plus the untagged archive', function () {
+    [$buyerA] = cmSeedTaggedBuyers();
+
+    $user = cmReportUser('commercial', ['buyer_id' => $buyerA->id]);
+
+    expect($user->isBuyerConfined())->toBeTrue()
+        // 2 untagged lines + Buyer A's. Buyer B's is gone.
+        ->and(app(CommercialReportService::class)->forUser($user)->count([]))->toBe(3);
+});
+
+test('a multi-buyer commercial viewer sees every buyer they hold, not just the first', function () {
+    [$buyerA, $buyerB] = cmSeedTaggedBuyers();
+
+    $user = cmReportUser('commercial', [
+        'buyer_id' => $buyerA->id,
+        'buyer_scope_mode' => BuyerScope::MODE_SPECIFIC,
+    ]);
+    $user->buyers()->sync([$buyerA->id, $buyerB->id]);
+
+    expect($user->fresh()->scopedBuyerIds())->toBe([$buyerA->id, $buyerB->id])
+        ->and(app(CommercialReportService::class)->forUser($user->fresh())->count([]))->toBe(4);
+});
+
+/* THE DEFAULT. Switching Commercial on confined nobody: a user with no buyer
+ * sits on the column default 'all' and reads the whole report, exactly as
+ * every Commercial user did before this change. */
+test('an unassigned commercial viewer is unconfined and sees everything', function () {
+    cmSeedTaggedBuyers();
+
+    $user = cmReportUser('commercial');
+
+    expect($user->isBuyerConfined())->toBeFalse()
+        ->and($user->fresh()->buyer_scope_mode)->toBe(BuyerScope::MODE_ALL)
+        ->and(app(CommercialReportService::class)->forUser($user)->count([]))->toBe(4);
+});
+
+test('a confined commercial viewer cannot reach another buyer by typing its name', function () {
+    [$buyerA] = cmSeedTaggedBuyers();
+    $user = cmReportUser('commercial', ['buyer_id' => $buyerA->id]);
+
+    expect(app(CommercialReportService::class)->forUser($user)->count(['buyer' => 'Buyer B']))->toBe(0);
+});
+
+/* The dropdowns are built from the rows the viewer may SEE, so a confined
+ * Commercial user is never offered another buyer's name to filter by. */
+test('the filter dropdowns are scoped for a commercial viewer too', function () {
+    [$buyerA] = cmSeedTaggedBuyers();
+    $user = cmReportUser('commercial', ['buyer_id' => $buyerA->id]);
+
+    expect(app(CommercialReportService::class)->forUser($user)->filterOptions()['buyer']->all())
+        ->not->toContain('Buyer B');
 });

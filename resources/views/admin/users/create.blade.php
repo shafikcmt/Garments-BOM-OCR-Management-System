@@ -50,6 +50,7 @@
                         'currentBuyerScopeMode' => 'all',
                         'currentBuyerIds' => [],
                         'scopeDepartments' => $buyerScopedDepartments,
+                        'unscopedRoles' => $buyerUnscopedRoles,
                     ])
                 @endif
             </div>

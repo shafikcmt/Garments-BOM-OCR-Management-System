@@ -9,6 +9,7 @@ use App\Models\ExcelCell;
 use App\Models\MaterialReceiving;
 use App\Services\HeaderAliasResolver;
 use Illuminate\Http\Request;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 
 /**
  * Buyer/Style Stock (module B) — GRN-level receive (Excel "Receiving" sheet).
@@ -17,6 +18,8 @@ use Illuminate\Http\Request;
  */
 class MaterialReceivingController extends Controller
 {
+    use ScopesToAssignedBuyers;
+
     use AuthorizesStoreCorrections;
 
     /** Section this controller belongs to, for the section-scoped correction
@@ -168,7 +171,13 @@ class MaterialReceivingController extends Controller
      */
     private function historyQuery(array $filters = [])
     {
-        return MaterialReceiving::query()
+        $query = MaterialReceiving::query();
+
+        // The one funnel behind the Receiving history list and its AJAX paging,
+        // so the scope cannot reach one and miss the other.
+        $this->applyBuyerScope($query);
+
+        return $query
             ->when($filters['from_date'] ?? null, fn ($q, $date) => $q->whereDate('receive_date', '>=', $date))
             ->when($filters['to_date'] ?? null, fn ($q, $date) => $q->whereDate('receive_date', '<=', $date))
             ->when($filters['invoice_no'] ?? null, function ($q, $term) {
@@ -404,6 +413,11 @@ class MaterialReceivingController extends Controller
      */
     public function poDetails(BookingPo $bookingPo)
     {
+        // The auto-fill endpoint answers with a PO's buyer, style, vendor and
+        // prices. Named by id it is a read of one record, so it takes the same
+        // guard the write paths take rather than the list's silent filter.
+        $this->assertBuyerAccessVia($bookingPo);
+
         if ($bookingPo->excelFile && $bookingPo->excelFile->isLockedForUser(auth()->user())) {
             return response()->json(['locked' => true], 423);
         }
@@ -487,9 +501,15 @@ class MaterialReceivingController extends Controller
 
         $term = trim((string) ($validated['term'] ?? ''));
 
+        // This one builds its own query rather than going through
+        // BookingPoSourceService, so it carries its own scope call. Without it
+        // the Independent form's style picker would be the one Store lookup
+        // still naming every buyer's styles.
         $query = BookingPo::query()
             ->whereNotNull('style_name')
             ->where('style_name', '!=', '');
+
+        $this->applyBuyerScope($query);
 
         if ($term !== '') {
             // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE is
@@ -578,6 +598,10 @@ class MaterialReceivingController extends Controller
      */
     public function poItems(BookingPo $bookingPo)
     {
+        // Same reasoning as poDetails(): one PO, named by id, so it is refused
+        // rather than answered with another buyer's material lines.
+        $this->assertBuyerAccessVia($bookingPo);
+
         if ($bookingPo->excelFile && $bookingPo->excelFile->isLockedForUser(auth()->user())) {
             return response()->json(['locked' => true], 423);
         }
@@ -729,6 +753,12 @@ class MaterialReceivingController extends Controller
         ]);
 
         $po = BookingPo::with('excelFile')->findOrFail($validated['booking_po_id']);
+
+        // Refused, not filtered. The PO dropdown already hides another buyer's
+        // POs, so a booking_po_id from outside this user's access arrived by
+        // hand — and stock booked against it would be invisible to the person
+        // who wrote it and wrong for the buyer who owns it.
+        $this->assertBuyerAccessVia($po);
 
         if ($locked = $this->lockGuard($po)) {
             return $locked;
@@ -955,7 +985,15 @@ class MaterialReceivingController extends Controller
             'excel_row_id' => ['required', 'integer'],
         ]);
 
+        // Both ends are guarded, and they are two different records: the
+        // receiving being changed, and the PO it is being attached to. Checking
+        // only the destination would let a confined user drag another buyer's
+        // independent receiving onto their own PO.
+        $this->assertBuyerAccessVia($materialReceiving);
+
         $po = BookingPo::with('excelFile')->findOrFail($validated['booking_po_id']);
+
+        $this->assertBuyerAccessVia($po);
 
         if ($locked = $this->lockGuard($po)) {
             return $locked;
@@ -1127,6 +1165,7 @@ class MaterialReceivingController extends Controller
     public function destroy(MaterialReceiving $materialReceiving)
     {
         $this->authorizeStoreDelete('receiving');
+        $this->assertBuyerAccessVia($materialReceiving);
 
         $materialReceiving->delete();
 

@@ -9,6 +9,7 @@ use App\Models\ExcelCell;
 use App\Models\ExcelHeader;
 use App\Models\ExcelRow;
 use App\Models\User;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 use App\Support\PiAlertSettings;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -17,6 +18,47 @@ use Illuminate\Support\Facades\Mail;
 
 class BookingPoSourceService
 {
+    /**
+     * Buyer scoping, applied to the SEARCH and BROWSE methods only.
+     *
+     * WHICH METHODS, AND WHY ONLY THOSE. This service does two different jobs,
+     * and only one of them is allowed to be narrowed:
+     *
+     *   SEARCH / BROWSE   bookingPosMatching(), browseOptionsForGroup() and
+     *                     rowsMatchingGroupValue() answer "what is out there?".
+     *                     They are the pickers behind Store's PO search, style
+     *                     search and style-BOM lookup, and every one of them
+     *                     hands back records the caller never named. Scoped.
+     *                     distinctValuesForGroup(), bookingPosForGroupValue()
+     *                     and itemRowsForBuyer() are compositions of
+     *                     browseOptionsForGroup(), so they inherit it for free
+     *                     — which is the whole reason those three were written
+     *                     as compositions rather than as queries of their own.
+     *
+     *   PER-RECORD READ   sourceValueForBookingPo(), paymentSnapshot(),
+     *                     itemRowsForBookingPo(), siblingSourceRows() answer
+     *                     "what does THIS record say?" about a PO the caller
+     *                     already holds and has already been authorised for.
+     *                     NOT scoped, and they must not be: scoping them would
+     *                     silently drop sibling BOM lines out of a PO the user
+     *                     is legitimately looking at, turning an access rule
+     *                     into wrong totals.
+     *
+     * NOBODY OUTSIDE STORE CALLS THE SCOPED SIX. Supply Chain's
+     * PaymentRequestController, BackfillStockSapCode and CheckMissingPiAlerts
+     * use only the per-record and pure-helper methods, so this is additive for
+     * Store and invisible to every other department — checked before it was
+     * added, and worth re-checking before a seventh method is scoped.
+     *
+     * INVISIBLE UNTIL SOMEBODY IS CONFINED. applyBuyerScope() returns at its
+     * first line for a viewer who is not buyer-confined, and every user is on
+     * buyer_scope_mode 'all' today. The console commands above run with no
+     * authenticated user at all, where buyerScopeViewer() is null and the
+     * scope is likewise a no-op — a scheduled PI alert must never depend on who
+     * happened to be logged in.
+     */
+    use ScopesToAssignedBuyers;
+
     protected array $headerIdCache = [];
 
     protected ?Collection $poNumberHeaderIdsCache = null;
@@ -648,8 +690,14 @@ class BookingPoSourceService
             return collect();
         }
 
+        // Scoped on the ROW's own file, not through a PO. These rows are raw BOM
+        // lines — Independent Receiving reads them to suggest the materials a
+        // style already carries, and a line has a buyer whether or not a PO was
+        // ever generated from it. Going via booking_pos here would leak exactly
+        // the lines that have no PO yet.
         return ExcelRow::query()
             ->whereIn('id', $rowIds->all())
+            ->tap(fn ($query) => $this->applyBuyerScope($query))
             ->with('cells.header')
             ->orderBy('row_number')
             ->get();
@@ -754,7 +802,11 @@ class BookingPoSourceService
         // PO number is a booking_pos column, so it needs none of the cell
         // mapping below.
         if ($group === 'po_no') {
-            return BookingPo::query()
+            $query = BookingPo::query();
+
+            $this->applyBuyerScope($query);
+
+            return $query
                 ->orderByDesc('id')
                 ->limit($limit)
                 ->get()
@@ -786,8 +838,16 @@ class BookingPoSourceService
         // Same two routes back to a PO that bookingPosMatching() uses: the row is
         // a PO's own primary row, or it is a sibling line carrying that PO's
         // number. Resolved in bulk rather than per row.
+        //
+        // The buyer scope rides on these two lookups rather than on the $cells
+        // query above, and that is deliberate: a cell whose PO resolves to
+        // nothing is already dropped by the map() below as "not yet receivable".
+        // Scoping the PO lookup therefore removes another buyer's values through
+        // the path that already exists, instead of adding a second filter that
+        // could disagree with it.
         $poByRow = BookingPo::query()
             ->whereIn('excel_row_id', $rowIds->all())
+            ->tap(fn ($query) => $this->applyBuyerScope($query))
             ->get()
             ->keyBy('excel_row_id');
 
@@ -800,6 +860,7 @@ class BookingPoSourceService
 
         $poByNo = $poNoByRow->isEmpty() ? collect() : BookingPo::query()
             ->whereIn('po_no', $poNoByRow->values()->unique()->all())
+            ->tap(fn ($query) => $this->applyBuyerScope($query))
             ->get()
             ->keyBy('po_no');
 
@@ -842,8 +903,12 @@ class BookingPoSourceService
         }
 
         // $column comes from the fixed map below, never from request input.
+        // Scoped like the cell route it stands in for — this is the fallback
+        // that fires when a workbook has no column of that name, so leaving it
+        // open would quietly re-admit every buyer through the back door.
         return BookingPo::query()
             ->whereRaw("TRIM(COALESCE({$column}, '')) <> ''")
+            ->tap(fn ($query) => $this->applyBuyerScope($query))
             ->orderByDesc('id')
             ->limit($limit)
             ->get()
@@ -996,11 +1061,11 @@ class BookingPoSourceService
         $like = '%'.mb_strtolower($term).'%';
 
         if ($group === 'po_no') {
-            return BookingPo::query()
-                ->whereRaw('LOWER(po_no) LIKE ?', [$like])
-                ->orderByDesc('id')
-                ->limit($limit)
-                ->get();
+            $query = BookingPo::query()->whereRaw('LOWER(po_no) LIKE ?', [$like]);
+
+            $this->applyBuyerScope($query);
+
+            return $query->orderByDesc('id')->limit($limit)->get();
         }
 
         $headerIds = $this->searchHeaderIds($group);
@@ -1026,32 +1091,41 @@ class BookingPoSourceService
         $query = BookingPo::query();
         $matched = false;
 
-        if ($rowIds->isNotEmpty()) {
-            $query->whereIn('excel_row_id', $rowIds->all());
-            $matched = true;
-        }
+        // The three match routes are ORed together INSIDE one group. They used
+        // to sit bare on the query, which was equivalent while they were the
+        // only conditions on it — but the buyer scope is ANDed on below, and
+        // `scope AND a OR b OR c` parses as `(scope AND a) OR b OR c`, which
+        // would hand back other buyers' POs through the second and third route.
+        $query->where(function ($match) use ($rowIds, $poNos, $group, $like, &$matched) {
+            if ($rowIds->isNotEmpty()) {
+                $match->whereIn('excel_row_id', $rowIds->all());
+                $matched = true;
+            }
 
-        if ($poNos->isNotEmpty()) {
-            $matched
-                ? $query->orWhereIn('po_no', $poNos->all())
-                : $query->whereIn('po_no', $poNos->all());
-            $matched = true;
-        }
+            if ($poNos->isNotEmpty()) {
+                $matched
+                    ? $match->orWhereIn('po_no', $poNos->all())
+                    : $match->whereIn('po_no', $poNos->all());
+                $matched = true;
+            }
 
-        // Several groups also have a dedicated booking_pos column (SAP code,
-        // buyer, season, style, material name…), so a PO still matches when its
-        // BOM cell is blank — or when the workbook has no such column at all.
-        // $column is from a fixed map, never from request input.
-        if ($column = $this->searchColumnForGroup($group)) {
-            $matched
-                ? $query->orWhereRaw("LOWER({$column}) LIKE ?", [$like])
-                : $query->whereRaw("LOWER({$column}) LIKE ?", [$like]);
-            $matched = true;
-        }
+            // Several groups also have a dedicated booking_pos column (SAP code,
+            // buyer, season, style, material name…), so a PO still matches when its
+            // BOM cell is blank — or when the workbook has no such column at all.
+            // $column is from a fixed map, never from request input.
+            if ($column = $this->searchColumnForGroup($group)) {
+                $matched
+                    ? $match->orWhereRaw("LOWER({$column}) LIKE ?", [$like])
+                    : $match->whereRaw("LOWER({$column}) LIKE ?", [$like]);
+                $matched = true;
+            }
+        });
 
         if (! $matched) {
             return collect();
         }
+
+        $this->applyBuyerScope($query);
 
         return $query->orderByDesc('id')->limit($limit)->get();
     }

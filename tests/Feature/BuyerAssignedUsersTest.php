@@ -15,7 +15,7 @@ use Spatie\Permission\Models\Role;
  * POST that never saw the form.
  */
 beforeEach(function () {
-    foreach (['admin', 'merchant', 'commercial'] as $role) {
+    foreach (['admin', 'merchant', 'commercial', 'production'] as $role) {
         Role::findOrCreate($role, 'web');
     }
 
@@ -104,16 +104,21 @@ it('refuses to add a department admin, who owns buyers instead', function () {
     expect($owner->fresh()->buyers()->count())->toBe(0);
 });
 
+/* The example role must be one whose department is genuinely unscoped, so it
+ * moves as BuyerScope::SCOPED_DEPARTMENTS grows — this read 'commercial' until
+ * Commercial was switched on. 'production' has no scoping and no plan for any. */
 it('refuses to add a user from a department scoping does not apply to', function () {
-    $commercial = User::factory()->create([
+    expect(BuyerScope::SCOPED_DEPARTMENTS)->not->toContain('production');
+
+    $outsider = User::factory()->create([
         'buyer_scope_mode' => BuyerScope::MODE_SPECIFIC,
-    ])->assignRole('commercial');
+    ])->assignRole('production');
 
     $this->actingAs($this->superAdmin)
-        ->post(route('admin.buyers.users.attach', $this->buyerA), ['user_id' => $commercial->id])
+        ->post(route('admin.buyers.users.attach', $this->buyerA), ['user_id' => $outsider->id])
         ->assertSessionHas('error');
 
-    expect($commercial->fresh()->buyers()->count())->toBe(0);
+    expect($outsider->fresh()->buyers()->count())->toBe(0);
 });
 
 it('fills an empty primary buyer_id when it adds somebody', function () {

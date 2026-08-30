@@ -10,6 +10,7 @@ use App\Models\MaterialRequisition;
 use App\Models\MaterialStockLedger;
 use App\Services\HeaderAliasResolver;
 use Illuminate\Http\Request;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 use Spatie\Permission\Models\Role;
 
 /**
@@ -19,6 +20,8 @@ use Spatie\Permission\Models\Role;
  */
 class MaterialBulkIssueController extends Controller
 {
+    use ScopesToAssignedBuyers;
+
     /** Allowed page sizes for the history table. */
     private const PAGE_SIZES = [10, 20, 50, 100];
 
@@ -182,6 +185,11 @@ class MaterialBulkIssueController extends Controller
     /** Scope a query to a date tab window (issue_date). "all" is a no-op. */
     private function applyTab($query, string $tab): void
     {
+        // The buyer scope rides here rather than at each caller: applyTab() is
+        // the one funnel behind BOTH the issue list and the tab count badges,
+        // and a badge reading 12 above a list of 4 is a support call.
+        $this->applyBuyerScope($query);
+
         match ($tab) {
             'today' => $query->whereDate('issue_date', now()->toDateString()),
             'week' => $query->whereBetween('issue_date', [now()->startOfWeek()->toDateString(), now()->endOfWeek()->toDateString()]),
@@ -901,7 +909,9 @@ class MaterialBulkIssueController extends Controller
             'ids.*' => ['integer', 'exists:material_bulk_issues,id'],
         ]);
 
-        $issues = MaterialBulkIssue::whereIn('id', $validated['ids'])->get();
+        $issues = MaterialBulkIssue::whereIn('id', $validated['ids'])->with('excelFile')->get();
+        $this->assertBuyerAccessForIssues($issues);
+
         foreach ($issues as $issue) {
             $issue->delete();
         }
@@ -950,10 +960,32 @@ class MaterialBulkIssueController extends Controller
             'ids.*' => ['integer', 'exists:material_bulk_issues,id'],
         ]);
 
-        return MaterialBulkIssue::whereIn('id', $validated['ids'])
+        $issues = MaterialBulkIssue::whereIn('id', $validated['ids'])
+            ->with('excelFile')
             ->orderByDesc('issue_date')
             ->orderByDesc('id')
             ->get();
+
+        $this->assertBuyerAccessForIssues($issues);
+
+        return $issues;
+    }
+
+    /**
+     * Refuse a bulk action naming any issue outside this user's buyer access.
+     *
+     * REFUSED, not filtered. The list already hides these rows, so reaching
+     * here means the id was supplied by hand — and an action that silently
+     * skips half a selection reports a count the user cannot reconcile with
+     * what they ticked.
+     *
+     * @param  iterable<MaterialBulkIssue>  $issues
+     */
+    private function assertBuyerAccessForIssues($issues): void
+    {
+        foreach ($issues as $issue) {
+            $this->assertBuyerAccessVia($issue);
+        }
     }
 
     /**

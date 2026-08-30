@@ -17,7 +17,7 @@ use Spatie\Permission\Models\Role;
  * actor does not hold must fail the save, not just be missing from the form.
  */
 beforeEach(function () {
-    foreach (['admin', 'merchant', 'commercial', 'supply_chain'] as $role) {
+    foreach (['admin', 'merchant', 'commercial', 'supply_chain', 'production'] as $role) {
         Role::findOrCreate($role, 'web');
     }
 
@@ -216,12 +216,13 @@ it('never assigns buyers to a department admin, who owns them instead', function
 });
 
 it('never assigns buyers in a department scoping does not apply to', function () {
-    $commercial = User::factory()->create()->assignRole('commercial');
+    // production, not commercial: Commercial is a SCOPED department now.
+    $commercial = User::factory()->create()->assignRole('production');
 
     $this->actingAs($this->superAdmin)
         ->put(route('admin.users.update', $commercial), buyerEditPayload($commercial, [
-            'department' => 'commercial',
-            'role' => 'commercial',
+            'department' => 'production',
+            'role' => 'production',
             'buyer_assignment_control' => '1',
             'buyer_scope_mode' => BuyerScope::MODE_SPECIFIC,
             'buyer_ids' => [$this->buyerA->id],
@@ -270,7 +271,7 @@ it('shows the mode choice to a super admin', function () {
 */
 
 it('puts the Buyer Access block in the page for a user in an unscoped department', function () {
-    $commercial = User::factory()->create()->assignRole('commercial');
+    $commercial = User::factory()->create()->assignRole('production');
 
     $this->actingAs($this->superAdmin)
         ->get(route('admin.users.edit', $commercial))
@@ -282,7 +283,14 @@ it('puts the Buyer Access block in the page for a user in an unscoped department
         ->assertSee('buyer_ids[]', false)
         // Hidden on the first paint, and the script is told which departments
         // reveal it. Without the attribute the block could never be shown.
-        ->assertSee('data-scope-departments="merchandising,supply_chain"', false);
+        //
+        // Built from the const rather than spelled out, so switching another
+        // department on does not fail a test that has nothing to say about it.
+        // What is worth pinning is that the page carries the list at all.
+        ->assertSee(
+            'data-scope-departments="'.implode(',', BuyerScope::SCOPED_DEPARTMENTS).'"',
+            false
+        );
 });
 
 it('starts the block open for a user already in a scoped department', function () {
@@ -333,8 +341,8 @@ it('ignores buyer_ids in the same save that moves the user out to an unscoped de
 
     $this->actingAs($this->superAdmin)
         ->put(route('admin.users.update', $supplyChain), buyerEditPayload($supplyChain, [
-            'department' => 'commercial',
-            'role' => 'commercial',
+            'department' => 'production',
+            'role' => 'production',
             'buyer_assignment_control' => '1',
             'buyer_scope_mode' => BuyerScope::MODE_SPECIFIC,
             'buyer_ids' => [$this->buyerA->id],
@@ -343,7 +351,7 @@ it('ignores buyer_ids in the same save that moves the user out to an unscoped de
 
     $fresh = $supplyChain->fresh();
 
-    expect($fresh->departmentKey())->toBe('commercial')
+    expect($fresh->departmentKey())->toBe('production')
         ->and($fresh->buyers()->count())->toBe(0);
 });
 

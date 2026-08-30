@@ -7,6 +7,7 @@ use App\Models\MaterialDeadMovement;
 use App\Models\MaterialLiabilityMovement;
 use App\Models\MaterialStockLedger;
 use Illuminate\Http\Request;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 
 /**
  * Buyer/Style Stock (module B) — Closing Stock report (Excel "Closing Stock"
@@ -16,9 +17,14 @@ use Illuminate\Http\Request;
  */
 class MaterialStockLedgerController extends Controller
 {
+    use ScopesToAssignedBuyers;
+
     public function index(Request $request)
     {
-        $query = MaterialStockLedger::query();
+        // Buyer scope before the screen's own filters. NEVER on buyer_name, which
+        // the filters below match on: that column is denormalised free text a
+        // merchant can edit, fine as a filter and useless as a guard.
+        $query = $this->scopedLedger();
 
         if ($buyer = $request->input('buyer')) {
             $query->where('buyer_name', $buyer);
@@ -57,19 +63,23 @@ class MaterialStockLedgerController extends Controller
             ->withQueryString();
 
         // Options come from the ledger itself, so a dropdown never offers a value
-        // that would return an empty report.
-        $buyers = MaterialStockLedger::whereNotNull('buyer_name')->distinct()->orderBy('buyer_name')->pluck('buyer_name');
-        $styles = MaterialStockLedger::whereNotNull('style_name')->distinct()->orderBy('style_name')->pluck('style_name');
+        // that would return an empty report — and they run through the same
+        // buyer scope as the rows, or the Buyer dropdown would name every buyer
+        // in the factory to a user allowed to see one of them.
+        $buyers = $this->filterOptions('buyer_name');
+        $styles = $this->filterOptions('style_name');
         $seasons = $this->filterOptions('season_name');
         $poNos = $this->filterOptions('po_no');
         $gmtsColors = $this->filterOptions('gmts_color_name');
 
-        // Totals for the summary cards.
+        // Totals for the summary cards. Scoped too: a card reading the whole
+        // factory's closing value above a list showing one buyer's rows is both
+        // a leak and a figure nobody can reconcile.
         $totals = [
-            'running' => (float) MaterialStockLedger::sum('running_closing_qty'),
-            'liability' => (float) MaterialStockLedger::sum('liability_closing_qty'),
-            'dead' => (float) MaterialStockLedger::sum('dead_closing_qty'),
-            'value' => (float) MaterialStockLedger::sum('total_value'),
+            'running' => (float) $this->scopedLedger()->sum('running_closing_qty'),
+            'liability' => (float) $this->scopedLedger()->sum('liability_closing_qty'),
+            'dead' => (float) $this->scopedLedger()->sum('dead_closing_qty'),
+            'value' => (float) $this->scopedLedger()->sum('total_value'),
         ];
 
         return view('store.material-stock.ledger', compact(
@@ -77,6 +87,24 @@ class MaterialStockLedgerController extends Controller
         ));
     }
 
+    /**
+     * A ledger query with the buyer scope already on it.
+     *
+     * Every read on this screen starts here — the row list, the five filter
+     * dropdowns and the four summary totals. They used to be eight separate
+     * MaterialStockLedger::query() calls, which is eight chances for the next
+     * one to be written without the scope.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    private function scopedLedger()
+    {
+        $query = MaterialStockLedger::query();
+
+        $this->applyBuyerScope($query);
+
+        return $query;
+    }
     /**
      * Distinct non-blank values of one ledger column, for a filter dropdown.
      * Trimmed and de-duplicated in PHP so values that differ only by padding do
@@ -86,7 +114,8 @@ class MaterialStockLedgerController extends Controller
      */
     private function filterOptions(string $column): \Illuminate\Support\Collection
     {
-        return MaterialStockLedger::whereNotNull($column)
+        return $this->scopedLedger()
+            ->whereNotNull($column)
             ->distinct()
             ->orderBy($column)
             ->pluck($column)
@@ -102,6 +131,11 @@ class MaterialStockLedgerController extends Controller
      */
     public function storeLiabilityMovement(Request $request, MaterialStockLedger $ledger)
     {
+        // The ledger row named by id belongs to a buyer through its BOM file.
+        // Both movement endpoints write stock, so both are refused outright
+        // rather than left as the one unguarded write on a scoped screen.
+        $this->assertBuyerAccessVia($ledger);
+
         $data = $this->validateMovement($request);
 
         if (($data['transfer_to_bulk_qty'] + $data['sample_issue_qty']) <= 0) {
@@ -124,6 +158,8 @@ class MaterialStockLedgerController extends Controller
      */
     public function storeDeadMovement(Request $request, MaterialStockLedger $ledger)
     {
+        $this->assertBuyerAccessVia($ledger);
+
         $data = $this->validateMovement($request);
 
         if (($data['transfer_to_bulk_qty'] + $data['sample_issue_qty']) <= 0) {

@@ -73,20 +73,4 @@ class SentEmailController extends Controller
         return view('supply-chain.sent-emails.index', compact('emailLogs', 'filters'));
     }
 
-    /**
-     * Reach the buyer through whichever document the log belongs to. Both
-     * branches use the shared scope, so the PO half and the PRA half can never
-     * drift apart.
-     */
-    private function applyBuyerScopeToEmailLogs($query): void
-    {
-        if (! $this->buyerScopeViewer()?->isBuyerConfined()) {
-            return;
-        }
-
-        $query->where(function ($outer) {
-            $outer->whereHas('bookingPo', fn ($po) => $this->applyBuyerScope($po))
-                ->orWhereHas('paymentRequest.items', fn ($item) => $this->applyBuyerScope($item));
-        });
-    }
 }

@@ -223,6 +223,7 @@
                                 @include('admin.users._buyer-access', [
                                     'mayChooseBuyerScope' => $mayUnconfineBuyers,
                                     'scopeDepartments' => $buyerScopedDepartments,
+                                    'unscopedRoles' => $buyerUnscopedRoles,
                                     'startsOpen' => $buyerAccessStartsOpen,
                                 ])
 

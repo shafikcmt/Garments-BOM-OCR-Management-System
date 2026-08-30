@@ -373,16 +373,18 @@ it('leaves a merchant with the buyer rule their own department already had', fun
         ->and($merchant->scopedBuyerIds())->toBe([$this->buyerA->id]);
 });
 
-it('leaves an unscoped department unconfined even holding a stray buyer', function () {
-    Role::findOrCreate('store', 'web');
+it('leaves an unscoped role unconfined even holding a stray buyer', function () {
+    Role::findOrCreate('store_general_stock', 'web');
 
-    // A stray buyer_id on a Store account is inert because the department gate
-    // refuses to read it — the property that lets SCOPED_DEPARTMENTS grow one
-    // department at a time without touching anybody else.
-    $store = scScopeUser('store', [$this->buyerA->id], BuyerScope::MODE_SPECIFIC);
+    // A stray buyer_id on a General Stock account is inert because the gate
+    // refuses to read it — the property that lets the scope list grow without
+    // touching anybody else. Note this is now a ROLE carve-out rather than a
+    // whole department: Store IS scoped, General Stock inside it is not,
+    // because general stock carries no buyer column at all.
+    $generalStock = scScopeUser('store_general_stock', [$this->buyerA->id], BuyerScope::MODE_SPECIFIC);
 
-    expect($store->isBuyerConfined())->toBeFalse()
-        ->and($store->scopedBuyerIds())->toBe([]);
+    expect($generalStock->isBuyerConfined())->toBeFalse()
+        ->and($generalStock->scopedBuyerIds())->toBe([]);
 });
 
 /*

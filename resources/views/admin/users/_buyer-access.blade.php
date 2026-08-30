@@ -19,6 +19,13 @@
                               applies to. When given, the script below shows and
                               hides the block as the Department select changes.
                               Null means always shown.
+      $unscopedRoles          list<string>|null roles carved OUT of an otherwise
+                              scoped department — store_general_stock today. The
+                              block hides for these even when their department
+                              matches, because their data carries no buyer to
+                              scope on. A ROLE HERE WINS OVER ITS DEPARTMENT,
+                              the same precedence BuyerScope::appliesToRole()
+                              applies on the server.
       $startsOpen             bool|null whether the block is visible on the
                               first paint, before any script runs. Defaults to
                               false, which is right for create — nothing is
@@ -31,10 +38,11 @@
     post assigns nothing.
 --}}
 @php($scopeDepartments = $scopeDepartments ?? null)
+@php($unscopedRoles = $unscopedRoles ?? [])
 @php($startsOpen = $startsOpen ?? false)
 
 <div class="mb-3 js-buyer-access"
-     @if($scopeDepartments !== null) data-scope-departments="{{ implode(',', $scopeDepartments) }}" @unless($startsOpen) hidden @endunless @endif>
+     @if($scopeDepartments !== null) data-scope-departments="{{ implode(',', $scopeDepartments) }}" data-unscoped-roles="{{ implode(',', $unscopedRoles) }}" @unless($startsOpen) hidden @endunless @endif>
 
     <label class="form-label fw-semibold d-block mb-1">Buyer Access</label>
 
@@ -122,21 +130,31 @@
 
                 if (! block) { return; }
 
-                var list = block.querySelector('.js-buyer-list');
+                // NOT named `list`. The helper below is a hoisted function
+                // declaration of that name, so a `var list = ...` assignment
+                // overwrites it before the first call and `list(...)` throws a
+                // TypeError — which killed this whole IIFE, taking the show/hide
+                // and the checkbox greying down with it.
+                var buyerList = block.querySelector('.js-buyer-list');
                 var modes = block.querySelectorAll('.js-buyer-scope-mode');
                 var department = document.querySelector('.js-department');
-                var scoped = (block.dataset.scopeDepartments || '')
-                    .split(',')
-                    .filter(function (key) { return key !== ''; });
+                var role = document.querySelector('.js-role');
+
+                function list(value) {
+                    return (value || '').split(',').filter(function (k) { return k !== ''; });
+                }
+
+                var scoped = list(block.dataset.scopeDepartments);
+                var carvedOut = list(block.dataset.unscopedRoles);
 
                 function applyMode() {
-                    if (! modes.length || ! list) { return; }
+                    if (! modes.length || ! buyerList) { return; }
 
                     var specific = block.querySelector('.js-buyer-scope-mode[value="specific"]');
                     var on = specific && specific.checked;
 
-                    list.style.opacity = on ? '' : '0.5';
-                    list.querySelectorAll('input[type="checkbox"]').forEach(function (box) {
+                    buyerList.style.opacity = on ? '' : '0.5';
+                    buyerList.querySelectorAll('input[type="checkbox"]').forEach(function (box) {
                         box.disabled = ! on;
                         if (! on) { box.checked = false; }
                     });
@@ -148,7 +166,15 @@
                     // No data attribute means "always shown".
                     if (! scoped.length) { return; }
 
-                    block.hidden = scoped.indexOf(department ? department.value : '') === -1;
+                    var inScopedDepartment = scoped.indexOf(department ? department.value : '') !== -1;
+
+                    // A carved-out ROLE wins over its department — Store is
+                    // scoped, but General Stock inside it is not, because its
+                    // stock carries no buyer at all. Same precedence the server
+                    // applies in BuyerScope::appliesToRole().
+                    var roleCarvedOut = carvedOut.indexOf(role ? role.value : '') !== -1;
+
+                    block.hidden = ! inScopedDepartment || roleCarvedOut;
 
                     // The badges are the read-only view of the same fact, so
                     // exactly one of the two is on screen at any moment.
@@ -161,6 +187,13 @@
 
                 if (department) {
                     department.addEventListener('change', applyDepartment);
+                }
+
+                // The role matters too now, and _department-roles.blade.php
+                // dispatches a change on this same element when it clears a
+                // mismatched role — so this listener also catches that.
+                if (role) {
+                    role.addEventListener('change', applyDepartment);
                 }
 
                 applyDepartment();

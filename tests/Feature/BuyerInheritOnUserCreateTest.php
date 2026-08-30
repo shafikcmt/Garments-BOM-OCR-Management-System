@@ -14,7 +14,7 @@ use Spatie\Permission\Models\Role;
  * that a posted buyer_id cannot influence the result.
  */
 beforeEach(function () {
-    foreach (['admin', 'merchant', 'commercial'] as $role) {
+    foreach (['admin', 'merchant', 'commercial', 'production'] as $role) {
         Role::findOrCreate($role, 'web');
     }
 
@@ -279,15 +279,15 @@ it('refuses specific buyers with none ticked', function () {
     expect(User::where('email', 'incoherent@example.com')->exists())->toBeFalse();
 });
 
-/* An unscoped department is untouched: nothing reads a buyer set for Commercial, so
+/* An unscoped department is untouched: nothing reads a buyer set for Production, so
  * the posted mode is ignored and the user is created "all buyers" as always. */
-it('leaves a commercial user on all buyers whatever the form posts', function () {
+it('leaves a user of an unscoped department on all buyers whatever the form posts', function () {
     $super = User::factory()->create()->assignRole('admin');
 
     $this->actingAs($super)->post(route('admin.users.store'), createUserPayload([
         'email' => 'commercial.person@example.com',
-        'department' => 'commercial',
-        'role' => 'commercial',
+        'department' => 'production',
+        'role' => 'production',
         'buyer_scope_mode' => 'specific',
         'buyer_ids' => [$this->buyerA->id],
     ]));

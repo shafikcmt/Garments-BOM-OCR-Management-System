@@ -7,6 +7,7 @@ use App\Models\ExcelRow;
 use App\Models\PaymentRequest;
 use App\Services\DashboardMetricsService;
 use App\Services\DepartmentActivityService;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 
 /**
  * Accounts works inside the shared BOM workspace and against the payment
@@ -15,6 +16,8 @@ use App\Services\DepartmentActivityService;
  */
 class DashboardController extends Controller
 {
+    use ScopesToAssignedBuyers;
+
     public function index(DashboardMetricsService $metrics)
     {
         // Required-column progress for this department only, from the same
@@ -23,17 +26,26 @@ class DashboardController extends Controller
         $activity = app(DepartmentActivityService::class);
         $workspace = $activity->forRole('account') ?? $activity->emptyProgressFor('account');
 
-        $trend = $metrics->monthlyTrend(PaymentRequest::query());
+        // Every figure here is buyer-linked, so each is built from a scoped
+        // query. The PRA scope is the trait's, which is the same one Supply
+        // Chain's PRA list uses — Accounts and Supply Chain looking at the same
+        // PRA queue must not disagree about who may see which document.
+        $rows = ExcelRow::query();
+        $this->applyBuyerScope($rows);
+
+        $pras = fn () => tap(PaymentRequest::query(), fn ($q) => $this->applyBuyerScopeToPaymentRequests($q));
+
+        $trend = $metrics->monthlyTrend($pras());
         $delta = $metrics->deltaFor($trend);
 
         $stats = [
-            'rows' => ExcelRow::count(),
-            'pra_total' => PaymentRequest::count(),
-            'pra_pending' => PaymentRequest::whereIn('status', [
+            'rows' => $rows->count(),
+            'pra_total' => $pras()->count(),
+            'pra_pending' => $pras()->whereIn('status', [
                 PaymentRequest::STATUS_PENDING_CHECK,
                 PaymentRequest::STATUS_PENDING_APPROVAL,
             ])->count(),
-            'pra_approved' => PaymentRequest::where('status', PaymentRequest::STATUS_APPROVED)->count(),
+            'pra_approved' => $pras()->where('status', PaymentRequest::STATUS_APPROVED)->count(),
         ];
 
         return view('account.dashboard', compact('stats', 'workspace', 'trend', 'delta'));

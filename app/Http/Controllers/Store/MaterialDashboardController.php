@@ -9,6 +9,7 @@ use App\Models\MaterialRequisition;
 use App\Models\MaterialRequisitionItem;
 use App\Models\MaterialStockLedger;
 use App\Services\DashboardMetricsService;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -22,25 +23,35 @@ use Illuminate\Support\Facades\DB;
  */
 class MaterialDashboardController extends Controller
 {
+    /**
+     * EVERY query on this screen is scoped, because every table behind it
+     * carries a buyer. This dashboard summarises the Receiving, Requisition,
+     * Bulk Issue and Closing Stock screens, all four of which already filter —
+     * so a card reading the whole factory's figure above lists showing one
+     * buyer's rows is both a leak and a number nobody can reconcile.
+     */
+    use ScopesToAssignedBuyers;
+
     public function index()
     {
         // Requisition flow, display only: these never mutate stock. A line is
         // outstanding while less has been issued than was required, and
         // separately while less has been received than was issued.
-        $pendingReqLines = MaterialRequisitionItem::whereColumn('issued_qty', '<', 'required_qty')->count();
-        $pendingReqQty = (float) MaterialRequisitionItem::whereColumn('issued_qty', '<', 'required_qty')
+        $pendingReqLines = $this->scopedRequisitionItems()->whereColumn('issued_qty', '<', 'required_qty')->count();
+        $pendingReqQty = (float) $this->scopedRequisitionItems()->whereColumn('issued_qty', '<', 'required_qty')
             ->sum(DB::raw('required_qty - issued_qty'));
 
-        $pendingRecvLines = MaterialRequisitionItem::whereColumn('received_qty', '<', 'issued_qty')->count();
-        $pendingRecvQty = (float) MaterialRequisitionItem::whereColumn('received_qty', '<', 'issued_qty')
+        $pendingRecvLines = $this->scopedRequisitionItems()->whereColumn('received_qty', '<', 'issued_qty')->count();
+        $pendingRecvQty = (float) $this->scopedRequisitionItems()->whereColumn('received_qty', '<', 'issued_qty')
             ->sum(DB::raw('issued_qty - received_qty'));
 
         $stats = [
-            'material_lines' => MaterialStockLedger::count(),
-            'running_qty' => (float) MaterialStockLedger::sum('running_closing_qty'),
-            'liability_qty' => (float) MaterialStockLedger::sum('liability_closing_qty'),
-            'dead_qty' => (float) MaterialStockLedger::sum('dead_closing_qty'),
-            'pending_requisitions' => MaterialRequisition::where('status', MaterialRequisition::STATUS_PENDING)->count(),
+            'material_lines' => $this->scopedLedger()->count(),
+            'running_qty' => (float) $this->scopedLedger()->sum('running_closing_qty'),
+            'liability_qty' => (float) $this->scopedLedger()->sum('liability_closing_qty'),
+            'dead_qty' => (float) $this->scopedLedger()->sum('dead_closing_qty'),
+            'pending_requisitions' => $this->scoped(MaterialRequisition::query())
+                ->where('status', MaterialRequisition::STATUS_PENDING)->count(),
             'pending_req_lines' => $pendingReqLines,
             'pending_req_qty' => $pendingReqQty,
             'pending_recv_lines' => $pendingRecvLines,
@@ -48,12 +59,47 @@ class MaterialDashboardController extends Controller
         ];
 
         $metrics = app(DashboardMetricsService::class);
-        $trend = $metrics->monthlyTrend(MaterialReceiving::query(), 6, 'receive_date');
+        $trend = $metrics->monthlyTrend($this->scoped(MaterialReceiving::query()), 6, 'receive_date');
         $delta = $metrics->deltaFor($trend);
 
         return view('store.material-stock.dashboard', compact('stats', 'trend', 'delta') + [
             'recentActivity' => $this->recentActivity(),
         ]);
+    }
+
+    /**
+     * A query with the buyer scope already applied, returned for chaining.
+     *
+     * Every read on this screen starts from one of these three helpers, so the
+     * next card added here cannot be written without the scope.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    private function scoped($query, string $relation = 'excelFile')
+    {
+        $this->applyBuyerScope($query, $relation);
+
+        return $query;
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Builder */
+    private function scopedLedger()
+    {
+        return $this->scoped(MaterialStockLedger::query());
+    }
+
+    /**
+     * Requisition ITEMS reach their buyer one hop further than everything else
+     * on this screen: material_requisition_items has no excel_file_id of its
+     * own, only its parent requisition does. Hence the nested relation path —
+     * scoping these on 'excelFile' would silently match nothing.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    private function scopedRequisitionItems()
+    {
+        return $this->scoped(MaterialRequisitionItem::query(), 'requisition.excelFile');
     }
 
     /**
@@ -63,7 +109,9 @@ class MaterialDashboardController extends Controller
      */
     private function recentActivity()
     {
-        $receivings = MaterialReceiving::latest('id')->take(10)->get()->map(fn ($r) => [
+        // Scoped BEFORE take(10), never after. Filtering ten already-fetched
+        // rows would hand a confined user a "latest 10" list holding three.
+        $receivings = $this->scoped(MaterialReceiving::query())->latest('id')->take(10)->get()->map(fn ($r) => [
             'direction' => 'in',
             'label' => trim(collect([$r->po_no, $r->material_description])->filter()->implode(' · ')) ?: 'Receiving',
             'qty' => (float) $r->qty,
@@ -71,7 +119,7 @@ class MaterialDashboardController extends Controller
             'date' => $r->receive_date ?? $r->created_at,
         ]);
 
-        $bulkIssues = MaterialBulkIssue::latest('id')->take(10)->get()->map(fn ($i) => [
+        $bulkIssues = $this->scoped(MaterialBulkIssue::query())->latest('id')->take(10)->get()->map(fn ($i) => [
             'direction' => 'out',
             'label' => trim(collect([$i->po_no, $i->material_description])->filter()->implode(' · ')) ?: 'Bulk Issue',
             'qty' => (float) $i->bulk_qty + (float) $i->sample_qty + (float) $i->liability_qty + (float) $i->dead_qty,

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\MaterialBulkIssue;
 use App\Models\MaterialReceiving;
 use App\Models\MaterialStockLedger;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 use Illuminate\Support\Collection;
 
 /**
@@ -23,6 +24,8 @@ use Illuminate\Support\Collection;
  */
 class StoreReportService
 {
+    use ScopesToAssignedBuyers;
+
     public const TYPE_STYLE = 'style';
     public const TYPE_BUYER = 'buyer';
     public const TYPE_MATERIAL = 'material';
@@ -144,8 +147,19 @@ class StoreReportService
      */
     private function distinctValues(string $column): Collection
     {
-        $fromReceivings = MaterialReceiving::whereNotNull($column)->distinct()->pluck($column);
-        $fromIssues = MaterialBulkIssue::whereNotNull($column)->distinct()->pluck($column);
+        // Built from the rows the viewer may SEE, so a confined user is never
+        // offered another buyer's name — or their style, season, PO or colour.
+        // Deriving them from the scoped set rather than filtering the list
+        // afterwards is what keeps a value from leaking through a dropdown that
+        // returns nothing when picked.
+        $receivings = MaterialReceiving::whereNotNull($column);
+        $this->applyBuyerScope($receivings);
+
+        $issues = MaterialBulkIssue::whereNotNull($column);
+        $this->applyBuyerScope($issues);
+
+        $fromReceivings = $receivings->distinct()->pluck($column);
+        $fromIssues = $issues->distinct()->pluck($column);
 
         return $fromReceivings
             ->concat($fromIssues)
@@ -275,6 +289,19 @@ class StoreReportService
      */
     private function applyScopeFilters($query, array $filters): void
     {
+        // BUYER SCOPE FIRST, before the screen's own filters, so a confined
+        // user's filter choices narrow what they may already see rather than
+        // reach past it. All three source tables carry excel_file_id, which is
+        // what lets one method scope them identically — the same property the
+        // comment below relies on for the structured filters.
+        //
+        // NEVER matched on buyer_name, even though this method filters on it
+        // two lines down: that column is denormalised free text copied off a
+        // BOM cell a merchant can edit, so a gate reading it is a gate anyone
+        // can walk through by typing. It is fine as a FILTER and useless as a
+        // guard. The file's buyer_id is the only trustworthy answer.
+        $this->applyBuyerScope($query);
+
         if ($buyer = ($filters['buyer'] ?? null)) {
             $query->where('buyer_name', $buyer);
         }
