@@ -20,8 +20,11 @@ use Spatie\Permission\Models\Role;
  * What is left for this file is the rest of the department:
  *
  *   dashboard   file and row counts, both buyer-linked, both scoped.
- *   workspace   the shared BOM file list — DELIBERATELY UNFILTERED, the same
- *               rule Merchandising and Supply Chain follow.
+ *   workspace   the shared BOM file list — FILTERED since 2026-08-30. It was
+ *               deliberately unfiltered before that, on an edit-lock reading
+ *               that turned out to leak buyer and style names into the list
+ *               itself. Merchandising, Supply Chain, Accounts and Store all
+ *               changed at the same time and for the same reason.
  *
  * Commercial raises no PO or PRA, so there are no write paths to guard here.
  */
@@ -145,10 +148,44 @@ it('leaves an unassigned commercial user unconfined and counting everything', fu
 |--------------------------------------------------------------------------
 */
 
-/* The workspace file list is an EDIT LOCK, not a visibility filter. Switching
- * Commercial on must not quietly start hiding files from it. */
-it('leaves the commercial workspace file list unfiltered', function () {
-    $this->actingAs(cmScopeUser([$this->buyerA->id], BuyerScope::MODE_SPECIFIC))
+/* The workspace file list is now FILTERED.
+ *
+ * This test asserted the opposite until 2026-08-30, on the reasoning that
+ * buyer scoping on a workspace was an edit lock rather than a visibility
+ * filter — a user could see another buyer's file but not edit it. That
+ * reasoning was rejected: the list prints the file and, through
+ * ExcelFileSummaryService, the buyer and style beside it, so a confined user
+ * was reading another buyer's names off a page they could not act on. Locking
+ * the edit does not un-leak the label.
+ *
+ * The assertions go through the response BODY as well as the view data,
+ * because a row excluded from the query but still printed by some other
+ * partial would satisfy a count alone. The row's OPEN LINK is the identifier,
+ * not the file name: the table prints the name only inside a lock modal that
+ * non-admins never render, so a name-based assertion would pass whether the
+ * row was there or not. The trailing quote anchors the match so
+ * /uploaded-files/3 cannot satisfy a search for /uploaded-files/30. */
+it('hides another buyers files from the commercial workspace list', function () {
+    $mine = ExcelFile::where('buyer_id', $this->buyerA->id)->first();
+    $theirs = ExcelFile::where('buyer_id', $this->buyerB->id)->first();
+    $untagged = ExcelFile::whereNull('buyer_id')->first();
+
+    $response = $this->actingAs(cmScopeUser([$this->buyerA->id], BuyerScope::MODE_SPECIFIC))
+        ->get(route('commercial.workspace'))
+        ->assertOk()
+        ->assertViewHas('files', fn ($files) => $files->count() === 2);
+
+    $link = fn ($file) => route('uploaded-files.show', $file->id) . '"';
+
+    $response->assertSee($link($mine), false);
+    $response->assertSee($link($untagged), false);
+    $response->assertDontSee($link($theirs), false);
+});
+
+/* A scope that narrows the unconfined is a different bug from one that fails
+ * to narrow the confined, so both directions are pinned. */
+it('leaves the commercial workspace list whole for an unconfined user', function () {
+    $this->actingAs(cmScopeUser())
         ->get(route('commercial.workspace'))
         ->assertOk()
         ->assertViewHas('files', fn ($files) => $files->count() === 3);

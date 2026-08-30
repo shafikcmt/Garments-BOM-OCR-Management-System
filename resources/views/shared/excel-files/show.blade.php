@@ -1243,16 +1243,31 @@
             <div class="d-flex gap-2 flex-shrink-0 d-print-none">
                 <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"><i class="bi bi-arrow-left" aria-hidden="true"></i><span class="ms-1">Back</span></a>
 
-                <a href="{{ route('uploaded-files.download', $excelFile->id) }}"
-                   class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
-                   title="Download the file exactly as it was uploaded">
-                    <i class="bi bi-download" aria-hidden="true"></i><span class="ms-1">Original</span>
-                </a>
+                {{-- Taking the whole original workbook away is wider than
+                     reading a sheet on screen, so it follows download()'s own
+                     gate rather than being offered to anyone who can open the
+                     page. --}}
+                @if($canDownloadFile ?? true)
+                    <a href="{{ route('uploaded-files.download', $excelFile->id) }}"
+                       class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
+                       title="Download the file exactly as it was uploaded">
+                        <i class="bi bi-download" aria-hidden="true"></i><span class="ms-1">Original</span>
+                    </a>
+                @endif
 
-                <button type="button" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
-                        onclick="window.print()"><i class="bi bi-printer" aria-hidden="true"></i><span class="ms-1">Print</span></button>
+                {{-- Hidden on a file this user may not act on, alongside
+                     Delete: printing another buyer's order sheet is not an
+                     action a view-only visitor has any business taking. --}}
+                @if($canPrintFile ?? true)
+                    <button type="button" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
+                            onclick="window.print()"><i class="bi bi-printer" aria-hidden="true"></i><span class="ms-1">Print</span></button>
+                @endif
 
-                @if(($activityTotal ?? 0) > 0)
+                {{-- The panel below names staff and shows the edit timeline, so
+                     it is withheld on a locked file. The controller does not
+                     load $activityLog at all in that case — this only hides the
+                     button that would open an already-empty panel. --}}
+                @if(($canViewHistory ?? true) && ($activityTotal ?? 0) > 0)
                     <button type="button" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
                             data-bs-toggle="collapse" data-bs-target="#fileActivityLog"
                             aria-expanded="false" aria-controls="fileActivityLog">
@@ -1278,6 +1293,7 @@
              Six departments write to the same sheet, so this answers the
              question that follows a surprising value: who changed it. --}}
         @if(($activityTotal ?? 0) > 0)
+            @if($canViewHistory ?? true)
             <div class="collapse mt-3" id="fileActivityLog">
                 <div class="gx-activity">
                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -1323,6 +1339,7 @@
                     </div>
                 </div>
             </div>
+            @endif
         @endif
     </div>
 

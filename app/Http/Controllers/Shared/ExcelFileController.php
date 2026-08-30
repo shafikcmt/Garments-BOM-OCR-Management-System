@@ -175,7 +175,28 @@ class ExcelFileController extends Controller
         $canAddRow = ($user->hasRole('admin') || $user->hasRole('merchant'))
             && ! $isFileLockedForUser
             && ! $isBuyerLockedForUser;
-        $canDeleteFile = $user->hasRole('admin') || $user->hasRole('merchant');
+        // Deletion follows the SAME two locks every other mutation does. This
+        // was role-only, so a locked file rendered the read-only banner and an
+        // active red Delete button on the same screen. destroy() now refuses
+        // the request outright; this hides the button that should never have
+        // offered it. The server check is the fix — this is the second layer.
+        $canDeleteFile = ($user->hasRole('admin') || $user->hasRole('merchant'))
+            && ! $isFileLockedForUser
+            && ! $isBuyerLockedForUser;
+
+        // Printing a file this user may not act on is not an action they have
+        // any business taking, so the button goes with the Delete one.
+        $canPrintFile = ! $isFileLockedForUser && ! $isBuyerLockedForUser;
+
+        // Taking the whole original workbook away is a wider act than reading a
+        // sheet on screen, so it follows download()'s own gate exactly: the
+        // admin lock excuses an admin, the buyer lock excuses nobody.
+        $canDownloadFile = (! $isFileLockedForUser || $user->hasRole('admin'))
+            && ! $isBuyerLockedForUser;
+
+        // The change history names STAFF and shows another buyer's edit
+        // timeline, neither of which the grid already exposes.
+        $canViewHistory = $canPrintFile;
 
         // Which cells carry a "Needs update" marker on a duplicated row.
         $duplicateNeedsUpdateHeaderIds = $this->duplicateNeedsUpdateHeaderIds();
@@ -199,11 +220,22 @@ class ExcelFileController extends Controller
         // Every cell edit has been logged since the workspace was built, but
         // nothing ever displayed it. With six departments editing the same
         // sheet, "who changed this?" is the question that actually gets asked.
-        $activityLog = ActivityLog::with(['user', 'header'])
-            ->where('excel_file_id', $excelFile->id)
-            ->latest('id')
-            ->limit(50)
-            ->get();
+        /*
+         * NOT LOADED AT ALL when this user may not see it.
+         *
+         * The history is a Bootstrap collapse rendered inline, so its rows —
+         * staff names, old value → new value, timestamps — sit in the page
+         * source whether the panel is open or not. Hiding the BUTTON would
+         * leave every one of them one "view source" away. Withholding the data
+         * is the fix; the hidden button is the cosmetic half.
+         */
+        $activityLog = $canViewHistory
+            ? ActivityLog::with(['user', 'header'])
+                ->where('excel_file_id', $excelFile->id)
+                ->latest('id')
+                ->limit(50)
+                ->get()
+            : collect();
 
         $activityTotal = ActivityLog::where('excel_file_id', $excelFile->id)->count();
 
@@ -229,6 +261,9 @@ class ExcelFileController extends Controller
             'calculatedHeaderIds',
             'canAddRow',
             'canDeleteFile',
+            'canPrintFile',
+            'canDownloadFile',
+            'canViewHistory',
             'highlightBatchId',
             'highlightedCellKeys',
             'lockedRowIds',
@@ -755,8 +790,13 @@ class ExcelFileController extends Controller
     {
         $user = auth()->user();
 
-        if (! $user->hasRole('admin') && ! $user->hasRole('merchant')) {
-            abort(403, 'You are not allowed to change this row.');
+        // The SAME gate the duplicate actions use, rather than the role-only
+        // check this method used to carry. Clearing a badge writes to the row,
+        // so an admin-locked or another buyer's file must refuse it exactly as
+        // it refuses the duplication that created the badge. It had the role
+        // half and neither lock.
+        if ($blocked = $this->duplicateGuard($excelFile, $user, 'change this row')) {
+            return $blocked;
         }
 
         // Scoped to the file in the URL, so a row id from another workbook
@@ -1176,11 +1216,11 @@ class ExcelFileController extends Controller
      * honoured a weaker gate would be the worst possible place for the two to
      * disagree.
      */
-    private function duplicateGuard(ExcelFile $excelFile, $user)
+    private function duplicateGuard(ExcelFile $excelFile, $user, string $action = 'duplicate a row')
     {
         // The same gate addRow() applies, stated the same way on purpose.
         if (! $user->hasRole('admin') && ! $user->hasRole('merchant')) {
-            abort(403, 'You are not allowed to duplicate a row.');
+            abort(403, 'You are not allowed to ' . $action . '.');
         }
 
         if ($excelFile->isLockedForUser($user)) {
@@ -1399,12 +1439,27 @@ class ExcelFileController extends Controller
      * back — useful when someone needs to check what was actually submitted
      * against what the workspace now holds.
      */
+    /**
+     * Download the file exactly as it was uploaded.
+     *
+     * THE BUYER CHECK IS NOT OPTIONAL HERE. This method used to test the admin
+     * lock alone, on the reasoning that "if you can open the file you can take
+     * a copy of what it came from" — which quietly made it the widest hole in
+     * the module: a merchant confined to one buyer could pull another buyer's
+     * COMPLETE original workbook off the server as a file. Viewing a sheet in a
+     * browser and exporting the whole book are not the same act, and the buyer
+     * boundary has to hold for the second one too.
+     */
     public function download(ExcelFile $excelFile)
     {
-        // Same visibility rule as viewing the workspace: if you can open the
-        // file you can take a copy of what it came from.
-        if ($excelFile->isLockedForUser(auth()->user()) && ! auth()->user()->hasRole('admin')) {
+        $user = auth()->user();
+
+        if ($excelFile->isLockedForUser($user) && ! $user->hasRole('admin')) {
             abort(403, 'This file is locked for you.');
+        }
+
+        if ($excelFile->isBuyerLockedForUser($user)) {
+            abort(403, 'This file belongs to another buyer. Only its own buyer team can download it.');
         }
 
         if (empty($excelFile->file_path) || ! Storage::exists($excelFile->file_path)) {
@@ -1417,12 +1472,37 @@ class ExcelFileController extends Controller
         );
     }
 
+    /**
+     * Delete the file, its rows and its stored original.
+     *
+     * THE LOCK CHECKS BELOW ARE THE POINT. This method used to gate on ROLE
+     * ALONE, which meant any merchant could delete any file — including one
+     * belonging to a buyer they do not hold, and one an admin had explicitly
+     * locked. The screen showed the read-only "belongs to another buyer"
+     * banner and an active red Delete button on the same page, and the button
+     * worked. Every other mutating action on this file already refused both
+     * cases; deletion, the one irreversible action, refused neither.
+     *
+     * 403 rather than the redirect-with-warning the editing actions use. A
+     * warning is right where the user was legitimately trying to work and
+     * needs to be told why they cannot; there is no longer any UI path to this
+     * route for a locked file, so reaching it means the request did not come
+     * from the screen.
+     */
     public function destroy(ExcelFile $excelFile)
     {
         $user = auth()->user();
 
         if (! $user->hasRole('admin') && ! $user->hasRole('merchant')) {
             abort(403, 'You are not allowed to delete this file.');
+        }
+
+        if ($excelFile->isLockedForUser($user)) {
+            abort(403, 'This file is locked by admin and cannot be deleted.');
+        }
+
+        if ($excelFile->isBuyerLockedForUser($user)) {
+            abort(403, 'This file belongs to another buyer. Only its own buyer team can delete it.');
         }
 
         DB::transaction(function () use ($excelFile, $user) {

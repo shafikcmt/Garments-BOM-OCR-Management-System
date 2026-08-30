@@ -10,9 +10,33 @@ use Spatie\Permission\Models\Role;
 
 class WorkspaceController extends Controller
 {
+    use \App\Support\Concerns\ScopesToAssignedBuyers;
+
     public function index()
     {
+        /*
+         * The file list is scoped to the buyers this user holds.
+         *
+         * This used to be a plain `ExcelFile::latest()->get()`, on the reasoning
+         * that buyer scoping here was an EDIT LOCK rather than a visibility
+         * filter: a merchant could see another buyer's file but opening it
+         * rendered read-only. That was the wrong trade. The list itself prints
+         * the file name and, through ExcelFileSummaryService, the buyer and
+         * style beside it — so a merchant holding one buyer was reading other
+         * buyers' names and styles off a screen they could not act on. Locking
+         * the edit does not un-leak the label.
+         *
+         * UNTAGGED FILES STAY VISIBLE, via constrainBuyerColumn()'s
+         * whereNull('buyer_id'). buyer_id null means no buyer can claim the
+         * file, and every live BOM file is untagged today — hiding the
+         * pre-tagging archive would empty the screen for everyone, which is an
+         * outage rather than a scope rule.
+         *
+         * Unconfined viewers (admin, Management, an 'all'-mode user) are never
+         * narrowed; the trait returns before touching the query.
+         */
         $files = ExcelFile::with(['uploader'])
+            ->tap(fn ($query) => $this->applyBuyerScopeToFiles($query))
             ->latest()
             ->get();
 

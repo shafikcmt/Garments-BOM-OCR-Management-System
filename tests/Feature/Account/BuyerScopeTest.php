@@ -17,10 +17,12 @@ use Spatie\Permission\Models\Role;
  * SupplyChain/BuyerScopeTest.php rather than a copy of it:
  *
  *   dashboard   BOM row count + the PRA queue. Both buyer-linked, both scoped.
- *   workspace   the shared BOM file list — DELIBERATELY UNFILTERED, the same
- *               rule Merchandising and Supply Chain follow. Buyer scoping is an
- *               EDIT LOCK there, not a visibility filter, and a test asserting
- *               the list is filtered would pin the opposite of the design.
+ *   workspace   the shared BOM file list — FILTERED since 2026-08-30. It was
+ *               deliberately unfiltered before that, on the reading that buyer
+ *               scoping there was an EDIT LOCK rather than a visibility
+ *               filter. That reading leaked buyer and style names into the
+ *               list itself, so it was dropped; Merchandising, Supply Chain,
+ *               Commercial and Store all changed at the same time.
  *   report      Accounts has none. There is no routes/account.php report group
  *               and no AccountReportService, so there is nothing to scope.
  *
@@ -226,10 +228,33 @@ it('counts everything for an all-buyers accounts user', function () {
 /* The workspace file list is an EDIT LOCK, not a visibility filter — the same
  * rule Merchandising and Supply Chain follow. Switching Accounts on must not
  * quietly start hiding files from it. */
-it('leaves the accounts workspace file list unfiltered', function () {
-    $user = acScopeUser([$this->buyerA->id], BuyerScope::MODE_SPECIFIC);
+/* The workspace file list is now FILTERED — see the header of this file for
+ * why the edit-lock reading was dropped.
+ *
+ * The assertions go through the response BODY as well as the view data,
+ * because a row excluded from the query but still printed by some other
+ * partial would satisfy a count alone. The row's OPEN LINK is the identifier,
+ * not the file name: the table prints the name only inside a lock modal that
+ * non-admins never render, so a name-based assertion would pass whether the
+ * row was there or not. The trailing quote anchors the match so
+ * /uploaded-files/3 cannot satisfy a search for /uploaded-files/30. */
+it('hides another buyers files from the accounts workspace list', function () {
+    $response = $this->actingAs(acScopeUser([$this->buyerA->id], BuyerScope::MODE_SPECIFIC))
+        ->get(route('account.workspace'))
+        ->assertOk()
+        ->assertViewHas('files', fn ($files) => $files->count() === 2);
 
-    $this->actingAs($user)
+    $link = fn (ExcelRow $row) => route('uploaded-files.show', $row->excel_file_id) . '"';
+
+    $response->assertSee($link($this->rowA), false);
+    $response->assertSee($link($this->rowUntagged), false);
+    $response->assertDontSee($link($this->rowB), false);
+});
+
+/* A scope that narrows the unconfined is a different bug from one that fails
+ * to narrow the confined, so both directions are pinned. */
+it('leaves the accounts workspace list whole for an unconfined user', function () {
+    $this->actingAs(acScopeUser())
         ->get(route('account.workspace'))
         ->assertOk()
         ->assertViewHas('files', fn ($files) => $files->count() === 3);

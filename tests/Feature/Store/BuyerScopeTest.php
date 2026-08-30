@@ -247,7 +247,7 @@ it('leaves an all-buyers store user seeing every receiving', function () {
     storeScopeReceiving($this->mine, 'GRN-MINE');
     storeScopeReceiving($this->theirs, 'GRN-THEIRS');
 
-    $grns = collect($this->actingAs(storeScopeUser())
+    $grns = collect($this->actingAs(storeWorkspaceUser())
         ->get(route('store.material.receivings.index'))
         ->assertOk()
         ->viewData('receivings')
@@ -518,7 +518,7 @@ it('scopes a PI Number search, which reaches its PO through the BOM cells', func
 });
 
 it('leaves the PO search complete for an all-buyers user', function () {
-    $poNos = collect($this->actingAs(storeScopeUser())
+    $poNos = collect($this->actingAs(storeWorkspaceUser())
         ->getJson(route('store.material.receivings.po-search', ['type' => 'po_no', 'term' => 'PO-']))
         ->assertOk()
         ->json('results'))->pluck('po_no')->all();
@@ -638,4 +638,82 @@ it('leaves the General Stock item list unfiltered for a buyer-assigned user', fu
         ->assertOk()
         ->assertSee('Sewing Thread')
         ->assertSee('Carton Tape');
+});
+
+// --- The workspace file list ------------------------------------------------
+//
+// NOTE: store.workspace is gated on the store.workspace.view PERMISSION, unlike
+// every other screen in this file, which gate on role alone. storeWorkspaceRole()
+// grants it before each test; without it the route answers 403 and the scope
+// assertion never runs — a green-looking test that proved nothing.
+//
+// Added 2026-08-30, closing the last unscoped screen in this department.
+//
+// (Definition sits here beside its tests rather than up with the other helpers,
+// because it is the only one that grants a permission.) It was
+// a plain ExcelFile::with(['uploader'])->latest()->get(), on the old reading
+// that buyer scoping on a workspace was an EDIT LOCK rather than a visibility
+// filter. That reading leaked buyer and style names into the list itself, so it
+// was dropped across all five departments at once.
+//
+// The assertions go through the response BODY as well as the view data, because
+// a row excluded from the query but still printed by some other partial would
+// satisfy a count alone. The row's OPEN LINK is the identifier, not the file
+// name: the shared table partial prints the name only inside a lock modal that
+// non-admins never render, so a name-based assertion would pass whether the row
+// was there or not. The trailing quote anchors the match so /uploaded-files/3
+// cannot satisfy a search for /uploaded-files/30.
+
+/** Grants the permission store.workspace is gated on, then builds the user. */
+function storeWorkspaceUser(array $buyerIds = [], string $mode = BuyerScope::MODE_ALL, string $role = 'store'): User
+{
+    Permission::findOrCreate('store.workspace.view', 'web');
+    Role::findOrCreate($role, 'web')->givePermissionTo('store.workspace.view');
+
+    return storeScopeUser($buyerIds, $mode, $role);
+}
+
+it('hides another buyers files from the store workspace list', function () {
+    $response = $this->actingAs(storeWorkspaceUser([$this->buyerA->id], BuyerScope::MODE_SPECIFIC))
+        ->get(route('store.workspace'))
+        ->assertOk();
+
+    $link = fn (BookingPo $po) => route('uploaded-files.show', $po->excel_file_id) . '"';
+
+    $response->assertSee($link($this->mine), false);
+    $response->assertSee($link($this->untagged), false);
+    $response->assertDontSee($link($this->theirs), false);
+});
+
+/* A scope that narrows the unconfined is a different bug from one that fails to
+ * narrow the confined, so both directions are pinned. */
+it('leaves the store workspace list whole for an unconfined user', function () {
+    $response = $this->actingAs(storeWorkspaceUser())
+        ->get(route('store.workspace'))
+        ->assertOk();
+
+    $link = fn (BookingPo $po) => route('uploaded-files.show', $po->excel_file_id) . '"';
+
+    $response->assertSee($link($this->mine), false);
+    $response->assertSee($link($this->theirs), false);
+    $response->assertSee($link($this->untagged), false);
+});
+
+/* The ROLE carve-out, on this screen too.
+ *
+ * store_general_stock is in BuyerScope::UNSCOPED_ROLES because General Stock
+ * data carries no buyer column at all, so such a user is never confined even
+ * holding a buyer an admin ticked by mistake. Scoping the department's file
+ * list must not quietly acquire a role check the rest of the department does
+ * not have. */
+it('never narrows a general stock user on the workspace list', function () {
+    $user = storeWorkspaceUser([$this->buyerA->id], BuyerScope::MODE_SPECIFIC, 'store_general_stock');
+
+    $response = $this->actingAs($user)
+        ->get(route('store.workspace'))
+        ->assertOk();
+
+    $link = fn (BookingPo $po) => route('uploaded-files.show', $po->excel_file_id) . '"';
+
+    $response->assertSee($link($this->theirs), false);
 });

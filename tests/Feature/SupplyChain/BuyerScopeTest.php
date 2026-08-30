@@ -437,3 +437,54 @@ it('compiles to portable SQL on postgresql', function () {
         ->not->toContain('DATE_FORMAT')
         ->not->toContain('CONCAT');
 });
+
+/*
+|--------------------------------------------------------------------------
+| The workspace file list
+|--------------------------------------------------------------------------
+|
+| Added 2026-08-30, closing the last unscoped screen in this department.
+|
+| 'supply_chain' has been in BuyerScope::SCOPED_DEPARTMENTS since its report
+| started reading through the scope, and PO Generate, PRA, the dashboard counts
+| and Sent Emails were all filtered above. The workspace file list was simply
+| never given the same treatment — it stayed a plain
+| ExcelFile::with(['uploader'])->latest()->get(), on the old reading that buyer
+| scoping on a workspace was an EDIT LOCK rather than a visibility filter. That
+| reading leaked buyer and style names into the list itself, so it was dropped
+| across all five departments at once.
+|
+| The assertions go through the response BODY as well as the view data, because
+| a row excluded from the query but still printed by some other partial would
+| satisfy a count alone. The row's OPEN LINK is the identifier, not the file
+| name: the shared table partial prints the name only inside a lock modal that
+| non-admins never render, so a name-based assertion would pass whether the row
+| was there or not. The trailing quote anchors the match so /uploaded-files/3
+| cannot satisfy a search for /uploaded-files/30.
+*/
+
+it('hides another buyers files from the supply chain workspace list', function () {
+    $response = $this->actingAs(scScopeUser('supply_chain', [$this->buyerA->id], BuyerScope::MODE_SPECIFIC))
+        ->get(route('supply_chain.workspace'))
+        ->assertOk();
+
+    $link = fn (ExcelRow $row) => route('uploaded-files.show', $row->excel_file_id) . '"';
+
+    $response->assertSee($link($this->pendingA), false);
+    $response->assertSee($link($this->pendingUntagged), false);
+    $response->assertDontSee($link($this->pendingB), false);
+});
+
+/* A scope that narrows the unconfined is a different bug from one that fails
+ * to narrow the confined, so both directions are pinned. */
+it('leaves the supply chain workspace list whole for an unconfined user', function () {
+    $response = $this->actingAs(scScopeUser('supply_chain'))
+        ->get(route('supply_chain.workspace'))
+        ->assertOk();
+
+    $link = fn (ExcelRow $row) => route('uploaded-files.show', $row->excel_file_id) . '"';
+
+    $response->assertSee($link($this->pendingA), false);
+    $response->assertSee($link($this->pendingB), false);
+    $response->assertSee($link($this->pendingUntagged), false);
+});

@@ -7,9 +7,28 @@ use App\Models\ExcelFile;
 
 class WorkspaceController extends Controller
 {
+    use \App\Support\Concerns\ScopesToAssignedBuyers;
+
     public function index()
     {
+        /*
+         * Scoped to the buyers this user holds — see Merchant\WorkspaceController
+         * for the full reasoning; this closes the same gap on Store's copy of
+         * the same screen.
+         *
+         * THE ROLE CARVE-OUT STILL HOLDS, and it is handled inside the trait
+         * rather than here: 'store' is in BuyerScope::SCOPED_DEPARTMENTS, but
+         * store_general_stock is in UNSCOPED_ROLES because General Stock data
+         * carries no buyer column at all. A General Stock user reaching this
+         * screen answers false to isBuyerConfined() and is never narrowed.
+         * This screen is Buyer/Style BOM browsing, which is the scoped half of
+         * the department.
+         *
+         * Untagged files (buyer_id null) stay visible, and an unconfined viewer
+         * is never narrowed — both live in the trait, not here.
+         */
         $files = ExcelFile::with(['uploader'])
+            ->tap(fn ($query) => $this->applyBuyerScopeToFiles($query))
             ->latest()
             ->get();
 
