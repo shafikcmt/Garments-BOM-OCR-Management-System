@@ -3,114 +3,133 @@
 @section('title', 'PO Generate Control')
 
 @section('styles')
+@include('supply-chain.bookings.partials._po-module-theme')
 <style>
+    /* This page used to declare its OWN --po-ink / --po-muted / --po-blue on
+       .po-control-page, which shadowed the module tokens of the same name for
+       everything inside it — the reason Admin stayed a different blue from the
+       Supply Chain screens no matter what the shared layer said. The palette
+       now comes from the theme partial; only the three names that have no
+       module equivalent are aliased here. */
     .po-control-page {
-        --po-ink: #0f172a;
-        --po-muted: #64748b;
-        --po-border: #dbe7f3;
-        --po-blue: #2563eb;
-        --po-red: #dc2626;
-        --po-orange: #f59e0b;
-        --po-green: #059669;
+        --po-border: var(--po-line);
+        --po-red: var(--po-danger);
+        --po-orange: var(--po-warn);
+        --po-green: var(--po-ok);
     }
     .po-control-hero {
-        border: 1px solid rgba(191, 219, 254, .7);
-        border-radius: 22px;
-        background: radial-gradient(circle at top right, rgba(37, 99, 235, .14), transparent 34%), linear-gradient(135deg, #ffffff 0%, #eef6ff 100%);
-        box-shadow: 0 20px 55px rgba(15, 23, 42, .08);
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-surface);
+        background: linear-gradient(180deg, #FFFFFF 0%, var(--po-paper) 100%);
+        box-shadow: var(--po-shadow-sm);
     }
     .po-control-icon {
-        width: 54px;
-        height: 54px;
-        border-radius: 18px;
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
+        border-radius: var(--po-r-control);
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: #dbeafe;
-        color: var(--po-blue);
-        font-size: 24px;
-        box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .12);
+        background: var(--po-tint);
+        color: var(--po-blue-deep);
+        font-size: 19px;
     }
     .po-control-eyebrow {
-        color: var(--po-blue);
-        font-size: 11px;
-        letter-spacing: .14em;
-        font-weight: 900;
+        color: var(--po-muted);
+        font-size: 10px;
+        letter-spacing: .09em;
+        font-weight: 800;
         text-transform: uppercase;
     }
     .po-control-title { color: var(--po-ink); font-weight: 900; letter-spacing: -.03em; }
     .po-control-copy { color: var(--po-muted); }
+    /* KPI cards: same object as the Supply Chain screens, docket rail included.
+       The rail is applied in markup with .po-rail so its colour can say which
+       state each figure counts. */
     .po-stat-card {
-        border: 1px solid var(--po-border);
-        border-radius: 18px;
-        background: #fff;
-        box-shadow: 0 16px 40px rgba(15, 23, 42, .06);
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-surface);
+        background: var(--po-surface);
+        box-shadow: var(--po-shadow-sm);
         height: 100%;
     }
-    .po-stat-card .po-control-icon { width: 44px; height: 44px; border-radius: 15px; font-size: 20px; }
-    .po-stat-label { color: var(--po-muted); font-size: 12px; font-weight: 800; }
-    .po-stat-value { color: var(--po-ink); font-size: 28px; font-weight: 950; line-height: 1; }
+    .po-stat-card .po-control-icon { width: 40px; height: 40px; flex: 0 0 40px; border-radius: var(--po-r-control); font-size: 18px; }
+    .po-stat-label { color: var(--po-muted); font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+    .po-stat-value {
+        color: var(--po-ink);
+        font-size: 26px;
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: -.03em;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum" 1;
+    }
     .po-filter-card,
     .po-table-card {
-        border: 1px solid var(--po-border);
-        border-radius: 20px;
-        background: #fff;
-        box-shadow: 0 16px 45px rgba(15, 23, 42, .07);
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-surface);
+        background: var(--po-surface);
+        box-shadow: var(--po-shadow);
     }
+    /* 40px controls on the module radius, so Admin's filter row lines up the
+       same way Supply Chain's does. */
     .po-filter-card .form-control,
     .po-filter-card .form-select {
-        min-height: 44px;
-        border-radius: 13px;
-        border-color: #cbd5e1;
-        font-weight: 700;
+        min-height: 40px;
+        border-radius: var(--po-r-control);
+        border-color: var(--po-line);
+        font-weight: 600;
+        font-size: 13px;
         color: var(--po-ink);
     }
-    .po-control-hint {
-        border: 1px solid #bfdbfe;
-        border-radius: 18px;
-        background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
-        color: #1e3a8a;
+    .po-filter-card .form-control:focus,
+    .po-filter-card .form-select:focus {
+        border-color: var(--po-blue);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
+    .po-control-hint {
+        border: 1px solid #BAE0F2;
+        border-radius: var(--po-r-surface);
+        background: var(--po-tint);
+        color: var(--po-blue-deep);
+    }
+    /* Was a "floating card row" table — border-spacing plus rounded, shadowed
+       rows. It read as a different component from the Supply Chain list of the
+       same POs. Same hairline-divider treatment now. */
     .po-table {
         margin-bottom: 0;
-        border-collapse: separate;
-        border-spacing: 0 10px;
-        padding: 0 12px 12px;
+        border-collapse: collapse;
     }
+    /* The booking sheet's own tint band, exactly as on the Supply Chain
+       tables — the two lists are the same data seen by two roles and should
+       not look like two different products. */
     .po-table thead th {
-        background: #f8fafc;
-        color: #334155;
+        background: var(--po-tint);
+        color: var(--po-blue-deep);
         border: 0;
-        border-bottom: 1px solid var(--po-border);
+        border-bottom: 1px solid var(--po-line);
         font-size: 10px;
-        font-weight: 950;
-        letter-spacing: .08em;
+        font-weight: 800;
+        letter-spacing: .09em;
         text-transform: uppercase;
-        padding: 14px;
+        padding: 12px 14px;
         white-space: nowrap;
     }
-    .po-table tbody tr.po-row-main {
-        filter: drop-shadow(0 10px 22px rgba(15, 23, 42, .045));
-    }
     .po-table tbody tr.po-row-main td {
-        border-top: 1px solid #e7edf5;
-        border-bottom: 1px solid #e7edf5;
-        background: #fff;
-        padding: 14px;
+        border-top: 1px solid var(--po-line-soft);
+        border-bottom: 0;
+        background: var(--po-surface);
+        padding: 12px 14px;
         vertical-align: middle;
-        color: #1e293b;
+        font-size: 13px;
+        color: var(--po-ink);
+        transition: background .14s ease;
     }
-    .po-table tbody tr.po-row-main td:first-child {
-        border-left: 1px solid #e7edf5;
-        border-top-left-radius: 17px;
-        border-bottom-left-radius: 17px;
-    }
-    .po-table tbody tr.po-row-main td:last-child {
-        border-right: 1px solid #e7edf5;
-        border-top-right-radius: 17px;
-        border-bottom-right-radius: 17px;
-    }
-    .po-row-main:hover td { background: #f8fbff !important; }
+    .po-table tbody tr.po-row-main:first-child td { border-top: 0; }
+    .po-row-main:hover td { background: #F2F8FC !important; }
+    .po-table .po-num { text-align: right; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+    @media (prefers-reduced-motion: reduce) { .po-table tbody tr.po-row-main td { transition: none; } }
     .po-no-pill,
     .po-state-pill,
     .po-change-pill,
@@ -118,20 +137,23 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        border-radius: 999px;
-        padding: 6px 10px;
+        border-radius: var(--po-r-pill);
+        padding: 5px 11px;
         font-size: 11px;
         font-weight: 900;
+        line-height: 1;
         white-space: nowrap;
     }
-    .po-no-pill { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
-    .po-state-pill.generated { background: #ecfdf5; color: #047857; border: 1px solid #bbf7d0; }
-    .po-state-pill.regenerated { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
-    .po-change-pill { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-    .po-change-pill.clean { background: #f0fdf4; color: #047857; border-color: #bbf7d0; }
-    .po-control-chip.open { background: #ecfdf5; color: #047857; border: 1px solid #bbf7d0; }
-    .po-control-chip.locked { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-    .po-control-chip.permission { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+    /* One pill geometry, one semantic palette, shared with the Supply Chain
+       screens: green generated, amber re-generated, red locked/changed. */
+    .po-no-pill { background: var(--po-tint); color: var(--po-blue-deep); border: 1px solid #BAE0F2; font-variant-numeric: tabular-nums; }
+    .po-state-pill.generated { background: var(--po-ok-bg); color: var(--po-ok); border: 1px solid var(--po-ok-border); }
+    .po-state-pill.regenerated { background: var(--po-warn-bg); color: var(--po-warn); border: 1px solid var(--po-warn-border); }
+    .po-change-pill { background: var(--po-danger-bg); color: var(--po-danger); border: 1px solid var(--po-danger-border); }
+    .po-change-pill.clean { background: var(--po-ok-bg); color: var(--po-ok); border-color: var(--po-ok-border); }
+    .po-control-chip.open { background: var(--po-ok-bg); color: var(--po-ok); border: 1px solid var(--po-ok-border); }
+    .po-control-chip.locked { background: var(--po-danger-bg); color: var(--po-danger); border: 1px solid var(--po-danger-border); }
+    .po-control-chip.permission { background: var(--po-tint); color: var(--po-blue-deep); border: 1px solid #BAE0F2; }
     .po-action-stack { display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 132px; }
     .po-table thead th:last-child,
     .po-table tbody td:last-child { width: 150px; min-width: 150px; }
@@ -143,14 +165,14 @@
         justify-content: flex-start;
         gap: 6px;
         padding: 6px 10px;
-        border-radius: 10px;
+        border-radius: var(--po-r-control);
         font-weight: 700;
         font-size: 12px;
         border-width: 1px;
         flex: 0 0 auto;
-        box-shadow: 0 8px 18px rgba(15, 23, 42, .06);
+        box-shadow: none;
     }
-    .po-icon-btn.btn-primary { box-shadow: 0 10px 22px rgba(37, 99, 235, .18); }
+    .po-icon-btn.btn-primary { box-shadow: none; }
     .po-icon-btn .bi,
     .po-control-icon .bi,
     .po-no-pill .bi,
@@ -172,18 +194,18 @@
     .po-change-pill .bi::before,
     .po-control-chip .bi::before { line-height: 1; }
     .po-pending-card {
-        border: 1px solid #bfdbfe;
-        border-radius: 20px;
-        background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+        border: 1px solid #BAE0F2;
+        border-radius: var(--po-r-surface);
+        background: linear-gradient(135deg, #ffffff 0%, var(--po-paper) 100%);
         box-shadow: 0 16px 45px rgba(15, 23, 42, .065);
     }
     .po-pending-table { margin-bottom: 0; }
     .po-pending-table thead th {
-        background: #eff6ff;
-        color: #1e3a8a;
-        border-bottom: 1px solid #dbeafe;
+        background: var(--po-tint);
+        color: var(--po-blue-deep);
+        border-bottom: 1px solid #BAE0F2;
         font-size: 10px;
-        font-weight: 950;
+        font-weight: 900;
         letter-spacing: .08em;
         text-transform: uppercase;
         padding: 12px;
@@ -195,7 +217,7 @@
         border-color: #edf2f7;
         color: #1e293b;
     }
-    .po-pending-row:hover td { background: #f8fbff; }
+    .po-pending-row:hover td { background: var(--po-paper); }
     .po-pending-pill {
         display: inline-flex;
         align-items: center;
@@ -227,8 +249,8 @@
         padding: 0 14px 16px;
     }
     .po-detail-panel {
-        border: 1px solid #e2e8f0;
-        border-radius: 16px;
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-surface);
         padding: 14px;
         background: #fff;
     }
@@ -241,8 +263,8 @@
     }
     .po-change-table td { font-size: 12px; padding: 8px !important; border-bottom: 1px solid #eef2f7 !important; }
     .po-history-line {
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-control);
         padding: 10px 12px;
         background: #f8fafc;
         margin-bottom: 8px;
@@ -255,11 +277,11 @@
         color: var(--po-muted);
     }
     .po-detail-row.d-none { display: none; }
-    .po-history-toggle.is-open { background: #eef2ff; border-color: #bfdbfe; color: #1d4ed8; }
-    .po-access-modal .modal-content { border: 0; border-radius: 22px; box-shadow: 0 24px 70px rgba(15, 23, 42, .2); }
-    .po-access-modal .modal-header { border-bottom: 1px solid #e2e8f0; background: linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%); border-top-left-radius: 22px; border-top-right-radius: 22px; }
+    .po-history-toggle.is-open { background: var(--po-tint); border-color: #BAE0F2; color: #1d4ed8; }
+    .po-access-modal .modal-content { border: 0; border-radius: var(--po-r-surface); box-shadow: 0 24px 70px rgba(15, 23, 42, .2); }
+    .po-access-modal .modal-header { border-bottom: 1px solid var(--po-line); background: linear-gradient(135deg, var(--po-paper) 0%, #eef6ff 100%); border-top-left-radius: var(--po-r-surface); border-top-right-radius: var(--po-r-surface); }
     .po-access-modal .form-control,
-    .po-access-modal .form-select { border-radius: 13px; border-color: #cbd5e1; font-weight: 700; }
+    .po-access-modal .form-select { border-radius: var(--po-r-control); border-color: var(--po-line); font-weight: 700; }
     .po-access-modal .form-label { color: #475569; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
 
     .po-section-tabs {
@@ -269,7 +291,7 @@
     }
     .po-section-tab {
         border: 1px solid var(--po-border);
-        border-radius: 18px;
+        border-radius: var(--po-r-surface);
         background: #fff;
         color: var(--po-ink);
         display: flex;
@@ -281,9 +303,9 @@
         box-shadow: 0 12px 32px rgba(15, 23, 42, .055);
         transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
     }
-    .po-section-tab:hover { color: var(--po-ink); transform: translateY(-1px); box-shadow: 0 18px 44px rgba(15, 23, 42, .09); border-color: #bfdbfe; }
+    .po-section-tab:hover { color: var(--po-ink); transform: translateY(-1px); box-shadow: 0 18px 44px rgba(15, 23, 42, .09); border-color: #BAE0F2; }
     .po-section-tab.active {
-        background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+        background: linear-gradient(135deg, var(--po-tint) 0%, #ffffff 100%);
         border-color: #93c5fd;
         box-shadow: 0 18px 48px rgba(37, 99, 235, .13);
     }
@@ -294,7 +316,7 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: #dbeafe;
+        background: #BAE0F2;
         color: var(--po-blue);
         flex: 0 0 42px;
     }
@@ -304,7 +326,7 @@
         justify-content: space-between;
         gap: 14px;
         padding: 14px 16px;
-        background: linear-gradient(135deg, #f8fbff 0%, #ffffff 100%);
+        background: linear-gradient(135deg, var(--po-paper) 0%, #ffffff 100%);
     }
     .po-pager-summary { color: #475569; font-size: 13px; font-weight: 700; }
     .po-pager-actions { display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
@@ -312,11 +334,11 @@
         min-width: 36px;
         height: 36px;
         padding: 0 10px;
-        border-radius: 12px;
+        border-radius: var(--po-r-control);
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border: 1px solid #cbd5e1;
+        border: 1px solid var(--po-line);
         background: #fff;
         color: #334155;
         font-size: 13px;
@@ -324,14 +346,14 @@
         text-decoration: none;
         box-shadow: 0 6px 14px rgba(15, 23, 42, .045);
     }
-    .po-pager-btn:hover { color: var(--po-blue); border-color: #93c5fd; background: #eff6ff; }
+    .po-pager-btn:hover { color: var(--po-blue); border-color: #93c5fd; background: var(--po-tint); }
     .po-pager-btn.active { color: #fff; background: var(--po-blue); border-color: var(--po-blue); box-shadow: 0 10px 22px rgba(37, 99, 235, .22); }
     .po-pager-btn.disabled { opacity: .45; pointer-events: none; background: #f8fafc; }
     .po-pager-dot { border: 0; box-shadow: none; background: transparent; min-width: 22px; color: #94a3b8; }
     .po-modal-audit {
         border: 1px solid #dbe7f3;
-        border-radius: 18px;
-        background: linear-gradient(135deg, #f8fbff 0%, #ffffff 100%);
+        border-radius: var(--po-r-surface);
+        background: linear-gradient(135deg, var(--po-paper) 0%, #ffffff 100%);
         padding: 16px;
     }
     @media (max-width: 767.98px) {
@@ -368,7 +390,7 @@ document.addEventListener('DOMContentLoaded', function () {
 @endsection
 
 @section('content')
-<div class="container-fluid po-control-page">
+<div class="container-fluid po-control-page po-scope">
     <x-breadcrumb :items="[
         ['label' => 'Admin', 'url' => route('admin.dashboard')],
         ['label' => 'PO Generate Control'],
@@ -392,7 +414,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     <div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-3 mb-4">
         <div class="col">
-            <div class="po-stat-card p-3">
+            <div class="po-stat-card po-rail po-rail-ok p-3">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="po-stat-label">Total Generated PO</div><div class="po-stat-value">{{ $stats['total'] ?? 0 }}</div></div>
                     <span class="po-control-icon"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></span>
@@ -400,7 +422,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
         <div class="col">
-            <div class="po-stat-card p-3">
+            <div class="po-stat-card po-rail p-3">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="po-stat-label">Pending PO</div><div class="po-stat-value">{{ $stats['pending'] ?? 0 }}</div></div>
                     <span class="po-control-icon"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span>
@@ -408,7 +430,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
         <div class="col">
-            <div class="po-stat-card p-3">
+            <div class="po-stat-card po-rail po-rail-warn p-3">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="po-stat-label">Re-generated PO</div><div class="po-stat-value">{{ $stats['regenerated'] ?? 0 }}</div></div>
                     <span class="po-control-icon"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span>
@@ -416,7 +438,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
         <div class="col">
-            <div class="po-stat-card p-3">
+            <div class="po-stat-card po-rail po-rail-warn p-3">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="po-stat-label">Locked PO</div><div class="po-stat-value">{{ $stats['locked'] ?? 0 }}</div></div>
                     <span class="po-control-icon"><i class="bi bi-lock" aria-hidden="true"></i></span>
@@ -424,7 +446,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
         <div class="col">
-            <div class="po-stat-card p-3">
+            <div class="po-stat-card po-rail p-3">
                 <div class="d-flex align-items-center justify-content-between gap-3">
                     <div><div class="po-stat-label">Supply Chain Authorized</div><div class="po-stat-value">{{ $stats['authorized'] ?? 0 }}</div></div>
                     <span class="po-control-icon"><i class="bi bi-person-check" aria-hidden="true"></i></span>
@@ -443,11 +465,11 @@ document.addEventListener('DOMContentLoaded', function () {
     <form method="GET" action="{{ ($activePoPage ?? 'generated') === 'pending' ? route('admin.po-generate-control.pending') : route('admin.po-generate-control.generated') }}" class="po-filter-card p-3 p-lg-4 mb-4">
         <div class="row g-3 align-items-end">
             <div class="col-lg-4">
-                <label class="form-label small fw-bold text-muted">Search PO / buyer / vendor / style</label>
+                <label class="form-label po-field-label">Search PO / buyer / vendor / style</label>
                 <input type="text" name="q" value="{{ request('q') }}" class="form-control" placeholder="Search PO no, vendor, buyer...">
             </div>
             <div class="col-md-4 col-lg-2">
-                <label class="form-label small fw-bold text-muted">Control State</label>
+                <label class="form-label po-field-label">Control State</label>
                 <select name="state" class="form-select">
                     <option value="all" @selected(request('state', 'all') === 'all')>All PO</option>
                     <option value="pending" @selected(request('state') === 'pending')>Pending PO</option>
@@ -461,11 +483,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 </select>
             </div>
             <div class="col-md-4 col-lg-2">
-                <label class="form-label small fw-bold text-muted">Buyer</label>
+                <label class="form-label po-field-label">Buyer</label>
                 <input type="text" name="buyer" value="{{ request('buyer') }}" class="form-control" placeholder="Buyer" list="poBuyerOptions" autocomplete="off">
             </div>
             <div class="col-md-4 col-lg-2">
-                <label class="form-label small fw-bold text-muted">Vendor</label>
+                <label class="form-label po-field-label">Vendor</label>
                 <input type="text" name="vendor" value="{{ request('vendor') }}" class="form-control" placeholder="Vendor" list="poVendorOptions" autocomplete="off">
             </div>
             <div class="col-lg-2 d-flex gap-2">

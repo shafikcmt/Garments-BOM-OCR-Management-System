@@ -3,145 +3,93 @@
 @section('title', 'Booking Preview / Booking Generate')
 
 @section('styles')
+@include('supply-chain.bookings.partials._po-module-theme')
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
 <style>
+    /* The legacy --booking-* names are kept as ALIASES onto the module tokens
+       rather than deleted. Several hundred lines below still read them, and
+       re-pointing the six variables recolours all of it coherently in one
+       place — which is the whole reason the indigo could drift from the
+       document blue in the first place. */
     :root {
-        --booking-primary: #4338ca;
-        --booking-primary-dark: #1e1b4b;
-        --booking-primary-soft: #eef2ff;
-        --booking-ink: #0f172a;
-        --booking-muted: #64748b;
-        --booking-border: #e2e8f0;
-        --booking-card-shadow: 0 24px 70px rgba(15, 23, 42, .08);
+        --booking-primary: var(--po-blue);
+        --booking-primary-dark: var(--po-blue-deep);
+        --booking-primary-soft: var(--po-tint);
+        --booking-ink: var(--po-ink);
+        --booking-muted: var(--po-muted);
+        --booking-border: var(--po-line);
+        --booking-card-shadow: var(--po-shadow);
     }
     .booking-page {
         min-height: calc(100vh - 110px);
-        background:
-            radial-gradient(circle at 8% 0%, rgba(99, 102, 241, .14), transparent 30%),
-            radial-gradient(circle at 92% 8%, rgba(14, 165, 233, .12), transparent 28%),
-            linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%);
+        /* Paper, not a coloured dashboard ground. The sheet this module
+           produces is white; the desk it sits on should be quiet. */
+        background: linear-gradient(180deg, #FFFFFF 0%, var(--po-paper) 220px, var(--po-paper) 100%);
     }
-    .booking-shell { max-width: 1480px; margin: 0 auto; }
-    .booking-hero {
-        position: relative;
-        overflow: hidden;
-        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
-        color: #fff;
-        border-radius: 16px;
-        padding: 14px 20px;
-        box-shadow: 0 12px 30px rgba(67, 56, 202, .18);
-    }
-    .booking-hero::before,
-    .booking-hero::after {
-        content: "";
-        position: absolute;
-        border-radius: 999px;
-        pointer-events: none;
-    }
-    .booking-hero::before {
-        right: -92px;
-        top: -92px;
-        width: 290px;
-        height: 290px;
-        background: rgba(255,255,255,.11);
-    }
-    .booking-hero::after {
-        right: 120px;
-        bottom: -140px;
-        width: 220px;
-        height: 220px;
-        background: rgba(125, 211, 252, .12);
-    }
-    .booking-hero > * { position: relative; z-index: 1; }
-    .booking-hero h4 { letter-spacing: -.4px; font-size: clamp(1rem, 1.5vw, 1.25rem); margin-bottom: 0 !important; }
+    /* Full width, matching how the rest of the app lays out: components.css
+       sets `.content .container-fluid { max-width: none }`, and this module's
+       1480px cap was the reason a wide monitor showed ~790px of empty gutter
+       beside a table that had columns to spare. */
+    .booking-shell { max-width: none; margin: 0 auto; }
+    /* The dark indigo hero and the badge-style stat pills are gone — replaced
+       by .po-head and .po-kpi in the theme partial, so this page's header and
+       KPI cards are the same objects the Admin and detail screens use. */
     .booking-hero-copy { max-width: 680px; }
-    .booking-hero-icon {
-        width: 40px;
-        height: 40px;
-        flex: 0 0 40px;
-        border-radius: 13px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(255,255,255,.1);
-        border: 1px solid rgba(255,255,255,.18);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.16);
-        font-size: 18px;
-    }
-    .booking-hero-stats { min-width: 350px; justify-content: flex-end; }
-    .booking-stat {
-        min-width: 140px;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 12px;
-        border-radius: 12px;
-        background: rgba(255,255,255,.96);
-        color: var(--booking-ink);
-        box-shadow: 0 8px 18px rgba(15, 23, 42, .12);
-        border: 1px solid rgba(255,255,255,.65);
-    }
-    .booking-stat-icon {
-        width: 38px;
-        height: 38px;
-        border-radius:var(--gx-radius);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--booking-primary);
-        background: #eef2ff;
-        font-size: 18px;
-        flex: 0 0 38px;
-    }
-    .booking-stat-label { display: block; font-size: 12px; color: var(--booking-muted); font-weight: 700; line-height: 1.1; }
-    .booking-stat-value { display: block; margin-top: 2px; font-size: 18px; line-height: 1; color: var(--booking-ink); font-weight: 900; letter-spacing: -.03em; }
+    /* Radius collapsed from 24px to the module's one surface value, and the
+       glassmorphism dropped: a blurred translucent card over a white page was
+       doing nothing except making this card differ from every other card in
+       the app. */
     .booking-card {
-        border: 1px solid rgba(226, 232, 240, .9);
-        border-radius: 24px;
-        box-shadow: var(--booking-card-shadow);
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-surface);
+        box-shadow: var(--po-shadow);
         overflow: visible;
-        background: rgba(255,255,255,.94);
-        backdrop-filter: blur(12px);
+        background: var(--po-surface);
     }
     .booking-card .card-header {
-        background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-        border-bottom: 1px solid var(--booking-border);
-        border-radius: 24px 24px 0 0;
+        background: transparent;
+        border-bottom: 1px solid var(--po-line-soft);
+        border-radius: var(--po-r-surface) var(--po-r-surface) 0 0;
     }
-    .booking-section-title { display: flex; align-items: center; gap: 12px; color: var(--booking-ink); }
+    .booking-section-title { display: flex; align-items: center; gap: 10px; color: var(--po-ink); font-size: 15px; letter-spacing: -.01em; }
     .booking-title-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 15px;
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        border-radius: var(--po-r-control);
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: var(--booking-primary-soft);
-        color: var(--booking-primary);
-        font-size: 18px;
+        background: var(--po-tint);
+        color: var(--po-blue-deep);
+        font-size: 15px;
     }
     .booking-filter label {
-        font-size: 11px;
-        font-weight: 900;
-        color: #1e293b;
+        font-size: 10px;
+        font-weight: 800;
+        color: var(--po-muted);
         text-transform: uppercase;
-        letter-spacing: .055em;
+        letter-spacing: .09em;
+        margin-bottom: 5px;
     }
+    /* Every control in the module is 40px tall on one radius, so a select, an
+       input and a button sitting in the same filter row line up exactly. */
     .booking-filter .form-control,
     .booking-filter .form-select {
-        min-height: 38px;
-        border-radius: 11px;
-        border-color: #dbe4f0;
-        color: var(--booking-ink);
+        min-height: 40px;
+        border-radius: var(--po-r-control);
+        border-color: var(--po-line);
+        color: var(--po-ink);
         box-shadow: none;
         font-weight: 600;
-        background-color: #fff;
+        font-size: 13px;
+        background-color: var(--po-surface);
     }
     .booking-filter .form-control::placeholder { color: #94a3b8; font-weight: 500; }
     .booking-filter .form-control:focus,
     .booking-filter .form-select:focus {
-        border-color: #818cf8;
-        box-shadow: 0 0 0 .22rem rgba(99, 102, 241, .13);
+        border-color: var(--po-blue);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
     .booking-search-field { position: relative; }
     .booking-search-field .form-control { padding-left: 46px; }
@@ -158,54 +106,60 @@
         font-size: 18px;
         pointer-events: none;
     }
+    /* Primary is a flat, solid block of the document blue. The gradient +
+       lift-on-hover it replaced is the stock "SaaS CTA" treatment, and it made
+       Search compete with Generate PO for attention. One filled button per
+       area, everything else quiet. */
     .booking-primary-btn,
     .btn-generate {
-        border: 0;
-        border-radius:var(--gx-radius);
-        background: linear-gradient(135deg, #4f46e5, #312e81);
+        border: 1px solid var(--po-blue);
+        border-radius: var(--po-r-control);
+        background: var(--po-blue);
         color: #fff;
-        font-weight: 900;
-        min-height: 42px;
-        box-shadow: 0 14px 28px rgba(79, 70, 229, .24);
+        font-weight: 800;
+        min-height: 40px;
+        box-shadow: none;
     }
     .booking-primary-btn:hover,
-    .btn-generate:hover { color: #fff; background: linear-gradient(135deg, #4338ca, #1e1b4b); transform: translateY(-1px); }
+    .btn-generate:hover { color: #fff; background: var(--po-blue-deep); border-color: var(--po-blue-deep); }
+    .booking-primary-btn:focus-visible,
+    .btn-generate:focus-visible { outline: 2px solid var(--po-blue); outline-offset: 2px; }
     .btn-soft-reset {
-        border-radius:var(--gx-radius);
-        min-height: 42px;
-        border-color: #d8e0ea;
-        color: #475569;
-        font-weight: 800;
-        background: #fff;
+        border-radius: var(--po-r-control);
+        min-height: 40px;
+        border-color: var(--po-line);
+        color: var(--po-ink);
+        font-weight: 700;
+        background: var(--po-surface);
     }
-    .btn-soft-reset:hover { background: #f8fafc; color: var(--booking-ink); }
+    .btn-soft-reset:hover { background: var(--po-paper); border-color: #BFD3E1; color: var(--po-ink); }
     /* Searchable dropdowns (Tom Select) — matched to the booking filter input style */
     .booking-filter .ts-wrapper { font-weight: 600; }
     .booking-filter .ts-control {
-        min-height: 38px;
-        border-radius: 11px;
-        border-color: #dbe4f0;
-        color: var(--booking-ink);
-        background-color: #fff;
+        min-height: 40px;
+        border-radius: var(--po-r-control);
+        border-color: var(--po-line);
+        color: var(--po-ink);
+        background-color: var(--po-surface);
         box-shadow: none;
         padding: 5px 12px;
     }
     .booking-filter .ts-control input::placeholder { color: #94a3b8; font-weight: 500; }
     .booking-filter .ts-wrapper.focus .ts-control,
     .booking-filter .ts-wrapper.dropdown-active .ts-control {
-        border-color: #818cf8;
-        box-shadow: 0 0 0 .22rem rgba(99, 102, 241, .13);
+        border-color: var(--po-blue);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
-    /* The filter card and the table card below are sibling stacking contexts
-       (each .booking-card uses backdrop-filter). Lift the filter card so its
-       open dropdowns (IHOD, Vendor, etc.) paint above the table card instead
-       of being clipped behind it. */
+    /* Lift the filter card above the table card below it, so its open dropdowns
+       (IHOD, Vendor, etc.) paint over the table instead of being clipped by it.
+       This z-index is what does the work — the cards no longer use
+       backdrop-filter, so neither creates a stacking context of its own. */
     .booking-filter-card { position: relative; z-index: 30; }
     .booking-filter .ts-dropdown {
         z-index: 40;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        box-shadow: 0 18px 44px rgba(15, 23, 42, .14);
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-control);
+        box-shadow: 0 18px 44px rgba(11, 43, 60, .14);
         overflow: hidden;
         margin-top: 6px;
     }
@@ -237,86 +191,106 @@
         color: var(--booking-primary);
     }
     .booking-loading.show { display: flex; }
+    /* The header band is the booking sheet's own #E0F2FE tint, so the list and
+       the document it produces read as one system.
+
+       Zebra striping removed on purpose: with a tinted header AND a hover
+       state, three row signals competed and the hover — the only one that
+       means anything — was the hardest to see. Hairline dividers instead. */
     .booking-table {
-        --bs-table-hover-bg: #f8faff;
-        border-color: #e6edf5 !important;
+        --bs-table-hover-bg: transparent;
+        border-color: var(--po-line-soft) !important;
     }
     .booking-table thead th {
         position: sticky;
         top: 0;
         z-index: 2;
-        background: linear-gradient(180deg, #f3f4ff 0%, #eef2ff 100%) !important;
-        color: #1e1b4b;
-        font-size: 12px;
-        font-weight: 900;
-        letter-spacing: .01em;
+        background: var(--po-tint) !important;
+        color: var(--po-blue-deep) !important;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .09em;
+        text-transform: uppercase;
         white-space: nowrap;
         vertical-align: middle;
-        padding: 14px 12px;
-        border-color: #dde4f2 !important;
+        padding: 12px;
+        border-bottom: 1px solid var(--po-line) !important;
     }
     .booking-table tbody td {
         vertical-align: middle;
         font-size: 13px;
-        padding: 13px 12px;
-        line-height: 1.32;
-        color: #172033;
+        padding: 12px;
+        line-height: 1.35;
+        color: var(--po-ink);
+        border-top: 1px solid var(--po-line-soft);
+        border-bottom: 0;
     }
-    .booking-table tbody tr:nth-child(even) { background: #fcfdff; }
-    .booking-table tbody tr:hover { background: #f6f7ff; }
+    .booking-table tbody tr:first-child td { border-top: 0; }
+    .booking-table tbody tr { transition: background .14s ease; }
+    .booking-table tbody tr:hover { background: #F2F8FC; }
+    .booking-table .po-num { text-align: right; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+    @media (prefers-reduced-motion: reduce) { .booking-table tbody tr { transition: none; } }
     .item-cell .small { line-height: 1.25; }
-    .action-cell .btn { border-radius: 12px; padding: 8px 14px; }
+    .action-cell .btn { border-radius: var(--po-r-control); padding: 7px 14px; }
     .preview-outline-btn {
-        border: 1px solid #c7d2fe;
-        color: var(--booking-primary);
-        background: #fff;
-        font-weight: 900;
-        box-shadow: 0 8px 18px rgba(67, 56, 202, .08);
+        border: 1px solid var(--po-blue);
+        color: var(--po-blue);
+        background: var(--po-surface);
+        font-weight: 800;
+        box-shadow: none;
     }
-    .preview-outline-btn:hover { background: #eef2ff; color: #312e81; border-color: #a5b4fc; }
+    .preview-outline-btn:hover { background: var(--po-blue); color: #fff; border-color: var(--po-blue); }
+    .preview-outline-btn:hover { background: var(--po-tint); color: var(--po-blue-deep); border-color: #BAE0F2; }
     .booking-action-wrap { white-space: nowrap; }
+    /* Auto width, NOT the old fixed 38px square. This button was styled as an
+       icon-only kebab; once it gained its visible "Actions" label the fixed
+       width clipped the text. It sizes to its content now. */
     .booking-kebab-btn {
-        width: 38px;
-        height: 38px;
-        padding: 0 !important;
-        border-radius: 13px !important;
+        height: 34px;
+        padding: 0 12px !important;
+        border-radius: var(--po-r-control) !important;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: #fff;
-        color: #334155;
-        border: 1px solid #dbe4f0;
-        box-shadow: 0 8px 18px rgba(15, 23, 42, .06);
+        background: var(--po-surface);
+        color: var(--po-ink);
+        border: 1px solid var(--po-line);
+        font-size: 12px;
+        font-weight: 800;
+        box-shadow: none;
+        white-space: nowrap;
     }
     .booking-kebab-btn:hover,
-    .booking-kebab-btn:focus { background: #eef2ff; color: var(--booking-primary); border-color: #c7d2fe; }
+    .booking-kebab-btn:focus { background: var(--po-tint); color: var(--po-blue-deep); border-color: #BAE0F2; }
     .booking-action-dropdown {
-        min-width: 190px;
-        border: 1px solid #e2e8f0;
-        border-radius: 16px;
-        padding: 8px;
-        box-shadow: 0 22px 45px rgba(15, 23, 42, .16);
+        min-width: 196px;
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-control);
+        padding: 6px;
+        box-shadow: 0 22px 45px rgba(11, 43, 60, .16);
         z-index: 1080;
     }
     .booking-action-dropdown .dropdown-item {
-        border-radius: 10px;
+        border-radius: 7px;
         padding: 9px 10px;
         font-weight: 700;
-        color: #334155;
+        color: var(--po-ink);
         font-size: 13px;
     }
-    .booking-action-dropdown .dropdown-item:hover { background: #eef2ff; color: #312e81; }
+    .booking-action-dropdown .dropdown-item:hover { background: var(--po-tint); color: var(--po-blue-deep); }
     .po-pill,
     .po-mini-pill {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: #eef2ff;
-        color: #312e81;
+        padding: 5px 11px;
+        border-radius: var(--po-r-pill);
+        background: var(--po-tint);
+        color: var(--po-blue-deep);
+        border: 1px solid #BAE0F2;
         font-weight: 900;
-        font-size: 12px;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
     }
     .po-mini-pill { max-width: 112px; overflow: hidden; text-overflow: ellipsis; }
     .booking-empty { min-height:190px; display:flex; align-items:center; justify-content:center; }
@@ -344,17 +318,69 @@
         font-weight: 900;
         font-size: 12px;
     }
-    .booking-pagination a:hover { background: #eef2ff; border-color: #c7d2fe; color: #312e81; }
-    .booking-pagination .active { background: #4f46e5 !important; border-color: #4f46e5 !important; color: #fff !important; box-shadow: 0 12px 24px rgba(79, 70, 229, .24); }
+    .booking-pagination a:hover { background: var(--po-tint); border-color: #BAE0F2; color: var(--po-blue-deep); }
+    .booking-pagination .active { background: var(--po-blue) !important; border-color: var(--po-blue) !important; color: #fff !important; box-shadow: none; }
     .booking-pagination .disabled { opacity: .48; cursor: not-allowed; background: #f8fafc !important; }
-    .booking-preview-modal .modal-dialog { max-width: min(980px, 97vw); }
-    .booking-preview-modal .modal-content { border-radius: 20px; box-shadow: 0 30px 90px rgba(15, 23, 42, .32); }
-    .booking-preview-modal .modal-header { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); gap: 10px; }
+    /* Wide enough for the 198mm sheet at the 1.35 default (~1010px) plus the
+       modal's own padding — below that, .bf-sheet's max-width:100% clamps the
+       sheet and squeezes the fixed-mm table columns instead of scaling them.
+       Capped rather than full-bleed: the sheet is a fixed width, so extra
+       modal width past ~1400px only adds grey margin around the document. */
+    .booking-preview-modal .modal-dialog { max-width: min(1400px, 96vw); }
+    /* Modal chrome, deliberately designed rather than left at Bootstrap's
+       default: the header is the module's paper tone, the zoom cluster is a
+       single grouped control instead of three loose buttons, and the body
+       ground is a neutral grey so the white sheet reads as paper on a desk. */
+    .booking-preview-modal .modal-content {
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-surface);
+        box-shadow: 0 30px 90px rgba(11, 43, 60, .28);
+        overflow: hidden;
+    }
+    .booking-preview-modal .modal-header {
+        background: linear-gradient(180deg, #FFFFFF 0%, var(--po-paper) 100%);
+        border-bottom: 1px solid var(--po-line);
+        gap: 10px;
+        padding: 14px 18px;
+    }
+    .booking-preview-modal .modal-title { font-size: 15px; font-weight: 800; letter-spacing: -.01em; color: var(--po-ink); }
     .booking-preview-title-wrap { flex: 1 1 auto; min-width: 250px; }
-    .booking-preview-header-tools { display: inline-flex; align-items: center; gap: 6px; flex-wrap: nowrap; margin-left: auto; }
-    .booking-preview-zoom-btn { width: 32px; height: 30px; padding: 0; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
-    .booking-preview-zoom-value { min-width: 48px; text-align: center; font-size: 12px; font-weight: 900; color: #312e81; }
-    .booking-preview-inner { max-height: 86vh; overflow: auto; background: #eef2f6; padding: .65rem !important; scroll-behavior: smooth; }
+    /* The three zoom controls read as one instrument, not three stray buttons. */
+    .booking-preview-header-tools {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        flex-wrap: nowrap;
+        margin-left: auto;
+        padding: 3px;
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-control);
+        background: var(--po-surface);
+    }
+    .booking-preview-zoom-btn {
+        height: 30px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 7px;
+        color: var(--po-muted);
+        font-size: 12px;
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+    }
+    .booking-preview-zoom-btn:hover:not(:disabled) { background: var(--po-tint); color: var(--po-blue-deep); }
+    .booking-preview-zoom-btn:disabled { opacity: .4; }
+    .booking-preview-zoom-value {
+        min-width: 52px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 900;
+        color: var(--po-blue-deep);
+        font-variant-numeric: tabular-nums;
+    }
+    .booking-preview-inner { max-height: 86vh; overflow: auto; background: #E7EDF2; padding: 14px !important; scroll-behavior: smooth; }
     .booking-preview-steps { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
     .booking-preview-steps .bp-step {
         display: inline-flex;
@@ -366,10 +392,10 @@
         font-weight: 800;
         letter-spacing: .01em;
         color: #64748b;
-        background: #eef2ff;
+        background: var(--po-tint);
         border: 1px solid #e2e8f0;
     }
-    .booking-preview-steps .bp-step.is-active { color: #fff; background: linear-gradient(135deg, #4f46e5, #312e81); border-color: transparent; }
+    .booking-preview-steps .bp-step.is-active { color: #fff; background: var(--po-blue); border-color: transparent; }
     .booking-preview-steps .bp-step-arrow { color: #94a3b8; font-size: 13px; }
     .booking-confirm-overlay {
         position: absolute;
@@ -403,8 +429,8 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: #eef2ff;
-        color: #4338ca;
+        background: var(--po-tint);
+        color: var(--po-blue-deep);
         font-size: 26px;
     }
     .booking-confirm-title { font-weight: 900; color: #0f172a; margin-bottom: 8px; font-size: 1.15rem; }
@@ -450,39 +476,38 @@
         display: inline-flex;
         align-items: center;
         flex-wrap: wrap;
-        gap: 10px;
-        padding: 8px;
-        border-radius: 18px;
-        border: 1px solid rgba(199, 210, 254, .65);
-        background: rgba(255,255,255,.78);
-        box-shadow: 0 18px 40px rgba(15, 23, 42, .08);
-        backdrop-filter: blur(10px);
+        gap: 4px;
+        padding: 4px;
+        border-radius: var(--po-r-control);
+        border: 1px solid var(--po-line);
+        background: var(--po-surface);
+        box-shadow: var(--po-shadow-sm);
     }
     .booking-view-btn {
         display: inline-flex;
         align-items: center;
         gap: 7px;
-        min-height: 36px;
+        min-height: 34px;
         padding: 0 14px;
+        border-radius: 7px;
+        color: var(--po-muted);
         font-size: 13px;
-        border-radius:var(--gx-radius);
-        color: #475569;
-        font-size: 14px;
         font-weight: 800;
         letter-spacing: -.01em;
         border: 1px solid transparent;
-        transition: .18s ease;
+        transition: .16s ease;
     }
     .booking-view-btn:hover {
-        color: #312e81;
-        background: #eef2ff;
+        color: var(--po-blue-deep);
+        background: var(--po-tint);
     }
     .booking-view-btn.is-active {
         color: #fff;
-        border-color: rgba(79, 70, 229, .24);
-        background: linear-gradient(135deg, #4f46e5, #312e81);
-        box-shadow: 0 12px 28px rgba(79, 70, 229, .24);
+        border-color: var(--po-blue);
+        background: var(--po-blue);
     }
+    .booking-view-btn:focus-visible { outline: 2px solid var(--po-blue); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { .booking-view-btn { transition: none; } }
     .booking-tab-panel.is-hidden { display: none; }
 
 
@@ -507,8 +532,8 @@
         display:inline-flex;
         align-items:center;
         justify-content:center;
-        background:#eef2ff;
-        color:#4338ca;
+        background:var(--po-tint);
+        color:var(--po-blue-deep);
         font-size:18px;
     }
     .po-control-filter-card {
@@ -522,22 +547,25 @@
     .po-control-search i { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#94a3b8; pointer-events:none; }
     .po-control-search .form-control { padding-left:42px; min-height:44px; }
     .po-status-stack { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+    /* One pill geometry across the module; the colours keep the meanings they
+       already carried — green generated, amber re-generated, blue completed. */
     .po-status-pill, .po-change-pill {
         display:inline-flex;
         align-items:center;
         gap:6px;
-        padding:6px 10px;
-        border-radius:999px;
+        padding:5px 11px;
+        border-radius:var(--po-r-pill);
         font-size:11px;
         font-weight:900;
+        line-height:1;
         border:1px solid transparent;
         white-space:nowrap;
     }
-    .po-status-generated { color:#047857; background:#ecfdf5; border-color:#bbf7d0; }
-    .po-status-regenerated { color:#9a3412; background:#fff7ed; border-color:#fed7aa; }
-    .po-status-completed { color:#1d4ed8; background:#eff6ff; border-color:#bfdbfe; }
-    .po-change-clean { color:#475569; background:#f8fafc; border-color:#e2e8f0; }
-    .po-change-warning { color:#b91c1c; background:#fef2f2; border-color:#fecaca; }
+    .po-status-generated { color:var(--po-ok); background:var(--po-ok-bg); border-color:var(--po-ok-border); }
+    .po-status-regenerated { color:var(--po-warn); background:var(--po-warn-bg); border-color:var(--po-warn-border); }
+    .po-status-completed { color:var(--po-info); background:var(--po-info-bg); border-color:var(--po-info-border); }
+    .po-change-clean { color:var(--po-muted); background:var(--po-paper); border-color:var(--po-line); }
+    .po-change-warning { color:var(--po-danger); background:var(--po-danger-bg); border-color:var(--po-danger-border); }
     .po-change-card {
         border:1px solid #e2e8f0;
         border-radius:var(--gx-radius);
@@ -555,23 +583,34 @@
     .po-history-entry .meta { color:#64748b; font-size:11px; }
     .po-control-empty { min-height:180px; display:flex; align-items:center; justify-content:center; text-align:center; color:#64748b; }
     .generated-po-card .card-header { background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); }
-    .generated-po-actions { display:flex; justify-content:center; gap:7px; flex-wrap:wrap; }
+    /* All four actions on ONE line. nowrap is the point: with wrap enabled the
+       fourth button orphaned onto a second row, which made that row taller than
+       its neighbours and the whole table look ragged. The column is sized for
+       the full set below, so nothing has to wrap. */
+    .generated-po-actions { display:flex; justify-content:center; gap:6px; flex-wrap:nowrap; }
     .generated-po-action {
         display:inline-flex;
         align-items:center;
+        justify-content:center;
         gap:5px;
-        min-height:32px;
-        padding:6px 9px;
-        border-radius:999px;
-        border:1px solid #dbe4f0;
-        background:#fff;
-        color:#334155;
+        min-height:30px;
+        padding:5px 10px;
+        border-radius:var(--po-r-pill);
+        border:1px solid var(--po-line);
+        background:var(--po-surface);
+        color:var(--po-ink);
         text-decoration:none;
         font-size:11px;
-        font-weight:900;
-        box-shadow:0 8px 16px rgba(15,23,42,.05);
+        font-weight:800;
+        white-space:nowrap;
+        box-shadow:none;
     }
-    .generated-po-action:hover { color:#312e81; border-color:#c7d2fe; background:#eef2ff; }
+    .generated-po-action:hover { color:var(--po-blue-deep); border-color:#BAE0F2; background:var(--po-tint); }
+    .generated-po-action:focus-visible { outline:2px solid var(--po-blue); outline-offset:2px; }
+
+    /* IHOD From/To need no styling of their own — they are plain selects and
+       pick up the shared .booking-filter .form-select rules, which is the whole
+       point of using selects rather than bespoke date inputs. */
     @media (max-width: 1199px) { .po-control-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 575px) { .po-control-grid { grid-template-columns: 1fr; } }
 
@@ -584,29 +623,42 @@
     $selectedSeason = request('season');
     $selectedSapCode = request('sap_code');
     $selectedVendor = request('vendor');
-    $selectedIhod = request('ihod');
+    $selectedIhodFrom = request('ihod_from');
+    $selectedIhodTo = request('ihod_to');
     $selectedKeyword = request('keyword');
     $generatedPoCount = $generatedPos->count();
 @endphp
 
-<div class="booking-page p-2 p-md-3"><div class="booking-shell">
-    <div class="booking-hero mb-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+<div class="booking-page po-scope p-2 p-md-3"><div class="booking-shell">
+    <div class="po-head mb-3">
         <div class="d-flex align-items-center gap-3 booking-hero-copy">
-            <span class="booking-hero-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+            <span class="po-head-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
             <div>
-                <div class="small opacity-60" style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;">Supply Chain</div>
-                <h4 class="fw-bold">PO Generation</h4>
+                <div class="po-micro">Supply Chain</div>
+                <h4 class="po-head-title">PO Generation</h4>
             </div>
         </div>
-        <div class="booking-hero-stats d-flex gap-3 flex-wrap">
-            <span class="booking-stat">
-                <span class="booking-stat-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
-                <span><span class="booking-stat-label">Pending Preview</span><span class="booking-stat-value" id="pendingTotal">{{ $pendingRows->total() }}</span></span>
-            </span>
-            <span class="booking-stat">
-                <span class="booking-stat-icon"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></span>
-                <span><span class="booking-stat-label">Generated PO List</span><span class="booking-stat-value" id="recentTotal">{{ $generatedPoCount }}</span></span>
-            </span>
+    </div>
+
+    {{-- KPI cards. The docket rail on the left edge says which state each
+         figure counts — blue for the pending queue, emerald for what is already
+         generated — so the two are distinguishable before the label is read. --}}
+    <div class="po-kpi-grid mb-3">
+        <div class="po-kpi po-rail">
+            <span class="po-kpi-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
+            <div class="po-kpi-body">
+                <div class="po-micro">Pending Preview</div>
+                <div class="po-figure" id="pendingTotal">{{ $pendingRows->total() }}</div>
+                <div class="po-kpi-sub">Orders awaiting a PO</div>
+            </div>
+        </div>
+        <div class="po-kpi po-kpi-ok po-rail po-rail-ok">
+            <span class="po-kpi-icon"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></span>
+            <div class="po-kpi-body">
+                <div class="po-micro">Generated PO List</div>
+                <div class="po-figure" id="recentTotal">{{ $generatedPoCount }}</div>
+                <div class="po-kpi-sub">POs issued to vendors</div>
+            </div>
         </div>
     </div>
 
@@ -662,16 +714,38 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label">IHOD</label>
-                        <select name="ihod" class="form-select booking-auto-filter">
-                            <option value="">All IHOD</option>
+                    {{-- IHOD is the contract shipment DATE and filters as a From/To
+                         window, but the two ends are pickers of the dates that
+                         ACTUALLY EXIST in the data — the same list the old single
+                         dropdown offered — not a blank calendar. Staff choosing a
+                         shipment window do not know the dates in advance, and a
+                         free calendar lets them pick a day no order ships on.
+
+                         Plain <select>s so the Tom Select initialiser below turns
+                         them into searchable dropdowns exactly like Buyer, Season,
+                         SAP Code and Vendor. Values stay ISO YYYY-MM-DD, so
+                         applyDateRangeCellFilter() is unchanged. --}}
+                    <div class="col-md-2">
+                        <label class="form-label" for="ihodFrom">IHOD from</label>
+                        <select id="ihodFrom" name="ihod_from" class="form-select booking-auto-filter" autocomplete="off">
+                            <option value="">Any date</option>
                             @foreach($filterOptions['ihods'] as $ihod)
-                                <option value="{{ $ihod }}" @selected($selectedIhod === $ihod)>{{ $ihod }}</option>
+                                <option value="{{ $ihod }}" @selected($selectedIhodFrom === $ihod)>{{ $ihod }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-6 booking-search-field">
+                    <div class="col-md-2">
+                        <label class="form-label" for="ihodTo">IHOD to</label>
+                        <select id="ihodTo" name="ihod_to" class="form-select booking-auto-filter" autocomplete="off">
+                            <option value="">Any date</option>
+                            @foreach($filterOptions['ihods'] as $ihod)
+                                <option value="{{ $ihod }}" @selected($selectedIhodTo === $ihod)>{{ $ihod }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    {{-- 2 + 2 + 5 + 3 = 12. IHOD went from one column to two, so
+                         the keyword field gives up one to keep the row on one line. --}}
+                    <div class="col-md-5 booking-search-field">
                         <label class="form-label">Quick keyword search</label>
                         <i class="bi bi-search booking-search-icon" aria-hidden="true"></i>
                         <input type="text" name="keyword" value="{{ $selectedKeyword }}" class="form-control booking-auto-filter-text" placeholder="Search buyer / season / vendor / item / style / PO keyword...">
@@ -714,7 +788,7 @@
                             <th>IHOD</th>
                             <th>Vendor</th>
                             <th>Item</th>
-                            <th class="text-end">Qty</th>
+                            <th class="po-num">Qty</th>
                             <th class="text-center" style="width:180px;">Action</th>
                         </tr>
                     </thead>
@@ -744,10 +818,11 @@
                         </div>
                     </div>
                     <div class="booking-preview-header-tools no-print" aria-label="Booking preview zoom controls">
-                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomOut" aria-label="Zoom out"><i class="bi bi-zoom-out me-1" aria-hidden="true"></i>Zoom Out</button>
-                        <span class="booking-preview-zoom-value" id="bookingPreviewZoomValue">100%</span>
-                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomIn" aria-label="Zoom in"><i class="bi bi-zoom-in me-1" aria-hidden="true"></i>Zoom In</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm booking-preview-zoom-btn" id="bookingPreviewZoomReset" aria-label="Reset zoom"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset</button>
+                        <button type="button" class="btn booking-preview-zoom-btn" id="bookingPreviewZoomOut" aria-label="Zoom out"><i class="bi bi-zoom-out me-1" aria-hidden="true"></i>Zoom Out</button>
+                        {{-- Matches the default in the script below; overwritten on first paint. --}}
+                        <span class="booking-preview-zoom-value" id="bookingPreviewZoomValue">135%</span>
+                        <button type="button" class="btn booking-preview-zoom-btn" id="bookingPreviewZoomIn" aria-label="Zoom in"><i class="bi bi-zoom-in me-1" aria-hidden="true"></i>Zoom In</button>
+                        <button type="button" class="btn booking-preview-zoom-btn" id="bookingPreviewZoomReset" aria-label="Reset zoom"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset</button>
                     </div>
                     <button type="button" class="btn-close ms-1" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -800,9 +875,13 @@
                             <th>Buyer / Season</th>
                             <th>Vendor</th>
                             <th>Style / Item</th>
-                            <th class="text-end">Qty</th>
+                            <th class="po-num">Qty</th>
                             <th>Generated</th>
-                            <th class="text-center" style="width:230px;">Action</th>
+                            {{-- Sized for View / Print / PDF / Excel on one line
+                                 (~259px of buttons plus padding). Below this the
+                                 fourth button wraps and the row grows taller than
+                                 its neighbours. --}}
+                            <th class="text-center" style="width:275px;min-width:275px;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -840,7 +919,7 @@
                                     <div class="fw-semibold">{{ $po->style_name ?: ($poData['order_style_no'] ?? '-') }}</div>
                                     <div class="small text-muted">{{ $po->item_name ?: ($poData['item_type'] ?? '-') }}</div>
                                 </td>
-                                <td class="text-end fw-bold">{{ $po->qty !== null && $po->qty !== '' ? $po->qty : '-' }}</td>
+                                <td class="po-num fw-bold">{{ $po->qty !== null && $po->qty !== '' ? $po->qty : '-' }}</td>
                                 <td>
                                     <span class="po-status-pill po-status-generated"><i class="bi bi-check2-circle" aria-hidden="true"></i>Generated</span>
                                     <div class="small text-muted mt-1">{{ optional($po->generated_at)->format('d M Y, h:i A') ?: '-' }}</div>
@@ -888,6 +967,7 @@
 @endsection
 
 @section('scripts')
+@include('supply-chain.bookings.partials._ex-mill-autofill')
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -994,9 +1074,16 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!form || !rowsBody) return;
 
     let filterTimer = null;
-    let bookingPreviewZoom = 1;
+    // Starts at the scale users were manually reaching for anyway, and matches
+    // the CSS default in the preview partial — the two must agree, or the first
+    // paint and the label above it disagree by 35%. Reset returns here, not to
+    // 1: 100% is the unreadable paper-size rendering, not a useful home.
+    // The ceiling moved up with the floor so there is still room above the
+    // default for anyone who wants it larger.
+    const bookingPreviewZoomDefault = 1.35;
+    let bookingPreviewZoom = bookingPreviewZoomDefault;
     const bookingPreviewZoomMin = 0.7;
-    const bookingPreviewZoomMax = 1.4;
+    const bookingPreviewZoomMax = 1.8;
     const bookingPreviewZoomStep = 0.1;
 
     function applyPreviewZoom(value) {
@@ -1213,7 +1300,8 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     zoomResetBtn?.addEventListener('click', function () {
-        applyPreviewZoom(1);
+        // Back to the readable default, not to 1.
+        applyPreviewZoom(bookingPreviewZoomDefault);
         previewContent?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
     });
 
@@ -1224,8 +1312,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Turn each filter dropdown into a searchable (typeable) dropdown. Falls back to the
     // native <select> if the Tom Select library fails to load — filter logic is unchanged.
+    // `select.` matters: .booking-auto-filter is also on the IHOD date inputs so
+    // they reload the table on change, and running TomSelect over an
+    // <input type="date"> replaces the native date picker with a tag widget.
     if (window.TomSelect) {
-        document.querySelectorAll('.booking-auto-filter').forEach(function (select) {
+        document.querySelectorAll('select.booking-auto-filter').forEach(function (select) {
             const placeholder = (select.options[0] && select.options[0].value === '')
                 ? select.options[0].text
                 : 'Search...';
@@ -1331,6 +1422,16 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        // The chips are positional, so they are rewritten after every add and
+        // remove rather than baked in once — otherwise deleting instruction 2
+        // leaves the list reading 1, 3, 4.
+        function renumberNotes(list) {
+            list.querySelectorAll('.booking-preview-note-row').forEach(function (row, i) {
+                const chip = row.querySelector('.bp-note-index');
+                if (chip) chip.textContent = i + 1;
+            });
+        }
+
         const addNoteBtn = event.target.closest('.booking-preview-add-note');
         if (addNoteBtn) {
             const panel = addNoteBtn.closest('.booking-preview-edit-panel');
@@ -1338,8 +1439,11 @@ document.addEventListener('DOMContentLoaded', function () {
             if (list) {
                 const row = document.createElement('div');
                 row.className = 'booking-preview-note-row';
-                row.innerHTML = '<textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea><button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>';
+                // Must match the server-rendered row in preview.blade.php:
+                // numbered chip, textarea, quiet Remove pill.
+                row.innerHTML = '<span class="bp-note-index" aria-hidden="true"></span><textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea><button type="button" class="bp-remove booking-preview-remove-note"><i class="bi bi-x-lg" aria-hidden="true"></i>Remove</button>';
                 list.appendChild(row);
+                renumberNotes(list);
             }
             return;
         }
@@ -1350,6 +1454,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const row = removeNoteBtn.closest('.booking-preview-note-row');
             if (row && list && list.querySelectorAll('.booking-preview-note-row').length > 1) {
                 row.remove();
+                renumberNotes(list);
             } else if (row) {
                 const textarea = row.querySelector('textarea');
                 if (textarea) textarea.value = '';

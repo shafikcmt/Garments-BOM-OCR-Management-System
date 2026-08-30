@@ -762,6 +762,7 @@ class BookingController extends Controller
             'email' => 'Email',
             'address' => 'Supplier Address',
             'date' => 'Date',
+            'required_ex_mill' => 'Required Ex-mill',
             'buyer' => 'Buyer',
             'season' => 'Season',
             'from' => 'From',
@@ -1347,7 +1348,14 @@ class BookingController extends Controller
         $this->applyCellFilter($pendingRowsQuery, 'season', $request->input('season'));
         $this->applyCellFilter($pendingRowsQuery, 'sap_code', $request->input('sap_code'));
         $this->applyCellFilter($pendingRowsQuery, 'vendor', $request->input('vendor'));
-        $this->applyCellFilter($pendingRowsQuery, 'ihod', $request->input('ihod'));
+        // IHOD is a DATE (the contract shipment date), so it takes a From/To
+        // range rather than the substring match the text filters above use.
+        $this->applyDateRangeCellFilter(
+            $pendingRowsQuery,
+            'ihod',
+            $request->input('ihod_from'),
+            $request->input('ihod_to')
+        );
         $this->applyKeywordFilter($pendingRowsQuery, $request->input('keyword'));
 
         return $pendingRowsQuery;
@@ -1755,6 +1763,85 @@ class BookingController extends Controller
             $cellQuery->whereIn('header_id', $headerIds)
                 ->whereRaw('LOWER(value) LIKE ?', ['%' . $value . '%']);
         });
+    }
+
+    /**
+     * Narrow a row query to cells in one group whose DATE value falls inside a
+     * From/To window. Either bound may be omitted for an open-ended range.
+     *
+     * WHY PLAIN STRING COMPARISON, AND WHY THAT IS NOT A BODGE.
+     * excel_cells.value is a text column, and the obvious instinct is to cast
+     * it to a date before comparing. Don't: casting is where this project's
+     * two engines diverge (CLAUDE.md's Database Rules — DATE_FORMAT is MySQL
+     * only, TO_CHAR is PostgreSQL, STRFTIME is the SQLite the tests run on),
+     * and a cast also throws the moment one row holds text that is not a date.
+     *
+     * It is unnecessary here because ISO-8601 dates sort lexicographically in
+     * exactly chronological order: '2026-07-02' < '2026-07-11' as a string is
+     * the same answer as as a date. Every one of the 614 non-blank IHOD values
+     * on file is strict YYYY-MM-DD, so a >= / <= on the raw text is correct,
+     * needs no casting, and behaves identically on MySQL, PostgreSQL and
+     * SQLite.
+     *
+     * THE FORMAT IS THE PRECONDITION. This holds only while the values stay
+     * ISO. A value in any other shape (dd/mm/yyyy, an Excel serial) simply
+     * falls outside the window rather than throwing — it is dropped from a
+     * filtered result, never shown wrongly. The bounds themselves are
+     * normalised below so a picker sending anything else cannot widen a range
+     * by accident.
+     */
+    protected function applyDateRangeCellFilter($query, string $group, ?string $from, ?string $to): void
+    {
+        $from = $this->isoDateOrNull($from);
+        $to = $this->isoDateOrNull($to);
+
+        if ($from === null && $to === null) {
+            return;
+        }
+
+        // A reversed range is the user filling the boxes in the wrong order,
+        // not a request for zero rows. Swap rather than return nothing.
+        if ($from !== null && $to !== null && $from > $to) {
+            [$from, $to] = [$to, $from];
+        }
+
+        $headerIds = $this->headerIdsForGroup($group);
+
+        if (empty($headerIds)) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereHas('cells', function ($cellQuery) use ($headerIds, $from, $to) {
+            $cellQuery->whereIn('header_id', $headerIds);
+
+            if ($from !== null) {
+                $cellQuery->where('value', '>=', $from);
+            }
+
+            if ($to !== null) {
+                $cellQuery->where('value', '<=', $to);
+            }
+        });
+    }
+
+    /**
+     * A bound is used only if it is exactly YYYY-MM-DD and a real calendar
+     * date. Anything else is treated as "not set", so a malformed value
+     * silently widens nothing.
+     */
+    protected function isoDateOrNull($value): ?string
+    {
+        $value = trim((string) $value);
+
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return null;
+        }
+
+        [$y, $m, $d] = array_map('intval', explode('-', $value));
+
+        return checkdate($m, $d, $y) ? $value : null;
     }
 
     protected function applyKeywordFilter($query, ?string $keyword): void
@@ -2442,6 +2529,7 @@ class BookingController extends Controller
         return [
             'to' => $supplier?->display_name ?: ($bookingPo->vendor_name ?: '[Supplier company name]'),
             'date' => optional($bookingPo->generated_at ?: now())->format('d/m/Y'),
+            'required_ex_mill' => optional($bookingPo->generated_at ?: now())->copy()->addMonth()->format('d/m/Y'),
             'attn' => $supplier?->contact_person ?: '[Contact person]',
             'buyer' => $bookingPo->buyer_name ?: '[Buyer name]',
             'email' => $supplier?->email ?: '[Supplier email]',
@@ -3016,7 +3104,12 @@ BIN: 005635381-0406 TIN: 780096271681",
     protected function bookingScalarKeys(): array
     {
         return [
-            'to', 'date', 'attn', 'buyer', 'email', 'address', 'season', 'from', 'po_number',
+            // required_ex_mill rides inside booking_data like every other
+            // scalar — booking_pos.booking_data is an array-cast JSON column,
+            // so the field needs no migration of its own. It MUST be listed
+            // here: cleanBooking() rebuilds the blob from this list, so a key
+            // missing from it is silently dropped on every save.
+            'to', 'date', 'required_ex_mill', 'attn', 'buyer', 'email', 'address', 'season', 'from', 'po_number',
             'supplier', 'incoterm', 'item_type', 'ship_mode', 'order_style_no',
             'tolerance', 'consignee', 'delivery_destination_id', 'delivery_destination_name',
             'delivery_destination_details', 'best_regards',

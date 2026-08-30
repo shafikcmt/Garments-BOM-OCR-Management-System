@@ -52,6 +52,10 @@
         <td class="label">DATE</td><td colspan="6">{{ $bookingData['date'] ?? '' }}</td>
     </tr>
     <tr>
+        <td class="label"></td><td colspan="5"></td>
+        <td class="label">REQUIRED EX-MILL</td><td colspan="6">{{ $bookingData['required_ex_mill'] ?? '' }}</td>
+    </tr>
+    <tr>
         <td class="label">E-MAIL</td><td colspan="5">{{ $bookingData['email'] ?? '' }}</td>
         <td class="label">BUYER</td><td colspan="6">{{ $bookingData['buyer'] ?? '' }}</td>
     </tr>

@@ -37,6 +37,27 @@
         --hapl-blue: #006C9D;
         --hapl-blue-dark: #004b70;
         --hapl-border: #94a3b8;
+
+        /* THE SHEET'S RENDERED WIDTH, derived rather than measured.
+         *
+         * .bf-sheet is `width: 198mm` scaled by CSS `zoom` — and zoom scales
+         * layout, so the sheet occupies exactly 198mm x zoom on screen. That is
+         * computable in CSS, which is why the chrome panels that must line up
+         * with the paper need no JS resize listener: they read the same
+         * --booking-preview-zoom the sheet does, off a shared ancestor
+         * (#bookingPreviewContent, where the zoom buttons set it), so they
+         * re-sync on their own the moment the zoom changes.
+         *
+         * Had the sheet used `transform: scale()` this would not work — a
+         * transform paints at a different size than it lays out at, so the
+         * rendered width could only be read back from the DOM.
+         *
+         * The 1.35 fallback matches the sheet's own default, which keeps the
+         * Generated PO and Admin screens correct: they render this partial with
+         * no zoom control, so the variable is never set there.
+         */
+        --po-sheet-rendered-width: calc(198mm * var(--booking-preview-zoom, 1.35));
+
         background: linear-gradient(180deg, #eef6fb 0%, #ffffff 100%);
         padding: 8px;
         border-radius: 12px;
@@ -44,7 +65,14 @@
     }
     .booking-format-preview-box .bf-sheet {
         width: 198mm;
-        zoom: var(--booking-preview-zoom, 1);
+        /* DEFAULT 1.35, not 1. The sheet is a true-to-paper A4 rendering — 198mm
+           wide with 7px body text — so at 1 it is the size the text would be on
+           paper, which nobody can read on a screen. Users were reaching for the
+           Zoom In button and stopping at 140% every single time, so that is now
+           where it starts. Nothing about the design changes; only the scale it
+           is first painted at. The zoom control still overrides this, and the
+           print/PDF output never reads this variable at all. */
+        zoom: var(--booking-preview-zoom, 1.35);
         max-width: 100%;
         min-height: 285mm;
         margin: 0 auto;
@@ -109,6 +137,19 @@
         text-transform: uppercase;
     }
     .booking-format-preview-box .bf-info-table td { font-size: 7px; }
+    /* The Required Ex-mill row only. The table is table-layout:fixed, so the
+       label column is locked to the 20mm set by the first row and "REQUIRED
+       EX-MILL" broke across two lines inside it. nowrap plus a slightly tighter
+       size and tracking fits it on one line without touching the column width,
+       which every other row depends on. */
+    .booking-format-preview-box .bf-info-table th.bf-info-tight {
+        white-space: nowrap;
+        font-size: 6px;
+        letter-spacing: -.01em;
+    }
+    /* The blank left half of that row: plain paper, no header tint, so it reads
+       as empty space rather than an abandoned label cell. */
+    .booking-format-preview-box .bf-info-table td.bf-info-blank { background: #fff; }
     .booking-format-preview-box .bf-style-value { font-size: 8px; font-weight: 900; color: var(--hapl-blue-dark); letter-spacing: .2px; }
     .booking-format-preview-box .bf-revision-pill {
         display: inline-block;
@@ -271,31 +312,170 @@
         .booking-format-preview-box .bf-action-footer-buttons { justify-content: stretch; }
         .booking-format-preview-box .bf-action-footer-buttons .btn { flex: 1; justify-content: center; }
     }
+    /* THE EDIT PANEL — application chrome, not the printed sheet.
+     *
+     * It sits inside .booking-format-preview-box but is `no-print` and is never
+     * part of the document the vendor receives. Everything below therefore uses
+     * the module's shared tokens (--po-*), the same ones the filter card, KPI
+     * cards and tables use, so the one screen a merchant actually types into
+     * stops looking like a raw dev form bolted onto a polished module.
+     *
+     * NOTHING here touches .bf-* — the sheet's own styles are untouched.
+     */
     .booking-format-preview-box .booking-preview-edit-panel {
-        width: 198mm;
+        /* EXACTLY THE SHEET'S RENDERED WIDTH — see --po-sheet-rendered-width
+         * above. Not 198mm (that ignores the zoom and left the panel narrower
+         * than the document), and not 100% (that made it wider than the
+         * document). Both edges now line up with the paper below it, at every
+         * zoom level, with no JS.
+         */
+        width: var(--po-sheet-rendered-width);
         max-width: 100%;
         margin: 0 auto 12px;
-        border: 1px solid #cbd5e1;
-        border-radius:var(--gx-radius);
-        background: #ffffff;
-        padding: 14px;
-        box-shadow: 0 14px 32px rgba(15, 23, 42, .08);
+        border: 1px solid var(--po-line, #D7E3ED);
+        border-radius: var(--po-r-surface, 14px);
+        background: var(--po-surface, #fff);
+        padding: 18px;
+        box-shadow: var(--po-shadow, 0 14px 34px rgba(11, 43, 60, .06));
     }
-    .booking-format-preview-box .booking-preview-edit-panel label {
+    /* Section heads carry the module's docket rail, so the panel reads as three
+       groups — Vendor, Booking details, Instructions — instead of one flat run
+       of fifteen fields. */
+    .booking-format-preview-box .bp-section + .bp-section {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid var(--po-line-soft, #EEF3F8);
+    }
+    .booking-format-preview-box .bp-section-head {
+        position: relative;
+        padding-left: 10px;
+        margin-bottom: 12px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: .09em;
+        text-transform: uppercase;
+        color: var(--po-blue-deep, #004B70);
+    }
+    .booking-format-preview-box .bp-section-head::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 1px;
+        bottom: 1px;
+        width: 3px;
+        border-radius: 2px;
+        background: var(--po-blue, #006C9D);
+    }
+    /* Sub-cards for the two instruction columns, so each is a contained list
+       rather than loose controls floating on the panel. */
+    .booking-format-preview-box .bp-subcard {
+        border: 1px solid var(--po-line, #D7E3ED);
+        border-radius: var(--po-r-control, 10px);
+        background: var(--po-paper, #F6F9FC);
+        padding: 10px;
+    }
+    .booking-format-preview-box .bp-scroll { max-height: 232px; overflow-y: auto; }
+    /* Suggested instructions: a real checkbox list. It replaces a
+       <select multiple size="7"> whose options were clipped mid-word and which
+       needed a "hold Ctrl/Cmd" instruction to operate. Same field name, so the
+       POST is byte-identical. */
+    .booking-format-preview-box .bp-check {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        padding: 7px 8px;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    .booking-format-preview-box .bp-check + .bp-check { border-top: 1px solid var(--po-line-soft, #EEF3F8); }
+    .booking-format-preview-box .bp-check:hover { background: var(--po-tint, #E0F2FE); }
+    .booking-format-preview-box .bp-check input { margin-top: 2px; flex: 0 0 auto; }
+    .booking-format-preview-box .bp-check span {
+        font-size: 11.5px;
+        line-height: 1.4;
+        font-weight: 500;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--po-ink, #0B2B3C);
+    }
+    /* Current instructions: numbered rows. */
+    .booking-format-preview-box .bp-note-index {
+        flex: 0 0 auto;
+        width: 20px;
+        height: 20px;
+        margin-top: 6px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--po-tint, #E0F2FE);
+        color: var(--po-blue-deep, #004B70);
+        font-size: 10px;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+    }
+    /* Remove is QUIET until you reach for it. Seven permanent red outline
+       buttons down the panel made deletion the loudest thing on a screen whose
+       job is editing text. */
+    .booking-format-preview-box .bp-remove {
+        flex: 0 0 auto;
+        margin-top: 4px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 10px;
+        border-radius: var(--po-r-pill, 999px);
+        border: 1px solid var(--po-line, #D7E3ED);
+        background: var(--po-surface, #fff);
+        color: var(--po-muted, #5B7383);
         font-size: 11px;
         font-weight: 800;
-        color: #334155;
-        text-transform: uppercase;
-        letter-spacing: .04em;
+        line-height: 1;
+        white-space: nowrap;
     }
+    .booking-format-preview-box .bp-remove:hover,
+    .booking-format-preview-box .bp-remove:focus {
+        border-color: var(--po-danger-border, #FECACA);
+        background: var(--po-danger-bg, #FEF2F2);
+        color: var(--po-danger, #B91C1C);
+    }
+    .booking-format-preview-box .booking-preview-edit-panel label {
+        font-size: 10px;
+        font-weight: 800;
+        color: var(--po-muted, #5B7383);
+        letter-spacing: .09em;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+    }
+    /* 40px controls on the module radius — the same height and shape as every
+       field in the filter card, instead of the 34px default this panel had. */
     .booking-format-preview-box .booking-preview-edit-panel .form-control,
-    .booking-format-preview-box .booking-preview-edit-panel .form-select { border-radius: 10px; font-size: 12px; }
-    .booking-format-preview-box .booking-preview-edit-panel .form-check-label { text-transform: none; letter-spacing: 0; font-size: 12px; }
+    .booking-format-preview-box .booking-preview-edit-panel .form-select {
+        min-height: 40px;
+        border-radius: var(--po-r-control, 10px);
+        border-color: var(--po-line, #D7E3ED);
+        color: var(--po-ink, #0B2B3C);
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .booking-format-preview-box .booking-preview-edit-panel textarea.form-control { min-height: 0; }
+    .booking-format-preview-box .booking-preview-edit-panel .form-control:focus,
+    .booking-format-preview-box .booking-preview-edit-panel .form-select:focus {
+        border-color: var(--po-blue, #006C9D);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
+    }
+    .booking-format-preview-box .booking-preview-edit-panel .form-text {
+        font-size: 10.5px;
+        color: var(--po-muted, #5B7383);
+    }
+    .booking-format-preview-box .booking-preview-edit-panel .form-check-label { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 600; }
     .booking-format-preview-box .booking-preview-note-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
     .booking-format-preview-box .booking-preview-note-row textarea { flex: 1; }
 
+    /* Tracks the sheet, same as the edit panel, so the whole column shares one
+       pair of edges. */
     .booking-format-preview-box .booking-change-control-panel {
-        width: 198mm;
+        width: var(--po-sheet-rendered-width);
         max-width: 100%;
         margin: 0 auto 12px;
         border: 1px solid #fecaca;
@@ -308,7 +488,7 @@
     .booking-format-preview-box .booking-change-table { margin-bottom: 0; }
     .booking-format-preview-box .booking-change-table th { font-size: 10px; color: #7f1d1d; text-transform: uppercase; letter-spacing: .05em; }
     .booking-format-preview-box .booking-change-table td { font-size: 11px; color: #334155; vertical-align: top; }
-    .booking-format-preview-box .booking-history-mini { width: 198mm; max-width:100%; margin: 0 auto 12px; border: 1px solid #e2e8f0; border-radius:var(--gx-radius); background:#fff; padding: 10px 12px; }
+    .booking-format-preview-box .booking-history-mini { width: var(--po-sheet-rendered-width); max-width:100%; margin: 0 auto 12px; border: 1px solid var(--po-line, #D7E3ED); border-radius:var(--po-r-surface, 14px); background:#fff; padding: 10px 12px; }
     .booking-format-preview-box .booking-history-mini .history-line { color:#64748b; font-size:11px; }
     @media (max-width: 767px) {
         .booking-format-preview-box { padding: 6px; }
@@ -392,6 +572,11 @@
 
             <input type="hidden" name="booking[supplier]" value="{{ $bookingData['supplier'] ?? '' }}">
 
+            {{-- Section 1 of 3. The fields below are unchanged — only grouped,
+                 so the panel reads as Vendor / Booking details / Instructions
+                 rather than one undifferentiated run of inputs. --}}
+            <div class="bp-section">
+            <div class="bp-section-head">Vendor</div>
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label">TO / Vendor Name</label>
@@ -409,9 +594,32 @@
                     <label class="form-label">Supplier Address</label>
                     <textarea name="booking[address]" rows="2" class="form-control" placeholder="Supplier address">{{ $bookingData['address'] ?? '' }}</textarea>
                 </div>
+            </div>
+            </div>
+
+            {{-- Section 2 of 3. --}}
+            <div class="bp-section">
+            <div class="bp-section-head">Booking details</div>
+            <div class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label">Date</label>
-                    <input type="text" name="booking[date]" value="{{ $bookingData['date'] ?? '' }}" class="form-control">
+                    <input type="text" name="booking[date]" value="{{ $bookingData['date'] ?? '' }}"
+                           class="form-control js-booking-date">
+                </div>
+                {{-- Required Ex-mill defaults to Date + 1 month. The two hooks
+                     below are read by the delegated script the host page loads
+                     (_ex-mill-autofill.blade.php): js-booking-ex-mill marks the
+                     field, and data-ex-mill-touched records whether the user
+                     has typed in it, so re-dating the PO never overwrites a
+                     date somebody set on purpose. --}}
+                <div class="col-md-3">
+                    <label class="form-label">Required Ex-mill</label>
+                    <input type="text" name="booking[required_ex_mill]"
+                           value="{{ $bookingData['required_ex_mill'] ?? '' }}"
+                           class="form-control js-booking-ex-mill"
+                           data-ex-mill-touched="0"
+                           placeholder="dd/mm/yyyy">
+                    <div class="form-text">Defaults to Date + 1 month. Edit if the vendor deadline differs.</div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Buyer</label>
@@ -485,36 +693,52 @@
                     <label class="form-label">Best Regards Name</label>
                     <input type="text" name="booking[best_regards]" value="{{ $bookingData['best_regards'] ?? '' }}" class="form-control">
                 </div>
-            </div>
+            </div>{{-- /.row --}}
+            </div>{{-- /.bp-section Booking details --}}
 
-            <hr class="my-4">
-
+            {{-- Section 3 of 3. --}}
+            <div class="bp-section">
+            <div class="bp-section-head">Instructions</div>
             <div class="row g-3">
                 <div class="col-md-5">
-                    <label class="form-label">Add Extra Suggested Instructions</label>
-                    <select name="common_instruction_ids[]" class="form-select" multiple size="7">
-                        @foreach($instructionOptions as $instruction)
-                            <option value="{{ $instruction->id }}">{{ $instruction->instruction }}</option>
-                        @endforeach
-                    </select>
-                    <div class="form-text">Only admin active suggestion instructions show here. Hold Ctrl/Cmd to select multiple; selected suggestions will be added to this booking.</div>
-                </div>
-                <div class="col-md-7">
-                    <label class="form-label">Current Instructions</label>
-                    <div class="booking-preview-notes-list">
-                        @forelse($notes as $note)
-                            <div class="booking-preview-note-row">
-                                <textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text">{{ $note }}</textarea>
-                                <button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>
-                            </div>
+                    <label class="form-label">Add extra suggested instructions</label>
+                    {{-- A TICK LIST, not a <select multiple>. The old control clipped
+                         every option mid-word and needed a "hold Ctrl/Cmd" note to
+                         operate, which is a support call waiting to happen for
+                         non-technical staff. Same field name and same values, so
+                         the submitted payload is identical. --}}
+                    <div class="bp-subcard bp-scroll">
+                        @forelse($instructionOptions as $instruction)
+                            <label class="bp-check">
+                                <input type="checkbox" class="form-check-input" name="common_instruction_ids[]" value="{{ $instruction->id }}">
+                                <span>{{ $instruction->instruction }}</span>
+                            </label>
                         @empty
-                            <div class="booking-preview-note-row">
-                                <textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea>
-                                <button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>
-                            </div>
+                            <div class="form-text mb-0">No admin suggestion instructions are active yet.</div>
                         @endforelse
                     </div>
-                    <button type="button" class="btn btn-outline-primary btn-sm booking-preview-add-note"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Instruction Line</button>
+                    <div class="form-text">Tick any suggestion to add it to this booking. Admin manages this list.</div>
+                </div>
+                <div class="col-md-7">
+                    <label class="form-label">Current instructions</label>
+                    <div class="bp-subcard">
+                        <div class="booking-preview-notes-list">
+                            @forelse($notes as $note)
+                                <div class="booking-preview-note-row">
+                                    <span class="bp-note-index" aria-hidden="true">{{ $loop->iteration }}</span>
+                                    <textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text">{{ $note }}</textarea>
+                                    <button type="button" class="bp-remove booking-preview-remove-note"><i class="bi bi-x-lg" aria-hidden="true"></i>Remove</button>
+                                </div>
+                            @empty
+                                <div class="booking-preview-note-row">
+                                    <span class="bp-note-index" aria-hidden="true">1</span>
+                                    <textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea>
+                                    <button type="button" class="bp-remove booking-preview-remove-note"><i class="bi bi-x-lg" aria-hidden="true"></i>Remove</button>
+                                </div>
+                            @endforelse
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm booking-preview-add-note mt-1"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Instruction Line</button>
+                    </div>
                 </div>
                 <div class="col-12">
                     <label class="form-label">New Instruction</label>
@@ -524,8 +748,9 @@
                         <label class="form-check-label" for="saveNewInstruction{{ $previewFormUid }}">Save this new instruction as an extra suggestion for future bookings</label>
                     </div>
                 </div>
-            </div>
-        </div>
+            </div>{{-- /.row --}}
+            </div>{{-- /.bp-section Instructions --}}
+        </div>{{-- /.booking-preview-edit-panel --}}
     @endif
 
     <div class="bf-sheet">
@@ -545,6 +770,17 @@
             <table class="bf-info-table">
                 <tr><th>TO</th><td>{{ $bookingData['to'] ?? '' }}</td><th>PO/WO/ NUMBER</th><td>{{ $poNo }} @if($revisionLabel)<span class="bf-revision-pill">{{ $revisionLabel }}</span>@endif</td></tr>
                 <tr><th>ATTN</th><td>{{ $bookingData['attn'] ?? '' }}</td><th>DATE</th><td>{{ $bookingData['date'] ?? '' }}</td></tr>
+                {{-- RIGHT COLUMN, directly under DATE, which it is derived from.
+                     The left half is one blank spacer cell (colspan=2) rather
+                     than an empty th+td pair: the empty th was painting the
+                     header tint, so it read as a stray leftover box instead of
+                     dead space. Still four columns wide, so no other row's
+                     structure changes. --}}
+                <tr>
+                    <td class="bf-info-blank" colspan="2"></td>
+                    <th class="bf-info-tight">REQUIRED EX-MILL</th>
+                    <td>{{ $bookingData['required_ex_mill'] ?? '' }}</td>
+                </tr>
                 <tr><th>E-MAIL</th><td>{{ $bookingData['email'] ?? '' }}</td><th>BUYER</th><td>{{ $bookingData['buyer'] ?? '' }}</td></tr>
                 <tr><th>ADDRESS</th><td>{{ $bookingData['address'] ?? '' }}</td><th>SEASON</th><td>{{ $bookingData['season'] ?? '' }}</td></tr>
                 <tr><th>FROM</th><td>{{ $bookingData['from'] ?? '' }}</td><th>STYLE NO</th><td class="bf-style-value">{{ $bookingData['order_style_no'] ?? '' }}</td></tr>

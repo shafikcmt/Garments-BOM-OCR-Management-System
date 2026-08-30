@@ -24,74 +24,108 @@
 @endphp
 
 @section('styles')
+@include('supply-chain.bookings.partials._po-module-theme')
 <style>
-    .po-control-show-wrap { background: #f4f8fb; min-height: calc(100vh - 110px); }
-    .po-control-show-shell { max-width: 1120px; margin: 0 auto; }
-    .po-control-show-hero,
-    .po-admin-access-card {
-        border: 1px solid #dbe7f3;
-        border-radius: 20px;
-        background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
-        box-shadow: 0 16px 42px rgba(15, 23, 42, .08);
+    /* Page chrome only — the embedded Humana Apparels sheet is styled by the
+       preview partial and is not touched here. Everything visual comes from the
+       module theme, so Admin and Supply Chain look like one product. */
+    .po-control-show-wrap {
+        min-height: calc(100vh - 110px);
+        background: linear-gradient(180deg, #FFFFFF 0%, var(--po-paper) 220px, var(--po-paper) 100%);
     }
-    .po-admin-access-card { background: #fff; }
+    /* Full width for the chrome; the printable sheet inside stays 198mm and
+       centres itself. Same reasoning as the Generated PO view. */
+    .po-control-show-shell { max-width: none; margin: 0 auto; }
+    .po-control-hero-note { color: var(--po-muted); max-width: 720px; }
+    .po-control-actionbar,
+    .po-admin-access-card {
+        background: var(--po-surface);
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-surface);
+        box-shadow: var(--po-shadow-sm);
+    }
+    .po-control-actionbar { padding: 12px 16px; }
     .po-control-chip {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        border-radius: 999px;
-        padding: 7px 11px;
+        border-radius: var(--po-r-pill);
+        padding: 5px 11px;
         font-size: 11px;
         font-weight: 900;
+        line-height: 1;
         white-space: nowrap;
     }
-    .po-control-chip.locked { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-    .po-control-chip.open { background: #ecfdf5; color: #047857; border: 1px solid #bbf7d0; }
-    .po-control-chip.permission { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+    .po-control-chip.locked { background: var(--po-danger-bg); color: var(--po-danger); border: 1px solid var(--po-danger-border); }
+    .po-control-chip.open { background: var(--po-ok-bg); color: var(--po-ok); border: 1px solid var(--po-ok-border); }
+    .po-control-chip.permission { background: var(--po-tint); color: var(--po-blue-deep); border: 1px solid #BAE0F2; }
     .po-control-chip .bi,
     .btn .bi { display: inline-flex; align-items: center; justify-content: center; width: 1em; height: 1em; line-height: 1; }
     .po-control-chip .bi::before,
     .btn .bi::before { line-height: 1; }
     .po-admin-access-card .form-control,
-    .po-admin-access-card .form-select { border-radius: 13px; border-color: #cbd5e1; font-weight: 700; }
-    .po-admin-access-card .form-label { color: #475569; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
+    .po-admin-access-card .form-select {
+        border-radius: var(--po-r-control);
+        border-color: var(--po-line);
+        min-height: 40px;
+        font-weight: 600;
+        font-size: 13px;
+    }
+    .po-admin-access-card .form-control:focus,
+    .po-admin-access-card .form-select:focus {
+        border-color: var(--po-blue);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
+    }
+    .po-admin-access-card .form-label {
+        color: var(--po-muted);
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .09em;
+    }
 </style>
 @endsection
 
 @section('content')
-<div class="po-control-show-wrap p-2 p-md-3">
+<div class="po-control-show-wrap po-scope p-2 p-md-3">
     <div class="po-control-show-shell">
-        <div class="po-control-show-hero p-3 p-md-4 mb-3">
-            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                <div>
-                    <div class="small fw-bold text-primary text-uppercase">Admin PO Generate Control</div>
-                    <h4 class="mb-1 fw-bold text-slate-900">PO {{ $bookingPo->po_no }} @if($revisionNo > 0)<span class="badge rounded-pill text-bg-warning">R-{{ $revisionNo }}</span>@endif</h4>
-                    <div class="small text-muted">Admin can edit, lock, authorize Supply Chain users, delete and check before/after changes. Default PO generate/re-generate owner is Supply Chain only.</div>
-                    <div class="d-flex gap-2 flex-wrap mt-2">
-                        @if($poLocked)
-                            <span class="po-control-chip locked"><i class="bi bi-lock-fill" aria-hidden="true"></i>Locked</span>
-                        @else
-                            <span class="po-control-chip open"><i class="bi bi-unlock" aria-hidden="true"></i>Open</span>
-                        @endif
-                        <span class="po-control-chip permission"><i class="bi bi-person-gear" aria-hidden="true"></i>{{ $poPermissionText }}</span>
-                        @if($poLocked)
-                            <span class="po-control-chip locked"><i class="bi bi-people-fill" aria-hidden="true"></i>{{ $poLockScopeText }}</span>
-                        @endif
-                    </div>
-                </div>
-                <div class="d-flex gap-2 flex-wrap justify-content-end">
-                    <a href="{{ route('admin.po-generate-control.index') }}" class="btn btn-outline-secondary btn-sm rounded-pill fw-bold"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back</a>
-                    <button type="button" class="btn btn-primary btn-sm fw-bold rounded-pill booking-show-edit-start" data-url="{{ route('admin.po-generate-control.edit_preview', $bookingPo) }}" {{ $poLocked ? 'disabled' : '' }} title="{{ $poLocked ? 'Unlock this PO first' : 'Edit PO' }}"><i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit PO</button>
-                    <button type="button" class="btn btn-warning btn-sm fw-bold rounded-pill booking-show-regenerate-start" data-url="{{ route('admin.po-generate-control.regenerate_preview', $bookingPo) }}" {{ $poLocked ? 'disabled' : '' }} title="{{ $poLocked ? 'Unlock this PO first' : 'Re-generate PO' }}"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Re-generate PO</button>
-                    <a href="{{ route('admin.po-generate-control.print', $bookingPo) }}" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill fw-bold"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print</a>
-                    <a href="{{ route('admin.po-generate-control.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm rounded-pill fw-bold"><i class="bi bi-filetype-pdf me-1" aria-hidden="true"></i>PDF</a>
-                    <a href="{{ route('admin.po-generate-control.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm rounded-pill fw-bold"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel</a>
-                    <form method="POST" action="{{ route('admin.po-generate-control.destroy', $bookingPo) }}" onsubmit="return confirm('Delete PO {{ $bookingPo->po_no }}? This will remove only the generated PO number and move source rows back to Pending PO.');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill fw-bold"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
-                    </form>
-                </div>
+        <div class="po-head po-rail {{ $poLocked ? 'po-rail-warn' : '' }} mb-3">
+            <div>
+                <div class="po-micro">Admin / PO Generate Control</div>
+                <h4 class="po-head-title">PO {{ $bookingPo->po_no }} @if($revisionNo > 0)<span class="po-pill po-pill-warn ms-1">R-{{ $revisionNo }}</span>@endif</h4>
+                <div class="small po-control-hero-note mt-1">Admin can edit, lock, authorize Supply Chain users, delete and check before/after changes. Default PO generate/re-generate owner is Supply Chain only.</div>
+            </div>
+            {{-- The rail turns amber when this PO is locked, so the page's state
+                 is readable from its left edge before any chip is read. --}}
+            <div class="d-flex gap-2 flex-wrap justify-content-end">
+                    @if($poLocked)
+                        <span class="po-control-chip locked"><i class="bi bi-lock-fill" aria-hidden="true"></i>Locked</span>
+                    @else
+                        <span class="po-control-chip open"><i class="bi bi-unlock" aria-hidden="true"></i>Open</span>
+                    @endif
+                <span class="po-control-chip permission"><i class="bi bi-person-gear" aria-hidden="true"></i>{{ $poPermissionText }}</span>
+                @if($poLocked)
+                    <span class="po-control-chip locked"><i class="bi bi-people-fill" aria-hidden="true"></i>{{ $poLockScopeText }}</span>
+                @endif
+            </div>
+        </div>
+
+        {{-- Buttons unchanged: same routes, labels, classes and disabled states. --}}
+        <div class="po-control-actionbar mb-3">
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+                <a href="{{ route('admin.po-generate-control.index') }}" class="btn btn-outline-secondary btn-sm rounded-pill fw-bold"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back</a>
+                <button type="button" class="btn btn-primary btn-sm fw-bold rounded-pill booking-show-edit-start" data-url="{{ route('admin.po-generate-control.edit_preview', $bookingPo) }}" {{ $poLocked ? 'disabled' : '' }} title="{{ $poLocked ? 'Unlock this PO first' : 'Edit PO' }}"><i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit PO</button>
+                <button type="button" class="btn btn-warning btn-sm fw-bold rounded-pill booking-show-regenerate-start" data-url="{{ route('admin.po-generate-control.regenerate_preview', $bookingPo) }}" {{ $poLocked ? 'disabled' : '' }} title="{{ $poLocked ? 'Unlock this PO first' : 'Re-generate PO' }}"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Re-generate PO</button>
+                <a href="{{ route('admin.po-generate-control.print', $bookingPo) }}" target="_blank" class="btn btn-outline-primary btn-sm rounded-pill fw-bold"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print</a>
+                <a href="{{ route('admin.po-generate-control.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm rounded-pill fw-bold"><i class="bi bi-filetype-pdf me-1" aria-hidden="true"></i>PDF</a>
+                <a href="{{ route('admin.po-generate-control.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm rounded-pill fw-bold"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel</a>
+                {{-- Delete stays last and visually separated, so the destructive
+                     action is never the one next to Back. --}}
+                <form method="POST" action="{{ route('admin.po-generate-control.destroy', $bookingPo) }}" class="ms-auto" onsubmit="return confirm('Delete PO {{ $bookingPo->po_no }}? This will remove only the generated PO number and move source rows back to Pending PO.');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill fw-bold"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                </form>
             </div>
         </div>
 
@@ -189,6 +223,7 @@
 @endsection
 
 @section('scripts')
+@include('supply-chain.bookings.partials._ex-mill-autofill')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -302,6 +337,16 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        // The chips are positional, so they are rewritten after every add and
+        // remove — otherwise deleting instruction 2 leaves the list reading
+        // 1, 3, 4. Same helper as the Supply Chain screen.
+        function renumberNotes(list) {
+            list.querySelectorAll('.booking-preview-note-row').forEach(function (row, i) {
+                const chip = row.querySelector('.bp-note-index');
+                if (chip) chip.textContent = i + 1;
+            });
+        }
+
         const addNoteBtn = event.target.closest('.booking-preview-add-note');
         if (addNoteBtn) {
             const panel = addNoteBtn.closest('.booking-preview-edit-panel');
@@ -309,8 +354,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (list) {
                 const row = document.createElement('div');
                 row.className = 'booking-preview-note-row';
-                row.innerHTML = '<textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea><button type="button" class="btn btn-outline-danger btn-sm booking-preview-remove-note" title="Remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="ms-1">Remove</span></button>';
+                // Must match the server-rendered row in preview.blade.php.
+                row.innerHTML = '<span class="bp-note-index" aria-hidden="true"></span><textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea><button type="button" class="bp-remove booking-preview-remove-note"><i class="bi bi-x-lg" aria-hidden="true"></i>Remove</button>';
                 list.appendChild(row);
+                renumberNotes(list);
             }
             return;
         }
@@ -319,8 +366,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (removeNoteBtn) {
             const list = removeNoteBtn.closest('.booking-preview-notes-list');
             const row = removeNoteBtn.closest('.booking-preview-note-row');
-            if (row && list && list.querySelectorAll('.booking-preview-note-row').length > 1) row.remove();
-            else if (row) row.querySelector('textarea').value = '';
+            if (row && list && list.querySelectorAll('.booking-preview-note-row').length > 1) {
+                row.remove();
+                renumberNotes(list);
+            } else if (row) {
+                row.querySelector('textarea').value = '';
+            }
             return;
         }
 

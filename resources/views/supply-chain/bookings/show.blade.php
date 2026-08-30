@@ -7,33 +7,72 @@
 @endphp
 
 @section('styles')
+@include('supply-chain.bookings.partials._po-module-theme')
 <style>
+    /* Page chrome only. NOTHING here reaches inside .booking-format-preview-box
+       — the Humana Apparels sheet is the official paper format and is styled
+       entirely by the preview partial. These rules stop at its edge.
+
+       Everything visual comes from the module theme partial, so this screen and
+       the list it was opened from are built from the same objects. */
     .booking-format-wrap {
-        background: #f4f8fb;
         min-height: calc(100vh - 110px);
+        background: linear-gradient(180deg, #FFFFFF 0%, var(--po-paper) 220px, var(--po-paper) 100%);
+        /* The generated PO has no zoom control — it is read-only — so it takes
+           the partial's 1.35 default and needs somewhere to scroll on a narrow
+           laptop rather than clamping the sheet. */
+        overflow-x: auto;
     }
     .booking-format-shell {
-        max-width: 980px;
+        /* Full width for the CHROME — header, action bar, email history — so
+           this page fills the screen like the rest of the app. The printable
+           sheet inside is a fixed 198mm and keeps centring itself via its own
+           `margin: 0 auto`, so widening the shell gives the chrome room without
+           stretching the document. */
+        max-width: none;
         margin: 0 auto;
     }
+    .booking-show-actionbar {
+        background: var(--po-surface);
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-r-surface);
+        box-shadow: var(--po-shadow-sm);
+        padding: 12px 16px;
+    }
+    .booking-show-actionbar .btn { font-weight: 700; border-radius: var(--po-r-control); }
 </style>
 @endsection
 
 @section('content')
-<div class="booking-format-wrap p-2 p-md-3">
+<div class="booking-format-wrap po-scope p-2 p-md-3">
     <div class="booking-format-shell">
-        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
-            <div>
-                <h4 class="mb-1 fw-bold text-primary">Booking Format</h4>
-                <div class="small text-muted">PO {{ $bookingPo->po_no }}@if($revisionNo > 0) · R-{{ $revisionNo }}@endif. Generated PO is read-only.</div>
+        <div class="po-head po-rail po-rail-ok mb-3">
+            <div class="d-flex align-items-center gap-3">
+                <span class="po-head-icon"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></span>
+                <div>
+                    <div class="po-micro">Supply Chain / Generated PO</div>
+                    <h4 class="po-head-title">Booking Format</h4>
+                </div>
             </div>
+            {{-- The same three facts the old subtitle sentence carried, promoted
+                 to pills so PO number, revision and read-only state are legible
+                 at a glance instead of buried in a line of muted prose. --}}
             <div class="d-flex gap-2 flex-wrap">
-                <a href="{{ route('supply_chain.bookings.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back</a>
-                <a href="{{ route('supply_chain.bookings.print', $bookingPo) }}" target="_blank" class="btn btn-outline-primary btn-sm"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print</a>
-                <a href="{{ route('supply_chain.bookings.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-pdf me-1" aria-hidden="true"></i>Download PDF</a>
-                <a href="{{ route('supply_chain.bookings.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Export Excel</a>
-                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#bookingEmailModal" title="Email this PO Booking to the supplier as a PDF attachment"><i class="bi bi-envelope me-1" aria-hidden="true"></i>Email to Supplier</button>
+                <span class="po-pill po-pill-blue"><i class="bi bi-upc-scan" aria-hidden="true"></i>{{ $bookingPo->po_no }}</span>
+                @if($revisionNo > 0)
+                    <span class="po-pill po-pill-warn"><i class="bi bi-arrow-repeat" aria-hidden="true"></i>R-{{ $revisionNo }}</span>
+                @endif
+                <span class="po-pill"><i class="bi bi-lock" aria-hidden="true"></i>Read-only</span>
             </div>
+        </div>
+
+        {{-- Buttons unchanged: same routes, same labels, same outline styles. --}}
+        <div class="booking-show-actionbar mb-3 d-flex gap-2 flex-wrap">
+            <a href="{{ route('supply_chain.bookings.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back</a>
+            <a href="{{ route('supply_chain.bookings.print', $bookingPo) }}" target="_blank" class="btn btn-outline-primary btn-sm"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print</a>
+            <a href="{{ route('supply_chain.bookings.download', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-pdf me-1" aria-hidden="true"></i>Download PDF</a>
+            <a href="{{ route('supply_chain.bookings.download_excel', $bookingPo) }}" target="_blank" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Export Excel</a>
+            <button type="button" class="btn btn-primary btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#bookingEmailModal" title="Email this PO Booking to the supplier as a PDF attachment"><i class="bi bi-envelope me-1" aria-hidden="true"></i>Email to Supplier</button>
         </div>
 
         @if(session('success'))

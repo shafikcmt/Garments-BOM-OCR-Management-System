@@ -112,6 +112,12 @@
             text-transform: uppercase;
         }
         .info-table td { font-size: 7px; }
+        /* Required Ex-mill row only — same treatment as the on-screen preview,
+           so the printed sheet and the PDF cannot drift from what was reviewed.
+           nowrap keeps "REQUIRED EX-MILL" on one line inside the fixed 20mm
+           label column; the blank left half carries no header tint. */
+        .info-table th.info-tight { white-space: nowrap; font-size: 6px; letter-spacing: -.01em; }
+        .info-table td.info-blank { background: #fff; }
         .style-value { font-size: 8px; font-weight: 900; color: #004b70; letter-spacing: .2px; }
         .revision-pill { display: inline-block; margin-left: 3mm; padding: .7mm 1.8mm; border-radius: 999px; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; font-weight: 900; font-size: 6px; line-height: 1; white-space: nowrap; text-transform: uppercase; }
         .line-style { font-weight: 900; color: #004b70; }
@@ -211,6 +217,13 @@
         <table class="info-table">
             <tr><th>TO</th><td>{{ $bookingData['to'] ?? '' }}</td><th>PO/WO/ NUMBER</th><td>{{ $bookingData['po_number'] ?? $bookingPo->po_no }} @if($revisionLabel)<span class="revision-pill">{{ $revisionLabel }}</span>@endif</td></tr>
             <tr><th>ATTN</th><td>{{ $bookingData['attn'] ?? '' }}</td><th>DATE</th><td>{{ $bookingData['date'] ?? '' }}</td></tr>
+            {{-- Right column under DATE, with the left half as one blank spacer
+                 cell — same position and same shape as the on-screen preview. --}}
+            <tr>
+                <td class="info-blank" colspan="2"></td>
+                <th class="info-tight">REQUIRED EX-MILL</th>
+                <td>{{ $bookingData['required_ex_mill'] ?? '' }}</td>
+            </tr>
             <tr><th>E-MAIL</th><td>{{ $bookingData['email'] ?? '' }}</td><th>BUYER</th><td>{{ $bookingData['buyer'] ?? '' }}</td></tr>
             <tr><th>ADDRESS</th><td>{{ $bookingData['address'] ?? '' }}</td><th>SEASON</th><td>{{ $bookingData['season'] ?? '' }}</td></tr>
             <tr><th>FROM</th><td>{{ $bookingData['from'] ?? '' }}</td><th>STYLE NO</th><td class="style-value">{{ $bookingData['order_style_no'] ?? '' }}</td></tr>

@@ -881,52 +881,35 @@ a { text-decoration: none; }
 }
 
 
-/* Project-wide compact icon actions: any button/link that already has a Bootstrap icon
-   is rendered as an attractive square icon button. The original text remains available
-   for title/aria-label through the script below, but no longer breaks layouts at zoom. */
-.content :is(a, button).btn:has(> i.bi),
-.content .generated-po-action:has(> i.bi) {
-    width: 38px !important;
-    min-width: 38px !important;
-    height: 38px !important;
-    padding: 0 !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 0 !important;
-    border-radius: 13px !important;
-    font-size: 0 !important;
-    line-height: 1 !important;
-    white-space: nowrap !important;
-    box-shadow: 0 10px 22px rgba(15, 23, 42, .08);
-    overflow: hidden;
-}
-.content :is(a, button).btn.btn-sm:has(> i.bi),
-.content .generated-po-action:has(> i.bi) {
-    width: 34px !important;
-    min-width: 34px !important;
-    height: 34px !important;
-    border-radius: 11px !important;
-}
-.content :is(a, button).btn:has(> i.bi) > i.bi,
-.content .generated-po-action:has(> i.bi) > i.bi {
-    margin: 0 !important;
-    font-size: 15px !important;
-    line-height: 1 !important;
-}
-.content :is(a, button).btn.btn-sm:has(> i.bi) > i.bi,
-.content .generated-po-action:has(> i.bi) > i.bi {
-    font-size: 14px !important;
-}
-.content :is(a, button).btn:has(> i.bi) > span,
-.content .generated-po-action:has(> i.bi) > span {
-    display: none !important;
-}
-.content :is(a, button).btn:has(> i.bi):hover,
-.content .generated-po-action:has(> i.bi):hover {
-    transform: translateY(-1px);
-    box-shadow: 0 14px 26px rgba(15, 23, 42, .12);
-}
+/* REMOVED: the project-wide "compact icon action" block.
+ *
+ * It matched every :is(a, button).btn:has(> i.bi) inside .content and forced it
+ * to a 38x38 square with `font-size: 0 !important`, `padding: 0 !important` and
+ * `> span { display: none !important }`. The effect was that EVERY action button
+ * carrying a Bootstrap icon rendered icon-only, with its label still present in
+ * the DOM but painted at zero pixels.
+ *
+ * That is exactly what CLAUDE.md's Button Rules forbid: "Icon-only buttons are
+ * not allowed anywhere in the system... A tooltip alone is not a substitute for
+ * a visible label." The block's own comment acknowledged it kept the text only
+ * as title/aria-label — which is the substitution the rule rejects. Our users
+ * are non-technical factory and office staff; an icon they have to hover to
+ * identify is a support call.
+ *
+ * It also made the defect invisible to source search: the labels are right
+ * there in every Blade file, so grepping the templates says the buttons are
+ * labelled while the browser shows bare squares.
+ *
+ * The layout-at-zoom problem it was written for is handled properly now —
+ * buttons wrap on their own, and the PO module sizes its controls on one
+ * shared scale. If a genuinely icon-only control is ever needed, give it an
+ * explicit class and an aria-label rather than a rule that silently strips
+ * labels from every button in the application.
+ *
+ * The companion script in layouts/app.blade.php is unaffected: it only ADDS
+ * title/aria-label from the existing text, so labels stay visible and the
+ * accessible names it sets are still correct.
+ */
 
 @media (max-width: 991.98px) {
     :root { --app-sidebar: 260px; --app-header: 70px; }

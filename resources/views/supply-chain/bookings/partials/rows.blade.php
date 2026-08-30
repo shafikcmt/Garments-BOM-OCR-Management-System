@@ -37,7 +37,9 @@
             <div class="fw-bold text-slate-900">{{ $groupItems->isNotEmpty() ? $groupItems->take(3)->implode(', ') : ($preview['item_name'] ?? '-') }}</div>
             <div class="text-muted small">Style: {{ $preview['style_name'] ?? '-' }}</div>
         </td>
-        <td class="text-end fw-bold text-slate-900">{{ $displayQty !== '' && $displayQty !== null ? $displayQty : '-' }}</td>
+        {{-- po-num: right-aligned with tabular figures, so quantities line up
+             digit-for-digit down the column. --}}
+        <td class="po-num fw-bold">{{ $displayQty !== '' && $displayQty !== null ? $displayQty : '-' }}</td>
         <td class="text-center action-cell">
             @if($isApplied)
                 <div class="d-inline-flex align-items-center justify-content-center gap-2 booking-action-wrap">
