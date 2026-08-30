@@ -41,61 +41,124 @@
 
                     {{-- ---- STEP 1: find the source row ------------------ --}}
                     <div id="addOrderStepSearch">
-                        <div class="ao-step-head">
-                            <span class="ao-step-num">1</span>
-                            <span class="ao-step-title">Find the order to copy</span>
+                        @php
+                            // header_key => the <select> id it fills. Kept here so
+                            // the three dropdowns are rendered from one loop rather
+                            // than three near-identical blocks.
+                            $aoFilterFields = [
+                                'buyer_name' => ['id' => 'addOrderFilterBuyer', 'label' => 'Buyer', 'any' => 'Any buyer'],
+                                'season_name' => ['id' => 'addOrderFilterSeason', 'label' => 'Season', 'any' => 'Any season'],
+                            ];
+                            $aoStyleOptions = $addOrderFilterOptions['style_name'] ?? [];
+                        @endphp
+
+                        {{-- The search area is its own tinted panel, so the
+                             controls and the results below read as two things
+                             rather than one long white column. --}}
+                        <div class="ao-panel">
+                            <div class="ao-step-head">
+                                <span class="ao-step-chip">
+                                    <span class="ao-step-num">1</span>
+                                    Find the order to copy
+                                </span>
+                            </div>
+
+                            {{-- STYLE IS THE PRIMARY FILTER, full width and first.
+                                 Duplication here is nearly always "another order
+                                 of the same style, a few fields different", so
+                                 style is the question the merchant already has an
+                                 answer to. Buyer and Season narrow what it
+                                 returns; they are not how the search starts.
+
+                                 Selecting a style searches immediately — having
+                                 answered the main question, being made to press
+                                 Search is a step that tells the user nothing. --}}
+                            <div class="ao-field ao-field-primary">
+                                <label class="ao-label" for="addOrderFilterStyle">
+                                    Style <span class="ao-label-hint">— start here</span>
+                                </label>
+                                <select class="form-select form-select-sm ao-filter ao-filter-auto"
+                                        id="addOrderFilterStyle" data-filter="style_name">
+                                    <option value="">Any style</option>
+                                    @foreach($aoStyleOptions as $option)
+                                        <option value="{{ $option }}">{{ $option }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="row g-2 mt-1">
+                                @foreach($aoFilterFields as $headerKey => $field)
+                                    <div class="col-md-4">
+                                        <div class="ao-field">
+                                            <label class="ao-label" for="{{ $field['id'] }}">{{ $field['label'] }}</label>
+                                            <select class="form-select form-select-sm ao-filter ao-filter-auto"
+                                                    id="{{ $field['id'] }}" data-filter="{{ $headerKey }}">
+                                                <option value="">{{ $field['any'] }}</option>
+                                                @foreach($addOrderFilterOptions[$headerKey] ?? [] as $option)
+                                                    <option value="{{ $option }}">{{ $option }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                    </div>
+                                @endforeach
+
+                                {{-- Stays free text. A contract number or a row
+                                     number is inherently open-ended, and typing
+                                     has no natural "done" moment — so this one
+                                     keeps the explicit Search button rather than
+                                     firing on every keystroke. --}}
+                                <div class="col-md-4">
+                                    <div class="ao-field">
+                                        <label class="ao-label" for="addOrderFilterAny">Any column / row no.</label>
+                                        <input type="text" class="form-control form-control-sm ao-filter"
+                                               id="addOrderFilterAny" data-filter="q" placeholder="Contract no., colour…">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="ao-actions">
+                                <button type="button" class="btn btn-primary btn-sm" id="addOrderSearchButton">
+                                    <i class="bi bi-search me-1" aria-hidden="true"></i>Search
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="addOrderResetButton">
+                                    Clear filters
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="row g-2 mb-2">
-                            <div class="col-md-3">
-                                <label class="form-label small mb-1" for="addOrderFilterBuyer">Buyer</label>
-                                <input type="text" class="form-control form-control-sm ao-filter" id="addOrderFilterBuyer" data-filter="buyer_name" placeholder="Any buyer">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small mb-1" for="addOrderFilterStyle">Style</label>
-                                <input type="text" class="form-control form-control-sm ao-filter" id="addOrderFilterStyle" data-filter="style_name" placeholder="Any style">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small mb-1" for="addOrderFilterSeason">Season</label>
-                                <input type="text" class="form-control form-control-sm ao-filter" id="addOrderFilterSeason" data-filter="season_name" placeholder="Any season">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label small mb-1" for="addOrderFilterAny">Any column / row no.</label>
-                                <input type="text" class="form-control form-control-sm ao-filter" id="addOrderFilterAny" data-filter="q" placeholder="Contract no., colour…">
-                            </div>
+                        {{-- Guidance, not body text: a merchant who cannot find
+                             their row needs to notice that the list was cut off. --}}
+                        <div class="ao-note d-none" id="addOrderResultNote" role="status">
+                            <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            <span id="addOrderResultNoteText"></span>
                         </div>
 
-                        <div class="d-flex gap-2 align-items-center mb-2">
-                            <button type="button" class="btn btn-outline-primary btn-sm" id="addOrderSearchButton">
-                                <i class="bi bi-search me-1" aria-hidden="true"></i>Search
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" id="addOrderResetButton">
-                                Clear filters
-                            </button>
-                            <span class="text-muted small" id="addOrderResultNote"></span>
-                        </div>
-
-                        <div class="ao-results">
-                            <table class="table table-sm table-hover align-middle mb-0" id="addOrderResultsTable">
-                                <thead>
-                                    <tr>
-                                        <th style="width:70px;">Row</th>
-                                        <th>Buyer</th>
-                                        <th>Style</th>
-                                        <th>Season</th>
-                                        <th>Colour</th>
-                                        <th>Contract No.</th>
-                                        <th style="width:120px;"></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="addOrderResultsBody">
-                                    <tr class="ao-empty">
-                                        <td colspan="7" class="text-muted text-center py-4">
-                                            Search above to find the order you want to copy.
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <div class="ao-results-card">
+                            <div class="ao-results">
+                                <table class="table table-sm align-middle mb-0" id="addOrderResultsTable">
+                                    <thead>
+                                        <tr>
+                                            <th class="ao-col-row">Row</th>
+                                            <th>Buyer</th>
+                                            <th>Style</th>
+                                            <th>Season</th>
+                                            <th>Colour</th>
+                                            <th>Contract No.</th>
+                                            <th class="ao-col-action"><span class="visually-hidden">Choose</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="addOrderResultsBody">
+                                        <tr class="ao-empty">
+                                            <td colspan="7">
+                                                <div class="ao-empty-state">
+                                                    <i class="bi bi-search" aria-hidden="true"></i>
+                                                    <span>Pick a style above to see the orders you can copy.</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 

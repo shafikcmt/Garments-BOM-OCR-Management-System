@@ -207,6 +207,12 @@ class ExcelFileController extends Controller
             ? $this->addOrderFormHeaders($editableHeaderIds)
             : collect();
 
+        // The dropdown options for step one, read from this file's own rows.
+        // Only built when the dialog can be opened at all.
+        $addOrderFilterOptions = $canAddRow
+            ? $this->addOrderFilterOptions($excelFile)
+            : [];
+
         // Latest PRA dates per PI No., pre-formatted for the live (client-side)
         // formulas. Keyed by normalised PI No. so every row sharing that PI No.
         // picks up the same dates.
@@ -279,7 +285,8 @@ class ExcelFileController extends Controller
             'styleMatchValues',
             'styleMatchRowIds',
             'styleMatchHeaderIds',
-            'addOrderHeaders'
+            'addOrderHeaders',
+            'addOrderFilterOptions'
         ));
     }
 
@@ -1008,6 +1015,71 @@ class ExcelFileController extends Controller
             // colours already taught on the grid.
             ->sortBy(fn ($header) => $header['tier'] === 'always' ? 0 : 1)
             ->values();
+    }
+
+    /**
+     * The distinct Buyer / Style / Season values THIS file actually holds.
+     *
+     * Feeds the three searchable dropdowns in step one of the Add New Order
+     * dialog. They were free-text boxes, which asked a merchant to reproduce a
+     * style code from memory — a typo returned "no rows match" and looked
+     * exactly like the style genuinely not being there.
+     *
+     * SCOPED TO THIS FILE, via the row_id subquery. A global list of every
+     * buyer in the system would offer options that cannot match anything in the
+     * open workbook, which is a worse lie than free text: the value looks
+     * confirmed because it came from a dropdown.
+     *
+     * Blank and null values are excluded — an empty option in a filter reads as
+     * "no filter" and would silently widen the search.
+     *
+     * DB-agnostic on purpose: SELECT DISTINCT over two indexed columns, no
+     * LIKE, no string or date functions, no raw SQL. It compiles the same on
+     * MySQL, PostgreSQL and the SQLite the tests run on.
+     *
+     * Options are rendered inline rather than fetched. The largest files here
+     * run 500-600 rows, so the three columns yield low hundreds of distinct
+     * values between them — small enough that a request per dropdown would cost
+     * more than the markup does.
+     *
+     * @return array<string, list<string>>  header_key => sorted distinct values
+     */
+    private function addOrderFilterOptions(ExcelFile $excelFile): array
+    {
+        $headerIdByKey = ExcelHeader::whereIn('header_key', self::STYLE_MATCH_HEADER_KEYS)
+            ->pluck('id', 'header_key');
+
+        if ($headerIdByKey->isEmpty()) {
+            return [];
+        }
+
+        $valuesByHeaderId = ExcelCell::select('header_id', 'value')
+            ->distinct()
+            ->whereIn('header_id', $headerIdByKey->values()->all())
+            ->whereIn('row_id', $excelFile->rows()->select('id'))
+            ->whereNotNull('value')
+            ->where('value', '<>', '')
+            ->orderBy('value')
+            ->get()
+            ->groupBy('header_id');
+
+        $options = [];
+
+        foreach (self::STYLE_MATCH_HEADER_KEYS as $headerKey) {
+            $headerId = $headerIdByKey->get($headerKey);
+
+            $options[$headerKey] = $headerId === null
+                ? []
+                : $valuesByHeaderId->get($headerId, collect())
+                    ->pluck('value')
+                    // A value that is only whitespace survives the '<>' test
+                    // above but is not an option a merchant can recognise.
+                    ->reject(fn ($value) => trim((string) $value) === '')
+                    ->values()
+                    ->all();
+        }
+
+        return $options;
     }
 
     /**

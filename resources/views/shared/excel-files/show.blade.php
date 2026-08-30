@@ -2,6 +2,19 @@
 
 @section('title', 'Order Information')
 
+{{-- Tom Select, for the Add New Order dialog's Buyer/Style/Season dropdowns.
+     Same library and same pinned version the Booking Preview filters use — one
+     searchable-dropdown pattern in the app, not two. The script is loaded in
+     @section('scripts') below, which the layout yields inside <body>, so it is
+     parsed before the DOMContentLoaded handler that initialises it. --}}
+@section('styles')
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+@endsection
+
+@section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+@endsection
+
 @section('content')
 @php
     $orderInfo = $orderInfo ?? [
@@ -908,46 +921,196 @@
         border-color: var(--po-blue, #006C9D);
         box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
+    /* The module palette, imported rather than re-picked. These are the same
+       tokens the PO module defines in _po-module-theme; declaring them here
+       with the module's own values means this dialog stays part of that system
+       instead of becoming a second one, and the fallbacks below keep it correct
+       on screens where the theme partial is not loaded. */
+    #addOrderModal {
+        --ao-blue: var(--po-blue, #006C9D);
+        --ao-blue-deep: var(--po-blue-deep, #004B70);
+        --ao-tint: var(--po-tint, #E0F2FE);
+        --ao-ink: var(--po-ink, #0B2B3C);
+        --ao-muted: var(--po-muted, #5B7383);
+        --ao-line: var(--po-line, #D7E3ED);
+        --ao-line-soft: var(--po-line-soft, #EEF3F8);
+        --ao-paper: var(--po-paper, #F6F9FC);
+    }
+
+    /* SEARCH PANEL — tinted, bordered, visually one thing. The flat white box
+       gave the controls and the results equal weight, so neither read as a
+       step. */
+    #addOrderModal .ao-panel {
+        background: var(--ao-paper);
+        border: 1px solid var(--ao-line);
+        border-radius: 10px;
+        padding: 14px;
+    }
     #addOrderModal .ao-step-head {
         display: flex;
         align-items: center;
+        margin-bottom: 12px;
+    }
+    #addOrderModal .ao-step-chip {
+        display: inline-flex;
+        align-items: center;
         gap: 8px;
-        margin-bottom: 10px;
-        padding-bottom: 6px;
-        border-bottom: 1px solid #EEF0F3;
+        padding: 4px 12px 4px 4px;
+        border-radius: 999px;
+        background: var(--ao-tint);
+        color: var(--ao-blue-deep);
+        font-size: 12px;
+        font-weight: 700;
     }
     #addOrderModal .ao-step-num {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 20px;
-        height: 20px;
+        width: 22px;
+        height: 22px;
         border-radius: 50%;
-        background: var(--po-blue, #006C9D);
+        background: var(--ao-blue);
         color: #fff;
-        font-size: 11px;
-        font-weight: 600;
+        font-size: 12px;
+        font-weight: 700;
         flex: 0 0 auto;
     }
-    #addOrderModal .ao-step-title { font-size: 13px; font-weight: 600; color: #1F2A37; }
-    /* The results list scrolls on its own, so the dialog keeps a stable height
-       whether a search returns two rows or twenty-five. */
+    #addOrderModal .ao-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .02em;
+        text-transform: uppercase;
+        color: var(--ao-muted);
+        margin-bottom: 4px;
+    }
+    #addOrderModal .ao-label-hint {
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 600;
+        color: var(--ao-blue);
+    }
+    /* The primary field is wider AND heavier, because "which style" is the
+       question this dialog actually asks. */
+    #addOrderModal .ao-field-primary .form-select {
+        font-size: 14px;
+        font-weight: 600;
+        min-height: 40px;
+    }
+    #addOrderModal .ao-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--ao-line);
+    }
+
+    /* The count note, as guidance rather than grey body text. */
+    #addOrderModal .ao-note {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 12px 0 0;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: var(--ao-tint);
+        border: 1px solid var(--ao-line);
+        color: var(--ao-blue-deep);
+        font-size: 12px;
+    }
+
+    /* RESULTS — its own card, so the boundary between "what I asked" and "what
+       came back" is visible. */
+    #addOrderModal .ao-results-card {
+        margin-top: 12px;
+        border: 1px solid var(--ao-line);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    /* Scrolls on its own, so the dialog keeps a stable height whether a search
+       returns two rows or twenty-five. */
     #addOrderModal .ao-results {
         max-height: 320px;
         overflow-y: auto;
-        border: 1px solid #EEF0F3;
-        border-radius: 6px;
     }
     #addOrderModal .ao-results thead th {
         position: sticky;
         top: 0;
         z-index: 1;
-        background: #F8FAFC;
-        font-size: 11px;
+        background: var(--ao-line-soft);
+        border-bottom: 1px solid var(--ao-line);
+        font-size: 10px;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: .03em;
-        color: #64748B;
+        letter-spacing: .04em;
+        color: var(--ao-muted);
+        white-space: nowrap;
     }
+    #addOrderModal .ao-results tbody tr:nth-child(even) > td { background: #FBFCFE; }
+    #addOrderModal .ao-results tbody tr:hover > td { background: var(--ao-tint); }
+    #addOrderModal .ao-results td { font-size: 12px; color: var(--ao-ink); }
+    #addOrderModal .ao-col-row { width: 64px; }
+    #addOrderModal .ao-col-action { width: 118px; }
+    /* Row and contract numbers line up digit-for-digit, which is how a merchant
+       scans a column of codes. */
+    #addOrderModal .ao-num {
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        color: var(--ao-muted);
+    }
+    #addOrderModal .ao-contract { font-variant-numeric: tabular-nums; }
+    /* One action per row, so it is filled rather than an outline competing with
+       five columns of text. */
+    #addOrderModal .ao-pick {
+        background: var(--ao-blue);
+        border-color: var(--ao-blue);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    #addOrderModal .ao-pick:hover,
+    #addOrderModal .ao-pick:focus {
+        background: var(--ao-blue-deep);
+        border-color: var(--ao-blue-deep);
+        color: #fff;
+    }
+    #addOrderModal .ao-empty > td { background: #fff !important; }
+    #addOrderModal .ao-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        padding: 28px 12px;
+        color: var(--ao-muted);
+        font-size: 12px;
+    }
+    #addOrderModal .ao-empty-state .bi { font-size: 20px; opacity: .5; }
+
+    /* Tom Select, sized to match the Bootstrap controls beside it rather than
+       its own default. Same library and version the Booking Preview filters
+       use; if the CDN fails these rules simply style a native <select>. */
+    #addOrderModal .ts-wrapper { margin: 0; }
+    #addOrderModal .ts-control {
+        min-height: 31px;
+        border-color: var(--ao-line);
+        border-radius: 6px;
+        font-size: 12px;
+        padding: 4px 8px;
+    }
+    #addOrderModal .ao-field-primary .ts-control {
+        min-height: 40px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    #addOrderModal .ts-wrapper.focus .ts-control {
+        border-color: var(--ao-blue);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
+    }
+    #addOrderModal .ts-dropdown { font-size: 12px; border-color: var(--ao-line); }
+    #addOrderModal .ts-dropdown .active { background: var(--ao-tint); color: var(--ao-blue-deep); }
+    #addOrderModal .ts-dropdown .no-results { padding: 8px 12px; color: var(--ao-muted); }
     #addOrderModal .ao-source-strip {
         background: #F8FAFC;
         border: 1px solid #EEF0F3;
@@ -3117,6 +3280,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const addOrderStepEdit = document.getElementById('addOrderStepEdit');
         const addOrderResultsBody = document.getElementById('addOrderResultsBody');
         const addOrderResultNote = document.getElementById('addOrderResultNote');
+        const addOrderResultNoteText = document.getElementById('addOrderResultNoteText');
         const addOrderSourceStrip = document.getElementById('addOrderSourceStrip');
         const addOrderSubmitButton = document.getElementById('addOrderSubmitButton');
         const addOrderSearchButton = document.getElementById('addOrderSearchButton');
@@ -3135,6 +3299,26 @@ document.addEventListener('DOMContentLoaded', function () {
             return div.innerHTML;
         }
 
+        /* Reading and clearing a filter has to go through these two, because a
+         * Tom Select field keeps its own value and the underlying <select> is
+         * no longer what the user is looking at: setting .value directly
+         * updates the DOM and leaves the visible control showing the old
+         * choice. */
+        function aoFilterValue(el) {
+            return (el.tomselect ? el.tomselect.getValue() : el.value) || '';
+        }
+
+        function aoClearFilter(el) {
+            if (el.tomselect) {
+                // silent: this runs during a reset, and firing change here
+                // would kick off a search of the dialog being torn down.
+                el.tomselect.clear(true);
+                return;
+            }
+
+            el.value = '';
+        }
+
         function aoShowStep(step) {
             addOrderStepSearch.classList.toggle('d-none', step !== 'search');
             addOrderStepEdit.classList.toggle('d-none', step !== 'edit');
@@ -3149,23 +3333,35 @@ document.addEventListener('DOMContentLoaded', function () {
         function aoReset() {
             addOrderSourceRowId.value = '';
             addOrderRowsById = {};
-            addOrderResultsBody.innerHTML =
-                '<tr class="ao-empty"><td colspan="7" class="text-muted text-center py-4">'
-                + 'Search above to find the order you want to copy.</td></tr>';
-            addOrderResultNote.textContent = '';
-            document.querySelectorAll('#addOrderModal .ao-filter').forEach(el => { el.value = ''; });
+            addOrderResultsBody.innerHTML = aoEmptyRow('Pick a style above to see the orders you can copy.', 'bi-search');
+            aoSetNote('');
+            document.querySelectorAll('#addOrderModal .ao-filter').forEach(aoClearFilter);
             document.querySelectorAll('#addOrderModal .ao-input').forEach(el => { el.value = ''; });
             aoShowStep('search');
+        }
+
+        function aoEmptyRow(message, icon) {
+            return '<tr class="ao-empty"><td colspan="7"><div class="ao-empty-state">'
+                + '<i class="bi ' + icon + '" aria-hidden="true"></i>'
+                + '<span>' + aoEscape(message) + '</span>'
+                + '</div></td></tr>';
+        }
+
+        // The note is a banner, so it is hidden outright rather than left as an
+        // empty bordered strip when there is nothing to say.
+        function aoSetNote(text) {
+            if (!addOrderResultNote) return;
+
+            addOrderResultNote.classList.toggle('d-none', !text);
+            if (addOrderResultNoteText) addOrderResultNoteText.textContent = text;
         }
 
         function aoRenderRows(payload) {
             addOrderRowsById = {};
 
             if (!payload.rows.length) {
-                addOrderResultsBody.innerHTML =
-                    '<tr class="ao-empty"><td colspan="7" class="text-muted text-center py-4">'
-                    + 'No row in this file matches that search.</td></tr>';
-                addOrderResultNote.textContent = '';
+                addOrderResultsBody.innerHTML = aoEmptyRow('No row in this file matches that search.', 'bi-inbox');
+                aoSetNote('');
                 return;
             }
 
@@ -3174,35 +3370,34 @@ document.addEventListener('DOMContentLoaded', function () {
                 const v = row.values || {};
 
                 return '<tr>'
-                    + '<td class="text-muted">' + row.row_number + '</td>'
+                    + '<td class="ao-num">' + row.row_number + '</td>'
                     + '<td>' + aoEscape(v.buyer_name) + '</td>'
                     + '<td>' + aoEscape(v.style_name) + '</td>'
                     + '<td>' + aoEscape(v.season_name) + '</td>'
                     + '<td>' + aoEscape(v.gmts_color_name) + '</td>'
-                    + '<td>' + aoEscape(v.initial_contract_number) + '</td>'
-                    + '<td><button type="button" class="btn btn-outline-primary btn-sm ao-pick" '
+                    + '<td class="ao-contract">' + aoEscape(v.initial_contract_number) + '</td>'
+                    + '<td><button type="button" class="btn btn-sm ao-pick" '
                     + 'data-row-id="' + row.id + '">Use This Row</button></td>'
                     + '</tr>';
             }).join('');
 
             // Says plainly when the list is capped, so a merchant who cannot
             // find their row knows to narrow rather than keep scrolling.
-            addOrderResultNote.textContent = payload.total > payload.shown
+            aoSetNote(payload.total > payload.shown
                 ? 'Showing the first ' + payload.shown + ' of ' + payload.total + ' matches — narrow the filters to see the rest.'
-                : payload.total + (payload.total === 1 ? ' match' : ' matches');
+                : payload.total + (payload.total === 1 ? ' match' : ' matches'));
         }
 
         function aoSearch() {
             const params = new URLSearchParams();
 
             document.querySelectorAll('#addOrderModal .ao-filter').forEach(function (el) {
-                const value = el.value.trim();
+                const value = aoFilterValue(el).trim();
                 if (value !== '') params.append(el.dataset.filter, value);
             });
 
-            addOrderResultsBody.innerHTML =
-                '<tr class="ao-empty"><td colspan="7" class="text-muted text-center py-4">Searching…</td></tr>';
-            addOrderResultNote.textContent = '';
+            addOrderResultsBody.innerHTML = aoEmptyRow('Searching…', 'bi-hourglass-split');
+            aoSetNote('');
 
             fetch(addOrderSourcesUrl + '?' + params.toString(), {
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -3211,9 +3406,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then(res => res.ok ? res.json() : Promise.reject(res.status))
                 .then(aoRenderRows)
                 .catch(function () {
-                    addOrderResultsBody.innerHTML =
-                        '<tr class="ao-empty"><td colspan="7" class="text-danger text-center py-4">'
-                        + 'Could not load rows. Check your connection and try again.</td></tr>';
+                    addOrderResultsBody.innerHTML = aoEmptyRow(
+                        'Could not load rows. Check your connection and try again.',
+                        'bi-exclamation-triangle'
+                    );
                 });
         }
 
@@ -3249,8 +3445,60 @@ document.addEventListener('DOMContentLoaded', function () {
             aoShowStep('edit');
         }
 
-        addOrderSearchButton.addEventListener('click', aoSearch);
-        addOrderResetButton.addEventListener('click', aoReset);
+        /* Turn the three filter dropdowns into searchable ones, with the same
+         * options the Booking Preview filters use so the control behaves
+         * identically in both places.
+         *
+         * `select.` matters: .ao-filter is also on the free-text input, and
+         * running TomSelect over an <input type="text"> replaces it with a tag
+         * widget. Guarded on window.TomSelect so a failed CDN leaves plain
+         * native <select> elements that still filter correctly — the search
+         * logic reads through aoFilterValue() either way. */
+        if (window.TomSelect) {
+            addOrderModalEl.querySelectorAll('select.ao-filter').forEach(function (select) {
+                const placeholder = (select.options[0] && select.options[0].value === '')
+                    ? select.options[0].text
+                    : 'Search...';
+
+                new TomSelect(select, {
+                    allowEmptyOption: true,
+                    placeholder: placeholder,
+                    searchField: ['text'],
+                    render: {
+                        no_results: function () {
+                            return '<div class="no-results">No match found</div>';
+                        }
+                    }
+                });
+            });
+        }
+
+        /* Choosing a dropdown value searches on its own.
+         *
+         * Style is the question this dialog asks, so having answered it the
+         * merchant should not have to press a second button to be shown the
+         * answer. Debounced because Buyer and Season are usually set straight
+         * after Style, and three selections in a row should cost one request,
+         * not three. The free-text box is deliberately NOT in this set — typing
+         * has no natural "done" moment, so it keeps the Search button. */
+        let aoSearchTimer = null;
+
+        addOrderModalEl.querySelectorAll('.ao-filter-auto').forEach(function (select) {
+            select.addEventListener('change', function () {
+                clearTimeout(aoSearchTimer);
+                aoSearchTimer = setTimeout(aoSearch, 200);
+            });
+        });
+
+        addOrderSearchButton.addEventListener('click', function () {
+            clearTimeout(aoSearchTimer);
+            aoSearch();
+        });
+
+        addOrderResetButton.addEventListener('click', function () {
+            clearTimeout(aoSearchTimer);
+            aoReset();
+        });
         addOrderBackButton.addEventListener('click', function () {
             addOrderSourceRowId.value = '';
             aoShowStep('search');
@@ -3258,10 +3506,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Enter searches rather than submitting the form, which at step one
         // would post with no source row chosen.
-        addOrderModalEl.querySelectorAll('.ao-filter').forEach(function (el) {
+        // Only the free-text box: a Tom Select field owns its own Enter, which
+        // is how an option gets chosen from its dropdown.
+        addOrderModalEl.querySelectorAll('input.ao-filter').forEach(function (el) {
             el.addEventListener('keydown', function (event) {
                 if (event.key === 'Enter') {
                     event.preventDefault();
+                    clearTimeout(aoSearchTimer);
                     aoSearch();
                 }
             });
