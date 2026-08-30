@@ -121,6 +121,23 @@ class ExcelFileController extends Controller
         // ids directly. Ids only — a few hundred integers.
         $allMatchingRowIds = (clone $rowsQuery)->orderBy('row_number')->pluck('id')->all();
 
+        // The exact-match style group, computed INDEPENDENTLY of the substring
+        // filter above. The screen keeps showing what the merchant filtered —
+        // narrowing it under them would be a surprise — while the bulk action
+        // acts only on the rows that match exactly. Where the two counts differ
+        // the view says so, so the gap is never silent.
+        $styleMatchValues = $this->styleMatchFilterValues($columnFilters);
+        $styleMatchRowIds = $this->styleMatchRowIds($excelFile, $styleMatchValues);
+
+        // header_key => header id, so the view can post the style values back
+        // under the same filters[<header id>] keys the action reads. Resolved
+        // here rather than hard-coded because ids differ between environments.
+        $styleMatchHeaderIds = $styleMatchValues === []
+            ? []
+            : ExcelHeader::whereIn('header_key', array_keys($styleMatchValues))
+                ->pluck('id', 'header_key')
+                ->all();
+
         $rows = $rowsQuery
             ->with(['cells' => function ($query) use ($visibleHeaderIds) {
                 $query->select('id', 'row_id', 'header_id', 'value')
@@ -217,7 +234,10 @@ class ExcelFileController extends Controller
             'perPage',
             'piPraDates',
             'duplicateNeedsUpdateHeaderIds',
-            'allMatchingRowIds'
+            'allMatchingRowIds',
+            'styleMatchValues',
+            'styleMatchRowIds',
+            'styleMatchHeaderIds'
         ));
     }
 
@@ -534,31 +554,185 @@ class ExcelFileController extends Controller
      * duplicated_from_row_id, so after a few weeks you can compare copies
      * against their sources and see which cells merchants actually edited.
      *
-     * @var list<string>
+     * TWO TIERS, because "check this" and "this is wrong until you change it"
+     * are not the same instruction and a single marker cannot say both:
+     *
+     *   always  a new order cannot reuse the old value. A copied contract
+     *           number or PO number is not merely stale, it is wrong.
+     *   likely  worth checking, but often correct as copied — a re-order in
+     *           the same colour keeps its colours, and a vendor who has not
+     *           re-quoted keeps its rate and payment term.
+     *
+     * BOTH DEPARTMENTS' COLUMNS SIT ON THIS ONE SHEET. excel_headers holds all
+     * 133 columns for every role, distinguished only by owner_role_id, so a
+     * duplicated row shows the merchant's markers and Supply Chain's together.
+     * Each user can still only edit the columns their own role owns; the
+     * markers are display-only and do not change that.
+     *
+     * Every key below was verified present, is_active, and value_mode=input —
+     * a marker on a calculated cell would point at something the user cannot
+     * edit. Note materials_ordered (Supply Chain, editable) is a DIFFERENT
+     * column from materials_to_be_ordered (merchant, calculated); the two are
+     * easy to confuse and only the former belongs here.
+     *
+     * @var array<string, list<string>>
      */
     private const DUPLICATE_NEEDS_UPDATE_HEADER_KEYS = [
-        'initial_contract_number',
-        'contract_shipment_date',
+        'always' => [
+            // Merchant
+            'initial_contract_number',
+            'contract_shipment_date',
+            // Supply Chain
+            'materials_ordered',
+            'material_po_number',
+            'po_date',
+            'material_pi_number',
+        ],
+        'likely' => [
+            // Merchant — a re-order in the same colour keeps both of these.
+            'gmts_color_name',
+            'material_color',
+            'bom_quantity',
+            // Supply Chain — unchanged unless the vendor re-quoted.
+            'pi_rate',
+            'committed_ex_mill',
+            'payment_term',
+        ],
     ];
 
     /**
-     * Header ids the worksheet should flag on a duplicated row.
+     * Header ids the worksheet should flag on a duplicated row, by tier.
      *
      * Resolved from header_key so the constant above stays readable and does
-     * not break if ids differ between environments.
+     * not break if ids differ between environments. A key that does not resolve
+     * is silently skipped rather than fatal — an environment missing a column
+     * should lose a hint, not the screen.
      *
-     * @return list<int>
+     * @return array{always: list<int>, likely: list<int>}
      */
     private function duplicateNeedsUpdateHeaderIds(): array
     {
-        if (self::DUPLICATE_NEEDS_UPDATE_HEADER_KEYS === []) {
+        $byKey = ExcelHeader::whereIn(
+            'header_key',
+            array_merge(
+                self::DUPLICATE_NEEDS_UPDATE_HEADER_KEYS['always'],
+                self::DUPLICATE_NEEDS_UPDATE_HEADER_KEYS['likely']
+            )
+        )->pluck('id', 'header_key');
+
+        $resolve = fn (array $keys) => collect($keys)
+            ->map(fn ($key) => $byKey->get($key))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        return [
+            'always' => $resolve(self::DUPLICATE_NEEDS_UPDATE_HEADER_KEYS['always']),
+            'likely' => $resolve(self::DUPLICATE_NEEDS_UPDATE_HEADER_KEYS['likely']),
+        ];
+    }
+
+    /**
+     * The columns whose combined value defines "the same style".
+     *
+     * Buyer + Style + Season, and deliberately NOT GMTS Color: duplicating a
+     * style is most often how a NEW COLOURWAY of it gets onto the sheet, so
+     * matching on colour would exclude exactly the rows the merchant wants.
+     *
+     * All three must be filled before the bulk action is offered. Two of three
+     * is how a style group silently grows to include another season's rows.
+     *
+     * @var list<string>
+     */
+    private const STYLE_MATCH_HEADER_KEYS = [
+        'buyer_name',
+        'style_name',
+        'season_name',
+    ];
+
+    /**
+     * The style-defining filter values the user currently has typed, if all
+     * three are present.
+     *
+     * Read from the SAME filters[] input the ordinary column filter uses, so
+     * the merchant does not learn a second control — they filter as always, and
+     * once all three style columns are filled the bulk action becomes available.
+     *
+     * Returns [] unless every one of the three is non-empty. A partial style key
+     * is precisely how a group quietly grows to include another season's rows,
+     * so two-of-three offers nothing at all.
+     *
+     * @return array<string, string>  header_key => exact value
+     */
+    private function styleMatchFilterValues(array $columnFilters): array
+    {
+        $headerKeyById = ExcelHeader::whereIn('header_key', self::STYLE_MATCH_HEADER_KEYS)
+            ->pluck('header_key', 'id');
+
+        $values = [];
+
+        foreach ($columnFilters as $filterKey => $filterValue) {
+            $headerKey = $headerKeyById->get((int) $filterKey);
+
+            if ($headerKey === null || ! is_string($filterValue)) {
+                continue;
+            }
+
+            $trimmed = trim($filterValue);
+
+            if ($trimmed !== '') {
+                $values[$headerKey] = $trimmed;
+            }
+        }
+
+        return count($values) === count(self::STYLE_MATCH_HEADER_KEYS) ? $values : [];
+    }
+
+    /**
+     * Every row in this file whose style columns EXACTLY equal the given values.
+     *
+     * EXACT, not the substring match the ordinary filter uses. The filter is a
+     * find-as-you-type convenience where over-matching costs a glance; this
+     * feeds a bulk action over rows the merchant cannot all see, where
+     * over-matching silently duplicates the wrong work. Typing "ABC" must not
+     * sweep in "ABC-2".
+     *
+     * Uses `=` rather than whereLike deliberately. There is no wildcard to
+     * escape and no LIKE/ILIKE divergence to reason about between MySQL and
+     * PostgreSQL. It does mean the comparison is case-sensitive on PostgreSQL,
+     * which is the safer direction for an action of this weight: it can only
+     * ever match fewer rows than intended, never more.
+     *
+     * @param  array<string, string>  $values  header_key => exact value
+     * @return list<int>
+     */
+    private function styleMatchRowIds(ExcelFile $excelFile, array $values): array
+    {
+        if ($values === []) {
             return [];
         }
 
-        return ExcelHeader::whereIn('header_key', self::DUPLICATE_NEEDS_UPDATE_HEADER_KEYS)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        $headerIdByKey = ExcelHeader::whereIn('header_key', array_keys($values))
+            ->pluck('id', 'header_key');
+
+        $query = $excelFile->rows();
+
+        foreach ($values as $headerKey => $value) {
+            $headerId = $headerIdByKey->get($headerKey);
+
+            // A style column missing from this environment would otherwise
+            // widen the match by one whole dimension. Refuse instead.
+            if ($headerId === null) {
+                return [];
+            }
+
+            $query->whereHas('cells', function ($cellQuery) use ($headerId, $value) {
+                $cellQuery->where('header_id', $headerId)->where('value', $value);
+            });
+        }
+
+        return $query->orderBy('row_number')->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 
     /**
@@ -615,21 +789,8 @@ class ExcelFileController extends Controller
     {
         $user = auth()->user();
 
-        // The same gate addRow() applies, stated the same way on purpose.
-        if (! $user->hasRole('admin') && ! $user->hasRole('merchant')) {
-            abort(403, 'You are not allowed to duplicate a row.');
-        }
-
-        if ($excelFile->isLockedForUser($user)) {
-            return redirect()
-                ->route('uploaded-files.show', $excelFile->id)
-                ->with('warning', 'This file is locked by admin. Rows cannot be duplicated until it is unlocked for your user or role.');
-        }
-
-        if ($excelFile->isBuyerLockedForUser($user)) {
-            return redirect()
-                ->route('uploaded-files.show', $excelFile->id)
-                ->with('warning', 'This file belongs to another buyer. Only its own buyer team can duplicate its rows.');
+        if ($blocked = $this->duplicateGuard($excelFile, $user)) {
+            return $blocked;
         }
 
         $validated = $request->validate([
@@ -652,11 +813,132 @@ class ExcelFileController extends Controller
                 ->with('warning', 'No matching row was found to duplicate.');
         }
 
+        $this->performRowDuplication($excelFile, $user, $sourceRows, 'below_source');
+
+        $count = $sourceRows->count();
+
+        return redirect()
+            ->route('uploaded-files.show', $excelFile->id)
+            ->with('success', $count === 1
+                ? 'Row duplicated. The copy was inserted directly below its source row.'
+                : $count . ' rows duplicated. Each copy was inserted directly below its own source row.');
+    }
+
+    /**
+     * Duplicate every row of one style group, as a block.
+     *
+     * THE ROW IDS ARE NOT ACCEPTED FROM THE CLIENT. The request carries the
+     * style VALUES — buyer, style, season — and the server resolves the rows
+     * itself, exactly as show() did when it drew the button. A tampered or
+     * simply stale page therefore cannot name rows outside the group it is
+     * looking at, and cannot act on a group that has since changed. This is the
+     * whole reason the action takes filter values rather than a row_ids list
+     * like duplicateRows() does.
+     *
+     * PLACEMENT DIFFERS FROM duplicateRows() ON PURPOSE. The copies land as one
+     * contiguous block immediately after the LAST row of the matched group,
+     * rather than each below its own source. Duplicating a whole style is an
+     * action on the group, and interleaving copies through the originals would
+     * leave the merchant reading alternate lines to tell old from new. Single
+     * and manual multi-select duplication are unchanged.
+     */
+    public function duplicateMatchingRows(Request $request, ExcelFile $excelFile)
+    {
+        $user = auth()->user();
+
+        if ($blocked = $this->duplicateGuard($excelFile, $user)) {
+            return $blocked;
+        }
+
+        $columnFilters = collect((array) $request->input('filters', []))
+            ->map(fn ($value) => is_string($value) ? trim($value) : $value)
+            ->filter(fn ($value) => $value !== null && $value !== '')
+            ->all();
+
+        $styleMatchValues = $this->styleMatchFilterValues($columnFilters);
+
+        if ($styleMatchValues === []) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'Set all three style filters — Buyer Name, Style Name and Season Name — before duplicating a whole style.');
+        }
+
+        $rowIds = $this->styleMatchRowIds($excelFile, $styleMatchValues);
+
+        $sourceRows = ExcelRow::where('excel_file_id', $excelFile->id)
+            ->whereIn('id', $rowIds)
+            ->with('cells')
+            ->orderBy('row_number')
+            ->get();
+
+        if ($sourceRows->isEmpty()) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'No row exactly matches that Buyer, Style and Season, so nothing was duplicated.');
+        }
+
+        $this->performRowDuplication($excelFile, $user, $sourceRows, 'block_after_last');
+
+        $count = $sourceRows->count();
+        $label = implode(' / ', $styleMatchValues);
+
+        return redirect()
+            ->route('uploaded-files.show', $excelFile->id)
+            ->with('success', $count . ' ' . ($count === 1 ? 'row' : 'rows') . ' duplicated for ' . $label
+                . '. The copies were inserted together, directly after the last row of that style.');
+    }
+
+    /**
+     * The role and lock gate shared by every duplication entry point.
+     *
+     * Returns a redirect to send back, or null to continue. Stated once so the
+     * bulk action can never drift from the single-row one — a bulk action that
+     * honoured a weaker gate would be the worst possible place for the two to
+     * disagree.
+     */
+    private function duplicateGuard(ExcelFile $excelFile, $user)
+    {
+        // The same gate addRow() applies, stated the same way on purpose.
+        if (! $user->hasRole('admin') && ! $user->hasRole('merchant')) {
+            abort(403, 'You are not allowed to duplicate a row.');
+        }
+
+        if ($excelFile->isLockedForUser($user)) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'This file is locked by admin. Rows cannot be duplicated until it is unlocked for your user or role.');
+        }
+
+        if ($excelFile->isBuyerLockedForUser($user)) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'This file belongs to another buyer. Only its own buyer team can duplicate its rows.');
+        }
+
+        return null;
+    }
+
+    /**
+     * Copy the given rows into the sheet, and renumber around them.
+     *
+     * $placement decides ONLY where the copies land:
+     *
+     *   below_source      each copy directly after its own source. The general
+     *                     Duplicate and Duplicate Selected actions.
+     *   block_after_last  all copies together, after the last source. The
+     *                     "duplicate this whole style" action.
+     *
+     * Everything else — the cell copying, the lineage, the activity log, the
+     * park-and-reassign that keeps row_number unique — is identical for both,
+     * which is why they share this method rather than each owning a variant.
+     */
+    private function performRowDuplication(ExcelFile $excelFile, $user, $sourceRows, string $placement): void
+    {
         $blankHeaderIds = ExcelHeader::whereIn('header_key', self::DUPLICATE_BLANK_HEADER_KEYS)
             ->pluck('id')
             ->all();
 
-        DB::transaction(function () use ($excelFile, $user, $sourceRows, $blankHeaderIds) {
+        DB::transaction(function () use ($excelFile, $user, $sourceRows, $blankHeaderIds, $placement) {
             // Every ACTIVE header, so a duplicate has the same cell coverage as
             // a fresh row. A source row missing a cell for a newly added column
             // still gets that column here, blank.
@@ -665,36 +947,60 @@ class ExcelFileController extends Controller
                 ->get();
 
             $sourceIdSet = $sourceRows->keyBy('id');
-            $minPos = (int) $sourceRows->min('row_number');
 
             /*
              * THE TARGET ORDER, worked out in PHP before a single row moves.
              *
-             * Walking existing rows and emitting each one followed by its copy
-             * gives the final sequence in one pass. Shifting per insert instead
-             * would compound offsets — the second insert would have to account
-             * for the first having moved everything — which is exactly where
-             * this kind of code goes wrong.
+             * Building the whole final sequence in one pass is what makes this
+             * safe. Shifting per insert instead would compound offsets — the
+             * second insert would have to account for the first having moved
+             * everything — which is exactly where this kind of code goes wrong.
              *
-             * Rows at or before $minPos never move, so the sequence starts just
-             * after the earliest source.
+             * $anchor is the last row_number that does NOT move. Everything
+             * after it is rewritten from the sequence below. The two placements
+             * differ only in where that anchor sits and how the sequence is
+             * ordered; the park-and-reassign that follows is identical.
              */
             $sequence = [];
 
-            $laterRows = ExcelRow::where('excel_file_id', $excelFile->id)
-                ->where('row_number', '>=', $minPos)
-                ->orderBy('row_number')
-                ->get(['id', 'row_number']);
+            if ($placement === 'block_after_last') {
+                // The whole group stays put and the copies follow it in one
+                // run, so a style reads as originals-then-copies rather than
+                // alternating lines.
+                $anchor = (int) $sourceRows->max('row_number');
 
-            foreach ($laterRows as $existing) {
-                // The row sitting at $minPos keeps its number; only its copy and
-                // everything after it are renumbered.
-                if ((int) $existing->row_number !== $minPos) {
-                    $sequence[] = ['existing', $existing->id];
+                foreach ($sourceRows as $sourceRow) {
+                    $sequence[] = ['new', $sourceRow->id];
                 }
 
-                if ($sourceIdSet->has($existing->id)) {
-                    $sequence[] = ['new', $existing->id];
+                $tailRows = ExcelRow::where('excel_file_id', $excelFile->id)
+                    ->where('row_number', '>', $anchor)
+                    ->orderBy('row_number')
+                    ->get(['id', 'row_number']);
+
+                foreach ($tailRows as $existing) {
+                    $sequence[] = ['existing', $existing->id];
+                }
+            } else {
+                // Rows at or before $anchor never move, so the sequence starts
+                // just after the earliest source.
+                $anchor = (int) $sourceRows->min('row_number');
+
+                $laterRows = ExcelRow::where('excel_file_id', $excelFile->id)
+                    ->where('row_number', '>=', $anchor)
+                    ->orderBy('row_number')
+                    ->get(['id', 'row_number']);
+
+                foreach ($laterRows as $existing) {
+                    // The row sitting at $anchor keeps its number; only its copy
+                    // and everything after it are renumbered.
+                    if ((int) $existing->row_number !== $anchor) {
+                        $sequence[] = ['existing', $existing->id];
+                    }
+
+                    if ($sourceIdSet->has($existing->id)) {
+                        $sequence[] = ['new', $existing->id];
+                    }
                 }
             }
 
@@ -714,10 +1020,10 @@ class ExcelFileController extends Controller
             $offset = $maxRowNumber + count($sequence) + 1000;
 
             ExcelRow::where('excel_file_id', $excelFile->id)
-                ->where('row_number', '>', $minPos)
+                ->where('row_number', '>', $anchor)
                 ->update(['row_number' => DB::raw('row_number + ' . $offset)]);
 
-            $nextRowNumber = $minPos + 1;
+            $nextRowNumber = $anchor + 1;
 
             foreach ($sequence as [$kind, $refId]) {
                 if ($kind === 'existing') {
@@ -771,14 +1077,6 @@ class ExcelFileController extends Controller
             $this->recalculateFile($excelFile, $user->id);
             $this->refreshFileStatus($excelFile);
         });
-
-        $count = $sourceRows->count();
-
-        return redirect()
-            ->route('uploaded-files.show', $excelFile->id)
-            ->with('success', $count === 1
-                ? 'Row duplicated. The copy was inserted directly below its source row.'
-                : $count . ' rows duplicated. Each copy was inserted directly below its own source row.');
     }
 
     /**

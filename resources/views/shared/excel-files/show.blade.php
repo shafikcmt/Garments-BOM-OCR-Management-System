@@ -899,14 +899,27 @@
     /* Soft tint plus an inset left accent, instead of a full amber border and a
        2px outer glow. Still unmistakable against its neighbours, but it no
        longer competes with the data when several duplicates are on screen. */
+    /* TIER 1 — "always": a new order cannot reuse this value. Amber, the
+       stronger of the two, because the copied value is wrong until changed. */
     .excel-data-table tbody td.cell-needs-update input.form-control,
     .excel-data-table tbody td.cell-needs-update .excel-readonly-cell {
         border-color: #FCD9A5 !important;
         background: #FFFBF4 !important;
         box-shadow: inset 2px 0 0 var(--po-warn, #F59E0B);
     }
+    /* TIER 2 — "likely": worth a glance, often correct as copied. Deliberately
+       quieter — a 1px rail and a barely-there tint — so that scanning a
+       duplicated row the eye lands on the amber cells first and these second.
+       Same shape, less weight: the two tiers must read as one family. */
+    .excel-data-table tbody td.cell-check-value input.form-control,
+    .excel-data-table tbody td.cell-check-value .excel-readonly-cell {
+        border-color: #E4E7EC !important;
+        background: #FCFCFD !important;
+        box-shadow: inset 1px 0 0 #C4C9D2;
+    }
     /* Focus still wins, so editing the cell reads normally. */
-    .excel-data-table tbody td.cell-needs-update input.form-control:focus {
+    .excel-data-table tbody td.cell-needs-update input.form-control:focus,
+    .excel-data-table tbody td.cell-check-value input.form-control:focus {
         border-color: var(--po-blue, #006C9D) !important;
         box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
@@ -1107,6 +1120,20 @@
             @csrf
         </form>
 
+        {{-- Duplicating a whole style. Carries the three style FILTER VALUES,
+             never row ids: the server re-resolves the group itself, so this
+             form cannot be edited to reach rows outside the style on screen.
+             Rendered only when all three filters are set — which is the same
+             condition that shows the button. --}}
+        @if(! empty($styleMatchValues))
+            <form method="POST" action="{{ route('uploaded-files.rows.duplicate_matching', $excelFile->id) }}" id="duplicate-matching-form" class="d-none">
+                @csrf
+                @foreach($styleMatchValues as $styleHeaderKey => $styleValue)
+                    <input type="hidden" name="filters[{{ $styleMatchHeaderIds[$styleHeaderKey] ?? '' }}]" value="{{ $styleValue }}">
+                @endforeach
+            </form>
+        @endif
+
         {{-- The action is rewritten per row before submit, so one form serves
              every "clear duplicate marker" button on the page. --}}
         <form method="POST" id="dismiss-duplicate-form" class="d-none">
@@ -1271,6 +1298,25 @@
                         <button type="button" id="selectAllMatchesButton" class="btn btn-link btn-sm p-0 ms-1 d-none">
                             Select all <span id="selectAllMatchesCount">0</span> matching rows
                         </button>
+
+                        {{-- Duplicating a whole style. Offered only once all
+                             three style filters (Buyer, Style, Season) are set,
+                             because a partial style key is how a group quietly
+                             grows to include another season's rows.
+
+                             The count is the EXACT-match count from the server,
+                             not the number of rows on screen — the ordinary
+                             filter matches substrings, this action does not.
+                             Where the two differ the note below says so. --}}
+                        @if(! empty($styleMatchValues) && count($styleMatchRowIds) > 0)
+                            <button type="button"
+                                    id="duplicateMatchingButton"
+                                    class="btn btn-outline-primary btn-sm"
+                                    data-count="{{ count($styleMatchRowIds) }}"
+                                    data-style-label="{{ implode(' / ', $styleMatchValues) }}">
+                                <i class="bi bi-layers me-1" aria-hidden="true"></i>Duplicate All {{ count($styleMatchRowIds) }} Matching {{ Str::plural('Row', count($styleMatchRowIds)) }}
+                            </button>
+                        @endif
                     @endif
 
                     @if(count($editableHeaderIds) > 0)
@@ -1280,6 +1326,27 @@
                     @endif
                 </div>
             </div>
+
+            {{-- The gap between what the screen shows and what the bulk action
+                 would touch, stated before the merchant presses the button.
+
+                 The column filter matches SUBSTRINGS ("ABC" finds "ABC-2");
+                 the style duplicate matches EXACTLY. So the filtered view can
+                 legitimately be wider than the group. Silence here would let a
+                 merchant read "37 rows" off the screen and get 24. --}}
+            @if(($canAddRow ?? false) && ! empty($styleMatchValues) && count($styleMatchRowIds) > 0 && count($styleMatchRowIds) !== count($allMatchingRowIds ?? []))
+                <div class="alert alert-light border small d-flex align-items-start gap-2 mt-2 mb-0 py-2">
+                    <i class="bi bi-info-circle mt-1" aria-hidden="true"></i>
+                    <span>
+                        The filter shows <strong>{{ count($allMatchingRowIds ?? []) }}</strong>
+                        {{ Str::plural('row', count($allMatchingRowIds ?? [])) }}, but only
+                        <strong>{{ count($styleMatchRowIds) }}</strong> match
+                        <strong>{{ implode(' / ', $styleMatchValues) }}</strong> exactly.
+                        Duplicating the style copies those {{ count($styleMatchRowIds) }}.
+                        The column filter matches partial text; this action does not.
+                    </span>
+                </div>
+            @endif
 
             <div class="server-search-bar">
                 <div class="server-search-left">
@@ -1489,12 +1556,24 @@
                                     $isHighlightedCell = isset($highlightedCellKeys) && $highlightedCellKeys->contains($cellHighlightKey);
                                     $roleClass = $headerRoleClass($header);
 
-                                    // "Needs update": only on a still-flagged
-                                    // duplicate, and only for the few
-                                    // contract-level columns a new order
-                                    // normally changes. Clears with the badge.
+                                    // Duplicate markers: only on a still-flagged
+                                    // duplicate, and only for the few columns a
+                                    // new order normally changes. Both tiers
+                                    // clear with the badge.
+                                    //
+                                    // TWO TIERS, because "this is wrong until
+                                    // you change it" and "worth checking" are
+                                    // different instructions:
+                                    //   always → cell-needs-update (amber)
+                                    //   likely → cell-check-value  (quiet grey)
+                                    // A column can only be in one tier, so the
+                                    // classes are mutually exclusive.
                                     $needsUpdate = $isFlaggedDuplicate
-                                        && in_array($header->id, $duplicateNeedsUpdateHeaderIds ?? [], true);
+                                        && in_array($header->id, $duplicateNeedsUpdateHeaderIds['always'] ?? [], true);
+
+                                    $checkValue = $isFlaggedDuplicate
+                                        && ! $needsUpdate
+                                        && in_array($header->id, $duplicateNeedsUpdateHeaderIds['likely'] ?? [], true);
 
                                     $inputType = 'text';
                                     if ($header->field_type === 'number') {
@@ -1505,8 +1584,12 @@
                                 @endphp
 
                                     <td
-                                        class="role-column {{ $roleClass }} {{ trim(($isCalculated ? 'calculated-cell ' : '') . ($isHighlightedCell ? 'notification-highlight-cell ' : '') . ($needsUpdate ? 'cell-needs-update' : '')) }}"
-                                        @if($needsUpdate) title="This is a duplicated row — {{ $header->header_name }} usually needs a new value." @endif
+                                        class="role-column {{ $roleClass }} {{ trim(($isCalculated ? 'calculated-cell ' : '') . ($isHighlightedCell ? 'notification-highlight-cell ' : '') . ($needsUpdate ? 'cell-needs-update' : ($checkValue ? 'cell-check-value' : ''))) }}"
+                                        @if($needsUpdate)
+                                            title="Duplicated row — {{ $header->header_name }} must be given a new value."
+                                        @elseif($checkValue)
+                                            title="Duplicated row — check {{ $header->header_name }}. It is often correct as copied."
+                                        @endif
                                         data-header-id="{{ $header->id }}"
                                         data-header-key="{{ $header->header_key }}"
                                         data-row-index="{{ $loop->parent->index }}"
@@ -2903,6 +2986,41 @@ document.addEventListener('DOMContentLoaded', function () {
             if (confirm(message)) {
                 submitDuplicate(ids);
             }
+        });
+    }
+
+    /* Duplicate a whole style, as a block.
+     *
+     * Submits NO row ids — the form carries only the three style filter values
+     * and the server re-resolves the group. So the count named in the confirm
+     * is the server's exact-match count rendered into the button, not anything
+     * this script counted off the page.
+     *
+     * The confirm names the style and says where the copies land, because this
+     * is the widest of the three duplicate actions and the only one that can
+     * touch rows the merchant cannot currently see.
+     */
+    const duplicateMatchingForm = document.getElementById('duplicate-matching-form');
+    const duplicateMatchingButton = document.getElementById('duplicateMatchingButton');
+
+    if (duplicateMatchingButton && duplicateMatchingForm) {
+        duplicateMatchingButton.addEventListener('click', function () {
+            const count = parseInt(this.dataset.count, 10) || 0;
+            const styleLabel = this.dataset.styleLabel || '';
+
+            if (count === 0) return;
+
+            const message = 'Duplicate all ' + count + ' row' + (count === 1 ? '' : 's')
+                + ' for ' + styleLabel + '?\n\n'
+                + 'The copies are inserted together, directly after the last row of that style.\n'
+                + 'Only rows matching this Buyer, Style and Season exactly are copied.';
+
+            if (!confirm(message)) return;
+            if (!passesUnsavedGuard()) return;
+
+            isSubmitting = true;
+            clearDraft();
+            duplicateMatchingForm.submit();
         });
     }
 

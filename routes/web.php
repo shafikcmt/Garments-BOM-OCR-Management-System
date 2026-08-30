@@ -103,6 +103,11 @@ Route::middleware(['auth'])->group(function () {
     // Duplicate one or many existing rows. Same guards and same persistence
     // behaviour as rows.store above — see duplicateRows().
     Route::post('/uploaded-files/{excelFile}/rows/duplicate', [ExcelFileController::class, 'duplicateRows'])->name('uploaded-files.rows.duplicate');
+    // Duplicate a whole style group as a block. Takes the three style FILTER
+    // VALUES, not row ids — the server resolves the rows itself, so a stale or
+    // tampered page cannot name rows outside the group it is looking at. See
+    // duplicateMatchingRows().
+    Route::post('/uploaded-files/{excelFile}/rows/duplicate-matching', [ExcelFileController::class, 'duplicateMatchingRows'])->name('uploaded-files.rows.duplicate_matching');
     // Clears the "Duplicated" badge on one row; the lineage is kept.
     Route::patch('/uploaded-files/{excelFile}/rows/{row}/dismiss-duplicate', [ExcelFileController::class, 'dismissDuplicateFlag'])->name('uploaded-files.rows.dismiss_duplicate');
     Route::get('/uploaded-files/{excelFile}/download', [ExcelFileController::class, 'download'])->name('uploaded-files.download');
