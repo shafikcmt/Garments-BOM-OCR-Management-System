@@ -108,6 +108,11 @@ Route::middleware(['auth'])->group(function () {
     // tampered page cannot name rows outside the group it is looking at. See
     // duplicateMatchingRows().
     Route::post('/uploaded-files/{excelFile}/rows/duplicate-matching', [ExcelFileController::class, 'duplicateMatchingRows'])->name('uploaded-files.rows.duplicate_matching');
+    // The Add New Order dialog: a JSON picker for the source row, then one
+    // write that goes through the same gate and the same copy routine as every
+    // other duplication. See orderSourceOptions() / storeDuplicatedOrder().
+    Route::get('/uploaded-files/{excelFile}/rows/order-sources', [ExcelFileController::class, 'orderSourceOptions'])->name('uploaded-files.rows.order_sources');
+    Route::post('/uploaded-files/{excelFile}/rows/add-order', [ExcelFileController::class, 'storeDuplicatedOrder'])->name('uploaded-files.rows.add_order');
     // Clears the "Duplicated" badge on one row; the lineage is kept.
     Route::patch('/uploaded-files/{excelFile}/rows/{row}/dismiss-duplicate', [ExcelFileController::class, 'dismissDuplicateFlag'])->name('uploaded-files.rows.dismiss_duplicate');
     Route::get('/uploaded-files/{excelFile}/download', [ExcelFileController::class, 'download'])->name('uploaded-files.download');

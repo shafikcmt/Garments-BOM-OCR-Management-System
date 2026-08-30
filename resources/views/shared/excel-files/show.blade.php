@@ -802,35 +802,6 @@
     }
     .row-pick .form-check-input { cursor: pointer; margin: 0; }
 
-    /* Icon + visible label, never icon-only — the project's button rule. */
-    .row-duplicate-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        margin-top: 4px;
-        padding: 3px 8px;
-        border-radius: 999px;
-        border: 1px solid var(--po-line, #D7E3ED);
-        background: #fff;
-        color: var(--po-muted, #5B7383);
-        font-size: 10px;
-        font-weight: 800;
-        line-height: 1;
-        white-space: nowrap;
-        cursor: pointer;
-        transition: .14s ease;
-    }
-    .row-duplicate-btn:hover,
-    .row-duplicate-btn:focus {
-        border-color: #BAE0F2;
-        background: var(--po-tint, #E0F2FE);
-        color: var(--po-blue-deep, #004B70);
-    }
-    .row-duplicate-btn:focus-visible {
-        outline: 2px solid var(--po-blue, #006C9D);
-        outline-offset: 2px;
-    }
-
     /* A ticked row is tinted across its whole width, so a multi-row selection
        is readable while scrolled far to the right of a very wide sheet. */
     .excel-data-table tbody tr.row-is-selected > td {
@@ -917,15 +888,95 @@
         background: #FCFCFD !important;
         box-shadow: inset 1px 0 0 #C4C9D2;
     }
+    /* ---- Add New Order dialog -------------------------------------------
+       The two tiers again, on form inputs this time. Same colours and the same
+       inset-rail shape as the grid cells above, deliberately: a merchant who
+       has learned "amber means I must change this" on the sheet must not have
+       to learn it a second time in the dialog. Kept next to the grid rules so
+       the two cannot drift apart unnoticed. */
+    #addOrderModal .ao-input-always {
+        border-color: #FCD9A5;
+        background: #FFFBF4;
+        box-shadow: inset 2px 0 0 var(--po-warn, #F59E0B);
+    }
+    #addOrderModal .ao-input-likely {
+        border-color: #E4E7EC;
+        background: #FCFCFD;
+        box-shadow: inset 1px 0 0 #C4C9D2;
+    }
+    #addOrderModal .ao-input:focus {
+        border-color: var(--po-blue, #006C9D);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
+    }
+    #addOrderModal .ao-step-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #EEF0F3;
+    }
+    #addOrderModal .ao-step-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--po-blue, #006C9D);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 600;
+        flex: 0 0 auto;
+    }
+    #addOrderModal .ao-step-title { font-size: 13px; font-weight: 600; color: #1F2A37; }
+    /* The results list scrolls on its own, so the dialog keeps a stable height
+       whether a search returns two rows or twenty-five. */
+    #addOrderModal .ao-results {
+        max-height: 320px;
+        overflow-y: auto;
+        border: 1px solid #EEF0F3;
+        border-radius: 6px;
+    }
+    #addOrderModal .ao-results thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #F8FAFC;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        color: #64748B;
+    }
+    #addOrderModal .ao-source-strip {
+        background: #F8FAFC;
+        border: 1px solid #EEF0F3;
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 12px;
+        margin-bottom: 12px;
+    }
+    #addOrderModal .ao-group { margin-top: 14px; }
+    #addOrderModal .ao-group-head {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 6px;
+    }
+    #addOrderModal .ao-tier-dot {
+        width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto;
+    }
+    #addOrderModal .ao-tier-always { background: var(--po-warn, #F59E0B); }
+    #addOrderModal .ao-tier-likely { background: #C4C9D2; }
+
     /* Focus still wins, so editing the cell reads normally. */
     .excel-data-table tbody td.cell-needs-update input.form-control:focus,
     .excel-data-table tbody td.cell-check-value input.form-control:focus {
         border-color: var(--po-blue, #006C9D) !important;
         box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .row-duplicate-btn { transition: none; }
     }
 
     .custom-success-alert {
@@ -1113,9 +1164,14 @@
             @csrf
         </form>
 
-        {{-- Row ids are injected as hidden inputs just before submit, so a single
-             form serves both the per-row Duplicate button and the multi-select
-             toolbar action. --}}
+        {{-- The Add New Order dialog. Placed HERE, outside the worksheet form,
+             because it carries a form of its own and nesting one form inside
+             another is invalid HTML — the browser drops the inner one and the
+             dialog would silently post nothing. --}}
+        @include('shared.excel-files._add-order-modal')
+
+        {{-- Row ids are injected as hidden inputs just before submit, so one
+             form serves the multi-select toolbar action. --}}
         <form method="POST" action="{{ route('uploaded-files.rows.duplicate', $excelFile->id) }}" id="duplicate-rows-form" class="d-none">
             @csrf
         </form>
@@ -1285,6 +1341,15 @@
                     @if($canAddRow ?? false)
                         <button type="button" id="addRowButton" class="btn btn-outline-primary btn-sm">
                             Add New Row
+                        </button>
+                        {{-- The single-row duplicate entry point, moved off the
+                             rows and into the toolbar. Next to "Add New Row" the
+                             pair reads as the choice a merchant actually makes:
+                             a blank row, or a new order based on an existing
+                             one. --}}
+                        <button type="button" id="addOrderButton" class="btn btn-primary btn-sm"
+                                data-bs-toggle="modal" data-bs-target="#addOrderModal">
+                            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add New Order
                         </button>
                         {{-- Disabled until something is ticked; the count comes from
                              the selection so the confirm can name it. --}}
@@ -1509,12 +1574,13 @@
                                         </label>
                                     @endif
                                     {{ $row->row_number }}
-                                    @if($canAddRow ?? false)
-                                        {{-- Icon + visible label, per the project's button rule. --}}
-                                        <button type="button" class="row-duplicate-btn" data-row-id="{{ $row->id }}" data-row-number="{{ $row->row_number }}">
-                                            <i class="bi bi-copy" aria-hidden="true"></i>Duplicate
-                                        </button>
-                                    @endif
+                                    {{-- No per-row Duplicate button. It repeated on
+                                         every one of 50+ rows for an action used
+                                         occasionally, which read as noise in the
+                                         column that has to stay scannable. The
+                                         single-row entry point is now "Add New
+                                         Order" in the toolbar; the checkbox here
+                                         still feeds "Duplicate Selected". --}}
                                     @if($isFlaggedDuplicate)
                                         {{-- Read from the database, not from a
                                              transient CSS class, so it is still
@@ -2962,15 +3028,6 @@ document.addEventListener('DOMContentLoaded', function () {
             dismissDuplicateForm.submit();
             return;
         }
-
-        const single = event.target.closest('.row-duplicate-btn');
-
-        if (single) {
-            const rowNumber = single.dataset.rowNumber;
-            if (confirm('Duplicate row ' + rowNumber + '? The copy is inserted directly below its source row with the same values.')) {
-                submitDuplicate([single.dataset.rowId]);
-            }
-        }
     });
 
     if (duplicateSelectedButton) {
@@ -3022,6 +3079,203 @@ document.addEventListener('DOMContentLoaded', function () {
             clearDraft();
             duplicateMatchingForm.submit();
         });
+    }
+
+    /* ---- Add New Order dialog --------------------------------------------
+     *
+     * The single-row duplicate entry point, moved off the rows and into the
+     * toolbar. Three steps, one dialog, and nothing is written until the last
+     * one — Cancel at any point leaves the sheet exactly as it was.
+     *
+     * Searching is a request to the server, not a filter over the rendered
+     * rows: the grid is paginated, so a client-side search would silently
+     * offer only the current page.
+     */
+    const addOrderModalEl = document.getElementById('addOrderModal');
+
+    if (addOrderModalEl) {
+        const addOrderForm = document.getElementById('addOrderForm');
+        const addOrderSourceRowId = document.getElementById('addOrderSourceRowId');
+        const addOrderStepSearch = document.getElementById('addOrderStepSearch');
+        const addOrderStepEdit = document.getElementById('addOrderStepEdit');
+        const addOrderResultsBody = document.getElementById('addOrderResultsBody');
+        const addOrderResultNote = document.getElementById('addOrderResultNote');
+        const addOrderSourceStrip = document.getElementById('addOrderSourceStrip');
+        const addOrderSubmitButton = document.getElementById('addOrderSubmitButton');
+        const addOrderSearchButton = document.getElementById('addOrderSearchButton');
+        const addOrderResetButton = document.getElementById('addOrderResetButton');
+        const addOrderBackButton = document.getElementById('addOrderBackButton');
+        const addOrderSubtitle = document.getElementById('addOrderSubtitle');
+        const addOrderSourcesUrl = @json(route('uploaded-files.rows.order_sources', $excelFile->id));
+
+        // The rows the last search returned, by id, so choosing one fills the
+        // form from data already in hand rather than a second request.
+        let addOrderRowsById = {};
+
+        function aoEscape(value) {
+            const div = document.createElement('div');
+            div.textContent = value === null || value === undefined ? '' : String(value);
+            return div.innerHTML;
+        }
+
+        function aoShowStep(step) {
+            addOrderStepSearch.classList.toggle('d-none', step !== 'search');
+            addOrderStepEdit.classList.toggle('d-none', step !== 'edit');
+            // Nothing can be saved until a source row is chosen, so the button
+            // is the state of the dialog rather than a thing to guess at.
+            addOrderSubmitButton.disabled = step !== 'edit';
+            addOrderSubtitle.textContent = step === 'edit'
+                ? 'Check the values, then add the order'
+                : 'Based on an existing row in this file';
+        }
+
+        function aoReset() {
+            addOrderSourceRowId.value = '';
+            addOrderRowsById = {};
+            addOrderResultsBody.innerHTML =
+                '<tr class="ao-empty"><td colspan="7" class="text-muted text-center py-4">'
+                + 'Search above to find the order you want to copy.</td></tr>';
+            addOrderResultNote.textContent = '';
+            document.querySelectorAll('#addOrderModal .ao-filter').forEach(el => { el.value = ''; });
+            document.querySelectorAll('#addOrderModal .ao-input').forEach(el => { el.value = ''; });
+            aoShowStep('search');
+        }
+
+        function aoRenderRows(payload) {
+            addOrderRowsById = {};
+
+            if (!payload.rows.length) {
+                addOrderResultsBody.innerHTML =
+                    '<tr class="ao-empty"><td colspan="7" class="text-muted text-center py-4">'
+                    + 'No row in this file matches that search.</td></tr>';
+                addOrderResultNote.textContent = '';
+                return;
+            }
+
+            addOrderResultsBody.innerHTML = payload.rows.map(function (row) {
+                addOrderRowsById[row.id] = row;
+                const v = row.values || {};
+
+                return '<tr>'
+                    + '<td class="text-muted">' + row.row_number + '</td>'
+                    + '<td>' + aoEscape(v.buyer_name) + '</td>'
+                    + '<td>' + aoEscape(v.style_name) + '</td>'
+                    + '<td>' + aoEscape(v.season_name) + '</td>'
+                    + '<td>' + aoEscape(v.gmts_color_name) + '</td>'
+                    + '<td>' + aoEscape(v.initial_contract_number) + '</td>'
+                    + '<td><button type="button" class="btn btn-outline-primary btn-sm ao-pick" '
+                    + 'data-row-id="' + row.id + '">Use This Row</button></td>'
+                    + '</tr>';
+            }).join('');
+
+            // Says plainly when the list is capped, so a merchant who cannot
+            // find their row knows to narrow rather than keep scrolling.
+            addOrderResultNote.textContent = payload.total > payload.shown
+                ? 'Showing the first ' + payload.shown + ' of ' + payload.total + ' matches — narrow the filters to see the rest.'
+                : payload.total + (payload.total === 1 ? ' match' : ' matches');
+        }
+
+        function aoSearch() {
+            const params = new URLSearchParams();
+
+            document.querySelectorAll('#addOrderModal .ao-filter').forEach(function (el) {
+                const value = el.value.trim();
+                if (value !== '') params.append(el.dataset.filter, value);
+            });
+
+            addOrderResultsBody.innerHTML =
+                '<tr class="ao-empty"><td colspan="7" class="text-muted text-center py-4">Searching…</td></tr>';
+            addOrderResultNote.textContent = '';
+
+            fetch(addOrderSourcesUrl + '?' + params.toString(), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            })
+                .then(res => res.ok ? res.json() : Promise.reject(res.status))
+                .then(aoRenderRows)
+                .catch(function () {
+                    addOrderResultsBody.innerHTML =
+                        '<tr class="ao-empty"><td colspan="7" class="text-danger text-center py-4">'
+                        + 'Could not load rows. Check your connection and try again.</td></tr>';
+                });
+        }
+
+        function aoChooseRow(rowId) {
+            const row = addOrderRowsById[rowId];
+
+            if (!row) return;
+
+            addOrderSourceRowId.value = row.id;
+
+            const v = row.values || {};
+            const label = [v.buyer_name, v.style_name, v.season_name]
+                .filter(part => part !== null && part !== undefined && String(part).trim() !== '')
+                .map(aoEscape)
+                .join(' / ');
+
+            addOrderSourceStrip.innerHTML =
+                '<strong>Copying row ' + row.row_number + '</strong>'
+                + (label ? ' — ' + label : '')
+                + '<br><span class="text-muted">The new order is inserted directly below row '
+                + row.row_number + '.</span>';
+
+            // Pre-fill from the source, so the form starts as a true copy and
+            // the merchant changes what differs — the same thing the grid's
+            // markers ask for, asked here first.
+            const formValues = row.form_values || {};
+
+            document.querySelectorAll('#addOrderModal .ao-input').forEach(function (el) {
+                const value = formValues[el.dataset.headerId];
+                el.value = (value === null || value === undefined) ? '' : value;
+            });
+
+            aoShowStep('edit');
+        }
+
+        addOrderSearchButton.addEventListener('click', aoSearch);
+        addOrderResetButton.addEventListener('click', aoReset);
+        addOrderBackButton.addEventListener('click', function () {
+            addOrderSourceRowId.value = '';
+            aoShowStep('search');
+        });
+
+        // Enter searches rather than submitting the form, which at step one
+        // would post with no source row chosen.
+        addOrderModalEl.querySelectorAll('.ao-filter').forEach(function (el) {
+            el.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    aoSearch();
+                }
+            });
+        });
+
+        addOrderResultsBody.addEventListener('click', function (event) {
+            const pick = event.target.closest('.ao-pick');
+            if (pick) aoChooseRow(pick.dataset.rowId);
+        });
+
+        // Saving navigates away, exactly as the other duplicate actions do, so
+        // it takes the same unsaved-work guard: without it the redirect would
+        // silently discard pending cell edits in the sheet behind the dialog.
+        addOrderForm.addEventListener('submit', function (event) {
+            if (!addOrderSourceRowId.value) {
+                event.preventDefault();
+                return;
+            }
+
+            if (!passesUnsavedGuard()) {
+                event.preventDefault();
+                return;
+            }
+
+            isSubmitting = true;
+            clearDraft();
+        });
+
+        // A dialog reopened mid-edit would otherwise still show the last search
+        // and the last chosen row, which is not what "Add New Order" means.
+        addOrderModalEl.addEventListener('show.bs.modal', aoReset);
     }
 
     refreshDuplicateSelection();

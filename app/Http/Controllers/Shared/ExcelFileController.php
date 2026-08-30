@@ -180,6 +180,12 @@ class ExcelFileController extends Controller
         // Which cells carry a "Needs update" marker on a duplicated row.
         $duplicateNeedsUpdateHeaderIds = $this->duplicateNeedsUpdateHeaderIds();
 
+        // The focused form inside the Add New Order dialog — the same columns
+        // the markers above flag, narrowed to the ones this user may edit.
+        $addOrderHeaders = $canAddRow
+            ? $this->addOrderFormHeaders($editableHeaderIds)
+            : collect();
+
         // Latest PRA dates per PI No., pre-formatted for the live (client-side)
         // formulas. Keyed by normalised PI No. so every row sharing that PI No.
         // picks up the same dates.
@@ -237,7 +243,8 @@ class ExcelFileController extends Controller
             'allMatchingRowIds',
             'styleMatchValues',
             'styleMatchRowIds',
-            'styleMatchHeaderIds'
+            'styleMatchHeaderIds',
+            'addOrderHeaders'
         ));
     }
 
@@ -889,6 +896,279 @@ class ExcelFileController extends Controller
     }
 
     /**
+     * Every header id the signed-in user may write, ignoring file locks.
+     *
+     * The authority behind the Add New Order dialog, stated once so the picker
+     * that PRE-FILLS the form and the action that SAVES it cannot disagree
+     * about which columns are in play. Calculated columns are excluded here as
+     * they are everywhere else — recalculate would overwrite them moments
+     * later anyway.
+     *
+     * File and buyer locks are not consulted: duplicateGuard() has already
+     * refused the whole request by the time either caller reaches this.
+     *
+     * @return list<int>
+     */
+    private function editableHeaderIdsForCurrentUser(): array
+    {
+        $roleIds = $this->getRoleIds();
+        $calculatedHeaderKeys = $this->calculatedHeaderKeys();
+
+        return ExcelHeader::where('is_active', true)
+            ->get()
+            ->filter(fn ($header) => $this->canEditHeader($header, $roleIds))
+            ->reject(fn ($header) => $this->isCalculatedHeader($header, $calculatedHeaderKeys))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * The columns the "Add New Order" dialog puts on its form, by tier.
+     *
+     * The SAME constant the grid markers read, so the dialog and the sheet
+     * teach one rule about what a new order usually changes rather than two
+     * lists that can drift apart.
+     *
+     * Narrowed to what THIS user may actually edit. The thirteen keys span
+     * Merchandising and Supply Chain, so a merchant sees the merchant ones and
+     * nothing else — the screen already holds that a user who cannot save a
+     * column must not be shown an input for it. The columns left out are still
+     * copied from the source; they are simply not editable here, exactly as
+     * they are not editable in the grid.
+     *
+     * @param  list<int>  $editableHeaderIds
+     * @return \Illuminate\Support\Collection<int, array{id:int,name:string,key:string,tier:string,field_type:string}>
+     */
+    private function addOrderFormHeaders(array $editableHeaderIds)
+    {
+        $tierByKey = [];
+
+        foreach (self::DUPLICATE_NEEDS_UPDATE_HEADER_KEYS as $tier => $keys) {
+            foreach ($keys as $key) {
+                $tierByKey[$key] = $tier;
+            }
+        }
+
+        $editable = array_flip($editableHeaderIds);
+
+        return ExcelHeader::where('is_active', true)
+            ->whereIn('header_key', array_keys($tierByKey))
+            ->orderBy('position')
+            ->get()
+            ->filter(fn ($header) => isset($editable[$header->id]))
+            ->map(fn ($header) => [
+                'id' => (int) $header->id,
+                'name' => $header->header_name,
+                'key' => $header->header_key,
+                'tier' => $tierByKey[$header->header_key],
+                'field_type' => $header->field_type ?? 'text',
+            ])
+            // Amber before grey, so the form reads in the order the marker
+            // colours already taught on the grid.
+            ->sortBy(fn ($header) => $header['tier'] === 'always' ? 0 : 1)
+            ->values();
+    }
+
+    /**
+     * Rows a merchant can pick as the source for a new order, as JSON.
+     *
+     * Step one of the Add New Order dialog. Searching happens HERE rather than
+     * over the rows the page happens to have rendered, because the grid is
+     * paginated — a client-side search would quietly offer only the current
+     * page and look like the older rows had been deleted.
+     *
+     * Substring matching, matching the column filter the merchant already
+     * knows. This picks ONE row to copy and shows it back to them before
+     * anything is written, so over-matching here costs a glance, not data —
+     * unlike duplicateMatchingRows(), which acts on the whole match unseen and
+     * is exact for that reason.
+     */
+    public function orderSourceOptions(Request $request, ExcelFile $excelFile)
+    {
+        $user = auth()->user();
+
+        // Read-only lookup, but it feeds an action only these roles may take,
+        // and it reports another team's rows — so it takes the same gate.
+        if ($blocked = $this->duplicateGuard($excelFile, $user)) {
+            return response()->json(['rows' => [], 'message' => 'This file is not available for editing.'], 403);
+        }
+
+        $headerIdByKey = ExcelHeader::whereIn('header_key', self::ADD_ORDER_SUMMARY_HEADER_KEYS)
+            ->pluck('id', 'header_key');
+
+        $terms = collect(self::STYLE_MATCH_HEADER_KEYS)
+            ->mapWithKeys(fn ($key) => [$key => trim((string) $request->query($key, ''))])
+            ->filter(fn ($value) => $value !== '');
+
+        $freeText = trim((string) $request->query('q', ''));
+
+        $rowsQuery = $excelFile->rows();
+
+        foreach ($terms as $headerKey => $value) {
+            $headerId = $headerIdByKey->get($headerKey);
+
+            if ($headerId === null) {
+                continue;
+            }
+
+            $rowsQuery->whereHas('cells', function ($cellQuery) use ($headerId, $value) {
+                $cellQuery->where('header_id', $headerId)->whereLike('value', '%' . $value . '%');
+            });
+        }
+
+        if ($freeText !== '') {
+            $rowsQuery->where(function ($query) use ($freeText) {
+                $query->whereLike('row_number', '%' . $freeText . '%')
+                    ->orWhereHas('cells', function ($cellQuery) use ($freeText) {
+                        $cellQuery->whereLike('value', '%' . $freeText . '%');
+                    });
+            });
+        }
+
+        $summaryHeaderIds = $headerIdByKey->values()->map(fn ($id) => (int) $id)->all();
+
+        // The form's own columns come back with each candidate, so choosing a
+        // row fills the edit step from data already in hand. A second request
+        // per click would put a spinner between "that one" and seeing it.
+        $formHeaderIds = $this->addOrderFormHeaders($this->editableHeaderIdsForCurrentUser())
+            ->pluck('id')
+            ->all();
+
+        $wantedHeaderIds = array_values(array_unique(array_merge($summaryHeaderIds, $formHeaderIds)));
+
+        // Capped. This is a picker, not a report — a merchant who gets 400 hits
+        // needs to type more, not scroll further, and the footer says so.
+        $limit = 25;
+
+        $total = (clone $rowsQuery)->count();
+
+        $rows = $rowsQuery
+            ->with(['cells' => function ($query) use ($wantedHeaderIds) {
+                $query->select('id', 'row_id', 'header_id', 'value')
+                    ->whereIn('header_id', $wantedHeaderIds);
+            }])
+            ->orderBy('row_number')
+            ->limit($limit)
+            ->get();
+
+        $keyById = $headerIdByKey->flip();
+        $formHeaderIdSet = array_flip($formHeaderIds);
+
+        return response()->json([
+            'total' => $total,
+            'shown' => $rows->count(),
+            'limit' => $limit,
+            'rows' => $rows->map(function ($row) use ($keyById, $formHeaderIdSet) {
+                $values = [];
+                $formValues = [];
+
+                foreach ($row->cells as $cell) {
+                    $key = $keyById->get($cell->header_id);
+
+                    if ($key !== null) {
+                        $values[$key] = $cell->value;
+                    }
+
+                    if (isset($formHeaderIdSet[(int) $cell->header_id])) {
+                        $formValues[(int) $cell->header_id] = $cell->value;
+                    }
+                }
+
+                return [
+                    'id' => (int) $row->id,
+                    'row_number' => (int) $row->row_number,
+                    'values' => $values,
+                    'form_values' => (object) $formValues,
+                ];
+            })->values(),
+        ]);
+    }
+
+    /**
+     * The columns the source picker shows for each candidate row.
+     *
+     * Enough to tell two orders apart at a glance and no more — the dialog is
+     * for choosing a row, and a wide table inside a modal is how a merchant
+     * loses the row they were looking at.
+     *
+     * @var list<string>
+     */
+    private const ADD_ORDER_SUMMARY_HEADER_KEYS = [
+        'buyer_name',
+        'style_name',
+        'season_name',
+        'gmts_color_name',
+        'initial_contract_number',
+    ];
+
+    /**
+     * Create one new order from a chosen source row, with the merchant's edits
+     * already applied.
+     *
+     * Step three of the Add New Order dialog, and deliberately the SAME write
+     * path as every other duplication: the same gate, the same lineage, the
+     * same badge, the same below-source placement. The dialog changes where the
+     * action is started from, not what it does — which is why this method is
+     * short and performRowDuplication() is untouched apart from taking the
+     * edits.
+     *
+     * The overrides are re-checked against what this user may edit. The form
+     * only renders editable columns, but the form is not the control.
+     */
+    public function storeDuplicatedOrder(Request $request, ExcelFile $excelFile)
+    {
+        $user = auth()->user();
+
+        if ($blocked = $this->duplicateGuard($excelFile, $user)) {
+            return $blocked;
+        }
+
+        $validated = $request->validate([
+            'source_row_id' => ['required', 'integer'],
+            'overrides' => ['array'],
+        ]);
+
+        $sourceRow = ExcelRow::where('excel_file_id', $excelFile->id)
+            ->where('id', $validated['source_row_id'])
+            ->with('cells')
+            ->first();
+
+        // Scoped to THIS file, so a hand-made request cannot pull a row out of
+        // somebody else's workbook — the same rule duplicateRows() applies.
+        if (! $sourceRow) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'That source row was not found in this file, so no order was created.');
+        }
+
+        $editableHeaderIds = collect($this->editableHeaderIdsForCurrentUser())->flip();
+
+        $overrides = [];
+
+        foreach ((array) ($validated['overrides'] ?? []) as $headerId => $value) {
+            $headerId = (int) $headerId;
+
+            if (! $editableHeaderIds->has($headerId)) {
+                continue;
+            }
+
+            $value = is_string($value) ? trim($value) : $value;
+
+            $overrides[$headerId] = ($value === '' || $value === null) ? null : $value;
+        }
+
+        $newRows = $this->performRowDuplication($excelFile, $user, collect([$sourceRow]), 'below_source', $overrides);
+
+        $newRow = $newRows->first();
+
+        return redirect()
+            ->route('uploaded-files.show', $excelFile->id)
+            ->with('success', 'New order added as row ' . ($newRow?->row_number ?? '')
+                . ', copied from row ' . $sourceRow->row_number . '. Marked cells still need checking.');
+    }
+
+    /**
      * The role and lock gate shared by every duplication entry point.
      *
      * Returns a redirect to send back, or null to continue. Stated once so the
@@ -931,14 +1211,35 @@ class ExcelFileController extends Controller
      * Everything else — the cell copying, the lineage, the activity log, the
      * park-and-reassign that keeps row_number unique — is identical for both,
      * which is why they share this method rather than each owning a variant.
+     *
+     * $overrides is header_id => value, applied to the new row AFTER its cells
+     * are copied and BEFORE the single recalculate at the end — which is the
+     * whole reason it lives here rather than in the caller. Writing the edited
+     * values afterwards would mean a second recalculate over the file, and
+     * recalculating is the expensive part of this method. It is only meaningful
+     * for a single source row, so it is ignored unless there is exactly one;
+     * storeDuplicatedOrder() is the only caller that passes it.
+     *
+     * Returns the rows it created, in the order they were placed, so a caller
+     * can redirect to one. Existing callers ignore the return.
+     *
+     * @param  array<int, string|null>  $overrides
+     * @return \Illuminate\Support\Collection<int, ExcelRow>
      */
-    private function performRowDuplication(ExcelFile $excelFile, $user, $sourceRows, string $placement): void
+    private function performRowDuplication(ExcelFile $excelFile, $user, $sourceRows, string $placement, array $overrides = [])
     {
         $blankHeaderIds = ExcelHeader::whereIn('header_key', self::DUPLICATE_BLANK_HEADER_KEYS)
             ->pluck('id')
             ->all();
 
-        DB::transaction(function () use ($excelFile, $user, $sourceRows, $blankHeaderIds, $placement) {
+        // Ambiguous with more than one source: there would be no saying which
+        // new row the edited values belonged to. Silently dropping them is the
+        // safe direction — a copied value is always recoverable in the grid.
+        if ($sourceRows->count() !== 1) {
+            $overrides = [];
+        }
+
+        return DB::transaction(function () use ($excelFile, $user, $sourceRows, $blankHeaderIds, $placement, $overrides) {
             // Every ACTIVE header, so a duplicate has the same cell coverage as
             // a fresh row. A source row missing a cell for a newly added column
             // still gets that column here, blank.
@@ -1024,6 +1325,7 @@ class ExcelFileController extends Controller
                 ->update(['row_number' => DB::raw('row_number + ' . $offset)]);
 
             $nextRowNumber = $anchor + 1;
+            $createdRows = collect();
 
             foreach ($sequence as [$kind, $refId]) {
                 if ($kind === 'existing') {
@@ -1050,6 +1352,13 @@ class ExcelFileController extends Controller
                         ? null
                         : ($sourceValues->get($header->id)->value ?? null);
 
+                    // The merchant's edit wins over the copied value. Only for
+                    // headers actually present here, so an override naming a
+                    // column this file does not have is simply not written.
+                    if (array_key_exists($header->id, $overrides)) {
+                        $value = $overrides[$header->id];
+                    }
+
                     ExcelCell::create([
                         'row_id' => $newRow->id,
                         'header_id' => $header->id,
@@ -1057,6 +1366,8 @@ class ExcelFileController extends Controller
                         'updated_by' => $user->id,
                     ]);
                 }
+
+                $createdRows->push($newRow);
 
                 ActivityLog::create([
                     'excel_file_id' => $excelFile->id,
@@ -1076,6 +1387,8 @@ class ExcelFileController extends Controller
             // the result is the same.
             $this->recalculateFile($excelFile, $user->id);
             $this->refreshFileStatus($excelFile);
+
+            return $createdRows;
         });
     }
 
