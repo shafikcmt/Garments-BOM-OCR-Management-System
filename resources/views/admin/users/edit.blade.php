@@ -294,7 +294,11 @@
                                     @endif
                                 </div>
                             </div>
-                        @elseif($user->isDepartmentAdmin())
+                        {{-- Buyer scoping is read only for Merchandising, so only a
+                             merchant department admin can act on this prompt. A Store
+                             or Accounts admin asked to "assign one from Admin › Buyers"
+                             would be chasing something that nothing will ever read. --}}
+                        @elseif($user->isDepartmentAdmin() && $user->isMerchantDepartment())
                             <div class="mb-4">
                                 <label class="form-label fw-semibold d-block">Assigned Buyer</label>
                                 <span class="badge bg-warning-subtle text-warning border border-warning-subtle">

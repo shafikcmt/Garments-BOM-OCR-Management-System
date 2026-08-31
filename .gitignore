@@ -40,3 +40,7 @@ public/storage/
 # Reference BOM workbooks kept locally for lookup. Real buyer data, read by
 # nothing in the application — no test, seeder or import path opens them.
 docs/OCR Files/
+
+# Reference image of the buyer PO layout, kept locally for lookup while
+# matching the PDF export. Not read by any code path.
+docs/PO Format.png
