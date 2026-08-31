@@ -140,6 +140,10 @@ class UserPolicy
      *   another dept admin    peers and other departments' heads are managed by
      *                         the super admin only, or one department admin
      *                         could strip another's account.
+     *   another buyer's team  see coversBuyers() below. Department alone was
+     *                         the whole rule until it was found to let one
+     *                         buyer's admin edit and DELETE another buyer's
+     *                         team members.
      *
      * Managing your own account is allowed and lands on the existing self-edit
      * guard in the controller, which already refuses your own role, status and
@@ -162,6 +166,80 @@ class UserPolicy
         $scope = $actor->departmentKey();
         $theirs = $target->departmentKey();
 
-        return $theirs !== null && $theirs === $scope;
+        if ($theirs === null || $theirs !== $scope) {
+            return false;
+        }
+
+        return $this->coversBuyers($actor, $target);
+    }
+
+    /**
+     * Whether the actor's buyers cover the target's — the second half of the
+     * scope, added after Team Management was found showing a MACYS admin the
+     * Hugo Boss team.
+     *
+     * DEPARTMENT WAS NEVER ENOUGH. Merchandising holds one team per buyer, so a
+     * department-only rule let the admin of one buyer view, edit, reset the
+     * password of and delete the members of every other buyer's team. The
+     * screen listed their names, emails and roles. setCanUpload() below already
+     * narrowed its own grant by buyer, and this closes the larger hole beside
+     * it: it made no sense that one buyer's admin could not grant upload to
+     * another buyer's member but could delete their account.
+     *
+     * Three answers, and each is deliberate:
+     *
+     *   actor owns nothing   ALLOWED, department-wide, exactly as before. Every
+     *                        Store, Commercial and Accounts department admin
+     *                        owns no buyer today, so this is the branch they
+     *                        take and nothing about their screen moves. Take
+     *                        this out and Team Management empties for all of
+     *                        them.
+     *   target holds none    ALLOWED. A user with no buyer belongs to no team,
+     *                        so no team's admin is wronged by showing them —
+     *                        and hiding them would strand every newly created
+     *                        or unassigned member where only a super admin
+     *                        could reach them, which is how somebody ends up
+     *                        unable to assign a buyer to the user they just
+     *                        created. It is the same rule ScopesToAssignedBuyers
+     *                        applies to an untagged file, for the same reason.
+     *   otherwise            THEY MUST SHARE ONE. An admin owning two buyers
+     *                        reaches both their teams and nobody else's, and a
+     *                        member spanning one buyer this admin owns and one
+     *                        they do not IS still theirs to administer.
+     *
+     * INTERSECTION, NOT SUBSET, and the difference is not cosmetic. A member can
+     * hold a buyer this admin cannot reach — assigned by another admin, or by a
+     * super admin — and UserController already handles that case deliberately:
+     * a save by an admin who cannot see that buyer leaves it untouched rather
+     * than stripping it, because the form never showed the field. Requiring the
+     * target's whole holding to sit inside the actor's would 403 that same admin
+     * out of a member they share a buyer with, and
+     * BuyerAssignmentOnUserEditTest's "leaves buyers outside the acting admin
+     * reach untouched" pins that they must not be.
+     *
+     * setCanUpload() below reads the subset instead, and that asymmetry is
+     * correct: GRANTING A NEW AUTHORITY on someone should be refused unless they
+     * are wholly yours, while ADMINISTERING a member you demonstrably share a
+     * team with should not be. Different questions, different set operation.
+     *
+     * Asks scopedBuyerIds(), which already answers "owned" for a department
+     * admin and "assigned" for a member, so ownership and assignment do not
+     * have to be told apart here.
+     */
+    private function coversBuyers(User $actor, User $target): bool
+    {
+        $mine = $actor->scopedBuyerIds();
+
+        if ($mine === []) {
+            return true;
+        }
+
+        $theirs = $target->scopedBuyerIds();
+
+        if ($theirs === []) {
+            return true;
+        }
+
+        return array_intersect($theirs, $mine) !== [];
     }
 }
