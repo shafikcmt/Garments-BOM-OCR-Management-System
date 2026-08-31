@@ -1678,13 +1678,27 @@ class ExcelFileController extends Controller
             : 'File unlocked successfully.');
     }
 
+    /**
+     * Tell the other departments a merchant edited a file.
+     *
+     * SCOPED for the same reason the upload notification is: the message names
+     * the file, and the navbar prints it in full, so an unfiltered fan-out hands
+     * a confined user the file name of a buyer they have no access to. The
+     * companion is ExcelUploadController::notifyOtherRoles() — the two are
+     * separate fan-outs over the same recipient list and must not drift.
+     *
+     * isBuyerLockedForUser() is the same predicate the file screen applies, so a
+     * recipient is dropped on exactly the rule that would have withheld the file
+     * itself, and an untagged file still notifies everybody.
+     */
     private function notifyOtherRolesAboutFileUpdate(ExcelFile $excelFile, array $changedCells, string $batchId, $actor): void
     {
         $users = User::where('id', '!=', $actor->id)
             ->whereDoesntHave('roles', function ($query) {
                 $query->where('name', 'merchant');
             })
-            ->get();
+            ->get()
+            ->reject(fn (User $user) => $excelFile->isBuyerLockedForUser($user));
 
         foreach ($users as $user) {
             $notification = AppNotification::create([

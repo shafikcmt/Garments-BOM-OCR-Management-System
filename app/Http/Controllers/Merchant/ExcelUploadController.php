@@ -597,13 +597,31 @@ class ExcelUploadController extends Controller
         return $spreadsheet;
     }
 
+    /**
+     * Tell the other departments a file arrived.
+     *
+     * SCOPED, because the message names the file. A confined Store, Commercial,
+     * Accounts or Supply Chain user has no business being told that a file for
+     * a buyer outside their access exists, and the notification is not a link
+     * they can ignore — the navbar prints the title and message in full, so the
+     * file name reaches them whether or not they ever click it. Locking the edit
+     * does not un-leak the label; that reading was already rejected for the
+     * Workspace file list and it is no different here.
+     *
+     * Filtered through isBuyerLockedForUser(), the same predicate the file
+     * screen uses, so a recipient is dropped on exactly the rule that would have
+     * withheld the file itself. An untagged file still notifies everybody — it
+     * belongs to no buyer, and every live BOM file is untagged today, so
+     * anything stricter would silence these notifications entirely.
+     */
     private function notifyOtherRoles($excelFile, string $type, string $title, string $message, ?string $batchId = null): void
     {
         $users = User::where('id', '!=', auth()->id())
             ->whereDoesntHave('roles', function ($query) {
                 $query->where('name', 'merchant');
             })
-            ->get();
+            ->get()
+            ->reject(fn (User $user) => $excelFile->isBuyerLockedForUser($user));
 
         foreach ($users as $user) {
             $notification = AppNotification::create([
