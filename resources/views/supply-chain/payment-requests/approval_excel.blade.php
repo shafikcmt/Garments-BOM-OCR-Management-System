@@ -74,7 +74,11 @@
                  Comments stays left-aligned: it holds free-text sentences, which
                  centring makes markedly harder to read. --}}
             <td class="center">{{ $row['contract_shipment'] ?: '-' }}</td>
-            <td class="center">{{ $row['style'] ?: '-' }}</td>
+            {{-- One spanning Style cell per run of consecutive rows sharing it,
+                 matching the preview, the PDF and the .xlsx merge. --}}
+            @if(($row['style_rowspan'] ?? 1) > 0)
+                <td class="center" style="vertical-align:middle;font-weight:bold;" rowspan="{{ $row['style_rowspan'] ?? 1 }}">{{ $row['style'] ?: '-' }}</td>
+            @endif
             <td class="center">{{ $row['pcd_required'] ?: '-' }}</td>
             <td class="center">{{ $row['vendor_name'] ?: '-' }}</td>
             <td class="center">{{ $row['material_po_number'] ?: '-' }}</td>

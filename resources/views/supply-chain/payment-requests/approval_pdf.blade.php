@@ -43,6 +43,7 @@
         .report th { background:#000b6f; color:#fff; border:1px solid #33439e; padding: 4px 3px; font-size: 9px; line-height:1.15; font-weight:800; text-align:center; vertical-align:middle; }
         .report td { border:1px solid #e2e6ef; padding: 3px 4px; font-size: 9px; line-height:1.15; vertical-align:middle; word-break: break-word; }
         .center { text-align:center; } .right { text-align:right; }
+        .style-cell { vertical-align:middle; font-weight:700; }
         .grand td { background:#eaf0fb !important; color:#000b6f; font-size: 10px; font-weight:800; padding: 5px 5px; }
         .sign { margin-top: 18px; color:#000b6f; }
         .sign td { border:0; width:33.33%; padding:0 22px; vertical-align:bottom; }
@@ -153,7 +154,12 @@
                 {{-- Centred body, right-aligned amount — identical to the
                      on-screen preview, so the PDF matches what was approved. --}}
                 <td class="center">{{ $row['contract_shipment'] ?: '-' }}</td>
-                <td class="center">{{ $row['style'] ?: '-' }}</td>
+                {{-- One spanning Style cell per run of consecutive rows sharing
+                     it, matching the preview. A covered row emits no cell -
+                     an empty one would shift its remaining columns right. --}}
+                @if(($row['style_rowspan'] ?? 1) > 0)
+                    <td class="center style-cell" rowspan="{{ $row['style_rowspan'] ?? 1 }}">{{ $row['style'] ?: '-' }}</td>
+                @endif
                 <td class="center">{{ $row['pcd_required'] ?: '-' }}</td>
                 <td class="center">{{ $row['vendor_name'] ?: '-' }}</td>
                 <td class="center">{{ $row['material_po_number'] ?: '-' }}</td>

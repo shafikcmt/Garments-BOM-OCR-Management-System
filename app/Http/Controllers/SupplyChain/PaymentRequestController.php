@@ -1151,7 +1151,54 @@ class PaymentRequestController extends Controller
                 ['material_type', 'asc'],
                 ['material_po_number', 'asc'],
             ])
-            ->values();
+            ->pipe(fn ($rows) => $this->annotateStyleSpans($rows));
+    }
+
+    /**
+     * Marks each run of CONSECUTIVE rows sharing a Style, so the three
+     * renderers can print that style once as a spanning cell instead of
+     * repeating it on every line.
+     *
+     * Each row gains 'style_rowspan': the run length on the FIRST row of a run,
+     * and 0 on every row the span already covers (those emit no Style cell at
+     * all). Nothing else is touched - no reordering, no data change - so the
+     * Grand Total and every other column are unaffected.
+     *
+     * CONSECUTIVE RUNS, NOT GROUP-BY-STYLE, and the distinction is not
+     * theoretical. The sort above is by VENDOR first, so one style legitimately
+     * appears in several separate blocks with another vendor's rows between
+     * them: on the current data, style 4800093964 occupies two blocks and
+     * 4800094675 three. Grouping by style would try to span rows that are not
+     * adjacent, which no table can express - a run-based span is the only
+     * correct reading of "these rows share a style".
+     *
+     * Same-style rows are always contiguous WITHIN a vendor, so no sort step is
+     * needed to make the runs whole; if the sort above ever stops leading with
+     * vendor and style, re-check this.
+     */
+    protected function annotateStyleSpans($rows): \Illuminate\Support\Collection
+    {
+        $rows = collect($rows)->values()->all();
+        $count = count($rows);
+        $index = 0;
+
+        while ($index < $count) {
+            $style = $rows[$index]['style'] ?? null;
+
+            $run = 1;
+            while ($index + $run < $count && ($rows[$index + $run]['style'] ?? null) === $style) {
+                $run++;
+            }
+
+            $rows[$index]['style_rowspan'] = $run;
+            for ($offset = 1; $offset < $run; $offset++) {
+                $rows[$index + $offset]['style_rowspan'] = 0;
+            }
+
+            $index += $run;
+        }
+
+        return collect($rows);
     }
 
     protected function approvalRowFromItem(PaymentRequestItem $item): array
@@ -1547,7 +1594,17 @@ class PaymentRequestController extends Controller
         $sheet->getRowDimension($tableStart)->setRowHeight(26);
 
         $rowNo = $tableStart + 1;
+        // Sheet rows to merge in column B (Style), collected while the body is
+        // written: one entry per run of consecutive rows sharing a style, so the
+        // .xlsx groups them the same way the preview and the PDF do.
+        $styleMerges = [];
+
         foreach ($approvalRows as $row) {
+            $span = (int) ($row['style_rowspan'] ?? 1);
+            if ($span > 1) {
+                $styleMerges[] = ['B' . $rowNo, 'B' . ($rowNo + $span - 1)];
+            }
+
             $sheet->fromArray([
                 // Positional — must stay in step with $headers above.
                 $row['contract_shipment'] ?: '-',
@@ -1572,6 +1629,18 @@ class PaymentRequestController extends Controller
                 'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FFE4E7EF']]],
             ]);
             $rowNo++;
+        }
+
+        // Merge each style run in column B. Done AFTER the body is written:
+        // mergeCells keeps the top-left value and blanks the rest, so writing
+        // every row first and merging second leaves exactly the style that
+        // started the run. Bold + centred to match the other two renderers.
+        foreach ($styleMerges as [$from, $to]) {
+            $sheet->mergeCells($from . ':' . $to);
+            $sheet->getStyle($from . ':' . $to)->getAlignment()
+                ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER)
+                ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle($from . ':' . $to)->getFont()->setBold(true);
         }
 
         // The label spans A..K (through Budget) and the total sits in L. Budget

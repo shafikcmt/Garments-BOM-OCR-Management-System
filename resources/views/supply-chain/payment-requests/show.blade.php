@@ -64,6 +64,9 @@
     .pra-table tbody td { font-size:11px; line-height:1.35; padding:5px 6px; border-color:#e7eaf1; vertical-align:top; word-break:break-word; overflow-wrap:break-word; }
     .pra-table tfoot td { background:#eaf0fb; color:#000b6f; font-size:14px; font-weight:800; padding:7px 6px; border-color:#e7eaf1; }
     .pra-table td.text-end, .pra-table th.text-end, .pra-table tfoot td.text-end { white-space:nowrap; }
+    {{-- The merged Style cell centres against the block it spans; every other
+         body cell stays top-aligned. --}}
+    .pra-table tbody td.pra-style-cell { vertical-align:middle; font-weight:600; }
     {{-- 11 columns summing to 100, mirrored by .w-* in approval_pdf.blade.php -
          the two tables are compared side by side and must not drift.
 
@@ -292,7 +295,14 @@
                                      reads down its decimal point, and centring it
                                      would break that. --}}
                                 <td class="text-center">{{ $row['contract_shipment'] ?: '-' }}</td>
-                                <td class="text-center">{{ $row['style'] ?: '-' }}</td>
+                                {{-- Style prints ONCE per run of consecutive rows
+                                     sharing it, as a spanning cell. A row the span
+                                     already covers emits no cell at all - emitting
+                                     an empty one would push every later column of
+                                     that row one place right. --}}
+                                @if(($row['style_rowspan'] ?? 1) > 0)
+                                    <td class="text-center pra-style-cell" rowspan="{{ $row['style_rowspan'] ?? 1 }}">{{ $row['style'] ?: '-' }}</td>
+                                @endif
                                 <td class="text-center">{{ $row['pcd_required'] ?: '-' }}</td>
                                 <td class="text-center">{{ $row['vendor_name'] ?: '-' }}</td>
                                 <td class="text-center">{{ $row['material_po_number'] ?: '-' }}</td>

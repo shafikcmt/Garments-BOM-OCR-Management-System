@@ -172,3 +172,80 @@ it('leaves the Grand Total unchanged however the lines are split', function () {
     // Three distinct POs across three lines, counted once each.
     expect($summary['total_po_count'])->toBe(3);
 });
+
+/**
+ * STYLE ROW-SPANNING. The Style column prints once per run of consecutive rows
+ * sharing it, instead of repeating on every line. annotateStyleSpans() marks
+ * those runs and all three renderers read the marks, so these pin the contract
+ * the preview, the PDF and the .xlsx merge all depend on.
+ */
+
+/** Every grid slot is filled exactly once iff the spans sum to the row count. */
+function assertSpansTileTheTable(Illuminate\Support\Collection $rows): void
+{
+    expect($rows->sum('style_rowspan'))->toBe($rows->count());
+}
+
+it('spans one Style cell over consecutive rows sharing a style', function () {
+    $rows = approvalRows([
+        praItem(['style_name' => 'ST-1', 'material_type' => 'Fabric Interlining', 'pi_amount' => 100]),
+        praItem(['style_name' => 'ST-1', 'material_type' => 'Fabric Scrim', 'pi_amount' => 200]),
+        praItem(['style_name' => 'ST-2', 'material_type' => 'Fabric Scrim', 'pi_amount' => 300]),
+    ]);
+
+    // First row of a run carries the span; rows it covers carry 0 and emit no cell.
+    expect($rows->pluck('style_rowspan')->all())->toBe([2, 0, 1]);
+    expect($rows->pluck('style')->all())->toBe(['ST-1', 'ST-1', 'ST-2']);
+
+    assertSpansTileTheTable($rows);
+});
+
+it('starts a NEW run when the same style reappears after another vendor', function () {
+    // Rows sort by vendor first, so one style legitimately occupies several
+    // separate blocks. Grouping by style rather than by run would try to span
+    // rows that are not adjacent — this is the case that catches it.
+    // Distinct PO numbers keep the two ST-9 lines apart: vendor is NOT part of
+    // the merge key, so same style + same PO + same item would fuse them into a
+    // single row before the spanning ever runs.
+    $rows = approvalRows([
+        praItem(['supplier_name' => 'Alpha Mills', 'style_name' => 'ST-9', 'po_no' => 'PO-11', 'pi_amount' => 100]),
+        praItem(['supplier_name' => 'Beta Weaving', 'style_name' => 'ST-5', 'po_no' => 'PO-12', 'pi_amount' => 200]),
+        praItem(['supplier_name' => 'Gamma Trims', 'style_name' => 'ST-9', 'po_no' => 'PO-13', 'pi_amount' => 300]),
+    ]);
+
+    expect($rows->pluck('vendor_name')->all())->toBe(['Alpha Mills', 'Beta Weaving', 'Gamma Trims'])
+        ->and($rows->pluck('style')->all())->toBe(['ST-9', 'ST-5', 'ST-9']);
+
+    // Three runs of 1 — NOT one run of 2 for ST-9 with a hole in the middle.
+    expect($rows->pluck('style_rowspan')->all())->toBe([1, 1, 1]);
+
+    assertSpansTileTheTable($rows);
+});
+
+it('spans every row when a whole PRA is one style', function () {
+    $rows = approvalRows([
+        praItem(['material_type' => 'Fabric Interlining', 'pi_amount' => 100]),
+        praItem(['material_type' => 'Fabric Scrim', 'pi_amount' => 200]),
+        praItem(['material_type' => 'Fabric Twill', 'pi_amount' => 300]),
+    ]);
+
+    expect($rows->pluck('style_rowspan')->all())->toBe([3, 0, 0]);
+
+    assertSpansTileTheTable($rows);
+});
+
+it('leaves the Grand Total untouched by the spanning', function () {
+    $controller = app(PaymentRequestController::class);
+    $summarise = new ReflectionMethod($controller, 'summaryFromApprovalRows');
+    $summarise->setAccessible(true);
+
+    $rows = approvalRows([
+        praItem(['style_name' => 'ST-1', 'material_type' => 'Fabric Interlining', 'pi_amount' => 7500]),
+        praItem(['style_name' => 'ST-1', 'material_type' => 'Fabric Scrim', 'pi_amount' => 5000]),
+        praItem(['style_name' => 'ST-2', 'material_type' => 'Fabric Scrim', 'pi_amount' => 1250.55]),
+    ]);
+
+    // Spanning is presentation only — it merges no data and drops no line.
+    expect($summarise->invoke($controller, $rows)['total_pi_amount'])->toBe(13750.55)
+        ->and($rows)->toHaveCount(3);
+});
