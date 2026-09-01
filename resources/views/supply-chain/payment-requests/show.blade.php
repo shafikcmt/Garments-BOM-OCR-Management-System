@@ -64,8 +64,17 @@
     .pra-table tbody td { font-size:11px; line-height:1.35; padding:5px 6px; border-color:#e7eaf1; vertical-align:top; word-break:break-word; overflow-wrap:break-word; }
     .pra-table tfoot td { background:#eaf0fb; color:#000b6f; font-size:14px; font-weight:800; padding:7px 6px; border-color:#e7eaf1; }
     .pra-table td.text-end, .pra-table th.text-end, .pra-table tfoot td.text-end { white-space:nowrap; }
-    .c-vendor { width:13%; } .c-style { width:9%; } .c-pcd { width:9%; } .c-term { width:9%; } .c-po { width:11%; }
-    .c-pi { width:11%; } .c-type { width:8%; } .c-cship { width:9%; } .c-exmill { width:9%; } .c-amount { width:12%; }
+    {{-- 11 columns summing to 100, mirrored by .w-* in approval_pdf.blade.php -
+         the two tables are compared side by side and must not drift.
+
+         Room for Budget came from the three DATE columns (IHOD, PCD, Ex Mill),
+         which hold exactly "01-Aug-26" and can never wrap, rather than from a
+         flat 1% off everything: the free-text columns wrap when squeezed, and a
+         wrapped cell makes the whole row taller, which is what costs pages in
+         print. See the fuller note in approval_pdf.blade.php. --}}
+    .c-vendor { width:14%; } .c-style { width:8%; } .c-pcd { width:7%; } .c-term { width:10%; } .c-po { width:10%; }
+    .c-pi { width:10%; } .c-type { width:9%; } .c-cship { width:7%; } .c-exmill { width:7%; }
+    .c-budget { width:8%; } .c-amount { width:10%; }
     .pra-sign-area { margin-top:52px; color:#000b6f; }
     .pra-sign-title { font-size:13px; font-weight:800; margin-bottom:30px; }
     .pra-sign-text { font-size:13px; margin-bottom:30px; }
@@ -245,14 +254,19 @@
                 <table class="table table-bordered align-middle pra-table mb-0">
                     <thead>
                         <tr>
-                            {{-- Column order is business-defined: C. Shipment leads,
+                            {{-- Column order is business-defined: IHOD leads,
                                  then Style / PCD / Vendor, with Pay Term moved next
                                  to Ex Mill. The width classes are semantic, so each
                                  column keeps its own width as it moves. --}}
                             {{-- Headers follow the body: centred, with the amount
                                  right-aligned. Left-aligned headers over centred
                                  values read as a misalignment. --}}
-                            <th class="c-cship text-center">C. Shipment</th>
+                            {{-- IHOD is this app's name for the contract shipment
+                                 date everywhere else (the Booking Preview filter
+                                 reads the same contract_shipment_date column), so
+                                 the PRA uses it too. Same field, same value - only
+                                 the label changed. --}}
+                            <th class="c-cship text-center">IHOD</th>
                             <th class="c-style text-center">Style</th>
                             <th class="c-pcd text-center">PCD Date</th>
                             <th class="c-vendor text-center">Vendor</th>
@@ -263,6 +277,10 @@
                             <th class="c-type text-center">Item Name</th>
                             <th class="c-term text-center">Pay Term</th>
                             <th class="c-exmill text-center">Ex Mill</th>
+                            {{-- The line's allocated budget, right-aligned beside
+                                 PI Amt so the two money columns read down their
+                                 decimal points together. --}}
+                            <th class="c-budget text-end">Budget</th>
                             <th class="c-amount text-end">PI Amt (USD)</th>
                         </tr>
                     </thead>
@@ -282,15 +300,22 @@
                                 <td class="text-center">{{ $row['material_type'] ?: '-' }}</td>
                                 <td class="text-center">{{ $row['payment_term'] ?: '-' }}</td>
                                 <td class="text-center">{{ $row['committed_ex_mill'] ?: '-' }}</td>
+                                {{-- null means the sheet recorded no budget for
+                                     this line, which prints "-" like any other
+                                     empty cell. It must not become $0.00. --}}
+                                <td class="text-end">{{ isset($row['budget']) ? '$ ' . $money($row['budget']) : '-' }}</td>
                                 <td class="text-end fw-bold">$ {{ $money($row['pi_amount'] ?? 0) }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="10" class="text-center py-5 text-muted">No payment request item found.</td></tr>
+                            <tr><td colspan="11" class="text-center py-5 text-muted">No payment request item found.</td></tr>
                         @endforelse
                     </tbody>
                     <tfoot>
+                        {{-- No Budget total: the column is filled on only some rows,
+                             so a partial sum would read as a real ceiling and make a
+                             normal PRA look wildly over budget. The cell stays blank. --}}
                         <tr>
-                            <td colspan="9">Grand Total</td>
+                            <td colspan="10">Grand Total</td>
                             <td class="text-end">$ {{ $money($summary['total_pi_amount'] ?? 0) }}</td>
                         </tr>
                     </tfoot>

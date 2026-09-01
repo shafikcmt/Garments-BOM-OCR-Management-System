@@ -16,22 +16,22 @@
         .request-no { text-align: center; font-size: 10.5px; margin-top: 6px; letter-spacing: .04em; }
         .date-area { text-align: right; font-size: 9px; font-weight: 700; line-height: 1.6; }
         .date-area .date-value { font-weight: 800; white-space: nowrap; }
-                {{-- VERTICAL SPACING IS A ONE-PAGE BUDGET. A4 landscape leaves roughly
- 577pt of height, and the header/OCR/total/signature chrome around
- the table used to consume about 60% of it - so a PRA fitted only 13
- rows, or 8 once a long vendor name wrapped. Splitting a PO into one
- line per item (the correct behaviour) routinely produces 12-15 rows,
- which pushed a normal PRA onto a second page.
+        {{-- VERTICAL SPACING IS A ONE-PAGE BUDGET. A4 landscape leaves roughly
+             577pt of height, and the header/OCR/total/signature chrome around
+             the table used to consume about 60% of it — so a PRA fitted only 13
+             rows, or 8 once a long vendor name wrapped. Splitting a PO into one
+             line per item (the correct behaviour) routinely produces 12-15 rows,
+             which pushed a normal PRA onto a second page.
 
- The padding and line-heights below were therefore tightened, and the
- chrome tightened harder than the table, since that is where the space
- actually was. FONT SIZES ARE DELIBERATELY UNCHANGED - this is a
- document signed by non-technical staff, and shrinking the text to win
- rows is the wrong trade. Measured after this change: 20 rows on one
- page, or 13 with long wrapping vendor/item values.
+             The padding and line-heights below were therefore tightened, and the
+             chrome tightened harder than the table, since that is where the space
+             actually was. FONT SIZES ARE DELIBERATELY UNCHANGED — this is a
+             document signed by non-technical staff, and shrinking the text to win
+             rows is the wrong trade. Measured after this change: 20 rows on one
+             page, or 13 with long wrapping vendor/item values.
 
- Keep this file and show.blade.php's @media print block in step; they
- render the same document and are compared side by side. --}}
+             Keep this file and show.blade.php's @media print block in step; they
+             render the same document and are compared side by side. --}}
         .info td { border: 0; vertical-align: top; padding: 7px 0 5px; }
         .buyer { font-size: 9px; line-height: 1.7; font-weight: 700; }
         .note { font-size: 8.5px; line-height: 1.4; font-weight: 700; padding-top: 5px; }
@@ -53,9 +53,25 @@
         .sign-img { max-height:42px; max-width:100%; margin-bottom:4px; }
         .sign-meta { font-size:8.5px; line-height:1.4; margin-top:4px; }
         .sign-meta .sign-name { font-weight:800; }
-        .w-vendor { width: 13%; } .w-style { width: 9%; } .w-pcd { width: 9%; } .w-term { width: 9%; }
-        .w-po { width: 11%; } .w-pi { width: 11%; } .w-type { width: 8%; } .w-cship { width: 9%; } .w-exmill { width: 9%; }
-        .w-amount { width: 12%; }
+        {{-- 11 columns summing to 100, mirrored by .c-* in show.blade.php.
+
+             WIDTH IS A ROW-HEIGHT BUDGET HERE, not just a look. Every column is
+             word-break:break-word, so a column too narrow for its content wraps
+             to a second or third line and makes the WHOLE ROW taller - which is
+             what decides how many rows fit on the page. Taking a flat 1% off
+             every column to make room for Budget cost three rows on a PRA with
+             long vendor and payment-term values, even though the table was no
+             taller on paper.
+
+             So the space came from the three DATE columns instead: IHOD, PCD and
+             Ex Mill hold exactly "01-Aug-26" and can never wrap, so 7% is enough
+             for them, while Vendor, Pay Term and Item Name hold free text and got
+             their width back. Measured: 20 rows on one page for normal values,
+             12 with long wrapping ones - both unchanged from before Budget was
+             added. Re-measure if you move these. --}}
+        .w-vendor { width: 14%; } .w-style { width: 8%; } .w-pcd { width: 7%; } .w-term { width: 10%; }
+        .w-po { width: 10%; } .w-pi { width: 10%; } .w-type { width: 9%; } .w-cship { width: 7%; } .w-exmill { width: 7%; }
+        .w-budget { width: 8%; } .w-amount { width: 10%; }
     </style>
 </head>
 <body>
@@ -117,7 +133,7 @@
             {{-- Same order as the on-screen preview, so the PDF cannot drift
                  from what was approved. Width classes are semantic and travel
                  with their column. --}}
-            <th class="w-cship">C. Shipment</th>
+            <th class="w-cship">IHOD</th>
             <th class="w-style">Style</th>
             <th class="w-pcd">PCD Date</th>
             <th class="w-vendor">Vendor</th>
@@ -127,6 +143,7 @@
             <th class="w-type">Item Name</th>
             <th class="w-term">Pay Term</th>
             <th class="w-exmill">Ex Mill</th>
+            <th class="w-budget right">Budget</th>
             <th class="w-amount right">PI Amt (USD)</th>
         </tr>
     </thead>
@@ -144,13 +161,14 @@
                 <td class="center">{{ $row['material_type'] ?: '-' }}</td>
                 <td class="center">{{ $row['payment_term'] ?: '-' }}</td>
                 <td class="center">{{ $row['committed_ex_mill'] ?: '-' }}</td>
+                <td class="right">{{ isset($row['budget']) ? '$' . $money($row['budget']) : '-' }}</td>
                 <td class="right">${{ $money($row['pi_amount'] ?? 0) }}</td>
             </tr>
         @empty
-            <tr><td colspan="10" class="center">No payment request item found.</td></tr>
+            <tr><td colspan="11" class="center">No payment request item found.</td></tr>
         @endforelse
         <tr class="grand">
-            <td colspan="9">Grand Total</td>
+            <td colspan="10">Grand Total</td>
             <td class="right">${{ $money($summary['total_pi_amount'] ?? 0) }}</td>
         </tr>
     </tbody>
