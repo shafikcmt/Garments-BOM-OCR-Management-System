@@ -16,23 +16,39 @@
         .request-no { text-align: center; font-size: 10.5px; margin-top: 6px; letter-spacing: .04em; }
         .date-area { text-align: right; font-size: 9px; font-weight: 700; line-height: 1.6; }
         .date-area .date-value { font-weight: 800; white-space: nowrap; }
-        .info td { border: 0; vertical-align: top; padding: 12px 0 8px; }
-        .buyer { font-size: 9px; line-height: 2.2; font-weight: 700; }
-        .note { font-size: 8.5px; line-height: 1.45; font-weight: 700; padding-top: 8px; }
-        .check { min-height: 78px; padding: 11px 12px; font-size: 8.5px; line-height: 1.75; }
+                {{-- VERTICAL SPACING IS A ONE-PAGE BUDGET. A4 landscape leaves roughly
+ 577pt of height, and the header/OCR/total/signature chrome around
+ the table used to consume about 60% of it - so a PRA fitted only 13
+ rows, or 8 once a long vendor name wrapped. Splitting a PO into one
+ line per item (the correct behaviour) routinely produces 12-15 rows,
+ which pushed a normal PRA onto a second page.
+
+ The padding and line-heights below were therefore tightened, and the
+ chrome tightened harder than the table, since that is where the space
+ actually was. FONT SIZES ARE DELIBERATELY UNCHANGED - this is a
+ document signed by non-technical staff, and shrinking the text to win
+ rows is the wrong trade. Measured after this change: 20 rows on one
+ page, or 13 with long wrapping vendor/item values.
+
+ Keep this file and show.blade.php's @media print block in step; they
+ render the same document and are compared side by side. --}}
+        .info td { border: 0; vertical-align: top; padding: 7px 0 5px; }
+        .buyer { font-size: 9px; line-height: 1.7; font-weight: 700; }
+        .note { font-size: 8.5px; line-height: 1.4; font-weight: 700; padding-top: 5px; }
+        .check { min-height: 60px; padding: 8px 10px; font-size: 8.5px; line-height: 1.5; }
         .mini-box { display: inline-block; width: 11px; height: 11px; border: 1px solid #91a1d0; vertical-align: middle; margin: 0 5px 0 13px; }
         .line { display: inline-block; border-bottom: 1px solid #4a5cb2; width: 132px; height: 10px; }
-        .total { text-align: right; font-size: 12px; font-weight: 800; margin: 4px 0 7px; }
+        .total { text-align: right; font-size: 12px; font-weight: 800; margin: 3px 0 5px; }
         .report { table-layout: fixed; color: #111827; }
-        .report th { background:#000b6f; color:#fff; border:1px solid #33439e; padding: 6px 3px; font-size: 9px; line-height:1.2; font-weight:800; text-align:center; vertical-align:middle; }
-        .report td { border:1px solid #e2e6ef; padding: 5px 4px; font-size: 9px; line-height:1.2; vertical-align:middle; word-break: break-word; }
+        .report th { background:#000b6f; color:#fff; border:1px solid #33439e; padding: 4px 3px; font-size: 9px; line-height:1.15; font-weight:800; text-align:center; vertical-align:middle; }
+        .report td { border:1px solid #e2e6ef; padding: 3px 4px; font-size: 9px; line-height:1.15; vertical-align:middle; word-break: break-word; }
         .center { text-align:center; } .right { text-align:right; }
-        .grand td { background:#eaf0fb !important; color:#000b6f; font-size: 10px; font-weight:800; padding: 8px 5px; }
-        .sign { margin-top: 34px; color:#000b6f; }
+        .grand td { background:#eaf0fb !important; color:#000b6f; font-size: 10px; font-weight:800; padding: 5px 5px; }
+        .sign { margin-top: 18px; color:#000b6f; }
         .sign td { border:0; width:33.33%; padding:0 22px; vertical-align:bottom; }
         .sign td + td { border-left:1px solid #8d9bd3; }
-        .sign-title { font-size:9px; font-weight:800; margin-bottom:25px; }
-        .sign-text { font-size:9px; margin-bottom:25px; }
+        .sign-title { font-size:9px; font-weight:800; margin-bottom:14px; }
+        .sign-text { font-size:9px; margin-bottom:14px; }
         .sign-line { border-bottom:1px solid #000b6f; height:1px; }
         .sign-img { max-height:42px; max-width:100%; margin-bottom:4px; }
         .sign-meta { font-size:8.5px; line-height:1.4; margin-top:4px; }

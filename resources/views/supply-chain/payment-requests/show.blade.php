@@ -56,9 +56,13 @@
     .pra-note { font-size:12px; line-height:1.45; font-weight:700; color:#000b6f; }
     .pra-total { font-size:18px; font-weight:800; text-align:right; color:#000b6f; margin-bottom:10px; }
     .pra-table { color:#101828; border-color:#e5e7eb; table-layout:fixed; width:100%; }
-    .pra-table thead th { background:#000b6f; color:#fff; border-color:#33439e; font-size:10px; line-height:1.2; padding:8px 5px; text-align:center; vertical-align:middle; word-break:break-word; overflow-wrap:break-word; }
-    .pra-table tbody td { font-size:11px; padding:8px 6px; border-color:#e7eaf1; vertical-align:top; word-break:break-word; overflow-wrap:break-word; }
-    .pra-table tfoot td { background:#eaf0fb; color:#000b6f; font-size:14px; font-weight:800; padding:10px 6px; border-color:#e7eaf1; }
+    {{-- The explicit line-height on tbody td matters: without it the cell
+         inherits Bootstrap's body 1.5, which at 11px is ~16.5px of text in a
+         row that only ever holds one line. That, more than the padding, is what
+         made a 12-row PRA look airy on screen and spill over one page in print. --}}
+    .pra-table thead th { background:#000b6f; color:#fff; border-color:#33439e; font-size:10px; line-height:1.2; padding:6px 5px; text-align:center; vertical-align:middle; word-break:break-word; overflow-wrap:break-word; }
+    .pra-table tbody td { font-size:11px; line-height:1.35; padding:5px 6px; border-color:#e7eaf1; vertical-align:top; word-break:break-word; overflow-wrap:break-word; }
+    .pra-table tfoot td { background:#eaf0fb; color:#000b6f; font-size:14px; font-weight:800; padding:7px 6px; border-color:#e7eaf1; }
     .pra-table td.text-end, .pra-table th.text-end, .pra-table tfoot td.text-end { white-space:nowrap; }
     .c-vendor { width:13%; } .c-style { width:9%; } .c-pcd { width:9%; } .c-term { width:9%; } .c-po { width:11%; }
     .c-pi { width:11%; } .c-type { width:8%; } .c-cship { width:9%; } .c-exmill { width:9%; } .c-amount { width:12%; }
@@ -74,12 +78,43 @@
         body { background:#fff !important; }
         .pra-toolbar, .sidebar, nav, header, .pra-no-print { display:none !important; }
         .content-wrapper, main, .pra-wrap { margin:0 !important; padding:0 !important; background:#fff !important; }
-        .pra-sheet { min-width:0; width:100%; box-shadow:none; border:0; padding:12px; }
+        .pra-sheet { min-width:0; width:100%; box-shadow:none; border:0; padding:8px; }
         .table-responsive { overflow:visible !important; }
         .pra-table { width:100% !important; table-layout:fixed; }
-        .pra-table thead th { font-size:8.5px; padding:4px 3px; }
-        .pra-table tbody td { font-size:8.5px; padding:4px 3px; }
-        .pra-table tfoot td { font-size:10px; padding:5px 3px; }
+        .pra-table thead th { font-size:8.5px; line-height:1.15; padding:3px 3px; }
+        .pra-table tbody td { font-size:8.5px; line-height:1.15; padding:2.5px 3px; }
+        .pra-table tfoot td { font-size:10px; padding:4px 3px; }
+
+        {{-- THE HEADER AND SIGNATURE CHROME, WHICH THIS BLOCK USED TO IGNORE.
+             Only the table was ever shrunk for print, so the Buyer/Season block,
+             OCR box, title, Total line and signature area all printed at their
+             full on-screen size and together ate most of the page. That is why a
+             12-row PRA spilled onto a second sheet even though the table itself
+             was already compact. These are print-only overrides — the on-screen
+             layout is untouched. Font sizes here shrink only for the CHROME; the
+             table's own text is left readable. --}}
+        .pra-title { font-size:22px; }
+        .pra-request-no { font-size:11px; margin-top:4px; }
+        .pra-company { margin-top:8px; }
+        .pra-logo-text { font-size:22px; }
+        .pra-sheet .row.mb-3 { margin-bottom:.4rem !important; }
+        .pra-info { font-size:11px; line-height:1.6; }
+        .pra-info.mt-3, .pra-note.mt-3 { margin-top:.4rem !important; }
+        .pra-note { font-size:10px; }
+        .pra-check-box { min-height:66px; padding:9px 11px; font-size:10.5px; }
+        .pra-check-box .mb-3 { margin-bottom:.5rem !important; }
+        .pra-total { font-size:13px; margin-bottom:6px; }
+        .pra-sign-area { margin-top:22px; }
+        .pra-sign-title { font-size:10.5px; margin-bottom:16px; }
+        .pra-sign-text { font-size:10.5px; margin-bottom:16px; }
+        .pra-sign-img { max-height:38px; }
+        .pra-sign-meta { font-size:9.5px; }
+
+        {{-- A table that does break onto a second page must not tear a row in
+             half or lose its header — multi-page is acceptable, cut rows are not. --}}
+        .pra-table tr, .pra-sign-area { page-break-inside:avoid; }
+        .pra-table thead { display:table-header-group; }
+
         @page { size: A4 landscape; margin:8mm; }
     }
 </style>
