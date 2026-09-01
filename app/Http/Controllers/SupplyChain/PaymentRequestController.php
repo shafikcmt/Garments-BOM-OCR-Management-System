@@ -779,7 +779,12 @@ class PaymentRequestController extends Controller
             })
             ->whereNotNull('generated_at')
             ->get()
-            ->map(fn (BookingPo $bookingPo) => $this->sourceService->paymentSnapshot($bookingPo))
+            // One snapshot PER SOURCE ROW, not one per PO. A generated PO can
+            // span several worksheet lines, and the PRA has to show each of them
+            // on its own row — see paymentSnapshotLines(). Eligibility is still
+            // decided for the PO as a whole: every line of a PO inherits the
+            // aggregate's flag, so exactly the same POs are selected as before.
+            ->flatMap(fn (BookingPo $bookingPo) => $this->sourceService->paymentSnapshotLines($bookingPo))
             ->filter(fn (array $row) => (bool) ($row['eligible_for_payment_request'] ?? false))
             ->values();
     }
@@ -1151,24 +1156,48 @@ class PaymentRequestController extends Controller
 
     protected function approvalRowFromItem(PaymentRequestItem $item): array
     {
-        // Rows merge into a single PRA line only when Style, Color and Size all
-        // match. Any difference in one of these keeps the rows separate. Other
-        // differing fields (PO No, PI No, dates, etc.) are comma-joined and the
-        // PI Amount is summed in mergeApprovalRows().
+        // Rows merge into a single PRA line only when EVERY identity column
+        // matches: Style, Color, Size, Item Name, PO No and PI No.
+        //
+        // WHY THE LAST THREE WERE ADDED. The key used to be Style, Color and
+        // Size alone, so several BOM items sharing one style collapsed into a
+        // single line and mergeApprovalRows() comma-joined everything that
+        // differed. On a real PRA that produced one cell reading "Fabric
+        // Interlining, Fabric Scrim, ..." beside another reading "PO-11, PO-12",
+        // with the amounts fused into one figure — the approver could not see
+        // which item cost what, which is the one thing the document is signed
+        // for. One line per (style, item, PO, PI) is what the paper form has
+        // always shown.
+        //
+        // NO AMOUNT IS INVENTED OR DOUBLED. Every PaymentRequestItem carries its
+        // own pi_amount and mergeApprovalRows() was summing them; a finer key
+        // sums fewer of them together, so the same figures are distributed
+        // across more lines instead of added up. The Grand Total, which
+        // summaryFromApprovalRows() takes over these same rows, is arithmetically
+        // unchanged.
+        //
+        // PO No and PI No join the key because the request is for them to REPEAT
+        // on each split line. A column left out of the key stays comma-joined,
+        // which would simply move the cramped cell rather than remove it.
         $style = $item->style_name ?: data_get($item->data, 'style_name');
         $color = $item->material_color ?: data_get($item->data, 'material_color');
         $size = data_get($item->data, 'size') ?: data_get($item->data, 'size_width');
+        $materialType = data_get($item->data, 'material_type') ?: $item->material_description ?: $item->material_type;
+        $poNumber = $item->po_no ?: data_get($item->data, 'po_no');
+        $piNumber = $item->pi_number ?: data_get($item->data, 'pi_number');
 
         return [
-            'merge_key' => $this->mergeKey($style, $color, $size),
+            'merge_key' => $this->mergeKey($style, $color, $size, $materialType, $poNumber, $piNumber),
             'booking_po_ids' => collect([$item->booking_po_id])->filter()->values()->all(),
             'vendor_name' => $item->supplier_name ?: '-',
             'style' => $style ?: '-',
             'pcd_required' => $this->reportDate(data_get($item->data, 'pcd_required')),
             'payment_term' => $item->payment_term ?: data_get($item->data, 'payment_term') ?: '-',
-            'material_po_number' => $item->po_no ?: data_get($item->data, 'po_no') ?: '-',
-            'material_pi_number' => $item->pi_number ?: data_get($item->data, 'pi_number') ?: '-',
-            'material_type' => data_get($item->data, 'material_type') ?: $item->material_description ?: $item->material_type ?: '-',
+            // The same three locals the merge key is built from, so what is
+            // grouped on and what is printed cannot drift apart.
+            'material_po_number' => $poNumber ?: '-',
+            'material_pi_number' => $piNumber ?: '-',
+            'material_type' => $materialType ?: '-',
             'contract_shipment' => $this->reportDate(data_get($item->data, 'contract_shipment')),
             'committed_ex_mill' => $this->reportDate(data_get($item->data, 'committed_ex_mill')),
             'comments' => $item->remarks ?: data_get($item->data, 'remarks') ?: data_get($item->data, 'comments') ?: '(blank)',

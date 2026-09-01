@@ -293,6 +293,97 @@ class BookingPoSourceService
         return $snapshot;
     }
 
+    /**
+     * The SAME PO, but one snapshot PER SOURCE WORKSHEET ROW instead of one
+     * aggregated snapshot for the whole PO.
+     *
+     * WHY THIS EXISTS. paymentSnapshot() deliberately folds every sibling row of
+     * a PO into a single record: it sums PI Amount / Budget / Qty and runs the
+     * text columns through joinDistinct(). That is exactly right for the pending
+     * PAYMENT LIST, which shows one line per PO. It is wrong for the PRA, which
+     * is a document an approver signs line by line: there it produced one cell
+     * reading "Fabric Interlining, Fabric Scrim, Fabric Scrim, ..." beside a
+     * single fused amount, so no reader could tell which item cost what.
+     *
+     * Note the joined text also repeats itself, because joinDistinct() compares
+     * each new value against the whole accumulated string rather than against
+     * its parts. Splitting the rows removes the cause rather than patching that.
+     *
+     * NO AMOUNT IS INVENTED OR LOST. Each line carries the very component figure
+     * that paymentSnapshot() adds into its total — the primary row's own amount,
+     * then each sibling's — so the lines sum back to the aggregate to the cent.
+     * Qty and Budget are split the same way.
+     *
+     * paymentSnapshot() itself is untouched, so the pending list keeps its
+     * one-row-per-PO shape. A PO with no sibling rows returns that single
+     * snapshot unchanged.
+     */
+    public function paymentSnapshotLines(BookingPo $bookingPo): array
+    {
+        $snapshot = $this->paymentSnapshot($bookingPo);
+        $siblings = $this->siblingSourceRows($bookingPo);
+
+        if ($siblings->isEmpty()) {
+            return [$snapshot];
+        }
+
+        // The PI number of the primary row, used as each line's fallback. The
+        // aggregate's pi_number may be a joined list, and copying that onto a
+        // line would put the cramped cell straight back.
+        $primaryPiNumber = $this->sourceValueForBookingPo($bookingPo, 'pi_number');
+
+        $lines = [$this->paymentSnapshotLine($snapshot, $bookingPo, null, $primaryPiNumber)];
+
+        foreach ($siblings as $siblingRow) {
+            $lines[] = $this->paymentSnapshotLine($snapshot, $bookingPo, $siblingRow, $primaryPiNumber);
+        }
+
+        return $lines;
+    }
+
+    /**
+     * One line of paymentSnapshotLines(): the PO-level snapshot with only the
+     * per-row columns overridden. Passing $row = null builds the primary line,
+     * which reads through the BookingPo so it keeps the model-column fallbacks
+     * paymentSnapshot() uses.
+     */
+    protected function paymentSnapshotLine(array $base, BookingPo $bookingPo, ?ExcelRow $row, ?string $primaryPiNumber): array
+    {
+        $isPrimary = $row === null;
+
+        $read = fn (string $group) => $isPrimary
+            ? $this->sourceValueForBookingPo($bookingPo, $group)
+            : $this->sourceValueForRow($row, $group);
+
+        // Same precedence as paymentSnapshot(): source column first, then the
+        // BookingPo column, and only on the primary line.
+        $fallback = fn ($value) => $isPrimary ? $value : null;
+
+        $qty = $this->numericValue($read('materials_ordered') ?? $read('qty') ?? $fallback($bookingPo->qty));
+        $rate = $this->numericValue($read('pi_rate')) ?? 0.0;
+        $amount = $this->numericValue($read('pi_amount')) ?? ($rate * ($qty ?? 0));
+        $budget = $this->numericValue($read('budget'));
+        $savings = $this->numericValue($read('savings'))
+            ?? ($budget !== null ? ($budget - $amount) : null);
+
+        return array_replace($base, [
+            'excel_row_id' => $isPrimary ? $bookingPo->excel_row_id : $row->id,
+            'style_name' => $read('style') ?: $fallback($bookingPo->style_name),
+            'sap_code' => $read('sap_code') ?: $fallback($bookingPo->supplier_article),
+            'material_type' => $read('material_type') ?: $fallback($bookingPo->item_type),
+            'material_description' => $read('material_description')
+                ?: $fallback($bookingPo->description ?: $bookingPo->item_name),
+            'material_color' => $read('material_color') ?: $fallback($bookingPo->color),
+            'size' => $read('size') ?: $fallback($bookingPo->size_width),
+            'qty' => $qty,
+            'pi_rate' => $rate,
+            'pi_amount' => $amount,
+            'budget' => $budget,
+            'savings' => $savings,
+            'pi_number' => $read('pi_number') ?: $primaryPiNumber,
+        ]);
+    }
+
     public function isEligibleForPaymentRequest(BookingPo $bookingPo): bool
     {
         return $this->isEligibleForPaymentRequestSnapshot($this->paymentSnapshot($bookingPo), $bookingPo);
