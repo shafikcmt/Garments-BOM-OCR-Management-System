@@ -103,6 +103,45 @@ final class BuyerScope
         'store_general_stock',
     ];
 
+    /**
+     * Roles buyer scoping NEVER applies to, whatever their department says.
+     *
+     * UNSCOPED_ROLES above answers a department-shaped question: Store is
+     * scoped, but one role inside it has no buyer column to scope on. This list
+     * answers a different one - roles that must stay unscoped no matter how
+     * SCOPED_DEPARTMENTS grows later, because confining them would be wrong on
+     * its face rather than merely unimplemented:
+     *
+     *   management  Oversight. Management reads the whole floor by definition;
+     *               a Management user confined to two buyers is a reporting
+     *               screen that silently under-reports to the people who decide
+     *               on it. (admin is already excluded by name in
+     *               User::isBuyerScopedDepartment(), so it is not repeated.)
+     *   production  Sews what is cut, for every order on the line. Its screens
+     *               carry no buyer filter, so a buyer on a production account
+     *               would be a control that restricts nothing visible while
+     *               still locking BOM edits.
+     *   store_general_stock  Consumables belong to no order - see UNSCOPED_ROLES.
+     *
+     * BEHAVIOUR-NEUTRAL THE DAY IT LANDED, deliberately: 'management' and
+     * 'production' are not in SCOPED_DEPARTMENTS, so appliesToRole() already
+     * answered false for both, and store_general_stock was already carved out.
+     * It is a standing guarantee for whoever adds the next department, not a
+     * change of anybody's access.
+     *
+     * store_general_stock appears in BOTH lists on purpose. UNSCOPED_ROLES is
+     * also handed to the Users form so the Buyer Access block can start closed
+     * for it; this list is the access rule. Dropping it from either one would
+     * quietly change something.
+     *
+     * @var list<string>
+     */
+    public const NEVER_SCOPED_ROLES = [
+        'management',
+        'production',
+        'store_general_stock',
+    ];
+
     /** Every buyer — the unrestricted mode, and the default for a new user. */
     public const MODE_ALL = 'all';
 
@@ -139,13 +178,16 @@ final class BuyerScope
      * Whether buyer scoping applies to a specific ROLE. The precise question,
      * and the one every access decision should ask.
      *
-     * Two gates, in this order and not the other: the role's own carve-out
-     * first, then its department. Reversing them would let a scoped department
-     * re-admit a role that was deliberately excluded from it.
+     * Three gates, in this order and not another: the never-scoped roles, then
+     * the role's own department carve-out, then the department allowlist. Both
+     * role lists are checked BEFORE the department, so a scoped department can
+     * never re-admit a role that was deliberately excluded from it.
      */
     public static function appliesToRole(?string $role): bool
     {
-        if ($role === null || in_array($role, self::UNSCOPED_ROLES, true)) {
+        if ($role === null
+            || in_array($role, self::NEVER_SCOPED_ROLES, true)
+            || in_array($role, self::UNSCOPED_ROLES, true)) {
             return false;
         }
 
