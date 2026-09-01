@@ -7,8 +7,8 @@ use App\Models\IndentSection;
 use App\Models\IssueApprover;
 use App\Models\ItemCategory;
 use App\Models\StockIssue;
-use App\Models\StockItem;
 use App\Services\GeneralStockReportService;
+use App\Support\StockItemLookup;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\ToArray;
@@ -232,8 +232,9 @@ class IssueImport implements ToArray, WithCustomCsvSettings
         }
 
         // One query each, not one per row.
-        $items = StockItem::get(['id', 'name', 'uom', 'category', 'brand'])
-            ->keyBy(fn (StockItem $item) => mb_strtolower(trim($item->name)));
+        // Resolved on name AND brand — see StockItemLookup for why a name-only
+        // key issued stock against the wrong item.
+        $items = StockItemLookup::fromMaster();
 
         $masters = [
             'indent_section' => self::masterIndex(IndentSection::class),
@@ -366,7 +367,25 @@ class IssueImport implements ToArray, WithCustomCsvSettings
                 $group[$target] = self::resolveMaster($field, $name, $masters, $created);
             }
 
-            $item = $items->get(mb_strtolower($itemName));
+            // Read BEFORE the item is resolved, because it is half of what
+            // resolves it.
+            $fileBrand = self::text($cell('brand'), 190);
+
+            $match = $items->resolve($itemName, $fileBrand);
+
+            if ($match['ambiguous']) {
+                // REFUSED, not noted — the reason ReceivingImport gives. Issuing
+                // against the wrong item is the worse direction of the two: it
+                // draws down a balance that was never there and leaves the item
+                // actually consumed still showing as in stock.
+                $group['errors'][] = 'Row '.$line.': '.StockItemLookup::ambiguityMessage($itemName, $match);
+                $group['rows'][$at]['reason'] = StockItemLookup::ambiguityMessage($itemName, $match);
+                unset($group);
+
+                continue;
+            }
+
+            $item = $match['item'];
 
             if (! $item) {
                 // Never auto-created, for the reason ReceivingImport gives: an
@@ -458,7 +477,10 @@ class IssueImport implements ToArray, WithCustomCsvSettings
             // treatment as Uom above: a difference is worth telling somebody
             // about, never worth losing a requisition over. Matching the
             // wording ReceivingImport already uses.
-            $fileBrand = self::text($cell('brand'), 190);
+            //
+            // Only reachable when the name resolved to ONE item despite the
+            // brand not matching — rung 2 of StockItemLookup's ladder.
+            // $fileBrand is read further up, where the lookup needs it.
             $masterBrand = $item->brand;
 
             if ($fileBrand !== null && $masterBrand

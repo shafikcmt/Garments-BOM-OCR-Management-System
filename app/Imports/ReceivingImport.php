@@ -3,8 +3,8 @@
 namespace App\Imports;
 
 use App\Models\GeneralStockSupplier;
-use App\Models\StockItem;
 use App\Models\StockPurchase;
+use App\Support\StockItemLookup;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\ToArray;
 use Maatwebsite\Excel\Concerns\WithCustomCsvSettings;
@@ -174,9 +174,10 @@ class ReceivingImport implements ToArray, WithCustomCsvSettings
             ]]);
         }
 
-        // One query each, not one per row.
-        $items = StockItem::get(['id', 'name', 'uom', 'category', 'brand'])
-            ->keyBy(fn (StockItem $item) => mb_strtolower(trim($item->name)));
+        // One query each, not one per row. StockItemLookup resolves on name AND
+        // brand — see that class for why a name-only key posted quantities to
+        // the wrong item.
+        $items = StockItemLookup::fromMaster();
 
         $suppliers = GeneralStockSupplier::get(['id', 'name'])
             ->keyBy(fn (GeneralStockSupplier $s) => mb_strtolower(trim($s->name)));
@@ -261,7 +262,27 @@ class ReceivingImport implements ToArray, WithCustomCsvSettings
                 continue;
             }
 
-            $item = $items->get(mb_strtolower($itemName));
+            // Read BEFORE the item is resolved, because it is half of what
+            // resolves it. An older file's separate Specification column stands
+            // in when it has no Brand column of its own.
+            $fileBrand = self::text($cell('brand'), 190) ?? self::text($cell('legacy_specification'), 190);
+
+            $match = $items->resolve($itemName, $fileBrand);
+
+            if ($match['ambiguous']) {
+                // REFUSED, not noted. The old lookup picked one of the
+                // candidates silently and the quantity went to whichever row
+                // happened to survive keyBy — wrong stock, no error, and the
+                // figure feeds the Stock Report and the re-order levels from
+                // then on. A rejected delivery is fixable in the file; a
+                // quantity on the wrong item is not noticed for months.
+                $group['errors'][] = 'Row '.$line.': '.StockItemLookup::ambiguityMessage($itemName, $match);
+                unset($group);
+
+                continue;
+            }
+
+            $item = $match['item'];
 
             if (! $item) {
                 // Never auto-created: an item invented from a typo would carry
@@ -321,9 +342,13 @@ class ReceivingImport implements ToArray, WithCustomCsvSettings
             // telling somebody about, but never worth losing a delivery over,
             // so it is a note and the row imports.
             //
-            // An older file's separate Specification column stands in when it
-            // has no Brand column of its own.
-            $fileBrand = self::text($cell('brand'), 190) ?? self::text($cell('legacy_specification'), 190);
+            // Only reachable now when the name resolved to ONE item despite the
+            // brand not matching it — rung 2 of StockItemLookup's ladder. An
+            // exact match cannot differ, and several candidates were refused
+            // above, so this note means "one item bears this name and your
+            // brand text is worded differently", which is the legacy-file case
+            // it was written for. $fileBrand is read further up, where the
+            // lookup needs it.
             $masterBrand = $item->brand;
 
             if ($fileBrand !== null && $masterBrand

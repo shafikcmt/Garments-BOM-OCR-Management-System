@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\StockItem;
+use App\Support\StockItemLookup;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\ToArray;
 use Maatwebsite\Excel\Concerns\WithCustomCsvSettings;
@@ -356,12 +357,16 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
      * Breaker" are one item - a double space is a typing slip, not a different
      * part. A blank brand normalises to an empty string and is compared like
      * any other value, never as a wildcard.
+     *
+     * DELEGATES rather than restating it. The rule used to live here alone
+     * while ReceivingImport and IssueImport resolved items by name only, so an
+     * item this importer created as a distinct row was an item they could not
+     * find — they posted to whichever duplicate `keyBy` happened to keep. One
+     * definition, asked by all three, is what stops that returning.
      */
     private static function identity(?string $name, ?string $brand): string
     {
-        $norm = fn ($value) => preg_replace('/\s+/', ' ', mb_strtolower(trim((string) $value)));
-
-        return $norm($name).'|'.$norm($brand);
+        return StockItemLookup::identity($name, $brand);
     }
 
     /** A heading reduced to letters and digits, so spacing and "*" cannot matter. */
