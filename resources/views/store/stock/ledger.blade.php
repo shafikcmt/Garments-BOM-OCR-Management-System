@@ -32,10 +32,19 @@
     <x-page-header icon="journal-text" eyebrow="General Stock" title="Stock Report"
                    copy="Opening Stock + Addition − Consumption = Stock as on Date · {{ $monthLabel }}">
         <x-slot:actions>
-            <a href="{{ route('store.stock.ledger.pdf', request()->query()) }}" class="btn btn-outline-secondary">
+            {{-- data-ledger-export is what keeps these two honest.
+
+                 Both hrefs are built server-side from the query as it was AT
+                 PAGE LOAD. The filter JS swaps the table and rewrites the
+                 address bar without reloading, so without this hook the buttons
+                 stayed frozen on the month the page opened with: pick August on
+                 a page that opened in September and the table said August while
+                 the download said September. stock-ledger-table.js re-points
+                 both after every filter change. --}}
+            <a href="{{ route('store.stock.ledger.pdf', request()->query()) }}" class="btn btn-outline-secondary" data-ledger-export>
                 <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Download PDF
             </a>
-            <a href="{{ route('store.stock.ledger.excel', request()->query()) }}" class="btn btn-outline-secondary">
+            <a href="{{ route('store.stock.ledger.excel', request()->query()) }}" class="btn btn-outline-secondary" data-ledger-export>
                 <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Download Excel
             </a>
             @if($canImport ?? false)

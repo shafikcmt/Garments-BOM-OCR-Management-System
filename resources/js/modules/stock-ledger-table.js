@@ -23,6 +23,14 @@ export function initStockLedgerTable() {
     const actionCount = document.querySelector('[data-ledger-action-count]');
     const searchInput = form.querySelector('[name="search"]');
 
+    // The Download PDF / Download Excel buttons. Their hrefs are rendered by the
+    // server from the query at page load, so on a screen the JS has since
+    // re-filtered they point at the wrong report — the bug where a table showing
+    // August downloaded as September. The base is captured ONCE here, before any
+    // sync rewrites it, so repeated syncs cannot compound a query onto a query.
+    const exportLinks = Array.from(document.querySelectorAll('[data-ledger-export]'))
+        .map((el) => ({ el, base: el.href.split('?')[0] }));
+
     // Bumped on every request; a response whose ticket is stale is thrown away.
     // Without it a slow reply to "co" can land after the reply to "cotton" and
     // leave the table showing results for a term no longer in the box.
@@ -52,6 +60,24 @@ export function initStockLedgerTable() {
         return params;
     }
 
+    /**
+     * Point the two download buttons at the report currently on screen.
+     *
+     * `page` is dropped: the exports always cover every row in the period, not
+     * the page being looked at, so carrying it would only put a misleading
+     * number in the URL. `partial` is never in buildQuery() to begin with —
+     * it is added per-request for the fetch alone.
+     */
+    function syncExportLinks() {
+        const params = buildQuery();
+        params.delete('page');
+
+        const qs = params.toString();
+        exportLinks.forEach(({ el, base }) => {
+            el.href = qs ? base + '?' + qs : base;
+        });
+    }
+
     function syncUrl() {
         const qs = buildQuery().toString();
         // replaceState, not push: typing a six-letter search term would
@@ -59,6 +85,9 @@ export function initStockLedgerTable() {
         // The URL still reflects the current state, so a refresh or a copied
         // link reopens the same filtered report.
         window.history.replaceState(null, '', qs ? '?' + qs : window.location.pathname);
+        // The address bar and the download buttons describe the same report, so
+        // they move together. Anything that desyncs them is the original bug.
+        syncExportLinks();
     }
 
     /** Figures that sit outside the swapped fragment, carried in with it. */
