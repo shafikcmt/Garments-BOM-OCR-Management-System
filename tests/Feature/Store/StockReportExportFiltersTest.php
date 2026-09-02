@@ -149,6 +149,156 @@ it('passes every filter, not just the month, into the export', function () {
     });
 });
 
+// --- Live SUBTOTAL totals in the workbook -------------------------------------
+
+/**
+ * Download the real workbook through the real route and hand back the sheet.
+ *
+ * Deliberately NOT Excel::fake() here: these assertions are about the bytes a
+ * user actually opens — the formulas, their ranges and the AutoFilter are all
+ * applied in the AfterSheet hook, which a faked writer never runs.
+ */
+function exportedSheet(array $query = []): \PhpOffice\PhpSpreadsheet\Worksheet\Worksheet
+{
+    $response = test()->actingAs(exportUser())
+        ->get(route('store.stock.ledger.excel', $query))
+        ->assertOk()
+        ->baseResponse;
+
+    $raw = $response instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse
+        ? file_get_contents($response->getFile()->getPathname())
+        : $response->getContent();
+
+    $path = tempnam(sys_get_temp_dir(), 'stockreport').'.xlsx';
+    file_put_contents($path, $raw);
+
+    return \PhpOffice\PhpSpreadsheet\IOFactory::load($path)->getSheet(0);
+}
+
+/** The row carrying the headings, wherever the letterhead has pushed it to. */
+function headerRowOf(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet): ?int
+{
+    for ($row = 1; $row <= 40; $row++) {
+        if (trim((string) $sheet->getCell('C'.$row)->getValue()) === 'Item Name') {
+            return $row;
+        }
+    }
+
+    return null;
+}
+
+it('writes live SUBTOTAL formulas above the five figure columns', function () {
+    exportItem();
+
+    $sheet = exportedSheet(['month' => '2026-08']);
+    $header = headerRowOf($sheet);
+    $strip = $header - 1;
+
+    // SUBTOTAL(9, …), not SUM: 9 sums only the rows Excel's filter leaves
+    // visible, which is the whole point of the client's format.
+    expect($sheet->getCell('G'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,G')
+        ->and($sheet->getCell('L'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,L')
+        ->and($sheet->getCell('N'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,N')
+        ->and($sheet->getCell('P'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,P')
+        ->and($sheet->getCell('R'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,R')
+        // Named plainly: the Sub-Total row is filter-aware too now, so calling
+        // this one "Visible Total" would imply a difference that is not there.
+        ->and($sheet->getCell('F'.$strip)->getValue())->toBe('Total');
+});
+
+it('computes the same figures the report does', function () {
+    // A formula that is syntactically fine but points at the wrong rows would
+    // still open cleanly in Excel and quietly show the wrong number.
+    exportItem();
+
+    $sheet = exportedSheet(['month' => '2026-08']);
+    $strip = headerRowOf($sheet) - 1;
+
+    expect($sheet->getCell('G'.$strip)->getCalculatedValue())->toEqual(20.0)  // Opening
+        ->and($sheet->getCell('N'.$strip)->getCalculatedValue())->toEqual(10.0)  // Consumption
+        ->and($sheet->getCell('P'.$strip)->getCalculatedValue())->toEqual(10.0); // Stock as on
+});
+
+it('ranges the formulas over the real data rows, wherever the header lands', function () {
+    // A Filters line or the not-counted Note pushes the header down. Hardcoding
+    // the reference workbook's own row 4 / row 6294 would break on both.
+    exportItem();
+
+    $plain = exportedSheet(['month' => '2026-08']);
+    $shifted = exportedSheet(['month' => '2026-08', 'category' => 'Stationery']);
+
+    $plainHeader = headerRowOf($plain);
+    $shiftedHeader = headerRowOf($shifted);
+
+    // Whatever row the header is on, the range starts on the row after it.
+    expect($plain->getCell('G'.($plainHeader - 1))->getValue())
+        ->toContain('G'.($plainHeader + 1).':')
+        ->and($shifted->getCell('G'.($shiftedHeader - 1))->getValue())
+        ->toContain('G'.($shiftedHeader + 1).':');
+});
+
+it('makes the bottom Sub-Total row filter-aware too', function () {
+    // Two totals that behave differently on one sheet is a support call. The
+    // Blade still writes this row as static figures — the same partial renders
+    // the PDF, which has no formula engine — so the conversion is workbook-only.
+    exportItem();
+
+    $sheet = exportedSheet(['month' => '2026-08']);
+    $header = headerRowOf($sheet);
+
+    $subTotal = null;
+    for ($row = $header + 1; $row <= $sheet->getHighestDataRow(); $row++) {
+        if (strcasecmp(trim((string) $sheet->getCell('A'.$row)->getValue()), 'Sub-Total') === 0) {
+            $subTotal = $row;
+            break;
+        }
+    }
+
+    expect($subTotal)->not->toBeNull();
+
+    // The three the Blade actually totals, now live.
+    expect($sheet->getCell('L'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,L')
+        ->and($sheet->getCell('N'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,N')
+        ->and($sheet->getCell('R'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,R')
+        // ...and it still adds up.
+        ->and($sheet->getCell('N'.$subTotal)->getCalculatedValue())->toEqual(10.0);
+
+    // Opening Stock and Stock as on Date are left out of this row on purpose —
+    // summing a brought-forward balance across unrelated items says nothing.
+    // Writing a formula into those blanks would invent a total.
+    expect($sheet->getCell('G'.$subTotal)->getValue())->toBeEmpty()
+        ->and($sheet->getCell('P'.$subTotal)->getValue())->toBeEmpty();
+});
+
+it('enables AutoFilter over the header and data, excluding the Sub-Total row', function () {
+    // SUBTOTAL is only useful beside a filter the reader can apply, and a
+    // Sub-Total row inside the filter range would be treated as data.
+    exportItem();
+
+    $sheet = exportedSheet(['month' => '2026-08']);
+    $header = headerRowOf($sheet);
+
+    $range = $sheet->getAutoFilter()->getRange();
+
+    expect($range)->toStartWith('A'.$header.':');
+
+    // The last filtered row is the last data row — the row above Sub-Total.
+    preg_match('/:([A-Z]+)(\d+)$/', $range, $m);
+    $lastFiltered = (int) $m[2];
+
+    expect(trim((string) $sheet->getCell('A'.($lastFiltered + 1))->getValue()))->toBe('Sub-Total');
+});
+
+it('writes no totals strip when the report has no rows', function () {
+    // No Sub-Total row exists on an empty report, so there is nothing to range
+    // over. It must degrade quietly rather than emit =SUBTOTAL(9,G9:G8).
+    $sheet = exportedSheet(['month' => '2026-08', 'search' => 'zzz-no-such-item-zzz']);
+    $header = headerRowOf($sheet);
+
+    expect($sheet->getCell('G'.($header - 1))->getValue())->toBeEmpty()
+        ->and($sheet->getAutoFilter()->getRange())->toBeEmpty();
+});
+
 // --- The page gives the JS something to re-point ------------------------------
 
 it('marks both download buttons so the filter JS can re-point them', function () {
