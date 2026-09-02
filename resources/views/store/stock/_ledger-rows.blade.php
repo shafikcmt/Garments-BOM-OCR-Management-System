@@ -69,11 +69,14 @@
                 <th style="min-width:140px;">Brand/Specification</th>
                 <th class="gx-ledger-quiet">Uom</th>
                 <th>Category</th>
-                {{-- Opening is the counted Item Master figure and never
-                     moves. Balance B/F is last month's closing — the
-                     figure this month's arithmetic actually builds on. --}}
-                <th class="text-end" title="Counted stock from the Item Master — never changed by a purchase or an issue">Opening</th>
-                <th class="text-end" title="Balance brought forward — last month's closing stock">Balance B/F</th>
+                {{-- ONE opening column, and it is the running one — last
+                     month's closing, which is what this month's arithmetic
+                     builds on. The frozen Item Master count that used to sit
+                     beside it never moved between months, so it could not
+                     reconcile with Stock as on Date and the client read it as
+                     a broken carry-forward. It now lives on the Item Master
+                     list, where a counted seed belongs. --}}
+                <th class="text-end" title="Last month's closing stock, carried forward">Opening Stock</th>
                 <th class="text-end gx-ledger-quiet" title="Last month consumption pattern (per day)">Cons./Day</th>
                 <th class="text-end" title="Safety Stock Level (7 days stock)">Safety</th>
                 <th class="text-end" title="Safety stock + (consumption per day x (lead time + time to place order))">Re-order</th>
@@ -117,9 +120,6 @@
                     <td>{{ $r['item']->brand ?: '—' }}</td>
                     <td class="gx-ledger-quiet">{{ $r['item']->uom ?: '—' }}</td>
                     <td>{{ $r['item']->category ?: '—' }}</td>
-                    {{-- "—" before the item was counted: no count had
-                         happened, which is not the same as zero. --}}
-                    <td class="text-end">{{ $qty($r['opening']) }}</td>
                     <td class="text-end fw-semibold">{{ $qty($r['balance_bf']) }}</td>
                     <td class="text-end gx-ledger-quiet">{{ number_format($r['consumption_per_day'], 2) }}</td>
                     <td class="text-end">
@@ -150,7 +150,7 @@
                     <td class="gx-stock-micro">{{ $r['remarks'] ?: '—' }}</td>
                 </tr>
             @empty
-                <tr><td colspan="20" class="gx-stock-empty">
+                <tr><td colspan="19" class="gx-stock-empty">
                                 <span class="gx-stock-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>
                                 <div class="gx-stock-empty-title">Nothing to show</div>
                                 <div class="gx-stock-empty-hint">Try a different month, category or status.</div>
@@ -160,11 +160,12 @@
         @if($rows->isNotEmpty())
             <tfoot>
                 <tr>
-                    {{-- 12, not 11: Balance B/F sits inside this span and
-                         is deliberately not totalled — summing a
+                    {{-- 11: the span swallows Opening Stock, which is
+                         deliberately not totalled — summing a
                          brought-forward balance across unrelated items
-                         says nothing. --}}
-                    <td colspan="12" class="text-end gx-stock-total-label">Total</td>
+                         says nothing. Was 12 while the frozen counted
+                         column sat beside it. --}}
+                    <td colspan="11" class="text-end gx-stock-total-label">Total</td>
                     <td class="text-end text-success">{{ $qty($summary['addition']) }}</td>
                     <td></td>
                     <td class="text-end text-danger">{{ $qty($summary['consumption']) }}</td>

@@ -24,12 +24,21 @@
             <th class="col-brand">Brand/Specification</th>
             <th class="col-txt">Uom</th>
             <th class="col-txt">Category</th>
-            {{-- Opening Stock is the counted Item Master figure and never moves.
-                 Balance B/F is the running figure this month builds on — last
-                 month's closing. Kept side by side so the two are read as the
-                 different things they are. --}}
+            {{-- ONE opening column, and it is the running one: the seed count
+                 plus everything received minus everything issued before this
+                 month, which is last month's Stock as on Date.
+
+                 This column used to be called Balance B/F and sat beside a
+                 second column, "Opening Stock", carrying the frozen Item Master
+                 count. That frozen figure reads the same in every month, so
+                 from the second month onward the report printed an "Opening"
+                 that did not reconcile with its own Stock as on Date — 221 of
+                 1,241 rows in September against local data. The reference
+                 workbook has one opening column (Stock <Month> column H, keyed
+                 "Opening Stock as on <Month>"), and it is this one. The counted
+                 seed is a property of the item, not a monthly movement, and now
+                 lives on the Item Master list where it belongs. --}}
             <th class="num">Opening Stock</th>
-            <th class="num">Balance B/F</th>
             <th class="num">Last Month Cons. Pattern</th>
             <th class="num">Safety Stock Level</th>
             <th class="num">Re-order Level</th>
@@ -53,9 +62,6 @@
                 <td>{{ $r['item']->brand }}</td>
                 <td>{{ $r['item']->uom }}</td>
                 <td>{{ $r['item']->category }}</td>
-                {{-- Blank before the item was counted: no count had happened,
-                     which is not the same as having counted zero. --}}
-                <td class="num">{{ $r['opening'] === null ? '-' : $qty($r['opening']) }}</td>
                 <td class="num">{{ $qty($r['balance_bf']) }}</td>
                 <td class="num">{{ number_format($r['consumption_per_day'], 4, '.', '') }}</td>
                 <td class="num">{{ $qty($r['safety']) }}</td>
@@ -81,16 +87,17 @@
                 <td>{{ $r['remarks'] }}</td>
             </tr>
         @empty
-            <tr><td colspan="20" class="empty">No items match this filter.</td></tr>
+            <tr><td colspan="19" class="empty">No items match this filter.</td></tr>
         @endforelse
     </tbody>
     @if($rows->isNotEmpty())
         <tfoot>
-            {{-- 12, not 11: Balance B/F sits inside the leading span and is
+            {{-- 11: the leading span swallows Opening Stock, which is
                  deliberately not totalled — summing a brought-forward balance
-                 across unrelated items says nothing. --}}
+                 across unrelated items says nothing. Was 12 while the frozen
+                 counted column sat beside it. --}}
             <tr class="grand">
-                <td colspan="12">Sub-Total</td>
+                <td colspan="11">Sub-Total</td>
                 <td class="num">{{ $qty($summary['addition']) }}</td>
                 <td></td>
                 <td class="num">{{ $qty($summary['consumption']) }}</td>

@@ -66,17 +66,23 @@
            long item name or brand/specification wraps inside its own cell — the
            row grows taller rather than pushing a column off the page.
 
-           20 columns: 1 flag + 1 sl + name + brand + 5 text + 11 numeric. Size
+           19 columns: 1 flag + 1 sl + name + brand + 5 text + 10 numeric. Size
            and Specification merged into Brand/Specification, and the 10% they
            held between them went where the text actually needs it: the merged
            column carries all three values now, and the item name gets the rest.
            A wrapped item name is readable and a wrapped quantity is not, so the
            figure columns were left alone.
-           5 + 2 + 12 + 12.5 + (5 x 4) + (11 x 4.4) = 99.9%. */
+
+           Dropping the frozen Opening Stock column freed one numeric width
+           (4.4%). It went to the two columns that actually wrap — item name and
+           Brand/Specification, +2.4 and +2 — rather than being spread across
+           the figures, which do not need it. The budget still lands just under
+           100 so table-layout:fixed has nothing to redistribute.
+           5 + 2 + 14.4 + 14.5 + (5 x 4) + (10 x 4.4) = 99.9%. */
         .report-table .col-flag { width: 5%; }
         .report-table .col-sl { width: 2%; }
-        .report-table .col-name { width: 12%; }
-        .report-table .col-brand { width: 12.5%; }
+        .report-table .col-name { width: 14.4%; }
+        .report-table .col-brand { width: 14.5%; }
         .report-table .col-txt { width: 4%; }
         .report-table th.num, .report-table td.num { width: 4.4%; }
 
@@ -120,7 +126,11 @@
 
     <div class="filters">{{ $periodCaption }}: {{ $monthLabel }}@if($activeFilters)  |  {{ $activeFilters }}@endif</div>
     <div class="legend">
-        Stock as on Date = Opening Stock + Addition &minus; Consumption.
+        {{-- A PLAIN HYPHEN, not &minus;. The PDF font has no U+2212, so dompdf
+             printed the formula as "Addition ? Consumption" — the one line on
+             the page that tells a manager how the row reconciles. &mdash; is in
+             the font and is left alone above and below. --}}
+        Stock as on Date = Opening Stock + Addition - Consumption.
         "Place Order" is raised when Stock as on Date falls below the Safety Stock Level;
         "Low Stock" is the earlier warning at the Re-order Level.
     </div>
@@ -133,7 +143,9 @@
          Same four heading lines the reference workbook prints above its Stock
          sheet — company, address, department, then the report and its month. --}}
     @php
-        $columns = 20;
+        // 19, matching the report table since the frozen Opening Stock column
+        // was dropped — the letterhead merges have to span the sheet exactly.
+        $columns = 19;
         $labelSpan = 5;
         $valueSpan = $columns - $labelSpan;
     @endphp

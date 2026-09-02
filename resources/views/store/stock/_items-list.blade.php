@@ -48,6 +48,18 @@
             <tr>
                 <th>Item</th>
                 <th>UOM</th>
+                {{-- The counted seed, and the date it was counted on.
+
+                     It lives here because it is a property of the item, not a
+                     monthly movement. The Stock Report used to carry it as a
+                     column, where it read as that month's opening and did not
+                     reconcile with Stock as on Date from the second month
+                     onward. Off the report it would otherwise only be reachable
+                     through the Edit modal, which is an Admin / Management
+                     right — so a plain Store user could no longer see on screen
+                     what an item was seeded at. This column is inside the
+                     section's existing view guard and adds no new permission. --}}
+                <th class="text-end">Opening Stock</th>
                 <th class="text-end">Current Stock</th>
                 <th class="text-end">Safety / Re-order</th>
                 <th>Status</th>
@@ -87,6 +99,16 @@
                         </div>
                     </td>
                     <td class="small">{{ $item->uom ?: '—' }}</td>
+                    {{-- The count date is printed, not hidden in a tooltip. A
+                         seed quantity with no date beside it cannot be audited,
+                         and our users are not going to hover a number to find
+                         out what it means. --}}
+                    <td class="text-end">
+                        <div class="text-slate-900">{{ $qty($item->opening_qty) }}</div>
+                        @if($item->opening_qty !== null && $item->opening_as_on)
+                            <div class="gx-stock-micro">as on {{ $item->opening_as_on->format('d-M-y') }}</div>
+                        @endif
+                    </td>
                     <td class="text-end">
                         <div class="fw-bold text-slate-900">{{ $qty($current) }}</div>
                         @if($fill !== null)
@@ -134,7 +156,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="gx-stock-empty">
+                <tr><td colspan="7" class="gx-stock-empty">
                         <span class="gx-stock-empty-icon"><i class="bi bi-{{ $hasFilters ? 'search' : 'box-seam' }}" aria-hidden="true"></i></span>
                         @if($hasFilters)
                             <div class="gx-stock-empty-title">No items match this filter</div>

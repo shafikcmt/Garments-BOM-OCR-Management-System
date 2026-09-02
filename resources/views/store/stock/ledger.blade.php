@@ -30,7 +30,7 @@
     @include('store.stock._ledger-ui')
 
     <x-page-header icon="journal-text" eyebrow="General Stock" title="Stock Report"
-                   copy="Opening + Addition − Consumption = Stock as on Date · {{ $monthLabel }}">
+                   copy="Opening Stock + Addition − Consumption = Stock as on Date · {{ $monthLabel }}">
         <x-slot:actions>
             <a href="{{ route('store.stock.ledger.pdf', request()->query()) }}" class="btn btn-outline-secondary">
                 <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Download PDF
@@ -141,23 +141,17 @@
                      being a line of text in a heading. --}}
             </div>
 
-            {{-- Why two columns near the left show the same number.
-
-                 Opening is the counted figure and never moves; Balance B/F is
-                 last month's closing. They are equal exactly once per item — in
-                 the month it was counted, when there is no earlier movement to
-                 carry forward — and differ from then on. With every record in
-                 the system currently dated inside one month, that "exactly
-                 once" is every row on the screen, which reads as a duplicated
-                 column rather than as two figures that happen to agree.
+            {{-- The note that used to sit here explained why two columns near
+                 the left showed the same number. There is one opening column
+                 now, so there is nothing left to explain — and the explanation
+                 was covering for the defect rather than fixing it.
 
                  Said here rather than in _report-table: that partial is shared
                  with the PDF and the Excel export, and a note belongs on the
                  screen somebody is puzzling at, not in a management document. --}}
             <p class="gx-stock-help mb-3">
-                <strong>Opening</strong> is the counted figure from the Item Master and never changes.
-                <strong>Balance B/F</strong> is last month's closing stock. The two match until the item
-                has movement in an earlier month, then Balance B/F carries forward and Opening stays put.
+                <strong>Opening Stock</strong> is last month's closing stock, carried forward.
+                This month's Addition and Consumption move it to <strong>Stock as on Date</strong>.
             </p>
 
             {{-- Filters sit inside the card they narrow, the same as every other
