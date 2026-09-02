@@ -80,7 +80,7 @@ class PoGenerateControlController extends SupplyChainBookingController
         $bookingPo = $this->syncBookingPoSourceControl($bookingPo);
 
         $bookingData = $this->bookingData($bookingPo);
-        $instructionOptions = $this->bookingInstructionOptions();
+        $instructionOptions = $this->bookingInstructionOptions($bookingPo, $bookingData);
         $deliveryDestinationOptions = $this->deliveryDestinationOptions();
         $bookingRoutePrefix = $this->bookingRoutePrefix();
         $canControlPo = $this->canControlPo();
@@ -131,7 +131,7 @@ class PoGenerateControlController extends SupplyChainBookingController
                 'adminEditMode' => true,
                 'editPanelOpen' => true,
                 'generateUrl' => $this->bookingRoute('update', $bookingPo),
-                'instructionOptions' => $this->bookingInstructionOptions(),
+                'instructionOptions' => $this->bookingInstructionOptions($bookingPo, $bookingData),
                 'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
                 'bookingRoutePrefix' => $this->bookingRoutePrefix(),
                 'canControlPo' => $this->canControlPo(),
@@ -174,7 +174,7 @@ class PoGenerateControlController extends SupplyChainBookingController
                     'regenerateMode' => false,
                     'adminEditMode' => false,
                     'generateUrl' => null,
-                    'instructionOptions' => $this->bookingInstructionOptions(),
+                    'instructionOptions' => $this->bookingInstructionOptions($bookingPo, $bookingData),
                     'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
                     'bookingRoutePrefix' => $this->bookingRoutePrefix(),
                     'canControlPo' => $this->canControlPo(),

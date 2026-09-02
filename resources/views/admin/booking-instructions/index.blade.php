@@ -78,6 +78,7 @@
                     <tr>
                         <th style="width:60px;">#</th>
                         <th>Instruction</th>
+                        <th style="width:150px;">Buyer</th>
                         <th style="width:140px;">Type</th>
                         <th style="width:90px;">Sort</th>
                         <th style="width:110px;">Status</th>
@@ -89,6 +90,13 @@
                         <tr>
                             <td>{{ $loop->iteration + ($instructions->currentPage() - 1) * $instructions->perPage() }}</td>
                             <td class="small">{!! nl2br(e($instruction->instruction)) !!}</td>
+                            <td>
+                                @if($instruction->buyer)
+                                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">{{ $instruction->buyer->buyer_name }}</span>
+                                @else
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">All buyers</span>
+                                @endif
+                            </td>
                             <td>
                                 @if($instruction->is_default)
                                     <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Default</span>
@@ -117,7 +125,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="text-center text-muted py-4">No booking instruction found.</td>
+                            <td colspan="7" class="text-center text-muted py-4">No booking instruction found.</td>
                         </tr>
                     @endforelse
                 </tbody>

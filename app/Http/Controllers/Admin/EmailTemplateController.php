@@ -42,16 +42,25 @@ class EmailTemplateController extends Controller
             'body' => ['required', 'string', 'max:20000'],
         ]);
 
-        EmailTemplate::updateOrCreate(
-            ['type' => $validated['type']],
-            [
-                'name' => $this->templateNames()[$validated['type']],
-                'subject' => $validated['subject'],
-                'default_to' => $validated['default_to'] ?? null,
-                'default_cc' => $validated['default_cc'] ?? null,
-                'body' => $validated['body'],
-            ]
-        );
+        $template = EmailTemplate::firstOrNew(['type' => $validated['type']]);
+
+        $template->fill([
+            'name' => $this->templateNames()[$validated['type']],
+            'subject' => $validated['subject'],
+            'default_to' => $validated['default_to'] ?? null,
+            'default_cc' => $validated['default_cc'] ?? null,
+            'body' => $validated['body'],
+            'updated_by' => auth()->id(),
+        ]);
+
+        // Only on the first save. An existing row's author is whoever created
+        // it — or null for the two rows that predate this column, whose author
+        // is genuinely unknown and is not going to be invented here.
+        if (! $template->exists) {
+            $template->created_by = auth()->id();
+        }
+
+        $template->save();
 
         return redirect()
             ->route('admin.email-templates.edit')

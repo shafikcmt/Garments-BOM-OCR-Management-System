@@ -714,10 +714,14 @@
                                 <span>{{ $instruction->instruction }}</span>
                             </label>
                         @empty
-                            <div class="form-text mb-0">No admin suggestion instructions are active yet.</div>
+                            {{-- The list is now filtered two ways — to this PO's buyer, and to
+                                 instructions not already in Current Instructions — so "none
+                                 configured" is the wrong thing to say. On a fresh preview every
+                                 default is already on the PO, which is exactly when this shows. --}}
+                            <div class="form-text mb-0">Nothing more to add — every instruction for this buyer is already listed under Current Instructions.</div>
                         @endforelse
                     </div>
-                    <div class="form-text">Tick any suggestion to add it to this booking. Admin manages this list.</div>
+                    <div class="form-text">Tick any suggestion to add it to this booking. Shows global instructions plus this buyer's own. Admin manages this list.</div>
                 </div>
                 <div class="col-md-7">
                     <label class="form-label">Current instructions</label>

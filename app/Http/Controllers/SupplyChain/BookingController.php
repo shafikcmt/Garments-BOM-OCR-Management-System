@@ -8,6 +8,7 @@ use App\Models\ActivityLog;
 use App\Models\BookingPo;
 use App\Models\BookingInstruction;
 use App\Models\BookingDeliveryDestination;
+use App\Models\Buyer;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\ExcelCell;
@@ -71,7 +72,7 @@ class BookingController extends Controller
         $previewMode = ! $bookingPo->exists;
         $generateUrl = $previewMode ? $this->bookingRoute('generate', $excelRow) : null;
 
-        $instructionOptions = $this->bookingInstructionOptions();
+        $instructionOptions = $this->bookingInstructionOptions($bookingPo, $bookingData);
         $deliveryDestinationOptions = $this->deliveryDestinationOptions();
 
         return response()->json([
@@ -106,7 +107,10 @@ class BookingController extends Controller
         $seenGroups = [];
         $previewHtml = '';
         $previewCount = 0;
-        $instructionOptions = $this->bookingInstructionOptions();
+        // Instruction options are resolved per booking inside the loop, not once
+        // up here: a bulk preview can span several buyers, and one shared list
+        // would hand every PO in the batch the first buyer's clauses. The
+        // destination list carries no buyer scope, so it stays hoisted.
         $deliveryDestinationOptions = $this->deliveryDestinationOptions();
 
         foreach ($rows as $row) {
@@ -121,6 +125,7 @@ class BookingController extends Controller
             [$bookingPo, $bookingData, $groupRows] = $this->previewBookingForRow($row);
             $previewMode = ! $bookingPo->exists;
             $generateUrl = $previewMode ? $this->bookingRoute('generate', $row) : null;
+            $instructionOptions = $this->bookingInstructionOptions($bookingPo, $bookingData);
             $previewHtml .= view('supply-chain.bookings.partials.preview', compact('bookingPo', 'bookingData', 'previewMode', 'generateUrl', 'instructionOptions', 'deliveryDestinationOptions'))->render();
             $previewCount++;
         }
@@ -155,7 +160,7 @@ class BookingController extends Controller
                     [
                         'previewMode' => false,
                         'generateUrl' => null,
-                        'instructionOptions' => $this->bookingInstructionOptions(),
+                        'instructionOptions' => $this->bookingInstructionOptions($bookingPo, $bookingData),
                         'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
                         'bookingRoutePrefix' => $this->bookingRoutePrefix(),
                         'canControlPo' => $this->canControlPo(),
@@ -192,7 +197,7 @@ class BookingController extends Controller
                 'regenerateMode' => true,
                 'editPanelOpen' => true,
                 'generateUrl' => $this->bookingRoute('regenerate', $bookingPo),
-                'instructionOptions' => $this->bookingInstructionOptions(),
+                'instructionOptions' => $this->bookingInstructionOptions($bookingPo, $bookingData),
                 'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
                 'bookingRoutePrefix' => $this->bookingRoutePrefix(),
                 'canControlPo' => $this->canControlPo(),
@@ -233,7 +238,7 @@ class BookingController extends Controller
                     'previewMode' => false,
                     'regenerateMode' => false,
                     'generateUrl' => null,
-                    'instructionOptions' => $this->bookingInstructionOptions(),
+                    'instructionOptions' => $this->bookingInstructionOptions($bookingPo, $bookingData),
                     'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
                     'bookingRoutePrefix' => $this->bookingRoutePrefix(),
                     'canControlPo' => $this->canControlPo(),
@@ -406,7 +411,7 @@ class BookingController extends Controller
                 'bookingData' => $bookingData,
                 'previewMode' => true,
                 'generateUrl' => $this->bookingRoute('batch_generate'),
-                'instructionOptions' => $this->bookingInstructionOptions(),
+                'instructionOptions' => $this->bookingInstructionOptions($bookingPo, $bookingData),
                 'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
                 'batchMode' => true,
                 'batchRowIds' => $rowIds->all(),
@@ -551,7 +556,7 @@ class BookingController extends Controller
                 [
                     'previewMode' => false,
                     'generateUrl' => null,
-                    'instructionOptions' => $this->bookingInstructionOptions(),
+                    'instructionOptions' => $this->bookingInstructionOptions($bookingPo, $bookingData),
                     'deliveryDestinationOptions' => $this->deliveryDestinationOptions(),
                     'bookingRoutePrefix' => $this->bookingRoutePrefix(),
                     'canControlPo' => $this->canControlPo(),
@@ -1002,7 +1007,7 @@ class BookingController extends Controller
         $bookingPo = $this->syncBookingPoSourceControl($bookingPo);
 
         $bookingData = $this->bookingData($bookingPo);
-        $instructionOptions = $this->bookingInstructionOptions();
+        $instructionOptions = $this->bookingInstructionOptions($bookingPo, $bookingData);
         $deliveryDestinationOptions = $this->deliveryDestinationOptions();
         $emailDefaults = $this->bookingEmailDefaults($bookingPo, $bookingData);
         $emailLogs = EmailLog::where('booking_po_id', $bookingPo->id)
@@ -2551,7 +2556,7 @@ BIN: 005635381-0406 TIN: 780096271681",
             'delivery_destination_name' => '',
             'delivery_destination_details' => '',
             'items' => $items,
-            'notes' => $this->defaultInstructionTexts(),
+            'notes' => $this->defaultInstructionTexts($this->instructionBuyerIdForBooking($bookingPo)),
             'best_regards' => optional($bookingPo->generatedBy)->name ?: optional(auth()->user())->name ?: '[Supply-chain user]',
         ];
     }
@@ -2806,17 +2811,90 @@ BIN: 005635381-0406 TIN: 780096271681",
             ->first();
     }
 
-    protected function bookingInstructionOptions()
+    /**
+     * Which buyer's instructions this PO is allowed to print, or null when the
+     * buyer cannot be identified.
+     *
+     * THIS IS NOT AN ACCESS GATE AND MUST NEVER BE REUSED AS ONE. Compare
+     * assertBuyerAccessForRow(), which deliberately refuses to look at
+     * booking_pos.buyer_name because that column is free text a merchant can
+     * edit — a gate reading it is a gate anyone can type their way through.
+     * The question here is different in kind: not "may this user see this PO"
+     * but "which boilerplate paragraph belongs on this document". Getting it
+     * wrong prints the wrong sentence, it does not leak a record, and the
+     * file's buyer_id is set on only one of three live BOM files, so a
+     * buyer_id-only resolver would leave almost every PO unscoped and the leak
+     * unfixed. Hence the name match — and hence this comment, so nobody
+     * mistakes it for the other thing.
+     *
+     * Resolution order:
+     *   1. the BOM file's buyer_id — a real FK, trusted when present
+     *   2. the booking's buyer name against buyers.buyer_name
+     *   3. null
+     *
+     * withTrashed(), because six of the nine buyers are soft-deleted and two
+     * of those (HUMANA, NEXT) still appear on live booking POs. Without it
+     * those POs would silently resolve to null.
+     */
+    protected function instructionBuyerIdForBooking(?BookingPo $bookingPo = null, array $bookingData = []): ?int
+    {
+        if ($bookingPo) {
+            $bookingPo->loadMissing('excelFile');
+
+            if ($fileBuyerId = $bookingPo->excelFile?->buyer_id) {
+                return (int) $fileBuyerId;
+            }
+        }
+
+        $buyerName = trim((string) ($bookingData['buyer'] ?? $bookingPo?->buyer_name ?? ''));
+
+        if ($buyerName === '' || ! Schema::hasTable('buyers')) {
+            return null;
+        }
+
+        // whereLike() compiles to ILIKE on PostgreSQL and LIKE on MySQL, so the
+        // match is case-insensitive on both. No wildcards are wanted here — this
+        // is exact equality, ignoring case — so any % or _ the free-text name
+        // happens to carry is escaped rather than left to act as a pattern.
+        $buyerId = Buyer::withTrashed()
+            ->whereLike('buyer_name', addcslashes($buyerName, '%_\\'))
+            ->value('id');
+
+        return $buyerId === null ? null : (int) $buyerId;
+    }
+
+    /**
+     * The tick list under "Add extra suggested instructions".
+     *
+     * Two filters, and they answer different questions:
+     *
+     *   forBuyer()   may this instruction appear on this PO at all
+     *   notes        is it already on this PO, making the tick a no-op
+     *
+     * The second is computed against the CURRENT notes rather than against
+     * is_default. Every default starts out in the notes, so a fresh preview
+     * lists nothing to tick — but a user who deletes a default line gets it
+     * back as tickable instead of having to retype it from memory.
+     */
+    protected function bookingInstructionOptions(?BookingPo $bookingPo = null, array $bookingData = [])
     {
         if (! Schema::hasTable('booking_instructions')) {
             return collect();
         }
 
+        $alreadyOnPo = collect($bookingData['notes'] ?? [])
+            ->map(fn ($note) => $this->normalize($note))
+            ->filter()
+            ->all();
+
         return BookingInstruction::query()
             ->where('is_active', true)
+            ->forBuyer($this->instructionBuyerIdForBooking($bookingPo, $bookingData))
             ->orderBy('sort_order')
             ->orderBy('instruction')
-            ->get();
+            ->get()
+            ->reject(fn (BookingInstruction $row) => in_array($this->normalize($row->instruction), $alreadyOnPo, true))
+            ->values();
     }
 
     protected function deliveryDestinationOptions()
@@ -2856,39 +2934,47 @@ BIN: 005635381-0406 TIN: 780096271681",
         return $data;
     }
 
-    protected function defaultInstructionTexts(): array
+    /**
+     * The instructions that print on a new PO without being asked for.
+     *
+     * NO TEXT FALLBACK. This used to return six hardcoded instructions when the
+     * table came back empty — the original migration seed, which the business
+     * has since replaced entirely (two of those six were deleted outright). A
+     * stale paragraph printing on a live PO to a supplier looks exactly like
+     * correct output: no error, nothing to notice, and the supplier follows an
+     * instruction the company retired. An empty notes block is visible on the
+     * preview before the PO is generated, so the user can act on it.
+     *
+     * The Schema::hasTable() guard stays; that one covers a real case, a fresh
+     * install part-way through migrating.
+     */
+    protected function defaultInstructionTexts(?int $buyerId = null): array
     {
-        if (Schema::hasTable('booking_instructions')) {
-            $instructions = BookingInstruction::query()
-                ->where('is_active', true)
-                ->where('is_default', true)
-                ->orderBy('sort_order')
-                ->pluck('instruction')
-                ->filter()
-                ->values()
-                ->all();
-
-            if (! empty($instructions)) {
-                return $instructions;
-            }
+        if (! Schema::hasTable('booking_instructions')) {
+            return [];
         }
 
-        return $this->fallbackInstructionTexts();
+        return BookingInstruction::query()
+            ->where('is_active', true)
+            ->where('is_default', true)
+            ->forBuyer($buyerId)
+            ->orderBy('sort_order')
+            ->pluck('instruction')
+            ->filter()
+            ->values()
+            ->all();
     }
 
-    protected function fallbackInstructionTexts(): array
-    {
-        return [
-            'Please make sure buyer-required quality and approval are completed before bulk production.',
-            'Please mention style no., buyer name, PO number, ship mode and incoterm in PI, challan and shipping documents.',
-            'Bulk booking consumption must match approved BOM / usage standard.',
-            'Approved dye-lot, inspection report and test report should be shared before shipment.',
-            'Supplier must maintain delivery schedule strictly and share final shipping document draft for checking.',
-            'Add any buyer-specific special requirement only in this notes section.',
-        ];
-    }
-
-    protected function instructionTextsByIds(array $ids): array
+    /**
+     * Resolve ticked instruction ids back to their text.
+     *
+     * forBuyer() is applied here as well as on the tick list that produced the
+     * ids. The list is what a user sees; this is what actually reaches the
+     * document, and a submitted id is just a number in a form post. Filtering
+     * both ends means a hand-edited request cannot put another buyer's clause
+     * on a PO.
+     */
+    protected function instructionTextsByIds(array $ids, ?int $buyerId = null): array
     {
         $ids = collect($ids)->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
 
@@ -2899,6 +2985,7 @@ BIN: 005635381-0406 TIN: 780096271681",
         return BookingInstruction::query()
             ->whereIn('id', $ids)
             ->where('is_active', true)
+            ->forBuyer($buyerId)
             ->orderBy('sort_order')
             ->pluck('instruction')
             ->filter()
@@ -2906,16 +2993,45 @@ BIN: 005635381-0406 TIN: 780096271681",
             ->all();
     }
 
+    /**
+     * Add a user-written instruction to the shared suggestion library.
+     *
+     * MATCHED ON NORMALISED TEXT, not on the exact string. firstOrCreate() on
+     * the raw text treated "…before bulk production." and "…before bulk
+     * production" as two different instructions, so the library grew a near
+     * duplicate every time someone retyped a line with different punctuation —
+     * and Supply Chain can add to this list but cannot delete from it, so the
+     * duplicates were permanent and they crowd the tick list.
+     *
+     * Compared in PHP over the whole table rather than in SQL: normalize()
+     * strips punctuation and case in a way no portable expression reproduces
+     * across MySQL and PostgreSQL, and the table holds single-figure rows.
+     *
+     * Saved as GLOBAL (buyer_id null), which is what it did before. Whether a
+     * suggestion written while working a Hugo Boss PO should inherit that buyer
+     * is a real question, but it is a behaviour change nobody has asked for
+     * yet, so it is deliberately not made here.
+     */
     protected function saveCommonInstruction(string $instruction): BookingInstruction
     {
-        return BookingInstruction::firstOrCreate(
-            ['instruction' => $instruction],
-            [
-                'is_default' => false,
-                'is_active' => true,
-                'sort_order' => (int) (BookingInstruction::max('sort_order') ?? 0) + 10,
-            ]
-        );
+        $normalized = $this->normalize($instruction);
+
+        $existing = BookingInstruction::query()
+            ->get()
+            ->first(fn (BookingInstruction $row) => $this->normalize($row->instruction) === $normalized);
+
+        if ($existing) {
+            return $existing;
+        }
+
+        return BookingInstruction::create([
+            'instruction' => $instruction,
+            'is_default' => false,
+            'is_active' => true,
+            'sort_order' => (int) (BookingInstruction::max('sort_order') ?? 0) + 10,
+            'created_by' => auth()->id(),
+            'updated_by' => auth()->id(),
+        ]);
     }
 
     protected function requestHasBookingEdits(Request $request): bool
@@ -2969,7 +3085,10 @@ BIN: 005635381-0406 TIN: 780096271681",
             $data['items'] = $cleanItems;
         }
 
-        $selectedInstructionTexts = $this->instructionTextsByIds($validated['common_instruction_ids'] ?? []);
+        $selectedInstructionTexts = $this->instructionTextsByIds(
+            $validated['common_instruction_ids'] ?? [],
+            $this->instructionBuyerIdForBooking($bookingPo, $data)
+        );
         $newInstructionText = $this->cleanText($validated['new_instruction'] ?? '');
 
         if ($newInstructionText && $request?->boolean('save_new_instruction')) {

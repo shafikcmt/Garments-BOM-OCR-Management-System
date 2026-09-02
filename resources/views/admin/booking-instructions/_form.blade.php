@@ -32,6 +32,25 @@
         @enderror
     </div>
 
+    <div class="col-md-6">
+        <label class="form-label">Buyer</label>
+        <select name="buyer_id" class="form-select @error('buyer_id') is-invalid @enderror">
+            <option value="">All buyers (global)</option>
+            @foreach($buyers ?? [] as $buyer)
+                <option value="{{ $buyer->id }}" @selected((int) old('buyer_id', $instruction->buyer_id ?? 0) === (int) $buyer->id)>
+                    {{ $buyer->buyer_name }}
+                </option>
+            @endforeach
+        </select>
+        @error('buyer_id')
+            <div class="invalid-feedback">{{ $message }}</div>
+        @enderror
+        <div class="form-text">
+            Leave as <strong>All buyers</strong> unless the text names one buyer's requirement.
+            A buyer-specific instruction only prints on that buyer's POs.
+        </div>
+    </div>
+
     <div class="col-md-3">
         <label class="form-label">Sort Order</label>
         <input type="number" min="0" name="sort_order" class="form-control @error('sort_order') is-invalid @enderror"
