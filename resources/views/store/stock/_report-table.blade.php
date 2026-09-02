@@ -13,6 +13,12 @@
     $money = fn ($v) => $v === null ? '' : number_format((float) $v, 2, '.', '');
     $date = fn ($v) => $v ? $v->format('d-M-y') : '';
     $labels = \App\Services\GeneralStockReportService::statusLabels();
+
+    // A row whose stock count had not happened by this period carries computed
+    // zeros, not measured figures. It prints "-" so a printed sheet can never be
+    // read as "this item was empty", and summary() leaves it out of the totals
+    // below. One helper so no numeric cell on the row is missed.
+    $cell = fn (array $r, $value) => $r['not_counted'] ? '-' : $value;
 @endphp
 
 <table class="report-table">
@@ -56,34 +62,37 @@
     <tbody>
         @forelse($rows as $index => $r)
             <tr>
-                <td @class(['flag-order' => ! $forExcel && $r['status'] !== 'ok'])>{{ $labels[$r['status']] }}</td>
+                {{-- Not Counted Yet is stated but never highlighted: it is not a
+                     buying instruction, and the red flag is reserved for rows
+                     that are. --}}
+                <td @class(['flag-order' => ! $forExcel && ! in_array($r['status'], ['ok', 'not_counted'], true)])>{{ $labels[$r['status']] }}</td>
                 <td class="col-sl">{{ $index + 1 }}</td>
                 <td>{{ $r['item']->name }}</td>
                 <td>{{ $r['item']->brand }}</td>
                 <td>{{ $r['item']->uom }}</td>
                 <td>{{ $r['item']->category }}</td>
-                <td class="num">{{ $qty($r['balance_bf']) }}</td>
-                <td class="num">{{ number_format($r['consumption_per_day'], 4, '.', '') }}</td>
-                <td class="num">{{ $qty($r['safety']) }}</td>
-                <td class="num">{{ $r['reorder'] === null ? '-' : $qty($r['reorder']) }}</td>
+                <td class="num">{{ $cell($r, $qty($r['balance_bf'])) }}</td>
+                <td class="num">{{ $cell($r, number_format($r['consumption_per_day'], 4, '.', '')) }}</td>
+                <td class="num">{{ $cell($r, $qty($r['safety'])) }}</td>
+                <td class="num">{{ $cell($r, $r['reorder'] === null ? '-' : $qty($r['reorder'])) }}</td>
                 <td class="num">{{ $r['lead_time_days'] }}</td>
-                <td class="num">{{ $qty($r['addition']) }}</td>
+                <td class="num">{{ $cell($r, $qty($r['addition'])) }}</td>
                 {{-- A reference date is marked, for the same reason a standard
                      price is: this column normally means "the day something was
                      received", and a date carried over from the old sheets is
                      not that. Dropped from the Excel export, where a marker
                      would only be noise in a cell. --}}
                 <td>{{ $date($r['last_addition_date']) }}@if(! $forExcel && $r['last_addition_is_reference'])<i class="bi bi-bookmark text-muted ms-1" title="Reference date carried over from the old records — no receiving has been recorded here for this item yet" aria-hidden="true"></i>@endif</td>
-                <td class="num">{{ $qty($r['consumption']) }}</td>
+                <td class="num">{{ $cell($r, $qty($r['consumption'])) }}</td>
                 <td>{{ $date($r['last_consumption_date']) }}@if(! $forExcel && $r['last_consumption_is_reference'])<i class="bi bi-bookmark text-muted ms-1" title="Reference date carried over from the old records — no issue has been recorded here for this item yet" aria-hidden="true"></i>@endif</td>
-                <td class="num">{{ $qty($r['stock_as_on']) }}</td>
+                <td class="num">{{ $cell($r, $qty($r['stock_as_on'])) }}</td>
                 {{-- A standard price off the item master is marked, because it
                      is not what this report's price column has always meant.
                      The figure here is normally the last challan price — money
                      somebody actually paid — and presenting a standard rate the
                      same way would quietly change what the column asserts. --}}
-                <td class="num">{{ $money($r['unit_price']) }}@if($r['unit_price_is_standard'])<i class="bi bi-tag text-muted ms-1" title="Standard price from the item master — nothing has been received against this item with a price on the challan" aria-hidden="true"></i>@endif</td>
-                <td class="num">{{ $money($r['closing_value']) }}</td>
+                <td class="num">{{ $cell($r, $money($r['unit_price'])) }}@if(! $r['not_counted'] && $r['unit_price_is_standard'])<i class="bi bi-tag text-muted ms-1" title="Standard price from the item master — nothing has been received against this item with a price on the challan" aria-hidden="true"></i>@endif</td>
+                <td class="num">{{ $cell($r, $money($r['closing_value'])) }}</td>
                 <td>{{ $r['remarks'] }}</td>
             </tr>
         @empty

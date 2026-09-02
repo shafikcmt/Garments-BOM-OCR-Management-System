@@ -44,12 +44,35 @@ class GeneralStockReportService
     public const STATUS_OK = 'ok';
 
     /**
+     * The period being viewed ENDS BEFORE this item was counted, so there is no
+     * known position for it — which is not the same as a position of zero.
+     *
+     * Without this the report answered a pre-count month by treating the missing
+     * seed as 0 and then calling the item Out of Stock: a July 2026 report
+     * flagged 1,138 items for purchase and put the store's value at 0.00. That
+     * is a false buying signal off a figure nobody ever counted.
+     *
+     * It is NOT a severity. It is the absence of an answer, so it is excluded
+     * from the totals, from the Place Order list and from "Needs Attention".
+     */
+    public const STATUS_NOT_COUNTED = 'not_counted';
+
+    /**
      * Statuses in severity order, worst first. Used for sorting and for the
      * "at least this bad" filter on the screen.
      *
+     * NOT_COUNTED sorts last, below Ok: a row with no figures cannot be more
+     * urgent than one that has them.
+     *
      * @var list<string>
      */
-    public const SEVERITY = [self::STATUS_OUT, self::STATUS_PLACE_ORDER, self::STATUS_LOW, self::STATUS_OK];
+    public const SEVERITY = [
+        self::STATUS_OUT,
+        self::STATUS_PLACE_ORDER,
+        self::STATUS_LOW,
+        self::STATUS_OK,
+        self::STATUS_NOT_COUNTED,
+    ];
 
     /** @return array<string, string> status => label */
     public static function statusLabels(): array
@@ -59,6 +82,7 @@ class GeneralStockReportService
             self::STATUS_PLACE_ORDER => 'Place Order',
             self::STATUS_LOW => 'Low Stock',
             self::STATUS_OK => 'Ok',
+            self::STATUS_NOT_COUNTED => 'Not Counted Yet',
         ];
     }
 
@@ -172,32 +196,45 @@ class GeneralStockReportService
      */
     public function summary(Collection $rows): array
     {
+        // EVERY TOTAL IS TAKEN OVER THE COUNTED ROWS ONLY. A row whose count had
+        // not happened by this period contributes no known quantity or value, so
+        // adding its computed zero in would state a store-wide figure partly
+        // built from items nobody had measured.
+        $counted = $rows->where('not_counted', false);
+
         return [
             'items' => $rows->count(),
-            'out' => $rows->where('status', self::STATUS_OUT)->count(),
-            'place_order' => $rows->where('status', self::STATUS_PLACE_ORDER)->count(),
-            'low' => $rows->where('status', self::STATUS_LOW)->count(),
-            'ok' => $rows->where('status', self::STATUS_OK)->count(),
-            'closing_value' => (float) $rows->sum('closing_value'),
-            'addition' => (float) $rows->sum('addition'),
-            'consumption' => (float) $rows->sum('consumption'),
+            // How many of those rows actually carry figures, so the screen and
+            // the printed sheet can say what the totals are drawn from.
+            'counted_items' => $counted->count(),
+            'not_counted' => $rows->count() - $counted->count(),
+            'out' => $counted->where('status', self::STATUS_OUT)->count(),
+            'place_order' => $counted->where('status', self::STATUS_PLACE_ORDER)->count(),
+            'low' => $counted->where('status', self::STATUS_LOW)->count(),
+            'ok' => $counted->where('status', self::STATUS_OK)->count(),
+            'closing_value' => (float) $counted->sum('closing_value'),
+            'addition' => (float) $counted->sum('addition'),
+            'consumption' => (float) $counted->sum('consumption'),
 
             // Closing stock quantity. This is the figure Total Value is priced
             // from — closing_value is this column times unit price — so the two
             // belong beside each other.
-            'stock_as_on' => (float) $rows->sum('stock_as_on'),
+            'stock_as_on' => (float) $counted->sum('stock_as_on'),
 
             // How many different units of measure the filtered set spans. A
             // single quantity total only means anything when they all share
             // one: 5,000 PCS plus 200 KG is 5,200 of nothing. The report says
-            // so on screen when this is above 1.
-            'uom_count' => $rows->map(fn ($r) => $r['item']->uom)->filter()->unique()->count(),
+            // so on screen when this is above 1. Counted rows only, for the
+            // same reason as the totals it qualifies.
+            'uom_count' => $counted->map(fn ($r) => $r['item']->uom)->filter()->unique()->count(),
         ];
     }
 
     /**
      * Rows needing purchase action, worst first — the management "Place Order"
-     * list. Excludes healthy items entirely.
+     * list. Excludes healthy items entirely, and items not yet counted: an
+     * item with no known position is not evidence that anything needs buying,
+     * and putting 1,138 of them on a purchase list buries the ones that do.
      *
      * @param  Collection<int, array<string, mixed>>  $rows
      * @return Collection<int, array<string, mixed>>
@@ -206,7 +243,7 @@ class GeneralStockReportService
     {
         $order = array_flip(self::SEVERITY);
 
-        return $rows->where('status', '!=', self::STATUS_OK)
+        return $rows->whereNotIn('status', [self::STATUS_OK, self::STATUS_NOT_COUNTED])
             ->sortBy(fn ($row) => [$order[$row['status']], $row['item']->name])
             ->values();
     }
@@ -417,6 +454,16 @@ class GeneralStockReportService
             $counted = (float) $item->opening_qty;
         }
 
+        // The period predates the count. Every figure below still computes —
+        // consumers like the dashboard read stock_as_on unconditionally — but
+        // the row is marked so the screen and the exports print "—" instead of
+        // a zero nobody measured, and so summary() leaves it out of the totals.
+        //
+        // Keyed on the count DATE, not on a null seed: an item with no
+        // opening_qty at all was never seeded, and its movements are real.
+        $notCounted = $item->opening_as_on !== null
+            && $monthStart->lt($item->opening_as_on->copy()->startOfMonth());
+
         // Balance Brought Forward is the running figure — the counted seed plus
         // everything received minus everything issued BEFORE this month, which
         // is what carries last month's closing into this month. It always
@@ -518,7 +565,12 @@ class GeneralStockReportService
             'unit_price' => $unitPrice,
             'unit_price_is_standard' => $priceIsStandard,
             'closing_value' => $unitPrice !== null ? $stockAsOn * $unitPrice : null,
-            'status' => $this->status($stockAsOn, $safety, $reorder),
+            // Not counted yet wins over any computed severity: calling an item
+            // Out of Stock because its count had not happened is the defect.
+            'status' => $notCounted
+                ? self::STATUS_NOT_COUNTED
+                : $this->status($stockAsOn, $safety, $reorder),
+            'not_counted' => $notCounted,
             'remarks' => $item->remarks,
         ];
     }
@@ -563,9 +615,11 @@ class GeneralStockReportService
      */
     private function filterByStatus(Collection $rows, string $status): Collection
     {
-        // "attention" is the management shorthand for anything not Ok.
+        // "attention" is the management shorthand for anything not Ok — but not
+        // for a row with no figures on it, which is nothing to attend to. Same
+        // set actionList() and the meta's "attention" count use.
         if ($status === 'attention') {
-            return $rows->where('status', '!=', self::STATUS_OK);
+            return $rows->whereNotIn('status', [self::STATUS_OK, self::STATUS_NOT_COUNTED]);
         }
 
         return $rows->where('status', $status);

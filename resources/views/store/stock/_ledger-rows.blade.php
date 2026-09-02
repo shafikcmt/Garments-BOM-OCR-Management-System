@@ -28,7 +28,17 @@
         'out' => ['bg-danger text-white', 'bi-x-octagon'],
         'place_order' => ['bg-danger-subtle text-danger', 'bi-cart-plus'],
         'low' => ['bg-warning-subtle text-warning-emphasis', 'bi-exclamation-triangle'],
+        // Neutral on purpose: it is information, not a warning. Grouped with the
+        // pills rather than the quiet "Ok" treatment because the reader does
+        // need to notice that this row carries no figures.
+        'not_counted' => ['bg-secondary-subtle text-secondary', 'bi-dash-circle'],
     ];
+
+    // A row whose stock count had not happened by this period has no figures,
+    // only computed zeros. Printing "—" is what stops a zero nobody measured
+    // being read as an empty shelf. One helper so every numeric cell on the row
+    // is blanked the same way and none can be missed.
+    $cell = fn (array $r, $value) => $r['not_counted'] ? '—' : $value;
 
     // Figures that live outside this fragment — the card heading's count badge,
     // the Closing Stock Value beside it, and the four summary tiles. They are
@@ -46,7 +56,15 @@
         'stock_qty' => $qty($summary['stock_as_on']),
         'month_label' => $monthLabel,
         // Anything not "ok" — the same set the purchase-action banner counts.
+        // Not-counted rows are already out of these three counts, so they
+        // cannot leak into it.
         'attention' => $summary['out'] + $summary['place_order'] + $summary['low'],
+        // The pre-count notice lives OUTSIDE the swapped fragment, so its
+        // figures have to travel with the fragment like every other card on
+        // this screen — otherwise switching July to August leaves a banner
+        // claiming 1,138 uncounted items over a month where there are none.
+        'not_counted' => $summary['not_counted'],
+        'counted_items' => $summary['counted_items'],
     ];
 @endphp
 
@@ -93,7 +111,14 @@
         </thead>
         <tbody>
             @forelse($pageRows as $index => $r)
-                @php $needsAction = $r['status'] !== 'ok'; @endphp
+                @php
+                    // Two different questions. A not-counted row gets a badge,
+                    // because the reader must see why it has no figures — but it
+                    // is NOT an action, so it gets no red spine down the edge and
+                    // never joins the rows that need buying.
+                    $needsAction = ! in_array($r['status'], ['ok', 'not_counted'], true);
+                    $isBadged = $r['status'] !== 'ok';
+                @endphp
                 <tr @class([
                     'table-danger' => $r['status'] === 'out',
                     // Paints the left-edge spine, so the rows that need buying
@@ -102,7 +127,7 @@
                     'gx-ledger-flag-'.$r['status'] => $needsAction,
                 ])>
                     <td>
-                        @if($needsAction)
+                        @if($isBadged)
                             @php [$badgeClass, $badgeIcon] = $badges[$r['status']]; @endphp
                             <span class="badge {{ $badgeClass }}"><i class="bi {{ $badgeIcon }} me-1" aria-hidden="true"></i>{{ $statusLabels[$r['status']] }}</span>
                         @else
@@ -120,18 +145,18 @@
                     <td>{{ $r['item']->brand ?: '—' }}</td>
                     <td class="gx-ledger-quiet">{{ $r['item']->uom ?: '—' }}</td>
                     <td>{{ $r['item']->category ?: '—' }}</td>
-                    <td class="text-end fw-semibold">{{ $qty($r['balance_bf']) }}</td>
-                    <td class="text-end gx-ledger-quiet">{{ number_format($r['consumption_per_day'], 2) }}</td>
+                    <td class="text-end fw-semibold">{{ $cell($r, $qty($r['balance_bf'])) }}</td>
+                    <td class="text-end gx-ledger-quiet">{{ $cell($r, number_format($r['consumption_per_day'], 2)) }}</td>
                     <td class="text-end">
-                        {{ $qty($r['safety']) }}
-                        @if($r['safety_is_manual'])<i class="bi bi-pin-angle-fill text-primary ms-1" title="Set by hand in the item master" aria-hidden="true"></i>@endif
+                        {{ $cell($r, $qty($r['safety'])) }}
+                        @if(! $r['not_counted'] && $r['safety_is_manual'])<i class="bi bi-pin-angle-fill text-primary ms-1" title="Set by hand in the item master" aria-hidden="true"></i>@endif
                     </td>
                     <td class="text-end">
-                        {{ $r['reorder'] === null ? '—' : $qty($r['reorder']) }}
-                        @if($r['reorder_is_manual'])<i class="bi bi-pin-angle-fill text-primary ms-1" title="Set by hand in the item master" aria-hidden="true"></i>@endif
+                        {{ $cell($r, $r['reorder'] === null ? '—' : $qty($r['reorder'])) }}
+                        @if(! $r['not_counted'] && $r['reorder_is_manual'])<i class="bi bi-pin-angle-fill text-primary ms-1" title="Set by hand in the item master" aria-hidden="true"></i>@endif
                     </td>
                     <td class="text-end gx-ledger-quiet">{{ $r['lead_time_days'] }}</td>
-                    <td class="text-end text-success">{{ $qty($r['addition']) }}</td>
+                    <td class="text-end text-success">{{ $cell($r, $qty($r['addition'])) }}</td>
                     {{-- gx-stock-micro is already the quiet treatment; adding
                          gx-ledger-quiet on top would only fight it. --}}
                     {{-- A reference date carried over from the old records is
@@ -139,14 +164,14 @@
                          column normally means "the day something moved", and a
                          date with no transaction behind it is not that. --}}
                     <td class="gx-stock-micro">{{ $date($r['last_addition_date']) }}@if($r['last_addition_is_reference'])<i class="bi bi-bookmark text-muted ms-1" title="Reference date carried over from the old records — no receiving has been recorded here for this item yet" aria-hidden="true"></i>@endif</td>
-                    <td class="text-end text-danger">{{ $qty($r['consumption']) }}</td>
+                    <td class="text-end text-danger">{{ $cell($r, $qty($r['consumption'])) }}</td>
                     <td class="gx-stock-micro">{{ $date($r['last_consumption_date']) }}@if($r['last_consumption_is_reference'])<i class="bi bi-bookmark text-muted ms-1" title="Reference date carried over from the old records — no issue has been recorded here for this item yet" aria-hidden="true"></i>@endif</td>
-                    <td class="text-end fw-bold text-slate-900 gx-ledger-primary">{{ $qty($r['stock_as_on']) }}</td>
+                    <td class="text-end fw-bold text-slate-900 gx-ledger-primary">{{ $cell($r, $qty($r['stock_as_on'])) }}</td>
                     {{-- Marked the same way as on the Stock Report: a standard
                          price from the item master is not the challan price
                          this column normally shows. --}}
-                    <td class="text-end">{{ $money($r['unit_price']) }}@if($r['unit_price_is_standard'])<i class="bi bi-tag text-muted ms-1" title="Standard price from the item master — nothing has been received against this item with a price on the challan" aria-hidden="true"></i>@endif</td>
-                    <td class="text-end fw-semibold">{{ $money($r['closing_value']) }}</td>
+                    <td class="text-end">{{ $cell($r, $money($r['unit_price'])) }}@if(! $r['not_counted'] && $r['unit_price_is_standard'])<i class="bi bi-tag text-muted ms-1" title="Standard price from the item master — nothing has been received against this item with a price on the challan" aria-hidden="true"></i>@endif</td>
+                    <td class="text-end fw-semibold">{{ $cell($r, $money($r['closing_value'])) }}</td>
                     <td class="gx-stock-micro">{{ $r['remarks'] ?: '—' }}</td>
                 </tr>
             @empty

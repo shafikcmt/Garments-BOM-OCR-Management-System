@@ -133,6 +133,16 @@
         Stock as on Date = Opening Stock + Addition - Consumption.
         "Place Order" is raised when Stock as on Date falls below the Safety Stock Level;
         "Low Stock" is the earlier warning at the Re-order Level.
+        @if(($summary['not_counted'] ?? 0) > 0)
+            {{-- Said on the face of the sheet, not just implied by the dashes.
+                 A printed report leaves this system and gets quoted; whoever
+                 reads it must know the totals cover part of the store. --}}
+            <br>
+            {{ number_format($summary['not_counted']) }} of {{ number_format($summary['items']) }}
+            items had not been stock-counted as at {{ $monthLabel }}. They are shown as "-"
+            and are excluded from the Sub-Total, which covers
+            {{ number_format($summary['counted_items']) }} counted items.
+        @endif
     </div>
 @else
     {{-- Excel letterhead, laid out the same way as the Purchase Requisition
@@ -172,6 +182,14 @@
             <tr>
                 <td colspan="{{ $labelSpan }}">Filters</td>
                 <td colspan="{{ $valueSpan }}">{{ $activeFilters }}</td>
+            </tr>
+        @endif
+        {{-- The workbook needs this as badly as the PDF does — more so, since a
+             spreadsheet invites someone to sum a column themselves. --}}
+        @if(($summary['not_counted'] ?? 0) > 0)
+            <tr>
+                <td colspan="{{ $labelSpan }}">Note</td>
+                <td colspan="{{ $valueSpan }}">{{ number_format($summary['not_counted']) }} of {{ number_format($summary['items']) }} items had not been stock-counted as at {{ $monthLabel }}. They are shown as "-" and are excluded from the Sub-Total, which covers {{ number_format($summary['counted_items']) }} counted items.</td>
             </tr>
         @endif
         <tr><td colspan="{{ $columns }}"></td></tr>

@@ -16,12 +16,23 @@ export function initStockLedgerTable() {
     if (!container || !form) return;
 
     const spinner = document.querySelector('[data-ledger-spinner]');
-    const countEl = document.querySelector('[data-ledger-count]');
     const closingEl = document.querySelector('[data-ledger-closing]');
-    const monthLabelEl = document.querySelector('[data-ledger-month-label]');
     const actionAlert = document.querySelector('[data-ledger-action-alert]');
     const actionCount = document.querySelector('[data-ledger-action-count]');
     const searchInput = form.querySelector('[name="search"]');
+
+    // querySelectorAll, not querySelector: the item count and the month label
+    // each appear more than once now that the pre-count notice quotes them, and
+    // updating only the first would leave the notice describing the month the
+    // page opened with.
+    const countEls = document.querySelectorAll('[data-ledger-count]');
+    const monthLabelEls = document.querySelectorAll('[data-ledger-month-label]');
+
+    // The pre-count notice: shown only for a period that predates some item's
+    // stock count, so it has to be toggled as well as refilled.
+    const uncountedAlert = document.querySelector('[data-ledger-uncounted-alert]');
+    const uncountedCount = document.querySelector('[data-ledger-uncounted-count]');
+    const countedCount = document.querySelector('[data-ledger-counted-count]');
 
     // The Download PDF / Download Excel buttons. Their hrefs are rendered by the
     // server from the query at page load, so on a screen the JS has since
@@ -102,9 +113,23 @@ export function initStockLedgerTable() {
             return;
         }
 
-        if (countEl) countEl.textContent = Number(meta.items).toLocaleString();
+        countEls.forEach((node) => {
+            node.textContent = Number(meta.items).toLocaleString();
+        });
+        monthLabelEls.forEach((node) => {
+            node.textContent = meta.month_label;
+        });
         if (closingEl) closingEl.textContent = meta.closing_value;
-        if (monthLabelEl) monthLabelEl.textContent = meta.month_label;
+
+        if (uncountedAlert) {
+            uncountedAlert.classList.toggle('d-none', !meta.not_counted);
+            if (uncountedCount) {
+                uncountedCount.textContent = Number(meta.not_counted).toLocaleString();
+            }
+            if (countedCount) {
+                countedCount.textContent = Number(meta.counted_items).toLocaleString();
+            }
+        }
 
         document.querySelectorAll('[data-ledger-tile]').forEach((tile) => {
             const key = tile.getAttribute('data-ledger-tile');

@@ -156,6 +156,69 @@ it('shows September opening as August closing on the report screen', function ()
         ->assertDontSee('>50<', false);   // the frozen seed is no longer a cell
 });
 
+// --- Months before the item was counted ---------------------------------------
+
+it('marks a month before the count as not counted, not out of stock', function () {
+    // The old behaviour treated the missing seed as 0 and then called the item
+    // Out of Stock: a July 2026 report flagged 1,138 items for purchase and put
+    // the store's value at 0.00, off a figure nobody ever counted.
+    $item = openingItem('Late Counted Item', [
+        'opening_qty' => 40, 'opening_as_on' => '2026-08-01',
+    ]);
+
+    $july = openingRow($item, '2026-07');
+    $august = openingRow($item, '2026-08');
+
+    expect($july['not_counted'])->toBeTrue()
+        ->and($july['status'])->toBe(GeneralStockReportService::STATUS_NOT_COUNTED)
+        ->and($august['not_counted'])->toBeFalse()
+        ->and($august['status'])->not->toBe(GeneralStockReportService::STATUS_NOT_COUNTED)
+        ->and($august['balance_bf'])->toBe(40.0);
+});
+
+it('leaves uncounted rows out of the totals and the counts', function () {
+    openingItem('Counted In July', ['opening_qty' => 10, 'opening_as_on' => '2026-07-01', 'unit_price' => 5]);
+    openingItem('Counted In August', ['opening_qty' => 100, 'opening_as_on' => '2026-08-01', 'unit_price' => 5]);
+
+    $svc = app(GeneralStockReportService::class);
+    $rows = $svc->rows(Carbon::parse('2026-07-01'), ['only_active' => false]);
+    $summary = $svc->summary($rows);
+
+    expect($summary['items'])->toBe(2)
+        ->and($summary['counted_items'])->toBe(1)
+        ->and($summary['not_counted'])->toBe(1)
+        // Only the July-counted item's 10 x 5. The August item contributes
+        // nothing rather than a zero.
+        ->and($summary['closing_value'])->toBe(50.0)
+        ->and($summary['stock_as_on'])->toBe(10.0)
+        // And it is not reported as a stock problem.
+        ->and($summary['out'])->toBe(0);
+});
+
+it('keeps uncounted rows off the purchase action list', function () {
+    openingItem('Not Counted Yet Item', ['opening_qty' => 40, 'opening_as_on' => '2026-08-01']);
+
+    $svc = app(GeneralStockReportService::class);
+    $rows = $svc->rows(Carbon::parse('2026-07-01'), ['only_active' => false]);
+
+    expect($svc->actionList($rows))->toHaveCount(0)
+        // "Needs Attention" is the same set, so it must agree.
+        ->and($svc->rows(Carbon::parse('2026-07-01'), ['only_active' => false, 'status' => 'attention']))
+        ->toHaveCount(0);
+});
+
+it('prints a dash rather than a zero for an uncounted row', function () {
+    openingItem('Late Counted Item', ['opening_qty' => 40, 'opening_as_on' => '2026-08-01']);
+
+    $this->actingAs(openingReportUser())
+        ->get(route('store.stock.ledger', ['month' => '2026-07']))
+        ->assertOk()
+        ->assertSee('Late Counted Item')
+        ->assertSee('Not Counted Yet')
+        // The notice has to say so on the face of the report.
+        ->assertSee('had not been');
+});
+
 // --- The PDF / Excel table ----------------------------------------------------
 
 it('keeps the PDF and Excel total row aligned with its header columns', function () {

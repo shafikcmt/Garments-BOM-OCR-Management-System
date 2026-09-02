@@ -163,6 +163,28 @@
                 This month's Addition and Consumption move it to <strong>Stock as on Date</strong>.
             </p>
 
+            {{-- Shown only when the period actually predates some item's stock
+                 count. Before this, such a month reported those items as
+                 0.00 and flagged them Out of Stock — 1,138 of them in a July
+                 2026 report — which reads as an empty store and is a buying
+                 signal off a figure nobody counted. --}}
+            {{-- Always rendered, hidden when the count is zero: the filter JS
+                 toggles and refills it from the fragment's meta, and an element
+                 that is not in the DOM cannot be toggled back on when the user
+                 switches to a month that does need it. --}}
+            <div class="alert alert-secondary d-flex gap-2 mb-3 {{ ($summary['not_counted'] ?? 0) > 0 ? '' : 'd-none' }}"
+                 role="status" data-ledger-uncounted-alert>
+                <i class="bi bi-info-circle mt-1" aria-hidden="true"></i>
+                <div>
+                    <strong data-ledger-uncounted-count>{{ number_format($summary['not_counted']) }}</strong> of
+                    <span data-ledger-count>{{ number_format($summary['items']) }}</span> items had not been
+                    stock-counted as at <span data-ledger-month-label>{{ $monthLabel }}</span>.
+                    Their figures show as &mdash; and are left out of the totals, which cover the
+                    <span data-ledger-counted-count>{{ number_format($summary['counted_items']) }}</span>
+                    counted items.
+                </div>
+            </div>
+
             {{-- Filters sit inside the card they narrow, the same as every other
                  General Stock list. As a separate card above they read as their
                  own step and cost a full card's padding of vertical room. --}}
