@@ -9,7 +9,7 @@
     @endif
 
     <x-breadcrumb :items="[
-        ['label' => 'Admin', 'url' => route('admin.dashboard')],
+        ['label' => 'Admin', 'url' => auth()->user()?->hasRole('admin') ? route('admin.dashboard') : null],
         ['label' => 'Booking Setup'],
         ['label' => 'Booking Instructions'],
     ]" />
@@ -113,14 +113,20 @@
                                 @endif
                             </td>
                             <td>
-                                <div class="d-flex gap-2">
-                                    <a href="{{ route('admin.booking-instructions.edit', $instruction) }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil-square" aria-hidden="true"></i><span class="ms-1">Edit</span></a>
-                                    <form action="{{ route('admin.booking-instructions.destroy', $instruction) }}" method="POST" onsubmit="return confirm('Delete this instruction?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
-                                    </form>
-                                </div>
+                                @if($instruction->is_default && ! $canManageDefaults)
+                                    {{-- Still listed, because Supply Chain needs to know what already
+                                         prints on a PO — but a default is an administrator's to change. --}}
+                                    <span class="text-muted small">Admin only</span>
+                                @else
+                                    <div class="d-flex gap-2">
+                                        <a href="{{ route('admin.booking-instructions.edit', $instruction) }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil-square" aria-hidden="true"></i><span class="ms-1">Edit</span></a>
+                                        <form action="{{ route('admin.booking-instructions.destroy', $instruction) }}" method="POST" onsubmit="return confirm('Delete this instruction?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
+                                        </form>
+                                    </div>
+                                @endif
                             </td>
                         </tr>
                     @empty

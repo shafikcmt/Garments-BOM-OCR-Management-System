@@ -33,6 +33,8 @@ class PermissionCatalog
         'orders' => 'Orders / BOM',
         'materials' => 'Materials',
         'vendors' => 'Vendors / Suppliers',
+        'booking' => 'Booking Setup',
+        'email' => 'Email Templates',
         'shipments' => 'Shipment',
         'payments' => 'Accounts / Payments',
         'ocr' => 'OCR Workspace',
@@ -49,7 +51,7 @@ class PermissionCatalog
      */
     private const MODULE_ORDER = [
         'store', 'material', 'orders', 'materials', 'vendors', 'shipments',
-        'payments', 'reports', 'ocr', 'users', 'roles', 'audit',
+        'payments', 'reports', 'ocr', 'booking', 'email', 'users', 'roles', 'audit',
     ];
 
     /**
@@ -71,6 +73,10 @@ class PermissionCatalog
         'closing_stock' => 'Closing Stock',
         'bulk_issue' => 'Bulk Issuing',
         'requisitions' => 'Requisitions',
+
+        // Booking Setup / Email Templates
+        'instructions' => 'PO Instructions',
+        'templates' => 'Subject & Body',
     ];
 
     /** Per-module sub-section order. Sections not listed follow, alphabetically. */

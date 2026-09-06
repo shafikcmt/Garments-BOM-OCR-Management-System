@@ -5,7 +5,7 @@
 @section('content')
 <div class="container-fluid">
     <x-breadcrumb :items="[
-        ['label' => 'Admin', 'url' => route('admin.dashboard')],
+        ['label' => 'Admin', 'url' => auth()->user()?->hasRole('admin') ? route('admin.dashboard') : null],
         ['label' => 'Booking Setup'],
         ['label' => 'Edit Booking Instruction'],
     ]" />

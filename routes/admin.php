@@ -53,7 +53,6 @@ Route::prefix('admin')
         Route::post('buyers/{buyer}/users', [BuyerController::class, 'attachUser'])->name('buyers.users.attach');
         Route::delete('buyers/{buyer}/users/{user}', [BuyerController::class, 'detachUser'])->name('buyers.users.detach');
         Route::resource('booking-delivery-destinations', BookingDeliveryDestinationController::class)->except(['show']);
-        Route::resource('booking-instructions', BookingInstructionController::class)->except(['show']);
 
         Route::get('/po-generate-control', [PoGenerateControlController::class, 'index'])->name('po-generate-control.index');
         Route::get('/po-generate-control/pending', [PoGenerateControlController::class, 'pending'])->name('po-generate-control.pending');
@@ -75,9 +74,6 @@ Route::prefix('admin')
         Route::get('/payment-settings', [PaymentSettingController::class, 'edit'])->name('payment-settings.edit');
         Route::post('/payment-settings', [PaymentSettingController::class, 'update'])->name('payment-settings.update');
 
-        Route::get('/email-templates', [EmailTemplateController::class, 'edit'])->name('email-templates.edit');
-        Route::put('/email-templates', [EmailTemplateController::class, 'update'])->name('email-templates.update');
-
         Route::get('/workspace', [DashboardController::class, 'workspace'])->name('workspace');
 
         // PRA approver pool management + approval history + notification toggle
@@ -88,4 +84,37 @@ Route::prefix('admin')
         Route::delete('/pra-approvers/{praApprover}', [PraApproverController::class, 'destroy'])->name('pra-approvers.destroy');
         Route::put('/pra-approvers/settings', [PraApproverController::class, 'updateSettings'])->name('pra-approvers.settings');
         Route::get('/pra-approvals/history', [PraApproverController::class, 'history'])->name('pra-approvals.history');
+    });
+
+/*
+ * The two template screens Supply Chain maintains for itself.
+ *
+ * They keep their admin.* names and /admin URLs — renaming them would break
+ * every existing link, breadcrumb and redirect for no gain — but they sit
+ * outside the role:admin group so a second, narrower door can open onto them.
+ *
+ * role_or_perm admits either the admin role or the permission, the pattern
+ * routes/store.php already uses. Listing admin explicitly matters: Gate::before
+ * makes admin pass every can() check, but Spatie's middleware asks the role and
+ * permission tables directly and never consults the gate, so an admin whose
+ * role was never granted the permission would otherwise be locked out of a
+ * screen they have always owned.
+ *
+ * What the permission does NOT buy is inside the controllers: is_default on an
+ * instruction, and default_to / default_cc on an email template, stay admin-only
+ * and are re-checked there on every write.
+ */
+Route::prefix('admin')
+    ->middleware(['auth', 'role_or_perm:admin|booking.instructions.manage'])
+    ->name('admin.')
+    ->group(function () {
+        Route::resource('booking-instructions', BookingInstructionController::class)->except(['show']);
+    });
+
+Route::prefix('admin')
+    ->middleware(['auth', 'role_or_perm:admin|email.templates.edit'])
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/email-templates', [EmailTemplateController::class, 'edit'])->name('email-templates.edit');
+        Route::put('/email-templates', [EmailTemplateController::class, 'update'])->name('email-templates.update');
     });

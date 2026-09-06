@@ -6,7 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Models\BookingInstruction;
 use App\Models\Buyer;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
+/**
+ * Booking instruction library.
+ *
+ * TWO TIERS OF ACCESS, and the difference is the whole point of this class:
+ *
+ *   admin                       everything, including is_default.
+ *   booking.instructions.manage suggestions only — create, edit and delete
+ *                               rows with is_default = false.
+ *
+ * A default instruction prints on every matching PO without anyone asking for
+ * it, so promoting a row to default is a change to what suppliers receive
+ * company-wide. That decision stays with the admin. The radio is disabled in
+ * the form for anyone else, and every write below re-checks it, because a
+ * disabled input is a courtesy to the user and not a guard against a request.
+ */
 class BookingInstructionController extends Controller
 {
     public function index()
@@ -25,7 +41,11 @@ class BookingInstructionController extends Controller
             'active' => BookingInstruction::where('is_active', true)->count(),
         ];
 
-        return view('admin.booking-instructions.index', compact('instructions', 'stats'));
+        return view('admin.booking-instructions.index', [
+            'instructions' => $instructions,
+            'stats' => $stats,
+            'canManageDefaults' => $this->canManageDefaults(),
+        ]);
     }
 
     public function create()
@@ -37,6 +57,7 @@ class BookingInstructionController extends Controller
                 'sort_order' => ((int) BookingInstruction::max('sort_order')) + 10,
             ]),
             'buyers' => $this->buyerOptions(),
+            'canManageDefaults' => $this->canManageDefaults(),
         ]);
     }
 
@@ -55,14 +76,19 @@ class BookingInstructionController extends Controller
 
     public function edit(BookingInstruction $bookingInstruction)
     {
+        $this->authorizeTouching($bookingInstruction);
+
         return view('admin.booking-instructions.edit', [
             'instruction' => $bookingInstruction,
             'buyers' => $this->buyerOptions($bookingInstruction->buyer_id),
+            'canManageDefaults' => $this->canManageDefaults(),
         ]);
     }
 
     public function update(Request $request, BookingInstruction $bookingInstruction)
     {
+        $this->authorizeTouching($bookingInstruction);
+
         $data = $this->validatedData($request);
         $data['updated_by'] = auth()->id();
 
@@ -75,6 +101,8 @@ class BookingInstructionController extends Controller
 
     public function destroy(BookingInstruction $bookingInstruction)
     {
+        $this->authorizeTouching($bookingInstruction);
+
         $bookingInstruction->delete();
 
         return redirect()
@@ -99,6 +127,34 @@ class BookingInstructionController extends Controller
             ->get(['id', 'buyer_name']);
     }
 
+    /**
+     * May the current user decide whether an instruction is a default one?
+     *
+     * Admin only. Asked through the role rather than a permission because there
+     * is deliberately no permission to grant here — the answer is meant to be
+     * "the super admin, and nobody else" until somebody decides otherwise.
+     */
+    private function canManageDefaults(): bool
+    {
+        return (bool) auth()->user()?->hasRole('admin');
+    }
+
+    /**
+     * An existing default row is off limits to a permission-only holder.
+     *
+     * Edit and delete both route through here, so the two ways of damaging a
+     * default — rewriting its text and removing it outright — are closed by the
+     * same check rather than by two that could drift apart.
+     */
+    private function authorizeTouching(BookingInstruction $instruction): void
+    {
+        if ($instruction->is_default && ! $this->canManageDefaults()) {
+            throw new AccessDeniedHttpException(
+                'Default instructions can only be changed by an administrator.'
+            );
+        }
+    }
+
     private function validatedData(Request $request): array
     {
         $data = $request->validate([
@@ -114,7 +170,10 @@ class BookingInstructionController extends Controller
             // Blank means global. Cast through ?: null so an empty select value
             // stores NULL rather than 0, which no buyer would ever match.
             'buyer_id' => ((int) ($data['buyer_id'] ?? 0)) ?: null,
-            'is_default' => $data['instruction_type'] === 'default',
+            // The form disables the "Default instruction" radio for a
+            // permission-only holder; this is the check that actually enforces
+            // it, against a hand-made POST as much as a stale page.
+            'is_default' => $this->canManageDefaults() && $data['instruction_type'] === 'default',
             'is_active' => $request->boolean('is_active'),
             'sort_order' => (int) ($data['sort_order'] ?? 0),
         ];

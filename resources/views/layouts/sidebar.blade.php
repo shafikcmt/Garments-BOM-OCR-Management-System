@@ -682,6 +682,39 @@
                 </div>
             @endcan
 
+            {{-- Template maintenance, for whoever holds the permission without
+                 being an admin — today the Supply Chain role. Admin is excluded
+                 here because Booking Setup > Instructions and Settings > Email
+                 Templates already carry these two links in the admin block
+                 above, and Gate::before would otherwise draw them twice. --}}
+            @if(auth()->user() && ! auth()->user()->hasRole('admin') && auth()->user()->canAny(['booking.instructions.manage', 'email.templates.edit']))
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Templates</div>
+                    <ul class="sidebar-list">
+                        @can('booking.instructions.manage')
+                            <li class="sidebar-item">
+                                <a href="{{ route('admin.booking-instructions.index') }}" class="sidebar-nav-link {{ request()->routeIs('admin.booking-instructions.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main">
+                                        <span class="sidebar-icon"><i class="bi bi-card-list" aria-hidden="true"></i></span>
+                                        <span class="sidebar-link-text">PO Instructions</span>
+                                    </span>
+                                </a>
+                            </li>
+                        @endcan
+                        @can('email.templates.edit')
+                            <li class="sidebar-item">
+                                <a href="{{ route('admin.email-templates.edit') }}" class="sidebar-nav-link {{ request()->routeIs('admin.email-templates.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main">
+                                        <span class="sidebar-icon"><i class="bi bi-envelope-paper" aria-hidden="true"></i></span>
+                                        <span class="sidebar-link-text">Email Templates</span>
+                                    </span>
+                                </a>
+                            </li>
+                        @endcan
+                    </ul>
+                </div>
+            @endif
+
             @can('manage-style-budgets')
                 <div class="sidebar-section">
                     <div class="sidebar-section-label">Planning</div>

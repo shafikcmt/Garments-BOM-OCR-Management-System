@@ -1,5 +1,12 @@
 @php
+    $canManageDefaults = $canManageDefaults ?? true;
     $selectedType = old('instruction_type', ($instruction->is_default ?? false) ? 'default' : 'suggestion');
+
+    // Without this a permission-only holder opening the create form sees the
+    // Default radio pre-selected and disabled, with no way to reach Suggestion.
+    if (! $canManageDefaults) {
+        $selectedType = 'suggestion';
+    }
 @endphp
 
 <div class="row g-3">
@@ -17,8 +24,9 @@
         <label class="form-label d-block">Instruction Use <span class="text-danger">*</span></label>
         <div class="border rounded-4 p-3 h-100">
             <div class="form-check mb-2">
-                <input class="form-check-input" type="radio" name="instruction_type" id="instructionDefault" value="default" @checked($selectedType === 'default')>
-                <label class="form-check-label fw-semibold" for="instructionDefault">Default instruction</label>
+                <input class="form-check-input" type="radio" name="instruction_type" id="instructionDefault" value="default"
+                       @checked($selectedType === 'default') @disabled(! $canManageDefaults)>
+                <label class="form-check-label fw-semibold {{ $canManageDefaults ? '' : 'text-muted' }}" for="instructionDefault">Default instruction</label>
                 <div class="form-text">Automatically shows in every new booking format.</div>
             </div>
             <div class="form-check">
@@ -26,6 +34,9 @@
                 <label class="form-check-label fw-semibold" for="instructionSuggestion">Extra suggestion</label>
                 <div class="form-text">Supply Chain user can select and add it only when needed.</div>
             </div>
+            @unless($canManageDefaults)
+                <div class="form-text mt-2 border-top pt-2">Only an administrator can set an instruction as default.</div>
+            @endunless
         </div>
         @error('instruction_type')
             <div class="text-danger small mt-1">{{ $message }}</div>

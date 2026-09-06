@@ -1,4 +1,5 @@
 @php($old = old('type') === $type)
+@php($canManageRecipients = $canManageRecipients ?? true)
 <form method="POST" action="{{ route('admin.email-templates.update') }}">
     @csrf
     @method('PUT')
@@ -17,27 +18,37 @@
                                value="{{ $old ? old('subject') : ($template->subject ?? $defaultSubject) }}">
                     </div>
 
+                    {{-- Recipients stay administrator-only: changing them silently
+                         redirects future mail. Disabled inputs post nothing, so a
+                         non-admin save simply leaves the stored lists alone — the
+                         controller re-checks the same rule regardless. --}}
                     <div class="row g-3 mb-3">
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-semibold">Default To <span class="text-muted fw-normal">(optional)</span></label>
                             <input type="text" name="default_to" class="form-control" maxlength="1000"
                                    value="{{ $old ? old('default_to') : ($template->default_to ?? '') }}"
-                                   placeholder="e.g. team@humanaapparels.com">
-                            <div class="form-text">Pre-fills the "To" field. Comma separated. Senders can still edit it.</div>
+                                   placeholder="e.g. team@humanaapparels.com" @disabled(! $canManageRecipients)>
+                            <div class="form-text">
+                                Pre-fills the "To" field. Comma separated. Senders can still edit it.
+                                @unless($canManageRecipients) Administrator only. @endunless
+                            </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-semibold">Default Cc <span class="text-muted fw-normal">(optional)</span></label>
                             <input type="text" name="default_cc" class="form-control" maxlength="1000"
                                    value="{{ $old ? old('default_cc') : ($template->default_cc ?? '') }}"
-                                   placeholder="e.g. manager@humanaapparels.com">
-                            <div class="form-text">Pre-fills the "Cc" field. Comma separated. Senders can still edit it.</div>
+                                   placeholder="e.g. manager@humanaapparels.com" @disabled(! $canManageRecipients)>
+                            <div class="form-text">
+                                Pre-fills the "Cc" field. Comma separated. Senders can still edit it.
+                                @unless($canManageRecipients) Administrator only. @endunless
+                            </div>
                         </div>
                     </div>
 
                     <div class="mb-2">
                         <label class="form-label fw-semibold">Body (HTML)</label>
                         <textarea name="body" rows="14" class="form-control" style="font-family:monospace;font-size:13px;" required>{{ $old ? old('body') : ($template->body ?? '') }}</textarea>
-                        <div class="form-text">Raw HTML allowed (e.g. &lt;p&gt;, &lt;strong&gt;, &lt;br&gt;) — admin only. Senders see this as formatted text, not code. Use the placeholders on the right.</div>
+                        <div class="form-text">Raw HTML allowed (e.g. &lt;p&gt;, &lt;strong&gt;, &lt;br&gt;). Senders see this as formatted text, not code. Use the placeholders on the right.</div>
                     </div>
                 </div>
             </div>
