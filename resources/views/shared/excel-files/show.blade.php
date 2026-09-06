@@ -1622,6 +1622,11 @@
                             Clear
                         </a>
                     @endif
+
+                    {{-- Shown by sheet-range-select.js only while a block of two
+                         or more cells is selected. Drag-to-select is not a
+                         discoverable gesture, so it says what to press. --}}
+                    <span class="sheet-select-status" data-cell-select-status hidden></span>
                 </div>
                 <div class="header-find-tools">
                     <span class="header-find-label">Header Finder</span>
@@ -1652,7 +1657,10 @@
             </div>
 
             <div class="excel-table-wrap">
-                <table class="table table-bordered excel-data-table" id="excelDataTable">
+                {{-- data-cell-select opts this table into drag/shift-click range
+                     selection and Ctrl+C copy (resources/js/modules/sheet-range-select.js).
+                     Selection and copy only — that module never writes a cell. --}}
+                <table class="table table-bordered excel-data-table" id="excelDataTable" data-cell-select>
                     <thead>
                         <tr>
                             {{-- The select-all checkbox lives INSIDE the existing

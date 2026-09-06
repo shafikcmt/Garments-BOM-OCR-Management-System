@@ -8,6 +8,7 @@ import { initSubmitButtons } from './modules/submit-button';
 import { initBulkIssueTable } from './modules/bulk-issue-table';
 import { initStockLedgerTable } from './modules/stock-ledger-table';
 import { initStockListTable } from './modules/stock-list-table';
+import { initSheetRangeSelect } from './modules/sheet-range-select';
 
 import Alpine from 'alpinejs';
 import AOS from 'aos';
@@ -48,3 +49,7 @@ document.addEventListener('DOMContentLoaded', initStockLedgerTable);
 
 // General Store list screens: live search and filtering, no page reload.
 document.addEventListener('DOMContentLoaded', initStockListTable);
+
+// Workspace sheet: drag or shift-click a rectangle of cells and copy it out.
+// Selection and copy only — it never writes a cell.
+document.addEventListener('DOMContentLoaded', initSheetRangeSelect);

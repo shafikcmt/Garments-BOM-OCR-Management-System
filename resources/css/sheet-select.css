@@ -1,0 +1,78 @@
+/* --- Workspace sheet: range selection ------------------------------------
+ *
+ * Paired with resources/js/modules/sheet-range-select.js.
+ *
+ * The tint is painted by an ::after layer rather than by background-color on
+ * purpose. Every data cell already carries a background it must not lose: the
+ * per-department role tints (.role-merchant and friends) and .calculated-cell
+ * both set theirs with !important, and the duplicate-row and notification
+ * markers set theirs too. A background here would either lose to them or have
+ * to fight them with a second !important. An overlay sits above all of it and
+ * argues with none of it.
+ *
+ * Per-cell, not one positioned rectangle: the sheet's first column and its
+ * header are position:sticky inside a scrolling wrapper, so a single overlay
+ * would drift out of alignment behind the frozen column and need recomputing
+ * on every scroll event.
+ */
+
+.excel-data-table tbody td.cell-selected {
+    position: relative;
+}
+
+.excel-data-table tbody td.cell-selected::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: rgba(37, 99, 235, .13);
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .18);
+    z-index: 1;
+}
+
+/* Where the drag began. Excel leaves its anchor untinted; this keeps the tint
+   for a readable block but rings the cell, so the user can see which end
+   Shift+click will extend from. */
+.excel-data-table tbody td.cell-selected-anchor::after {
+    background: rgba(37, 99, 235, .05);
+    box-shadow: inset 0 0 0 2px rgba(37, 99, 235, .55);
+}
+
+/* The input keeps its own focus ring while selected; two rings on one cell
+   reads as an error state. */
+.excel-data-table tbody td.cell-selected input:focus {
+    box-shadow: none;
+}
+
+/* Only while a range drag is actually in progress, so ordinary editing keeps
+   the text cursor and normal selection behaviour. */
+.excel-data-table.is-range-dragging {
+    cursor: cell;
+    user-select: none;
+}
+
+.excel-data-table.is-range-dragging input {
+    pointer-events: none;
+}
+
+/* Tells the user the block can be copied. The gesture is not discoverable on
+   its own, and our users are not spreadsheet-power-users by trade. */
+.sheet-select-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border: 1px solid rgba(37, 99, 235, .25);
+    border-radius: 999px;
+    background: rgba(37, 99, 235, .07);
+    color: #1d4ed8;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .excel-data-table tbody td.cell-selected::after {
+        transition: background .12s ease;
+    }
+}
