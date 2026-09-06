@@ -54,6 +54,18 @@
                 </div>
             @endif
 
+            @if(session('info'))
+                <div class="app-flash-alert app-flash-info" role="status">
+                    <div class="app-flash-icon"><i class="bi bi-info-lg" aria-hidden="true"></i></div>
+                    <div class="app-flash-content">
+                        <h6 class="app-flash-title">Note</h6>
+                        <p class="app-flash-text">{!! session('info') !!}</p>
+                    </div>
+                    <button type="button" class="app-flash-close" aria-label="Close message">&times;</button>
+                    <div class="app-flash-progress"><span></span></div>
+                </div>
+            @endif
+
             @if(session('import_errors'))
                 <div class="app-flash-alert app-flash-error" role="alert">
                     <div class="app-flash-icon"><i class="bi bi-exclamation-lg" aria-hidden="true"></i></div>

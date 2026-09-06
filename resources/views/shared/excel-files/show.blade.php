@@ -1510,6 +1510,13 @@
         @csrf
         @method('PUT')
 
+        {{-- How many cell inputs this form intends to send. Set by JS at submit
+             time and deliberately placed FIRST, before the sheet, so it always
+             survives PHP's max_input_vars truncation. The server compares it
+             with what actually arrived and refuses to report success on a
+             short payload — the failure that used to silently lose edits. --}}
+        <input type="hidden" name="cells_count" id="cellsCountField" value="">
+
         <div class="excel-work-card">
             <div class="table-toolbar">
                 <div class="table-toolbar-left">
@@ -1600,7 +1607,7 @@
                         id="globalDocSearch"
                         class="form-control form-control-sm server-search-input"
                         value="{{ $globalSearchValue }}"
-                        placeholder="Search entire document..."
+                        placeholder="Search entire document, then press Enter"
                         autocomplete="off"
                     >
                     <button type="button" class="btn btn-outline-primary btn-sm" id="applySheetSearchButton">
@@ -1688,7 +1695,7 @@
 
                         <tr class="filter-row">
                             <th>
-                                <input type="text" class="form-control form-control-sm filter-input" placeholder="Row" data-column="0" data-filter-key="__row" value="{{ $filterValues['__row'] ?? '' }}" autocomplete="off">
+                                <input type="text" class="form-control form-control-sm filter-input" placeholder="Row + Enter" data-column="0" data-filter-key="__row" value="{{ $filterValues['__row'] ?? '' }}" autocomplete="off">
                             </th>
                             @foreach($headers as $header)
                                 @php
@@ -1704,7 +1711,8 @@
                                     <input
                                         type="text"
                                         class="form-control form-control-sm filter-input"
-                                        placeholder="Search"
+                                        {{-- Says how it submits: typing alone no longer reloads the sheet. --}}
+                                        placeholder="Search + Enter"
                                         data-column="{{ $loop->index + 1 }}"
                                         data-filter-key="{{ $header->id }}"
                                         value="{{ $filterValues[$header->id] ?? '' }}"
@@ -2900,7 +2908,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const applySheetSearchButton = document.getElementById('applySheetSearchButton');
     const excelTableWrap = document.querySelector('.excel-table-wrap');
     const searchColumnStorageKey = `excel_search_column_user_{{ auth()->id() }}_file_{{ $excelFile->id }}`;
-    let sheetSearchTimer = null;
 
     function rememberActiveSearchColumn() {
         const active = document.activeElement;
@@ -2971,27 +2978,26 @@ document.addEventListener('DOMContentLoaded', function () {
         window.location.href = url.toString();
     }
 
-    function scheduleServerSheetSearch() {
-        clearTimeout(sheetSearchTimer);
-        sheetSearchTimer = setTimeout(submitServerSheetSearch, 700);
-    }
-
+    /* Search runs on Enter or the Search button only — never while typing.
+     *
+     * It used to fire on a 700ms typing debounce, but this search is a FULL
+     * PAGE NAVIGATION, not an in-place filter. Any debounce can expire during
+     * a normal mid-word pause, and once the reload starts every further
+     * keystroke is thrown away (focus is only restored ~250ms after load), so
+     * "bilaram" reached the server as "bilar". A reload also discards unsaved
+     * cell edits. No timeout value fixes that — the trigger has to be the
+     * user saying they are done. */
     [globalDocSearch, ...filterInputs].filter(Boolean).forEach(input => {
-        input.addEventListener('input', scheduleServerSheetSearch);
         input.addEventListener('keydown', function (event) {
             if (event.key === 'Enter') {
                 event.preventDefault();
-                clearTimeout(sheetSearchTimer);
                 submitServerSheetSearch();
             }
         });
     });
 
     if (applySheetSearchButton) {
-        applySheetSearchButton.addEventListener('click', function () {
-            clearTimeout(sheetSearchTimer);
-            submitServerSheetSearch();
-        });
+        applySheetSearchButton.addEventListener('click', submitServerSheetSearch);
     }
 
     if (headerJumpSelect) {
@@ -3057,12 +3063,56 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    /* Send only the cells the user actually edited.
+     *
+     * The sheet renders one named input per editable cell, and a form posts
+     * every one of them. For a merchant on the default 50-row page that is
+     * ~1,300 variables, well past PHP's max_input_vars (1000), so PHP dropped
+     * everything past roughly row 39 before Laravel ever saw it. The server
+     * then found nothing to change for those rows and still flashed "File
+     * updated successfully" — the silent data loss.
+     *
+     * A disabled input is not submitted, so pruning unchanged cells here takes
+     * a normal save from ~1,300 variables to a handful. It also removes ~1,200
+     * pointless firstOrNew() SELECTs per save. Unchanged cells were already
+     * no-ops server-side, so what gets persisted is identical.
+     */
+    function pruneUnchangedCells() {
+        const pruned = [];
+
+        editableInputs.forEach(input => {
+            if (input.disabled) return;
+            if (input.value === (input.dataset.originalValue ?? '')) {
+                input.disabled = true;
+                pruned.push(input);
+            }
+        });
+
+        return pruned;
+    }
+
     if (form) {
         form.addEventListener('submit', function () {
             isSubmitting = true;
             clearDraft();
+
+            const pruned = pruneUnchangedCells();
+            const cellsCountField = document.getElementById('cellsCountField');
+
+            if (cellsCountField) {
+                cellsCountField.value = String(editableInputs.length - pruned.length);
+            }
+
+            // If the navigation never happens (validation, a blocked submit, the
+            // user coming back via the bfcache), the sheet must not be left with
+            // dead inputs.
+            setTimeout(() => pruned.forEach(input => { input.disabled = false; }), 0);
         });
     }
+
+    window.addEventListener('pageshow', function () {
+        editableInputs.forEach(input => { input.disabled = false; });
+    });
 
     /* ---- Row duplication -------------------------------------------------
      * Duplicating navigates away and the server persists immediately, exactly

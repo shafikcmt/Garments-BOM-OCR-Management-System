@@ -337,6 +337,27 @@ class ExcelFileController extends Controller
                 ->with('warning', 'This file belongs to another buyer. You can view it, but only its own buyer team can edit it.');
         }
 
+        // PHP silently discards every POST variable past max_input_vars (1000 by
+        // default) — no exception, nothing Laravel can see, just a truncated
+        // $_POST. The sheet posts one variable per editable cell, so a large
+        // save used to lose its tail and still be reported as successful.
+        //
+        // The form states up front how many cell inputs it sent. Fewer arrived
+        // means the request was cut short, and the only safe thing to do is
+        // refuse it rather than persist half an edit and call it a success.
+        $declaredCellCount = $request->input('cells_count');
+
+        if ($declaredCellCount !== null) {
+            $receivedCellCount = collect((array) $request->input('cells', []))
+                ->sum(fn ($rowCells) => count((array) $rowCells));
+
+            if ($receivedCellCount < (int) $declaredCellCount) {
+                return redirect()
+                    ->route('uploaded-files.show', $excelFile->id)
+                    ->with('error', 'Your changes were NOT saved. The browser sent more data than this server accepts in one request, so part of it was dropped. Save fewer rows at a time, or ask IT to raise max_input_vars in php.ini.');
+            }
+        }
+
         $roleIds = $this->getRoleIds();
         $calculatedHeaderKeys = $this->calculatedHeaderKeys();
         $batchId = (string) Str::uuid();
@@ -473,8 +494,12 @@ class ExcelFileController extends Controller
             $redirectUrl .= '?' . http_build_query($queryParams);
         }
 
-        $redirect = redirect($redirectUrl)
-            ->with('success', 'File updated successfully.');
+        // Say what actually happened. "File updated successfully" on a save that
+        // wrote nothing is what let the truncation bug above stay invisible for
+        // so long: the user saw a green message and only found out on reload.
+        $redirect = count($changedCells) > 0
+            ? redirect($redirectUrl)->with('success', count($changedCells) . ' cell(s) updated successfully.')
+            : redirect($redirectUrl)->with('info', 'No changes to save.');
 
         if ($lockedRowIds->isNotEmpty()) {
             $redirect->with('warning', $lockedRowIds->count() . ' locked PO row(s) were skipped. Unlock the PO in Admin PO Control or change the lock scope before editing.');
@@ -2696,12 +2721,21 @@ class ExcelFileController extends Controller
         $filled = 0;
         $total = 0;
 
+        // keyBy() rather than firstWhere() inside the loop. firstWhere() rescans
+        // the row's whole cell collection for every target header, which on a
+        // real file (499 rows x ~100 target headers x ~128 cells) is millions of
+        // PHP comparisons — it measured 23 seconds on one save, with only five
+        // queries. Hashing each row's cells once makes the lookup O(1). Same
+        // counts, same resulting status.
+        $targetHeaderIds = $targetHeaderIds->all();
+
         foreach ($rows as $row) {
+            $cellsByHeader = $row->cells->keyBy('header_id');
+
             foreach ($targetHeaderIds as $headerId) {
                 $total++;
 
-                $cell = $row->cells->firstWhere('header_id', $headerId);
-                $value = trim((string) ($cell->value ?? ''));
+                $value = trim((string) ($cellsByHeader->get($headerId)?->value ?? ''));
 
                 if ($value !== '') {
                     $filled++;

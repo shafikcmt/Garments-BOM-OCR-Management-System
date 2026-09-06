@@ -503,10 +503,21 @@ a { text-decoration: none; }
 .app-flash-error .app-flash-text { color: #b91c1c; }
 .app-flash-error .app-flash-close { color: #b91c1c; }
 .app-flash-error .app-flash-close:hover { background: rgba(239, 68, 68, .12); }
+/* Neutral outcome — "nothing to do", not a success and not a failure. Kept
+   visually quieter than both so a routine no-op does not read as an alarm. */
+.app-flash-info { border-color: #bfdbfe; background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%); }
+.app-flash-info::before { background: linear-gradient(180deg, #3b82f6, #2563eb); }
+.app-flash-info .app-flash-icon { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.app-flash-info .app-flash-title { color: #1e3a8a; }
+.app-flash-info .app-flash-text { color: #1d4ed8; }
+.app-flash-info .app-flash-close { color: #1d4ed8; }
+.app-flash-info .app-flash-close:hover { background: rgba(59, 130, 246, .12); }
+
 .app-flash-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(148, 163, 184, .15); }
 .app-flash-progress span { display: block; height: 100%; width: 100%; transform-origin: left center; animation: appFlashTimer 5s linear forwards; }
 .app-flash-success .app-flash-progress span { background: linear-gradient(90deg, #22c55e, #10b981); }
 .app-flash-error .app-flash-progress span { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.app-flash-info .app-flash-progress span { background: linear-gradient(90deg, #3b82f6, #2563eb); }
 
 @keyframes appFlashIn { from { opacity: 0; transform: translateX(20px) scale(.98); } to { opacity: 1; transform: translateX(0) scale(1); } }
 @keyframes appFlashOut { from { opacity: 1; transform: translateX(0) scale(1); } to { opacity: 0; transform: translateX(20px) scale(.98); } }
