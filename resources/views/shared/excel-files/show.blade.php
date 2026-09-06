@@ -1506,7 +1506,11 @@
         @endif
     </div>
 
-    <form method="POST" action="{{ route('uploaded-files.update', $excelFile->id) }}{{ $updateQueryString ? '?' . $updateQueryString : '' }}" id="excelFileForm">
+    {{-- autocomplete="off" here as well as on each cell. The form-level flag is
+         the layer that covers any input added to this sheet later without one
+         of its own — a new cell input is exactly the thing a browser would
+         start refilling silently. --}}
+    <form method="POST" action="{{ route('uploaded-files.update', $excelFile->id) }}{{ $updateQueryString ? '?' . $updateQueryString : '' }}" id="excelFileForm" autocomplete="off">
         @csrf
         @method('PUT')
 
@@ -1850,11 +1854,31 @@
                                         data-col-index="{{ $loop->index }}"
                                     >
                                         @if($editable)
+                                            {{-- SILENT DATA CORRUPTION, do not remove these four
+                                                 attributes. A cell input's name is stable across
+                                                 page loads (cells[<row id>][<header id>]), which is
+                                                 exactly the signature a browser's form history keys
+                                                 on. Chrome was silently refilling empty cells with a
+                                                 value somebody once submitted for that same cell —
+                                                 firing change, marking the sheet dirty, and then
+                                                 being written by the "you have unsaved changes, save
+                                                 first?" prompt. Nobody typed those values. The change
+                                                 log carries several such writes.
+
+                                                 The search and filter inputs on this screen already
+                                                 carry autocomplete="off"; the cells were missed.
+                                                 data-lpignore / data-form-type / data-1p-ignore do
+                                                 the same for the third-party password managers, which
+                                                 ignore autocomplete outright. --}}
                                             <input
                                                 type="{{ $inputType }}"
                                                 name="cells[{{ $row->id }}][{{ $header->id }}]"
                                                 value="{{ $value }}"
                                                 class="form-control form-control-sm excel-editable-cell"
+                                                autocomplete="off"
+                                                data-lpignore="true"
+                                                data-form-type="other"
+                                                data-1p-ignore
                                                 data-row-index="{{ $loop->parent->index }}"
                                                 data-col-index="{{ $loop->index }}"
                                                 data-original-value="{{ $value }}"
@@ -2903,6 +2927,52 @@ document.addEventListener('DOMContentLoaded', function () {
 
     buildEditableGrid();
     updateLiveFormulas();
+
+    /* ---- Autofill guard, second layer ------------------------------------
+     * autocomplete="off" on the form and on every cell is the fix; this is the
+     * net under it, because a browser is free to ignore that attribute on a
+     * field its heuristics decide to claim.
+     *
+     * The rule is narrow enough to be safe: BEFORE the user has touched the
+     * page at all, no cell value may differ from what the server rendered.
+     * Nothing legitimate writes a cell in that window — the draft restore never
+     * applies on its own, it opens a modal and waits for a click — so any
+     * divergence here is the browser, not a person, and reverting it cannot
+     * discard an edit nobody has had the chance to make yet.
+     *
+     * After the first click or keypress this never runs again, so a real edit
+     * is never second-guessed.
+     */
+    let userHasInteracted = false;
+
+    ['pointerdown', 'keydown'].forEach((type) => {
+        document.addEventListener(type, () => { userHasInteracted = true; }, { capture: true, once: true });
+    });
+
+    function revertUntouchedAutofill() {
+        if (userHasInteracted) return;
+
+        let reverted = 0;
+
+        editableInputs.forEach((input) => {
+            const original = input.dataset.originalValue ?? '';
+
+            if (input.value !== original) {
+                input.value = original;
+                reverted++;
+            }
+        });
+
+        if (reverted > 0) {
+            updateLiveFormulas();
+            // Recomputes the dirty state from scratch, so the sheet stops being
+            // marked changed and the draft this had already written is cleared.
+            markWorksheetChanged();
+            console.warn(`[workspace] Reverted ${reverted} cell(s) the browser filled before the user typed anything.`);
+        }
+    }
+
+    setTimeout(revertUntouchedAutofill, 400);
 
     const globalDocSearch = document.getElementById('globalDocSearch');
     const applySheetSearchButton = document.getElementById('applySheetSearchButton');
