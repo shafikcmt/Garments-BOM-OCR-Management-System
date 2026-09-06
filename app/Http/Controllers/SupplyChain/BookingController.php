@@ -3036,7 +3036,7 @@ BIN: 005635381-0406 TIN: 780096271681",
 
     protected function requestHasBookingEdits(Request $request): bool
     {
-        foreach (['booking', 'items', 'notes', 'common_instruction_ids', 'new_instruction', 'save_new_instruction'] as $key) {
+        foreach (['booking', 'items', 'notes', 'common_instruction_ids', 'save_suggestion'] as $key) {
             if ($request->has($key)) {
                 return true;
             }
@@ -3054,8 +3054,11 @@ BIN: 005635381-0406 TIN: 780096271681",
             'notes' => ['nullable', 'array'],
             'common_instruction_ids' => ['nullable', 'array'],
             'common_instruction_ids.*' => ['integer'],
-            'new_instruction' => ['nullable', 'string', 'max:1000'],
-            'save_new_instruction' => ['nullable', 'boolean'],
+            // One tick per instruction row, keyed by the same index as notes[].
+            // Replaces the old single new_instruction / save_new_instruction
+            // pair, which could only ever carry one line.
+            'save_suggestion' => ['nullable', 'array'],
+            'save_suggestion.*' => ['nullable', 'boolean'],
         ]);
     }
 
@@ -3064,10 +3067,12 @@ BIN: 005635381-0406 TIN: 780096271681",
         $data = $this->bookingData($bookingPo);
         $bookingInput = $validated['booking'] ?? [];
         $itemsInput = array_values($validated['items'] ?? []);
-        $notesInput = collect($validated['notes'] ?? [])
+        // Keys are kept here so each row can be paired with its own
+        // save_suggestion tick; the PO's own list is re-indexed further down.
+        $keyedNotes = collect($validated['notes'] ?? [])
             ->map(fn ($note) => $this->cleanText($note))
-            ->filter()
-            ->values();
+            ->filter();
+        $notesInput = $keyedNotes->values();
 
         foreach ($this->bookingScalarKeys() as $key) {
             if (array_key_exists($key, $bookingInput)) {
@@ -3089,16 +3094,20 @@ BIN: 005635381-0406 TIN: 780096271681",
             $validated['common_instruction_ids'] ?? [],
             $this->instructionBuyerIdForBooking($bookingPo, $data)
         );
-        $newInstructionText = $this->cleanText($validated['new_instruction'] ?? '');
+        // Any instruction row the user ticked "save as suggestion" on also joins
+        // the shared library. saveCommonInstruction() matches on normalised text,
+        // so re-ticking an existing line adds nothing.
+        $saveFlags = collect($validated['save_suggestion'] ?? []);
 
-        if ($newInstructionText && $request?->boolean('save_new_instruction')) {
-            $this->saveCommonInstruction($newInstructionText);
+        foreach ($keyedNotes as $noteKey => $noteText) {
+            if (filter_var($saveFlags->get($noteKey), FILTER_VALIDATE_BOOLEAN)) {
+                $this->saveCommonInstruction($noteText);
+            }
         }
 
-        if (array_key_exists('notes', $validated) || ! empty($selectedInstructionTexts) || $newInstructionText) {
+        if (array_key_exists('notes', $validated) || ! empty($selectedInstructionTexts)) {
             $data['notes'] = collect($selectedInstructionTexts)
                 ->merge($notesInput)
-                ->when($newInstructionText, fn ($notes) => $notes->push($newInstructionText))
                 ->filter()
                 ->unique(fn ($note) => $this->normalize($note))
                 ->values()

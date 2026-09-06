@@ -470,7 +470,25 @@
     }
     .booking-format-preview-box .booking-preview-edit-panel .form-check-label { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 600; }
     .booking-format-preview-box .booking-preview-note-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
-    .booking-format-preview-box .booking-preview-note-row textarea { flex: 1; }
+    .booking-format-preview-box .booking-preview-note-row textarea { flex: 1; width: 100%; }
+    .booking-format-preview-box .bp-note-body { flex: 1; min-width: 0; }
+    /* Opt-in on a NEW line only: keep this wording in the shared library so the
+       next booking can tick it from the suggestion list. Overrides the panel's
+       uppercase micro-label rule, which is for field captions, not a sentence
+       the user has to read. */
+    .booking-format-preview-box .booking-preview-edit-panel label.bp-note-save {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin: 6px 0 0;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--po-muted, #5B7383);
+        cursor: pointer;
+    }
+    .booking-format-preview-box .bp-note-save input { margin: 0; flex: 0 0 auto; }
 
     /* Tracks the sheet, same as the edit panel, so the whole column shares one
        pair of edges. */
@@ -699,7 +717,17 @@
             {{-- Section 3 of 3. --}}
             <div class="bp-section">
             <div class="bp-section-head">Instructions</div>
+            @php
+                // The tick list is filtered to this PO's buyer AND to instructions
+                // not already on the PO, so on a fresh preview it is usually empty
+                // — every default is already under Current Instructions. An empty
+                // box with a paragraph explaining why it is empty is clutter on a
+                // panel that is already dense, so the whole column is dropped and
+                // Current Instructions takes the full width instead.
+                $hasSuggestions = count($instructionOptions) > 0;
+            @endphp
             <div class="row g-3">
+                @if($hasSuggestions)
                 <div class="col-md-5">
                     <label class="form-label">Add extra suggested instructions</label>
                     {{-- A TICK LIST, not a <select multiple>. The old control clipped
@@ -708,49 +736,46 @@
                          non-technical staff. Same field name and same values, so
                          the submitted payload is identical. --}}
                     <div class="bp-subcard bp-scroll">
-                        @forelse($instructionOptions as $instruction)
+                        @foreach($instructionOptions as $instruction)
                             <label class="bp-check">
                                 <input type="checkbox" class="form-check-input" name="common_instruction_ids[]" value="{{ $instruction->id }}">
                                 <span>{{ $instruction->instruction }}</span>
                             </label>
-                        @empty
-                            {{-- The list is now filtered two ways — to this PO's buyer, and to
-                                 instructions not already in Current Instructions — so "none
-                                 configured" is the wrong thing to say. On a fresh preview every
-                                 default is already on the PO, which is exactly when this shows. --}}
-                            <div class="form-text mb-0">Nothing more to add — every instruction for this buyer is already listed under Current Instructions.</div>
-                        @endforelse
+                        @endforeach
                     </div>
                     <div class="form-text">Tick any suggestion to add it to this booking. Shows global instructions plus this buyer's own. Admin manages this list.</div>
                 </div>
-                <div class="col-md-7">
+                @endif
+                <div class="{{ $hasSuggestions ? 'col-md-7' : 'col-12' }}">
                     <label class="form-label">Current instructions</label>
+                    {{-- ONE way to add a line. There used to be a second "New
+                         Instruction" box below with its own save-as-suggestion
+                         checkbox; it did exactly what a blank row here does, minus
+                         being able to add more than one, so the checkbox moved onto
+                         the row and the duplicate box is gone. --}}
                     <div class="bp-subcard">
-                        <div class="booking-preview-notes-list">
+                        <div class="booking-preview-notes-list" data-next-index="{{ max(count($notes), 1) }}">
                             @forelse($notes as $note)
                                 <div class="booking-preview-note-row">
                                     <span class="bp-note-index" aria-hidden="true">{{ $loop->iteration }}</span>
-                                    <textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text">{{ $note }}</textarea>
+                                    <div class="bp-note-body">
+                                        <textarea name="notes[{{ $loop->index }}]" rows="2" class="form-control" placeholder="Instruction text">{{ $note }}</textarea>
+                                    </div>
                                     <button type="button" class="bp-remove booking-preview-remove-note"><i class="bi bi-x-lg" aria-hidden="true"></i>Remove</button>
                                 </div>
                             @empty
                                 <div class="booking-preview-note-row">
                                     <span class="bp-note-index" aria-hidden="true">1</span>
-                                    <textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea>
+                                    <div class="bp-note-body">
+                                        <textarea name="notes[0]" rows="2" class="form-control" placeholder="Instruction text"></textarea>
+                                    </div>
                                     <button type="button" class="bp-remove booking-preview-remove-note"><i class="bi bi-x-lg" aria-hidden="true"></i>Remove</button>
                                 </div>
                             @endforelse
                         </div>
                         <button type="button" class="btn btn-outline-primary btn-sm booking-preview-add-note mt-1"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Instruction Line</button>
                     </div>
-                </div>
-                <div class="col-12">
-                    <label class="form-label">New Instruction</label>
-                    <textarea name="new_instruction" rows="2" class="form-control" placeholder="Write a new instruction to add with this booking"></textarea>
-                    <div class="form-check mt-2">
-                        <input class="form-check-input" type="checkbox" value="1" name="save_new_instruction" id="saveNewInstruction{{ $previewFormUid }}">
-                        <label class="form-check-label" for="saveNewInstruction{{ $previewFormUid }}">Save this new instruction as an extra suggestion for future bookings</label>
-                    </div>
+                    <div class="form-text">Edit any line, or add one. Tick <strong>Save as suggestion</strong> on a new line to keep it in the list Admin manages for future bookings.</div>
                 </div>
             </div>{{-- /.row --}}
             </div>{{-- /.bp-section Instructions --}}

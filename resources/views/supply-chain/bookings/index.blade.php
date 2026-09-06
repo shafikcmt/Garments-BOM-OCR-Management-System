@@ -1432,17 +1432,33 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
+        // A new line carries its own "save as suggestion" tick — the one thing
+        // the removed separate "New Instruction" box could do that an inline row
+        // could not. The name index comes from a counter rather than the row
+        // position, so removing a row never re-points a tick at another line.
+        function buildNoteRow(list) {
+            const i = Number(list.dataset.nextIndex || 0);
+            list.dataset.nextIndex = i + 1;
+            const row = document.createElement('div');
+            row.className = 'booking-preview-note-row';
+            // Must match the server-rendered row in preview.blade.php:
+            // numbered chip, textarea, quiet Remove pill.
+            row.innerHTML =
+                '<span class="bp-note-index" aria-hidden="true"></span>'
+                + '<div class="bp-note-body">'
+                + '<textarea name="notes[' + i + ']" rows="2" class="form-control" placeholder="Instruction text"></textarea>'
+                + '<label class="bp-note-save"><input type="checkbox" class="form-check-input" name="save_suggestion[' + i + ']" value="1"> Save as suggestion for future bookings</label>'
+                + '</div>'
+                + '<button type="button" class="bp-remove booking-preview-remove-note"><i class="bi bi-x-lg" aria-hidden="true"></i>Remove</button>';
+            return row;
+        }
+
         const addNoteBtn = event.target.closest('.booking-preview-add-note');
         if (addNoteBtn) {
             const panel = addNoteBtn.closest('.booking-preview-edit-panel');
             const list = panel?.querySelector('.booking-preview-notes-list');
             if (list) {
-                const row = document.createElement('div');
-                row.className = 'booking-preview-note-row';
-                // Must match the server-rendered row in preview.blade.php:
-                // numbered chip, textarea, quiet Remove pill.
-                row.innerHTML = '<span class="bp-note-index" aria-hidden="true"></span><textarea name="notes[]" rows="2" class="form-control" placeholder="Instruction text"></textarea><button type="button" class="bp-remove booking-preview-remove-note"><i class="bi bi-x-lg" aria-hidden="true"></i>Remove</button>';
-                list.appendChild(row);
+                list.appendChild(buildNoteRow(list));
                 renumberNotes(list);
             }
             return;
@@ -1458,6 +1474,8 @@ document.addEventListener('DOMContentLoaded', function () {
             } else if (row) {
                 const textarea = row.querySelector('textarea');
                 if (textarea) textarea.value = '';
+                const save = row.querySelector('.bp-note-save input');
+                if (save) save.checked = false;
             }
             return;
         }

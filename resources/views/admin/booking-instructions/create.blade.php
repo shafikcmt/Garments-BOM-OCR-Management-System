@@ -25,7 +25,7 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);max-width:720px;">
+    <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);max-width:860px;">
         <div class="card-body p-4">
             <form method="POST" action="{{ route('admin.booking-instructions.store') }}">
                 @csrf
