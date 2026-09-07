@@ -3,7 +3,14 @@
     $workspaceLockUsers = $workspaceLockUsers ?? collect();
     $authUser = auth()->user();
     $canLockFiles = $authUser?->hasRole('admin');
-    $canDeleteFiles = $authUser?->hasRole('admin') || $authUser?->hasRole('merchant');
+
+    // Role half of the Delete gate only. This list used to stop here, which
+    // made it weaker than the file page and than destroy() itself: a merchant
+    // saw a live red Delete on a file the admin lock or the buyer lock had
+    // already made read-only for them. Pressing it earned a 403. The two
+    // per-file lock checks are applied inside the row loop below, so the gate
+    // here now matches $canDeleteFile in ExcelFileController::show() exactly.
+    $canDeleteFilesByRole = $authUser?->hasRole('admin') || $authUser?->hasRole('merchant');
 
     // Resolved by ExcelFileSummaryService in the controller. Falling back to
     // resolving it here would reintroduce the cell-hydration cost this replaced,
@@ -102,6 +109,13 @@
                         $status = strtolower($file->status ?? 'pending');
                         $isFileLocked = (bool) ($file->is_locked ?? false);
                         $isLockedForCurrentUser = $file->isLockedForUser($authUser);
+                        $isBuyerLockedForCurrentUser = $file->isBuyerLockedForUser($authUser);
+
+                        // Same three conditions destroy() enforces, in the same
+                        // order: the role, the admin lock, the buyer lock.
+                        $canDeleteThisFile = $canDeleteFilesByRole
+                            && ! $isLockedForCurrentUser
+                            && ! $isBuyerLockedForCurrentUser;
 
                         $statusClass = match($status) {
                             'pending' => 'warning',
@@ -173,14 +187,18 @@
                                     </button>
                                 @endif
 
-                                @if($canDeleteFiles)
+                                @if($canDeleteThisFile)
+                                    {{-- data-file-delete-form carries the id so
+                                         the handler below can drop this file's
+                                         unsaved-draft key on the way out. --}}
                                     <form action="{{ route('uploaded-files.destroy', $file->id) }}"
                                           method="POST"
-                                          onsubmit="return confirm('Are you sure you want to delete this file? This will remove the uploaded file and all worksheet rows.');">
+                                          data-file-delete-form
+                                          data-file-id="{{ $file->id }}">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-danger">
-                                            Delete
+                                            <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
                                         </button>
                                     </form>
                                 @endif
@@ -314,4 +332,32 @@
             </div>
         </div>
     @endforeach
+@endif
+
+@if($canDeleteFilesByRole)
+    {{-- Delete used to sit on the file page, where submitting it also cleared
+         that file's unsaved-draft key from localStorage. The button moved here,
+         so the clearing moves with it — otherwise a draft would outlive the
+         file it belongs to and be offered back on the next file to take that
+         id. Delegated, so it covers every row including any added later. --}}
+    <script>
+    document.addEventListener('submit', function (event) {
+        const form = event.target.closest('[data-file-delete-form]');
+
+        if (! form) {
+            return;
+        }
+
+        if (! window.confirm('Are you sure you want to delete this file? This will remove the uploaded file and all worksheet rows.')) {
+            event.preventDefault();
+            return;
+        }
+
+        try {
+            localStorage.removeItem(`excel_draft_user_{{ auth()->id() }}_file_${form.dataset.fileId}`);
+        } catch (e) {
+            // Private mode or a full quota — the delete itself still proceeds.
+        }
+    });
+    </script>
 @endif

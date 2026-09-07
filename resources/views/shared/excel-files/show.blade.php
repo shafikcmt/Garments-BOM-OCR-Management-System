@@ -1361,12 +1361,6 @@
         </form>
     @endif
 
-    @if($canDeleteFile ?? false)
-        <form method="POST" action="{{ route('uploaded-files.destroy', $excelFile->id) }}" id="delete-file-form" class="d-none">
-            @csrf
-            @method('DELETE')
-        </form>
-    @endif
 
     <div class="order-summary-card mb-2">
         <div class="order-summary-top">
@@ -1418,14 +1412,6 @@
                     </a>
                 @endif
 
-                {{-- Hidden on a file this user may not act on, alongside
-                     Delete: printing another buyer's order sheet is not an
-                     action a view-only visitor has any business taking. --}}
-                @if($canPrintFile ?? true)
-                    <button type="button" class="btn btn-outline-secondary btn-sm" style="min-height:32px;font-size:12px;"
-                            onclick="window.print()"><i class="bi bi-printer" aria-hidden="true"></i><span class="ms-1">Print</span></button>
-                @endif
-
                 {{-- The panel below names staff and shows the edit timeline, so
                      it is withheld on a locked file. The controller does not
                      load $activityLog at all in that case — this only hides the
@@ -1438,9 +1424,12 @@
                     </button>
                 @endif
 
-                @if($canDeleteFile ?? false)
-                    <button type="submit" form="delete-file-form" class="btn btn-outline-danger btn-sm" style="min-height:32px;font-size:12px;" onclick="return confirm('Are you sure you want to delete this file?');"><i class="bi bi-trash" aria-hidden="true"></i><span class="ms-1">Delete</span></button>
-                @endif
+                {{-- Delete is deliberately absent here. It now lives only in
+                     the Existing Files list, so removing a whole order is a
+                     decision taken from the list of orders rather than a red
+                     button sitting beside Back on the sheet you are editing.
+                     $canDeleteFile is still resolved by the controller and
+                     destroy() still enforces the same three checks. --}}
             </div>
         </div>
         <div class="order-summary-grid">
@@ -2004,7 +1993,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('excelFileForm');
     const addRowForm = document.getElementById('add-row-form');
     const addRowButton = document.getElementById('addRowButton');
-    const deleteFileForm = document.getElementById('delete-file-form');
     const editableInputs = Array.from(document.querySelectorAll('.excel-editable-cell'));
     const successAlert = document.getElementById('pageSuccessAlert');
 
@@ -3696,11 +3684,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    if (deleteFileForm) {
-        deleteFileForm.addEventListener('submit', function () {
-            clearDraft();
-        });
-    }
 
     if (successAlert) {
         setTimeout(() => {

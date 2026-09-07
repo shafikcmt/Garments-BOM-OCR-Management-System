@@ -141,10 +141,11 @@ it('hides the Delete and Print buttons on a foreign buyer file', function () {
     $response->assertViewHas('canDeleteFile', false);
     $response->assertViewHas('canPrintFile', false);
 
-    // The Delete BUTTON specifically. The id 'delete-file-form' also appears in
-    // a getElementById lookup that is always rendered, so asserting on the bare
-    // id would pass or fail for the wrong reason; `form="delete-file-form"` is
-    // the submit button's own attribute and nothing else carries it.
+    // The Delete BUTTON specifically. Neither the button nor the hidden form it
+    // submitted is on this page any more — Delete moved to the Existing Files
+    // list — so this now holds for every user. It is kept because the view flag
+    // above is what the list reads, and a regression that put a Delete back on
+    // this page would have to answer for it here.
     $response->assertDontSee('form="delete-file-form"', false);
     $response->assertDontSee('window.print()', false);
 
@@ -152,7 +153,25 @@ it('hides the Delete and Print buttons on a foreign buyer file', function () {
     $response->assertViewHas('isBuyerLockedForUser', true);
 });
 
-it('still lets the files own buyer team delete and print it', function () {
+/**
+ * Print was removed outright and Delete was moved to the Existing Files list,
+ * so the file page offers neither — not even to the buyer's own team, who may
+ * still do both. The permission flags are untouched; only the buttons are gone.
+ */
+it('offers neither Print nor Delete on the file page itself', function () {
+    $insider = lfUser('merchant', [$this->annTaylor->id]);
+
+    $response = $this->actingAs($insider)
+        ->get(route('uploaded-files.show', $this->file->id))
+        ->assertOk()
+        ->assertViewHas('canDeleteFile', true);
+
+    $response->assertDontSee('window.print()', false)
+        ->assertDontSee('form="delete-file-form"', false)
+        ->assertDontSee('id="delete-file-form"', false);
+});
+
+it('still lets the files own buyer team delete it, from wherever it is offered', function () {
     // A lock that refuses everyone is not a fix.
     $insider = lfUser('merchant', [$this->annTaylor->id]);
 

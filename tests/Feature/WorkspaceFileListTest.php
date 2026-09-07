@@ -163,3 +163,56 @@ it('offers export but never a bulk delete', function () {
     // action.
     $response->assertDontSee('data-file-bulk-delete', false);
 });
+
+/**
+ * Delete now lives only in this list, and its gate here has to be the same one
+ * destroy() enforces. It used to be role-only, which meant a merchant was shown
+ * a live red Delete on a file either lock had already made read-only for them.
+ *
+ * These assert on the ROW's own delete form, not the bare marker: the delegated
+ * handler at the foot of the partial also mentions `data-file-delete-form` in
+ * its selector, so asserting on that alone would pass for the wrong reason.
+ * `data-file-id="N"` is carried by the row form and by nothing else.
+ */
+function deleteFormFor(ExcelFile $file): string
+{
+    return 'data-file-id="'.$file->id.'"';
+}
+
+it('offers Delete in the list to a role that may delete', function () {
+    $file = fileWithRows(['Buyer Name' => 'Buyer A']);
+
+    $this->actingAs(workspaceUser('merchant'))
+        ->get(route('merchant.workspace'))
+        ->assertOk()
+        ->assertSee(deleteFormFor($file), false);
+});
+
+it('withholds Delete from a role that may not delete', function () {
+    $file = fileWithRows(['Buyer Name' => 'Buyer A']);
+
+    $this->actingAs(workspaceUser('commercial'))
+        ->get(route('commercial.workspace'))
+        ->assertOk()
+        ->assertDontSee(deleteFormFor($file), false);
+});
+
+it('withholds Delete on a file the admin lock has made read-only', function () {
+    $file = fileWithRows(['Buyer Name' => 'Buyer A']);
+
+    $file->update([
+        'is_locked' => true,
+        'lock_scope' => 'all_users',
+    ]);
+
+    $user = workspaceUser('merchant');
+
+    // The gate on the list and the server must now agree. Before this change
+    // the row still rendered a live red Delete here and destroy() answered 403.
+    expect($file->fresh()->isLockedForUser($user))->toBeTrue();
+
+    $this->actingAs($user)
+        ->get(route('merchant.workspace'))
+        ->assertOk()
+        ->assertDontSee(deleteFormFor($file), false);
+});
