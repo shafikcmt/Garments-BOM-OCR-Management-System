@@ -806,38 +806,77 @@
         box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
 
+    /* ==== WORKSHEET TOOLBAR =============================================
+     * The grid below was retoned onto the module tokens in an earlier pass;
+     * this bar was the block left on hardcoded hex, which is why it read as
+     * flatter than everything around it. Same aliasing pattern as the Order
+     * Information boxes and the Add New Order dialog: import the palette,
+     * keep literal fallbacks for screens without the theme partial.
+     *
+     * Nothing here touches the grid — the sticky ladder (z-index 2/3/4), the
+     * filter row's top:46px offset and the min-width rules are all below and
+     * untouched.
+     */
     .server-search-bar {
+        --tb-blue: var(--po-blue, #006C9D);
+        --tb-ink: var(--po-ink, #0B2B3C);
+        --tb-muted: var(--po-muted, #5B7383);
+        --tb-line: var(--po-line, #D7E3ED);
+        --tb-line-soft: var(--po-line-soft, #EEF3F8);
+
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
         padding: 10px 14px;
+        /* The tint the original rule asked for. It was overridden by a
+           `background: #ffffff` on the very next line, so the bar had been
+           rendering flat white and sitting on the grid with no separation. */
         background: var(--po-paper, #F6F9FC);
-        border-bottom: 1px solid var(--po-line-soft, #EEF3F8);
-        border-top: 1px solid #edf2f7;
-        background: #ffffff;
+        border-top: 1px solid var(--tb-line-soft, #EEF3F8);
+        border-bottom: 1px solid var(--tb-line, #D7E3ED);
     }
 
     .server-search-left {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 5px;
+        gap: 6px;
+    }
+
+    /* One height and one radius for every control on this bar, matching the
+       Order Information controls above it. */
+    .server-search-bar .form-control,
+    .server-search-bar .form-select,
+    .server-search-bar .btn {
+        height: 28px;
+        min-height: 28px;
+        font-size: 12px;
+        border-radius: var(--po-r-control, 10px);
+        padding-top: 0;
+        padding-bottom: 0;
+        display: inline-flex;
+        align-items: center;
     }
 
     .server-search-input {
         width: min(280px, 60vw);
-        height: 30px;
-        font-size: 12px;
-        border-radius: 7px;
-        border: 1px solid #dbe4ef;
+        border: 1px solid var(--tb-line, #D7E3ED);
+        color: var(--tb-ink, #0B2B3C);
+        background: #fff;
+    }
+
+    .server-search-bar .form-control:focus,
+    .server-search-bar .form-select:focus {
+        border-color: var(--tb-blue, #006C9D);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
 
     .search-help-text {
         font-size: 10px;
-        color: #94a3b8;
-        font-weight: 600;
+        color: var(--tb-muted, #5B7383);
+        font-weight: 700;
     }
 
     .header-find-tools {
@@ -845,44 +884,98 @@
         flex-wrap: wrap;
         align-items: center;
         justify-content: flex-end;
-        gap: 5px;
+        gap: 6px;
         margin-left: auto;
+        /* Reads as its own cluster rather than more controls in a row. */
+        padding-left: 12px;
+        border-left: 1px solid var(--tb-line, #D7E3ED);
     }
 
     .header-find-label {
         font-size: 10px;
         font-weight: 800;
-        color: #64748b;
+        color: var(--tb-muted, #5B7383);
         text-transform: uppercase;
         letter-spacing: .04em;
     }
 
-    .header-find-input,
     .header-find-select {
-        height: 30px;
-        border-radius: 7px;
-        border: 1px solid #dbe4ef;
+        width: min(240px, 54vw);
+        border: 1px solid var(--tb-line, #D7E3ED);
+        color: var(--tb-ink, #0B2B3C);
+        background: #fff;
+    }
+
+    /* Tom Select builds its own control, so the bar's sizing is restated for
+       it — same as the Order Information boxes. */
+    .header-find-tools .ts-wrapper {
+        width: min(240px, 54vw);
+        min-height: 28px;
+    }
+
+    .header-find-tools .ts-wrapper .ts-control {
+        min-height: 28px;
+        height: 28px;
         font-size: 12px;
-        color: #334155;
+        padding: 0 22px 0 8px;
+        border-radius: var(--po-r-control, 10px);
+        border: 1px solid var(--tb-line, #D7E3ED);
+        color: var(--tb-ink, #0B2B3C);
+        line-height: 26px;
+        box-shadow: none;
     }
 
-    .header-find-input {
-        width: min(180px, 46vw);
+    .header-find-tools .ts-wrapper.dropdown-active .ts-control,
+    .header-find-tools .ts-wrapper.focus .ts-control {
+        border-color: var(--tb-blue, #006C9D);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
 
-    .header-find-select {
-        width: min(210px, 54vw);
+    /* Parented to <body> (see the JS), so it is styled from the root rather
+       than from inside .header-find-tools. z-index clears the sticky header
+       band below. */
+    .header-find-dropdown {
+        z-index: 2000;
+        font-size: 12px;
+        border: 1px solid var(--tb-line, #D7E3ED);
+        border-radius: var(--po-r-control, 10px);
+        box-shadow: var(--po-shadow, 0 14px 34px rgba(11, 43, 60, .06));
+        margin-top: 4px;
     }
 
+    .header-find-dropdown .ts-dropdown-content {
+        max-height: 300px;
+        padding: 4px;
+    }
+
+    .header-find-dropdown .option {
+        border-radius: 7px;
+        padding: 6px 8px;
+        color: var(--tb-ink, #0B2B3C);
+    }
+
+    .header-find-dropdown .option.active {
+        background: var(--tb-blue, #006C9D);
+        color: #fff;
+    }
+
+    .header-find-dropdown .no-results {
+        padding: 8px;
+        color: var(--tb-muted, #5B7383);
+    }
+
+    /* Re-pointed at the module blue. This was #2563eb — a different blue from
+       every other accent on the page, so the "you jumped here" highlight was
+       the one thing on screen not speaking the module's palette. */
     .active-header-column {
         position: relative;
-        box-shadow: inset 0 0 0 2px #2563eb !important;
-        background-color: #eff6ff !important;
+        box-shadow: inset 0 0 0 2px var(--po-blue, #006C9D) !important;
+        background-color: var(--po-tint, #E0F2FE) !important;
     }
 
     .active-header-column input,
     .active-header-column .excel-readonly-cell {
-        border-color: #2563eb !important;
+        border-color: var(--po-blue, #006C9D) !important;
         background: #ffffff !important;
     }
 
@@ -1819,7 +1912,10 @@
                         placeholder="Search entire document, then press Enter"
                         autocomplete="off"
                     >
-                    <button type="button" class="btn btn-outline-primary btn-sm" id="applySheetSearchButton">
+                    {{-- Solid rather than outlined: it is the one action on
+                         this bar that answers the question the user came here
+                         with, and it sat at the same weight as Clear. --}}
+                    <button type="button" class="btn btn-primary btn-sm" id="applySheetSearchButton">
                         Search
                     </button>
                     @if($globalSearchValue || count($filterValues))
@@ -1835,26 +1931,24 @@
                 </div>
                 <div class="header-find-tools">
                     <span class="header-find-label">Header Finder</span>
-                    <input
-                        type="text"
-                        id="headerQuickFind"
-                        class="form-control form-control-sm header-find-input"
-                        list="headerQuickFindList"
-                        placeholder="Type header name..."
-                        autocomplete="off"
-                    >
-                    <datalist id="headerQuickFindList">
-                        @foreach($headers as $header)
-                            <option value="{{ $header->header_name }}">{{ ucfirst(str_replace('_', ' ', optional($header->ownerRole)->name ?? 'N/A')) }}</option>
-                        @endforeach
-                    </datalist>
-                    <select id="headerJumpSelect" class="form-select form-select-sm header-find-select">
-                        <option value="">Select header to find/edit</option>
+                    {{-- One control, not two. This used to be a text box with
+                         its own datalist AND this dropdown, each able to jump
+                         on its own. They were not a combo box: the text box
+                         never narrowed the dropdown. Worse, the Find handler
+                         read `selected || typed`, and the dropdown's value was
+                         never cleared — so after picking once from the list,
+                         typing a different header and pressing Find silently
+                         took you back to the dropdown's stale choice. A single
+                         searchable dropdown is both halves of what those two
+                         boxes were splitting, and the precedence bug cannot be
+                         written again. Selecting jumps, so Find is gone too. --}}
+                    <select id="headerJumpSelect" class="form-select form-select-sm header-find-select"
+                            aria-label="Find a column by name">
+                        <option value="">Search headers…</option>
                         @foreach($headers as $header)
                             <option value="{{ $header->id }}">{{ $header->header_name }} — {{ ucfirst(str_replace('_', ' ', optional($header->ownerRole)->name ?? 'N/A')) }}</option>
                         @endforeach
                     </select>
-                    <button type="button" class="btn btn-outline-primary btn-sm" id="headerFindButton">Find</button>
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="jumpToMyColumnsButton">My Columns</button>
                 </div>
 
@@ -2219,9 +2313,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const currentUserRoleSlugs = @json($currentUserRoleSlugs);
     const shouldAutoScrollToUserColumns = @json($shouldAutoScrollToUserColumns);
 
-    const headerQuickFind = document.getElementById('headerQuickFind');
     const headerJumpSelect = document.getElementById('headerJumpSelect');
-    const headerFindButton = document.getElementById('headerFindButton');
     const jumpToMyColumnsButton = document.getElementById('jumpToMyColumnsButton');
 
     const draftModal = document.getElementById('draftRestoreModal');
@@ -2265,14 +2357,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function normalizeSearchText(value) {
-        return String(value ?? '')
-            .toLowerCase()
-            .replace(/[_\-]+/g, ' ')
-            .replace(/[^a-z0-9]+/g, ' ')
-            .trim();
-    }
-
     function headerIndexById(headerId) {
         const id = Number(headerId);
         return sheetHeaders.findIndex(header => Number(header.id) === id);
@@ -2281,19 +2365,6 @@ document.addEventListener('DOMContentLoaded', function () {
     function headerById(headerId) {
         const index = headerIndexById(headerId);
         return index >= 0 ? sheetHeaders[index] : null;
-    }
-
-    function findHeaderByName(query) {
-        const normalized = normalizeSearchText(query);
-
-        if (normalized === '') {
-            return null;
-        }
-
-        return sheetHeaders.find(header => normalizeSearchText(header.header_name) === normalized)
-            || sheetHeaders.find(header => normalizeSearchText(header.header_key) === normalized)
-            || sheetHeaders.find(header => normalizeSearchText(header.header_name).includes(normalized))
-            || sheetHeaders.find(header => normalizeSearchText(header.header_key).includes(normalized));
     }
 
     function clearActiveHeaderColumn() {
@@ -2332,8 +2403,17 @@ document.addEventListener('DOMContentLoaded', function () {
             localStorage.setItem(searchColumnStorageKey, String(index + 1));
         }
 
+        /* Keep the finder showing the column we actually landed on, including
+         * when we got here from My Columns or the auto-scroll rather than from
+         * the dropdown. Silent, and Tom Select ignores a write to .value once
+         * it has taken the element over, so it has to be told directly —
+         * otherwise the control keeps displaying the previous choice. */
         if (headerJumpSelect) {
-            headerJumpSelect.value = String(header.id);
+            if (headerJumpSelect.tomselect) {
+                headerJumpSelect.tomselect.setValue(String(header.id), true);
+            } else {
+                headerJumpSelect.value = String(header.id);
+            }
         }
 
         if (focusFirstEditable) {
@@ -2356,20 +2436,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function scrollToHeaderFromFinder() {
-        const selectedHeader = headerJumpSelect && headerJumpSelect.value ? headerById(headerJumpSelect.value) : null;
-        const typedHeader = headerQuickFind ? findHeaderByName(headerQuickFind.value) : null;
-        const targetHeader = selectedHeader || typedHeader;
-
-        if (!targetHeader) {
-            if (headerQuickFind) {
-                headerQuickFind.focus();
-            }
-            return;
-        }
-
-        scrollToHeader(targetHeader, true);
-    }
 
     function firstHeaderForCurrentUser() {
         const roles = Array.isArray(currentUserRoleSlugs) ? currentUserRoleSlugs : [];
@@ -3413,32 +3479,44 @@ document.addEventListener('DOMContentLoaded', function () {
     }, true);
 
     if (headerJumpSelect) {
+        /* Choosing a column IS the jump — there is no Find button to press any
+         * more, exactly as choosing a style in the Order Information header
+         * filters the sheet on its own. */
         headerJumpSelect.addEventListener('change', function () {
             const header = headerById(this.value);
 
             if (header) {
-                if (headerQuickFind) {
-                    headerQuickFind.value = header.header_name || '';
-                }
-
                 scrollToHeader(header, true);
             }
         });
-    }
 
-    if (headerFindButton) {
-        headerFindButton.addEventListener('click', scrollToHeaderFromFinder);
-    }
-
-    if (headerQuickFind) {
-        headerQuickFind.addEventListener('keydown', function (event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                scrollToHeaderFromFinder();
-            }
-        });
-
-        headerQuickFind.addEventListener('change', scrollToHeaderFromFinder);
+        /* Searchable, because this list is 129 columns long and scrolling a
+         * native select to "Order To Be Placed By" is the reason the old text
+         * box existed. Same options as every other Tom Select on this page.
+         * Guarded on window.TomSelect: a failed CDN leaves a plain <select>
+         * that still jumps through the same change handler. */
+        if (window.TomSelect) {
+            new TomSelect(headerJumpSelect, {
+                allowEmptyOption: true,
+                placeholder: 'Search headers…',
+                searchField: ['text'],
+                maxOptions: null,
+                /* Same reason as the Order Information dropdowns: this bar sits
+                 * inside .excel-work-card, which is overflow:hidden for its
+                 * corners. On this file the card is tall enough that a 303px
+                 * panel happens to fit inside it — but on a file with a handful
+                 * of rows the card is short, and the panel would be clipped by
+                 * it exactly as the header ones were. Parenting to <body> means
+                 * that never depends on how many rows the file has. */
+                dropdownParent: 'body',
+                dropdownClass: 'ts-dropdown header-find-dropdown',
+                render: {
+                    no_results: function () {
+                        return '<div class="no-results">No column matches that name</div>';
+                    }
+                }
+            });
+        }
     }
 
     if (jumpToMyColumnsButton) {
