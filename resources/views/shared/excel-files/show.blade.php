@@ -17,12 +17,25 @@
 
 @section('content')
 @php
+    // Each entry is the field's own distribution, not a bare string — see
+    // ExcelFileController::buildOrderInfo(). A box with one distinct value
+    // renders as it always did; one with several renders a count and a filter,
+    // because the first row's value does not speak for the whole file.
+    $blankOrderInfoBox = [
+        'value' => '',
+        'header_id' => null,
+        'options' => [],
+        'distinct' => 0,
+        'noun' => '',
+        'filter_value' => '',
+    ];
+
     $orderInfo = $orderInfo ?? [
-        'Buyer Name' => '-',
-        'Season Name' => '-',
-        'Style Name' => '-',
-        'Contract Number' => '-',
-        'Contract Shipment Date' => '-',
+        'Buyer Name' => $blankOrderInfoBox,
+        'Season Name' => $blankOrderInfoBox,
+        'Style Name' => $blankOrderInfoBox,
+        'Contract Number' => $blankOrderInfoBox,
+        'Contract Shipment Date' => $blankOrderInfoBox,
     ];
 
     $updateQueryString = http_build_query(request()->only('page', 'per_page', 'search', 'filters'));
@@ -400,13 +413,178 @@
         text-overflow: ellipsis;
     }
 
+    /* Matched to .order-info-count-figure below, so a box carries the same
+       visual weight whether it holds one value or a count of many. Before, a
+       12px value sat beside a bolder count and the row read as two different
+       kinds of box. */
     .order-info-value {
-        font-size: 12px;
-        font-weight: 700;
-        color: #0f172a;
+        font-size: 15px;
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -.01em;
+        color: var(--oi-ink, #0B2B3C);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    /* The module palette, imported rather than re-picked — same approach the
+       Add New Order dialog above takes, so these boxes stay part of the PO
+       module's system instead of becoming a second one. Literal fallbacks keep
+       them correct on screens where the theme partial is not loaded. */
+    .order-summary-grid,
+    .order-info-dropdown {
+        --oi-blue: var(--po-blue, #006C9D);
+        --oi-ink: var(--po-ink, #0B2B3C);
+        --oi-muted: var(--po-muted, #5B7383);
+        --oi-line: var(--po-line, #D7E3ED);
+        --oi-line-soft: var(--po-line-soft, #EEF3F8);
+        --oi-paper: var(--po-paper, #F6F9FC);
+    }
+
+    /* The varied-field boxes: a count where the single value used to sit, and
+     * a filter under it. The figure carries the weight and the noun recedes,
+     * so the box reads as "6 — styles" at a glance and still lines up with the
+     * plain bold value in the Buyer Name box beside it. */
+    .order-info-count {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+        margin-bottom: 4px;
+        min-width: 0;
+    }
+
+    .order-info-count-figure {
+        font-size: 15px;
+        font-weight: 800;
+        line-height: 1.1;
+        color: var(--oi-ink, #0B2B3C);
+        letter-spacing: -.01em;
+    }
+
+    .order-info-count-noun {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--oi-muted, #5B7383);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Tom Select replaces the <select> with its own markup, so the compact
+     * sizing has to be restated for the control it builds. */
+    .order-info-box .order-info-filter,
+    .order-info-box .ts-wrapper .ts-control {
+        font-size: 11px;
+        min-height: 28px;
+        padding: 2px 22px 2px 8px;
+        border-radius: var(--po-r-control, 10px);
+        border: 1px solid var(--oi-line, #D7E3ED);
+        background: var(--oi-paper, #F6F9FC);
+        color: var(--oi-ink, #0B2B3C);
+        font-weight: 600;
+        line-height: 22px;
+        box-shadow: none;
+    }
+
+    .order-info-box .ts-wrapper {
+        min-height: 28px;
+    }
+
+    .order-info-box .ts-wrapper.dropdown-active .ts-control,
+    .order-info-box .ts-wrapper.focus .ts-control {
+        border-color: var(--oi-blue, #006C9D);
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
+    }
+
+    /* An applied filter is a state the merchant should be able to see without
+       reading the value: tinted control, not a plain one. */
+    .order-info-box .ts-wrapper.has-items .ts-control {
+        background: #fff;
+        border-color: var(--oi-blue, #006C9D);
+        color: var(--oi-blue, #006C9D);
+    }
+
+    /* ---- The panel itself -------------------------------------------------
+     * Parented to <body> (see the JS), because .order-summary-card is
+     * overflow:hidden and clipped 163 of its 170 pixels. So it is styled from
+     * the root, not from inside .order-info-box. */
+    .order-info-dropdown {
+        font-size: 11px;
+        z-index: 2000;
+        min-width: 210px;
+        border: 1px solid var(--oi-line, #D7E3ED);
+        border-radius: var(--po-r-control, 10px);
+        box-shadow: var(--po-shadow, 0 14px 34px rgba(11, 43, 60, .06));
+        overflow: hidden;
+        margin-top: 4px;
+    }
+
+    .order-info-dropdown .ts-dropdown-content {
+        max-height: 280px;
+        padding: 4px;
+    }
+
+    .order-info-dropdown .option {
+        border-radius: 7px;
+        padding: 0;
+        margin-bottom: 1px;
+    }
+
+    .order-info-dropdown .oi-opt {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 6px 8px;
+        min-width: 0;
+    }
+
+    .order-info-dropdown .oi-opt-name {
+        font-weight: 600;
+        color: var(--oi-ink, #0B2B3C);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* The row count is the reason this list exists — it is what tells the
+       merchant how much of the file each value accounts for. */
+    .order-info-dropdown .oi-opt-count {
+        flex-shrink: 0;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--oi-muted, #5B7383);
+        background: var(--oi-line-soft, #EEF3F8);
+        border-radius: var(--po-r-pill, 999px);
+        padding: 1px 7px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .order-info-dropdown .oi-opt-all {
+        padding: 6px 8px;
+        font-weight: 600;
+        color: var(--oi-muted, #5B7383);
+    }
+
+    .order-info-dropdown .option.active .oi-opt-name,
+    .order-info-dropdown .option.active .oi-opt-all {
+        color: #fff;
+    }
+
+    .order-info-dropdown .option.active {
+        background: var(--oi-blue, #006C9D);
+    }
+
+    .order-info-dropdown .option.active .oi-opt-count {
+        background: rgba(255, 255, 255, .22);
+        color: #fff;
+    }
+
+    .order-info-dropdown .no-results {
+        padding: 8px;
+        color: var(--oi-muted, #5B7383);
     }
 
     /* ==== WORKSHEET SURFACE ==============================================
@@ -1361,7 +1539,6 @@
         </form>
     @endif
 
-
     <div class="order-summary-card mb-2">
         <div class="order-summary-top">
             <div class="order-summary-meta">
@@ -1433,10 +1610,49 @@
             </div>
         </div>
         <div class="order-summary-grid">
-            @foreach($orderInfo as $label => $value)
+            @foreach($orderInfo as $label => $box)
+                @php
+                    $box = is_array($box) ? $box + $blankOrderInfoBox : $blankOrderInfoBox;
+                    $isVaried = $box['header_id'] !== null && count($box['options']) > 1;
+                    $boxId = 'orderInfoFilter' . \Illuminate\Support\Str::slug($label);
+                @endphp
+
                 <div class="order-info-box">
                     <div class="order-info-label">{{ $label }}</div>
-                    <div class="order-info-value" title="{{ $value ?: '-' }}">{{ $value ?: '-' }}</div>
+
+                    @if($isVaried)
+                        {{-- The file carries several of these, so naming one of
+                             them here would describe a fraction of the rows.
+                             The count is the honest summary; the dropdown turns
+                             it into the way to narrow the sheet to one. --}}
+                        <div class="order-info-count">
+                            <span class="order-info-count-figure">{{ number_format($box['distinct']) }}</span>
+                            <span class="order-info-count-noun">{{ $box['noun'] }}</span>
+                        </div>
+
+                        {{-- The counts ride as data rather than inside the
+                             option text, so the dropdown can render the value
+                             and its row count as two separate things. The
+                             option label still carries "(77)" for the case
+                             where Tom Select does not load and the browser
+                             draws a plain <select>. --}}
+                        <select class="form-select form-select-sm order-info-filter"
+                                id="{{ $boxId }}"
+                                data-order-info-filter
+                                data-header-id="{{ $box['header_id'] }}"
+                                data-order-info-counts="{{ json_encode(collect($box['options'])->pluck('count', 'value')) }}"
+                                aria-label="Filter the sheet by {{ $label }}">
+                            <option value="">All {{ $box['noun'] }}</option>
+                            @foreach($box['options'] as $option)
+                                <option value="{{ $option['value'] }}"
+                                        @selected($box['filter_value'] === $option['value'])>
+                                    {{ $option['value'] }} ({{ number_format($option['count']) }})
+                                </option>
+                            @endforeach
+                        </select>
+                    @else
+                        <div class="order-info-value" title="{{ $box['value'] ?: '-' }}">{{ $box['value'] ?: '-' }}</div>
+                    @endif
                 </div>
             @endforeach
         </div>
@@ -3066,6 +3282,136 @@ document.addEventListener('DOMContentLoaded', function () {
         applySheetSearchButton.addEventListener('click', submitServerSheetSearch);
     }
 
+    /* Order Information boxes for a VARIED field carry a filter instead of a
+     * value. Choosing one narrows the sheet through the same
+     * filters[<header id>] query the column search boxes already use — this is
+     * a second way into the existing filter, not a second filter.
+     *
+     * Only this box's own key is touched, so a dropdown choice sits on top of
+     * whatever column filters are already applied instead of clearing them.
+     *
+     * Returns false when the page is saving instead of navigating. */
+    function applyOrderInfoFilter(headerId, value) {
+        if (!passesUnsavedGuard()) {
+            return false;
+        }
+
+        const url = new URL(window.location.href);
+        url.searchParams.delete('page');
+
+        const paramName = 'filters[' + headerId + ']';
+
+        if (value !== '') {
+            url.searchParams.set(paramName, value);
+        } else {
+            url.searchParams.delete(paramName);
+        }
+
+        window.location.href = url.toString();
+
+        return true;
+    }
+
+    document.querySelectorAll('[data-order-info-filter]').forEach(function (select) {
+        const initialValue = select.value;
+
+        const onOrderInfoChange = function (value) {
+            if (value === initialValue) {
+                return;
+            }
+
+            if (applyOrderInfoFilter(select.dataset.headerId, value)) {
+                return;
+            }
+
+            /* The guard chose to save, so no navigation happened. Put the
+             * control back: a dropdown showing a value the sheet was never
+             * filtered by describes rows that are not on screen. Tom Select
+             * ignores a write to .value — it has to be told. */
+            if (select.tomselect) {
+                select.tomselect.setValue(initialValue, true);
+            } else {
+                select.value = initialValue;
+            }
+        };
+
+        let counts = {};
+
+        try {
+            counts = JSON.parse(select.dataset.orderInfoCounts || '{}');
+        } catch (e) {
+            counts = {};
+        }
+
+        /* Same options as the Add New Order dialog's dropdowns, so there is one
+         * searchable-dropdown behaviour on this page rather than two. Guarded
+         * on window.TomSelect: a failed CDN leaves a plain <select> that still
+         * filters correctly through the same handler.
+         *
+         * dropdownParent: 'body' is the fix for the panel that would not show.
+         * These boxes sit inside .order-summary-card, which is overflow:hidden
+         * to keep its 12px corners from being overdrawn. An absolutely
+         * positioned panel is clipped by that ancestor no matter how high its
+         * z-index is — the measured result was 163 of 170 pixels cut off, so
+         * only a 7px sliver of the list was ever on screen. Raising z-index
+         * cannot fix a clip; the panel has to leave the clipping box. Tom
+         * Select then positions it itself and keeps it aligned on window
+         * scroll and resize. */
+        if (window.TomSelect) {
+            new TomSelect(select, {
+                allowEmptyOption: true,
+                placeholder: select.options[0] ? select.options[0].text : 'Search...',
+                searchField: ['text'],
+                onChange: onOrderInfoChange,
+                dropdownParent: 'body',
+                // Parented to <body>, the panel is no longer a descendant of
+                // .order-info-box, so it needs its own hook for the styling.
+                dropdownClass: 'ts-dropdown order-info-dropdown',
+                render: {
+                    option: function (data, escape) {
+                        if (data.value === '') {
+                            return '<div class="oi-opt oi-opt-all">' + escape(data.text) + '</div>';
+                        }
+
+                        const count = counts[data.value];
+
+                        return '<div class="oi-opt">'
+                            + '<span class="oi-opt-name">' + escape(data.value) + '</span>'
+                            + (count === undefined ? '' : '<span class="oi-opt-count">' + escape(String(count)) + '</span>')
+                            + '</div>';
+                    },
+                    /* The chosen value alone. The row count belongs in the list
+                     * where values are being compared, not in the control,
+                     * where it would just crowd a 160px box. */
+                    item: function (data, escape) {
+                        return '<div>' + escape(data.value === '' ? data.text : data.value) + '</div>';
+                    },
+                    no_results: function () {
+                        return '<div class="no-results">No match found</div>';
+                    }
+                }
+            });
+        } else {
+            select.addEventListener('change', function () {
+                onOrderInfoChange(select.value);
+            });
+        }
+    });
+
+    /* Tom Select repositions a body-parented panel on WINDOW scroll only. In
+     * today's layout that is enough — the Order Information card does not move
+     * when anything scrolls, the sheet scrolls inside its own box below it — so
+     * this handler is a guard, not a fix for an observed bug: it keeps the
+     * panel attached if the card is ever put inside a scrolling container.
+     * Capture phase, because scroll does not bubble. */
+    document.addEventListener('scroll', function () {
+        document.querySelectorAll('[data-order-info-filter]').forEach(function (select) {
+            if (select.tomselect && select.tomselect.isOpen) {
+                select.tomselect.positionDropdown();
+            }
+        });
+    }, true);
+
     if (headerJumpSelect) {
         headerJumpSelect.addEventListener('change', function () {
             const header = headerById(this.value);
@@ -3683,7 +4029,6 @@ document.addEventListener('DOMContentLoaded', function () {
             addRowForm.submit();
         });
     }
-
 
     if (successAlert) {
         setTimeout(() => {

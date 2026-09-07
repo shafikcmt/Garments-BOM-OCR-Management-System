@@ -73,7 +73,7 @@ class ExcelFileController extends Controller
                 ->pluck('id')
                 ->all();
 
-        $orderInfo = $this->buildOrderInfo($excelFile);
+        $orderInfo = $this->buildOrderInfo($excelFile, $visibleHeaderIds);
 
         $perPage = (int) request()->query('per_page', 50);
         $perPage = in_array($perPage, [20, 50, 100], true) ? $perPage : 50;
@@ -290,30 +290,138 @@ class ExcelFileController extends Controller
         ));
     }
 
-    private function buildOrderInfo(ExcelFile $excelFile): array
+    /**
+     * The boxes in the Order Information header, and the real spread of each.
+     *
+     * Each box used to read the FIRST ROW and present that single value as if
+     * it described the whole file. For two of them it does not. On the FA-27
+     * outerwear file (499 rows) the header announced style "Anetinna-1" and
+     * contract "4800095665"; each is true of 31 rows — 6% of the file. Buyer
+     * Name and Season Name genuinely are one value throughout, so the answer is
+     * not to convert every box but to let each box describe its own field: one
+     * distinct value renders exactly the plain box it always did, more than one
+     * renders a count and a filter. A file whose shipment dates vary therefore
+     * gets the filter without a code change, and this file — where that column
+     * is entirely empty — still gets the plain box.
+     *
+     * The "Contract Number" box was also looking up a header called
+     * "Contract Number", which does not exist: the real column is "Initial
+     * Contract Number", so the box could never fill and always showed "-".
+     * Both names are accepted here and the box keeps the shorter label.
+     *
+     * @param  array<int, int>  $visibleHeaderIds  Headers this user's role may
+     *                                             see. The filter is applied by
+     *                                             show() only for these, so a
+     *                                             box for a hidden column must
+     *                                             not offer a dropdown that
+     *                                             would silently do nothing.
+     * @return array<string, array{value: string, header_id: int|null, options: array<int, array{value: string, count: int}>, distinct: int, noun: string, filter_value: string}>
+     */
+    private function buildOrderInfo(ExcelFile $excelFile, array $visibleHeaderIds = []): array
     {
-        $orderInfo = [
-            'Buyer Name' => '-',
-            'Season Name' => '-',
-            'Style Name' => '-',
-            'Contract Number' => '-',
-            'Contract Shipment Date' => '-',
+        // label => [candidate header names in preference order, plural noun].
+        $fields = [
+            'Buyer Name' => [['Buyer Name'], 'buyers'],
+            'Season Name' => [['Season Name'], 'seasons'],
+            'Style Name' => [['Style Name'], 'styles'],
+            'Contract Number' => [['Initial Contract Number', 'Contract Number'], 'contract numbers'],
+            'Contract Shipment Date' => [['Contract Shipment Date'], 'shipment dates'],
         ];
 
-        $firstRow = $excelFile->rows()
-            ->with(['cells.header'])
-            ->orderBy('row_number')
-            ->first();
+        $appliedFilters = collect((array) request()->query('filters', []))
+            ->map(fn ($value) => is_string($value) ? trim($value) : '')
+            ->all();
 
-        if (! $firstRow) {
+        $orderInfo = [];
+
+        foreach ($fields as $label => [$candidates, $noun]) {
+            $orderInfo[$label] = [
+                'value' => '',
+                'header_id' => null,
+                'options' => [],
+                'distinct' => 0,
+                'noun' => $noun,
+                'filter_value' => '',
+            ];
+        }
+
+        $rowIds = $excelFile->rows()->orderBy('row_number')->pluck('id');
+
+        if ($rowIds->isEmpty()) {
             return $orderInfo;
         }
 
-        foreach ($firstRow->cells as $cell) {
-            $headerName = optional($cell->header)->header_name;
+        $firstRowId = $rowIds->first();
 
-            if (array_key_exists($headerName, $orderInfo) && filled($cell->value)) {
-                $orderInfo[$headerName] = $cell->value;
+        $headerIdsByName = ExcelHeader::query()
+            ->whereIn('header_name', collect($fields)->pluck(0)->flatten()->unique()->all())
+            ->pluck('id', 'header_name');
+
+        if ($headerIdsByName->isEmpty()) {
+            return $orderInfo;
+        }
+
+        // Only the columns these boxes describe, and only three small fields of
+        // them. The distinct values are then counted in PHP rather than with a
+        // GROUP BY: MySQL's default collation groups case-insensitively and
+        // PostgreSQL's does not, so the same file would report a different
+        // number of styles on local and on live. A count shown to a merchant as
+        // "6 styles" has to be the same number on both.
+        $cells = ExcelCell::query()
+            ->whereIn('row_id', $rowIds->all())
+            ->whereIn('header_id', $headerIdsByName->values()->all())
+            ->get(['row_id', 'header_id', 'value'])
+            ->groupBy('header_id');
+
+        foreach ($fields as $label => [$candidates, $noun]) {
+            $headerId = null;
+
+            foreach ($candidates as $candidate) {
+                if ($headerIdsByName->has($candidate)) {
+                    $headerId = (int) $headerIdsByName[$candidate];
+                    break;
+                }
+            }
+
+            if ($headerId === null) {
+                continue;
+            }
+
+            $forHeader = $cells->get($headerId, collect());
+
+            $orderInfo[$label]['value'] = trim((string) ($forHeader
+                ->firstWhere('row_id', $firstRowId)->value ?? ''));
+
+            // Blank cells are not a value. A file where two thirds of the rows
+            // are unfilled has as many styles as it has styles, not one more.
+            $counts = [];
+
+            foreach ($forHeader as $cell) {
+                $value = trim((string) ($cell->value ?? ''));
+
+                if ($value === '') {
+                    continue;
+                }
+
+                $counts[$value] = ($counts[$value] ?? 0) + 1;
+            }
+
+            arsort($counts);
+
+            $orderInfo[$label]['distinct'] = count($counts);
+
+            // A dropdown is only honest if show() will act on it, which it does
+            // for visible headers only.
+            if (count($counts) > 1 && in_array($headerId, $visibleHeaderIds, true)) {
+                $orderInfo[$label]['header_id'] = $headerId;
+                $orderInfo[$label]['filter_value'] = (string) ($appliedFilters[$headerId] ?? '');
+
+                foreach ($counts as $value => $count) {
+                    $orderInfo[$label]['options'][] = [
+                        'value' => (string) $value,
+                        'count' => $count,
+                    ];
+                }
             }
         }
 
