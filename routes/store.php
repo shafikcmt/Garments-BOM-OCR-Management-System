@@ -180,6 +180,15 @@ Route::prefix('store')
                 Route::get('/ledger/pdf', [GeneralStockLedgerController::class, 'pdf'])->name('ledger.pdf');
                 Route::get('/ledger/excel', [GeneralStockLedgerController::class, 'excel'])->name('ledger.excel');
 
+                // All three Store reports as one workbook. It sits behind this
+                // section's guard like the rest of the screen, and then decides
+                // per sheet: the Receiving and Issue tabs are built only for a
+                // user who satisfies THEIR sections' rules, so this route can
+                // never become a way around store.receiving.view or
+                // store.issues.view. That check is in the controller, on the
+                // data — hiding the button would not be a guard.
+                Route::get('/ledger/excel-all', [GeneralStockLedgerController::class, 'excelAll'])->name('ledger.excel.all');
+
                 // Backfilling Unit Price and the two reference dates for items
                 // carried over from the Excel sheets. Guarded on the correction
                 // right inside StockReferenceImportController rather than here,

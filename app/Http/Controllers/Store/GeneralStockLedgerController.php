@@ -2,10 +2,16 @@
 
 namespace App\Http\Controllers\Store;
 
+use App\Exports\GeneralStockCombinedExport;
 use App\Exports\GeneralStockReportExport;
+use App\Exports\IssueReportExport;
+use App\Exports\ReceivingReportExport;
 use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Http\Controllers\Controller;
+use App\Models\ItemCategory;
 use App\Services\GeneralStockReportService;
+use App\Services\IssueReportService;
+use App\Services\ReceivingReportService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
@@ -50,8 +56,17 @@ class GeneralStockLedgerController extends Controller
      */
     private const PER_PAGE = 150;
 
-    public function __construct(private readonly GeneralStockReportService $report)
-    {
+    /**
+     * The two extra services are for the combined workbook only — every other
+     * action on this controller uses $report alone. They are injected rather
+     * than resolved inside excelAll() so the dependency is visible and the
+     * action stays testable.
+     */
+    public function __construct(
+        private readonly GeneralStockReportService $report,
+        private readonly ReceivingReportService $receiving,
+        private readonly IssueReportService $issues,
+    ) {
     }
 
     public function index(Request $request)
@@ -230,5 +245,163 @@ class GeneralStockLedgerController extends Controller
         return 'Stock-Report-'.Str::slug(
             $data['period']['is_range'] ? $data['monthLabel'] : $data['month']
         );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | The combined workbook: Stock + Receiving + Issues in one file
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * One .xlsx carrying all three Store reports as tabs, under the filters
+     * currently on this screen.
+     *
+     * Each tab is the SAME export class its own screen downloads, so a tab and
+     * the standalone file cannot disagree. What this action owns is the two
+     * things composition cannot answer by itself: which sheets this user is
+     * allowed to receive, and how a filter written for the Stock Report should
+     * be read against receipts and issues.
+     */
+    public function excelAll(Request $request)
+    {
+        $stock = $this->build($request);
+        $filters = $stock['filters'];
+
+        $sheets = [];
+        $omitted = [];
+
+        // Sheet 1 is always present: the route already sits behind this
+        // screen's own guard, so anyone reaching it may have the Stock report.
+        $sheets[] = new GeneralStockReportExport($stock);
+
+        // The three reports sit behind three DIFFERENT section guards. A user
+        // holding only store.stock_report.view can open this screen but not the
+        // Receiving or Issue report, and a combined download must not be the
+        // way around that. So each further sheet is built only if that
+        // section's own rule is satisfied, and anything withheld is named on
+        // the Stock sheet rather than silently missing — a workbook that is
+        // quietly short of a tab gets read as "there were no receipts".
+        if ($this->satisfiesSection('store.receiving.view')) {
+            $sheets[] = new ReceivingReportExport(
+                $this->receiving->reportPayload($this->receivingFilters($filters))
+            );
+        } else {
+            $omitted[] = 'Receiving';
+        }
+
+        if ($this->satisfiesSection('store.issues.view')) {
+            $sheets[] = new IssueReportExport(
+                $this->issues->reportPayload($this->issueFilters($filters))
+            );
+        } else {
+            $omitted[] = 'Issues';
+        }
+
+        // Re-rendered with the note attached, so the first tab says what the
+        // workbook does not contain.
+        if ($omitted !== []) {
+            $sheets[0] = new GeneralStockReportExport($stock + [
+                'omittedSheets' => $omitted,
+            ]);
+        }
+
+        return Excel::download(
+            new GeneralStockCombinedExport($sheets),
+            $this->filename($stock).'-All.xlsx',
+        );
+    }
+
+    /**
+     * Mirrors the route middleware's own rule, `role_or_perm:store|admin|
+     * management|<section>.view` — Spatie checks canAny() OR hasAnyRole() over
+     * the whole pipe-separated list, so this checks the same list the same way.
+     * Written out rather than inferred so a change to the route guard is an
+     * obvious change here too.
+     */
+    private function satisfiesSection(string $permission): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        $tokens = ['store', 'admin', 'management', $permission];
+
+        return $user->canAny($tokens) || $user->hasAnyRole($tokens);
+    }
+
+    /**
+     * The Stock Report's filters, read against RECEIPTS.
+     *
+     * month / from / to / search carry over as they are — the Receiving service
+     * applies them to purchase_date and to challan, RV, supplier and item name.
+     *
+     * supplier_id becomes a NAME, because that is the only supplier filter the
+     * Receiving report has: it matches `supplier_name LIKE %name%` on the
+     * denormalised column. That is a looser test than the Stock sheet's exact
+     * general_stock_supplier_id, so a vendor whose name is a prefix of another
+     * ("ABC" inside "ABC Traders") would pull both. Named here rather than
+     * hidden: the Receiving tab prints its own filter line, so the workbook
+     * says which supplier string it matched on.
+     *
+     * category, status and include_inactive are dropped. Receiving has no
+     * category filter at all; status and include_inactive describe an ITEM's
+     * stock position, which a delivery does not have.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function receivingFilters(array $filters): array
+    {
+        return array_filter([
+            'month' => $filters['month'] ?? null,
+            'from' => $filters['from'] ?? null,
+            'to' => $filters['to'] ?? null,
+            'search' => $filters['search'] ?? null,
+            'supplier' => $this->report->supplierName($filters['supplier_id'] ?? null),
+        ], fn ($value) => $value !== null && $value !== '');
+    }
+
+    /**
+     * The Stock Report's filters, read against ISSUES.
+     *
+     * month / from / to / search carry over — applied to issue_date, and to
+     * requisition_no and item name.
+     *
+     * category has to be TRANSLATED. The Stock Report filters the string column
+     * stock_items.category; the Issue report filters stock_issues
+     * .item_category_id, a foreign key into item_categories. They are the same
+     * vocabulary stored two ways — every distinct stock_items.category value
+     * exists in item_categories.name, names there are unique, and no item's
+     * string disagrees with its own foreign key — so the name resolves to
+     * exactly one id.
+     *
+     * supplier is dropped, and cannot be otherwise: stock_issues carries no
+     * supplier, so consumption cannot be attributed to a vendor. With a
+     * supplier chosen the Issues tab therefore covers more than the Stock tab,
+     * which is why it prints its own filter line. status and include_inactive
+     * are dropped for the same reason as on Receiving.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function issueFilters(array $filters): array
+    {
+        $category = $filters['category'] ?? null;
+
+        return array_filter([
+            'month' => $filters['month'] ?? null,
+            'from' => $filters['from'] ?? null,
+            'to' => $filters['to'] ?? null,
+            'search' => $filters['search'] ?? null,
+            // Exact match, not whereLike: this is an id lookup on a value that
+            // came out of the same database, so there is nothing to be
+            // case-insensitive about and ILIKE would only risk a second hit.
+            'category' => $category
+                ? ItemCategory::where('name', $category)->value('id')
+                : null,
+        ], fn ($value) => $value !== null && $value !== '');
     }
 }

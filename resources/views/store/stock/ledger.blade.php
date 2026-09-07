@@ -47,6 +47,16 @@
             <a href="{{ route('store.stock.ledger.excel', request()->query()) }}" class="btn btn-outline-secondary" data-ledger-export>
                 <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Download Excel
             </a>
+            {{-- The same filters, but the whole Store month: Stock, Receiving
+                 and Issues as three tabs of one workbook. Carries
+                 data-ledger-export like its neighbours so the filter JS
+                 re-points it too — without that it would download the month the
+                 page opened with. The label says what is inside, because "All"
+                 alone reads as "all months" to someone who has not opened one
+                 yet. --}}
+            <a href="{{ route('store.stock.ledger.excel.all', request()->query()) }}" class="btn btn-outline-secondary" data-ledger-export>
+                <i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i>Download Excel (3 Reports)
+            </a>
             @if($canImport ?? false)
                 <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importReference">
                     <i class="bi bi-upload me-1" aria-hidden="true"></i>Import Reference Data

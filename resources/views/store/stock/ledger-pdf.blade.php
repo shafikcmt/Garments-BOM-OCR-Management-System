@@ -184,6 +184,17 @@
                 <td colspan="{{ $valueSpan }}">{{ $activeFilters }}</td>
             </tr>
         @endif
+        {{-- Only ever set by the combined workbook, and only when this user was
+             not allowed one of its tabs. A workbook quietly short of a sheet
+             gets read as "there were no receipts that month", so it says so on
+             its own face instead. Absent on the standalone PDF and Excel, which
+             have no other sheets to be missing. --}}
+        @if(! empty($omittedSheets ?? []))
+            <tr>
+                <td colspan="{{ $labelSpan }}">Not included</td>
+                <td colspan="{{ $valueSpan }}">{{ implode(' and ', $omittedSheets) }}: this workbook does not cover {{ count($omittedSheets) === 1 ? 'it' : 'them' }}, because your account does not have access to {{ count($omittedSheets) === 1 ? 'that report' : 'those reports' }}.</td>
+            </tr>
+        @endif
         {{-- The workbook needs this as badly as the PDF does — more so, since a
              spreadsheet invites someone to sum a column themselves. --}}
         @if(($summary['not_counted'] ?? 0) > 0)

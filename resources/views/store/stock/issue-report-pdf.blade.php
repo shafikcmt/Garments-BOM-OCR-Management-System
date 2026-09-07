@@ -36,6 +36,12 @@
     $applied = array_filter([
         'Req No' => $filters['requisition_no'] ?? null,
         'Type' => $filters['type'] ?? null,
+        // By NAME. The filter itself is a category id, which this sheet cannot
+        // print, so a report narrowed to one category used to say nothing about
+        // it at all — and a partial consumption figure that does not admit it
+        // is partial gets quoted as the month's total. Resolved by the service,
+        // so the combined Store workbook says it too.
+        'Category' => $categoryName ?? null,
         'Search' => $filters['search'] ?? null,
         'From' => $filters['from'] ?? null,
         'To' => $filters['to'] ?? null,

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ItemCategory;
 use App\Models\StockIssue;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -145,6 +146,14 @@ class IssueReportService
             'month' => $month?->format('Y-m'),
             'periodLabel' => $this->periodLabel($filters, $month),
             'title' => 'Issue Report',
+            // The category filter is an ID, and the printed sheet cannot name a
+            // filter it only holds a number for — so the report said nothing at
+            // all about being narrowed to one category. Resolved here, where
+            // every consumer of the report gets it, rather than in the screen's
+            // controller, which the combined workbook does not go through.
+            'categoryName' => ($filters['category'] ?? null)
+                ? ItemCategory::whereKey($filters['category'])->value('name')
+                : null,
         ];
     }
 
