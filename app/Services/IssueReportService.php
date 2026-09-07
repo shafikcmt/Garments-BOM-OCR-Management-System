@@ -119,4 +119,65 @@ class IssueReportService
             ])
             ->sortKeys();
     }
+
+    /**
+     * The report itself, for whoever is rendering it.
+     *
+     * Lifted out of IssueReportController::build() so the combined Store
+     * workbook (GeneralStockCombinedExport) reads the report from the same
+     * place the screen, the PDF and the standalone Excel do. The controller's
+     * build() still exists and still adds the screen's own dropdown masters on
+     * top; what moved here is only the part that says what the report SAYS.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function reportPayload(array $filters): array
+    {
+        $rows = $this->rows($filters);
+        $month = $this->resolveMonth($filters['month'] ?? null);
+
+        return [
+            'rows' => $rows,
+            'summary' => $this->summary($rows),
+            'byCategory' => $this->byCategory($rows),
+            'filters' => $filters,
+            'month' => $month?->format('Y-m'),
+            'periodLabel' => $this->periodLabel($filters, $month),
+            'title' => 'Issue Report',
+        ];
+    }
+
+    /**
+     * What the report covers, in words — printed on the PDF so a filtered
+     * download can never be mistaken for the whole period.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    public function periodLabel(array $filters, ?Carbon $month = null): string
+    {
+        $month ??= $this->resolveMonth($filters['month'] ?? null);
+
+        if ($month) {
+            return $month->format('F Y');
+        }
+
+        $from = $filters['from'] ?? null;
+        $to = $filters['to'] ?? null;
+
+        if ($from && $to) {
+            return Carbon::parse($from)->format('d M Y')
+                .' — '.Carbon::parse($to)->format('d M Y');
+        }
+
+        if ($from) {
+            return 'From '.Carbon::parse($from)->format('d M Y');
+        }
+
+        if ($to) {
+            return 'Up to '.Carbon::parse($to)->format('d M Y');
+        }
+
+        return 'All dates';
+    }
 }

@@ -84,18 +84,12 @@ class IssueReportController extends Controller
             'to' => ['nullable', 'date'],
         ]);
 
-        $rows = $this->report->rows($filters);
-        $month = $this->report->resolveMonth($filters['month'] ?? null);
-
-        return [
-            'rows' => $rows,
-            'summary' => $this->report->summary($rows),
-            'byCategory' => $this->report->byCategory($rows),
-            'filters' => $filters,
-            'month' => $month?->format('Y-m'),
-            'periodLabel' => $this->periodLabel($filters, $month),
-            'title' => 'Issue Report',
-
+        // The report itself now comes from the service, so the combined Store
+        // workbook reads it from the same place this screen does. Only the
+        // filter form's dropdown masters are added here: they are furniture,
+        // not part of what the report says, and the PDF and Excel never use
+        // them.
+        return $this->report->reportPayload($filters) + [
             // Filter dropdowns, the same masters the Record Issue screen uses.
             'items' => StockItem::orderBy('name')->get(['id', 'name']),
             'sections' => IndentSection::selectable()->get(['id', 'name']),
@@ -103,37 +97,6 @@ class IssueReportController extends Controller
             'categories' => ItemCategory::selectable()->get(['id', 'name']),
             'requisitionTypes' => StockIssue::REQUISITION_TYPES,
         ];
-    }
-
-    /**
-     * What the report covers, in words — printed on the PDF so a filtered
-     * download can never be mistaken for the whole period.
-     *
-     * @param  array<string, mixed>  $filters
-     */
-    private function periodLabel(array $filters, $month): string
-    {
-        if ($month) {
-            return $month->format('F Y');
-        }
-
-        $from = $filters['from'] ?? null;
-        $to = $filters['to'] ?? null;
-
-        if ($from && $to) {
-            return \Illuminate\Support\Carbon::parse($from)->format('d M Y')
-                .' — '.\Illuminate\Support\Carbon::parse($to)->format('d M Y');
-        }
-
-        if ($from) {
-            return 'From '.\Illuminate\Support\Carbon::parse($from)->format('d M Y');
-        }
-
-        if ($to) {
-            return 'Up to '.\Illuminate\Support\Carbon::parse($to)->format('d M Y');
-        }
-
-        return 'All dates';
     }
 
     /** @param array<string, mixed> $data */
