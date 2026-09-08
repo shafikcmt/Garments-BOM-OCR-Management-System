@@ -494,6 +494,12 @@ class ExcelUploadController extends Controller
             $rowInsertBatch[] = [
                 'excel_file_id' => $excelFile->id,
                 'row_number' => $rowNumber,
+                // Part of the original order. Stated here rather than left to
+                // the column default because this is the path the deletion rule
+                // exists to exclude: these rows arrive full of real data and
+                // write no change-log entries, so nothing about them afterwards
+                // distinguishes them from a row added a moment ago.
+                'origin' => \App\Models\ExcelRow::ORIGIN_IMPORTED,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];

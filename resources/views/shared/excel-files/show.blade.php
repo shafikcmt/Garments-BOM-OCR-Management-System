@@ -1172,23 +1172,96 @@
         background: #FCFCFD !important;
         box-shadow: inset 1px 0 0 #C4C9D2;
     }
+    /* The per-row Delete, on the narrow set of rows that qualify. Sized and
+       toned like the duplicate badge beside it rather than like a button, so a
+       column that has to stay scannable does not gain a red block. */
+    .row-delete-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        margin-top: 3px;
+        padding: 1px 6px;
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1.5;
+        border-radius: var(--po-r-pill, 999px);
+        border: 1px solid var(--po-danger-border, #FECACA);
+        background: var(--po-danger-bg, #FEF2F2);
+        color: var(--po-danger, #B91C1C);
+        cursor: pointer;
+    }
+
+    .row-delete-btn:hover,
+    .row-delete-btn:focus {
+        background: var(--po-danger, #B91C1C);
+        border-color: var(--po-danger, #B91C1C);
+        color: #fff;
+    }
+
+    /* ---- Duplicate Rows dialog: the placement choice --------------------- */
+    #duplicateRowsModal .ao-place {
+        border: 0;
+        padding: 0;
+        margin: 0 0 12px;
+    }
+
+    #duplicateRowsModal .ao-place-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        padding: 9px 11px;
+        margin-bottom: 6px;
+        border: 1px solid var(--ao-line, #D7E3ED);
+        border-radius: var(--po-r-control, 10px);
+        background: #fff;
+        cursor: pointer;
+    }
+
+    #duplicateRowsModal .ao-place-option:has(input:checked) {
+        border-color: var(--ao-blue, #006C9D);
+        box-shadow: 0 0 0 3px rgba(0, 108, 157, .12);
+    }
+
+    #duplicateRowsModal .ao-place-title {
+        display: block;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--ao-ink, #0B2B3C);
+    }
+
+    #duplicateRowsModal .ao-place-hint {
+        display: block;
+        font-size: 11px;
+        color: var(--ao-muted, #5B7383);
+        margin-top: 1px;
+    }
+
+    #duplicateRowsModal .ao-note-inline {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        margin-top: 8px;
+        font-size: 11px;
+        color: var(--ao-muted, #5B7383);
+    }
+
     /* ---- Add New Order dialog -------------------------------------------
        The two tiers again, on form inputs this time. Same colours and the same
        inset-rail shape as the grid cells above, deliberately: a merchant who
        has learned "amber means I must change this" on the sheet must not have
        to learn it a second time in the dialog. Kept next to the grid rules so
        the two cannot drift apart unnoticed. */
-    #addOrderModal .ao-input-always {
+    #duplicateRowsModal .ao-input-always {
         border-color: #FCD9A5;
         background: #FFFBF4;
         box-shadow: inset 2px 0 0 var(--po-warn, #F59E0B);
     }
-    #addOrderModal .ao-input-likely {
+    #duplicateRowsModal .ao-input-likely {
         border-color: #E4E7EC;
         background: #FCFCFD;
         box-shadow: inset 1px 0 0 #C4C9D2;
     }
-    #addOrderModal .ao-input:focus {
+    #duplicateRowsModal .ao-input:focus {
         border-color: var(--po-blue, #006C9D);
         box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
@@ -1197,7 +1270,7 @@
        with the module's own values means this dialog stays part of that system
        instead of becoming a second one, and the fallbacks below keep it correct
        on screens where the theme partial is not loaded. */
-    #addOrderModal {
+    #duplicateRowsModal {
         --ao-blue: var(--po-blue, #006C9D);
         --ao-blue-deep: var(--po-blue-deep, #004B70);
         --ao-tint: var(--po-tint, #E0F2FE);
@@ -1211,18 +1284,18 @@
     /* SEARCH PANEL — tinted, bordered, visually one thing. The flat white box
        gave the controls and the results equal weight, so neither read as a
        step. */
-    #addOrderModal .ao-panel {
+    #duplicateRowsModal .ao-panel {
         background: var(--ao-paper);
         border: 1px solid var(--ao-line);
         border-radius: 10px;
         padding: 14px;
     }
-    #addOrderModal .ao-step-head {
+    #duplicateRowsModal .ao-step-head {
         display: flex;
         align-items: center;
         margin-bottom: 12px;
     }
-    #addOrderModal .ao-step-chip {
+    #duplicateRowsModal .ao-step-chip {
         display: inline-flex;
         align-items: center;
         gap: 8px;
@@ -1233,7 +1306,7 @@
         font-size: 12px;
         font-weight: 700;
     }
-    #addOrderModal .ao-step-num {
+    #duplicateRowsModal .ao-step-num {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -1246,7 +1319,7 @@
         font-weight: 700;
         flex: 0 0 auto;
     }
-    #addOrderModal .ao-label {
+    #duplicateRowsModal .ao-label {
         display: block;
         font-size: 11px;
         font-weight: 700;
@@ -1255,7 +1328,7 @@
         color: var(--ao-muted);
         margin-bottom: 4px;
     }
-    #addOrderModal .ao-label-hint {
+    #duplicateRowsModal .ao-label-hint {
         text-transform: none;
         letter-spacing: 0;
         font-weight: 600;
@@ -1263,12 +1336,12 @@
     }
     /* The primary field is wider AND heavier, because "which style" is the
        question this dialog actually asks. */
-    #addOrderModal .ao-field-primary .form-select {
+    #duplicateRowsModal .ao-field-primary .form-select {
         font-size: 14px;
         font-weight: 600;
         min-height: 40px;
     }
-    #addOrderModal .ao-actions {
+    #duplicateRowsModal .ao-actions {
         display: flex;
         gap: 8px;
         align-items: center;
@@ -1278,7 +1351,7 @@
     }
 
     /* The count note, as guidance rather than grey body text. */
-    #addOrderModal .ao-note {
+    #duplicateRowsModal .ao-note {
         display: flex;
         align-items: center;
         gap: 8px;
@@ -1293,7 +1366,7 @@
 
     /* RESULTS — its own card, so the boundary between "what I asked" and "what
        came back" is visible. */
-    #addOrderModal .ao-results-card {
+    #duplicateRowsModal .ao-results-card {
         margin-top: 12px;
         border: 1px solid var(--ao-line);
         border-radius: 10px;
@@ -1301,11 +1374,11 @@
     }
     /* Scrolls on its own, so the dialog keeps a stable height whether a search
        returns two rows or twenty-five. */
-    #addOrderModal .ao-results {
+    #duplicateRowsModal .ao-results {
         max-height: 320px;
         overflow-y: auto;
     }
-    #addOrderModal .ao-results thead th {
+    #duplicateRowsModal .ao-results thead th {
         position: sticky;
         top: 0;
         z-index: 1;
@@ -1318,22 +1391,22 @@
         color: var(--ao-muted);
         white-space: nowrap;
     }
-    #addOrderModal .ao-results tbody tr:nth-child(even) > td { background: #FBFCFE; }
-    #addOrderModal .ao-results tbody tr:hover > td { background: var(--ao-tint); }
-    #addOrderModal .ao-results td { font-size: 12px; color: var(--ao-ink); }
-    #addOrderModal .ao-col-row { width: 64px; }
-    #addOrderModal .ao-col-action { width: 118px; }
+    #duplicateRowsModal .ao-results tbody tr:nth-child(even) > td { background: #FBFCFE; }
+    #duplicateRowsModal .ao-results tbody tr:hover > td { background: var(--ao-tint); }
+    #duplicateRowsModal .ao-results td { font-size: 12px; color: var(--ao-ink); }
+    #duplicateRowsModal .ao-col-row { width: 64px; }
+    #duplicateRowsModal .ao-col-action { width: 118px; }
     /* Row and contract numbers line up digit-for-digit, which is how a merchant
        scans a column of codes. */
-    #addOrderModal .ao-num {
+    #duplicateRowsModal .ao-num {
         font-variant-numeric: tabular-nums;
         text-align: right;
         color: var(--ao-muted);
     }
-    #addOrderModal .ao-contract { font-variant-numeric: tabular-nums; }
+    #duplicateRowsModal .ao-contract { font-variant-numeric: tabular-nums; }
     /* One action per row, so it is filled rather than an outline competing with
        five columns of text. */
-    #addOrderModal .ao-pick {
+    #duplicateRowsModal .ao-pick {
         background: var(--ao-blue);
         border-color: var(--ao-blue);
         color: #fff;
@@ -1341,14 +1414,14 @@
         font-weight: 600;
         white-space: nowrap;
     }
-    #addOrderModal .ao-pick:hover,
-    #addOrderModal .ao-pick:focus {
+    #duplicateRowsModal .ao-pick:hover,
+    #duplicateRowsModal .ao-pick:focus {
         background: var(--ao-blue-deep);
         border-color: var(--ao-blue-deep);
         color: #fff;
     }
-    #addOrderModal .ao-empty > td { background: #fff !important; }
-    #addOrderModal .ao-empty-state {
+    #duplicateRowsModal .ao-empty > td { background: #fff !important; }
+    #duplicateRowsModal .ao-empty-state {
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -1357,32 +1430,32 @@
         color: var(--ao-muted);
         font-size: 12px;
     }
-    #addOrderModal .ao-empty-state .bi { font-size: 20px; opacity: .5; }
+    #duplicateRowsModal .ao-empty-state .bi { font-size: 20px; opacity: .5; }
 
     /* Tom Select, sized to match the Bootstrap controls beside it rather than
        its own default. Same library and version the Booking Preview filters
        use; if the CDN fails these rules simply style a native <select>. */
-    #addOrderModal .ts-wrapper { margin: 0; }
-    #addOrderModal .ts-control {
+    #duplicateRowsModal .ts-wrapper { margin: 0; }
+    #duplicateRowsModal .ts-control {
         min-height: 31px;
         border-color: var(--ao-line);
         border-radius: 6px;
         font-size: 12px;
         padding: 4px 8px;
     }
-    #addOrderModal .ao-field-primary .ts-control {
+    #duplicateRowsModal .ao-field-primary .ts-control {
         min-height: 40px;
         font-size: 14px;
         font-weight: 600;
     }
-    #addOrderModal .ts-wrapper.focus .ts-control {
+    #duplicateRowsModal .ts-wrapper.focus .ts-control {
         border-color: var(--ao-blue);
         box-shadow: 0 0 0 3px rgba(0, 108, 157, .14);
     }
-    #addOrderModal .ts-dropdown { font-size: 12px; border-color: var(--ao-line); }
-    #addOrderModal .ts-dropdown .active { background: var(--ao-tint); color: var(--ao-blue-deep); }
-    #addOrderModal .ts-dropdown .no-results { padding: 8px 12px; color: var(--ao-muted); }
-    #addOrderModal .ao-source-strip {
+    #duplicateRowsModal .ts-dropdown { font-size: 12px; border-color: var(--ao-line); }
+    #duplicateRowsModal .ts-dropdown .active { background: var(--ao-tint); color: var(--ao-blue-deep); }
+    #duplicateRowsModal .ts-dropdown .no-results { padding: 8px 12px; color: var(--ao-muted); }
+    #duplicateRowsModal .ao-source-strip {
         background: #F8FAFC;
         border: 1px solid #EEF0F3;
         border-radius: 6px;
@@ -1390,8 +1463,8 @@
         font-size: 12px;
         margin-bottom: 12px;
     }
-    #addOrderModal .ao-group { margin-top: 14px; }
-    #addOrderModal .ao-group-head {
+    #duplicateRowsModal .ao-group { margin-top: 14px; }
+    #duplicateRowsModal .ao-group-head {
         display: flex;
         align-items: center;
         gap: 6px;
@@ -1400,11 +1473,11 @@
         color: #334155;
         margin-bottom: 6px;
     }
-    #addOrderModal .ao-tier-dot {
+    #duplicateRowsModal .ao-tier-dot {
         width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto;
     }
-    #addOrderModal .ao-tier-always { background: var(--po-warn, #F59E0B); }
-    #addOrderModal .ao-tier-likely { background: #C4C9D2; }
+    #duplicateRowsModal .ao-tier-always { background: var(--po-warn, #F59E0B); }
+    #duplicateRowsModal .ao-tier-likely { background: #C4C9D2; }
 
     /* Focus still wins, so editing the cell reads normally. */
     .excel-data-table tbody td.cell-needs-update input.form-control:focus,
@@ -1626,6 +1699,21 @@
 
         {{-- The action is rewritten per row before submit, so one form serves
              every "clear duplicate marker" button on the page. --}}
+        {{-- One form for every row's Delete, action rewritten per click — the
+             same approach the dismiss-badge form takes, so 150 rows do not each
+             render their own form. --}}
+        <form method="POST" id="delete-row-form" class="d-none">
+            @csrf
+            @method('DELETE')
+        </form>
+
+        {{-- Delete Selected. POST rather than DELETE because it carries a list;
+             the action itself is the same one the per-row button performs. --}}
+        <form method="POST" id="delete-selected-form" class="d-none"
+              action="{{ route('uploaded-files.rows.destroy_many', $excelFile->id) }}">
+            @csrf
+        </form>
+
         <form method="POST" id="dismiss-duplicate-form" class="d-none">
             @csrf
             @method('PATCH')
@@ -1831,19 +1919,35 @@
                         <button type="button" id="addRowButton" class="btn btn-outline-primary btn-sm">
                             Add New Row
                         </button>
-                        {{-- The single-row duplicate entry point, moved off the
-                             rows and into the toolbar. Next to "Add New Row" the
-                             pair reads as the choice a merchant actually makes:
-                             a blank row, or a new order based on an existing
-                             one. --}}
-                        <button type="button" id="addOrderButton" class="btn btn-primary btn-sm"
-                                data-bs-toggle="modal" data-bs-target="#addOrderModal">
-                            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add New Order
-                        </button>
-                        {{-- Disabled until something is ticked; the count comes from
-                             the selection so the confirm can name it. --}}
-                        <button type="button" id="duplicateSelectedButton" class="btn btn-outline-primary btn-sm" disabled>
+                        {{-- THE duplicate action, and now the only general one.
+                             "Add New Order" used to sit here as a second entry
+                             point: a two-step dialog whose first step made the
+                             merchant re-find, through four filter boxes, a row
+                             the grid already lets them tick — and which then
+                             produced exactly what this button produces. Its
+                             genuinely useful half, editing the key fields before
+                             the copy is written, is now the "Edit key fields
+                             first" choice in this dialog, and is reachable for
+                             any ticked row rather than only a filter-found one.
+
+                             Disabled until something is ticked; the count comes
+                             from the selection so the dialog can name it. --}}
+                        {{-- HIDDEN until something is ticked, not disabled. A
+                             greyed "(0)" is a control the merchant has to read
+                             and dismiss on every page load, for an action that
+                             is not available yet; the toolbar is shorter and
+                             says more when it only shows what can be done. --}}
+                        <button type="button" id="duplicateSelectedButton" class="btn btn-primary btn-sm d-none"
+                                data-bs-toggle="modal" data-bs-target="#duplicateRowsModal">
                             <i class="bi bi-copy me-1" aria-hidden="true"></i>Duplicate Selected (<span id="duplicateSelectedCount">0</span>)
+                        </button>
+                        {{-- Appears with its sibling, and counts only the rows
+                             that can ACTUALLY go — the selection is made for
+                             duplication, so it routinely holds rows nothing may
+                             delete. Naming the real number here means the
+                             confirm and the result agree with the button. --}}
+                        <button type="button" id="deleteSelectedButton" class="btn btn-outline-danger btn-sm d-none">
+                            <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete Selected (<span id="deleteSelectedCount">0</span>)
                         </button>
                         {{-- Filtering is server-side, so a page holds at most
                              per_page rows of a possibly larger result set.
@@ -2065,7 +2169,13 @@
                                     ? $row->duplicated_from_row_id
                                     : null;
                             @endphp
-                            <tr data-row-id="{{ $row->id }}" class="{{ trim(($isFileLockedForUser ?? false ? 'file-row-locked ' : '') . ($isPoRowLocked ? 'po-row-locked ' : '') . ($isFlaggedDuplicate ? 'row-is-duplicate ' : '') . ($isRunContinuation ? 'row-duplicate-run' : '')) }}">
+                            {{-- data-row-number so script that needs the number
+                                 reads it from the row itself. Scraping it out
+                                 of the first cell's text does not work: that
+                                 cell also carries the duplicate badge, the lock
+                                 badges and now the Delete button, so the number
+                                 is not the only text in it. --}}
+                            <tr data-row-id="{{ $row->id }}" data-row-number="{{ $row->row_number }}" class="{{ trim(($isFileLockedForUser ?? false ? 'file-row-locked ' : '') . ($isPoRowLocked ? 'po-row-locked ' : '') . ($isFlaggedDuplicate ? 'row-is-duplicate ' : '') . ($isRunContinuation ? 'row-duplicate-run' : '')) }}">
                                 <td>
                                     @if($canAddRow ?? false)
                                         <label class="row-pick" title="Select row {{ $row->row_number }} for duplication">
@@ -2097,6 +2207,31 @@
                                                         aria-label="Clear duplicate marker for row {{ $row->row_number }}">&times;</button>
                                             @endif
                                         </div>
+                                    @endif
+                                    {{-- Shown ONLY on a row that may actually be
+                                         deleted, which is the narrow set this
+                                         action exists for: one just added and
+                                         not yet worked on or depended upon. A
+                                         disabled button on every one of 150
+                                         rows would be exactly the noise the
+                                         note above removed the per-row
+                                         Duplicate button for — and here the
+                                         button appearing is itself the signal
+                                         that this is a row you just added.
+
+                                         Membership only: $deletableRowIds was
+                                         computed in one batch by
+                                         ExcelRow::deletableIdsFor(), the same
+                                         method deleteRow() refuses on, so this
+                                         markup decides nothing. --}}
+                                    @if(isset($deletableRowIds[$row->id]))
+                                        <button type="button"
+                                                class="row-delete-btn js-delete-row"
+                                                data-row-id="{{ $row->id }}"
+                                                data-row-number="{{ $row->row_number }}"
+                                                title="Delete row {{ $row->row_number }} — it has not been edited and nothing uses it">
+                                            <i class="bi bi-trash" aria-hidden="true"></i><span>Delete</span>
+                                        </button>
                                     @endif
                                     @if($isFileLockedForUser ?? false)
                                         <div class="file-row-lock-badge" title="This workspace file is locked by admin">
@@ -3612,6 +3747,8 @@ document.addEventListener('DOMContentLoaded', function () {
      */
     const duplicateRowsForm = document.getElementById('duplicate-rows-form');
     const duplicateSelectedButton = document.getElementById('duplicateSelectedButton');
+    const deleteSelectedButton = document.getElementById('deleteSelectedButton');
+    const deleteSelectedCount = document.getElementById('deleteSelectedCount');
     const duplicateSelectedCount = document.getElementById('duplicateSelectedCount');
     const rowSelectAll = document.getElementById('rowSelectAll');
 
@@ -3635,7 +3772,34 @@ document.addEventListener('DOMContentLoaded', function () {
         const ids = selectedRowIds();
 
         if (duplicateSelectedCount) duplicateSelectedCount.textContent = ids.length;
-        if (duplicateSelectedButton) duplicateSelectedButton.disabled = ids.length === 0;
+
+        // Shown only when there is a selection to act on, rather than sitting
+        // greyed at (0) on every page load.
+        if (duplicateSelectedButton) {
+            duplicateSelectedButton.classList.toggle('d-none', ids.length === 0);
+        }
+
+        /* Delete counts only the ELIGIBLE rows of the selection.
+         *
+         * A row's eligibility was decided server-side and rendered as the
+         * presence of its Delete button, so this reads that rather than
+         * deciding anything: the same answer the server will give when the
+         * request arrives. The selection is made for duplication, so it
+         * routinely holds rows nothing may delete, and a button counting all of
+         * them would promise more than the action performs. */
+        const deletableSelected = ids.filter(id =>
+            document.querySelector('tr[data-row-id="' + id + '"] .row-delete-btn.js-delete-row') !== null
+        );
+
+        if (deleteSelectedCount) deleteSelectedCount.textContent = deletableSelected.length;
+
+        if (deleteSelectedButton) {
+            // Absent when the selection contains nothing deletable at all —
+            // "Delete Selected (0)" is a button that cannot do anything.
+            deleteSelectedButton.classList.toggle('d-none', deletableSelected.length === 0);
+            deleteSelectedButton.dataset.eligibleIds = deletableSelected.join(',');
+            deleteSelectedButton.dataset.selectedCount = ids.length;
+        }
 
         // Offer the rest of the match only when the page is fully ticked and
         // there is actually more behind it.
@@ -3705,11 +3869,22 @@ document.addEventListener('DOMContentLoaded', function () {
         return true;
     }
 
-    function submitDuplicate(rowIds) {
+    function submitDuplicate(rowIds, placement) {
         if (!duplicateRowsForm || rowIds.length === 0) return;
         if (!passesUnsavedGuard()) return;
 
         duplicateRowsForm.querySelectorAll('input[name="row_ids[]"]').forEach(el => el.remove());
+        duplicateRowsForm.querySelectorAll('input[name="placement"]').forEach(el => el.remove());
+
+        // Only sent when the dialog asked for it. Absent means below_source,
+        // which is what this action has always done.
+        if (placement) {
+            const placementInput = document.createElement('input');
+            placementInput.type = 'hidden';
+            placementInput.name = 'placement';
+            placementInput.value = placement;
+            duplicateRowsForm.appendChild(placementInput);
+        }
 
         rowIds.forEach(function (id) {
             const hidden = document.createElement('input');
@@ -3750,21 +3925,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    if (duplicateSelectedButton) {
-        duplicateSelectedButton.addEventListener('click', function () {
-            const ids = selectedRowIds();
-
-            if (ids.length === 0) return;
-
-            const message = ids.length === 1
-                ? 'Duplicate 1 selected row? The copy is inserted directly below its source row.'
-                : 'Duplicate ' + ids.length + ' selected rows? Each copy is inserted directly below its own source row.';
-
-            if (confirm(message)) {
-                submitDuplicate(ids);
-            }
-        });
-    }
+    /* No confirm() here any more. The button opens the Duplicate Rows dialog
+       (data-bs-toggle on the markup), which asks where the copies go and is
+       itself the confirmation step — a browser confirm on top of it would be a
+       second question about a decision already made. */
 
     /* Duplicate a whole style, as a block.
      *
@@ -3801,289 +3965,221 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    /* ---- Add New Order dialog --------------------------------------------
+    /* Deleting a row somebody has just added.
      *
-     * The single-row duplicate entry point, moved off the rows and into the
-     * toolbar. Three steps, one dialog, and nothing is written until the last
-     * one — Cancel at any point leaves the sheet exactly as it was.
+     * The button is only rendered on rows the server already decided are
+     * deletable (ExcelRow::deletableIdsFor, batched for the whole page), so
+     * this handler does not re-decide anything — it confirms and posts. If the
+     * row stopped qualifying between page load and click, deleteRow() refuses
+     * and says why; the screen is never the guard.
      *
-     * Searching is a request to the server, not a filter over the rendered
-     * rows: the grid is paginated, so a client-side search would silently
-     * offer only the current page.
-     */
-    const addOrderModalEl = document.getElementById('addOrderModal');
+     * One form reused for every row, built from a template, so 150 rows do not
+     * each carry their own — the same approach the dismiss-badge button takes. */
+    /* Delete Selected. Posts the WHOLE selection, not the eligible subset the
+     * button counted: the server re-runs the same batched check and is the
+     * thing that decides, so sending a client-filtered list would only hide a
+     * disagreement rather than prevent one. The count in the confirm is the
+     * client's estimate of what will go; the flash afterwards is the server's
+     * account of what did. */
+    const deleteSelectedForm = document.getElementById('delete-selected-form');
 
-    if (addOrderModalEl) {
-        const addOrderForm = document.getElementById('addOrderForm');
-        const addOrderSourceRowId = document.getElementById('addOrderSourceRowId');
-        const addOrderStepSearch = document.getElementById('addOrderStepSearch');
-        const addOrderStepEdit = document.getElementById('addOrderStepEdit');
-        const addOrderResultsBody = document.getElementById('addOrderResultsBody');
-        const addOrderResultNote = document.getElementById('addOrderResultNote');
-        const addOrderResultNoteText = document.getElementById('addOrderResultNoteText');
-        const addOrderSourceStrip = document.getElementById('addOrderSourceStrip');
-        const addOrderSubmitButton = document.getElementById('addOrderSubmitButton');
-        const addOrderSearchButton = document.getElementById('addOrderSearchButton');
-        const addOrderResetButton = document.getElementById('addOrderResetButton');
-        const addOrderBackButton = document.getElementById('addOrderBackButton');
-        const addOrderSubtitle = document.getElementById('addOrderSubtitle');
-        const addOrderSourcesUrl = @json(route('uploaded-files.rows.order_sources', $excelFile->id));
+    if (deleteSelectedButton && deleteSelectedForm) {
+        deleteSelectedButton.addEventListener('click', function () {
+            const ids = selectedRowIds();
+            const eligible = (this.dataset.eligibleIds || '').split(',').filter(Boolean);
 
-        // The rows the last search returned, by id, so choosing one fills the
-        // form from data already in hand rather than a second request.
-        let addOrderRowsById = {};
+            if (eligible.length === 0) return;
 
-        function aoEscape(value) {
-            const div = document.createElement('div');
-            div.textContent = value === null || value === undefined ? '' : String(value);
-            return div.innerHTML;
-        }
+            const skipped = ids.length - eligible.length;
 
-        /* Reading and clearing a filter has to go through these two, because a
-         * Tom Select field keeps its own value and the underlying <select> is
-         * no longer what the user is looking at: setting .value directly
-         * updates the DOM and leaves the visible control showing the old
-         * choice. */
-        function aoFilterValue(el) {
-            return (el.tomselect ? el.tomselect.getValue() : el.value) || '';
-        }
+            let message = eligible.length === 1
+                ? 'Delete 1 row?'
+                : 'Delete ' + eligible.length + ' rows?';
 
-        function aoClearFilter(el) {
-            if (el.tomselect) {
-                // silent: this runs during a reset, and firing change here
-                // would kick off a search of the dialog being torn down.
-                el.tomselect.clear(true);
-                return;
+            if (skipped > 0) {
+                message += ' ' + skipped + ' of the ' + ids.length
+                    + ' rows you selected cannot be deleted and will be left alone.';
             }
 
-            el.value = '';
+            message += ' This cannot be undone.';
+
+            if (!confirm(message)) return;
+            if (!passesUnsavedGuard()) return;
+
+            deleteSelectedForm.querySelectorAll('input[name="row_ids[]"]').forEach(el => el.remove());
+
+            ids.forEach(function (id) {
+                const hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = 'row_ids[]';
+                hidden.value = id;
+                deleteSelectedForm.appendChild(hidden);
+            });
+
+            isSubmitting = true;
+            clearDraft();
+            deleteSelectedForm.submit();
+        });
+    }
+
+    const deleteRowForm = document.getElementById('delete-row-form');
+    const deleteRowUrlTemplate = @json(route('uploaded-files.rows.destroy', ['excelFile' => $excelFile->id, 'row' => '__ROW__']));
+
+    document.addEventListener('click', function (event) {
+        const deleteBtn = event.target.closest('.js-delete-row');
+
+        if (!deleteBtn || !deleteRowForm) {
+            return;
+        }
+
+        event.preventDefault();
+
+        // Same shape as the other destructive confirms on this screen: say what
+        // goes, and that it cannot be undone.
+        if (!confirm('Delete row ' + deleteBtn.dataset.rowNumber + '? The row and its values are removed and cannot be recovered.')) {
+            return;
+        }
+
+        if (!passesUnsavedGuard()) return;
+
+        deleteRowForm.action = deleteRowUrlTemplate.replace('__ROW__', deleteBtn.dataset.rowId);
+        isSubmitting = true;
+        clearDraft();
+        deleteRowForm.submit();
+    });
+
+    /* ---- Duplicate Rows dialog --------------------------------------------
+     *
+     * What used to be "Add New Order". That dialog searched for a source row
+     * through four filter boxes before it would let you do anything; the rows
+     * are now simply the ones ticked on the grid, so all this asks is where the
+     * copies go, and offers the edit step the old dialog wrapped.
+     *
+     * The write paths are unchanged: "Duplicate now" posts the same
+     * duplicate-rows form Duplicate Selected always posted, and "Edit key
+     * fields first" posts the same add-order form step 2 always posted. Only
+     * the way in changed. */
+    const duplicateModalEl = document.getElementById('duplicateRowsModal');
+
+    if (duplicateModalEl) {
+        const addOrderForm = document.getElementById('addOrderForm');
+        const addOrderSourceRowId = document.getElementById('addOrderSourceRowId');
+        const addOrderPlacement = document.getElementById('addOrderPlacement');
+        const addOrderStepSearch = document.getElementById('addOrderStepSearch');
+        const addOrderStepEdit = document.getElementById('addOrderStepEdit');
+        const addOrderSubmitButton = document.getElementById('addOrderSubmitButton');
+        const addOrderBackButton = document.getElementById('addOrderBackButton');
+        const addOrderSourceStrip = document.getElementById('addOrderSourceStrip');
+        const duplicateSelectionSummary = document.getElementById('duplicateSelectionSummary');
+        const duplicateNowButton = document.getElementById('duplicateNowButton');
+        const duplicateEditFirstButton = document.getElementById('duplicateEditFirstButton');
+        const duplicateEditFirstNote = document.getElementById('duplicateEditFirstNote');
+
+        function chosenPlacement() {
+            const checked = duplicateModalEl.querySelector('input[name="ao_placement"]:checked');
+
+            return checked ? checked.value : 'below_source';
         }
 
         function aoShowStep(step) {
             addOrderStepSearch.classList.toggle('d-none', step !== 'search');
             addOrderStepEdit.classList.toggle('d-none', step !== 'edit');
-            // Nothing can be saved until a source row is chosen, so the button
-            // is the state of the dialog rather than a thing to guess at.
+
+            /* HIDDEN in step 1, not merely disabled. Step 1 has its own
+             * "Duplicate now", and a greyed-out "Duplicate row" sitting beside
+             * it in the footer is two buttons with nearly the same name, one of
+             * which does nothing — the merchant has to work out which is real. */
             addOrderSubmitButton.disabled = step !== 'edit';
-            addOrderSubtitle.textContent = step === 'edit'
-                ? 'Check the values, then add the order'
-                : 'Based on an existing row in this file';
+            addOrderSubmitButton.classList.toggle('d-none', step !== 'edit');
         }
 
+        /* Reopened mid-edit, the dialog would otherwise still show the previous
+         * selection and the previous step. */
         function aoReset() {
+            const ids = selectedRowIds();
+
+            duplicateSelectionSummary.textContent = ids.length === 1
+                ? '1 row selected'
+                : ids.length + ' rows selected';
+
+            /* One row at a time, because performRowDuplication() discards
+             * overrides for more than one source — there would be no saying
+             * which copy the typed values belonged to. Disabled and explained,
+             * rather than accepting edits it would then throw away. */
+            const single = ids.length === 1;
+            duplicateEditFirstButton.disabled = !single;
+            duplicateEditFirstNote.classList.toggle('d-none', single);
+
             addOrderSourceRowId.value = '';
-            addOrderRowsById = {};
-            addOrderResultsBody.innerHTML = aoEmptyRow('Pick a style above to see the orders you can copy.', 'bi-search');
-            aoSetNote('');
-            document.querySelectorAll('#addOrderModal .ao-filter').forEach(aoClearFilter);
-            document.querySelectorAll('#addOrderModal .ao-input').forEach(el => { el.value = ''; });
+            addOrderPlacement.value = 'below_source';
+            duplicateModalEl.querySelectorAll('.ao-input').forEach(el => { el.value = ''; });
+
+            const belowRadio = document.getElementById('duplicatePlaceBelow');
+            if (belowRadio) belowRadio.checked = true;
+
             aoShowStep('search');
         }
 
-        function aoEmptyRow(message, icon) {
-            return '<tr class="ao-empty"><td colspan="7"><div class="ao-empty-state">'
-                + '<i class="bi ' + icon + '" aria-hidden="true"></i>'
-                + '<span>' + aoEscape(message) + '</span>'
-                + '</div></td></tr>';
-        }
+        if (duplicateNowButton) {
+            duplicateNowButton.addEventListener('click', function () {
+                const ids = selectedRowIds();
 
-        // The note is a banner, so it is hidden outright rather than left as an
-        // empty bordered strip when there is nothing to say.
-        function aoSetNote(text) {
-            if (!addOrderResultNote) return;
+                if (ids.length === 0) return;
 
-            addOrderResultNote.classList.toggle('d-none', !text);
-            if (addOrderResultNoteText) addOrderResultNoteText.textContent = text;
-        }
-
-        function aoRenderRows(payload) {
-            addOrderRowsById = {};
-
-            if (!payload.rows.length) {
-                addOrderResultsBody.innerHTML = aoEmptyRow('No row in this file matches that search.', 'bi-inbox');
-                aoSetNote('');
-                return;
-            }
-
-            addOrderResultsBody.innerHTML = payload.rows.map(function (row) {
-                addOrderRowsById[row.id] = row;
-                const v = row.values || {};
-
-                return '<tr>'
-                    + '<td class="ao-num">' + row.row_number + '</td>'
-                    + '<td>' + aoEscape(v.buyer_name) + '</td>'
-                    + '<td>' + aoEscape(v.style_name) + '</td>'
-                    + '<td>' + aoEscape(v.season_name) + '</td>'
-                    + '<td>' + aoEscape(v.gmts_color_name) + '</td>'
-                    + '<td class="ao-contract">' + aoEscape(v.initial_contract_number) + '</td>'
-                    + '<td><button type="button" class="btn btn-sm ao-pick" '
-                    + 'data-row-id="' + row.id + '">Use This Row</button></td>'
-                    + '</tr>';
-            }).join('');
-
-            // Says plainly when the list is capped, so a merchant who cannot
-            // find their row knows to narrow rather than keep scrolling.
-            aoSetNote(payload.total > payload.shown
-                ? 'Showing the first ' + payload.shown + ' of ' + payload.total + ' matches — narrow the filters to see the rest.'
-                : payload.total + (payload.total === 1 ? ' match' : ' matches'));
-        }
-
-        function aoSearch() {
-            const params = new URLSearchParams();
-
-            document.querySelectorAll('#addOrderModal .ao-filter').forEach(function (el) {
-                const value = aoFilterValue(el).trim();
-                if (value !== '') params.append(el.dataset.filter, value);
-            });
-
-            addOrderResultsBody.innerHTML = aoEmptyRow('Searching…', 'bi-hourglass-split');
-            aoSetNote('');
-
-            fetch(addOrderSourcesUrl + '?' + params.toString(), {
-                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                credentials: 'same-origin'
-            })
-                .then(res => res.ok ? res.json() : Promise.reject(res.status))
-                .then(aoRenderRows)
-                .catch(function () {
-                    addOrderResultsBody.innerHTML = aoEmptyRow(
-                        'Could not load rows. Check your connection and try again.',
-                        'bi-exclamation-triangle'
-                    );
-                });
-        }
-
-        function aoChooseRow(rowId) {
-            const row = addOrderRowsById[rowId];
-
-            if (!row) return;
-
-            addOrderSourceRowId.value = row.id;
-
-            const v = row.values || {};
-            const label = [v.buyer_name, v.style_name, v.season_name]
-                .filter(part => part !== null && part !== undefined && String(part).trim() !== '')
-                .map(aoEscape)
-                .join(' / ');
-
-            addOrderSourceStrip.innerHTML =
-                '<strong>Copying row ' + row.row_number + '</strong>'
-                + (label ? ' — ' + label : '')
-                + '<br><span class="text-muted">The new order is inserted directly below row '
-                + row.row_number + '.</span>';
-
-            // Pre-fill from the source, so the form starts as a true copy and
-            // the merchant changes what differs — the same thing the grid's
-            // markers ask for, asked here first.
-            const formValues = row.form_values || {};
-
-            document.querySelectorAll('#addOrderModal .ao-input').forEach(function (el) {
-                const value = formValues[el.dataset.headerId];
-                el.value = (value === null || value === undefined) ? '' : value;
-            });
-
-            aoShowStep('edit');
-        }
-
-        /* Turn the three filter dropdowns into searchable ones, with the same
-         * options the Booking Preview filters use so the control behaves
-         * identically in both places.
-         *
-         * `select.` matters: .ao-filter is also on the free-text input, and
-         * running TomSelect over an <input type="text"> replaces it with a tag
-         * widget. Guarded on window.TomSelect so a failed CDN leaves plain
-         * native <select> elements that still filter correctly — the search
-         * logic reads through aoFilterValue() either way. */
-        if (window.TomSelect) {
-            addOrderModalEl.querySelectorAll('select.ao-filter').forEach(function (select) {
-                const placeholder = (select.options[0] && select.options[0].value === '')
-                    ? select.options[0].text
-                    : 'Search...';
-
-                new TomSelect(select, {
-                    allowEmptyOption: true,
-                    placeholder: placeholder,
-                    searchField: ['text'],
-                    render: {
-                        no_results: function () {
-                            return '<div class="no-results">No match found</div>';
-                        }
-                    }
-                });
+                submitDuplicate(ids, chosenPlacement());
             });
         }
 
-        /* Choosing a dropdown value searches on its own.
-         *
-         * Style is the question this dialog asks, so having answered it the
-         * merchant should not have to press a second button to be shown the
-         * answer. Debounced because Buyer and Season are usually set straight
-         * after Style, and three selections in a row should cost one request,
-         * not three. The free-text box is deliberately NOT in this set — typing
-         * has no natural "done" moment, so it keeps the Search button. */
-        let aoSearchTimer = null;
+        if (duplicateEditFirstButton) {
+            duplicateEditFirstButton.addEventListener('click', function () {
+                const ids = selectedRowIds();
 
-        addOrderModalEl.querySelectorAll('.ao-filter-auto').forEach(function (select) {
-            select.addEventListener('change', function () {
-                clearTimeout(aoSearchTimer);
-                aoSearchTimer = setTimeout(aoSearch, 200);
-            });
-        });
+                if (ids.length !== 1) return;
 
-        addOrderSearchButton.addEventListener('click', function () {
-            clearTimeout(aoSearchTimer);
-            aoSearch();
-        });
+                addOrderSourceRowId.value = ids[0];
+                // Carried across so the choice made in step 1 still applies.
+                addOrderPlacement.value = chosenPlacement();
 
-        addOrderResetButton.addEventListener('click', function () {
-            clearTimeout(aoSearchTimer);
-            aoReset();
-        });
-        addOrderBackButton.addEventListener('click', function () {
-            addOrderSourceRowId.value = '';
-            aoShowStep('search');
-        });
+                const sourceRow = document.querySelector('tr[data-row-id="' + ids[0] + '"]');
+                const rowNumber = sourceRow ? sourceRow.dataset.rowNumber : '';
 
-        // Enter searches rather than submitting the form, which at step one
-        // would post with no source row chosen.
-        // Only the free-text box: a Tom Select field owns its own Enter, which
-        // is how an option gets chosen from its dropdown.
-        addOrderModalEl.querySelectorAll('input.ao-filter').forEach(function (el) {
-            el.addEventListener('keydown', function (event) {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    clearTimeout(aoSearchTimer);
-                    aoSearch();
+                if (addOrderSourceStrip) {
+                    addOrderSourceStrip.textContent = 'Copying row ' + rowNumber + ' — '
+                        + (chosenPlacement() === 'end_of_file'
+                            ? 'the copy will be added at the end of the file.'
+                            : 'the copy will be inserted directly below it.');
                 }
+
+                aoShowStep('edit');
             });
-        });
+        }
 
-        addOrderResultsBody.addEventListener('click', function (event) {
-            const pick = event.target.closest('.ao-pick');
-            if (pick) aoChooseRow(pick.dataset.rowId);
-        });
+        if (addOrderBackButton) {
+            addOrderBackButton.addEventListener('click', () => aoShowStep('search'));
+        }
 
-        // Saving navigates away, exactly as the other duplicate actions do, so
-        // it takes the same unsaved-work guard: without it the redirect would
-        // silently discard pending cell edits in the sheet behind the dialog.
-        addOrderForm.addEventListener('submit', function (event) {
-            if (!addOrderSourceRowId.value) {
-                event.preventDefault();
-                return;
-            }
+        /* The dialog navigates on submit, so it takes the same unsaved-work
+         * guard every other navigating control on this page takes: without it
+         * the redirect would silently discard pending cell edits in the sheet
+         * behind it. */
+        if (addOrderForm) {
+            addOrderForm.addEventListener('submit', function (event) {
+                if (!addOrderSourceRowId.value) {
+                    event.preventDefault();
+                    return;
+                }
 
-            if (!passesUnsavedGuard()) {
-                event.preventDefault();
-                return;
-            }
+                if (!passesUnsavedGuard()) {
+                    event.preventDefault();
+                    return;
+                }
 
-            isSubmitting = true;
-            clearDraft();
-        });
+                isSubmitting = true;
+                clearDraft();
+            });
+        }
 
-        // A dialog reopened mid-edit would otherwise still show the last search
-        // and the last chosen row, which is not what "Add New Order" means.
-        addOrderModalEl.addEventListener('show.bs.modal', aoReset);
+        duplicateModalEl.addEventListener('show.bs.modal', aoReset);
     }
 
     refreshDuplicateSelection();

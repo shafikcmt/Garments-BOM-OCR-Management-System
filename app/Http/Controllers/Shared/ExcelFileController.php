@@ -42,7 +42,7 @@ class ExcelFileController extends Controller
 
         $roleIds = $this->getRoleIds();
 
-        $minimumVisibleRows = 20;
+        $minimumVisibleRows = ExcelRow::MINIMUM_VISIBLE_ROWS;
         $this->ensureMinimumRows($excelFile, $minimumVisibleRows);
 
         $headers = ExcelHeader::with('ownerRole')
@@ -188,6 +188,13 @@ class ExcelFileController extends Controller
         // any business taking, so the button goes with the Delete one.
         $canPrintFile = ! $isFileLockedForUser && ! $isBuyerLockedForUser;
 
+        // Which rows on THIS PAGE may be deleted, worked out in one batch.
+        // Asking per row would be eleven queries each — about 1,650 for a
+        // 150-row page — for a button most rows will not show. The view does an
+        // isset() against this and decides nothing itself, so it cannot drift
+        // from what deleteRow() will actually allow.
+        $deletableRowIds = ExcelRow::deletableIdsFor($rows->getCollection(), $user);
+
         // Taking the whole original workbook away is a wider act than reading a
         // sheet on screen, so it follows download()'s own gate exactly: the
         // admin lock excuses an admin, the buyer lock excuses nobody.
@@ -206,12 +213,6 @@ class ExcelFileController extends Controller
         $addOrderHeaders = $canAddRow
             ? $this->addOrderFormHeaders($editableHeaderIds)
             : collect();
-
-        // The dropdown options for step one, read from this file's own rows.
-        // Only built when the dialog can be opened at all.
-        $addOrderFilterOptions = $canAddRow
-            ? $this->addOrderFilterOptions($excelFile)
-            : [];
 
         // Latest PRA dates per PI No., pre-formatted for the live (client-side)
         // formulas. Keyed by normalised PI No. so every row sharing that PI No.
@@ -266,6 +267,7 @@ class ExcelFileController extends Controller
             'calculatedHeaderKeys',
             'calculatedHeaderIds',
             'canAddRow',
+            'deletableRowIds',
             'canDeleteFile',
             'canPrintFile',
             'canDownloadFile',
@@ -285,8 +287,7 @@ class ExcelFileController extends Controller
             'styleMatchValues',
             'styleMatchRowIds',
             'styleMatchHeaderIds',
-            'addOrderHeaders',
-            'addOrderFilterOptions'
+            'addOrderHeaders'
         ));
     }
 
@@ -647,6 +648,8 @@ class ExcelFileController extends Controller
             $row = ExcelRow::create([
                 'excel_file_id' => $excelFile->id,
                 'row_number' => $nextRowNumber,
+                // The user asked for this row, so it is one they may take back.
+                'origin' => ExcelRow::ORIGIN_ADDED,
             ]);
 
             $headers = ExcelHeader::where('is_active', true)
@@ -1176,71 +1179,6 @@ class ExcelFileController extends Controller
     }
 
     /**
-     * The distinct Buyer / Style / Season values THIS file actually holds.
-     *
-     * Feeds the three searchable dropdowns in step one of the Add New Order
-     * dialog. They were free-text boxes, which asked a merchant to reproduce a
-     * style code from memory — a typo returned "no rows match" and looked
-     * exactly like the style genuinely not being there.
-     *
-     * SCOPED TO THIS FILE, via the row_id subquery. A global list of every
-     * buyer in the system would offer options that cannot match anything in the
-     * open workbook, which is a worse lie than free text: the value looks
-     * confirmed because it came from a dropdown.
-     *
-     * Blank and null values are excluded — an empty option in a filter reads as
-     * "no filter" and would silently widen the search.
-     *
-     * DB-agnostic on purpose: SELECT DISTINCT over two indexed columns, no
-     * LIKE, no string or date functions, no raw SQL. It compiles the same on
-     * MySQL, PostgreSQL and the SQLite the tests run on.
-     *
-     * Options are rendered inline rather than fetched. The largest files here
-     * run 500-600 rows, so the three columns yield low hundreds of distinct
-     * values between them — small enough that a request per dropdown would cost
-     * more than the markup does.
-     *
-     * @return array<string, list<string>>  header_key => sorted distinct values
-     */
-    private function addOrderFilterOptions(ExcelFile $excelFile): array
-    {
-        $headerIdByKey = ExcelHeader::whereIn('header_key', self::STYLE_MATCH_HEADER_KEYS)
-            ->pluck('id', 'header_key');
-
-        if ($headerIdByKey->isEmpty()) {
-            return [];
-        }
-
-        $valuesByHeaderId = ExcelCell::select('header_id', 'value')
-            ->distinct()
-            ->whereIn('header_id', $headerIdByKey->values()->all())
-            ->whereIn('row_id', $excelFile->rows()->select('id'))
-            ->whereNotNull('value')
-            ->where('value', '<>', '')
-            ->orderBy('value')
-            ->get()
-            ->groupBy('header_id');
-
-        $options = [];
-
-        foreach (self::STYLE_MATCH_HEADER_KEYS as $headerKey) {
-            $headerId = $headerIdByKey->get($headerKey);
-
-            $options[$headerKey] = $headerId === null
-                ? []
-                : $valuesByHeaderId->get($headerId, collect())
-                    ->pluck('value')
-                    // A value that is only whitespace survives the '<>' test
-                    // above but is not an option a merchant can recognise.
-                    ->reject(fn ($value) => trim((string) $value) === '')
-                    ->values()
-                    ->all();
-        }
-
-        return $options;
-    }
-
-    /**
      * Rows a merchant can pick as the source for a new order, as JSON.
      *
      * Step one of the Add New Order dialog. Searching happens HERE rather than
@@ -1397,6 +1335,11 @@ class ExcelFileController extends Controller
         $validated = $request->validate([
             'source_row_id' => ['required', 'integer'],
             'overrides' => ['array'],
+            // The dialog asks where the copy goes before it asks what to edit,
+            // so the choice has to survive into this path too. Without it,
+            // picking "end of file" and then "edit key fields first" would
+            // quietly insert below the source instead.
+            'placement' => ['nullable', 'string', 'in:below_source,end_of_file'],
         ]);
 
         $sourceRow = ExcelRow::where('excel_file_id', $excelFile->id)
@@ -1428,7 +1371,13 @@ class ExcelFileController extends Controller
             $overrides[$headerId] = ($value === '' || $value === null) ? null : $value;
         }
 
-        $newRows = $this->performRowDuplication($excelFile, $user, collect([$sourceRow]), 'below_source', $overrides);
+        $newRows = $this->performRowDuplication(
+            $excelFile,
+            $user,
+            collect([$sourceRow]),
+            $validated['placement'] ?? 'below_source',
+            $overrides
+        );
 
         $newRow = $newRows->first();
 
@@ -1446,6 +1395,237 @@ class ExcelFileController extends Controller
      * honoured a weaker gate would be the worst possible place for the two to
      * disagree.
      */
+    /**
+     * Delete one row, and close the gap it leaves.
+     *
+     * NARROW ON PURPOSE. This undoes a row somebody has just added and did not
+     * want; it is not a general "remove any line". Whether a row qualifies is
+     * ExcelRow::deletionBlockers(), which is the SAME method the worksheet will
+     * ask before offering the button — one answer, so the screen and the server
+     * cannot disagree about a destructive action.
+     *
+     * The refusal names the reason rather than returning a bare "cannot delete".
+     * A merchant told only "no" on a row that carries a booking PO will try
+     * again, or ask someone to force it; told that a PO was raised from it, they
+     * stop.
+     *
+     * Renumbering reuses duplication's park-and-reassign for the same reason it
+     * exists there: excel_rows is unique on (excel_file_id, row_number), and a
+     * straight `row_number - 1` can collide mid-statement on the way past.
+     */
+    public function deleteRow(Request $request, ExcelFile $excelFile, ExcelRow $row)
+    {
+        $user = auth()->user();
+
+        // Scoped to THIS file before anything else, so a row id from another
+        // workbook is a 404 rather than something to reason about.
+        if ((int) $row->excel_file_id !== (int) $excelFile->id) {
+            abort(404);
+        }
+
+        $blockers = $row->deletionBlockers($user);
+
+        if ($blockers !== []) {
+            // 403 for the two that are genuinely permission, so a hand-made
+            // request is refused the same way every other guarded action
+            // refuses it; a redirect for the rest, which are states the screen
+            // can explain.
+            if (in_array('your role cannot delete rows', $blockers, true)) {
+                abort(403, 'You are not allowed to delete a row.');
+            }
+
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'Row '.$row->row_number.' cannot be deleted: '
+                    .implode(', and ', $blockers).'.');
+        }
+
+        $deletedNumber = (int) $row->row_number;
+
+        DB::transaction(function () use ($excelFile, $user, $row, $deletedNumber) {
+            // Written BEFORE the delete: activity_logs.row_id is nullOnDelete,
+            // so the entry survives the row and simply loses its anchor — which
+            // is what an audit trail of a deletion should look like. Mirrors the
+            // file_deleted entry destroy() writes.
+            ActivityLog::create([
+                'excel_file_id' => $excelFile->id,
+                'row_id' => $row->id,
+                'header_id' => null,
+                'old_value' => 'Row '.$deletedNumber,
+                'new_value' => null,
+                'action' => 'row_deleted',
+                'user_id' => $user->id,
+            ]);
+
+            // excel_cells cascades; nothing else points at this row, which is
+            // precisely what deletionBlockers() has just established.
+            $row->delete();
+
+            $this->closeRowNumberGap($excelFile, $deletedNumber);
+
+            $this->recalculateFile($excelFile, $user->id);
+            $this->refreshFileStatus($excelFile);
+        });
+
+        return redirect()
+            ->route('uploaded-files.show', $excelFile->id)
+            ->with('success', 'Row '.$deletedNumber.' was deleted.');
+    }
+
+    /**
+     * Delete the eligible rows of a selection, and say what happened to the
+     * rest.
+     *
+     * A MIXED SELECTION IS NORMAL, because the checkboxes are the same ones
+     * Duplicate Selected uses and a merchant ticking a run of rows has no
+     * reason to know which of them a receiving references. Refusing the whole
+     * batch over one such row would send them hunting for it; deleting
+     * everything silently would be worse. So the eligible rows go, the rest are
+     * named with their reasons, and the confirm the user already agreed to was
+     * built from the same eligible count this recomputes.
+     *
+     * Eligibility is ExcelRow::deletionBlockersFor() — the same batched check
+     * the screen drew its buttons from and single-row deleteRow() refuses on.
+     * There is no second rule here.
+     */
+    public function deleteRows(Request $request, ExcelFile $excelFile)
+    {
+        $user = auth()->user();
+
+        $validated = $request->validate([
+            'row_ids' => ['required', 'array', 'min:1'],
+            'row_ids.*' => ['integer'],
+        ]);
+
+        // Scoped to THIS file, so a hand-made request cannot reach into another
+        // workbook — the same rule duplicateRows() applies.
+        $rows = ExcelRow::where('excel_file_id', $excelFile->id)
+            ->whereIn('id', $validated['row_ids'])
+            ->orderBy('row_number')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'No matching row was found to delete.');
+        }
+
+        $blockers = ExcelRow::deletionBlockersFor($rows, $user);
+
+        // The role refusal is the one that is a permission rather than a state,
+        // so it is answered the way every other guarded action answers it.
+        if (in_array('your role cannot delete rows', $blockers[$rows->first()->id] ?? [], true)) {
+            abort(403, 'You are not allowed to delete a row.');
+        }
+
+        $deletable = $rows->filter(fn (ExcelRow $row) => ($blockers[$row->id] ?? []) === []);
+        $refused = $rows->reject(fn (ExcelRow $row) => ($blockers[$row->id] ?? []) === []);
+
+        if ($deletable->isEmpty()) {
+            return redirect()
+                ->route('uploaded-files.show', $excelFile->id)
+                ->with('warning', 'None of the '.$rows->count().' selected rows can be deleted: '
+                    .$this->summariseRefusals($refused, $blockers).'.');
+        }
+
+        $deletedNumbers = $deletable->pluck('row_number')->map(fn ($n) => (int) $n)->sort()->values();
+
+        DB::transaction(function () use ($excelFile, $user, $deletable, $deletedNumbers) {
+            foreach ($deletable as $row) {
+                ActivityLog::create([
+                    'excel_file_id' => $excelFile->id,
+                    'row_id' => $row->id,
+                    'header_id' => null,
+                    'old_value' => 'Row '.$row->row_number,
+                    'new_value' => null,
+                    'action' => 'row_deleted',
+                    'user_id' => $user->id,
+                ]);
+
+                $row->delete();
+            }
+
+            // Once, from the lowest number removed: everything above it is
+            // reassigned in order, so several holes close in a single pass
+            // rather than one renumber per deleted row.
+            $this->closeRowNumberGap($excelFile, $deletedNumbers->first());
+
+            $this->recalculateFile($excelFile, $user->id);
+            $this->refreshFileStatus($excelFile);
+        });
+
+        $message = $deletable->count() === 1
+            ? 'Row '.$deletedNumbers->first().' was deleted.'
+            : $deletable->count().' rows were deleted.';
+
+        if ($refused->isNotEmpty()) {
+            $message .= ' '.$refused->count().' of the '.$rows->count()
+                .' selected could not be deleted: '.$this->summariseRefusals($refused, $blockers).'.';
+        }
+
+        return redirect()
+            ->route('uploaded-files.show', $excelFile->id)
+            ->with($refused->isEmpty() ? 'success' : 'warning', $message);
+    }
+
+    /**
+     * "row 23 (it came from the uploaded file), row 41 (it is used by a booking
+     * PO)" — named individually up to a point, then counted, because a listing
+     * of thirty is not something anybody reads.
+     *
+     * @param  \Illuminate\Support\Collection<int, ExcelRow>  $refused
+     * @param  array<int, list<string>>  $blockers
+     */
+    private function summariseRefusals($refused, array $blockers): string
+    {
+        $named = $refused->take(3)->map(function (ExcelRow $row) use ($blockers) {
+            return 'row '.$row->row_number.' ('.implode(', and ', $blockers[$row->id] ?? []).')';
+        })->all();
+
+        if ($refused->count() > 3) {
+            $named[] = 'and '.($refused->count() - 3).' more';
+        }
+
+        return implode('; ', $named);
+    }
+
+    /**
+     * Pull every row after $deletedNumber up by one, without tripping the
+     * unique index on (excel_file_id, row_number).
+     *
+     * Park, then reassign — the same two steps performRowDuplication() uses,
+     * and for the same reason. A straight `SET row_number = row_number - 1`
+     * can collide mid-statement (the row above has not moved yet), and the
+     * workaround differs per engine since ORDER BY in UPDATE is MySQL-only.
+     * Moving the affected rows into a disjoint number space first makes a
+     * collision arithmetically impossible on MySQL, PostgreSQL and the SQLite
+     * the tests run on alike.
+     */
+    private function closeRowNumberGap(ExcelFile $excelFile, int $deletedNumber): void
+    {
+        $tailRows = ExcelRow::where('excel_file_id', $excelFile->id)
+            ->where('row_number', '>', $deletedNumber)
+            ->orderBy('row_number')
+            ->get(['id']);
+
+        if ($tailRows->isEmpty()) {
+            return;
+        }
+
+        $offset = (int) $excelFile->rows()->max('row_number') + $tailRows->count() + 1000;
+
+        ExcelRow::where('excel_file_id', $excelFile->id)
+            ->where('row_number', '>', $deletedNumber)
+            ->update(['row_number' => DB::raw('row_number + '.$offset)]);
+
+        $nextRowNumber = $deletedNumber;
+
+        foreach ($tailRows as $tailRow) {
+            ExcelRow::where('id', $tailRow->id)->update(['row_number' => $nextRowNumber]);
+            $nextRowNumber++;
+        }
+    }
+
     private function duplicateGuard(ExcelFile $excelFile, $user, string $action = 'duplicate a row')
     {
         // The same gate addRow() applies, stated the same way on purpose.
@@ -1634,6 +1814,9 @@ class ExcelFileController extends Controller
                     // is what "Dismiss" clears. See the migration for why both.
                     'duplicated_from_row_id' => $sourceRow->id,
                     'duplicated_at' => now(),
+                    // A copy the user asked for, so it is one they may take back
+                    // — until they start working on it.
+                    'origin' => ExcelRow::ORIGIN_DUPLICATED,
                 ]);
 
                 foreach ($headers as $header) {
@@ -2542,6 +2725,10 @@ class ExcelFileController extends Controller
             $row = ExcelRow::create([
                 'excel_file_id' => $excelFile->id,
                 'row_number' => $rowNumber,
+                // Padding the sheet draws so it never opens on a stub. Nobody
+                // asked for these, and deleting one would achieve nothing —
+                // the next page load puts it back — so they are not user-added.
+                'origin' => ExcelRow::ORIGIN_IMPORTED,
             ]);
 
             foreach ($headers as $header) {

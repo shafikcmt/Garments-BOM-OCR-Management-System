@@ -115,6 +115,15 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/uploaded-files/{excelFile}/rows/add-order', [ExcelFileController::class, 'storeDuplicatedOrder'])->name('uploaded-files.rows.add_order');
     // Clears the "Duplicated" badge on one row; the lineage is kept.
     Route::patch('/uploaded-files/{excelFile}/rows/{row}/dismiss-duplicate', [ExcelFileController::class, 'dismissDuplicateFlag'])->name('uploaded-files.rows.dismiss_duplicate');
+    // Undo a row somebody has just added. NARROW: refused for any row that
+    // something downstream depends on, or that has been edited since it was
+    // created. ExcelRow::deletionBlockers() decides, and is the same method the
+    // worksheet asks before offering the button. See deleteRow().
+    Route::delete('/uploaded-files/{excelFile}/rows/{row}', [ExcelFileController::class, 'deleteRow'])->name('uploaded-files.rows.destroy');
+    // The same, for a checkbox selection. Deletes the eligible rows and names
+    // the rest with their reasons — a selection made for Duplicate Selected has
+    // no reason to be all-eligible. Same batched check, no second rule.
+    Route::post('/uploaded-files/{excelFile}/rows/delete-selected', [ExcelFileController::class, 'deleteRows'])->name('uploaded-files.rows.destroy_many');
     Route::get('/uploaded-files/{excelFile}/download', [ExcelFileController::class, 'download'])->name('uploaded-files.download');
     Route::delete('/uploaded-files/{excelFile}', [ExcelFileController::class, 'destroy'])->name('uploaded-files.destroy');
     Route::patch('/uploaded-files/{excelFile}/lock', [ExcelFileController::class, 'updateLock'])->name('uploaded-files.lock');

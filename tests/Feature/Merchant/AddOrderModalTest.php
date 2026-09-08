@@ -205,113 +205,50 @@ it('does not offer the picker to a role that cannot duplicate', function () {
 });
 
 /*
- * THE FILTER DROPDOWNS.
+ * REMOVED IN PHASE 3, not lost.
  *
- * They were free-text boxes, which asked a merchant to reproduce a style code
- * from memory — a typo returned "no rows match" and looked exactly like the
- * style genuinely not being in the file. The options must come from THIS file's
- * rows: a global list would offer values that cannot match anything in the open
- * workbook, which is a worse lie than free text, because a value picked from a
- * dropdown looks confirmed.
+ * Four tests here described the Buyer / Style / Season dropdowns of the
+ * dialog's old first step, and a fifth pinned the SQL of the query that
+ * built them. That step was a row FINDER for a row the grid already lets the
+ * merchant tick, and it is gone — along with addOrderFilterOptions(), which
+ * ran that query on EVERY worksheet page load for dropdowns nothing renders
+ * any more.
+ *
+ * What replaced them is the test below: the finder is absent and the
+ * placement choice is present.
  */
 
-it('offers dropdown options taken from this files own rows', function () {
-    $file = addOrderFile([
-        ['Zara', 'ABC', 'Summer', 'C-1', 'Red', 'PO-1'],
-        ['Zara', 'XYZ', 'Winter', 'C-2', 'Blue', 'PO-2'],
-    ]);
-
-    $response = $this->actingAs(addOrderUser('merchant'))
-        ->get(route('uploaded-files.show', $file->id))
-        ->assertOk();
-
-    $options = $response->viewData('addOrderFilterOptions');
-
-    expect($options['buyer_name'])->toEqual(['Zara']);          // distinct, not once per row
-    expect($options['style_name'])->toEqual(['ABC', 'XYZ']);    // sorted
-    expect($options['season_name'])->toEqual(['Summer', 'Winter']);
-});
-
-it('does not offer values that belong to another workbook', function () {
-    $file = addOrderFile([['Zara', 'ABC', 'Summer', 'C-1', 'Red', 'PO-1']]);
-
-    // A second file with completely different values. Its styles must not
-    // appear in the first file's dropdowns.
-    addOrderFile([['H&M', 'OTHERSTYLE', 'Winter', 'C-9', 'Blue', 'PO-9']]);
-
-    $options = $this->actingAs(addOrderUser('merchant'))
-        ->get(route('uploaded-files.show', $file->id))
-        ->assertOk()
-        ->viewData('addOrderFilterOptions');
-
-    expect($options['style_name'])->toEqual(['ABC']);
-    expect($options['style_name'])->not->toContain('OTHERSTYLE');
-    expect($options['buyer_name'])->not->toContain('H&M');
-});
-
-it('leaves blank and whitespace-only values out of the dropdowns', function () {
-    // A real sheet has empty cells; an empty option in a filter reads as "no
-    // filter" and would silently widen the search.
-    $file = addOrderFile([
-        ['Zara', 'ABC', 'Summer', 'C-1', 'Red', 'PO-1'],
-        ['', 'XYZ', '   ', 'C-2', 'Blue', 'PO-2'],
-    ]);
-
-    // And a genuinely null cell, which is not the same as an empty string.
-    $row = ExcelRow::where('excel_file_id', $file->id)->where('row_number', 2)->first();
-    $buyerHeader = ExcelHeader::where('header_key', 'buyer_name')->first();
-    ExcelCell::where('row_id', $row->id)->where('header_id', $buyerHeader->id)->update(['value' => null]);
-
-    $options = $this->actingAs(addOrderUser('merchant'))
-        ->get(route('uploaded-files.show', $file->id))
-        ->assertOk()
-        ->viewData('addOrderFilterOptions');
-
-    expect($options['buyer_name'])->toEqual(['Zara']);
-    expect($options['season_name'])->toEqual(['Summer']);
-    // The style on that row is real, so it stays.
-    expect($options['style_name'])->toEqual(['ABC', 'XYZ']);
-});
-
-it('renders the three filters as dropdowns carrying those options', function () {
+it('no longer makes the merchant search for a row the grid already selects', function () {
+    // The dialog's first step used to be a row FINDER — a style dropdown, buyer
+    // and season dropdowns, a free-text box, Search and Clear — to locate a row
+    // that was very often already ticked on the grid behind it, and which then
+    // produced exactly what Duplicate Selected produces in one click. It is
+    // gone; the rows are the selection.
     $file = addOrderFile([['Zara', 'ABC', 'Summer', 'C-1', 'Red', 'PO-1']]);
 
     $response = $this->actingAs(addOrderUser('merchant'))
         ->get(route('uploaded-files.show', $file->id))
         ->assertOk();
 
-    // Style is the primary field and is a <select>, not a text input.
-    $response->assertSee('id="addOrderFilterStyle"', false);
-    $response->assertSee('ao-field-primary', false);
-    $response->assertSee('<option value="ABC">ABC</option>', false);
-    $response->assertSee('<option value="Summer">Summer</option>', false);
+    foreach ([
+        'id="addOrderFilterStyle"',
+        'id="addOrderFilterBuyer"',
+        'id="addOrderFilterSeason"',
+        'id="addOrderFilterAny"',
+        'id="addOrderSearchButton"',
+        'id="addOrderResultsBody"',
+        // And the toolbar button that opened it.
+        'id="addOrderButton"',
+    ] as $gone) {
+        $response->assertDontSee($gone, false);
+    }
 
-    // The free-text edge-case box survives the conversion.
-    $response->assertSee('id="addOrderFilterAny"', false);
-
-    // And Tom Select is actually loaded for them.
-    $response->assertSee('tom-select@2.3.1', false);
+    // What replaced it: the one question the sheet cannot already answer.
+    $response->assertSee('id="duplicatePlaceBelow"', false)
+        ->assertSee('id="duplicatePlaceEnd"', false)
+        ->assertSee('Where should the copies go?', false);
 });
 
-it('builds no options for a user who cannot open the dialog', function () {
-    $file = addOrderFile([['Zara', 'ABC', 'Summer', 'C-1', 'Red', 'PO-1']]);
-
-    // supply_chain can view the sheet but not add rows, so the dialog is not
-    // rendered and the query behind it should not run either.
-    $this->actingAs(addOrderUser('supply_chain'))
-        ->get(route('uploaded-files.show', $file->id))
-        ->assertOk()
-        ->assertViewHas('addOrderFilterOptions', []);
-});
-
-/*
- * Local development is MySQL, production is PostgreSQL and this suite runs on
- * SQLite — three dialects, and green tests here prove nothing about the one
- * that matters. The options query is built entirely from query-builder methods
- * with no raw SQL, no LIKE and no string or date function, so it compiles on
- * all three; this pins that by reading the SQL the real PostgreSQL grammar
- * produces.
- */
 it('compiles the dropdown options query to portable SQL on postgresql', function () {
     config()->set('database.connections.pgcheck', [
         'driver' => 'pgsql',

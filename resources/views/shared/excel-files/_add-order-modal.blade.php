@@ -22,13 +22,13 @@
      The form carries the SOURCE ROW ID plus the edited values only. Everything
      else is copied server-side from the source, so the dialog never has to hold
      — or could ever corrupt — the ~60 columns it does not show. --}}
-<div class="modal fade" id="addOrderModal" tabindex="-1" aria-labelledby="addOrderModalLabel" aria-hidden="true">
+<div class="modal fade" id="duplicateRowsModal" tabindex="-1" aria-labelledby="addOrderModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <div>
-                    <h5 class="modal-title mb-0" id="addOrderModalLabel">Add New Order</h5>
-                    <div class="text-muted small" id="addOrderSubtitle">Based on an existing row in this file</div>
+                    <h5 class="modal-title mb-0" id="addOrderModalLabel">Duplicate Rows</h5>
+                    <div class="text-muted small" id="addOrderSubtitle">Copies of the rows you have selected</div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -36,129 +36,70 @@
             <form method="POST" action="{{ route('uploaded-files.rows.add_order', $excelFile->id) }}" id="addOrderForm">
                 @csrf
                 <input type="hidden" name="source_row_id" id="addOrderSourceRowId" value="">
+                {{-- Carries the step-1 choice into the edit path, so picking
+                     "end of file" and then "edit key fields first" does not
+                     quietly insert below the source instead. --}}
+                <input type="hidden" name="placement" id="addOrderPlacement" value="below_source">
 
                 <div class="modal-body">
 
-                    {{-- ---- STEP 1: find the source row ------------------ --}}
+                    {{-- ---- STEP 1: where do the copies go? ---------------
+                         This step used to be a row FINDER: four filter boxes, a
+                         Search button and a results table, to locate a row the
+                         merchant had very often already ticked on the grid
+                         behind this dialog. It is gone. The rows are whatever
+                         is selected, and the only thing left to ask is the one
+                         thing the sheet cannot already tell us. --}}
                     <div id="addOrderStepSearch">
-                        @php
-                            // header_key => the <select> id it fills. Kept here so
-                            // the three dropdowns are rendered from one loop rather
-                            // than three near-identical blocks.
-                            $aoFilterFields = [
-                                'buyer_name' => ['id' => 'addOrderFilterBuyer', 'label' => 'Buyer', 'any' => 'Any buyer'],
-                                'season_name' => ['id' => 'addOrderFilterSeason', 'label' => 'Season', 'any' => 'Any season'],
-                            ];
-                            $aoStyleOptions = $addOrderFilterOptions['style_name'] ?? [];
-                        @endphp
-
-                        {{-- The search area is its own tinted panel, so the
-                             controls and the results below read as two things
-                             rather than one long white column. --}}
                         <div class="ao-panel">
                             <div class="ao-step-head">
                                 <span class="ao-step-chip">
                                     <span class="ao-step-num">1</span>
-                                    Find the order to copy
+                                    <span id="duplicateSelectionSummary">Nothing selected</span>
                                 </span>
                             </div>
 
-                            {{-- STYLE IS THE PRIMARY FILTER, full width and first.
-                                 Duplication here is nearly always "another order
-                                 of the same style, a few fields different", so
-                                 style is the question the merchant already has an
-                                 answer to. Buyer and Season narrow what it
-                                 returns; they are not how the search starts.
+                            <fieldset class="ao-place">
+                                <legend class="ao-label mb-2">Where should the copies go?</legend>
 
-                                 Selecting a style searches immediately — having
-                                 answered the main question, being made to press
-                                 Search is a step that tells the user nothing. --}}
-                            <div class="ao-field ao-field-primary">
-                                <label class="ao-label" for="addOrderFilterStyle">
-                                    Style <span class="ao-label-hint">— start here</span>
+                                <label class="ao-place-option">
+                                    <input type="radio" name="ao_placement" value="below_source" checked
+                                           class="form-check-input" id="duplicatePlaceBelow">
+                                    <span>
+                                        <span class="ao-place-title">Below each source row</span>
+                                        <span class="ao-place-hint">Each copy stays with the row it came from. Everything under it shifts down.</span>
+                                    </span>
                                 </label>
-                                <select class="form-select form-select-sm ao-filter ao-filter-auto"
-                                        id="addOrderFilterStyle" data-filter="style_name">
-                                    <option value="">Any style</option>
-                                    @foreach($aoStyleOptions as $option)
-                                        <option value="{{ $option }}">{{ $option }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
 
-                            <div class="row g-2 mt-1">
-                                @foreach($aoFilterFields as $headerKey => $field)
-                                    <div class="col-md-4">
-                                        <div class="ao-field">
-                                            <label class="ao-label" for="{{ $field['id'] }}">{{ $field['label'] }}</label>
-                                            <select class="form-select form-select-sm ao-filter ao-filter-auto"
-                                                    id="{{ $field['id'] }}" data-filter="{{ $headerKey }}">
-                                                <option value="">{{ $field['any'] }}</option>
-                                                @foreach($addOrderFilterOptions[$headerKey] ?? [] as $option)
-                                                    <option value="{{ $option }}">{{ $option }}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                    </div>
-                                @endforeach
-
-                                {{-- Stays free text. A contract number or a row
-                                     number is inherently open-ended, and typing
-                                     has no natural "done" moment — so this one
-                                     keeps the explicit Search button rather than
-                                     firing on every keystroke. --}}
-                                <div class="col-md-4">
-                                    <div class="ao-field">
-                                        <label class="ao-label" for="addOrderFilterAny">Any column / row no.</label>
-                                        <input type="text" class="form-control form-control-sm ao-filter"
-                                               id="addOrderFilterAny" data-filter="q" placeholder="Contract no., colour…">
-                                    </div>
-                                </div>
-                            </div>
+                                <label class="ao-place-option">
+                                    <input type="radio" name="ao_placement" value="end_of_file"
+                                           class="form-check-input" id="duplicatePlaceEnd">
+                                    <span>
+                                        <span class="ao-place-title">At the end of the file</span>
+                                        <span class="ao-place-hint">All copies together as one block at the bottom, ready to edit. Nothing already in the sheet moves.</span>
+                                    </span>
+                                </label>
+                            </fieldset>
 
                             <div class="ao-actions">
-                                <button type="button" class="btn btn-primary btn-sm" id="addOrderSearchButton">
-                                    <i class="bi bi-search me-1" aria-hidden="true"></i>Search
+                                <button type="button" class="btn btn-primary btn-sm" id="duplicateNowButton">
+                                    <i class="bi bi-copy me-1" aria-hidden="true"></i>Duplicate now
                                 </button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" id="addOrderResetButton">
-                                    Clear filters
+                                {{-- performRowDuplication() discards overrides
+                                     for more than one source row — there would
+                                     be no saying which copy the typed values
+                                     belonged to. So this is disabled rather
+                                     than accepting edits it would then throw
+                                     away, and the note below says why. --}}
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="duplicateEditFirstButton">
+                                    Edit key fields first
                                 </button>
                             </div>
-                        </div>
 
-                        {{-- Guidance, not body text: a merchant who cannot find
-                             their row needs to notice that the list was cut off. --}}
-                        <div class="ao-note d-none" id="addOrderResultNote" role="status">
-                            <i class="bi bi-info-circle" aria-hidden="true"></i>
-                            <span id="addOrderResultNoteText"></span>
-                        </div>
-
-                        <div class="ao-results-card">
-                            <div class="ao-results">
-                                <table class="table table-sm align-middle mb-0" id="addOrderResultsTable">
-                                    <thead>
-                                        <tr>
-                                            <th class="ao-col-row">Row</th>
-                                            <th>Buyer</th>
-                                            <th>Style</th>
-                                            <th>Season</th>
-                                            <th>Colour</th>
-                                            <th>Contract No.</th>
-                                            <th class="ao-col-action"><span class="visually-hidden">Choose</span></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="addOrderResultsBody">
-                                        <tr class="ao-empty">
-                                            <td colspan="7">
-                                                <div class="ao-empty-state">
-                                                    <i class="bi bi-search" aria-hidden="true"></i>
-                                                    <span>Pick a style above to see the orders you can copy.</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                            <p class="ao-note-inline d-none mb-0" id="duplicateEditFirstNote">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                                Editing before the copy is written works on one row at a time. Duplicate now, then edit the copies in the sheet.
+                            </p>
                         </div>
                     </div>
 
@@ -168,7 +109,7 @@
                             <span class="ao-step-num">2</span>
                             <span class="ao-step-title">Check the values for the new order</span>
                             <button type="button" class="btn btn-link btn-sm p-0 ms-auto" id="addOrderBackButton">
-                                Back to search
+                                Back
                             </button>
                         </div>
 
@@ -243,7 +184,7 @@
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="addOrderSubmitButton" disabled>Add Order</button>
+                    <button type="submit" class="btn btn-primary" id="addOrderSubmitButton" disabled>Duplicate row</button>
                 </div>
             </form>
         </div>
