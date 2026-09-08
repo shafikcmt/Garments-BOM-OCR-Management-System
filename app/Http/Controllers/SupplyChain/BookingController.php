@@ -1291,9 +1291,17 @@ class BookingController extends Controller
 
     protected function indexData(Request $request, bool $includeFilters = true): array
     {
-        $pendingRows = $this->buildPendingRowsQuery($request)
-            ->latest('id')
-            ->paginate(50)
+        $pendingRowsQuery = $this->buildPendingRowsQuery($request);
+        $this->applyCompletenessOrder($pendingRowsQuery);
+
+        /*
+         * 25 rather than 50. With the most complete rows first, the pages a
+         * merchant actually works from are the early ones, so a shorter page
+         * is less to scan; and the rows with nothing on them are gathered at
+         * the back instead of appearing a few times on every page.
+         */
+        $pendingRows = $pendingRowsQuery
+            ->paginate(25)
             ->withQueryString();
 
         $this->decoratePendingRows($pendingRows);
@@ -1745,6 +1753,79 @@ class BookingController extends Controller
                 ->whereNotNull('value')
                 ->whereRaw("TRIM(value) <> ''");
         });
+    }
+
+    /**
+     * Most complete rows first, emptiest last.
+     *
+     * THE LIST USED TO BE NEWEST-FIRST, which scatters half-filled rows evenly
+     * through it. On the live set that is 173 rows of 550 carrying nothing but
+     * a buyer, a season and a style — about nine per page of fifty, so every
+     * page opened on something that looked blank and the list read as broken.
+     *
+     * "Complete" is not invented here. applyHasBookingSourceData() above
+     * already names the seven groups this screen is built on — buyer, season,
+     * ihod, vendor, style, item, qty — and admits a row if ANY of them is
+     * filled. This counts how many are, through the same headerIdsForGroup()
+     * every filter on this screen uses, so the ordering and the admission rule
+     * cannot drift apart.
+     *
+     * It counts CELLS over those groups' twelve headers rather than groups.
+     * The two are all but the same thing here because the groups are disjoint
+     * and the data is tiered: measured over 550 live rows, every one of the
+     * 173 sparse rows lands at the lowest count, and only four rows anywhere
+     * sort above a row with more groups filled — all four a tie between rows
+     * that are already nearly complete. Counting groups instead would mean
+     * summing seven subqueries in the ORDER BY, and a sum of aliases is a
+     * PostgreSQL error; a bare alias is not.
+     *
+     * A quantity of zero is a filled cell but not a real quantity, and 340 of
+     * these rows have one. They keep their place among rows of the same
+     * fullness and fall behind the ones that can actually be ordered.
+     *
+     * Applied to the query AFTER every filter, so a filtered list is ordered
+     * the same way the unfiltered one is.
+     */
+    protected function applyCompletenessOrder($query): void
+    {
+        $headerIds = collect(['buyer', 'season', 'ihod', 'vendor', 'style', 'item', 'qty'])
+            ->flatMap(fn ($group) => $this->headerIdsForGroup($group))
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($headerIds)) {
+            // No resolvable columns: nothing to score by, so the list keeps the
+            // order it has always had rather than an arbitrary one.
+            $query->latest('id');
+
+            return;
+        }
+
+        $qtyHeaderIds = $this->headerIdsForGroup('qty');
+
+        $query
+            ->withCount([
+                // TRIM is the same test applyHasBookingSourceData() applies, so
+                // a row counted as having source data is scored on that data.
+                'cells as booking_field_count' => fn ($cells) => $cells
+                    ->whereIn('header_id', $headerIds)
+                    ->whereNotNull('value')
+                    ->whereRaw("TRIM(value) <> ''"),
+
+                // A written-in zero, in the forms this column actually holds —
+                // compared as strings, because casting an EAV text column to a
+                // number is written differently on MySQL and PostgreSQL.
+                'cells as booking_real_qty_count' => fn ($cells) => $cells
+                    ->whereIn('header_id', $qtyHeaderIds)
+                    ->whereNotNull('value')
+                    ->whereRaw("TRIM(value) <> ''")
+                    ->whereNotIn('value', ['0', '0.0', '0.00', '0.000']),
+            ])
+            ->orderByDesc('booking_field_count')
+            ->orderByDesc('booking_real_qty_count')
+            // Unchanged, so within one tier the list reads as it always has.
+            ->latest('id');
     }
 
     protected function applyCellFilter($query, string $group, ?string $value): void
