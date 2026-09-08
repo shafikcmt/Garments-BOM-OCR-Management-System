@@ -15,6 +15,7 @@
     <meta charset="UTF-8">
     <style>
         table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 10pt; }
+        td.blank { border: 0; background: #fff; }
         th, td { border: 1px solid #4b5563; padding: 5px; vertical-align: top; }
         th { background: #006C9D; color: #ffffff; font-weight: bold; }
         .remarks-col { min-width: 90px; width: 11%; }
@@ -52,7 +53,10 @@
         <td class="label">DATE</td><td colspan="6">{{ $bookingData['date'] ?? '' }}</td>
     </tr>
     <tr>
-        <td class="label"></td><td colspan="5"></td>
+        {{-- Blank half of the REQUIRED EX-MILL row. Not "label", which
+             paints the header fill and made an empty cell look like a field
+             whose name had gone missing. --}}
+        <td class="blank"></td><td colspan="5" class="blank"></td>
         <td class="label">REQUIRED EX-MILL</td><td colspan="6">{{ $bookingData['required_ex_mill'] ?? '' }}</td>
     </tr>
     <tr>
@@ -128,7 +132,6 @@
             <tr><td>{{ $index + 1 }}</td><td colspan="12">{{ $note }}</td></tr>
         @endif
     @endforeach
-    <tr><td colspan="4" class="label">Prepared By</td><td colspan="5" class="label">Checked By</td><td colspan="4" class="label">Approved By</td></tr>
 </table>
 </body>
 </html>

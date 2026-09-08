@@ -117,7 +117,15 @@
            nowrap keeps "REQUIRED EX-MILL" on one line inside the fixed 20mm
            label column; the blank left half carries no header tint. */
         .info-table th.info-tight { white-space: nowrap; font-size: 6px; letter-spacing: -.01em; }
-        .info-table td.info-blank { background: #fff; }
+        /* Same treatment as the on-screen preview: the blank half of the
+           REQUIRED EX-MILL row loses its top and bottom edges so it reads as
+           space rather than as an empty cell. */
+        .info-table td.info-blank {
+            background: #fff;
+            border-top: 0;
+            border-bottom: 0;
+            border-left: 0;
+        }
         .style-value { font-size: 8px; font-weight: 900; color: #004b70; letter-spacing: .2px; }
         .revision-pill { display: inline-block; margin-left: 3mm; padding: .7mm 1.8mm; border-radius: 999px; background: #fff7ed; border: 1px solid #fdba74; color: #9a3412; font-weight: 900; font-size: 6px; line-height: 1; white-space: nowrap; text-transform: uppercase; }
         .line-style { font-weight: 900; color: #004b70; }
@@ -170,10 +178,6 @@
             padding: 0;
         }
         .notes-box li { margin: 0 0 .7mm; font-size: 6.8px; }
-        .sign-table { width: 100%; margin-top: 8mm; table-layout: fixed; }
-        .sign-table td { border: 0; padding: 0 6mm; vertical-align: bottom; text-align: center; }
-        .sign-box { width: 100%; font-size: 7.2px; color: #111827; font-weight: 900; }
-        .sign-line { width: 46mm; margin: 9mm auto 0; border-top: 1px solid #111827; height: 1mm; }
         .footer-note { margin-top: 2mm; font-size: 5.7px; color: #64748b; text-align: center; }
         .page-pad { padding: 0; }
         @media print {
@@ -303,29 +307,6 @@
                 @endforeach
             </ol>
         </div>
-
-        <table class="sign-table">
-            <tr>
-                <td>
-                    <div class="sign-box">
-                        <div>Prepared By</div>
-                        <div class="sign-line"></div>
-                    </div>
-                </td>
-                <td>
-                    <div class="sign-box">
-                        <div>Checked By</div>
-                        <div class="sign-line"></div>
-                    </div>
-                </td>
-                <td>
-                    <div class="sign-box">
-                        <div>Approved By</div>
-                        <div class="sign-line"></div>
-                    </div>
-                </td>
-            </tr>
-        </table>
 
         <div class="footer-note">Generated from HAPL OCR Supply Chain Booking Generate module - PO {{ $bookingPo->po_no }}</div>
     </div>

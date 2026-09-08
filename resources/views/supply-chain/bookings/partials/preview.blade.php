@@ -147,9 +147,19 @@
         font-size: 6px;
         letter-spacing: -.01em;
     }
-    /* The blank left half of that row: plain paper, no header tint, so it reads
-       as empty space rather than an abandoned label cell. */
-    .booking-format-preview-box .bf-info-table td.bf-info-blank { background: #fff; }
+    /* The left half of the REQUIRED EX-MILL row. Fifteen fields in a
+       two-per-row table always leave one half-cell empty, so this cannot be
+       removed — REQUIRED EX-MILL lives in the other half of this very row.
+       What it can stop doing is looking like a cell: without its top and
+       bottom edges it reads as continuous space between the ATTN row and the
+       E-MAIL row, rather than an empty box someone forgot to fill. The right
+       edge stays, so REQUIRED EX-MILL keeps its own left border. */
+    .booking-format-preview-box .bf-info-table td.bf-info-blank {
+        background: #fff;
+        border-top: 0;
+        border-bottom: 0;
+        border-left: 0;
+    }
     .booking-format-preview-box .bf-style-value { font-size: 8px; font-weight: 900; color: var(--hapl-blue-dark); letter-spacing: .2px; }
     .booking-format-preview-box .bf-revision-pill {
         display: inline-block;
@@ -212,10 +222,6 @@
     }
     .booking-format-preview-box .bf-notes-box ol { margin: 1.5mm 3.5mm 2mm 5.5mm; padding: 0; }
     .booking-format-preview-box .bf-notes-box li { margin: 0 0 .7mm; font-size: 6.8px; }
-    .booking-format-preview-box .bf-sign-table { width: 100%; margin-top: 8mm; table-layout: fixed; }
-    .booking-format-preview-box .bf-sign-table td { border: 0; padding: 0 6mm; vertical-align: bottom; text-align: center; }
-    .booking-format-preview-box .bf-sign-box { width: 100%; font-size: 7.2px; color: #111827; font-weight: 900; }
-    .booking-format-preview-box .bf-sign-line { width: 46mm; margin: 9mm auto 0; border-top: 1px solid #111827; height: 1mm; }
     .booking-format-preview-box .bf-footer-note { margin-top: 2mm; font-size: 5.7px; color: #64748b; text-align: center; }
     .booking-format-preview-box .bf-action-bar {
         display: flex;
@@ -889,29 +895,6 @@
                     @endforeach
                 </ol>
             </div>
-
-            <table class="bf-sign-table">
-                <tr>
-                    <td>
-                        <div class="bf-sign-box">
-                            <div>Prepared By</div>
-                            <div class="bf-sign-line"></div>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="bf-sign-box">
-                            <div>Checked By</div>
-                            <div class="bf-sign-line"></div>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="bf-sign-box">
-                            <div>Approved By</div>
-                            <div class="bf-sign-line"></div>
-                        </div>
-                    </td>
-                </tr>
-            </table>
 
             <div class="bf-footer-note">Generated from HAPL OCR Supply Chain Booking Generate module - PO {{ $poNo }}</div>
         </div>
