@@ -962,10 +962,19 @@ class ExcelFileController extends Controller
      * them, only pre-filled — including saving immediately, which is what Add
      * New Row does today.
      *
-     * Each copy is inserted DIRECTLY AFTER ITS OWN SOURCE, so a duplicate of
-     * row 41 becomes row 42 and stays with the work it belongs to. Everything
-     * below shifts down. See the transaction body for how that is done without
-     * tripping the unique index on (excel_file_id, row_number).
+     * WHERE THE COPIES LAND IS THE CALLER'S CHOICE, and the default is what
+     * this action has always done:
+     *
+     *   below_source (default) — each copy directly after its own source, so a
+     *     duplicate of row 41 becomes row 42 and stays with the work it belongs
+     *     to. Everything below shifts down.
+     *   end_of_file — every copy after the last row of the file, as one block.
+     *     Nothing that already exists moves. This is for duplicating rows
+     *     scattered through a long sheet in order to work on the copies: below
+     *     each source, a dozen of them are a dozen things to find again.
+     *
+     * See the transaction body for how either is done without tripping the
+     * unique index on (excel_file_id, row_number).
      *
      * Safe to renumber because row_number is ORDER ONLY: every real reference
      * — booking_pos.excel_row_id, activity_logs.row_id, excel_cells.row_id,
@@ -983,7 +992,14 @@ class ExcelFileController extends Controller
         $validated = $request->validate([
             'row_ids' => ['required', 'array', 'min:1'],
             'row_ids.*' => ['integer'],
+            // Optional, and absent means what this action has always done. An
+            // unrecognised value is refused rather than quietly falling back:
+            // silently duplicating to the wrong end of a 499-row sheet is worse
+            // than saying no.
+            'placement' => ['nullable', 'string', 'in:below_source,end_of_file'],
         ]);
+
+        $placement = $validated['placement'] ?? 'below_source';
 
         // Scoped to THIS file, so a hand-made request cannot copy rows out of
         // somebody else's workbook into this one. Ordered so a multi-row
@@ -1000,15 +1016,24 @@ class ExcelFileController extends Controller
                 ->with('warning', 'No matching row was found to duplicate.');
         }
 
-        $this->performRowDuplication($excelFile, $user, $sourceRows, 'below_source');
+        $this->performRowDuplication($excelFile, $user, $sourceRows, $placement);
 
         $count = $sourceRows->count();
 
-        return redirect()
-            ->route('uploaded-files.show', $excelFile->id)
-            ->with('success', $count === 1
+        // Says WHERE the copies went, because the two placements put them in
+        // very different parts of the sheet and the merchant is about to go
+        // looking for them.
+        $message = $placement === 'end_of_file'
+            ? ($count === 1
+                ? 'Row duplicated. The copy was added at the end of the file.'
+                : $count . ' rows duplicated. The copies were added at the end of the file, in the order they appeared above.')
+            : ($count === 1
                 ? 'Row duplicated. The copy was inserted directly below its source row.'
                 : $count . ' rows duplicated. Each copy was inserted directly below its own source row.');
+
+        return redirect()
+            ->route('uploaded-files.show', $excelFile->id)
+            ->with('success', $message);
     }
 
     /**
@@ -1509,7 +1534,26 @@ class ExcelFileController extends Controller
              */
             $sequence = [];
 
-            if ($placement === 'block_after_last') {
+            if ($placement === 'end_of_file') {
+                /*
+                 * Every copy goes after the LAST ROW OF THE FILE, in the order
+                 * the sources were given.
+                 *
+                 * This is the only placement that moves nothing that already
+                 * exists. The anchor is the highest row number there is, so the
+                 * park update below matches no rows and there is no tail to
+                 * rewrite — the copies simply take the numbers after it. That
+                 * is the point of it: a merchant duplicating a dozen scattered
+                 * rows to work on them gets one block at the bottom, rather
+                 * than a dozen copies interleaved through the sheet they then
+                 * have to hunt for.
+                 */
+                $anchor = (int) $excelFile->rows()->max('row_number');
+
+                foreach ($sourceRows as $sourceRow) {
+                    $sequence[] = ['new', $sourceRow->id];
+                }
+            } elseif ($placement === 'block_after_last') {
                 // The whole group stays put and the copies follow it in one
                 // run, so a style reads as originals-then-copies rather than
                 // alternating lines.

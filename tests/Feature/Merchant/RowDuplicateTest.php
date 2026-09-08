@@ -326,3 +326,147 @@ it('will not copy a row out of another workbook into this one', function () {
     expect($file->rows()->count())->toBe(1);
     expect($otherFile->rows()->count())->toBe(1);
 });
+
+/*
+|--------------------------------------------------------------------------
+| Placement — where the copies land
+|--------------------------------------------------------------------------
+|
+| duplicateRows() has always put each copy directly below its own source. That
+| is still the default and every test above still describes it. `end_of_file`
+| is the alternative: one block at the bottom, nothing that already exists
+| moved. It is for duplicating rows scattered through a long sheet in order to
+| work on the copies, where a dozen copies below a dozen sources are a dozen
+| things to find again.
+|
+| Row numbers are asserted directly, because placement IS the row number —
+| there is nothing else to observe about it.
+*/
+
+it('appends the copy at the end of the file when asked to', function () {
+    $file = worksheetFileWithRows(3);
+    $source = $file->rows()->orderBy('row_number')->first();
+
+    $this->actingAs(worksheetUser('merchant'))
+        ->post(route('uploaded-files.rows.duplicate', $file->id), [
+            'row_ids' => [$source->id],
+            'placement' => 'end_of_file',
+        ])
+        ->assertRedirect(route('uploaded-files.show', $file->id));
+
+    $copy = ExcelRow::where('duplicated_from_row_id', $source->id)->first();
+
+    // Row 1 copied to row 4, not to row 2.
+    expect($copy->row_number)->toBe(4)
+        ->and($source->fresh()->row_number)->toBe(1);
+});
+
+it('leaves every existing row exactly where it was', function () {
+    // The property that separates this placement from the other two: nothing
+    // that already exists moves, so no row number a user is reading off the
+    // screen changes under them.
+    $file = worksheetFileWithRows(5);
+    $rows = $file->rows()->orderBy('row_number')->get();
+    $before = $rows->pluck('row_number', 'id')->all();
+
+    $this->actingAs(worksheetUser('merchant'))
+        ->post(route('uploaded-files.rows.duplicate', $file->id), [
+            'row_ids' => [$rows[0]->id, $rows[2]->id],
+            'placement' => 'end_of_file',
+        ]);
+
+    $after = ExcelRow::whereIn('id', array_keys($before))->pluck('row_number', 'id')->all();
+
+    expect($after)->toEqual($before);
+});
+
+it('appends several copies as one block, in source order', function () {
+    $file = worksheetFileWithRows(5);
+    $rows = $file->rows()->orderBy('row_number')->get();
+
+    // Given out of order on purpose: the block must read in ROW order, not in
+    // whichever order the checkboxes were ticked.
+    $this->actingAs(worksheetUser('merchant'))
+        ->post(route('uploaded-files.rows.duplicate', $file->id), [
+            'row_ids' => [$rows[3]->id, $rows[0]->id],
+            'placement' => 'end_of_file',
+        ]);
+
+    $copyOfFirst = ExcelRow::where('duplicated_from_row_id', $rows[0]->id)->first();
+    $copyOfFourth = ExcelRow::where('duplicated_from_row_id', $rows[3]->id)->first();
+
+    expect($copyOfFirst->row_number)->toBe(6)
+        ->and($copyOfFourth->row_number)->toBe(7)
+        ->and($file->rows()->count())->toBe(7);
+});
+
+it('still duplicates below the source when no placement is given', function () {
+    // The default is what this action has always done, so an existing caller
+    // that knows nothing about placement is unaffected.
+    $file = worksheetFileWithRows(3);
+    $source = $file->rows()->orderBy('row_number')->first();
+
+    $this->actingAs(worksheetUser('merchant'))
+        ->post(route('uploaded-files.rows.duplicate', $file->id), ['row_ids' => [$source->id]]);
+
+    expect(ExcelRow::where('duplicated_from_row_id', $source->id)->first()->row_number)->toBe(2);
+});
+
+it('refuses an unrecognised placement rather than guessing', function () {
+    // Quietly falling back would duplicate to the wrong end of a long sheet
+    // and say it succeeded.
+    $file = worksheetFileWithRows(3);
+    $source = $file->rows()->orderBy('row_number')->first();
+
+    $this->actingAs(worksheetUser('merchant'))
+        ->post(route('uploaded-files.rows.duplicate', $file->id), [
+            'row_ids' => [$source->id],
+            'placement' => 'somewhere_else',
+        ])
+        ->assertSessionHasErrors('placement');
+
+    expect($file->rows()->count())->toBe(3);
+});
+
+it('gives an appended copy the same lineage, badge and values as any other', function () {
+    // Placement changes WHERE the copy goes and nothing else — it must not
+    // become a second kind of duplicate.
+    $file = worksheetFileWithRows(3);
+    $source = $file->rows()->orderBy('row_number')->first();
+
+    $this->actingAs(worksheetUser('merchant'))
+        ->post(route('uploaded-files.rows.duplicate', $file->id), [
+            'row_ids' => [$source->id],
+            'placement' => 'end_of_file',
+        ]);
+
+    $copy = ExcelRow::where('duplicated_from_row_id', $source->id)->first();
+
+    expect($copy->duplicated_from_row_id)->toBe($source->id)
+        ->and($copy->duplicated_at)->not->toBeNull()
+        // The badge the worksheet draws on a fresh copy.
+        ->and($copy->isFlaggedDuplicate())->toBeTrue()
+        // Every cell copied, same as below_source.
+        ->and($copy->cells->pluck('value', 'header_id')->all())
+        ->toEqual($source->cells->pluck('value', 'header_id')->all());
+
+    // And the duplication is recorded, naming the source's number.
+    expect(\App\Models\ActivityLog::where('row_id', $copy->id)
+        ->where('action', 'row_duplicated')->exists())->toBeTrue();
+});
+
+it('says where the copies went', function () {
+    $file = worksheetFileWithRows(3);
+    $rows = $file->rows()->orderBy('row_number')->get();
+
+    $this->actingAs(worksheetUser('merchant'))
+        ->post(route('uploaded-files.rows.duplicate', $file->id), [
+            'row_ids' => [$rows[0]->id, $rows[1]->id],
+            'placement' => 'end_of_file',
+        ])
+        ->assertSessionHas('success', fn ($m) => str_contains($m, 'end of the file'));
+
+    $this->actingAs(worksheetUser('merchant'))
+        ->post(route('uploaded-files.rows.duplicate', $file->id), ['row_ids' => [$rows[0]->id]])
+        ->assertSessionHas('success', fn ($m) => str_contains($m, 'below its source row'));
+});
