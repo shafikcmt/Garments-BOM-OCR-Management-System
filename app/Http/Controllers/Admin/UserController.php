@@ -1076,6 +1076,26 @@ class UserController extends Controller
             : $user->buyers()->get()->concat(collect([$user->buyer])->filter())
                 ->unique('id')->sortBy('id')->values();
 
+        /*
+         * THE OTHER HALF, for display only. $assignedBuyers above answers one
+         * question per kind of user: ownership for a department admin, Buyer
+         * Access for everybody else. That is right for what reads it, and it
+         * is also why this screen told a department admin "Not assigned yet"
+         * moments after somebody had ticked a buyer for them — the tick writes
+         * BUYER ACCESS into the buyer_user pivot, and for an admin the screen
+         * was only ever looking at ownership.
+         *
+         * The two are genuinely different things and are stored separately on
+         * purpose (see User::buyers() and User::ownedBuyers()). So the fix is
+         * not to merge them, it is to let the view name both. Nothing here
+         * changes what is stored, scoped or written.
+         */
+        $buyerAccessBuyers = $user->buyers()->get()
+            ->concat(collect([$user->buyer])->filter())
+            ->unique('id')
+            ->sortBy('id')
+            ->values();
+
         // The editable widget, when this actor may change the set at all.
         // Empty for everyone else, and the view falls back to the read-only
         // badges it has always shown.
@@ -1114,6 +1134,7 @@ class UserController extends Controller
                 'user',
                 'roles',
                 'assignedBuyers',
+                'buyerAccessBuyers',
                 'assignableBuyers',
                 'mayUnconfineBuyers',
                 'buyerScopedDepartments',

@@ -299,15 +299,43 @@
                              or Accounts admin asked to "assign one from Admin › Buyers"
                              would be chasing something that nothing will ever read. --}}
                         @elseif($user->isDepartmentAdmin() && $user->isMerchantDepartment())
+                            {{-- A department admin owning no buyer. The badge
+                                 here used to read "Not assigned yet", which was
+                                 wrong twice over when Buyer Access had just been
+                                 set for them: they ARE assigned, and what they
+                                 lack is ownership — a different thing, kept in a
+                                 different column on purpose. Saying "not
+                                 assigned" sent the admin back to the tick box
+                                 they had already ticked.
+
+                                 So both facts are stated, each by its own name. --}}
                             <div class="mb-4">
-                                <label class="form-label fw-semibold d-block">Assigned Buyer</label>
-                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">
-                                    <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>Not assigned yet
-                                </span>
-                                <div class="form-text">
-                                    This department admin owns no buyer yet — assign one from
-                                    <a href="{{ route('admin.buyers.index') }}">Admin &rsaquo; Buyers</a>.
-                                </div>
+                                @if($buyerAccessBuyers->isNotEmpty())
+                                    <label class="form-label fw-semibold d-block">Buyer access</label>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach($buyerAccessBuyers as $accessBuyer)
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                                <i class="bi bi-tag-fill me-1" aria-hidden="true"></i>{{ $accessBuyer->buyer_name }}
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                    <div class="form-text">
+                                        Assigned to {{ $buyerAccessBuyers->count() > 1 ? 'these buyers' : 'this buyer' }}.
+                                        Owns no buyer yet — ownership is separate and is set in
+                                        <a href="{{ route('admin.buyers.index') }}">Admin &rsaquo; Buyers</a>.
+                                    </div>
+                                @else
+                                    <label class="form-label fw-semibold d-block">Assigned Buyer</label>
+                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">
+                                        <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>No buyer yet
+                                    </span>
+                                    <div class="form-text">
+                                        This department admin owns no buyer and has no buyer access.
+                                        Ownership is set in
+                                        <a href="{{ route('admin.buyers.index') }}">Admin &rsaquo; Buyers</a>;
+                                        buyer access is set above.
+                                    </div>
+                                @endif
                             </div>
                         @endif
 

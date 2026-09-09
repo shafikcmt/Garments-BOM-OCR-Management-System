@@ -284,17 +284,6 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Store Reports</span></span>
                         </a>
                     </li>
-                    {{-- Same entry, same flag, as the Store block below. The
-                         flag was never Store-specific — only the one <li> that
-                         read it was, which left a Merchant department admin
-                         holding access with no way to reach it. --}}
-                    @if($seeTeamManagement)
-                    <li class="sidebar-item">
-                        <a href="{{ route('admin.users.index') }}" class="sidebar-nav-link {{ request()->routeIs('admin.users.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-people" aria-hidden="true"></i></span><span class="sidebar-link-text">Team Management</span></span>
-                        </a>
-                    </li>
-                    @endif
                 </ul>
             </div>
             @endrole
@@ -355,13 +344,6 @@
                     <li class="sidebar-item">
                         <a href="{{ route('store.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('store.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
-                        </a>
-                    </li>
-                    @endif
-                    @if($seeTeamManagement)
-                    <li class="sidebar-item">
-                        <a href="{{ route('admin.users.index') }}" class="sidebar-nav-link {{ request()->routeIs('admin.users.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-people" aria-hidden="true"></i></span><span class="sidebar-link-text">Team Management</span></span>
                         </a>
                     </li>
                     @endif
@@ -650,6 +632,34 @@
                 </ul>
             </div>
             @endrole
+
+            {{-- TEAM MANAGEMENT — ONE ENTRY, OUTSIDE EVERY ROLE BLOCK.
+                 It used to be an <li> copied inside the Merchant block and
+                 again inside the Store block, which meant the flag was right
+                 and the link was still unreachable for everyone else: a Supply
+                 Chain, Accounts or Commercial department admin renders neither
+                 of those blocks and so never saw it, however plainly
+                 is_department_admin said they should. Adding a third copy
+                 would have fixed one department and left the other two.
+
+                 So it sits here instead, beside Approvals — the other entry
+                 that belongs to a person rather than to a department.
+
+                 Admin is excluded on purpose: it already has "Users & Roles"
+                 pointing at this very screen, and burying the link inside role
+                 blocks was the original way of keeping it out of that menu. --}}
+            @if($seeTeamManagement && ! ($storeUser?->hasRole('admin') ?? false))
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Team</div>
+                    <ul class="sidebar-list">
+                        <li class="sidebar-item">
+                            <a href="{{ route('admin.users.index') }}" class="sidebar-nav-link {{ request()->routeIs('admin.users.*') ? 'is-active' : '' }}">
+                                <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-people" aria-hidden="true"></i></span><span class="sidebar-link-text">Team Management</span></span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            @endif
 
             @can('approve-pra')
                 @php

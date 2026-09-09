@@ -340,14 +340,20 @@ it('tells a super admin when a department admin still has no buyer', function ()
     $html = $this->actingAs(scopedSuperAdmin())
         ->get(route('admin.users.edit', $unassigned))->assertOk()->getContent();
 
-    expect($html)->toContain('Not assigned yet')
+    // The wording moved off "Not assigned yet", which was wrong for the case
+    // this screen actually hits most: a department admin who HAS been given
+    // buyer access and owns nothing. Access and ownership are separate things,
+    // so the notice now names which one is missing. The rule this test exists
+    // for is unchanged — a super admin is told, and is pointed at Buyers.
+    expect($html)->toContain('No buyer yet')
+        ->and($html)->toContain('owns no buyer and has no buyer access')
         ->and($html)->toContain(route('admin.buyers.index'));
 
     // A plain user has nothing to assign and is told nothing.
     $plain = User::factory()->create()->assignRole('merchant');
 
     expect($this->actingAs(scopedSuperAdmin())->get(route('admin.users.edit', $plain))->getContent())
-        ->not->toContain('Not assigned yet');
+        ->not->toContain('No buyer yet');
 });
 
 it('keeps a plain store user out of the screen entirely', function () {
