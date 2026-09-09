@@ -180,9 +180,13 @@ class User extends Authenticatable
      * Every buyer this user is confined to.
      *
      * Two sources, because the assignment is recorded in two places for two
-     * different kinds of user: a department-admin owns buyers
-     * (buyers.department_admin_id), a normal user is assigned them
+     * different things: OWNERSHIP, which only a department admin has
+     * (buyers.department_admin_id), and ACCESS, which anyone may be granted
      * (users.buyer_id + the buyer_user pivot).
+     *
+     * A department admin may hold BOTH, and the union of the two is what
+     * confines them. Reading ownership alone was how a granted-but-unowning
+     * admin came back with an empty set and was treated as unconfined.
      *
      * DO NOT read an empty result as "unscoped" in new code. Ask
      * isBuyerConfined(), or better, ask hasBuyerAccess() and let it decide.
@@ -202,18 +206,55 @@ class User extends Authenticatable
         }
 
         if ($this->isDepartmentAdmin()) {
-            return $this->ownedBuyers()->pluck('id')->map(fn ($id) => (int) $id)->all();
+            // OWNERSHIP AND ACCESS, NOT OWNERSHIP ALONE.
+            //
+            // This branch used to return ownedBuyers() and stop, which read the
+            // wrong half for a department admin who had been GRANTED buyers
+            // rather than given ownership of them. The tick boxes on the user
+            // form write the buyer_user pivot; this never looked at it; the set
+            // came back empty — and an empty set for an admin is exactly what
+            // isBuyerConfined() reads as "not confined", handing them every
+            // buyer in the system. The grant meant to narrow them widened them.
+            //
+            // Fails open, which is the direction that matters, and it is the
+            // very case the docblock above warns about: a 'specific' user
+            // holding nothing must be confined to NOTHING, never waved through.
+            //
+            // No production user was standing on it — every real department
+            // admin is mode 'all' today — but that is luck, not design. The
+            // profile screen now names buyer access plainly, so granting it to
+            // a department admin is about to become the ordinary thing to do,
+            // and fail-open must not sit under a screen that invites the input
+            // which trips it.
+            //
+            // Owned ids lead, so an admin's own buyers keep the position they
+            // have always held for anything that reads the first element.
+            return array_values(array_unique(array_merge(
+                $this->ownedBuyers()->pluck('id')->map(fn ($id) => (int) $id)->all(),
+                $this->accessBuyerIds()
+            )));
         }
 
-        // A team member's assignments live in the buyer_user pivot; their
-        // users.buyer_id is the primary one and is listed FIRST, so
-        // merchantBuyerId() below still answers with the column every existing
-        // caller has always read. The rest follow in id order.
-        //
-        // Union rather than pivot-only: the column is authoritative on its own
-        // for anyone whose pivot row is missing — a user created before the
-        // backfill ran, or one added straight to the table — and dropping them
-        // to unscoped would quietly hand them access to every buyer.
+        return $this->accessBuyerIds();
+    }
+
+    /**
+     * The buyers this user has been ASSIGNED — Buyer Access, as written by the
+     * tick boxes on the user form. Not ownership; see ownedBuyers().
+     *
+     * users.buyer_id is the primary one and is listed FIRST, so
+     * merchantBuyerId() below still answers with the column every existing
+     * caller has always read. The rest follow in id order.
+     *
+     * Union rather than pivot-only: the column is authoritative on its own for
+     * anyone whose pivot row is missing — a user created before the backfill
+     * ran, or one added straight to the table — and dropping them to unscoped
+     * would quietly hand them access to every buyer.
+     *
+     * @return list<int>
+     */
+    private function accessBuyerIds(): array
+    {
         $assigned = $this->buyers()->pluck('buyers.id')->map(fn ($id) => (int) $id)->all();
 
         if (! $this->buyer_id) {
@@ -244,9 +285,12 @@ class User extends Authenticatable
      * same thing; with an explicit mode they are not, and conflating them is
      * the one mistake in this design that silently unscopes everybody.
      *
-     *   department admin  confined by what they OWN. Mode is not consulted —
-     *                     applying it would let a mode value cancel an
-     *                     ownership the Buyers screen still shows them holding.
+     *   department admin  confined by what they OWN OR ARE GRANTED. Mode is
+     *                     not consulted — applying it would let a mode value
+     *                     cancel an ownership the Buyers screen still shows
+     *                     them holding. An admin holding neither is therefore
+     *                     unconfined whatever the mode says, which is how the
+     *                     four 'all'-mode admins in production read today.
      *   team member       confined when their mode says so, OR when they hold
      *                     buyers regardless of the mode. See the comment on
      *                     that expression — the "or" is what makes an unset or
