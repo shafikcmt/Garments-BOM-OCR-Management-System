@@ -362,6 +362,8 @@ class PurchaseRequisitionController extends Controller
      */
     public function pdf(PurchaseRequisition $requisition, MonthlyRequisitionReportService $report)
     {
+        $this->authorizeVisible($requisition);
+
         $data = $this->documentData($requisition, $report);
 
         // Landscape A4: the sheet is 21 columns wide and will not fit portrait.
@@ -388,10 +390,45 @@ class PurchaseRequisitionController extends Controller
      * read by someone else, so a change is a correction — that is stage 2 and
      * is permission-gated.
      */
+    /**
+     * May this user open the edit form on this requisition?
+     *
+     * Two separate doors, and a user needs only one of them:
+     *
+     *   1. It is still a DRAFT — isEditable(), unchanged, the requester's own
+     *      window.
+     *   2. The Store is correcting a department's sheet on the way through —
+     *      open across Submitted and Store Reviewed only, and only for someone
+     *      who holds the correction permission every other General Stock screen
+     *      uses. This is what lets Store fix a quantity before printing it
+     *      rather than sending the sheet back.
+     *
+     * Refusals name which rule stopped them, because "no longer be edited" on
+     * an approved requisition and "not your requisition to correct" are
+     * different problems with different next steps.
+     */
+    private function authorizeEditable(PurchaseRequisition $requisition): void
+    {
+        if ($requisition->isEditable()) {
+            return;
+        }
+
+        $user = auth()->user();
+
+        $storeMayCorrect = $user
+            && PurchaseRequisition::seesEveryRequisition($user)
+            && $requisition->isOpenToStoreCorrection()
+            && $user->canAny($this->correctionPermissions(self::PERMISSION_EDIT));
+
+        abort_unless($storeMayCorrect, 403, $requisition->isOpenToStoreCorrection()
+            ? 'Correcting a submitted requisition is done by the Store team. Ask them to amend it.'
+            : 'This requisition has been approved and can no longer be edited.');
+    }
+
     public function edit(PurchaseRequisition $requisition)
     {
-        abort_unless($requisition->isEditable(), 403,
-            'This requisition has already been submitted and can no longer be edited.');
+        $this->authorizeVisible($requisition);
+        $this->authorizeEditable($requisition);
 
         $requisition->load('items.stockItem');
 
@@ -404,12 +441,17 @@ class PurchaseRequisitionController extends Controller
 
     public function update(Request $request, PurchaseRequisition $requisition)
     {
-        abort_unless($requisition->isEditable(), 403,
-            'This requisition has already been submitted and can no longer be edited.');
+        $this->authorizeVisible($requisition);
+        $this->authorizeEditable($requisition);
 
         $data = $this->validated($request, $requisition);
 
-        DB::transaction(function () use ($data, $requisition) {
+        // A Store correction, as opposed to the requester finishing their own
+        // draft. Decided BEFORE the update, because the status it turns on is
+        // the one this save is about to overwrite.
+        $isStoreCorrection = ! $requisition->isEditable();
+
+        DB::transaction(function () use ($data, $requisition, $isStoreCorrection) {
             $requisition->update([
                 'requisition_no' => ($data['requisition_no'] ?? null) ?: $requisition->requisition_no,
                 'requisition_date' => $data['requisition_date'],
@@ -418,10 +460,29 @@ class PurchaseRequisitionController extends Controller
                 'indent_section_id' => $data['indent_section_id'] ?? null,
                 'indent_person_id' => $data['indent_person_id'] ?? null,
                 'contact' => $data['contact'] ?? null,
-                'status' => $data['action'] === 'submit'
-                    ? PurchaseRequisition::STATUS_SUBMITTED
-                    : PurchaseRequisition::STATUS_DRAFT,
-                'submitted_at' => $data['action'] === 'submit' ? now() : null,
+
+                // A Store correction KEEPS the stage the requisition is at.
+                // Without this a sheet the Store had already marked Received
+                // would be knocked back to Submitted by the act of fixing a
+                // quantity on it — or, on Save Draft, all the way back to
+                // Draft and out of the review queue altogether.
+                'status' => $isStoreCorrection
+                    ? $requisition->status
+                    : ($data['action'] === 'submit'
+                        ? PurchaseRequisition::STATUS_SUBMITTED
+                        : PurchaseRequisition::STATUS_DRAFT),
+                'submitted_at' => $isStoreCorrection
+                    ? $requisition->submitted_at
+                    : ($data['action'] === 'submit' ? now() : null),
+
+                // Who corrected it and when. checked_by / checked_at already
+                // existed on this table, already print as "Checked By" in the
+                // document's signature block, and were written by nothing —
+                // which is exactly this. created_by is untouched, so the sheet
+                // still belongs to the department that raised it.
+                'checked_by' => $isStoreCorrection ? auth()->id() : $requisition->checked_by,
+                'checked_at' => $isStoreCorrection ? now() : $requisition->checked_at,
+
                 'remarks' => $data['remarks'] ?? null,
             ]);
 
@@ -433,11 +494,19 @@ class PurchaseRequisitionController extends Controller
 
         return redirect()
             ->route('store.stock.requisitions.show', $requisition)
-            ->with('success', 'Requisition '.$requisition->requisition_no.' updated.');
+            ->with('success', $isStoreCorrection
+                // Says what actually happened: the sheet stayed where it was in
+                // the flow and is still the department's, which is the part a
+                // Store user needs to be sure of after correcting someone
+                // else's request.
+                ? 'Requisition '.$requisition->requisition_no.' corrected by Store. It stays at "'
+                    .$requisition->fresh()->progressLabel().'".'
+                : 'Requisition '.$requisition->requisition_no.' updated.');
     }
 
     public function destroy(PurchaseRequisition $requisition)
     {
+        $this->authorizeVisible($requisition);
         $this->authorizeStoreDelete('purchase requisition');
 
         $no = $requisition->requisition_no;

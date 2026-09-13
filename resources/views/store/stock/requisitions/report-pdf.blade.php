@@ -17,6 +17,19 @@
 
     $sections = $sections ?? array_merge(['ALL' => $rows], $byCategory->all());
 
+    /*
+     * The PDF header block below describes the WHOLE MONTH, and that is right
+     * for it: this branch only ever renders with every section at once (ALL
+     * followed by each category), so its Requisitions / Item Lines / Grand
+     * Total cover the document they head.
+     *
+     * An Excel sheet is handed exactly one section and takes the @else
+     * letterhead instead, which names that sheet's own section and prints no
+     * total — so a department tab cannot show the month's figures over its own
+     * rows. Each tab's own total is the "Total-" row in _report-rows, summed
+     * from the rows that tab was given.
+     */
+
     // Excel gets bare numbers and blank cells: a "1,175" carrying a thousands
     // separator arrives as TEXT, which cannot be summed, sorted or number
     // formatted, and a "-" placeholder would make a numeric column read as
