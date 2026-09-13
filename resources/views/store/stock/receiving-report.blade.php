@@ -30,7 +30,7 @@
                 <div>
                     <div class="app-hero-eyebrow">General Stock</div>
                     <h3 class="app-hero-title mb-0">Receiving Report</h3>
-                    <p class="app-hero-copy mb-0">Goods received in {{ $periodLabel }}, one line per delivery.</p>
+                    <p class="app-hero-copy mb-0">Goods received in {{ $periodLabel }}, one line per item.</p>
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2">
@@ -154,61 +154,87 @@
                                 <th>RCV Date</th>
                                 <th>Supplier</th>
                                 <th style="min-width:220px;">Item Name</th>
-                                <th class="text-end">Items</th>
-                                <th class="text-end">Total Qty</th>
-                                <th class="text-end">Total Value</th>
+                                <th style="min-width:150px;">Brand/Specification</th>
+                                <th>UOM</th>
+                                <th style="min-width:130px;">Category</th>
+                                <th class="text-end">Received Qty</th>
+                                <th class="text-end">Unit Price</th>
+                                <th class="text-end">Received Value</th>
                                 <th style="min-width:170px;">Remarks</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($rows as $i => $row)
-                                <tr>
-                                    <td class="text-center text-muted small">{{ $i + 1 }}</td>
-                                    <td class="fw-semibold text-slate-900">{{ $row->rv_no ?: '—' }}</td>
-                                    <td class="small">{{ $row->challan_no ?: '—' }}</td>
-                                    <td class="small">{{ $fmt($row->purchase_date) }}</td>
-                                    <td class="small">{{ $fmt($row->rcv_date) }}</td>
-                                    <td class="small">{{ $row->supplier_name ?: '—' }}</td>
-                                    {{-- The delivery's items, one per line with
-                                         the quantity received of each. --}}
-                                    @php($groupLines = $lines[$row->group_key] ?? collect())
-                                    <td class="small">
-                                        @forelse($groupLines as $line)
-                                            <div>
-                                                {{ optional($line->stockItem)->name ?: '—' }}
-                                                <span class="text-muted">({{ $qty($line->qty) }})</span>
-                                            </div>
-                                        @empty
-                                            —
-                                        @endforelse
-                                    </td>
-                                    <td class="text-end">{{ $row->line_count }}</td>
-                                    <td class="text-end">{{ $qty($row->group_total_qty) }}</td>
-                                    <td class="text-end fw-semibold">{{ $money($row->group_total_value) }}</td>
-                                    {{-- Last column, after the figures. One
-                                         remark per item line, in the same order
-                                         as the names in Item Name, so a note
-                                         still lines up with the item it was
-                                         written against even with the totals
-                                         between them. A line with no remark
-                                         keeps its row — dropping the blanks
-                                         would shift every note below it up
-                                         against the wrong item. --}}
-                                    <td class="small text-muted">
-                                        @forelse($groupLines as $line)
-                                            <div>{{ $line->remarks ?: '—' }}</div>
-                                        @empty
-                                            —
-                                        @endforelse
-                                    </td>
-                                </tr>
+                            {{-- One row per ITEM RECEIVED, not per delivery: a
+                                 challan carrying three items prints three rows,
+                                 each repeating that delivery's GRN, challan,
+                                 dates and supplier so every row can be read on
+                                 its own — and so a remark always sits level
+                                 with the item it was written against. $sl runs
+                                 across the whole table, so the last SL is the
+                                 number of item lines shown. --}}
+                            @php($sl = 0)
+                            @foreach($rows as $row)
+                                @php($groupLines = $lines[$row->group_key] ?? collect())
+                                @forelse($groupLines as $line)
+                                    @php($sl++)
+                                    <tr>
+                                        <td class="text-center text-muted small">{{ $sl }}</td>
+                                        <td class="fw-semibold text-slate-900">{{ $row->rv_no ?: '—' }}</td>
+                                        <td class="small">{{ $row->challan_no ?: '—' }}</td>
+                                        <td class="small">{{ $fmt($row->purchase_date) }}</td>
+                                        <td class="small">{{ $fmt($row->rcv_date) }}</td>
+                                        <td class="small">{{ $row->supplier_name ?: '—' }}</td>
+                                        <td class="small">{{ optional($line->stockItem)->name ?: '—' }}</td>
+                                        {{-- Brand/Specification and Category off
+                                             the item master, the same source the
+                                             Record Receiving form reads them from
+                                             — so this report, Purchase History and
+                                             the entry screen all name an item the
+                                             same way. --}}
+                                        <td class="small text-muted">{{ optional($line->stockItem)->brand ?: '—' }}</td>
+                                        <td class="small">{{ optional($line->stockItem)->uom ?: '—' }}</td>
+                                        <td class="small text-muted">{{ optional($line->stockItem)->category ?: '—' }}</td>
+                                        <td class="text-end">{{ $qty($line->qty) }}</td>
+                                        <td class="text-end small">{{ $line->unit_price !== null ? number_format((float) $line->unit_price, 2) : '—' }}</td>
+                                        <td class="text-end fw-semibold">{{ $money($line->total_value) }}</td>
+                                        <td class="small text-muted">{{ $line->remarks ?: '—' }}</td>
+                                    </tr>
+                                @empty
+                                    {{-- A delivery with no item lines left still
+                                         belongs in the table: dropping it would
+                                         make the Deliveries tile disagree with
+                                         what is printed. --}}
+                                    @php($sl++)
+                                    <tr>
+                                        <td class="text-center text-muted small">{{ $sl }}</td>
+                                        <td class="fw-semibold text-slate-900">{{ $row->rv_no ?: '—' }}</td>
+                                        <td class="small">{{ $row->challan_no ?: '—' }}</td>
+                                        <td class="small">{{ $fmt($row->purchase_date) }}</td>
+                                        <td class="small">{{ $fmt($row->rcv_date) }}</td>
+                                        <td class="small">{{ $row->supplier_name ?: '—' }}</td>
+                                        <td class="small">—</td>
+                                        <td class="small">—</td>
+                                        <td class="small">—</td>
+                                        <td class="small">—</td>
+                                        <td class="text-end">{{ $qty($row->group_total_qty) }}</td>
+                                        <td class="text-end small">—</td>
+                                        <td class="text-end fw-semibold">{{ $money($row->group_total_value) }}</td>
+                                        <td class="small text-muted">—</td>
+                                    </tr>
+                                @endforelse
                             @endforeach
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="7" class="text-end gx-stock-total-label">Total-</td>
-                                <td class="text-end fw-bold">{{ number_format($summary['lines']) }}</td>
+                                {{-- Brand/Specification and Category were added
+                                     after Item Name, so the label runs two
+                                     columns further. Unit Price is a per-line
+                                     rate and has no meaningful total, so its
+                                     cell is left empty rather than summing
+                                     rates into a number that means nothing. --}}
+                                <td colspan="10" class="text-end gx-stock-total-label">Total-</td>
                                 <td class="text-end fw-bold">{{ $qty($summary['qty']) }}</td>
+                                <td></td>
                                 <td class="text-end fw-bold">{{ $money($summary['value']) }}</td>
                                 <td></td>
                             </tr>

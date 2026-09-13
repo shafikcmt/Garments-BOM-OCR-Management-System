@@ -7,8 +7,9 @@
     family. Styling comes from the shared _report-styles partial those reports
     already use — one stylesheet, so a width tuned on one holds on the others.
 
-    One row per DELIVERY, with its item lines indented underneath, because that
-    is how Purchase History presents it and how the paper challan reads.
+    One row per ITEM RECEIVED. The delivery's own GRN, challan, dates and
+    supplier repeat on each of its item rows, so a reader can follow any single
+    row across the page and, on Excel, filter and sort by item.
 
     Expects: $rows, $lines, $summary, $filters, $periodLabel, $title.
 --}}
@@ -34,8 +35,10 @@
     $unit = config('stock.company_name');
 
     // Columns in the table below, and therefore how wide the Excel letterhead
-    // has to merge to sit over it.
-    $columns = 11;
+    // has to merge to sit over it. SL, GRN, Challan, Challan Date, RCV Date,
+    // Supplier, Item Name, Brand/Specification, UOM, Category, Received Qty,
+    // Unit Price, Received Value, Remarks.
+    $columns = 14;
 
     // What the reader is looking at. Only the filters actually applied are
     // listed — a report showing "Supplier: All" for six blank filters buries
@@ -116,12 +119,12 @@
 <table class="report-table">
     <thead>
         <tr>
-            {{-- Widths total 81.2%, leaving Item Name the remaining ~19%.
-                 Item Name and Remarks both hold several values per row, so
-                 they get the width the fixed columns do not need; Remarks is
-                 given a declared 12% rather than sharing the remainder, because
-                 a long note would otherwise squeeze Item Name. Remarks sits
-                 last, after the figures. --}}
+            {{-- Widths total 85%, leaving Item Name the remaining ~15% — it is
+                 the longest text on the row and takes what the fixed columns do
+                 not need. Brand/Specification, Category and Remarks are given
+                 declared widths rather than sharing the remainder, because one
+                 long brand or note would otherwise squeeze Item Name off the
+                 page. Landscape A4 carries all fourteen. --}}
             <th class="w-sl">SL</th>
             <th style="width:9%;">GRN No</th>
             <th style="width:9%;">Challan / Inv No</th>
@@ -129,71 +132,83 @@
             <th style="width:7.5%;">RCV Date</th>
             <th style="width:14%;">Supplier</th>
             <th>Item Name</th>
-            <th class="num" style="width:5%;">Items</th>
-            <th class="num" style="width:7%;">Total Qty</th>
-            <th class="num" style="width:8%;">Total Value</th>
-            <th style="width:12%;">Remarks</th>
+            <th style="width:10%;">Brand/Specification</th>
+            <th style="width:4%;">UOM</th>
+            <th style="width:9%;">Category</th>
+            <th class="num" style="width:6%;">Received Qty</th>
+            <th class="num" style="width:6%;">Unit Price</th>
+            <th class="num" style="width:7%;">Received Value</th>
+            <th style="width:9%;">Remarks</th>
         </tr>
     </thead>
     <tbody>
-        @forelse($rows as $i => $row)
-            <tr>
-                <td class="num">{{ $i + 1 }}</td>
-                <td>{{ $row->rv_no ?: ($forExcel ? '' : '-') }}</td>
-                <td>{{ $row->challan_no ?: ($forExcel ? '' : '-') }}</td>
-                <td class="nowrap">{{ $date($row->purchase_date) }}</td>
-                <td class="nowrap">{{ $date($row->rcv_date) }}</td>
-                <td>{{ $row->supplier_name ?: ($forExcel ? '' : '-') }}</td>
-                {{-- The delivery's items, one per line with the quantity that
-                     was received of each.
-
-                     Excel gets a <br> rather than a <div>: the HTML reader
-                     flattens block elements into the same cell with nothing
-                     between them, which would run the names together into one
-                     unreadable string. A <br> becomes a real line break inside
-                     the cell, so the names stay on separate lines there too. --}}
-                @php($groupLines = $lines[$row->group_key] ?? collect())
-                <td>
-                    @if($groupLines->isEmpty())
-                        {{ $forExcel ? '' : '-' }}
-                    @elseif($forExcel)
-                        @foreach($groupLines as $line){{ optional($line->stockItem)->name }} ({{ $qty($line->qty) }})@if(! $loop->last)<br>@endif @endforeach
-                    @else
-                        @foreach($groupLines as $line)
-                            <div>{{ optional($line->stockItem)->name ?: '-' }} ({{ $qty($line->qty) }})</div>
-                        @endforeach
-                    @endif
-                </td>
-                <td class="num">{{ $row->line_count }}</td>
-                <td class="num">{{ $qty($row->group_total_qty) }}</td>
-                <td class="num">{{ $money($row->group_total_value) }}</td>
-                {{-- Last column, after the figures. One remark per item line and
-                     in the same order as Item Name, so a note still sits level
-                     with the item it belongs to. Same <br>-for-Excel treatment
-                     as the names: the HTML reader flattens block elements into
-                     one cell with nothing between them. --}}
-                <td>
-                    @if($groupLines->isEmpty())
-                        {{ $forExcel ? '' : '-' }}
-                    @elseif($forExcel)
-                        @foreach($groupLines as $line){{ $line->remarks }}@if(! $loop->last)<br>@endif @endforeach
-                    @else
-                        @foreach($groupLines as $line)
-                            <div>{{ $line->remarks ?: '-' }}</div>
-                        @endforeach
-                    @endif
-                </td>
-            </tr>
+        {{-- One row per ITEM RECEIVED, not per delivery. A challan carrying
+             three items prints three rows, each repeating that delivery's GRN,
+             challan, dates and supplier, so each row stands on its own — and on
+             Excel every row is a real row, which can be filtered, sorted and
+             pivoted. Stacking several names inside one cell could do none of
+             that. $sl runs across the whole table. --}}
+        @php($sl = 0)
+        @forelse($rows as $row)
+            @php($groupLines = $lines[$row->group_key] ?? collect())
+            @forelse($groupLines as $line)
+                @php($sl++)
+                <tr>
+                    <td class="num">{{ $sl }}</td>
+                    <td>{{ $row->rv_no ?: ($forExcel ? '' : '-') }}</td>
+                    <td>{{ $row->challan_no ?: ($forExcel ? '' : '-') }}</td>
+                    <td class="nowrap">{{ $date($row->purchase_date) }}</td>
+                    <td class="nowrap">{{ $date($row->rcv_date) }}</td>
+                    <td>{{ $row->supplier_name ?: ($forExcel ? '' : '-') }}</td>
+                    <td>{{ optional($line->stockItem)->name ?: ($forExcel ? '' : '-') }}</td>
+                    {{-- Brand/Specification and Category off the item master,
+                         the same source the Record Receiving form and Purchase
+                         History read them from. --}}
+                    <td>{{ optional($line->stockItem)->brand ?: ($forExcel ? '' : '-') }}</td>
+                    <td>{{ optional($line->stockItem)->uom ?: ($forExcel ? '' : '-') }}</td>
+                    <td>{{ optional($line->stockItem)->category ?: ($forExcel ? '' : '-') }}</td>
+                    <td class="num">{{ $qty($line->qty) }}</td>
+                    <td class="num">{{ $line->unit_price === null ? ($forExcel ? '' : '-') : $money($line->unit_price) }}</td>
+                    <td class="num">{{ $money($line->total_value) }}</td>
+                    <td>{{ $line->remarks ?: ($forExcel ? '' : '-') }}</td>
+                </tr>
+            @empty
+                {{-- A delivery with no item lines left still belongs in the
+                     table: dropping it would make the Deliveries figure in the
+                     header block disagree with what is printed below it. --}}
+                @php($sl++)
+                <tr>
+                    <td class="num">{{ $sl }}</td>
+                    <td>{{ $row->rv_no ?: ($forExcel ? '' : '-') }}</td>
+                    <td>{{ $row->challan_no ?: ($forExcel ? '' : '-') }}</td>
+                    <td class="nowrap">{{ $date($row->purchase_date) }}</td>
+                    <td class="nowrap">{{ $date($row->rcv_date) }}</td>
+                    <td>{{ $row->supplier_name ?: ($forExcel ? '' : '-') }}</td>
+                    <td>{{ $forExcel ? '' : '-' }}</td>
+                    <td>{{ $forExcel ? '' : '-' }}</td>
+                    <td>{{ $forExcel ? '' : '-' }}</td>
+                    <td>{{ $forExcel ? '' : '-' }}</td>
+                    <td class="num">{{ $qty($row->group_total_qty) }}</td>
+                    <td class="num">{{ $forExcel ? '' : '-' }}</td>
+                    <td class="num">{{ $money($row->group_total_value) }}</td>
+                    <td>{{ $forExcel ? '' : '-' }}</td>
+                </tr>
+            @endforelse
         @empty
-            <tr><td colspan="11" class="empty">No deliveries match these filters.</td></tr>
+            <tr><td colspan="14" class="empty">No deliveries match these filters.</td></tr>
         @endforelse
     </tbody>
     @if($rows->isNotEmpty())
         <tfoot>
             <tr class="total">
-                <td colspan="7" class="total-label">Total-</td>
-                <td class="num">{{ number_format($summary['lines']) }}</td>
+                {{-- Brand/Specification and Category were added after Item
+                     Name, so the label runs two columns further. Unit Price is
+                     a per-line rate with no meaningful total, so its cell stays
+                     empty rather than summing rates into a number that means
+                     nothing. --}}
+                <td colspan="10" class="total-label">Total-</td>
                 <td class="num">{{ $qty($summary['qty']) }}</td>
+                <td></td>
                 <td class="num">{{ $money($summary['value']) }}</td>
                 <td></td>
             </tr>

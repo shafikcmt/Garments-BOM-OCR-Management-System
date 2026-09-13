@@ -12,11 +12,17 @@
     filter changes the rows the modals have to change with them". Left outside,
     Edit on page 2 would open a dialog built for page 1.
 
-    What does NOT need to be here: the collapse panes and the Edit buttons are
-    driven by Bootstrap's data-api, which is delegated from the document and so
-    reaches markup that arrives later; the Remove confirm is an inline onsubmit
-    attribute, parsed with the HTML; and the View/Hide Items label flip is a
-    delegated listener on the page for the same reason.
+    What does NOT need to be here: the Edit buttons are driven by Bootstrap's
+    data-api, which is delegated from the document and so reaches markup that
+    arrives later, and the Remove confirm is an inline onsubmit attribute,
+    parsed with the HTML.
+
+    ONE ROW PER ITEM. It used to be one row per delivery with the items folded
+    into a collapse pane behind a View Items button, which meant a store keeper
+    checking a morning's receipts clicked through every GRN on the page one at a
+    time. The delivery's GRN, challan, dates and supplier now repeat on each of
+    its item rows instead — the same flattening, and the same column names, the
+    Receiving Report already uses, so the two screens read alike.
 
     Parameters — all supplied by StockPurchaseController::index()
         $groups, $lines, $suppliers, $filters, $canEdit, $canDelete
@@ -41,26 +47,71 @@
 <div data-list-meta="{{ json_encode(['total' => $groups->total()]) }}" hidden></div>
 
 
+            {{-- Said once above the table, not once per delivery as it was
+                 inside the old expand pane.
+
+                 It matters MORE now than it did then: GRN, challan, dates and
+                 supplier repeat down the page, so a row reads as though it were
+                 a record of its own, and someone editing the RCV Date on one
+                 line could reasonably expect only that line to move. It does
+                 not — those fields belong to the delivery and are written to
+                 every line of it. Only shown when some delivery on the page
+                 actually has more than one item; with one item each there is no
+                 sharing to warn about. --}}
+            @if($lines->contains(fn ($groupLines) => $groupLines->count() > 1))
+                <div class="gx-line-scope mb-3">
+                    <span class="gx-edit-scope">Shared fields</span>
+                    <span>
+                        RCV Date and Supplier are shared by every item on this GRN.
+                        Qty, Unit Price and Remarks belong to one line, and so do
+                        Edit and Remove.
+                    </span>
+                </div>
+            @endif
+
             <div class="table-responsive">
                 <table class="table align-middle gx-stock-table">
                     <thead>
                         <tr>
+                            <th class="text-center" style="width:48px;">SL</th>
                             <th style="min-width:140px;">GRN No</th>
-                            <th>Challan / Inv</th>
+                            <th>Challan / Inv No</th>
                             <th>Challan Date</th>
                             <th>RCV Date</th>
                             <th style="min-width:150px;">Supplier</th>
-                            <th class="text-end">Items</th>
-                            <th class="text-end">Total Qty</th>
-                            <th class="text-end">Total Value</th>
+                            <th style="min-width:200px;">Item Name</th>
+                            <th style="min-width:150px;">Brand/Specification</th>
+                            <th>UOM</th>
+                            <th style="min-width:130px;">Category</th>
+                            <th class="text-end">Received Qty</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Received Value</th>
+                            <th style="min-width:140px;">Remarks</th>
                             <th class="text-end gx-stock-actions">Action</th>
                         </tr>
                     </thead>
                     <tbody>
+                        {{-- One row per ITEM RECEIVED, not per delivery.
+
+                             The delivery's GRN, challan, dates and supplier
+                             repeat on each of its item rows, so every row reads
+                             on its own and nothing has to be expanded to be
+                             seen. Same shape as the Receiving Report, which was
+                             flattened the same way for the same reason.
+
+                             $sl runs across the whole page, so the last SL is
+                             the number of item lines on it.
+
+                             Written as a PAIRED @php/@endphp, not the shorter
+                             @php($sl = 0). Blade extracts raw php blocks with a
+                             lazy @php(.*?)@endphp, so the inline form here would
+                             be read as the OPENER of a block and swallow
+                             everything down to the @endphp a few lines below —
+                             the whole @forelse with it. --}}
+                        @php $sl = 0; @endphp
                         @forelse($groups as $group)
                             @php
                                 $groupLines = $lines[$group->group_key] ?? collect();
-                                $paneId = 'rv-'.md5($group->group_key);
                                 // Numbers issued before the RV was generated are bare
                                 // digits; the generated ones always carry a month prefix.
                                 //
@@ -70,135 +121,127 @@
                                 // would label half the generated numbers as legacy.
                                 $isLegacy = ! preg_match('/^[A-Z]{3}\d{2}-\d{4,5}$/', (string) $group->rv_no);
                             @endphp
-                            <tr>
-                                <td>
-                                    <div class="fw-bold text-slate-900">{{ $group->rv_no ?: '—' }}</div>
-                                    @if($isLegacy && $group->rv_no)
-                                        <div class="gx-stock-spec">entered before GRN numbering</div>
-                                    @endif
-                                </td>
-                                <td class="small">{{ $group->challan_no ?: '—' }}</td>
-                                <td class="small">{{ $group->purchase_date ? \Illuminate\Support\Carbon::parse($group->purchase_date)->format('d-M-Y') : '—' }}</td>
-                                <td class="small">{{ $group->rcv_date ? \Illuminate\Support\Carbon::parse($group->rcv_date)->format('d-M-Y') : '—' }}</td>
-                                <td class="small text-muted">{{ $group->supplier_name ?: '—' }}</td>
-                                <td class="text-end fw-semibold">{{ $group->line_count }}</td>
-                                <td class="text-end">{{ $qty($group->group_total_qty) }}</td>
-                                <td class="text-end fw-semibold">{{ $money($group->group_total_value) }}</td>
-                                <td class="text-end gx-stock-actions">
-                                    <button type="button" class="btn btn-sm btn-outline-primary"
-                                            data-bs-toggle="collapse" data-bs-target="#{{ $paneId }}"
-                                            aria-expanded="false" aria-controls="{{ $paneId }}"
-                                            data-rv-toggle>
-                                        <i class="bi bi-list-ul me-1" aria-hidden="true"></i><span data-rv-toggle-text>View Items</span>
-                                    </button>
-                                </td>
-                            </tr>
-                            {{-- Inline detail rather than a modal: it keeps the
-                                 receiving row in view and avoids rendering 25
-                                 dialogs on every page load. --}}
-                            <tr class="gx-rv-detail">
-                                <td colspan="9" class="p-0">
-                                    <div class="collapse" id="{{ $paneId }}">
-                                        <div class="gx-rv-detail-body">
-                                            {{-- What the actions below reach.
+                            @forelse($groupLines as $line)
+                                @php $sl++; @endphp
+                                <tr>
+                                    <td class="text-center text-muted small">{{ $sl }}</td>
+                                    <td>
+                                        <div class="fw-bold text-slate-900">{{ $group->rv_no ?: '—' }}</div>
+                                        @if($isLegacy && $group->rv_no)
+                                            <div class="gx-stock-spec">entered before GRN numbering</div>
+                                        @endif
+                                    </td>
+                                    <td class="small">{{ $group->challan_no ?: '—' }}</td>
+                                    <td class="small">{{ $group->purchase_date ? \Illuminate\Support\Carbon::parse($group->purchase_date)->format('d-M-Y') : '—' }}</td>
+                                    <td class="small">{{ $group->rcv_date ? \Illuminate\Support\Carbon::parse($group->rcv_date)->format('d-M-Y') : '—' }}</td>
+                                    <td class="small text-muted">{{ $group->supplier_name ?: '—' }}</td>
+                                    {{-- Brand/Specification and Category come off the
+                                         item master, the same source the Record
+                                         Receiving form's own line rows read them from.
+                                         stockItem is already eager loaded, so no row
+                                         here costs a query. --}}
+                                    <td class="fw-semibold text-slate-900">{{ optional($line->stockItem)->name ?? '—' }}</td>
+                                    <td class="small text-muted">{{ optional($line->stockItem)->brand ?: '—' }}</td>
+                                    <td class="small">{{ optional($line->stockItem)->uom ?: '—' }}</td>
+                                    <td class="small text-muted">{{ optional($line->stockItem)->category ?: '—' }}</td>
+                                    <td class="text-end fw-bold">{{ $qty($line->qty) }}</td>
+                                    <td class="text-end small">{{ $line->unit_price !== null ? number_format((float) $line->unit_price, 2) : '—' }}</td>
+                                    <td class="text-end fw-semibold">{{ number_format($line->total_value, 2) }}</td>
+                                    <td class="small text-muted">{{ $line->remarks ?: '—' }}</td>
+                                    {{-- Edit and Delete are Admin / Management rights
+                                         (store.receiving.edit / .delete, or the flat
+                                         store.edit / store.delete); the controller
+                                         enforces the same checks server-side. Both act
+                                         on THIS ONE LINE, not the whole delivery —
+                                         which is what the confirm below spells out. --}}
+                                    <td class="text-end gx-stock-actions gx-row-actions">
+                                        @if($canEdit)
+                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPurchase{{ $line->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
+                                        @endif
+                                        @if($canDelete)
+                                            {{-- "Remove", not "Delete": this takes one item
+                                                 OUT OF a delivery, and Delete beside a GRN
+                                                 number reads as removing the whole thing.
+                                                 Issue History keeps "Delete" — an issue is a
+                                                 record in its own right, not part of a set.
 
-                                                 A "delivery" is not a record — it is these rows,
-                                                 grouped by GRN, challan and challan date. So every
-                                                 action in this pane is per LINE, while two of the
-                                                 fields on show above are shared by all of them. The
-                                                 Edit dialog already says so once it is open; this
-                                                 says it before anything is clicked, in the same
-                                                 amber the dialog uses for the identical point. --}}
-                                            @if($groupLines->count() > 1)
-                                                <div class="gx-line-scope mb-2">
-                                                    <span class="gx-edit-scope">All {{ $groupLines->count() }} items</span>
-                                                    <span>
-                                                        RCV Date and Supplier are shared by every item on this GRN.
-                                                        Qty, Unit Price and Remarks belong to one line, and so do
-                                                        Edit and Remove below.
-                                                    </span>
-                                                </div>
-                                            @endif
-                                            <table class="table align-middle mb-0 gx-line-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th style="min-width:200px;">Item</th>
-                                                        <th>Uom</th>
-                                                        <th class="text-end">Qty</th>
-                                                        <th class="text-end">Unit Price</th>
-                                                        <th class="text-end">Total</th>
-                                                        <th style="min-width:140px;">Remarks</th>
-                                                        <th class="text-end gx-stock-actions">Action</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach($groupLines as $line)
-                                                        <tr>
-                                                            <td class="fw-semibold text-slate-900">{{ optional($line->stockItem)->name ?? '—' }}</td>
-                                                            <td class="small">{{ optional($line->stockItem)->uom ?: '—' }}</td>
-                                                            <td class="text-end fw-bold">{{ $qty($line->qty) }}</td>
-                                                            <td class="text-end small">{{ $line->unit_price !== null ? number_format((float) $line->unit_price, 2) : '—' }}</td>
-                                                            <td class="text-end fw-semibold">{{ number_format($line->total_value, 2) }}</td>
-                                                            <td class="small text-muted">{{ $line->remarks ?: '—' }}</td>
-                                                            {{-- Edit and Delete are Admin / Management
-                                                                 rights (store.receiving.edit / .delete,
-                                                                 or the flat store.edit / store.delete);
-                                                                 the controller enforces the same checks
-                                                                 server-side. Both act on this one line,
-                                                                 not the whole receiving. --}}
-                                                            <td class="text-end gx-stock-actions gx-row-actions">
-                                                                @if($canEdit)
-                                                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPurchase{{ $line->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
-                                                                @endif
-                                                                @if($canDelete)
-                                                                    {{-- "Remove", not "Delete": this takes one item
-                                                                         OUT OF a delivery, and Delete beside a GRN
-                                                                         number reads as removing the whole thing.
-                                                                         Issue History keeps "Delete" — an issue is a
-                                                                         record in its own right, not part of a set.
+                                                 The confirm has to branch, because on the LAST
+                                                 line the old wording was simply untrue. There
+                                                 is no delivery record to keep: the group is
+                                                 these rows, so removing the last one takes the
+                                                 GRN and challan with it. --}}
+                                            @php
+                                                $itemLabel = optional($line->stockItem)->name ?? 'this item';
+                                                $grnLabel = $line->rv_no ?: 'this receiving';
+                                                $others = $groupLines->count() - 1;
 
-                                                                         The confirm has to branch, because on the LAST
-                                                                         line the old wording was simply untrue. There
-                                                                         is no delivery record to keep: the group is
-                                                                         these rows, so removing the last one takes the
-                                                                         GRN and challan with it. --}}
-                                                                    @php
-                                                                        $itemLabel = optional($line->stockItem)->name ?? 'this item';
-                                                                        $grnLabel = $line->rv_no ?: 'this receiving';
-                                                                        $others = $groupLines->count() - 1;
-
-                                                                        $confirmText = $others > 0
-                                                                            ? 'Remove '.$itemLabel.' from GRN '.$grnLabel.'? The other '
-                                                                                .($others === 1 ? 'item on this receiving is kept.' : $others.' items on this receiving are kept.')
-                                                                            : $itemLabel.' is the only item on GRN '.$grnLabel
-                                                                                .'. Removing it deletes the whole receiving, including its GRN and challan record. Continue?';
-                                                                    @endphp
-                                                                    <form method="POST" action="{{ route('store.stock.purchases.destroy', $line) }}" class="d-inline"
-                                                                          onsubmit="return confirm(@js($confirmText));">
-                                                                        @csrf @method('DELETE')
-                                                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Remove</button>
-                                                                    </form>
-                                                                @endif
-                                                                @if(! $canEdit && ! $canDelete)
-                                                                    <span class="text-muted small">—</span>
-                                                                @endif
-                                                            </td>
-                                                        </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
+                                                $confirmText = $others > 0
+                                                    ? 'Remove '.$itemLabel.' from GRN '.$grnLabel.'? The other '
+                                                        .($others === 1 ? 'item on this receiving is kept.' : $others.' items on this receiving are kept.')
+                                                    : $itemLabel.' is the only item on GRN '.$grnLabel
+                                                        .'. Removing it deletes the whole receiving, including its GRN and challan record. Continue?';
+                                            @endphp
+                                            <form method="POST" action="{{ route('store.stock.purchases.destroy', $line) }}" class="d-inline"
+                                                  onsubmit="return confirm(@js($confirmText));">
+                                                @csrf @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Remove</button>
+                                            </form>
+                                        @endif
+                                        @if(! $canEdit && ! $canDelete)
+                                            <span class="text-muted small">—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                {{-- A delivery whose lines have all gone still keeps
+                                     its place, so the count above the table and what
+                                     is printed below it cannot disagree. --}}
+                                @php $sl++; @endphp
+                                <tr>
+                                    <td class="text-center text-muted small">{{ $sl }}</td>
+                                    <td><div class="fw-bold text-slate-900">{{ $group->rv_no ?: '—' }}</div></td>
+                                    <td class="small">{{ $group->challan_no ?: '—' }}</td>
+                                    <td class="small">{{ $group->purchase_date ? \Illuminate\Support\Carbon::parse($group->purchase_date)->format('d-M-Y') : '—' }}</td>
+                                    <td class="small">{{ $group->rcv_date ? \Illuminate\Support\Carbon::parse($group->rcv_date)->format('d-M-Y') : '—' }}</td>
+                                    <td class="small text-muted">{{ $group->supplier_name ?: '—' }}</td>
+                                    <td class="small">—</td>
+                                    <td class="small">—</td>
+                                    <td class="small">—</td>
+                                    <td class="small">—</td>
+                                    <td class="text-end">{{ $qty($group->group_total_qty) }}</td>
+                                    <td class="text-end small">—</td>
+                                    <td class="text-end fw-semibold">{{ $money($group->group_total_value) }}</td>
+                                    <td class="small text-muted">—</td>
+                                    <td class="text-end gx-stock-actions"><span class="text-muted small">—</span></td>
+                                </tr>
+                            @endforelse
                         @empty
-                            <tr><td colspan="9" class="gx-stock-empty">
+                            <tr><td colspan="15" class="gx-stock-empty">
                                     <span class="gx-stock-empty-icon"><i class="bi bi-truck" aria-hidden="true"></i></span>
                                     <div class="gx-stock-empty-title">{{ $hasFilters ? 'No receivings match this filter' : 'No purchases recorded yet' }}</div>
                                     <div class="gx-stock-empty-hint">{{ $hasFilters ? 'Try a different month or search.' : 'Record a goods receiving above.' }}</div>
                                 </td></tr>
                         @endforelse
                     </tbody>
+                    @if($groups->isNotEmpty())
+                        {{-- Called "Page total" and not "Total", because it is.
+                             The list is paginated 25 deliveries at a time, so
+                             this adds up the rows actually on screen — a bare
+                             "Total" here would be read as the whole history and
+                             quoted as it. The flattened rows are summed
+                             directly, so the figure cannot drift from what is
+                             printed above it. --}}
+                        <tfoot>
+                            <tr>
+                                <td colspan="10" class="text-end gx-stock-total-label">Page total-</td>
+                                <td class="text-end fw-bold">{{ $qty($groups->sum('group_total_qty')) }}</td>
+                                <td></td>
+                                <td class="text-end fw-bold">{{ $money($groups->sum('group_total_value')) }}</td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </table>
             </div>
             <div class="mt-3">{{ $groups->links() }}</div>

@@ -486,36 +486,15 @@
     @include('store.stock._searchable')
     @include('store.stock._line-grid')
 
-    <style>
-        {{-- The item-lines table (.gx-line-scroll / .gx-line-table / .gx-line-no
-             / .gx-line-action) was declared here AND on the Record Issue screen,
-             and the two copies had already drifted — one had a row hover, the
-             other did not. Both now read the one definition in _stock-ui. Only
-             what is genuinely local to this screen is left below. --}}
+    {{-- No <style> block on this screen any more.
 
-        {{-- The expanded lines of one receiving.
-
-             This block used to be six rules of !important, all of them fighting
-             the app-wide table rule in components.css: the bordered pill on each
-             cell, the drop shadow, the white fill, the centred text, the hover
-             lift. Both .gx-line-table and .gx-stock-table are now listed in that
-             rule's own opt-out chain, so none of that reaches here any more and
-             the workarounds are gone with it. What is left is only what this
-             screen actually wants. --}}
-
-        /* Written as a child of .gx-stock-table so it outweighs that table's own
-           row rules in _stock-ui without needing !important to do it. */
-        .gx-stock-table > tbody > tr.gx-rv-detail > td {
-            border-bottom: 0;
-            background: #f8fafc;
-        }
-
-        .gx-rv-detail-body { padding: .55rem .35rem .65rem; }
-
-        /* The lines sit on the panel's own grey rather than a white band. */
-        .gx-rv-detail .gx-line-table > tbody > tr > td { background: transparent; }
-        .gx-rv-detail .gx-line-table > tbody > tr:hover > td { background: rgba(255, 255, 255, .6); }
-    </style>
+         It held two things. The item-lines table (.gx-line-scroll /
+         .gx-line-table / .gx-line-no / .gx-line-action) was declared here AND
+         on the Record Issue screen and the two copies had drifted; both now
+         read the one definition in _stock-ui. The rest styled the expandable
+         items panel under each delivery, and that panel is gone — Purchase
+         History prints one row per item outright, so there is no nested table
+         left to style. --}}
 
     <script>
         // Derived header field: Month from the challan date.
@@ -816,35 +795,9 @@
             }
         })();
 
-        // "View Items" / "Hide Items" — the label has to say what the button
-        // will do next, so it flips with the panel.
-        //
-        // DELEGATED FROM THE DOCUMENT, not bound to each button. The rows are
-        // swapped wholesale on every search and every page change, so listeners
-        // attached to the panes that happened to exist at page load would stop
-        // firing the moment the table was replaced — the panes would still open
-        // and close, and every button would go on saying "View Items" while its
-        // pane stood open.
-        //
-        // Bootstrap's collapse events bubble, so one listener on the document
-        // reaches every pane there will ever be, including ones fetched later,
-        // and there is nothing to re-run after a swap.
-        (function () {
-            var flip = function (event, text) {
-                var pane = event.target;
-                if (!pane || !pane.id) { return; }
-
-                // The button controlling this pane, found from the pane rather
-                // than remembered — the button may itself be newly swapped in.
-                var btn = document.querySelector('[data-rv-toggle][data-bs-target="#' + pane.id + '"]');
-                var label = btn && btn.querySelector('[data-rv-toggle-text]');
-
-                if (label) { label.textContent = text; }
-            };
-
-            document.addEventListener('shown.bs.collapse', function (e) { flip(e, 'Hide Items'); });
-            document.addEventListener('hidden.bs.collapse', function (e) { flip(e, 'View Items'); });
-        })();
+        // The collapse label-flip listener that used to sit here is gone with
+        // the panes it drove: Purchase History prints one row per item
+        // outright, so there is nothing left to expand.
     </script>
 
     {{-- Warn when the challan number has been recorded before.
