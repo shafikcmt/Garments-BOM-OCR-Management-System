@@ -320,6 +320,10 @@ it('renders the download links already carrying the active filters', function ()
         ->assertOk()
         // Escaped: Blade writes the & in the query string as &amp; inside the
         // href, so the raw route() string would never match the markup.
-        ->assertSee(e(route('store.stock.ledger.excel', ['month' => '2026-08', 'category' => 'Stationery'])), false)
+        // The Excel button is the combined workbook now — the two Excel buttons
+        // this screen used to carry were merged into one. The single-sheet
+        // route it used to point at is still live and still exercised by the
+        // export tests above; what the TOOLBAR offers is the workbook.
+        ->assertSee(e(route('store.stock.ledger.excel.all', ['month' => '2026-08', 'category' => 'Stationery'])), false)
         ->assertSee(e(route('store.stock.ledger.pdf', ['month' => '2026-08', 'category' => 'Stationery'])), false);
 });

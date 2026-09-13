@@ -180,6 +180,10 @@
                                 <th>Req No</th>
                                 <th>Type</th>
                                 <th>Item</th>
+                                {{-- Between the item and its quantity, the
+                                     order the two are read in, and the same
+                                     column the PDF and the Excel tab carry. --}}
+                                <th>UOM</th>
                                 <th>Category</th>
                                 <th class="text-end">Issued Qty</th>
                                 <th style="min-width:180px;">Remarks</th>
@@ -202,6 +206,7 @@
                                         @endif
                                     </td>
                                     <td class="fw-semibold text-slate-900">{{ optional($row->stockItem)->name ?: '—' }}</td>
+                                    <td class="small">{{ optional($row->stockItem)->uom ?: '—' }}</td>
                                     <td class="small text-muted">{{ optional($row->itemCategory)->name ?: '—' }}</td>
                                     <td class="text-end fw-semibold">{{ $qty($row->qty) }}</td>
                                     <td class="small text-muted">{{ $row->remarks ?: '—' }}</td>
@@ -210,7 +215,9 @@
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="9" class="text-end gx-stock-total-label">Total-</td>
+                                {{-- One column further than before: UOM now sits
+                                     between Item and Issued Qty. --}}
+                                <td colspan="10" class="text-end gx-stock-total-label">Total-</td>
                                 <td class="text-end fw-bold">{{ $qty($summary['qty']) }}</td>
                                 <td></td>
                             </tr>

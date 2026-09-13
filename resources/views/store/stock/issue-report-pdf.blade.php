@@ -29,9 +29,9 @@
 
     // Width of the letterhead block above the table, in columns. Must match the
     // data table below (SL, Date, Section, Person, Approved By, Req No, Type,
-    // Item, Category, Issued Qty, Remarks) or the merged title lines stop short
-    // of the table's right edge on the Excel copy.
-    $columns = 11;
+    // Item, UOM, Category, Issued Qty, Remarks) or the merged title lines stop
+    // short of the table's right edge on the Excel copy.
+    $columns = 12;
 
     $applied = array_filter([
         'Req No' => $filters['requisition_no'] ?? null,
@@ -119,9 +119,13 @@
             <th style="width:9%;">Req No</th>
             <th style="width:6%;">Type</th>
             <th>Item</th>
+            {{-- UOM sits between the item and its quantity, the order the two
+                 are read in: "Sewing Thread, Cone, 25". Same source as every
+                 other UOM in the system, stock_items.uom. --}}
+            <th style="width:5%;">UOM</th>
             <th style="width:10%;">Category</th>
             <th class="num" style="width:8%;">Issued Qty</th>
-            <th style="width:13%;">Remarks</th>
+            <th style="width:12%;">Remarks</th>
         </tr>
     </thead>
     <tbody>
@@ -135,18 +139,19 @@
                 <td>{{ $row->requisition_no ?: $blank }}</td>
                 <td>{{ $row->requisition_type ?: $blank }}</td>
                 <td>{{ optional($row->stockItem)->name ?: $blank }}</td>
+                <td>{{ optional($row->stockItem)->uom ?: $blank }}</td>
                 <td>{{ optional($row->itemCategory)->name ?: $blank }}</td>
                 <td class="num">{{ $qty($row->qty) }}</td>
                 <td>{{ $row->remarks ?: $blank }}</td>
             </tr>
         @empty
-            <tr><td colspan="11" class="empty">No issues match these filters.</td></tr>
+            <tr><td colspan="12" class="empty">No issues match these filters.</td></tr>
         @endforelse
     </tbody>
     @if($rows->isNotEmpty())
         <tfoot>
             <tr class="total">
-                <td colspan="9" class="total-label">Total-</td>
+                <td colspan="10" class="total-label">Total-</td>
                 <td class="num">{{ $qty($summary['qty']) }}</td>
                 <td></td>
             </tr>

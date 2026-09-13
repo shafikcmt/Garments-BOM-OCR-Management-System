@@ -40,22 +40,32 @@
                  stayed frozen on the month the page opened with: pick August on
                  a page that opened in September and the table said August while
                  the download said September. stock-ledger-table.js re-points
-                 both after every filter change. --}}
+                 both after every filter change, reading each button's own href,
+                 so it needs no change when one of them is re-pointed. --}}
             <a href="{{ route('store.stock.ledger.pdf', request()->query()) }}" class="btn btn-outline-secondary" data-ledger-export>
                 <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Download PDF
             </a>
-            <a href="{{ route('store.stock.ledger.excel', request()->query()) }}" class="btn btn-outline-secondary" data-ledger-export>
-                <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Download Excel
-            </a>
-            {{-- The same filters, but the whole Store month: Stock, Receiving
-                 and Issues as three tabs of one workbook. Carries
-                 data-ledger-export like its neighbours so the filter JS
-                 re-points it too — without that it would download the month the
-                 page opened with. The label says what is inside, because "All"
-                 alone reads as "all months" to someone who has not opened one
-                 yet. --}}
+            {{-- ONE Excel button, and it downloads the whole Store month:
+                 Stock, Receiving and Issues as three tabs of one workbook,
+                 under the filters currently on screen.
+
+                 There used to be two — a single-sheet "Download Excel" beside a
+                 "Download Excel (3 Reports)" — and nobody could tell from the
+                 toolbar which one they wanted. The workbook is a superset of
+                 the single sheet (tab 1 IS that sheet), so the richer download
+                 is now simply what "Download Excel" means.
+
+                 The single-sheet route (store.stock.ledger.excel) is left in
+                 place: it is still a working link for anyone who bookmarked it,
+                 it is still covered by its own tests, and removing a route to
+                 delete a button would break those for nothing.
+
+                 Which tabs arrive still depends on the reader — the Receiving
+                 and Issues sheets are built only for a user who satisfies THEIR
+                 sections' rules, decided in the controller on the data, not
+                 here on the button. --}}
             <a href="{{ route('store.stock.ledger.excel.all', request()->query()) }}" class="btn btn-outline-secondary" data-ledger-export>
-                <i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i>Download Excel (3 Reports)
+                <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Download Excel
             </a>
             @if($canImport ?? false)
                 <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importReference">

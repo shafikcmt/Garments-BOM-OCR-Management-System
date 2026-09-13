@@ -491,10 +491,14 @@ it('keeps the sheet names the standalone downloads already use', function () {
 it('offers the combined download on the Stock Report screen', function () {
     combinedFixture();
 
+    // The toolbar carries ONE Excel button and it is this workbook — the
+    // separate single-sheet "Download Excel (3 Reports)" pair was merged, so
+    // what is asserted is the route behind the plain "Download Excel" label.
+    // The button itself is pinned in StockReportSingleExcelButtonTest.
     $this->actingAs(combinedStoreUser())
         ->get(route('store.stock.ledger'))
         ->assertOk()
-        ->assertSee('Download Excel (3 Reports)')
+        ->assertSee(route('store.stock.ledger.excel.all'), false)
         // The filter JS re-points every [data-ledger-export] href, so without
         // this hook the button would download the month the page opened with.
         ->assertSee('data-ledger-export', false);
