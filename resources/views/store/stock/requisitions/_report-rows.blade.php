@@ -63,11 +63,18 @@
                      reader flattens block elements into the same cell with
                      nothing between them, which ran the item name and the
                      requisition number together as one unreadable string. --}}
+                {{-- A line naming something not in the Item Master says so
+                     next to the name, on paper and in the spreadsheet both —
+                     it tells Store the item has still to be added before it
+                     can ever be received against. --}}
+                @php($notInMaster = ($row['is_custom_item'] ?? false)
+                    ? ' ('.\App\Models\PurchaseRequisitionItem::NOT_IN_MASTER_NOTE.')'
+                    : '')
                 <td>
                     @if($forExcel)
-                        {{ $row['item_name'] }}@if($showSource && $row['requisition_no'])<br>{{ $row['requisition_no'] }}@endif
+                        {{ $row['item_name'] }}{{ $notInMaster }}@if($showSource && $row['requisition_no'])<br>{{ $row['requisition_no'] }}@endif
                     @else
-                        {{ $row['item_name'] }}
+                        {{ $row['item_name'] }}{{ $notInMaster }}
                         @if($showSource)
                             <div class="src">{{ $row['requisition_no'] ?: '—' }}</div>
                         @endif

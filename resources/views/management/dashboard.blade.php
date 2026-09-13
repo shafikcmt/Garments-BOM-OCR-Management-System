@@ -70,6 +70,8 @@
         </div>
     </div>
 
+    @include('shared._requisition-summary-card')
+
     <div class="row g-3 mb-4" data-aos="fade-up">
         <div class="col-12 col-xl-7">
             <x-card class="gx-fade-in h-100" style="--gx-delay:600ms">

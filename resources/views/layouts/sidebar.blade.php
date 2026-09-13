@@ -284,6 +284,7 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Store Reports</span></span>
                         </a>
                     </li>
+                    @include('layouts._requisition-nav-item')
                 </ul>
             </div>
             @endrole
@@ -302,6 +303,7 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
                         </a>
                     </li>
+                    @include('layouts._requisition-nav-item')
                 </ul>
             </div>
             @endrole
@@ -325,6 +327,7 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Reports</span></span>
                         </a>
                     </li>
+                    @include('layouts._requisition-nav-item')
                 </ul>
             </div>
             @endrole
@@ -514,6 +517,7 @@
                             </span>
                         </a>
                     </li>
+                    @include('layouts._requisition-nav-item')
                 </ul>
             </div>
             @endrole
@@ -691,6 +695,32 @@
                     </ul>
                 </div>
             @endcan
+
+            {{-- The departmental chain's own queue. A SEPARATE ENTRY from the
+                 legacy one above, matching the separate permission: the two
+                 flows have different access rules and merging the links would
+                 imply they are one list. Admin is excluded because it holds both
+                 permissions and would otherwise see two inboxes.
+
+                 The count deliberately asks only how many departmental PRAs are
+                 mid-chain, not how many are THIS user's — per-record eligibility
+                 needs PraStageResolver, which is far too much work for a badge
+                 rendered on every page. The queue itself is exact. --}}
+            @if(auth()->user() && ! auth()->user()->hasRole('admin') && auth()->user()->can('pra.departmental.act'))
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Approvals</div>
+                    <ul class="sidebar-list">
+                        <li class="sidebar-item">
+                            <a href="{{ route('pra_departmental.index') }}" class="sidebar-nav-link {{ request()->routeIs('pra_departmental.*') ? 'is-active' : '' }}">
+                                <span class="sidebar-link-main">
+                                    <span class="sidebar-icon"><i class="bi bi-inbox" aria-hidden="true"></i></span>
+                                    <span class="sidebar-link-text">PRA Approvals</span>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            @endif
 
             {{-- Template maintenance, for whoever holds the permission without
                  being an admin — today the Supply Chain role. Admin is excluded

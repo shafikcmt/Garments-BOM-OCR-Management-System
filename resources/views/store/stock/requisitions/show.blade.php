@@ -35,14 +35,32 @@
                     <div class="app-hero-eyebrow">Purchase Requisition</div>
                     <h3 class="app-hero-title mb-0">{{ $requisition->requisition_no }}</h3>
                     <p class="app-hero-copy mb-0">
-                        <span class="badge {{ $badges[$requisition->status] ?? 'bg-light text-dark' }}">{{ $requisition->statusLabel() }}</span>
+                        {{-- progressLabel(), not statusLabel(): the internal
+                             names describe the Store's workflow, and "Store
+                             Reviewed" means nothing to the department that sent
+                             the request in. This says "Sent to Store" /
+                             "Received by Store" / "Approved". --}}
+                        <span class="badge {{ $badges[$requisition->status] ?? 'bg-light text-dark' }}">{{ $requisition->progressLabel() }}</span>
+                        @if($requisition->store_ack_at)
+                            · received {{ $requisition->store_ack_at->format('d M Y') }}
+                        @endif
                         · {{ optional($requisition->requisition_date)->format('d M Y') }}
                         · {{ $requisition->items->count() }} item(s)
                     </p>
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2">
-                @if($requisition->isEditable())
+                {{-- The Store's two review steps. Each shows only at its own
+                     stage and only for whoever holds its permission, so a
+                     department user reading their own submission sees the
+                     status and no buttons. --}}
+                @include('store.stock.requisitions._review-actions', ['requisition' => $requisition])
+                {{-- Editable either because it is still the requester's draft,
+                     or because the Store is correcting a department's sheet on
+                     the way through — the two doors authorizeEditable() opens.
+                     $canCorrect carries the correction permission so a viewer
+                     who could not save is not offered the button. --}}
+                @if($requisition->isEditable() || (($canCorrect ?? false) && $requisition->isOpenToStoreCorrection()))
                     <a href="{{ route('store.stock.requisitions.edit', $requisition) }}" class="btn btn-outline-secondary">
                         <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
                     </a>
@@ -149,7 +167,18 @@
                                 {{-- One row per item: the entry form's per-department
                                      lines were merged on save, so nothing here can
                                      repeat an item or its stock figure. --}}
-                                <td class="fw-semibold text-slate-900">{{ optional($line->stockItem)->name ?? '—' }}</td>
+                                <td class="fw-semibold text-slate-900">
+                                    {{ $line->displayName() }}
+                                    {{-- Said on the row, so whoever reads this
+                                         requisition knows the item still has to
+                                         be added to the master before it can be
+                                         received against. --}}
+                                    @if($line->isCustomItem())
+                                        <span class="badge bg-warning-subtle text-warning-emphasis ms-1">
+                                            {{ \App\Models\PurchaseRequisitionItem::NOT_IN_MASTER_NOTE }}
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="small">{{ $line->uom_snapshot ?: '—' }}</td>
                                 <td class="small text-muted">{{ optional($line->itemCategory)->name ?: '—' }}</td>
                                 <td class="small">{{ $line->specification ?: '—' }}</td>

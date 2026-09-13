@@ -151,6 +151,8 @@
         </div>
     </div>
 
+    @include('shared._requisition-summary-card')
+
     <div class="row g-3 mb-4">
         <div class="col-12 col-sm-6 col-xl-3">
             <x-stat-card class="gx-fade-in h-100" style="--gx-delay:600ms"

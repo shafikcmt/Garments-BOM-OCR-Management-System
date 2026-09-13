@@ -23,6 +23,7 @@ class PurchaseRequisitionItem extends Model
     protected $fillable = [
         'purchase_requisition_id',
         'stock_item_id',
+        'custom_item_name',
         'item_category_id',
         'sort_order',
         'uom_snapshot',
@@ -59,6 +60,35 @@ class PurchaseRequisitionItem extends Model
         'accounts_pending_qty' => 'decimal:4',
         'sort_order' => 'integer',
     ];
+
+    /**
+     * A line naming something that is not in the Item Master.
+     *
+     * The department typed the name because the picker had nothing to offer.
+     * Such a line carries no stock_item_id, so it has no UOM, no category and
+     * no stock or last-purchase figures — there is no master record to read
+     * them from.
+     */
+    public function isCustomItem(): bool
+    {
+        return $this->stock_item_id === null && filled($this->custom_item_name);
+    }
+
+    /**
+     * What this line is called, wherever it is printed.
+     *
+     * One definition, used by the screen, the single-requisition document and
+     * the monthly report, so a custom item can never show as a blank dash on
+     * one of them and a name on another.
+     */
+    public function displayName(): string
+    {
+        return $this->stockItem?->name
+            ?? ($this->custom_item_name ?: '—');
+    }
+
+    /** Said next to the name, so Store knows this one still has to be added. */
+    public const NOT_IN_MASTER_NOTE = 'Not in Item Master';
 
     /** @return array<string, string> type => label */
     public static function typeLabels(): array

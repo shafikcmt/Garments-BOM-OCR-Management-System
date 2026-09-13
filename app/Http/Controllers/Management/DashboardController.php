@@ -8,6 +8,8 @@ use App\Models\PraApproval;
 
 class DashboardController extends Controller
 {
+    use \App\Http\Controllers\Concerns\ShowsRequisitionSummary;
+
     public function index()
     {
         $userId = auth()->id();
@@ -57,6 +59,8 @@ class DashboardController extends Controller
             'recentActivity',
             'trend',
             'delta'
-        ));
+        // Stock Summary for the current month. Management holds every
+        // requisition, so this comes back company-wide.
+        ) + $this->requisitionSummary(auth()->user()));
     }
 }

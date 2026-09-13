@@ -111,6 +111,23 @@ class PurchaseRequisitionService
         return max(0.0, $qtyRequested - (float) ($stockInHand ?? 0));
     }
 
+    /**
+     * The stock item this entry line points at, or null when the line names
+     * something that is not in the Item Master.
+     *
+     * A blank, a zero or a missing key all mean "no master item" — the form
+     * leaves the select empty when the typed-name box is being used, and an
+     * empty select posts "".
+     *
+     * @param  array<string, mixed>  $line
+     */
+    public function lineItemId(array $line): ?int
+    {
+        $id = $line['stock_item_id'] ?? null;
+
+        return ($id === null || $id === '' || (int) $id === 0) ? null : (int) $id;
+    }
+
     /** Separates the departments listed in one merged User Dept./Section cell. */
     public const DEPARTMENT_SEPARATOR = '/';
 
@@ -152,20 +169,38 @@ class PurchaseRequisitionService
      * Merged in line order, so the first mention of an item fixes its position
      * and the departments read in the order they were entered.
      *
+     * A line naming an item that is not in the Item Master merges on the typed
+     * NAME instead of an id, so two lines asking for the same typed item still
+     * become one, and two different typed items stay two.
+     *
      * @param  list<array<string, mixed>>  $lines  raw validated entry lines
-     * @return list<array<string, mixed>>  one entry per unique stock_item_id
+     * @return list<array<string, mixed>>  one entry per unique item, master or typed
      */
     public function mergeLines(array $lines): array
     {
-        /** @var array<int, array<string, mixed>> $merged keyed by stock item id */
+        /** @var array<string, array<string, mixed>> $merged keyed "id:<n>" or "custom:<name>" */
         $merged = [];
 
         foreach ($lines as $line) {
-            $itemId = (int) $line['stock_item_id'];
+            $itemId = $this->lineItemId($line);
 
-            if (! isset($merged[$itemId])) {
-                $merged[$itemId] = [
+            // A line naming something not in the Item Master has no id, so it
+            // is keyed by the name that WAS typed. Without that every custom
+            // line on the form would key on (int) null — zero — and five
+            // different typed items would collapse into one line carrying the
+            // sum of all five quantities.
+            $key = $itemId !== null
+                ? 'id:'.$itemId
+                : 'custom:'.mb_strtolower(trim((string) ($line['custom_item_name'] ?? '')));
+
+            if (! isset($merged[$key])) {
+                $merged[$key] = [
                     'stock_item_id' => $itemId,
+                    // Carried through so syncItems can write it; null for an
+                    // ordinary master line.
+                    'custom_item_name' => $itemId === null
+                        ? trim((string) ($line['custom_item_name'] ?? ''))
+                        : null,
                     'qty_requested' => 0.0,
                     // Collected as lists first so duplicates and blanks can be
                     // dropped once, at the end, rather than on every pass.
@@ -177,9 +212,9 @@ class PurchaseRequisitionService
                 ];
             }
 
-            $merged[$itemId]['qty_requested'] += (float) $line['qty_requested'];
-            $merged[$itemId]['departments'][] = trim((string) ($line['user_dept'] ?? ''));
-            $merged[$itemId]['remarks_parts'][] = trim((string) ($line['remarks'] ?? ''));
+            $merged[$key]['qty_requested'] += (float) $line['qty_requested'];
+            $merged[$key]['departments'][] = trim((string) ($line['user_dept'] ?? ''));
+            $merged[$key]['remarks_parts'][] = trim((string) ($line['remarks'] ?? ''));
 
             // First non-empty wins for the single-valued fields: the earliest
             // line is the one that described the item, and a later blank must
@@ -187,8 +222,8 @@ class PurchaseRequisitionService
             foreach (['specification', 'type', 'rate_appx'] as $field) {
                 $value = $line[$field] ?? null;
 
-                if ($merged[$itemId][$field] === null && $value !== null && $value !== '') {
-                    $merged[$itemId][$field] = $value;
+                if ($merged[$key][$field] === null && $value !== null && $value !== '') {
+                    $merged[$key][$field] = $value;
                 }
             }
         }

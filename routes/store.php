@@ -368,6 +368,13 @@ Route::prefix('store')
             Route::get('/requisitions/report/excel', [MonthlyRequisitionReportController::class, 'excel'])
                 ->name('requisitions.report.excel');
 
+            // The Store's review queue: requisitions the DEPARTMENTS sent in.
+            // Declared above /{requisition} so "requested" is never taken for a
+            // requisition id. The controller refuses anyone who is not Store,
+            // Admin or Management — this is a work queue, not a listing.
+            Route::get('/requisitions/requested', [PurchaseRequisitionController::class, 'requested'])
+                ->name('requisitions.requested');
+
             Route::get('/requisitions', [PurchaseRequisitionController::class, 'index'])->name('requisitions.index');
             Route::get('/requisitions/create', [PurchaseRequisitionController::class, 'create'])->middleware($act('store.requisition.create'))->name('requisitions.create');
             Route::post('/requisitions', [PurchaseRequisitionController::class, 'store'])->middleware($act('store.requisition.create'))->name('requisitions.store');
@@ -379,6 +386,17 @@ Route::prefix('store')
                 ->name('requisitions.pdf');
             Route::get('/requisitions/{requisition}/excel', [PurchaseRequisitionController::class, 'excel'])
                 ->name('requisitions.excel');
+
+            // The two review actions. Both are guarded a second time inside the
+            // controller on the permission the requisition seeder already
+            // defines — store.requisition.review for Received, and
+            // store.requisition.approve for Approve, which that seeder
+            // deliberately withholds from the store role so that whoever raises
+            // a requisition cannot also approve the spend.
+            Route::post('/requisitions/{requisition}/received', [PurchaseRequisitionController::class, 'markReceived'])
+                ->name('requisitions.received');
+            Route::post('/requisitions/{requisition}/approve', [PurchaseRequisitionController::class, 'approve'])
+                ->name('requisitions.approve');
 
             Route::get('/requisitions/{requisition}/edit', [PurchaseRequisitionController::class, 'edit'])->name('requisitions.edit');
             Route::put('/requisitions/{requisition}', [PurchaseRequisitionController::class, 'update'])->name('requisitions.update');

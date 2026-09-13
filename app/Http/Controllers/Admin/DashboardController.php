@@ -13,6 +13,8 @@ use App\Models\BookingPo;
 
 class DashboardController extends Controller
 {
+    use \App\Http\Controllers\Concerns\ShowsRequisitionSummary;
+
     public function index(\Illuminate\Http\Request $request)
     {
         $totalUsers = User::count();
@@ -67,7 +69,9 @@ class DashboardController extends Controller
             'selectedWorkspace',
             'trend',
             'delta',
-        ));
+        // Stock Summary for the current month, company-wide: Admin sees every
+        // requisition.
+        ) + $this->requisitionSummary($request->user()));
     }
 
     public function workspace()

@@ -14,6 +14,7 @@ use App\Models\StockItem;
 use App\Services\MonthlyRequisitionReportService;
 use App\Services\PurchaseRequisitionNumberGenerator;
 use App\Services\PurchaseRequisitionService;
+use App\Services\RequisitionFulfilmentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -42,6 +43,7 @@ class PurchaseRequisitionController extends Controller
     public function __construct(
         private readonly PurchaseRequisitionService $requisitions,
         private readonly PurchaseRequisitionNumberGenerator $numbers,
+        private readonly RequisitionFulfilmentService $fulfilment,
     ) {
     }
 
@@ -55,6 +57,10 @@ class PurchaseRequisitionController extends Controller
         ]);
 
         $requisitions = PurchaseRequisition::query()
+            // Store, Admin and Management still see the whole company. A user
+            // from another department, here on store.requisition.view, sees the
+            // requisitions they raised themselves.
+            ->visibleTo($request->user())
             ->with(['indentSection', 'indentPerson', 'createdBy'])
             ->withCount('items')
             ->withSum('items', 'amount')
@@ -67,18 +73,39 @@ class PurchaseRequisitionController extends Controller
                 // is case-sensitive, and stays LIKE everywhere else.
                 $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
                     ->orWhereHas('indentPerson', fn ($p) => $p->whereLike('name', $like))
-                    ->orWhereHas('items.stockItem', fn ($i) => $i->whereLike('name', $like)));
+                    ->orWhereHas('items.stockItem', fn ($i) => $i->whereLike('name', $like))
+                    // A line naming something not in the Item Master has no
+                    // stockItem to search, so its typed name is searched too —
+                    // otherwise the one item nobody can find in the master is
+                    // also the one nobody can find on this screen.
+                    ->orWhereHas('items', fn ($i) => $i->whereLike('custom_item_name', $like)));
             })
             ->orderByDesc('requisition_date')
             ->orderByDesc('id')
             ->paginate(25)
             ->withQueryString();
 
+        // Requested vs Purchased vs Pending, under the SAME month the list is
+        // filtered by and the same visibility, so the summary describes the
+        // list it sits above rather than a different set of requisitions.
+        $month = $filters['month'] ?? null;
+
         return view('store.stock.requisitions.index', [
             'requisitions' => $requisitions,
             'filters' => $filters,
             'sections' => IndentSection::selectable()->get(['id', 'name']),
             'statusLabels' => PurchaseRequisition::statusLabels(),
+            // Drives the "Requested" tab's badge. Counted only for whoever can
+            // open that queue, so a department user's screen runs no extra
+            // query for a tab they never see.
+            'awaitingCount' => ($request->user() && PurchaseRequisition::seesEveryRequisition($request->user()))
+                ? PurchaseRequisition::query()->fromDepartments()
+                    ->where('status', PurchaseRequisition::STATUS_SUBMITTED)->count()
+                : 0,
+            'fulfilment' => $this->fulfilment->summary($request->user(), ['month' => $month]),
+            'fulfilmentPeriod' => $month
+                ? Carbon::createFromFormat('Y-m', $month)->format('F Y')
+                : 'All dates',
         ]);
     }
 
@@ -98,6 +125,133 @@ class PurchaseRequisitionController extends Controller
             // it changes with the section, so the form recomputes it there too.
             'nextNo' => $this->numbers->preview(null),
         ]);
+    }
+
+    /**
+     * The Store's review queue — what the departments have sent in.
+     *
+     * The same list, the same filters and the same partial as index(); what
+     * differs is only fromDepartments(), which narrows it to requisitions
+     * raised OUTSIDE the Store. It is a separate screen rather than a filter on
+     * the main list because it is a work queue: the Store opens it to find what
+     * is waiting on them, not to browse.
+     */
+    public function requested(Request $request)
+    {
+        abort_unless(
+            $request->user() && PurchaseRequisition::seesEveryRequisition($request->user()),
+            403,
+            'Only the Store team can review incoming requisitions.'
+        );
+
+        $filters = $request->validate([
+            'month' => ['nullable', 'date_format:Y-m'],
+            'status' => ['nullable', 'string', 'in:'.implode(',', PurchaseRequisition::STATUS_FLOW)],
+            'section' => ['nullable', 'integer', 'exists:indent_sections,id'],
+            'search' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $requisitions = PurchaseRequisition::query()
+            ->fromDepartments()
+            ->with(['indentSection', 'indentPerson', 'createdBy'])
+            ->withCount('items')
+            ->withSum('items', 'amount')
+            ->when($filters['month'] ?? null, fn ($q, $month) => $q->forMonth($month))
+            ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['section'] ?? null, fn ($q, $id) => $q->where('indent_section_id', $id))
+            ->when($filters['search'] ?? null, function ($q, $search) {
+                $like = '%'.$search.'%';
+                $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
+                    ->orWhereHas('indentPerson', fn ($p) => $p->whereLike('name', $like))
+                    ->orWhereHas('createdBy', fn ($u) => $u->whereLike('name', $like))
+                    ->orWhereHas('items.stockItem', fn ($i) => $i->whereLike('name', $like))
+                    ->orWhereHas('items', fn ($i) => $i->whereLike('custom_item_name', $like)));
+            })
+            // Oldest first: a queue is worked from the end that has waited
+            // longest, unlike the main list which reads newest first.
+            ->orderByRaw("CASE WHEN status = ? THEN 0 ELSE 1 END", [PurchaseRequisition::STATUS_SUBMITTED])
+            ->orderBy('requisition_date')
+            ->orderBy('id')
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('store.stock.requisitions.requested', [
+            'requisitions' => $requisitions,
+            'filters' => $filters,
+            'sections' => IndentSection::selectable()->get(['id', 'name']),
+            'statusLabels' => PurchaseRequisition::statusLabels(),
+            'awaitingCount' => PurchaseRequisition::query()->fromDepartments()
+                ->where('status', PurchaseRequisition::STATUS_SUBMITTED)->count(),
+            // Decides whether the Edit button is drawn at all — the same
+            // question authorizeEditable() asks on the way in, so nobody is
+            // offered a button that would refuse them.
+            'canEdit' => $this->storeCorrectionAbilities()['edit'],
+        ]);
+    }
+
+    /**
+     * "Received" — the Store has seen the request.
+     *
+     * Moves Submitted to Store Reviewed and stamps the existing store_ack_by /
+     * store_ack_at columns, which is what the printed sheet's store signature
+     * box has always meant. Gated on store.requisition.review, the permission
+     * the seeder already grants to store, admin and management.
+     */
+    public function markReceived(PurchaseRequisition $requisition)
+    {
+        $this->authorizeTransition('store.requisition.review');
+
+        abort_unless($requisition->awaitingStoreReceipt(), 422,
+            'Only a requisition that has been submitted and not yet received can be marked received.');
+
+        $requisition->update([
+            'status' => PurchaseRequisition::STATUS_STORE_REVIEWED,
+            'store_ack_by' => auth()->id(),
+            'store_ack_at' => now(),
+        ]);
+
+        return back()->with('success',
+            'Requisition '.$requisition->requisition_no.' marked as received by Store.');
+    }
+
+    /**
+     * "Approve" — the request is accepted and may go to procurement.
+     *
+     * Moves Store Reviewed to Approved and stamps approved_by / approved_at.
+     *
+     * Gated on store.requisition.approve, which PurchaseRequisitionPermissionSeeder
+     * deliberately gives to admin and management but NOT to store: whoever
+     * raises a requisition must not be the one approving the spend, which is
+     * the whole point of the separate signature boxes on the paper form. That
+     * rule is left exactly as it was found.
+     */
+    public function approve(PurchaseRequisition $requisition)
+    {
+        $this->authorizeTransition('store.requisition.approve');
+
+        abort_unless($requisition->awaitingApproval(), 422,
+            'Only a requisition the Store has received can be approved.');
+
+        $requisition->update([
+            'status' => PurchaseRequisition::STATUS_APPROVED,
+            'approved_by' => auth()->id(),
+            'approved_at' => now(),
+        ]);
+
+        return back()->with('success',
+            'Requisition '.$requisition->requisition_no.' approved.');
+    }
+
+    /**
+     * Asks the workflow permission the same way the route guards do — role OR
+     * permission — so a change to one is readable next to the other.
+     */
+    private function authorizeTransition(string $permission): void
+    {
+        $user = auth()->user();
+
+        abort_unless($user && $user->can($permission), 403,
+            'You do not have permission to take this action on a requisition.');
     }
 
     public function store(Request $request)
@@ -152,8 +306,32 @@ class PurchaseRequisitionController extends Controller
             ->with('success', 'Requisition '.$requisition->requisition_no.' '.$verb.'.');
     }
 
+    /**
+     * Refuse a requisition this user is not allowed to see.
+     *
+     * The list is scoped by visibleTo(), but a scoped user could otherwise
+     * still reach any requisition by typing its id into the address bar —
+     * hiding a row from a listing is not a guard. Called by every action that
+     * takes a single requisition.
+     *
+     * 404 rather than 403: to someone who may not see it, a requisition raised
+     * by another department does not exist, and a 403 would confirm that the
+     * number is real.
+     */
+    private function authorizeVisible(PurchaseRequisition $requisition): void
+    {
+        $user = auth()->user();
+
+        abort_unless(
+            $user && (PurchaseRequisition::seesEveryRequisition($user) || $requisition->created_by === $user->id),
+            404
+        );
+    }
+
     public function show(PurchaseRequisition $requisition)
     {
+        $this->authorizeVisible($requisition);
+
         $requisition->load([
             'items.stockItem', 'items.itemCategory',
             'indentSection', 'indentPerson', 'createdBy',
@@ -165,6 +343,13 @@ class PurchaseRequisitionController extends Controller
             'statusLabels' => PurchaseRequisition::statusLabels(),
             'typeLabels' => PurchaseRequisitionItem::typeLabels(),
             'canDelete' => $this->storeCorrectionAbilities()['delete'],
+            // Whether this viewer holds the correction permission AND reads the
+            // whole company's requisitions — the Store-correction half of
+            // authorizeEditable(), asked the same way so the button and the
+            // action agree.
+            'canCorrect' => auth()->user()
+                && PurchaseRequisition::seesEveryRequisition(auth()->user())
+                && $this->storeCorrectionAbilities()['edit'],
         ]);
     }
 
@@ -188,6 +373,8 @@ class PurchaseRequisitionController extends Controller
     /** The same document as a single-sheet workbook. */
     public function excel(PurchaseRequisition $requisition, MonthlyRequisitionReportService $report)
     {
+        $this->authorizeVisible($requisition);
+
         $data = $this->documentData($requisition, $report);
 
         return Excel::download(
@@ -367,7 +554,13 @@ class PurchaseRequisitionController extends Controller
             'remarks' => ['nullable', 'string', 'max:2000'],
 
             'items' => ['required', 'array', 'min:1'],
-            'items.*.stock_item_id' => ['required', 'integer', 'exists:stock_items,id'],
+
+            // A line names EITHER a master item or a typed one, never neither.
+            // required_without each way is what refuses an empty line; nullable
+            // is what lets the unused half of the pair arrive blank, which it
+            // always does — the form posts both fields on every row.
+            'items.*.stock_item_id' => ['nullable', 'required_without:items.*.custom_item_name', 'integer', 'exists:stock_items,id'],
+            'items.*.custom_item_name' => ['nullable', 'required_without:items.*.stock_item_id', 'string', 'max:255'],
             'items.*.specification' => ['nullable', 'string', 'max:255'],
             'items.*.type' => ['nullable', 'in:'.PurchaseRequisitionItem::TYPE_REPLACE.','.PurchaseRequisitionItem::TYPE_NEW],
             'items.*.user_dept' => ['nullable', 'string', 'max:255'],
@@ -433,14 +626,22 @@ class PurchaseRequisitionController extends Controller
         // merged line's User Dept./ Section cell.
         $lines = $this->requisitions->mergeLines(array_values($lines));
 
-        $itemIds = array_map(fn ($line) => (int) $line['stock_item_id'], $lines);
+        // Custom lines carry no id, so they are filtered out here rather than
+        // being looked up as item 0. They get the empty snapshot below, which
+        // is the honest answer: there is no master record to read stock,
+        // safety or last purchase from.
+        $itemIds = array_values(array_filter(array_map(
+            fn ($line) => $this->requisitions->lineItemId($line),
+            $lines
+        )));
+
         $snapshots = $this->requisitions->snapshots($itemIds, $on);
         $stockItems = StockItem::whereIn('id', $itemIds)->get()->keyBy('id');
 
         foreach ($lines as $index => $line) {
-            $itemId = (int) $line['stock_item_id'];
-            $stockItem = $stockItems->get($itemId);
-            $snapshot = $snapshots[$itemId] ?? [];
+            $itemId = $this->requisitions->lineItemId($line);
+            $stockItem = $itemId ? $stockItems->get($itemId) : null;
+            $snapshot = $itemId ? ($snapshots[$itemId] ?? []) : [];
 
             $qty = (float) $line['qty_requested'];
             $toBeProcured = $this->requisitions->toBeProcured($qty, $snapshot['stock_in_hand'] ?? null);
@@ -454,6 +655,9 @@ class PurchaseRequisitionController extends Controller
 
             $requisition->items()->create([
                 'stock_item_id' => $itemId,
+                // Only set when there is no master item; the two are never both
+                // filled, so a line always has exactly one name.
+                'custom_item_name' => $itemId ? null : ($line['custom_item_name'] ?? null),
                 'item_category_id' => $stockItem?->item_category_id,
                 'sort_order' => $index,
                 'uom_snapshot' => $stockItem?->uom,

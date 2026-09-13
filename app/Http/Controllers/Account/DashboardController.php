@@ -16,6 +16,8 @@ use App\Support\Concerns\ScopesToAssignedBuyers;
  */
 class DashboardController extends Controller
 {
+    use \App\Http\Controllers\Concerns\ShowsRequisitionSummary;
+
     use ScopesToAssignedBuyers;
 
     public function index(DashboardMetricsService $metrics)
@@ -48,6 +50,6 @@ class DashboardController extends Controller
             'pra_approved' => $pras()->where('status', PaymentRequest::STATUS_APPROVED)->count(),
         ];
 
-        return view('account.dashboard', compact('stats', 'workspace', 'trend', 'delta'));
+        return view('account.dashboard', compact('stats', 'workspace', 'trend', 'delta') + $this->requisitionSummary(auth()->user()));
     }
 }

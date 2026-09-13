@@ -66,5 +66,8 @@
                 :href="route('commercial.workspace')" />
         </div>
     </div>
+    {{-- Stock Summary. Renders nothing for a user who may not see
+         requisitions, so it is included unconditionally. --}}
+    @include('shared._requisition-summary-card')
 </div>
 @endsection

@@ -207,6 +207,9 @@ class MonthlyRequisitionReportService
                 $q->where(fn ($w) => $w->whereLike('user_dept', $like)
                     ->orWhereLike('specification', $like)
                     ->orWhereHas('stockItem', fn ($i) => $i->whereLike('name', $like))
+                    // Lines naming something not in the Item Master have no
+                    // stockItem to search; their typed name is searched here.
+                    ->orWhereLike('custom_item_name', $like)
                     ->orWhereHas('requisition', fn ($r) => $r->whereLike('requisition_no', $like)));
             })
             ->get();
@@ -225,7 +228,11 @@ class MonthlyRequisitionReportService
 
         return [
             'stock_item_id' => $line->stock_item_id,
-            'item_name' => optional($line->stockItem)->name ?? '—',
+            // displayName() falls back to the typed name for a line naming
+            // something not in the Item Master, so such a line prints its item
+            // rather than a dash on the report, the PDF and the Excel alike.
+            'item_name' => $line->displayName(),
+            'is_custom_item' => $line->isCustomItem(),
             'uom' => $line->uom_snapshot,
             'category' => optional($line->itemCategory)->name,
             'specification' => $line->specification,

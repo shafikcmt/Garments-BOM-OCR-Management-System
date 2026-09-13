@@ -12,6 +12,8 @@ use App\Support\Concerns\ScopesToAssignedBuyers;
 
 class DashboardController extends Controller
 {
+    use \App\Http\Controllers\Concerns\ShowsRequisitionSummary;
+
     use ScopesToAssignedBuyers;
 
     public function index(DashboardMetricsService $metrics)
@@ -42,7 +44,7 @@ class DashboardController extends Controller
             'emails' => $this->scopedEmailLogs()->count(),
         ];
 
-        return view('supply-chain.dashboard', compact('stats', 'workspace', 'trend', 'delta'));
+        return view('supply-chain.dashboard', compact('stats', 'workspace', 'trend', 'delta') + $this->requisitionSummary(auth()->user()));
     }
 
     /** POs this viewer may see, through their BOM file's buyer. */

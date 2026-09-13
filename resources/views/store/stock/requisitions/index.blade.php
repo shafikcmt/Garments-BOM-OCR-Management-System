@@ -45,6 +45,39 @@
 
     @include('store._flash')
 
+    {{-- The review queue is Store-only, so the tabs appear only for whoever can
+         open it — a department user sees this screen with no tab strip at all,
+         exactly as before. --}}
+    @if(auth()->user() && \App\Models\PurchaseRequisition::seesEveryRequisition(auth()->user()))
+        <ul class="nav nav-tabs mb-4">
+            <li class="nav-item">
+                <a class="nav-link active" href="{{ route('store.stock.requisitions.index') }}">All Requisitions</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ route('store.stock.requisitions.requested') }}">
+                    Requested
+                    @if(($awaitingCount ?? 0) > 0)
+                        <span class="badge bg-primary-subtle text-primary ms-1">{{ number_format($awaitingCount) }}</span>
+                    @endif
+                </a>
+            </li>
+        </ul>
+    @endif
+
+    {{-- Requested vs Purchased vs Pending, above the list it summarises. It
+         follows the Month filter below and the same visibility as the list, so
+         the figures always describe exactly the requisitions on this screen. --}}
+    <div class="card gx-stock-card mb-4">
+        <div class="gx-stock-card-body">
+            @include('store.stock.requisitions._fulfilment', [
+                'fulfilment' => $fulfilment,
+                'periodLabel' => $fulfilmentPeriod,
+                'limit' => 10,
+                'moreUrl' => null,
+            ])
+        </div>
+    </div>
+
     <div class="card gx-stock-card">
         <div class="gx-stock-card-body">
             <div class="gx-stock-card-head">

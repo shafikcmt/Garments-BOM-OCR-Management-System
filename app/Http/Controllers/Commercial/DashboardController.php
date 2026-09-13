@@ -16,6 +16,8 @@ use App\Support\Concerns\ScopesToAssignedBuyers;
  */
 class DashboardController extends Controller
 {
+    use \App\Http\Controllers\Concerns\ShowsRequisitionSummary;
+
     use ScopesToAssignedBuyers;
 
     public function index(DashboardMetricsService $metrics)
@@ -49,6 +51,6 @@ class DashboardController extends Controller
             'rows' => (clone $rows)->count(),
         ];
 
-        return view('commercial.dashboard', compact('stats', 'workspace', 'trend', 'delta'));
+        return view('commercial.dashboard', compact('stats', 'workspace', 'trend', 'delta') + $this->requisitionSummary(auth()->user()));
     }
 }

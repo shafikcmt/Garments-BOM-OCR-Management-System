@@ -15,6 +15,8 @@ use App\Services\DepartmentActivityService;
  */
 class DashboardController extends Controller
 {
+    use \App\Http\Controllers\Concerns\ShowsRequisitionSummary;
+
     public function index(DashboardMetricsService $metrics)
     {
         // Required-column progress for this department only, from the same
@@ -32,6 +34,6 @@ class DashboardController extends Controller
             'my_files' => ExcelFile::where('uploaded_by', auth()->id())->count(),
         ];
 
-        return view('merchant.dashboard', compact('stats', 'workspace', 'trend', 'delta'));
+        return view('merchant.dashboard', compact('stats', 'workspace', 'trend', 'delta') + $this->requisitionSummary(auth()->user()));
     }
 }

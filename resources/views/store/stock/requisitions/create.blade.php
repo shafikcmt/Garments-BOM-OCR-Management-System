@@ -11,6 +11,8 @@
     $existingLines = collect(old('items', $editing
         ? $requisition->items->map(fn ($i) => [
             'stock_item_id' => $i->stock_item_id,
+            // Reopens a typed line as a typed line rather than an empty picker.
+            'custom_item_name' => $i->custom_item_name,
             'specification' => $i->specification,
             'type' => $i->type,
             'user_dept' => $i->user_dept,
@@ -190,10 +192,15 @@
                 </button>
             </div>
 
-            {{-- What the requester types — one row per line. Item Name leads
-                 because it is what the requester actually came to choose;
-                 Category sits beside it as the filter that narrows the list,
-                 and fills itself in from the item once one is picked. --}}
+            {{-- What the requester types — one row per line, in the order the
+                 requester works through it: Item Name leads because it is what
+                 they actually came to choose, then what describes it (Uom,
+                 Specification, Category), then what is being asked for and for
+                 whom, and the figures last.
+
+                 Category doubles as the filter that narrows the item list, so
+                 it can also be set BEFORE the item, from anywhere in the row —
+                 its position here does not change that. --}}
             <div class="gx-req-fields">
                 <div class="gx-req-field is-item">
                     <label class="form-label">Item Name <span class="text-danger">*</span></label>
@@ -206,6 +213,38 @@
                                     data-category-id="{{ $it->item_category_id }}">{{ $it->name }}@if($it->brand) ({{ $it->brand }})@endif</option>
                         @endforeach
                     </select>
+
+                    {{-- Asking for something the Item Master has never carried.
+                         A SEPARATE box rather than a "create" option on the
+                         dropdown, on purpose: a typed name here must NOT add a
+                         row to the Item Master. What belongs in the master has
+                         a category, a UOM and a re-order level behind it, and
+                         that is a Store decision taken afterwards — so the two
+                         are kept visibly apart.
+
+                         The select keeps its own markup and its own TomSelect
+                         untouched, which is what leaves item search, UOM
+                         auto-fill, the category filter and the stock chips
+                         behaving exactly as before on a master line. --}}
+                    <div class="gx-req-custom">
+                        <div class="form-check">
+                            <input class="form-check-input js-line-custom-toggle" type="checkbox"
+                                   id="customToggle__INDEX__">
+                            <label class="form-check-label" for="customToggle__INDEX__">Not in Item Master</label>
+                        </div>
+                        <input type="text" class="form-control form-control-sm js-line-custom-name"
+                               name="items[__INDEX__][custom_item_name]" maxlength="255"
+                               placeholder="Type the item name" hidden>
+                    </div>
+                </div>
+                <div class="gx-req-field is-uom">
+                    <label class="form-label">Uom</label>
+                    {{-- Derived from the item, never posted. --}}
+                    <input type="text" class="form-control form-control-sm js-line-uom gx-stock-readonly text-center" readonly tabindex="-1" placeholder="—">
+                </div>
+                <div class="gx-req-field is-spec">
+                    <label class="form-label">Specification</label>
+                    <input type="text" class="form-control form-control-sm js-line-spec" name="items[__INDEX__][specification]" maxlength="255" placeholder="—">
                 </div>
                 <div class="gx-req-field is-category">
                     <label class="form-label">Category</label>
@@ -219,31 +258,30 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="gx-req-field is-uom">
-                    <label class="form-label">Uom</label>
-                    {{-- Derived from the item, never posted. --}}
-                    <input type="text" class="form-control form-control-sm js-line-uom gx-stock-readonly text-center" readonly tabindex="-1" placeholder="—">
-                </div>
-                <div class="gx-req-field is-qty">
-                    <label class="form-label">Qty Req. <span class="text-danger">*</span></label>
-                    <input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm js-line-qty" name="items[__INDEX__][qty_requested]" required placeholder="0">
-                </div>
-                <div class="gx-req-field is-spec">
-                    <label class="form-label">Specification</label>
-                    <input type="text" class="form-control form-control-sm js-line-spec" name="items[__INDEX__][specification]" maxlength="255" placeholder="—">
-                </div>
                 <div class="gx-req-field is-type">
                     <label class="form-label">Type</label>
+                    {{-- Defaults to New, because most requested lines are. It is
+                         a plain <select>, so the requester changes it to Replace
+                         the same way as before, and "—" is still there for a
+                         line that is neither. The default is written HERE, on
+                         the template every row is cloned from, so the first row,
+                         an "Add Another Item" row and a row that came back from
+                         validation all agree. Restoring a saved line overrides
+                         it — see addLine(). --}}
                     <select class="form-select form-select-sm" name="items[__INDEX__][type]">
                         <option value="">—</option>
                         @foreach($typeLabels as $value => $label)
-                            <option value="{{ $value }}">{{ $label }}</option>
+                            <option value="{{ $value }}" @selected($value === \App\Models\PurchaseRequisitionItem::TYPE_NEW)>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
                 <div class="gx-req-field is-dept">
                     <label class="form-label">User Dept.</label>
                     <input type="text" class="form-control form-control-sm" name="items[__INDEX__][user_dept]" maxlength="255" placeholder="—">
+                </div>
+                <div class="gx-req-field is-qty">
+                    <label class="form-label">Qty Req. <span class="text-danger">*</span></label>
+                    <input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm js-line-qty" name="items[__INDEX__][qty_requested]" required placeholder="0">
                 </div>
                 <div class="gx-req-field is-rate">
                     <label class="form-label">Rate Appx.</label>
@@ -332,18 +370,29 @@
         /* One row for all nine, once there is room to do it without cramming. */
         @media (min-width: 1500px) {
             .gx-req-fields {
+                /* In the order the fields are typed, which is the order they
+                   appear in the markup above. Each keeps the width it has
+                   always had; only their positions moved. */
                 grid-template-columns:
                     minmax(0, 2.1fr)   /* Item Name */
-                    minmax(0, 1.2fr)   /* Category */
                     64px               /* Uom */
-                    minmax(0, .95fr)   /* Qty Req. */
                     minmax(0, 1.35fr)  /* Specification */
+                    minmax(0, 1.2fr)   /* Category */
                     minmax(0, .95fr)   /* Type */
                     minmax(0, 1.1fr)   /* User Dept. */
+                    minmax(0, .95fr)   /* Qty Req. */
                     minmax(0, .95fr)   /* Rate Appx. */
                     minmax(0, 1.3fr);  /* Remarks */
             }
         }
+
+        /* The "Not in Item Master" toggle and its typed name, under the item
+           picker. Small and quiet: it is the exception, not the normal path. */
+        .gx-req-custom { margin-top: .3rem; }
+        .gx-req-custom .form-check { margin-bottom: 0; min-height: auto; }
+        .gx-req-custom .form-check-label { font-size: .72rem; color: #64748b; }
+        .gx-req-custom .form-check-input { margin-top: .2rem; }
+        .gx-req-custom .form-control { margin-top: .3rem; }
 
         /* min-width:0 on the field itself as well: a grid item defaults to
            min-content, and TomSelect's widest option would otherwise stretch
@@ -609,6 +658,55 @@
                 }
             }
 
+            /* Switches one line between picking a master item and typing a name.
+             *
+             * Only ONE of the two is ever live, because only one of them can
+             * name the item: the unused control is hidden AND has its value
+             * cleared, so a half-filled line cannot post both and leave the
+             * server to guess which the requester meant.
+             *
+             * The derived boxes are blanked too. Uom, the stock chips and the
+             * last-purchase figures all come from the item master, and a typed
+             * item has no master record — showing the previous item's numbers
+             * beside a different name is how a wrong quantity gets ordered. The
+             * requester keeps typing Specification, Qty and Rate themselves.
+             *
+             * `required` moves with the mode so the browser asks for whichever
+             * field is actually in use; the server checks the same pair with
+             * required_without either way. */
+            function applyCustomItemMode(row) {
+                var custom = row.querySelector('.js-line-custom-toggle').checked;
+                var select = row.querySelector('.js-line-item');
+                var nameBox = row.querySelector('.js-line-custom-name');
+                var category = row.querySelector('.js-line-category');
+
+                nameBox.hidden = !custom;
+                nameBox.required = custom;
+                select.required = !custom;
+
+                // TomSelect draws its own wrapper over the select, so hiding
+                // the select alone would leave the widget on screen.
+                var wrapper = select.tomselect ? select.tomselect.wrapper : select;
+                wrapper.hidden = custom;
+
+                if (custom) {
+                    if (select.tomselect) { select.tomselect.clear(true); } else { select.value = ''; }
+
+                    // No master record behind this line, so nothing is known
+                    // about it but what is typed on the row.
+                    category.value = '';
+                    row.querySelector('.js-line-uom').value = '';
+                    ['.js-line-stock', '.js-line-safety', '.js-line-consumption',
+                     '.js-line-lpqty', '.js-line-lprate', '.js-line-lpdate'
+                    ].forEach(function (sel) { row.querySelector(sel).textContent = '—'; });
+
+                    row.dataset.stockInHand = '';
+                    recalc(row);
+                } else {
+                    nameBox.value = '';
+                }
+            }
+
             /* Category is a filter on the item list, exactly as on Record Issue. */
             function applyCategoryFilter(row) {
                 var categoryId = row.querySelector('.js-line-category').value;
@@ -656,14 +754,28 @@
                 if (values) {
                     if (values.stock_item_id) { row.querySelector('.js-line-item').value = values.stock_item_id; }
                     if (values.specification) { row.querySelector('.js-line-spec').value = values.specification; }
-                    if (values.type) { row.querySelector('[name$="[type]"]').value = values.type; }
+                    // Assigned even when blank, unlike its neighbours. The
+                    // template defaults Type to New; a saved line that is
+                    // deliberately neither New nor Replace would otherwise keep
+                    // that default and be re-saved as New on the next edit.
+                    // What was stored wins over the default for a restored row.
+                    row.querySelector('[name$="[type]"]').value = values.type || '';
                     if (values.user_dept) { row.querySelector('[name$="[user_dept]"]').value = values.user_dept; }
                     if (values.qty_requested) { row.querySelector('.js-line-qty').value = values.qty_requested; }
                     if (values.rate_appx) { row.querySelector('.js-line-rate').value = values.rate_appx; }
                     if (values.remarks) { row.querySelector('[name$="[remarks]"]').value = values.remarks; }
+                    if (values.custom_item_name) {
+                        row.querySelector('.js-line-custom-name').value = values.custom_item_name;
+                        row.querySelector('.js-line-custom-toggle').checked = true;
+                    }
                 }
 
                 if (window.gxInitSearchable) { window.gxInitSearchable(row); }
+
+                applyCustomItemMode(row);
+                row.querySelector('.js-line-custom-toggle').addEventListener('change', function () {
+                    applyCustomItemMode(row);
+                });
 
                 row.querySelector('.js-line-category').addEventListener('change', function () { applyCategoryFilter(row); });
                 row.querySelector('.js-line-item').addEventListener('change', function () { loadSnapshot(row); });

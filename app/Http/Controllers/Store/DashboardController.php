@@ -25,6 +25,8 @@ use App\Services\GeneralStockReportService;
  */
 class DashboardController extends Controller
 {
+    use \App\Http\Controllers\Concerns\ShowsRequisitionSummary;
+
     public function index()
     {
         // Same service the Consumable Stock Report screen uses, so the
@@ -60,7 +62,7 @@ class DashboardController extends Controller
 
         return view('store.dashboard', compact('stats', 'stockLevels') + [
             'recentActivity' => $this->recentActivity(),
-        ]);
+        ] + $this->requisitionSummary(auth()->user()));
     }
 
     /**
