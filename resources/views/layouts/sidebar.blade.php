@@ -60,6 +60,12 @@
     // admits anyone holding any one of the module permissions.
     $seeStoreHome = $isStoreRole || $seeGeneralStock || $seeMaterialStock;
 
+    // The Dashboard link itself asks the dashboard route's own question —
+    // every General Stock right EXCEPT the requisition one — so a user given
+    // only Purchase Requisition (the requisition_raiser role, or a clerk
+    // granted that screen alone) is not offered a link that would answer 403.
+    $seeStoreDashboard = $isStoreRole || $seeStockReport || $seeItems || $seeGsReceiving || $seeIssues || $seeSetup || $seeMaterialStock;
+
     // Store Reports is guarded by role only — no permission exists for it, so a
     // permission-only user must not be offered it.
     $seeStoreReports = $isStoreRole;
@@ -334,10 +340,13 @@
             @endrole
 
             @if($seeStoreArea)
+            {{-- No empty "Main Menu" heading for a requisition-only user, who
+                 has neither link under it. --}}
+            @if($seeStoreDashboard || $seeWorkspace)
             <div class="sidebar-section">
                 <div class="sidebar-section-label">Main Menu</div>
                 <ul class="sidebar-list">
-                    @if($seeStoreHome)
+                    @if($seeStoreDashboard)
                     <li class="sidebar-item">
                         <a href="{{ route('store.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('store.dashboard') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span><span class="sidebar-link-text">Dashboard</span></span>
@@ -353,6 +362,7 @@
                     @endif
                 </ul>
             </div>
+            @endif
             @if($seeGeneralStock)
             <div class="sidebar-section">
                 <div class="sidebar-section-label">General Stock</div>

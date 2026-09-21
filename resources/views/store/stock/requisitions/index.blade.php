@@ -21,7 +21,7 @@
 @section('content')
 <div class="container-fluid gx-stock-scope">
     <x-breadcrumb :items="[
-        ['label' => 'Store', 'url' => route('store.dashboard')],
+        ['label' => 'Store', 'url' => \App\Models\PurchaseRequisition::seesEveryRequisition(auth()->user()) ? route('store.dashboard') : null],
         ['label' => 'General Stock'],
         ['label' => 'Purchase Requisition'],
     ]" />
@@ -31,9 +31,14 @@
     <x-page-header icon="clipboard-check" eyebrow="General Stock" title="Purchase Requisition"
                    copy="What the departments have asked to be bought, and where each request stands.">
         <x-slot:actions>
+            {{-- The month compiled across the whole company — the Store's
+                 view, offered only to whoever reads every requisition. The
+                 controller refuses everyone else. --}}
+            @if(auth()->user() && \App\Models\PurchaseRequisition::seesEveryRequisition(auth()->user()))
             <a href="{{ route('store.stock.requisitions.report') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Monthly Report
             </a>
+            @endif
             {{-- One entry form covers both cases: a one-item requisition is
                  simply this form with a single line, so there is nothing for
                  a separate "Single Item" button to open. --}}

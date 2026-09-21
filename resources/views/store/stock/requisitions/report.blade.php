@@ -22,7 +22,7 @@
 @section('content')
 <div class="container-fluid gx-stock-scope">
     <x-breadcrumb :items="[
-        ['label' => 'Store', 'url' => route('store.dashboard')],
+        ['label' => 'Store', 'url' => \App\Models\PurchaseRequisition::seesEveryRequisition(auth()->user()) ? route('store.dashboard') : null],
         ['label' => 'General Stock'],
         ['label' => 'Purchase Requisition', 'url' => route('store.stock.requisitions.index')],
         ['label' => 'Monthly Report'],

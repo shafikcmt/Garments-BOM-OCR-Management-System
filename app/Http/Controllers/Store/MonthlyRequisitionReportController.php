@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Store;
 
 use App\Exports\MonthlyRequisitionReportExport;
 use App\Http\Controllers\Controller;
+use App\Models\PurchaseRequisition;
 use App\Models\RequisitionSignatureBlock;
 use App\Services\MonthlyRequisitionReportService;
 use App\Services\RequisitionSignatureResolver;
@@ -63,6 +64,17 @@ class MonthlyRequisitionReportController extends Controller
      */
     private function build(Request $request): array
     {
+        // The month is the WHOLE company's requisitions, unscoped. A
+        // department user reaches this module on store.requisition.view for
+        // their own list; this compiled view is the Store's and stays with
+        // whoever reads every requisition — the same rule as the Requested
+        // queue.
+        abort_unless(
+            $request->user() && PurchaseRequisition::seesEveryRequisition($request->user()),
+            403,
+            'The monthly requisition report is available to the Store team only.'
+        );
+
         $filters = $request->validate([
             'month' => ['nullable', 'string'],
             'category' => ['nullable', 'string', 'max:160'],

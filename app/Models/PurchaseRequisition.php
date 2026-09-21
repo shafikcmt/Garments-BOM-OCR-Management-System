@@ -14,6 +14,15 @@ use Illuminate\Database\Eloquent\Model;
  *
  * A single-item and a multi-item requisition are the same record with a
  * different `mode`, so both appear in one list and one report.
+ *
+ * SCOPE — GENERAL STOCK ONLY. This requisition workflow (department level
+ * with its department-head check, and the final / merged level with its
+ * configurable signature boxes) covers General Stock consumables and nothing
+ * else. Buyer / Style-wise stock requisition is a SEPARATE future module with
+ * its own permissions and, most likely, its own tables — the existing
+ * MaterialRequisition under Buyer / Style Stock is unrelated to this class.
+ * Do not extend this flow, its statuses, its signature blocks or its
+ * permissions to buyer / style stock without a new task that says so.
  */
 class PurchaseRequisition extends Model
 {

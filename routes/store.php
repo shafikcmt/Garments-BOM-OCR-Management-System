@@ -73,6 +73,17 @@ $generalStock = 'role_or_perm:store|admin|management'
     .'|store.stock_report.view|store.items.view|store.receiving.view'
     .'|store.issues.view|store.requisition.view|store.setup.view';
 
+// The General Stock DASHBOARD, as opposed to the module: every General Stock
+// permission except the requisition one. Purchase Requisition is the one
+// screen a person outside the Store can be given — a department clerk, or the
+// requisition_raiser role — and the dashboard is the Store's own stock
+// position, which is not theirs to read. Their landing page is the requisition
+// list instead (see /dashboard in routes/web.php). Everyone who could open the
+// dashboard on any other right still can.
+$generalStockDashboard = 'role_or_perm:store|admin|management'
+    .'|store.stock_report.view|store.items.view|store.receiving.view'
+    .'|store.issues.view|store.setup.view';
+
 /*
  * Section guards inside General Stock.
  *
@@ -162,13 +173,14 @@ Route::prefix('store')
 Route::prefix('store')
     ->middleware(['auth', $storeEntry])
     ->name('store.')
-    ->group(function () use ($generalStock, $materialStock, $secStockReport, $secSetup, $secItems, $secReceiving, $secIssues, $secRequisition, $act) {
+    ->group(function () use ($generalStock, $generalStockDashboard, $materialStock, $secStockReport, $secSetup, $secItems, $secReceiving, $secIssues, $secRequisition, $act) {
         // The dashboard is General Stock's own now, so it sits behind that
         // module's guard rather than the area-wide one. A Buyer / Style user
         // is sent to their own dashboard instead — see the resolver on
-        // /dashboard in routes/web.php.
+        // /dashboard in routes/web.php. A requisition-only user is refused
+        // here and lands on the requisition list instead.
         Route::get('/dashboard', [DashboardController::class, 'index'])
-            ->middleware($generalStock)
+            ->middleware($generalStockDashboard)
             ->name('dashboard');
 
         // --- Module A: General Stock (non-BOM) ---

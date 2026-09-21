@@ -56,8 +56,12 @@ Route::middleware(['auth'])->group(function () {
          * to update a list here.
          */
         if ($department === 'store') {
+            // store.requisition.view is deliberately NOT in this list: the
+            // Store dashboard's guard no longer admits it on its own (see
+            // routes/store.php), so a Store-department user holding only the
+            // requisition screen is sent to that screen below, not to a 403.
             $generalStock = ['store.stock_report.view', 'store.items.view', 'store.receiving.view',
-                'store.issues.view', 'store.requisition.view', 'store.setup.view'];
+                'store.issues.view', 'store.setup.view'];
 
             $materialStock = ['material.closing_stock.view', 'material.receiving.view',
                 'material.bulk_issue.view', 'material.requisitions.view'];
@@ -68,6 +72,10 @@ Route::middleware(['auth'])->group(function () {
 
             if ($user->canAny($materialStock)) {
                 return redirect()->route('store.material.dashboard');
+            }
+
+            if ($user->can('store.requisition.view')) {
+                return redirect()->route('store.stock.requisitions.index');
             }
 
             /*
@@ -86,6 +94,15 @@ Route::middleware(['auth'])->group(function () {
 
         if ($department && isset($dashboards[$department])) {
             return redirect()->route($dashboards[$department]);
+        }
+
+        // A role mapped to no department — the Requisition Raiser, or any
+        // narrow role an admin makes later — has no dashboard of its own.
+        // Whoever may open the Purchase Requisition list lands on it; that is
+        // the one screen such a role exists for. Asked as a permission so a
+        // future narrow role lands here too without being listed.
+        if ($user->can('store.requisition.view')) {
+            return redirect()->route('store.stock.requisitions.index');
         }
 
         abort(403, 'No dashboard route assigned for this role.');
