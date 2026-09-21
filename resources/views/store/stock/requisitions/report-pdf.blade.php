@@ -162,52 +162,17 @@
     @include('store.stock.requisitions._report-rows', ['rows' => $sectionRows])
 @endforeach
 
+{{-- The signature footer comes from Admin > Settings > Requisition Signatures
+     (the final sheet's boxes) — nothing here is typed in. --}}
 @unless($forExcel)
-    <table class="sign">
-        <tr>
-            <td>
-                <div class="sign-title">Prepared By</div>
-                <div class="sign-line"></div>
-                <div class="sign-meta">Store</div>
-            </td>
-            <td>
-                <div class="sign-title">Checked By</div>
-                <div class="sign-line"></div>
-                <div class="sign-meta">Store In-charge</div>
-            </td>
-            <td>
-                <div class="sign-title">Approved By</div>
-                <div class="sign-line"></div>
-                <div class="sign-meta">Management</div>
-            </td>
-        </tr>
-    </table>
+    @include('store.stock.requisitions._signature-block', ['signatures' => $signatures ?? [], 'forExcel' => false])
 
     <div class="footer">
         {{ $unit }} &mdash; {{ $title }} &mdash; {{ $monthLabel }}
         <span class="right">Generated {{ now()->format('d M Y') }}</span>
     </div>
 @else
-    {{-- Excel signature block. Three equal thirds of the table width, so each
-         has room to actually be signed; the rule above the labels is the
-         signature line and the blank rows above it are the signing space.
-         Bold, borders and heights are applied by FormatsStoreSheet. --}}
-    @php($third = (int) floor(21 / 3))
-    <table>
-        <tr><td colspan="21"></td></tr>
-        <tr><td colspan="21"></td></tr>
-        <tr><td colspan="21"></td></tr>
-        <tr>
-            <td colspan="{{ $third }}">Prepared by</td>
-            <td colspan="{{ $third }}">Checked by</td>
-            <td colspan="{{ 21 - 2 * $third }}">Approved by</td>
-        </tr>
-        <tr>
-            <td colspan="{{ $third }}">Store</td>
-            <td colspan="{{ $third }}">Store In-charge</td>
-            <td colspan="{{ 21 - 2 * $third }}">Management</td>
-        </tr>
-    </table>
+    @include('store.stock.requisitions._signature-block', ['signatures' => $signatures ?? [], 'forExcel' => true, 'columns' => 21])
 @endunless
 
 </body>

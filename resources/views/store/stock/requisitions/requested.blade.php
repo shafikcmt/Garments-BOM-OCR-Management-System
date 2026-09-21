@@ -41,19 +41,7 @@
     {{-- Two tabs over one list. The queue is a separate screen rather than a
          status filter because it answers a different question: not "what has
          been raised" but "what is waiting on me". --}}
-    <ul class="nav nav-tabs mb-4">
-        <li class="nav-item">
-            <a class="nav-link" href="{{ route('store.stock.requisitions.index') }}">All Requisitions</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link active" href="{{ route('store.stock.requisitions.requested') }}">
-                Requested
-                @if($awaitingCount > 0)
-                    <span class="badge bg-primary-subtle text-primary ms-1">{{ number_format($awaitingCount) }}</span>
-                @endif
-            </a>
-        </li>
-    </ul>
+    @include('store.stock.requisitions._tabs', ['active' => 'requested'])
 
     <div class="card gx-stock-card">
         <div class="gx-stock-card-body">
@@ -124,7 +112,12 @@
                                 </td>
                                 <td class="small">{{ optional($r->requisition_date)->format('d-M-Y') ?? '—' }}</td>
                                 <td class="small">{{ optional($r->indentSection)->name ?: 'All' }}</td>
-                                <td class="small">{{ optional($r->createdBy)->name ?: '—' }}</td>
+                                <td class="small">
+                                    {{ optional($r->createdBy)->name ?: '—' }}
+                                    @if($r->department_role)
+                                        <div class="gx-stock-spec">{{ $r->departmentLabel() }}@if($r->department_checked_at) · head checked {{ $r->department_checked_at->format('d-M-Y') }}@endif</div>
+                                    @endif
+                                </td>
                                 <td class="text-end fw-semibold">{{ $r->items_count }}</td>
                                 <td class="text-end fw-semibold">{{ $money($r->items_sum_amount) }}</td>
                                 <td>

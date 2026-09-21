@@ -375,6 +375,18 @@ Route::prefix('store')
             Route::get('/requisitions/requested', [PurchaseRequisitionController::class, 'requested'])
                 ->name('requisitions.requested');
 
+            // The Department Head's queue and decision — a department's sheet
+            // passes its head before it reaches the Store. Who the head is
+            // comes from Admin > Settings; the controller refuses anyone else
+            // per record. Declared above /{requisition} like the other fixed
+            // paths.
+            Route::get('/requisitions/department-review', [PurchaseRequisitionController::class, 'departmentReview'])
+                ->name('requisitions.department-review');
+            Route::post('/requisitions/{requisition}/department-approve', [PurchaseRequisitionController::class, 'departmentApprove'])
+                ->name('requisitions.department-approve');
+            Route::post('/requisitions/{requisition}/department-reject', [PurchaseRequisitionController::class, 'departmentReject'])
+                ->name('requisitions.department-reject');
+
             Route::get('/requisitions', [PurchaseRequisitionController::class, 'index'])->name('requisitions.index');
             Route::get('/requisitions/create', [PurchaseRequisitionController::class, 'create'])->middleware($act('store.requisition.create'))->name('requisitions.create');
             Route::post('/requisitions', [PurchaseRequisitionController::class, 'store'])->middleware($act('store.requisition.create'))->name('requisitions.store');

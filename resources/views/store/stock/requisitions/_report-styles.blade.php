@@ -56,10 +56,15 @@
     .w-remarks { width: 6%; }
 
     .sign { margin-top: 22px; }
-    .sign td { border: 0; width: 33.33%; text-align: center; padding: 0 10px; font-size: 8px; }
+    /* Box widths are set inline — the count comes from settings, three or
+       five or whatever the admin configured — so they share the row equally.
+       page-break-inside keeps a block from splitting across pages. */
+    .sign { page-break-inside: avoid; }
+    .sign td { border: 0; text-align: center; padding: 0 6px; font-size: 8px; vertical-align: top; }
     .sign-title { font-weight: 700; margin-bottom: 26px; }
     .sign-line { border-top: 1px solid #33439e; padding-top: 3px; }
     .sign-meta { font-size: 7px; color: #33439e; }
+    .sign-designation { font-style: italic; }
 
     .footer { margin-top: 10px; font-size: 7px; color: #33439e; }
     .footer .right { float: right; }

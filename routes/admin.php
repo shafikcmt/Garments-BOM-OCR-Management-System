@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\BookingInstructionController;
 use App\Http\Controllers\Admin\PoGenerateControlController;
 use App\Http\Controllers\Admin\AlertSettingController;
 use App\Http\Controllers\Admin\PaymentSettingController;
+use App\Http\Controllers\Admin\RequisitionSignatureSettingController;
 use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\PraApproverController;
 
@@ -73,6 +74,11 @@ Route::prefix('admin')
 
         Route::get('/payment-settings', [PaymentSettingController::class, 'edit'])->name('payment-settings.edit');
         Route::post('/payment-settings', [PaymentSettingController::class, 'update'])->name('payment-settings.update');
+
+        // The signature boxes printed on Purchase Requisitions, and who heads
+        // each department for the requisition workflow.
+        Route::get('/requisition-signatures', [RequisitionSignatureSettingController::class, 'edit'])->name('requisition-signatures.edit');
+        Route::post('/requisition-signatures', [RequisitionSignatureSettingController::class, 'update'])->name('requisition-signatures.update');
 
         Route::get('/workspace', [DashboardController::class, 'workspace'])->name('workspace');
 

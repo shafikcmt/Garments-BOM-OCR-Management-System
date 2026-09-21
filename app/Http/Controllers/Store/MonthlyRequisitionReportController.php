@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Store;
 
 use App\Exports\MonthlyRequisitionReportExport;
 use App\Http\Controllers\Controller;
+use App\Models\RequisitionSignatureBlock;
 use App\Services\MonthlyRequisitionReportService;
+use App\Services\RequisitionSignatureResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
@@ -92,6 +94,10 @@ class MonthlyRequisitionReportController extends Controller
             'month' => $monthStart->format('Y-m'),
             'monthLabel' => $monthStart->format('F Y'),
             'title' => 'Purchase Requisition',
+            // The footer of the merged month is the FINAL sheet's signature
+            // boxes from Admin > Settings — configured names only, since a
+            // month is not one requisition and has no recorded stamps.
+            'signatures' => app(RequisitionSignatureResolver::class)->forLevel(RequisitionSignatureBlock::LEVEL_FINAL),
         ];
     }
 

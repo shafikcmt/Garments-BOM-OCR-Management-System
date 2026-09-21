@@ -3,7 +3,7 @@
     $isAdminWorkspace = request()->routeIs('admin.workspace') || request()->routeIs('uploaded-files.*') || request()->routeIs('admin.headers.*');
     $isAdminUserRole = request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*');
     $isAdminBookingSettings = request()->routeIs('admin.suppliers.*') || request()->routeIs('admin.buyers.*') || request()->routeIs('admin.booking-delivery-destinations.*') || request()->routeIs('admin.booking-instructions.*') || request()->routeIs('admin.po-generate-control.*');
-    $isAdminSettings = request()->routeIs('admin.alert-settings.*') || request()->routeIs('admin.payment-settings.*') || request()->routeIs('admin.email-templates.*');
+    $isAdminSettings = request()->routeIs('admin.alert-settings.*') || request()->routeIs('admin.payment-settings.*') || request()->routeIs('admin.email-templates.*') || request()->routeIs('admin.requisition-signatures.*');
     // Store screens Admin shares with the store role: Bulk Issuing corrections,
     // reports, and the General Stock purchase / setup screens Admin owns the
     // edit and delete rights for. Store's own sidebar block lists these
@@ -252,6 +252,7 @@
                             <span class="sidebar-submenu-rail"></span>
                             <a href="{{ route('admin.alert-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.alert-settings.*') ? 'is-active' : '' }}">Alert Settings</a>
                             <a href="{{ route('admin.payment-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.payment-settings.*') ? 'is-active' : '' }}">PI / PRA Settings</a>
+                            <a href="{{ route('admin.requisition-signatures.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.requisition-signatures.*') ? 'is-active' : '' }}">Requisition Signatures</a>
                             <a href="{{ route('admin.email-templates.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.email-templates.*') ? 'is-active' : '' }}">Email Templates</a>
                             <a href="{{ route('admin.pra-approvers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-approvers.*') || request()->routeIs('admin.pra-approvals.*') ? 'is-active' : '' }}">PRA Approvers</a>
                         </div>

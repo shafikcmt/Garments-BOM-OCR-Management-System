@@ -45,23 +45,12 @@
 
     @include('store._flash')
 
-    {{-- The review queue is Store-only, so the tabs appear only for whoever can
-         open it — a department user sees this screen with no tab strip at all,
-         exactly as before. --}}
-    @if(auth()->user() && \App\Models\PurchaseRequisition::seesEveryRequisition(auth()->user()))
-        <ul class="nav nav-tabs mb-4">
-            <li class="nav-item">
-                <a class="nav-link active" href="{{ route('store.stock.requisitions.index') }}">All Requisitions</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{{ route('store.stock.requisitions.requested') }}">
-                    Requested
-                    @if(($awaitingCount ?? 0) > 0)
-                        <span class="badge bg-primary-subtle text-primary ms-1">{{ number_format($awaitingCount) }}</span>
-                    @endif
-                </a>
-            </li>
-        </ul>
+    {{-- The Requested queue is Store-only and Department Review is for a
+         department head, so the tab strip shows only to someone who has at
+         least one of those queues — a plain department user sees this screen
+         with no tabs at all, exactly as before. --}}
+    @if((auth()->user() && \App\Models\PurchaseRequisition::seesEveryRequisition(auth()->user())) || ($departmentReviewCount ?? null) !== null)
+        @include('store.stock.requisitions._tabs', ['active' => 'index'])
     @endif
 
     {{-- Requested vs Purchased vs Pending, above the list it summarises. It

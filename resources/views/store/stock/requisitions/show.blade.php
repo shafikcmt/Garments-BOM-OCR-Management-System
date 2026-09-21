@@ -105,17 +105,45 @@
                 <div class="col-12 col-lg-6">
                     <dl class="row gx-stock-dl">
                         <dt class="col-5">Type</dt><dd class="col-7">{{ \App\Models\PurchaseRequisition::modeLabels()[$requisition->mode] ?? $requisition->mode }}</dd>
-                        <dt class="col-5">Prepared by</dt><dd class="col-7">{{ optional($requisition->createdBy)->name ?: '—' }}</dd>
+                        <dt class="col-5">Requisition Level</dt>
+                        <dd class="col-7">
+                            {{ \App\Models\PurchaseRequisition::levelLabels()[$requisition->level] ?? 'Final Purchase Requisition' }}
+                            @if($requisition->isDepartmentLevel() && $requisition->department_role)
+                                <span class="text-muted">· {{ $requisition->departmentLabel() }}</span>
+                            @endif
+                        </dd>
                         <dt class="col-5">Submitted</dt><dd class="col-7">{{ $requisition->submitted_at?->format('d-M-Y H:i') ?: '—' }}</dd>
-                        <dt class="col-5">Store Acknowledgement</dt>
-                        <dd class="col-7">{{ optional($requisition->storeAckBy)->name ? optional($requisition->storeAckBy)->name.' · '.$requisition->store_ack_at?->format('d-M-Y') : 'Pending' }}</dd>
-                        <dt class="col-5">Accounts Acknowledgement</dt>
-                        <dd class="col-7">{{ optional($requisition->accountsAckBy)->name ? optional($requisition->accountsAckBy)->name.' · '.$requisition->accounts_ack_at?->format('d-M-Y') : 'Pending' }}</dd>
-                        <dt class="col-5">Approved by</dt>
-                        <dd class="col-7">{{ optional($requisition->approvedBy)->name ? optional($requisition->approvedBy)->name.' · '.$requisition->approved_at?->format('d-M-Y') : 'Pending' }}</dd>
+                        {{-- One line per configured signature box — the same
+                             boxes the PDF and Excel print, from Admin >
+                             Settings. A step the system records reads
+                             name · date or Pending; a box signed on paper
+                             reads the configured name. --}}
+                        @foreach($signatures as $box)
+                            <dt class="col-5">{{ $box['label'] }}@if($box['title'] !== '') <span class="text-muted fw-normal">({{ $box['title'] }})</span>@endif</dt>
+                            <dd class="col-7">
+                                @if($box['signed_at'])
+                                    {{ $box['name'] }} · {{ $box['signed_at']->format('d-M-Y') }}
+                                @elseif($box['stamped'])
+                                    <span class="text-muted">Pending</span>
+                                @else
+                                    {{ $box['name'] !== '' ? $box['name'] : '—' }}
+                                @endif
+                            </dd>
+                        @endforeach
                     </dl>
                 </div>
             </div>
+
+            @if($requisition->rejectedByDepartmentHead())
+                <div class="alert alert-warning border-0 mt-3 mb-0 small">
+                    <strong>Returned by {{ optional($requisition->departmentCheckedBy)->name ?: 'the department head' }}</strong>
+                    on {{ $requisition->department_checked_at?->format('d-M-Y') }}:
+                    {{ $requisition->department_review_note ?: 'No reason given.' }}
+                    @if($requisition->isEditable())
+                        <span class="d-block mt-1">Amend the requisition and submit it again.</span>
+                    @endif
+                </div>
+            @endif
 
             @if($requisition->remarks)
                 <div class="alert alert-light border mt-3 mb-0 small"><strong>Remarks:</strong> {{ $requisition->remarks }}</div>

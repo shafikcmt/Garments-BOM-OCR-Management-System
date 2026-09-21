@@ -28,11 +28,15 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
     use Exportable;
     use FormatsStoreSheet;
 
-    /** @param Collection<int, array<string, mixed>> $rows the requisition's item lines */
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows  the requisition's item lines
+     * @param  array<int, array<string, mixed>>  $signatures  the resolved signature boxes (RequisitionSignatureResolver)
+     */
     public function __construct(
         private readonly PurchaseRequisition $requisition,
         private readonly Collection $rows,
         private readonly string $title,
+        private readonly array $signatures,
     ) {
     }
 
@@ -42,6 +46,7 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
             'requisition' => $this->requisition,
             'rows' => $this->rows,
             'title' => $this->title,
+            'signatures' => $this->signatures,
             'forExcel' => true,
         ]);
     }

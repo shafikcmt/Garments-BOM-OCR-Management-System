@@ -40,16 +40,40 @@ class PurchaseRequisition extends Model
         self::STATUS_PURCHASE_ACTION_TAKEN,
     ];
 
+    /**
+     * Which sheet this is. A DEPARTMENT requisition is raised by a department
+     * for its own needs and passes its department head before the Store; a
+     * FINAL one is the merged Purchase Requisition the Store raises itself.
+     * See migration 2026_09_21_000001.
+     */
+    public const LEVEL_DEPARTMENT = 'department';
+    public const LEVEL_FINAL = 'final';
+
+    /**
+     * The Department Head's decision on a department requisition. Sits beside
+     * `status`, never inside it: a Submitted sheet is "with the department
+     * head" while this is pending and "with the Store" once approved.
+     */
+    public const DEPT_REVIEW_PENDING = 'pending';
+    public const DEPT_REVIEW_APPROVED = 'approved';
+    public const DEPT_REVIEW_REJECTED = 'rejected';
+
     protected $fillable = [
         'requisition_no',
         'requisition_date',
         'mode',
+        'level',
+        'department_role',
         'unit_name',
         'indent_section_id',
         'indent_person_id',
         'contact',
         'status',
         'submitted_at',
+        'department_review_status',
+        'department_checked_by',
+        'department_checked_at',
+        'department_review_note',
         'store_ack_by',
         'store_ack_at',
         'accounts_ack_by',
@@ -65,6 +89,7 @@ class PurchaseRequisition extends Model
     protected $casts = [
         'requisition_date' => 'date',
         'submitted_at' => 'datetime',
+        'department_checked_at' => 'datetime',
         'store_ack_at' => 'datetime',
         'accounts_ack_at' => 'datetime',
         'checked_at' => 'datetime',
@@ -104,7 +129,118 @@ class PurchaseRequisition extends Model
      */
     public function isEditable(): bool
     {
-        return $this->status === self::STATUS_DRAFT;
+        // A sheet the department head sent back is the requester's again:
+        // nobody downstream has accepted its figures, and the whole point of
+        // returning it is that they fix it and submit it once more.
+        return $this->status === self::STATUS_DRAFT || $this->rejectedByDepartmentHead();
+    }
+
+    /** @return array<string, string> level => label */
+    public static function levelLabels(): array
+    {
+        return RequisitionSignatureBlock::levelLabels();
+    }
+
+    public function isDepartmentLevel(): bool
+    {
+        return $this->level === self::LEVEL_DEPARTMENT;
+    }
+
+    /**
+     * The level a requisition raised by this user gets. Store-side users
+     * raise the merged, final sheet; everyone else raises their department's.
+     * The same rule the backfill migration applied to existing rows.
+     */
+    public static function levelFor(?User $user): string
+    {
+        return $user && self::seesEveryRequisition($user) ? self::LEVEL_FINAL : self::LEVEL_DEPARTMENT;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | The Department Head's step
+    |--------------------------------------------------------------------------
+    */
+
+    /** Submitted and waiting for the department head's decision. */
+    public function awaitingDepartmentHead(): bool
+    {
+        return $this->status === self::STATUS_SUBMITTED
+            && $this->department_review_status === self::DEPT_REVIEW_PENDING;
+    }
+
+    /** Sent back by the department head; the requester may amend and resubmit. */
+    public function rejectedByDepartmentHead(): bool
+    {
+        return $this->status === self::STATUS_SUBMITTED
+            && $this->department_review_status === self::DEPT_REVIEW_REJECTED;
+    }
+
+    /**
+     * Whether the department head's step stands between this requisition and
+     * the Store. False for a final-level sheet, for a department with no head
+     * configured, and for anything raised before the step existed (NULL).
+     */
+    public function heldByDepartmentHead(): bool
+    {
+        return in_array($this->department_review_status, [self::DEPT_REVIEW_PENDING, self::DEPT_REVIEW_REJECTED], true);
+    }
+
+    /**
+     * Whether this user is the head who decides on this requisition.
+     *
+     * The configured head of the requisition's department, plus Admin and
+     * Management, who can already do everything the Store can and are the
+     * fallback when a head is away. Never the requester on their own sheet
+     * unless they ARE the configured head — a one-person department signs
+     * both boxes and that is the paper form's rule too.
+     */
+    public function isDepartmentHeadFor(?User $user): bool
+    {
+        if (! $user || ! $this->isDepartmentLevel()) {
+            return false;
+        }
+
+        if ($user->hasAnyRole(['admin', 'management'])) {
+            return true;
+        }
+
+        return in_array($this->department_role, RequisitionDepartmentHead::departmentsHeadedBy($user), true);
+    }
+
+    public function departmentLabel(): string
+    {
+        return RequisitionDepartmentHead::departmentLabel($this->department_role);
+    }
+
+    public function departmentCheckedBy()
+    {
+        return $this->belongsTo(User::class, 'department_checked_by');
+    }
+
+    /**
+     * Department requisitions waiting on this user as department head: the
+     * Department Review queue. Admin and Management see every department's.
+     */
+    public function scopeAwaitingDepartmentHead(Builder $query, ?User $user): Builder
+    {
+        $query->where('level', self::LEVEL_DEPARTMENT)
+            ->where('status', self::STATUS_SUBMITTED)
+            ->where('department_review_status', self::DEPT_REVIEW_PENDING);
+
+        if (! $user) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        if ($user->hasAnyRole(['admin', 'management'])) {
+            return $query;
+        }
+
+        $departments = RequisitionDepartmentHead::departmentsHeadedBy($user);
+
+        return $departments === []
+            ? $query->whereRaw('1 = 0')
+            : $query->whereIn('department_role', $departments);
     }
 
     /**
@@ -194,10 +330,13 @@ class PurchaseRequisition extends Model
     | along them, which is what these answer.
     */
 
-    /** Raised by a department and not yet acknowledged by the Store. */
+    /**
+     * With the Store and not yet acknowledged. A department sheet still held
+     * by its department head has not reached the Store yet, so it is not.
+     */
     public function awaitingStoreReceipt(): bool
     {
-        return $this->status === self::STATUS_SUBMITTED;
+        return $this->status === self::STATUS_SUBMITTED && ! $this->heldByDepartmentHead();
     }
 
     /** Acknowledged by the Store and not yet approved. */
@@ -216,7 +355,11 @@ class PurchaseRequisition extends Model
     {
         return match ($this->status) {
             self::STATUS_DRAFT => 'Draft',
-            self::STATUS_SUBMITTED => 'Sent to Store',
+            self::STATUS_SUBMITTED => match ($this->department_review_status) {
+                self::DEPT_REVIEW_PENDING => 'With Department Head',
+                self::DEPT_REVIEW_REJECTED => 'Returned by Department Head',
+                default => 'Sent to Store',
+            },
             self::STATUS_STORE_REVIEWED => 'Received by Store',
             self::STATUS_APPROVED => 'Approved',
             self::STATUS_PURCHASE_ACTION_TAKEN => 'Purchase Action Taken',
@@ -243,7 +386,13 @@ class PurchaseRequisition extends Model
             ->whereDoesntHave('createdBy', fn ($u) => $u->whereHas(
                 'roles',
                 fn ($r) => $r->whereIn('name', ['store', 'admin', 'management'])
-            ));
+            ))
+            // A sheet still with its department head — pending or sent back —
+            // has not been sent to the Store yet. NULL is a sheet from before
+            // the head step existed, or from a department with no head, and
+            // those reach the Store directly as they always did.
+            ->where(fn ($q) => $q->whereNull('department_review_status')
+                ->orWhere('department_review_status', self::DEPT_REVIEW_APPROVED));
     }
 
     /**
@@ -278,7 +427,37 @@ class PurchaseRequisition extends Model
             return $query;
         }
 
-        return $query->where('created_by', $user->id);
+        // A department head also sees what their department raised — they
+        // cannot check a sheet they cannot open. Still nobody else's
+        // department: the head of Merchandising does not see Commercial's.
+        $departments = RequisitionDepartmentHead::departmentsHeadedBy($user);
+
+        return $query->where(function (Builder $q) use ($user, $departments) {
+            $q->where('created_by', $user->id);
+
+            if ($departments !== []) {
+                $q->orWhere(fn (Builder $d) => $d
+                    ->where('level', self::LEVEL_DEPARTMENT)
+                    ->where('status', '<>', self::STATUS_DRAFT)
+                    ->whereIn('department_role', $departments));
+            }
+        });
+    }
+
+    /** The single-record form of visibleTo(): may this user open this sheet? */
+    public function isVisibleTo(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if (self::seesEveryRequisition($user) || $this->created_by === $user->id) {
+            return true;
+        }
+
+        return $this->isDepartmentLevel()
+            && $this->status !== self::STATUS_DRAFT
+            && in_array($this->department_role, RequisitionDepartmentHead::departmentsHeadedBy($user), true);
     }
 
     /**

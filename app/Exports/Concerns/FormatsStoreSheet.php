@@ -116,7 +116,7 @@ trait FormatsStoreSheet
         // The signature block is found first, because it marks where the data
         // ends just as surely as a total does — and a sheet may carry one, the
         // other, or both.
-        $signatureRow = $this->locateLabelRow($sheet, $firstDataRow, $lastRow, 'prepared');
+        $signatureRow = $this->locateSignatureRow($sheet, $firstDataRow, $lastRow);
         $totalRow = $this->locateLabelRow($sheet, $firstDataRow, ($signatureRow ?? $lastRow + 1) - 1, 'total');
 
         $lastDataRow = ($totalRow ?? $signatureRow ?? $lastRow + 1) - 1;
@@ -348,6 +348,28 @@ trait FormatsStoreSheet
         }
 
         return null;
+    }
+
+    /**
+     * The label row of the signature block.
+     *
+     * Found by the "Prepared by" caption where a sheet still prints one. The
+     * requisition documents' captions are now whatever the admin configured,
+     * so those are found by the "Signature & Date" line every box carries
+     * two rows below its caption — the one string on that block that is not
+     * editable.
+     */
+    private function locateSignatureRow(Worksheet $sheet, int $from, int $to): ?int
+    {
+        $byCaption = $this->locateLabelRow($sheet, $from, $to, 'prepared');
+
+        if ($byCaption !== null) {
+            return $byCaption;
+        }
+
+        $dateLine = $this->locateLabelRow($sheet, $from, $to, 'signature &');
+
+        return $dateLine !== null && $dateLine - 2 >= $from ? $dateLine - 2 : null;
     }
 
     /**

@@ -3,12 +3,13 @@
     the single-sheet Excel export ($forExcel).
 
     Same letterhead, same header block, same two-tier item table and the same
-    Prepared by / Checked by / Approved by footer as the monthly report, scoped
-    to a single requisition instead of a whole month. The item table itself is
-    the shared _report-rows partial, so this page can never disagree with the
-    monthly report or the screen.
+    signature footer as the monthly report, scoped to a single requisition
+    instead of a whole month. The item table itself is the shared _report-rows
+    partial, and the footer is the shared _signature-block partial fed from
+    Admin > Settings > Requisition Signatures, so this page can never disagree
+    with the monthly report or the screen.
 
-    Expects: $requisition, $rows, $title.
+    Expects: $requisition, $rows, $title, $signatures.
 --}}
 @php
     $forExcel = $forExcel ?? false;
@@ -34,25 +35,48 @@
     // an older record may have been saved before the field was filled.
     $unit = $requisition->unit_name ?: config('stock.company_name');
 
-    $stamp = fn ($name, $at) => $name
-        ? $name.($at ? ' · '.$at->format('d-M-Y') : '')
-        : 'Pending';
-
     $requisitionDate = optional($requisition->requisition_date)->format('d F Y') ?: '-';
     $section = optional($requisition->indentSection)->name ?: 'All';
 
-    // Left column: what the document is. Right column: who handled it. Both
-    // read top to bottom, as on the paper form, and both are used by the PDF
-    // header block and the Excel letterhead below.
-    $infoRows = [
-        ['Requisition No', $requisition->requisition_no, 'Type', \App\Models\PurchaseRequisition::modeLabels()[$requisition->mode] ?? $requisition->mode],
-        ['Requisition Date', $requisitionDate, 'Prepared By', optional($requisition->createdBy)->name ?: '-'],
-        ['Name of Unit', $unit, 'Submitted', $requisition->submitted_at?->format('d-M-Y H:i') ?: '-'],
-        ['Section', $section, 'Store Acknowledgement', $stamp(optional($requisition->storeAckBy)->name, $requisition->store_ack_at)],
-        ['Name of User', optional($requisition->indentPerson)->name ?: '-', 'Accounts Acknowledgement', $stamp(optional($requisition->accountsAckBy)->name, $requisition->accounts_ack_at)],
-        ['Contact No. / Email', $requisition->contact ?: '-', 'Approved By', $stamp(optional($requisition->approvedBy)->name, $requisition->approved_at)],
-        ['Status', $requisition->statusLabel(), 'Total Amount', $money($rows->sum('amount'))],
+    // Left column: what the document is. Right column: who handled it — one
+    // line per configured signature box, reading name · date once the
+    // system recorded the step, the configured name for a box signed on
+    // paper, and Pending for a step still to come. Both columns read top to
+    // bottom, as on the paper form, and both feed the PDF header block and
+    // the Excel letterhead below.
+    $signatures = $signatures ?? [];
+
+    $leftRows = [
+        ['Requisition No', $requisition->requisition_no],
+        ['Requisition Date', $requisitionDate],
+        ['Name of Unit', $unit],
+        ['Section', $section],
+        ['Name of User', optional($requisition->indentPerson)->name ?: '-'],
+        ['Contact No. / Email', $requisition->contact ?: '-'],
+        // A department's sheet says where it is in the department's words
+        // ("With Department Head"); the Store's own keeps the status name.
+        ['Status', $requisition->isDepartmentLevel() ? $requisition->progressLabel() : $requisition->statusLabel()],
     ];
+
+    $rightRows = [
+        ['Type', \App\Models\PurchaseRequisition::modeLabels()[$requisition->mode] ?? $requisition->mode],
+    ];
+    foreach ($signatures as $box) {
+        $rightRows[] = [
+            $box['label'].($box['title'] !== '' ? ' ('.$box['title'].')' : ''),
+            $box['signed_at']
+                ? $box['name'].' · '.$box['signed_at']->format('d-M-Y')
+                : ($box['stamped'] ? 'Pending' : ($box['name'] !== '' ? $box['name'] : '-')),
+        ];
+    }
+    $rightRows[] = ['Total Amount', $money($rows->sum('amount'))];
+
+    // Pad the shorter column so the two sides stay paired row for row.
+    $lines = max(count($leftRows), count($rightRows));
+    $infoRows = [];
+    for ($i = 0; $i < $lines; $i++) {
+        $infoRows[] = array_merge($leftRows[$i] ?? ['', ''], $rightRows[$i] ?? ['', '']);
+    }
 @endphp
 <!doctype html>
 <html>
@@ -132,78 +156,18 @@
     </div>
 
     {{-- The manual approval area. This sheet is printed and signed off-system —
-         approval is a signature on paper, not a click — so each column has to
-         carry all three of the things a signatory fills in: who, the ruled line
-         they sign on, and the date they signed.
-
-         The name and the "Signature & Date" caption follow the PRA approval
-         document, the most-signed sheet in this system: the caption reads
-         "Signature & Date" while the box is empty and "Signature & Date: <date>"
-         once the system knows one, so a sheet signed on paper and one recorded
-         in the system read the same way round. --}}
-    @php
-        $signDate = fn ($at) => $at ? 'Signature &amp; Date: '.$at->format('d-M-Y') : 'Signature &amp; Date';
-    @endphp
-
-    <table class="sign">
-        <tr>
-            <td>
-                <div class="sign-title">Prepared By</div>
-                <div class="sign-line"></div>
-                <div class="sign-meta">
-                    <div>{{ optional($requisition->createdBy)->name ?: 'Store' }}</div>
-                    <div>{!! $signDate($requisition->submitted_at) !!}</div>
-                </div>
-            </td>
-            <td>
-                <div class="sign-title">Checked By</div>
-                <div class="sign-line"></div>
-                <div class="sign-meta">
-                    <div>{{ optional($requisition->checkedBy)->name ?: 'Store In-charge' }}</div>
-                    <div>{!! $signDate($requisition->checked_at) !!}</div>
-                </div>
-            </td>
-            <td>
-                <div class="sign-title">Approved By</div>
-                <div class="sign-line"></div>
-                <div class="sign-meta">
-                    <div>{{ optional($requisition->approvedBy)->name ?: 'Management' }}</div>
-                    <div>{!! $signDate($requisition->approved_at) !!}</div>
-                </div>
-            </td>
-        </tr>
-    </table>
+         approval is a signature on paper, not a click — so each box carries
+         who, the ruled line they sign on, and the date they signed. Which
+         boxes, and whose names, come from Admin > Settings > Requisition
+         Signatures; nothing here is typed in. --}}
+    @include('store.stock.requisitions._signature-block', ['signatures' => $signatures, 'forExcel' => false])
 
     <div class="footer">
         {{ $unit }} &mdash; {{ $title }} &mdash; {{ $requisition->requisition_no }}
         <span class="right">Generated {{ now()->format('d M Y') }}</span>
     </div>
 @else
-    {{-- Excel signature block — the blank rows above the labels are the
-         signing space; bold, borders and heights come from FormatsStoreSheet. --}}
-    @php($third = (int) floor(21 / 3))
-    <table>
-        <tr><td colspan="21"></td></tr>
-        <tr><td colspan="21"></td></tr>
-        <tr><td colspan="21"></td></tr>
-        <tr>
-            <td colspan="{{ $third }}">Prepared by</td>
-            <td colspan="{{ $third }}">Checked by</td>
-            <td colspan="{{ 21 - 2 * $third }}">Approved by</td>
-        </tr>
-        <tr>
-            <td colspan="{{ $third }}">{{ optional($requisition->createdBy)->name ?: 'Store' }}</td>
-            <td colspan="{{ $third }}">{{ optional($requisition->checkedBy)->name ?: 'Store In-charge' }}</td>
-            <td colspan="{{ 21 - 2 * $third }}">{{ optional($requisition->approvedBy)->name ?: 'Management' }}</td>
-        </tr>
-        {{-- The date line, same as the PDF half: a sheet printed from Excel is
-             signed off-system too, so it needs somewhere to write the date. --}}
-        <tr>
-            <td colspan="{{ $third }}">{{ $requisition->submitted_at ? 'Signature & Date: '.$requisition->submitted_at->format('d-M-Y') : 'Signature & Date' }}</td>
-            <td colspan="{{ $third }}">{{ $requisition->checked_at ? 'Signature & Date: '.$requisition->checked_at->format('d-M-Y') : 'Signature & Date' }}</td>
-            <td colspan="{{ 21 - 2 * $third }}">{{ $requisition->approved_at ? 'Signature & Date: '.$requisition->approved_at->format('d-M-Y') : 'Signature & Date' }}</td>
-        </tr>
-    </table>
+    @include('store.stock.requisitions._signature-block', ['signatures' => $signatures, 'forExcel' => true, 'columns' => 21])
 @endunless
 
 </body>
