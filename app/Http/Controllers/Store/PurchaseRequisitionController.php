@@ -12,6 +12,7 @@ use App\Models\PurchaseRequisition;
 use App\Models\PurchaseRequisitionItem;
 use App\Models\RequisitionDepartmentHead;
 use App\Models\StockItem;
+use App\Services\DepartmentRequisitionDefaults;
 use App\Services\MonthlyRequisitionReportService;
 use App\Services\PurchaseRequisitionNumberGenerator;
 use App\Services\PurchaseRequisitionService;
@@ -125,11 +126,16 @@ class PurchaseRequisitionController extends Controller
             ? PurchaseRequisition::MODE_SINGLE
             : PurchaseRequisition::MODE_MULTI;
 
-        return view('store.stock.requisitions.create', $this->formData() + [
+        // What a department user's form has fixed for them — section, head,
+        // contact, User Dept. — and nothing at all for the Store's own form.
+        $defaults = DepartmentRequisitionDefaults::for($request->user());
+
+        return view('store.stock.requisitions.create', $this->formData($defaults) + [
             'mode' => $mode,
             // A preview, not a reservation: whoever saves first takes it, and
             // it changes with the section, so the form recomputes it there too.
-            'nextNo' => $this->numbers->preview(null),
+            // A department sheet previews under ITS section from the start.
+            'nextNo' => $this->numbers->preview($defaults->numberSection()),
         ]);
     }
 
@@ -358,8 +364,18 @@ class PurchaseRequisitionController extends Controller
             'store_ack_at' => now(),
         ]);
 
-        return back()->with('success',
-            'Requisition '.$requisition->requisition_no.' marked as received by Store.');
+        // Lines naming something the Item Master has never carried. The
+        // Store is the one who decides whether it should, so the moment they
+        // take the sheet is the moment to say so — the show screen carries
+        // the per-item action.
+        $unknown = $requisition->items()->notInItemMaster()->count();
+
+        return redirect()
+            ->route('store.stock.requisitions.show', $requisition)
+            ->with('success', 'Requisition '.$requisition->requisition_no.' marked as received by Store.'
+                .($unknown > 0
+                    ? ' '.$unknown.' item'.($unknown === 1 ? ' is' : 's are').' not in the Item Master — see the notice below to add '.($unknown === 1 ? 'it' : 'them').'.'
+                    : ''));
     }
 
     /**
@@ -404,9 +420,10 @@ class PurchaseRequisitionController extends Controller
 
     public function store(Request $request)
     {
-        $data = $this->validated($request);
+        $defaults = DepartmentRequisitionDefaults::for($request->user());
+        $data = $this->applyDefaults($this->validated($request), $defaults);
 
-        $requisition = DB::transaction(function () use ($data) {
+        $requisition = DB::transaction(function () use ($data, $defaults) {
             // Optional fields are absent from the validated array when they are
             // not posted at all, so every read of one has to tolerate a missing
             // key, not just an empty value.
@@ -418,21 +435,20 @@ class PurchaseRequisitionController extends Controller
 
             // A number typed on the form wins — it lets a paper document that
             // already carries a number be entered as-is. Otherwise the
-            // allocator takes the next one for this section and month.
+            // allocator takes the next one for this section and month — the
+            // chosen section for the Store, the user's own for a department.
             //
             // The key may be ABSENT, not merely empty: the form drops the
             // field's name when the operator never edited the suggestion, so
             // that an untouched preview cannot bypass the allocator.
             $number = ($data['requisition_no'] ?? null)
-                ?: $this->numbers->next($section?->name, $date);
+                ?: $this->numbers->next($defaults->numberSection() ?? $section?->name, $date);
 
             // Which sheet this is, and whose department: decided by who is
             // raising it, and fixed at creation so a later change of role
             // does not move the sheet to a different head's queue.
-            $level = PurchaseRequisition::levelFor(auth()->user());
-            $department = $level === PurchaseRequisition::LEVEL_DEPARTMENT
-                ? RequisitionDepartmentHead::departmentOf(auth()->user())
-                : null;
+            $level = $defaults->level;
+            $department = $defaults->department;
             $submitting = $data['action'] === 'submit';
 
             $requisition = PurchaseRequisition::create([
@@ -510,9 +526,21 @@ class PurchaseRequisitionController extends Controller
             'departmentCheckedBy', 'storeAckBy', 'accountsAckBy', 'checkedBy', 'approvedBy',
         ]);
 
+        $user = auth()->user();
+
         return view('store.stock.requisitions.show', [
             'requisition' => $requisition,
             'signatures' => $this->signatures->forRequisition($requisition),
+            // Lines the Store may want to add to the Item Master. Offered only
+            // to whoever reads every requisition AND may create items — the
+            // same permission the Item Master screen's own Add button asks —
+            // never to the department that raised the sheet.
+            'promotableLines' => ($user && PurchaseRequisition::seesEveryRequisition($user) && $user->can('store.items.create'))
+                ? $requisition->items->filter(fn ($i) => $i->isCustomItem())->values()
+                : collect(),
+            'departmentHeadName' => $requisition->isDepartmentLevel()
+                ? RequisitionDepartmentHead::headOf($requisition->department_role)?->name
+                : null,
             'statusLabels' => PurchaseRequisition::statusLabels(),
             'typeLabels' => PurchaseRequisitionItem::typeLabels(),
             'canDelete' => $this->storeCorrectionAbilities()['delete'],
@@ -553,7 +581,7 @@ class PurchaseRequisitionController extends Controller
         $data = $this->documentData($requisition, $report);
 
         return Excel::download(
-            new RequisitionDocumentExport($requisition, $data['rows'], $data['title'], $data['signatures']),
+            new RequisitionDocumentExport($requisition, $data['rows'], $data['title'], $data['signatures'], $data['departmentHeadName']),
             $this->documentFilename($requisition).'.xlsx',
         );
     }
@@ -603,9 +631,9 @@ class PurchaseRequisitionController extends Controller
         $this->authorizeVisible($requisition);
         $this->authorizeEditable($requisition);
 
-        $requisition->load('items.stockItem');
+        $requisition->load('items.stockItem', 'createdBy.requisitionSection');
 
-        return view('store.stock.requisitions.create', $this->formData() + [
+        return view('store.stock.requisitions.create', $this->formData(DepartmentRequisitionDefaults::for(auth()->user(), $requisition)) + [
             'mode' => $requisition->mode,
             'requisition' => $requisition,
             'nextNo' => $requisition->requisition_no,
@@ -617,7 +645,8 @@ class PurchaseRequisitionController extends Controller
         $this->authorizeVisible($requisition);
         $this->authorizeEditable($requisition);
 
-        $data = $this->validated($request, $requisition);
+        $defaults = DepartmentRequisitionDefaults::for($request->user(), $requisition);
+        $data = $this->applyDefaults($this->validated($request, $requisition), $defaults);
 
         // A Store correction, as opposed to the requester finishing their own
         // draft. Decided BEFORE the update, because the status it turns on is
@@ -720,7 +749,7 @@ class PurchaseRequisitionController extends Controller
         // array_merge, not "+": the union operator keeps the LEFT side's value
         // for a duplicate key, which would send the raw timestamp instead of
         // the display date the form puts straight into a read-only box.
-        return response()->json(array_merge($snapshot, [
+        $payload = array_merge($snapshot, [
             'uom' => $stockItem->uom,
             // The item master's merged Brand/Specification field. The line's
             // own Specification stays editable — this only pre-fills it.
@@ -729,15 +758,31 @@ class PurchaseRequisitionController extends Controller
             'last_purchase_date' => $snapshot['last_purchase_date']
                 ? Carbon::parse($snapshot['last_purchase_date'])->format('d-M-y')
                 : null,
-        ]));
+        ]);
+
+        // A department user gets the item master's descriptive fields — Uom,
+        // Specification, Category — and none of the Store's figures. Hiding
+        // the chips on their form is not enough when the numbers still travel
+        // in the response; they are stripped here. The server re-reads the
+        // full snapshot when the line is saved, so the frozen figures the
+        // Store later sees are unaffected.
+        $user = $request->user();
+        if (! ($user && PurchaseRequisition::seesEveryRequisition($user))) {
+            $payload = array_intersect_key($payload, array_flip(['uom', 'specification', 'item_category_id']));
+        }
+
+        return response()->json($payload);
     }
 
     /** The next Requisition No for a section, so the form can update it live. */
     public function nextNumber(Request $request): JsonResponse
     {
-        $section = $request->filled('section')
-            ? IndentSection::find($request->query('section'))?->name
-            : null;
+        // A department user's number is fixed to their own section; the
+        // Store's follows whichever section it picked on the form.
+        $section = DepartmentRequisitionDefaults::for($request->user())->numberSection()
+            ?? ($request->filled('section')
+                ? IndentSection::find($request->query('section'))?->name
+                : null);
 
         $on = $request->filled('on') ? Carbon::parse($request->query('on')) : Carbon::now();
 
@@ -771,6 +816,12 @@ class PurchaseRequisitionController extends Controller
             // The signature footer, from Admin > Settings — the same boxes the
             // screen shows, so PDF, Excel and screen cannot disagree.
             'signatures' => $this->signatures->forRequisition($requisition),
+            // "Name of User" on a department sheet is its head, not a pick
+            // from the indent-person list. A value fallback only — the
+            // layout is untouched.
+            'departmentHeadName' => $requisition->isDepartmentLevel()
+                ? RequisitionDepartmentHead::headOf($requisition->department_role)?->name
+                : null,
         ];
     }
 
@@ -781,8 +832,10 @@ class PurchaseRequisitionController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function formData(): array
+    private function formData(DepartmentRequisitionDefaults $defaults): array
     {
+        $user = auth()->user();
+
         return [
             'items' => $this->requisitions->selectableItems(),
             'categories' => ItemCategory::selectable()->get(['id', 'name']),
@@ -791,7 +844,61 @@ class PurchaseRequisitionController extends Controller
             'typeLabels' => PurchaseRequisitionItem::typeLabels(),
             'modeLabels' => PurchaseRequisition::modeLabels(),
             'unitName' => config('stock.company_name'),
+            'defaults' => $defaults,
+            // Stock, last purchase, rate and amount are the Store's own
+            // knowledge. Decided by WHO is looking, not by the sheet's level:
+            // a Store user correcting a department's sheet still sees them.
+            'hideFigures' => ! ($user && PurchaseRequisition::seesEveryRequisition($user)),
         ];
+    }
+
+    /**
+     * Overwrite, on a department-level sheet, every field the form has fixed
+     * — whatever was posted. The screen locks these boxes, but a locked box
+     * is a courtesy; this is the rule.
+     *
+     *   Section       the user's requisition section, when one is set
+     *   Contact       the department head's email, when a head is configured
+     *   User Dept.    the section (or department) on every line
+     *   Rate Appx.    dropped for anyone outside the Store, so the line takes
+     *                 the last purchase rate the way a blank rate always has
+     *
+     * A final-level sheet passes through untouched.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function applyDefaults(array $data, DepartmentRequisitionDefaults $defaults): array
+    {
+        if (! $defaults->isDepartment()) {
+            return $data;
+        }
+
+        if ($defaults->fixesSection()) {
+            $data['indent_section_id'] = $defaults->section->id;
+        }
+
+        if ($defaults->fixesHead()) {
+            $data['contact'] = $defaults->contact();
+            // Requested By is the head, shown by name; the master list of
+            // indent persons is not written to for it.
+            $data['indent_person_id'] = null;
+        }
+
+        $user = auth()->user();
+        $storeSide = $user && PurchaseRequisition::seesEveryRequisition($user);
+        $userDept = $defaults->userDept();
+
+        foreach ($data['items'] as $i => $line) {
+            if ($userDept !== null) {
+                $data['items'][$i]['user_dept'] = $userDept;
+            }
+            if (! $storeSide) {
+                $data['items'][$i]['rate_appx'] = null;
+            }
+        }
+
+        return $data;
     }
 
     /** @return array<string, mixed> */

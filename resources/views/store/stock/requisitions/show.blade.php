@@ -88,6 +88,37 @@
     @include('store.stock._stock-ui')
     @include('store._flash')
 
+    {{-- Items the department asked for that the Item Master has never
+         carried. The Store decides whether they belong in the master, so
+         this is offered only to a Store-side viewer who may create items
+         ($promotableLines is empty for anyone else). Each button opens the
+         Item Master's own Add form, seeded with the typed name, and the save
+         links the line back to the new item. --}}
+    @if($promotableLines->isNotEmpty())
+        <div class="alert alert-warning border-0 shadow-sm rounded-3 mb-4">
+            <div class="d-flex align-items-start gap-3 flex-wrap">
+                <i class="bi bi-exclamation-triangle-fill fs-5" aria-hidden="true"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-semibold mb-1">
+                        {{ $promotableLines->count() }} {{ $promotableLines->count() === 1 ? 'item on this requisition is' : 'items on this requisition are' }} not in the Item Master.
+                    </div>
+                    <div class="small mb-2">Add each one to the master so it can be received, issued and reported like any other item. The line is linked to the new item automatically.</div>
+                    <ul class="list-unstyled mb-0 d-flex flex-column gap-1">
+                        @foreach($promotableLines as $line)
+                            <li class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="fw-semibold">{{ $line->custom_item_name }}</span>
+                                @if($line->specification)<span class="text-muted small">— {{ $line->specification }}</span>@endif
+                                <a href="{{ route('store.stock.items.index', ['requisition_item' => $line->id]) }}" class="btn btn-sm btn-outline-dark">
+                                    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add to Item Master
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Header block, mirroring rows 3-8 of the reference sheet. --}}
     <div class="card gx-stock-card mb-4">
         <div class="gx-stock-card-body">
@@ -98,7 +129,10 @@
                         <dt class="col-5">Requisition Date</dt><dd class="col-7">{{ optional($requisition->requisition_date)->format('d F Y') ?? '—' }}</dd>
                         <dt class="col-5">Name of Unit</dt><dd class="col-7">{{ $requisition->unit_name ?: '—' }}</dd>
                         <dt class="col-5">Section</dt><dd class="col-7">{{ optional($requisition->indentSection)->name ?: 'All' }}</dd>
-                        <dt class="col-5">Name of User</dt><dd class="col-7">{{ optional($requisition->indentPerson)->name ?: '—' }}</dd>
+                        {{-- A department sheet's requester is its department
+                             head, resolved from settings rather than picked
+                             from the indent-person list. --}}
+                        <dt class="col-5">Name of User</dt><dd class="col-7">{{ optional($requisition->indentPerson)->name ?: ($departmentHeadName ?? null) ?: '—' }}</dd>
                         <dt class="col-5">Contact No. / Email</dt><dd class="col-7">{{ $requisition->contact ?: '—' }}</dd>
                     </dl>
                 </div>

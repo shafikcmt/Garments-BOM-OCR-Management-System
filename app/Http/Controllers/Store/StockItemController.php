@@ -11,6 +11,7 @@ use App\Http\Controllers\Concerns\ResolvesIssueSetupMasters;
 use App\Imports\ItemMasterImport;
 use App\Imports\UnitPriceImport;
 use App\Models\ItemCategory;
+use App\Models\PurchaseRequisitionItem;
 use App\Models\StockItem;
 use App\Services\GeneralStockReportService;
 use Illuminate\Http\Request;
@@ -99,8 +100,27 @@ class StockItemController extends Controller
             ));
         }
 
+        // Arrived from a requisition line the master has never carried: the
+        // Add modal opens ready-filled with what the department typed, and
+        // carries the line id so the save can link it. The line must still
+        // be unlinked and must belong to the requisition named — a stale or
+        // hand-typed link seeds nothing.
+        $addFrom = null;
+        if ($request->filled('requisition_item')) {
+            $line = PurchaseRequisitionItem::query()->notInItemMaster()
+                ->find($request->integer('requisition_item'));
+
+            if ($line) {
+                $addFrom = [
+                    'requisition_item' => $line->id,
+                    'requisition_no' => $line->requisition?->requisition_no,
+                    'prefill' => ['name' => $line->custom_item_name, 'brand' => $line->specification],
+                ];
+            }
+        }
+
         return view('store.stock.items', compact(
-            'items', 'categories', 'canEdit', 'canDelete', 'filters', 'statusCounts'
+            'items', 'categories', 'canEdit', 'canDelete', 'filters', 'statusCounts', 'addFrom'
         ));
     }
 
@@ -297,7 +317,25 @@ class StockItemController extends Controller
         $data = $this->validated($request);
         $data['created_by'] = auth()->id();
 
-        StockItem::create($data);
+        $item = StockItem::create($data);
+
+        // Opened from a requisition line that named an item the master did
+        // not have ("Not in Item Master"). Now that it does, the line is
+        // pointed at the new record and the Store is taken back to the sheet
+        // they were reading. Only a line that is STILL unlinked is touched —
+        // a second click on a stale page cannot re-point a line somebody
+        // else already resolved.
+        $line = $request->filled('requisition_item')
+            ? PurchaseRequisitionItem::query()->notInItemMaster()->find($request->integer('requisition_item'))
+            : null;
+
+        if ($line) {
+            $line->linkToStockItem($item);
+
+            return redirect()
+                ->route('store.stock.requisitions.show', $line->purchase_requisition_id)
+                ->with('success', 'Stock item "'.$data['name'].'" added to the Item Master and linked to this requisition.');
+        }
 
         return back()->with('success', 'Stock item "' . $data['name'] . '" added.');
     }

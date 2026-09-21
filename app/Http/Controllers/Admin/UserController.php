@@ -1002,6 +1002,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
+            'requisition_section_id' => ['nullable', 'integer', 'exists:indent_sections,id'],
             'password' => ['required', 'min:6'],
             'status' => ['required', 'in:0,1'],
             'permissions' => ['nullable', 'array'],
@@ -1019,6 +1020,7 @@ class UserController extends Controller
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
+            'requisition_section_id' => $data['requisition_section_id'] ?? null,
             'password' => Hash::make($data['password']),
             'status' => $data['status'],
             'is_department_admin' => $this->departmentAdminFlag($request),
@@ -1155,6 +1157,7 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email,' . $user->id],
+            'requisition_section_id' => ['nullable', 'integer', 'exists:indent_sections,id'],
             'status' => ['required', 'in:0,1'],
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'permissions' => ['nullable', 'array'],
@@ -1171,6 +1174,10 @@ class UserController extends Controller
 
         $user->name = $data['name'];
         $user->email = $data['email'];
+        // Only a super admin's form carries the field.
+        if (array_key_exists('requisition_section_id', $data)) {
+            $user->requisition_section_id = $data['requisition_section_id'] ?: null;
+        }
         $user->status = $data['status'];
         $user->is_department_admin = $this->departmentAdminFlag($request, $user);
         $user->can_upload = $this->canUploadFlag($request, $user);

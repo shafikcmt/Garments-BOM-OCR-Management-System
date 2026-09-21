@@ -6,6 +6,17 @@
     $editing = isset($requisition);
     $old = fn ($key, $fallback = null) => old($key, $fallback);
 
+    // A DEPARTMENT sheet has its section, head, contact and User Dept. fixed
+    // by who is raising it (DepartmentRequisitionDefaults); the Store's own
+    // FINAL sheet fixes nothing and is the form exactly as it always was.
+    // $hideFigures is a separate question — who is LOOKING — so a Store user
+    // correcting a department sheet still sees stock and cost.
+    $isDepartmentForm = $defaults->isDepartment();
+    $fixSection = $defaults->fixesSection();
+    $fixHead = $defaults->fixesHead();
+    $lockedUserDept = $isDepartmentForm ? $defaults->userDept() : null;
+    $hideFigures = $hideFigures ?? false;
+
     // Lines to render on first paint: whatever validation bounced back, else
     // the saved lines when editing a draft, else one blank line.
     $existingLines = collect(old('items', $editing
@@ -39,7 +50,13 @@
                 <div>
                     <div class="app-hero-eyebrow">General Stock</div>
                     <h3 class="app-hero-title mb-0">{{ $editing ? 'Edit Requisition' : 'New Purchase Requisition' }}</h3>
-                    <p class="app-hero-copy mb-0">Stock, consumption and last purchase are filled in for you as you pick each item.</p>
+                    <p class="app-hero-copy mb-0">
+                        @if($hideFigures)
+                            Pick each item and the quantity you need. The Store checks stock and pricing once it receives the request.
+                        @else
+                            Stock, consumption and last purchase are filled in for you as you pick each item.
+                        @endif
+                    </p>
                 </div>
             </div>
             <a href="{{ route('store.stock.requisitions.index') }}" class="btn btn-outline-secondary">
@@ -80,7 +97,13 @@
                                class="form-control @error('requisition_no') is-invalid @enderror"
                                value="{{ $old('requisition_no', $editing ? $requisition->requisition_no : $nextNo) }}">
                         @error('requisition_no')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        <div class="gx-stock-help">Suggested for the chosen section — change it if your document already has a number.</div>
+                        <div class="gx-stock-help">
+                            @if($isDepartmentForm)
+                                Numbered under your section — change it only if your document already has a number.
+                            @else
+                                Suggested for the chosen section — change it if your document already has a number.
+                            @endif
+                        </div>
                     </div>
 
                     <div class="col-6 col-md-4 col-xl-2">
@@ -93,28 +116,51 @@
 
                     <div class="col-6 col-md-4 col-xl-2">
                         <label class="form-label" for="sectionSelect">Section</label>
-                        <select name="indent_section_id" id="sectionSelect" class="form-select js-searchable">
-                            <option value="">All</option>
-                            @foreach($sections as $s)
-                                <option value="{{ $s->id }}" @selected($old('indent_section_id', $editing ? $requisition->indent_section_id : null) == $s->id)>{{ $s->name }}</option>
-                            @endforeach
-                        </select>
+                        @if($fixSection)
+                            {{-- The requester's own section, set on Admin >
+                                 Users. Shown, not chosen: the server writes
+                                 the same value whatever is posted. --}}
+                            <input type="text" id="sectionSelect" class="form-control gx-stock-readonly" value="{{ $defaults->section->name }}" readonly tabindex="-1">
+                            <input type="hidden" name="indent_section_id" value="{{ $defaults->section->id }}">
+                        @else
+                            <select name="indent_section_id" id="sectionSelect" class="form-select js-searchable">
+                                <option value="">All</option>
+                                @foreach($sections as $s)
+                                    <option value="{{ $s->id }}" @selected($old('indent_section_id', $editing ? $requisition->indent_section_id : null) == $s->id)>{{ $s->name }}</option>
+                                @endforeach
+                            </select>
+                            @if($isDepartmentForm)
+                                <div class="gx-stock-help">No section is set on your account yet — ask your administrator to set it under Admin &gt; Users.</div>
+                            @endif
+                        @endif
                     </div>
 
                     <div class="col-6 col-md-6 col-xl-2">
                         <label class="form-label" for="personSelect">Requested By</label>
-                        <select name="indent_person_id" id="personSelect" class="form-select js-searchable">
-                            <option value="">Select…</option>
-                            @foreach($persons as $p)
-                                <option value="{{ $p->id }}" @selected($old('indent_person_id', $editing ? $requisition->indent_person_id : null) == $p->id)>{{ $p->name }}</option>
-                            @endforeach
-                        </select>
+                        @if($fixHead)
+                            {{-- The department head, from Admin > Settings >
+                                 Requisition Signatures. Nothing is posted: the
+                                 head is resolved again on save and on print. --}}
+                            <input type="text" id="personSelect" class="form-control gx-stock-readonly" value="{{ $defaults->head->name }}" readonly tabindex="-1">
+                            <div class="gx-stock-help">{{ \App\Models\RequisitionDepartmentHead::departmentLabel($defaults->department) }} department head</div>
+                        @else
+                            <select name="indent_person_id" id="personSelect" class="form-select js-searchable">
+                                <option value="">Select…</option>
+                                @foreach($persons as $p)
+                                    <option value="{{ $p->id }}" @selected($old('indent_person_id', $editing ? $requisition->indent_person_id : null) == $p->id)>{{ $p->name }}</option>
+                                @endforeach
+                            </select>
+                        @endif
                     </div>
 
                     <div class="col-6 col-md-6 col-xl-3">
                         <label class="form-label" for="contact">Contact No. / Email</label>
-                        <input type="text" name="contact" id="contact" maxlength="255"
-                               class="form-control" value="{{ $old('contact', $editing ? $requisition->contact : null) }}">
+                        @if($fixHead)
+                            <input type="text" id="contact" class="form-control gx-stock-readonly" value="{{ $defaults->contact() }}" readonly tabindex="-1">
+                        @else
+                            <input type="text" name="contact" id="contact" maxlength="255"
+                                   class="form-control" value="{{ $old('contact', $editing ? $requisition->contact : null) }}">
+                        @endif
                     </div>
                 </div>
 
@@ -128,7 +174,7 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                     <div>
                         <h6 class="gx-stock-subhead mb-0">Items</h6>
-                        <span class="gx-stock-help">Pick a category to narrow the item list, then choose the item.</span>
+                        <span class="gx-stock-help">Pick a category to narrow the item list, then choose the item. Tab out of the last line's Remarks to start the next line.</span>
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-primary js-add-line" id="addRequisitionLine">
                         <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Another Item
@@ -149,7 +195,10 @@
                     </button>
                 </div>
 
-                <div class="gx-req-total">
+                {{-- Amount is the Store's figure; a department user's form has
+                     no rate to total. The element stays (hidden) so the script
+                     that writes it needs no second code path. --}}
+                <div class="gx-req-total" @if($hideFigures) hidden @endif>
                     <span class="gx-req-total-label">Total Amount</span>
                     <span class="gx-req-total-value" id="grandTotal">0.00</span>
                 </div>
@@ -173,8 +222,13 @@
                         <i class="bi bi-send me-1" aria-hidden="true"></i>Submit Requisition
                     </button>
                     <p class="gx-stock-help mb-0" style="max-width:620px;">
-                        A draft stays editable. Once submitted, the stock and last-purchase figures are frozen on the
-                        requisition so it always shows the position that justified it.
+                        @if($hideFigures)
+                            A draft stays editable. Once submitted, the request goes forward for checking and the Store
+                            fills in stock and pricing.
+                        @else
+                            A draft stays editable. Once submitted, the stock and last-purchase figures are frozen on the
+                            requisition so it always shows the position that justified it.
+                        @endif
                     </p>
                 </div>
             </div>
@@ -277,26 +331,39 @@
                 </div>
                 <div class="gx-req-field is-dept">
                     <label class="form-label">User Dept.</label>
-                    <input type="text" class="form-control form-control-sm" name="items[__INDEX__][user_dept]" maxlength="255" placeholder="—">
+                    @if($lockedUserDept !== null)
+                        {{-- A department sheet is for the requester's own
+                             section on every line. Locked here and written by
+                             the server regardless of what is posted. --}}
+                        <input type="text" class="form-control form-control-sm gx-stock-readonly" name="items[__INDEX__][user_dept]" value="{{ $lockedUserDept }}" readonly tabindex="-1">
+                    @else
+                        <input type="text" class="form-control form-control-sm" name="items[__INDEX__][user_dept]" maxlength="255" placeholder="—">
+                    @endif
                 </div>
                 <div class="gx-req-field is-qty">
                     <label class="form-label">Qty Req. <span class="text-danger">*</span></label>
                     <input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm js-line-qty" name="items[__INDEX__][qty_requested]" required placeholder="0">
                 </div>
-                <div class="gx-req-field is-rate">
+                {{-- Rate is the Store's to set. Hidden — not removed — for a
+                     department user, so the script's recalc still finds it;
+                     the server drops whatever such a user posts in it. --}}
+                <div class="gx-req-field is-rate" @if($hideFigures) hidden @endif>
                     <label class="form-label">Rate Appx.</label>
-                    <input type="number" step="0.0001" min="0" class="form-control form-control-sm js-line-rate" name="items[__INDEX__][rate_appx]" placeholder="0.00">
+                    <input type="number" step="0.0001" min="0" class="form-control form-control-sm js-line-rate" name="items[__INDEX__][rate_appx]" placeholder="0.00" @if($hideFigures) tabindex="-1" @endif>
                 </div>
                 <div class="gx-req-field is-remarks">
                     <label class="form-label">Remarks</label>
-                    <input type="text" class="form-control form-control-sm" name="items[__INDEX__][remarks]" maxlength="1000" placeholder="Optional">
+                    <input type="text" class="form-control form-control-sm js-line-remarks" name="items[__INDEX__][remarks]" maxlength="1000" placeholder="Optional">
                 </div>
             </div>
 
             {{-- Read-only facts and the two derived results. Chips rather than
                  disabled inputs: nothing here is typed into, and boxes that
-                 look editable but are not is what made the old row confusing. --}}
-            <div class="gx-req-line-foot">
+                 look editable but are not is what made the old row confusing.
+                 Hidden for a department user: stock, last purchase, shortfall
+                 and amount are the Store's knowledge, and the snapshot
+                 endpoint sends them nothing to fill these with anyway. --}}
+            <div class="gx-req-line-foot" @if($hideFigures) hidden @endif>
                 <div class="gx-req-facts">
                     <div class="gx-req-fact-group">
                         <span class="gx-req-group-label">Stock</span>
@@ -603,15 +670,19 @@
                         row.querySelector('.js-line-safety').textContent = qtyText(data.safety_stock);
                         row.querySelector('.js-line-consumption').textContent = qtyText(data.consumption_last_month);
                         row.querySelector('.js-line-lpqty').textContent = qtyText(data.last_purchase_qty);
-                        row.querySelector('.js-line-lprate').textContent = data.last_purchase_rate === null ? '—' : money(data.last_purchase_rate);
+                        row.querySelector('.js-line-lprate').textContent = data.last_purchase_rate == null ? '—' : money(data.last_purchase_rate);
                         row.querySelector('.js-line-lpdate').textContent = data.last_purchase_date || '—';
 
                         row.dataset.stockInHand = data.stock_in_hand === null ? '' : data.stock_in_hand;
 
                         // Rate defaults to the last purchase rate but stays
                         // editable, so an expected price rise can be planned in.
+                        // `!= null` on purpose: a department user's payload
+                        // carries no figures at all (undefined, not null), and
+                        // their rate box must stay blank for the server to
+                        // fill from the last purchase.
                         var rateField = row.querySelector('.js-line-rate');
-                        if (!rateField.value && data.last_purchase_rate !== null) {
+                        if (!rateField.value && data.last_purchase_rate != null) {
                             rateField.value = data.last_purchase_rate;
                         }
 
@@ -809,6 +880,56 @@
             }
 
             addBtns.forEach(function (btn) { btn.addEventListener('click', function () { addLine(); }); });
+
+            /*
+             * Tab out of the last line's Remarks to start the next line.
+             *
+             * The same keystroke and the same four conditions as Record
+             * Receiving and Record Issue, kept as its own copy for the same
+             * reason those two are: this form has its own inline script and
+             * its own row shape. A requester listing a dozen items ends each
+             * line at Remarks and wants the next one without reaching for
+             * the mouse.
+             *
+             *   plain Tab       Shift+Tab still moves backwards and never adds
+             *                   a line; modifier combinations belong to the
+             *                   browser.
+             *   Remarks         the last field of the line; every other field
+             *                   tabs within the line as before.
+             *   the LAST line   an earlier line's Remarks still tabs on to
+             *                   whatever follows it, unchanged.
+             *   nothing pending no IME composition in progress.
+             *
+             * The "+ Add Another Item" buttons are untouched; all call addLine().
+             */
+            body.addEventListener('keydown', function (event) {
+                if (event.key !== 'Tab' || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) {
+                    return;
+                }
+
+                if (event.isComposing) { return; }
+
+                var field = event.target;
+                if (!field || !field.classList || !field.classList.contains('js-line-remarks')) { return; }
+
+                var row = field.closest('.gx-req-line');
+                var all = rows();
+                if (!row || row !== all[all.length - 1]) { return; }
+
+                event.preventDefault();
+
+                var added = addLine();
+                var select = added && added.querySelector('.js-line-item');
+                if (!select) { return; }
+
+                // The item picker is a TomSelect here, so focus goes to the
+                // widget's own control rather than the hidden <select>.
+                if (select.tomselect) {
+                    select.tomselect.focus();
+                } else {
+                    select.focus();
+                }
+            });
 
             // Re-suggest the Requisition No when the section or date changes —
             // the serial restarts per section per month.

@@ -22,6 +22,7 @@ class User extends Authenticatable
         'password',
         'status',
         'is_department_admin',
+        'requisition_section_id',
         'buyer_id',
         'buyer_scope_mode',
         'can_upload',
@@ -122,6 +123,16 @@ class User extends Authenticatable
      * a migration, and it is also why a per-module scope would need real
      * storage rather than an extra argument on a method.
      */
+    /**
+     * The section this user raises General Stock requisitions for (Cutting,
+     * Line-04 …) — an Issue Setup master, set on Admin > Users. Null means
+     * the requisition form offers the whole list, as it always did.
+     */
+    public function requisitionSection()
+    {
+        return $this->belongsTo(IndentSection::class, 'requisition_section_id');
+    }
+
     public function buyers()
     {
         return $this->belongsToMany(Buyer::class)->orderBy('buyers.id');

@@ -178,7 +178,24 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        @include('store.stock._item-fields', ['item' => null])
+                        {{-- Opened from a requisition line "Not in Item Master":
+                             the name and specification the department typed are
+                             seeded, and the line id rides along so the save
+                             links the line to the new item. --}}
+                        @php
+                            $fromLine = old('requisition_item', $addFrom['requisition_item'] ?? null);
+                        @endphp
+                        @if($fromLine)
+                            {{-- Survives a validation bounce: old() carries it
+                                 back even though the query string is gone. --}}
+                            <input type="hidden" name="requisition_item" value="{{ $fromLine }}">
+                            @if($addFrom ?? null)
+                                <div class="alert alert-info border-0 py-2 small mb-3">
+                                    Requested on requisition <strong>{{ $addFrom['requisition_no'] }}</strong>. Saving adds the item to the master and links that line to it.
+                                </div>
+                            @endif
+                        @endif
+                        @include('store.stock._item-fields', ['item' => null, 'prefill' => $addFrom['prefill'] ?? []])
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
@@ -303,6 +320,18 @@
             default => null,
         };
     @endphp
+
+    {{-- Arrived from a requisition: the Add modal opens on its own, seeded. --}}
+    @if(($addFrom ?? null) && ! $errors->any())
+        <script>
+            (function () {
+                var el = document.getElementById('addItem');
+                if (el && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(el).show();
+                }
+            })();
+        </script>
+    @endif
 
     @if($errors->any() && $reopen)
         <script>

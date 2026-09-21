@@ -74,6 +74,30 @@ class PurchaseRequisitionItem extends Model
         return $this->stock_item_id === null && filled($this->custom_item_name);
     }
 
+    /** The query form of isCustomItem(). */
+    public function scopeNotInItemMaster(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->whereNull('stock_item_id')->whereNotNull('custom_item_name')->where('custom_item_name', '<>', '');
+    }
+
+    /**
+     * The Store added this line's item to the Item Master: point the line at
+     * the new master record and take its Uom and category, so the sheet reads
+     * like any other line from here on. The typed name is dropped because
+     * the master's name now stands for it. Quantities, rate and the frozen
+     * figures are left alone — there was no stock to snapshot when the line
+     * was raised, and rewriting history is not this method's job.
+     */
+    public function linkToStockItem(StockItem $item): void
+    {
+        $this->update([
+            'stock_item_id' => $item->id,
+            'custom_item_name' => null,
+            'uom_snapshot' => $item->uom,
+            'item_category_id' => $item->item_category_id,
+        ]);
+    }
+
     /**
      * What this line is called, wherever it is printed.
      *

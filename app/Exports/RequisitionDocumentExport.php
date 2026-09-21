@@ -37,6 +37,7 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
         private readonly Collection $rows,
         private readonly string $title,
         private readonly array $signatures,
+        private readonly ?string $departmentHeadName = null,
     ) {
     }
 
@@ -47,6 +48,7 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
             'rows' => $this->rows,
             'title' => $this->title,
             'signatures' => $this->signatures,
+            'departmentHeadName' => $this->departmentHeadName,
             'forExcel' => true,
         ]);
     }

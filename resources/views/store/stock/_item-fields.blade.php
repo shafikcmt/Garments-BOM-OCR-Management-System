@@ -23,7 +23,11 @@
     $wasSubmitted = old('form') === $formKey;
 
     // old() for the form the user just submitted, the stored value for the rest.
-    $value = fn (string $field, $stored = null) => $wasSubmitted ? old($field, $stored) : $stored;
+    // $prefill (optional) seeds an ADD form opened from elsewhere — a
+    // requisition line naming an item the master does not have yet — and is
+    // read only when there is no stored value and nothing was submitted.
+    $prefill = $prefill ?? [];
+    $value = fn (string $field, $stored = null) => $wasSubmitted ? old($field, $stored) : ($stored ?? ($prefill[$field] ?? null));
 
     // The Advanced panel is folded away, which would hide an error raised on a
     // field inside it — the form would bounce back complaining about something

@@ -51,7 +51,7 @@
         ['Requisition Date', $requisitionDate],
         ['Name of Unit', $unit],
         ['Section', $section],
-        ['Name of User', optional($requisition->indentPerson)->name ?: '-'],
+        ['Name of User', optional($requisition->indentPerson)->name ?: (($departmentHeadName ?? null) ?: '-')],
         ['Contact No. / Email', $requisition->contact ?: '-'],
         // A department's sheet says where it is in the department's words
         // ("With Department Head"); the Store's own keeps the status name.
