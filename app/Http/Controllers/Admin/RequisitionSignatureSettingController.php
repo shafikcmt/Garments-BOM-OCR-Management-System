@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\RequisitionDepartmentHead;
 use App\Models\RequisitionSignatureBlock;
 use App\Models\User;
 use App\Services\RequisitionSignatureResolver;
@@ -14,14 +13,13 @@ use Illuminate\Validation\Rule;
 /**
  * Admin > Settings > Requisition Signatures.
  *
- * Two things on one screen, because they are read together:
+ * The signature boxes printed on each level of Purchase Requisition — how
+ * many, their captions, the role or person behind each, and which system
+ * step (if any) fills in the signed name and date.
  *
- *   - the signature boxes printed on each level of Purchase Requisition —
- *     how many, their captions, the role or person behind each, and which
- *     system step (if any) fills in the signed name and date;
- *   - who heads each department, which is what the department-level
- *     "Checked by — Department Head" box and the Department Review queue
- *     resolve to.
+ * Who heads each department and section — what the "Requester's Department
+ * Head" box and the Review queue resolve to — lives on Admin > Settings >
+ * Departments (DepartmentController), so heads are named in one place.
  *
  * Saving replaces each level's boxes wholesale. They are configuration with
  * nothing pointing at them — a requisition never stores a block id, the
@@ -43,8 +41,6 @@ class RequisitionSignatureSettingController extends Controller
             'assigneeTypes' => RequisitionSignatureBlock::assigneeTypeLabels(),
             'stampSources' => RequisitionSignatureBlock::stampSourceLabels(),
             'roles' => RequisitionSignatureResolver::roleLabels(),
-            'departments' => RequisitionDepartmentHead::departmentOptions(),
-            'heads' => RequisitionDepartmentHead::query()->pluck('user_id', 'role_name')->all(),
             // Active users only for the pickers; a person already chosen but
             // since deactivated is still shown by the view so the admin can
             // see who the box points at and replace them.
@@ -56,7 +52,6 @@ class RequisitionSignatureSettingController extends Controller
     {
         $levels = array_keys(RequisitionSignatureBlock::levelLabels());
         $roles = array_keys(RequisitionSignatureResolver::roleLabels());
-        $departments = array_keys(RequisitionDepartmentHead::departmentOptions());
 
         $data = $request->validate([
             'blocks' => ['required', 'array'],
@@ -67,8 +62,6 @@ class RequisitionSignatureSettingController extends Controller
             'blocks.*.*.role_name' => ['nullable', Rule::in($roles)],
             'blocks.*.*.user_id' => ['nullable', 'integer', 'exists:users,id'],
             'blocks.*.*.stamp_source' => ['nullable', Rule::in(array_filter(array_keys(RequisitionSignatureBlock::stampSourceLabels())))],
-            'heads' => ['nullable', 'array'],
-            'heads.*' => ['nullable', 'integer', 'exists:users,id'],
         ], [
             'blocks.*.*.label.required' => 'Every signature box needs a label.',
         ]);
@@ -82,7 +75,7 @@ class RequisitionSignatureSettingController extends Controller
             }
         }
 
-        DB::transaction(function () use ($data, $levels, $departments) {
+        DB::transaction(function () use ($data, $levels) {
             foreach ($levels as $level) {
                 RequisitionSignatureBlock::query()->where('level', $level)->delete();
 
@@ -102,16 +95,6 @@ class RequisitionSignatureSettingController extends Controller
                         'user_id' => $type === RequisitionSignatureBlock::ASSIGNEE_USER ? ($row['user_id'] ?? null) : null,
                         'stamp_source' => ($row['stamp_source'] ?? '') !== '' ? $row['stamp_source'] : null,
                     ]);
-                }
-            }
-
-            foreach ($departments as $role) {
-                $userId = $data['heads'][$role] ?? null;
-
-                if ($userId) {
-                    RequisitionDepartmentHead::updateOrCreate(['role_name' => $role], ['user_id' => $userId]);
-                } else {
-                    RequisitionDepartmentHead::query()->where('role_name', $role)->delete();
                 }
             }
         });

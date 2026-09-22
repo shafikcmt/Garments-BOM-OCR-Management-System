@@ -170,8 +170,8 @@
 
             @if($requisition->rejectedByDepartmentHead())
                 <div class="alert alert-warning border-0 mt-3 mb-0 small">
-                    <strong>Returned by {{ optional($requisition->departmentCheckedBy)->name ?: 'the department head' }}</strong>
-                    on {{ $requisition->department_checked_at?->format('d-M-Y') }}:
+                    <strong>Returned by {{ optional($requisition->headCheckedBy())->name ?: 'the '.strtolower($requisition->reviewLevelLabel()) }}</strong>
+                    on {{ $requisition->headCheckedAt()?->format('d-M-Y') }}:
                     {{ $requisition->department_review_note ?: 'No reason given.' }}
                     @if($requisition->isEditable())
                         <span class="d-block mt-1">Amend the requisition and submit it again.</span>

@@ -54,7 +54,16 @@ final class DepartmentRequisitionDefaults
         $owner = $existing?->createdBy ?: $user;
         $section = $owner?->requisitionSection ?: $existing?->indentSection;
 
-        return new self($level, $department, $section, RequisitionDepartmentHead::headOf($department));
+        // Requested By is the head the sheet goes to: the section head when
+        // the section has one, else the department head — the first step of
+        // the same chain that routes the sheet, so form, queue and signature
+        // box all name the same person. When the chain has no step (the
+        // department head's own sheet, or no heads at all) the department
+        // head is still the one the form names, as it always was.
+        $head = RequisitionReviewChain::stepsFor($owner, $section, $department)[0]['head']
+            ?? RequisitionDepartmentHead::headOf($department);
+
+        return new self($level, $department, $section, $head);
     }
 
     public function isDepartment(): bool
@@ -68,10 +77,20 @@ final class DepartmentRequisitionDefaults
         return $this->isDepartment() && $this->section !== null;
     }
 
-    /** Whether Requested By and Contact are fixed to the department head. */
+    /** Whether Requested By and Contact are fixed to a head. */
     public function fixesHead(): bool
     {
         return $this->isDepartment() && $this->head !== null;
+    }
+
+    /** "Cutting section head" / "Production department head" — who Requested By is. */
+    public function headTitle(): string
+    {
+        if ($this->head && $this->section && (int) $this->section->head_user_id === $this->head->id) {
+            return $this->section->name.' section head';
+        }
+
+        return RequisitionDepartmentHead::departmentLabel($this->department).' department head';
     }
 
     /**

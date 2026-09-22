@@ -19,8 +19,6 @@
             'stamp_source' => $b->stamp_source ?? '',
         ])->values()->all();
     };
-
-    $userLabel = fn ($u) => $u->name.(trim((string) ($u->designation ?? '')) !== '' ? ' — '.$u->designation : '');
 @endphp
 
 @section('content')
@@ -62,27 +60,14 @@
         @csrf
 
         <div class="row g-4">
-            {{-- Department heads first: the department-level "Department Head"
-                 box and the Department Review queue both resolve to these. --}}
+            {{-- Who heads each department and section — what the
+                 "Requester's Department Head" box and the Review queue
+                 resolve to — is set on the Departments screen, so there is
+                 one list of heads, not two. --}}
             <div class="col-12">
-                <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
-                    <div class="card-body p-4">
-                        <h5 class="mb-1">Department Heads</h5>
-                        <p class="text-muted small mb-3">A department's requisition goes to its head for checking before it reaches Store. Leave a department blank and its requisitions go straight to Store.</p>
-                        <div class="row g-3">
-                            @foreach($departments as $role => $label)
-                                <div class="col-12 col-md-6 col-xl-4">
-                                    <label class="form-label fw-semibold" for="head_{{ $role }}">{{ $label }}</label>
-                                    <select name="heads[{{ $role }}]" id="head_{{ $role }}" class="form-select js-searchable">
-                                        <option value="">— No head configured —</option>
-                                        @foreach($users as $u)
-                                            <option value="{{ $u->id }}" @selected((string) old('heads.'.$role, $heads[$role] ?? '') === (string) $u->id)>{{ $userLabel($u) }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
+                <div class="alert alert-light border small d-flex align-items-center justify-content-between gap-3 flex-wrap mb-0">
+                    <span>Department and section heads, who check a department's requisition before it reaches Store, are named on the Departments screen.</span>
+                    <a href="{{ route('admin.departments.index') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>Manage Departments</a>
                 </div>
             </div>
 

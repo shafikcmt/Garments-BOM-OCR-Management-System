@@ -138,11 +138,12 @@
                     <div class="col-6 col-md-6 col-xl-2">
                         <label class="form-label" for="personSelect">Requested By</label>
                         @if($fixHead)
-                            {{-- The department head, from Admin > Settings >
-                                 Requisition Signatures. Nothing is posted: the
-                                 head is resolved again on save and on print. --}}
+                            {{-- The head the sheet goes to — section head, else
+                                 department head — from Admin > Settings >
+                                 Departments. Nothing is posted: the head is
+                                 resolved again on save and on print. --}}
                             <input type="text" id="personSelect" class="form-control gx-stock-readonly" value="{{ $defaults->head->name }}" readonly tabindex="-1">
-                            <div class="gx-stock-help">{{ \App\Models\RequisitionDepartmentHead::departmentLabel($defaults->department) }} department head</div>
+                            <div class="gx-stock-help">{{ $defaults->headTitle() }}</div>
                         @else
                             <select name="indent_person_id" id="personSelect" class="form-select js-searchable">
                                 <option value="">Select…</option>

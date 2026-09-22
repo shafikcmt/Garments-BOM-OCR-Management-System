@@ -38,7 +38,7 @@ function deptUser(string $department = 'merchant'): User
 function deptHead(string $department = 'merchant'): User
 {
     $head = deptUser($department);
-    RequisitionDepartmentHead::create(['role_name' => $department, 'user_id' => $head->id]);
+    RequisitionDepartmentHead::assign($department, $head);
 
     return $head;
 }
@@ -95,7 +95,7 @@ it('sends a department submission to its department head, not to the Store', fun
     $requisition = PurchaseRequisition::query()->latest('id')->first();
 
     expect($requisition->level)->toBe(PurchaseRequisition::LEVEL_DEPARTMENT)
-        ->and($requisition->department_role)->toBe('merchant')
+        ->and($requisition->department_role)->toBe('merchandising')
         ->and($requisition->department_review_status)->toBe(PurchaseRequisition::DEPT_REVIEW_PENDING)
         ->and($requisition->progressLabel())->toBe('With Department Head');
 
@@ -439,7 +439,7 @@ it('renders the document view with the configured boxes for PDF and Excel', func
 
 // --- Admin settings ----------------------------------------------------------
 
-it('lets the admin replace the boxes and name a department head', function () {
+it('lets the admin replace the boxes', function () {
     $admin = User::factory()->create()->assignRole(Role::findOrCreate('admin', 'web'));
     $head = User::factory()->create();
 
@@ -455,14 +455,12 @@ it('lets the admin replace the boxes and name a department head', function () {
                     ['label' => 'Approved by', 'assignee_type' => 'user', 'user_id' => $head->id, 'stamp_source' => ''],
                 ],
             ],
-            'heads' => ['merchant' => $head->id],
         ])
         ->assertRedirect(route('admin.requisition-signatures.edit'));
 
     expect(RequisitionSignatureBlock::query()->forLevel('department')->pluck('label')->all())->toBe(['Requested by', 'Verified by'])
         ->and(RequisitionSignatureBlock::query()->forLevel('final')->pluck('label')->all())->toBe(['Prepared by', 'Approved by'])
-        ->and(RequisitionSignatureBlock::query()->forLevel('final')->get()[1]->stamp_source)->toBeNull()
-        ->and(RequisitionDepartmentHead::headOf('merchant')?->id)->toBe($head->id);
+        ->and(RequisitionSignatureBlock::query()->forLevel('final')->get()[1]->stamp_source)->toBeNull();
 });
 
 it('refuses a level with no boxes at all', function () {
@@ -487,6 +485,7 @@ it('renders the settings screen for the admin', function () {
     $this->actingAs($admin)
         ->get(route('admin.requisition-signatures.edit'))
         ->assertOk()
-        ->assertSee('Department Heads')
+        // Heads moved to the Departments screen; this one points there.
+        ->assertSee('Manage Departments')
         ->assertSee('Final Purchase Requisition');
 });

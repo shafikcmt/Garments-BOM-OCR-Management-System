@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\PoGenerateControlController;
 use App\Http\Controllers\Admin\AlertSettingController;
 use App\Http\Controllers\Admin\PaymentSettingController;
 use App\Http\Controllers\Admin\RequisitionSignatureSettingController;
+use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\EmailTemplateController;
 use App\Http\Controllers\Admin\PraApproverController;
 
@@ -75,10 +76,17 @@ Route::prefix('admin')
         Route::get('/payment-settings', [PaymentSettingController::class, 'edit'])->name('payment-settings.edit');
         Route::post('/payment-settings', [PaymentSettingController::class, 'update'])->name('payment-settings.update');
 
-        // The signature boxes printed on Purchase Requisitions, and who heads
-        // each department for the requisition workflow.
+        // The signature boxes printed on Purchase Requisitions.
         Route::get('/requisition-signatures', [RequisitionSignatureSettingController::class, 'edit'])->name('requisition-signatures.edit');
         Route::post('/requisition-signatures', [RequisitionSignatureSettingController::class, 'update'])->name('requisition-signatures.update');
+
+        // Departments, their roles and heads, and their sections with heads —
+        // what routes a department's requisition and what the user form offers.
+        Route::get('/departments', [DepartmentController::class, 'index'])->name('departments.index');
+        Route::post('/departments', [DepartmentController::class, 'store'])->name('departments.store');
+        Route::put('/departments/{department}', [DepartmentController::class, 'update'])->name('departments.update');
+        Route::post('/departments/{department}/sections', [DepartmentController::class, 'storeSection'])->name('departments.sections.store');
+        Route::delete('/departments/sections/{section}', [DepartmentController::class, 'detachSection'])->name('departments.sections.detach');
 
         Route::get('/workspace', [DashboardController::class, 'workspace'])->name('workspace');
 

@@ -2,75 +2,73 @@
 
 namespace App\Models;
 
+use App\Services\RequisitionReviewChain;
+use App\Support\DepartmentRoles;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * The configured head of one department (a Spatie role), for the Purchase
- * Requisition workflow. See the migration for why this is a mapping table.
+ * Who heads a department, for the Purchase Requisition workflow.
+ *
+ * This began as its own table (role_name -> user). Departments are data now
+ * (2026_09_23_000001) and the head is departments.head_user_id, edited on
+ * Admin > Settings > Departments. The static API below is what every caller
+ * ever used, so it stays and simply reads the new home; the old table is
+ * kept, unread, and its rows were copied across by that migration.
+ *
+ * Keys are department keys (production, harc). A role name is accepted
+ * too and resolved to its department, because purchase_requisitions rows
+ * written before the change carry the requester's role.
  */
 class RequisitionDepartmentHead extends Model
 {
     protected $fillable = ['role_name', 'user_id'];
 
     /**
-     * The departments a head can be named for, with the label a manager
-     * would use. The keys are role names — the only place this project
-     * records which department a user belongs to.
+     * The departments a requisition can belong to, with the label a manager
+     * would use. Management / Admin is left out: its people raise the Store's
+     * own final sheet, which has no department step.
      *
-     * @return array<string, string> role => label
+     * @return array<string, string> key => label
      */
     public static function departmentOptions(): array
     {
-        return [
-            'merchant' => 'Merchandising',
-            'commercial' => 'Commercial',
-            'account' => 'Accounts',
-            'supply_chain' => 'Supply Chain',
-            'production' => 'Production',
-            'store' => 'Store',
-        ];
+        return array_filter(
+            DepartmentRoles::departments(),
+            fn ($label, $key) => $key !== 'management',
+            ARRAY_FILTER_USE_BOTH
+        );
     }
 
-    public static function departmentLabel(?string $role): string
+    public static function departmentLabel(?string $keyOrRole): string
     {
-        return self::departmentOptions()[$role] ?? ucwords(str_replace('_', ' ', (string) $role));
+        $key = self::normalizeKey($keyOrRole);
+
+        return DepartmentRoles::labelOf($key) ?? ucwords(str_replace('_', ' ', (string) $keyOrRole));
     }
 
     /**
-     * The department a user raises requisitions FOR: the first of their roles
-     * that names a department. Store-side users (store / admin / management)
-     * raise final-level requisitions, which have no department step, so
-     * their department is not asked for here.
+     * The department a user raises requisitions FOR — the department of
+     * the first of their roles that belongs to one. Store-side users raise
+     * final-level requisitions, which have no department step, so their
+     * department is not asked for here.
      */
     public static function departmentOf(?User $user): ?string
     {
-        if (! $user) {
-            return null;
-        }
-
-        foreach (array_keys(self::departmentOptions()) as $role) {
-            if ($user->hasRole($role)) {
-                return $role;
-            }
-        }
-
-        return null;
+        return RequisitionReviewChain::departmentOf($user);
     }
 
     /** The head user of a department, or null when none is configured. */
-    public static function headOf(?string $role): ?User
+    public static function headOf(?string $keyOrRole): ?User
     {
-        if (! $role) {
-            return null;
-        }
+        $key = self::normalizeKey($keyOrRole);
 
-        return self::query()->where('role_name', $role)->with('user')->first()?->user;
+        return $key ? Department::query()->where('key', $key)->first()?->head : null;
     }
 
     /**
      * The departments this user heads.
      *
-     * @return array<int, string> role names
+     * @return array<int, string> department keys
      */
     public static function departmentsHeadedBy(?User $user): array
     {
@@ -78,7 +76,45 @@ class RequisitionDepartmentHead extends Model
             return [];
         }
 
-        return self::query()->where('user_id', $user->id)->pluck('role_name')->all();
+        return Department::query()->active()->where('head_user_id', $user->id)->pluck('key')->all();
+    }
+
+    /**
+     * The sections this user heads.
+     *
+     * @return array<int, int> indent_sections ids
+     */
+    public static function sectionsHeadedBy(?User $user): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        return IndentSection::query()->where('head_user_id', $user->id)->pluck('id')->all();
+    }
+
+    /** Name (or clear) the head of a department. */
+    public static function assign(string $keyOrRole, ?User $head): void
+    {
+        $key = self::normalizeKey($keyOrRole);
+
+        if ($key) {
+            Department::query()->where('key', $key)->update(['head_user_id' => $head?->id]);
+        }
+    }
+
+    /** A department key as given, or the department of a role name. */
+    public static function normalizeKey(?string $keyOrRole): ?string
+    {
+        if (! $keyOrRole) {
+            return null;
+        }
+
+        if (DepartmentRoles::labelOf($keyOrRole) !== null) {
+            return $keyOrRole;
+        }
+
+        return DepartmentRoles::departmentOf($keyOrRole);
     }
 
     public function user()

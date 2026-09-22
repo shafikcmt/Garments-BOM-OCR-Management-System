@@ -12,11 +12,13 @@ use App\Models\PurchaseRequisition;
 use App\Models\PurchaseRequisitionItem;
 use App\Models\RequisitionDepartmentHead;
 use App\Models\StockItem;
+use App\Models\User;
 use App\Services\DepartmentRequisitionDefaults;
 use App\Services\MonthlyRequisitionReportService;
 use App\Services\PurchaseRequisitionNumberGenerator;
 use App\Services\PurchaseRequisitionService;
 use App\Services\RequisitionFulfilmentService;
+use App\Services\RequisitionReviewChain;
 use App\Services\RequisitionSignatureResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -204,13 +206,15 @@ class PurchaseRequisitionController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | The Department Head's step
+    | The head's step — section head or department head
     |--------------------------------------------------------------------------
     |
-    | A department requisition passes its department head before the Store.
-    | Who the head is comes from Admin > Settings (RequisitionDepartmentHead);
-    | Admin and Management stand in for any head. The decision is recorded in
-    | department_review_status beside `status`, which is not touched.
+    | A department requisition passes ONE head before the Store: its section
+    | head if the section has one, else its department head, else nobody.
+    | RequisitionReviewChain decides which (review_level); the heads are
+    | named on Admin > Settings > Departments; Admin and Management stand in
+    | for any head. The decision is recorded in department_review_status
+    | beside `status`, which is not touched.
     */
 
     /**
@@ -258,7 +262,7 @@ class PurchaseRequisitionController extends Controller
         ]);
     }
 
-    /** The department head accepts the sheet; it now goes to the Store. */
+    /** The head accepts the sheet; it now goes to the Store. */
     public function departmentApprove(PurchaseRequisition $requisition)
     {
         $this->authorizeVisible($requisition);
@@ -266,19 +270,19 @@ class PurchaseRequisitionController extends Controller
 
         $requisition->update([
             'department_review_status' => PurchaseRequisition::DEPT_REVIEW_APPROVED,
-            'department_checked_by' => auth()->id(),
-            'department_checked_at' => now(),
             'department_review_note' => null,
-        ]);
+        ] + $requisition->headDecisionStamp(auth()->user()));
 
         return back()->with('success',
             'Requisition '.$requisition->requisition_no.' checked and sent to Store.');
     }
 
     /**
-     * The department head sends the sheet back. It stays Submitted — the
-     * requester's own screen reads "Returned by Department Head" — and becomes
-     * editable to them again, so they can amend it and submit once more.
+     * The head sends the sheet back. It stays Submitted — the requester's own
+     * screen reads "Returned by Section Head" / "Returned by Department Head"
+     * — and becomes editable to them again, so they can amend it and submit
+     * once more. review_level is kept, so the resubmission returns to the
+     * same head.
      */
     public function departmentReject(Request $request, PurchaseRequisition $requisition)
     {
@@ -293,10 +297,8 @@ class PurchaseRequisitionController extends Controller
 
         $requisition->update([
             'department_review_status' => PurchaseRequisition::DEPT_REVIEW_REJECTED,
-            'department_checked_by' => auth()->id(),
-            'department_checked_at' => now(),
             'department_review_note' => $data['note'],
-        ]);
+        ] + $requisition->headDecisionStamp(auth()->user()));
 
         return back()->with('success',
             'Requisition '.$requisition->requisition_no.' returned to the requester.');
@@ -305,15 +307,16 @@ class PurchaseRequisitionController extends Controller
     private function authorizeDepartmentHead(PurchaseRequisition $requisition): void
     {
         abort_unless($requisition->isDepartmentHeadFor(auth()->user()), 403,
-            'Only the head of this department can check this requisition.');
+            'Only the '.strtolower($requisition->reviewLevelLabel()).' of this requisition can check it.');
 
         abort_unless($requisition->awaitingDepartmentHead(), 422,
-            'Only a requisition waiting for the department head can be checked.');
+            'Only a requisition waiting for a head\'s check can be checked.');
     }
 
     /**
-     * How many sheets wait on this user as a department head — or NULL when
-     * they head no department at all, which is what hides the tab.
+     * How many sheets wait on this user as a head — of a section or of a
+     * department — or NULL when they head neither, which is what hides the
+     * tab.
      */
     private function departmentReviewCount(?\App\Models\User $user): ?int
     {
@@ -322,25 +325,27 @@ class PurchaseRequisitionController extends Controller
         }
 
         $isHead = $user->hasAnyRole(['admin', 'management'])
-            || RequisitionDepartmentHead::departmentsHeadedBy($user) !== [];
+            || RequisitionDepartmentHead::departmentsHeadedBy($user) !== []
+            || RequisitionDepartmentHead::sectionsHeadedBy($user) !== [];
 
         return $isHead ? PurchaseRequisition::query()->awaitingDepartmentHead($user)->count() : null;
     }
 
     /**
-     * What the department head's step is set to when a sheet is submitted.
+     * What the head's step is set to when a sheet is submitted: pending at
+     * the first level of the chain that applies, or nothing. A final sheet
+     * has no such step, and a department with no head goes straight to the
+     * Store rather than waiting on nobody.
      *
-     * Pending only for a department-level sheet whose department has a head
-     * configured. A final sheet has no such step, and a department with no
-     * head goes straight to the Store rather than waiting on nobody.
+     * @return array{department_review_status: ?string, review_level: ?string}
      */
-    private function departmentReviewOnSubmit(string $level, ?string $department): ?string
+    private function reviewOnSubmit(string $level, ?User $requester, ?IndentSection $section, ?string $department): array
     {
-        if ($level !== PurchaseRequisition::LEVEL_DEPARTMENT || ! RequisitionDepartmentHead::headOf($department)) {
-            return null;
+        if ($level !== PurchaseRequisition::LEVEL_DEPARTMENT) {
+            return ['department_review_status' => null, 'review_level' => null];
         }
 
-        return PurchaseRequisition::DEPT_REVIEW_PENDING;
+        return RequisitionReviewChain::onSubmit($requester, $section, $department);
     }
 
     /**
@@ -451,6 +456,13 @@ class PurchaseRequisitionController extends Controller
             $department = $defaults->department;
             $submitting = $data['action'] === 'submit';
 
+            // Which head (if any) the sheet stops at. Decided against the
+            // requester and their section NOW; a returned sheet finds its
+            // way back through the chain again on resubmit.
+            $review = $submitting
+                ? $this->reviewOnSubmit($level, auth()->user(), $section ?: $defaults->section, $department)
+                : ['department_review_status' => null, 'review_level' => null];
+
             $requisition = PurchaseRequisition::create([
                 'requisition_no' => $number,
                 'requisition_date' => $data['requisition_date'],
@@ -465,9 +477,8 @@ class PurchaseRequisitionController extends Controller
                     ? PurchaseRequisition::STATUS_SUBMITTED
                     : PurchaseRequisition::STATUS_DRAFT,
                 'submitted_at' => $submitting ? now() : null,
-                'department_review_status' => $submitting
-                    ? $this->departmentReviewOnSubmit($level, $department)
-                    : null,
+                'department_review_status' => $review['department_review_status'],
+                'review_level' => $review['review_level'],
                 'remarks' => $data['remarks'] ?? null,
                 'created_by' => auth()->id(),
             ]);
@@ -494,9 +505,16 @@ class PurchaseRequisitionController extends Controller
             return $no.' saved as draft.';
         }
 
-        return $requisition->awaitingDepartmentHead()
-            ? $no.' submitted to the '.$requisition->departmentLabel().' department head for checking.'
-            : $no.' submitted to Store.';
+        if (! $requisition->awaitingDepartmentHead()) {
+            return $no.' submitted to Store.';
+        }
+
+        // "…to the Cutting section head" / "…to the Production department head".
+        $with = $requisition->review_level === RequisitionReviewChain::LEVEL_SECTION
+            ? ($requisition->indentSection?->name ?: $requisition->departmentLabel()).' section head'
+            : $requisition->departmentLabel().' department head';
+
+        return $no.' submitted to the '.$with.' for checking.';
     }
 
     /**
@@ -523,7 +541,7 @@ class PurchaseRequisitionController extends Controller
         $requisition->load([
             'items.stockItem', 'items.itemCategory',
             'indentSection', 'indentPerson', 'createdBy',
-            'departmentCheckedBy', 'storeAckBy', 'accountsAckBy', 'checkedBy', 'approvedBy',
+            'departmentCheckedBy', 'sectionCheckedBy', 'storeAckBy', 'accountsAckBy', 'checkedBy', 'approvedBy',
         ]);
 
         $user = auth()->user();
@@ -653,7 +671,15 @@ class PurchaseRequisitionController extends Controller
         // the one this save is about to overwrite.
         $isStoreCorrection = ! $requisition->isEditable();
 
-        DB::transaction(function () use ($data, $requisition, $isStoreCorrection) {
+        // Where a (re)submission goes. A returned sheet goes back to the head
+        // who returned it while that step still applies; a draft, or a sheet
+        // whose head has since changed, goes to the first step that does. A
+        // Store correction, or a save as draft, has no step to set.
+        $review = (! $isStoreCorrection && $data['action'] === 'submit')
+            ? RequisitionReviewChain::onResubmit($requisition)
+            : ['department_review_status' => null, 'review_level' => null];
+
+        DB::transaction(function () use ($data, $requisition, $isStoreCorrection, $review) {
             $requisition->update([
                 'requisition_no' => ($data['requisition_no'] ?? null) ?: $requisition->requisition_no,
                 'requisition_date' => $data['requisition_date'],
@@ -678,16 +704,16 @@ class PurchaseRequisitionController extends Controller
                     : ($data['action'] === 'submit' ? now() : null),
 
                 // The requester submitting (or resubmitting a returned sheet)
-                // starts the department head's step afresh; a draft has no
-                // step yet; a Store correction leaves the decision as it is.
+                // starts the head's step afresh, at the level the chain picks;
+                // a draft has no step yet; a Store correction leaves the
+                // decision, its level and its stamps exactly as they are.
                 'department_review_status' => $isStoreCorrection
                     ? $requisition->department_review_status
-                    : ($data['action'] === 'submit'
-                        ? $this->departmentReviewOnSubmit($requisition->level ?: PurchaseRequisition::LEVEL_FINAL, $requisition->department_role)
-                        : null),
-                'department_checked_by' => $isStoreCorrection ? $requisition->department_checked_by : null,
-                'department_checked_at' => $isStoreCorrection ? $requisition->department_checked_at : null,
-                'department_review_note' => $isStoreCorrection ? $requisition->department_review_note : null,
+                    : $review['department_review_status'],
+                'review_level' => $isStoreCorrection
+                    ? $requisition->review_level
+                    : $review['review_level'],
+            ] + ($isStoreCorrection ? [] : PurchaseRequisition::clearedHeadStamps()) + [
 
                 // Who corrected it and when. checked_by / checked_at already
                 // existed on this table, already print as "Checked By" in the
@@ -806,7 +832,7 @@ class PurchaseRequisitionController extends Controller
         $requisition->load([
             'items.stockItem', 'items.itemCategory',
             'indentSection', 'indentPerson', 'createdBy',
-            'departmentCheckedBy', 'storeAckBy', 'accountsAckBy', 'checkedBy', 'approvedBy',
+            'departmentCheckedBy', 'sectionCheckedBy', 'storeAckBy', 'accountsAckBy', 'checkedBy', 'approvedBy',
         ]);
 
         return [

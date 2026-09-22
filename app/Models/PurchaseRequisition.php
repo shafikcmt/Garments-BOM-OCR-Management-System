@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Services\RequisitionReviewChain;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * General Stock (module A) — a Purchase Requisition document.
@@ -83,6 +85,9 @@ class PurchaseRequisition extends Model
         'department_checked_by',
         'department_checked_at',
         'department_review_note',
+        'review_level',
+        'section_checked_by',
+        'section_checked_at',
         'store_ack_by',
         'store_ack_at',
         'accounts_ack_by',
@@ -99,6 +104,7 @@ class PurchaseRequisition extends Model
         'requisition_date' => 'date',
         'submitted_at' => 'datetime',
         'department_checked_at' => 'datetime',
+        'section_checked_at' => 'datetime',
         'store_ack_at' => 'datetime',
         'accounts_ack_at' => 'datetime',
         'checked_at' => 'datetime',
@@ -167,18 +173,23 @@ class PurchaseRequisition extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | The Department Head's step
+    | The head's step — section head or department head
     |--------------------------------------------------------------------------
+    |
+    | department_review_status says WHETHER a head holds the sheet (pending /
+    | approved / rejected); review_level says WHICH head ('section' or
+    | 'department'). RequisitionReviewChain decides the level; nothing here
+    | does.
     */
 
-    /** Submitted and waiting for the department head's decision. */
+    /** Submitted and waiting for the head at review_level. */
     public function awaitingDepartmentHead(): bool
     {
         return $this->status === self::STATUS_SUBMITTED
             && $this->department_review_status === self::DEPT_REVIEW_PENDING;
     }
 
-    /** Sent back by the department head; the requester may amend and resubmit. */
+    /** Sent back by a head; the requester may amend and resubmit. */
     public function rejectedByDepartmentHead(): bool
     {
         return $this->status === self::STATUS_SUBMITTED
@@ -186,8 +197,8 @@ class PurchaseRequisition extends Model
     }
 
     /**
-     * Whether the department head's step stands between this requisition and
-     * the Store. False for a final-level sheet, for a department with no head
+     * Whether a head's step stands between this requisition and the Store.
+     * False for a final-level sheet, for a department with nothing
      * configured, and for anything raised before the step existed (NULL).
      */
     public function heldByDepartmentHead(): bool
@@ -195,14 +206,73 @@ class PurchaseRequisition extends Model
         return in_array($this->department_review_status, [self::DEPT_REVIEW_PENDING, self::DEPT_REVIEW_REJECTED], true);
     }
 
+    /** "Section Head" / "Department Head" — whoever the sheet is with or came back from. */
+    public function reviewLevelLabel(): string
+    {
+        return RequisitionReviewChain::levelLabel($this->review_level ?: RequisitionReviewChain::LEVEL_DEPARTMENT);
+    }
+
     /**
-     * Whether this user is the head who decides on this requisition.
+     * The head who decided on this sheet — the section head's stamp when the
+     * check was at section level, else the department head's. One check is
+     * made per sheet, so exactly one pair is ever written; this hides which.
+     */
+    public function headCheckedBy(): ?User
+    {
+        return $this->review_level === RequisitionReviewChain::LEVEL_SECTION
+            ? $this->sectionCheckedBy
+            : $this->departmentCheckedBy;
+    }
+
+    public function headCheckedAt(): ?Carbon
+    {
+        return $this->review_level === RequisitionReviewChain::LEVEL_SECTION
+            ? $this->section_checked_at
+            : $this->department_checked_at;
+    }
+
+    /**
+     * What a head's decision writes: the stamp pair for the level the sheet
+     * is at, the other pair untouched. Used by approve and return alike so
+     * the two can never stamp different columns.
      *
-     * The configured head of the requisition's department, plus Admin and
-     * Management, who can already do everything the Store can and are the
-     * fallback when a head is away. Never the requester on their own sheet
-     * unless they ARE the configured head — a one-person department signs
-     * both boxes and that is the paper form's rule too.
+     * @return array<string, mixed>
+     */
+    public function headDecisionStamp(?User $by): array
+    {
+        return $this->review_level === RequisitionReviewChain::LEVEL_SECTION
+            ? ['section_checked_by' => $by?->id, 'section_checked_at' => now()]
+            : ['department_checked_by' => $by?->id, 'department_checked_at' => now()];
+    }
+
+    /**
+     * The columns a fresh submission clears: every head stamp and note, so a
+     * returned sheet that is amended and sent again carries nothing from the
+     * round before. The status and level themselves come from
+     * RequisitionReviewChain.
+     *
+     * @return array<string, null>
+     */
+    public static function clearedHeadStamps(): array
+    {
+        return [
+            'department_checked_by' => null,
+            'department_checked_at' => null,
+            'section_checked_by' => null,
+            'section_checked_at' => null,
+            'department_review_note' => null,
+        ];
+    }
+
+    /**
+     * Whether this user is the head who decides on this requisition at its
+     * CURRENT level.
+     *
+     * The configured section head while the sheet is with the section; the
+     * configured department head while it is with the department; plus
+     * Admin and Management, who can already do everything the Store can and
+     * are the fallback when a head is away. Never the requester on their own
+     * sheet — the chain skipped any step they would have held.
      */
     public function isDepartmentHeadFor(?User $user): bool
     {
@@ -214,7 +284,16 @@ class PurchaseRequisition extends Model
             return true;
         }
 
-        return in_array($this->department_role, RequisitionDepartmentHead::departmentsHeadedBy($user), true);
+        if ($this->review_level === RequisitionReviewChain::LEVEL_SECTION) {
+            return $this->indent_section_id !== null
+                && in_array($this->indent_section_id, RequisitionDepartmentHead::sectionsHeadedBy($user), true);
+        }
+
+        return in_array(
+            RequisitionDepartmentHead::normalizeKey($this->department_role),
+            RequisitionDepartmentHead::departmentsHeadedBy($user),
+            true
+        );
     }
 
     public function departmentLabel(): string
@@ -227,9 +306,15 @@ class PurchaseRequisition extends Model
         return $this->belongsTo(User::class, 'department_checked_by');
     }
 
+    public function sectionCheckedBy()
+    {
+        return $this->belongsTo(User::class, 'section_checked_by');
+    }
+
     /**
-     * Department requisitions waiting on this user as department head: the
-     * Department Review queue. Admin and Management see every department's.
+     * Department requisitions waiting on this user as a head — of the section
+     * the sheet is with, or of the department it is with: the Review queue.
+     * Admin and Management see every department's.
      */
     public function scopeAwaitingDepartmentHead(Builder $query, ?User $user): Builder
     {
@@ -246,10 +331,28 @@ class PurchaseRequisition extends Model
         }
 
         $departments = RequisitionDepartmentHead::departmentsHeadedBy($user);
+        $sections = RequisitionDepartmentHead::sectionsHeadedBy($user);
 
-        return $departments === []
-            ? $query->whereRaw('1 = 0')
-            : $query->whereIn('department_role', $departments);
+        if ($departments === [] && $sections === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $q) use ($departments, $sections) {
+            // whereRaw('1 = 0') seeds an OR chain that is otherwise empty.
+            $q->whereRaw('1 = 0');
+
+            if ($sections !== []) {
+                $q->orWhere(fn (Builder $s) => $s
+                    ->where('review_level', RequisitionReviewChain::LEVEL_SECTION)
+                    ->whereIn('indent_section_id', $sections));
+            }
+
+            if ($departments !== []) {
+                $q->orWhere(fn (Builder $d) => $d
+                    ->where('review_level', RequisitionReviewChain::LEVEL_DEPARTMENT)
+                    ->whereIn('department_role', $departments));
+            }
+        });
     }
 
     /**
@@ -365,8 +468,8 @@ class PurchaseRequisition extends Model
         return match ($this->status) {
             self::STATUS_DRAFT => 'Draft',
             self::STATUS_SUBMITTED => match ($this->department_review_status) {
-                self::DEPT_REVIEW_PENDING => 'With Department Head',
-                self::DEPT_REVIEW_REJECTED => 'Returned by Department Head',
+                self::DEPT_REVIEW_PENDING => 'With '.$this->reviewLevelLabel(),
+                self::DEPT_REVIEW_REJECTED => 'Returned by '.$this->reviewLevelLabel(),
                 default => 'Sent to Store',
             },
             self::STATUS_STORE_REVIEWED => 'Received by Store',
@@ -436,12 +539,14 @@ class PurchaseRequisition extends Model
             return $query;
         }
 
-        // A department head also sees what their department raised — they
-        // cannot check a sheet they cannot open. Still nobody else's
-        // department: the head of Merchandising does not see Commercial's.
+        // A head also sees what their department, or their section, raised —
+        // they cannot check a sheet they cannot open. Still nobody else's:
+        // the head of Merchandising does not see Commercial's, and the head
+        // of Cutting does not see Finishing's.
         $departments = RequisitionDepartmentHead::departmentsHeadedBy($user);
+        $sections = RequisitionDepartmentHead::sectionsHeadedBy($user);
 
-        return $query->where(function (Builder $q) use ($user, $departments) {
+        return $query->where(function (Builder $q) use ($user, $departments, $sections) {
             $q->where('created_by', $user->id);
 
             if ($departments !== []) {
@@ -449,6 +554,13 @@ class PurchaseRequisition extends Model
                     ->where('level', self::LEVEL_DEPARTMENT)
                     ->where('status', '<>', self::STATUS_DRAFT)
                     ->whereIn('department_role', $departments));
+            }
+
+            if ($sections !== []) {
+                $q->orWhere(fn (Builder $s) => $s
+                    ->where('level', self::LEVEL_DEPARTMENT)
+                    ->where('status', '<>', self::STATUS_DRAFT)
+                    ->whereIn('indent_section_id', $sections));
             }
         });
     }
@@ -464,9 +576,13 @@ class PurchaseRequisition extends Model
             return true;
         }
 
-        return $this->isDepartmentLevel()
-            && $this->status !== self::STATUS_DRAFT
-            && in_array($this->department_role, RequisitionDepartmentHead::departmentsHeadedBy($user), true);
+        if (! $this->isDepartmentLevel() || $this->status === self::STATUS_DRAFT) {
+            return false;
+        }
+
+        return in_array(RequisitionDepartmentHead::normalizeKey($this->department_role), RequisitionDepartmentHead::departmentsHeadedBy($user), true)
+            || ($this->indent_section_id !== null
+                && in_array($this->indent_section_id, RequisitionDepartmentHead::sectionsHeadedBy($user), true));
     }
 
     /**

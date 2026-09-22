@@ -106,7 +106,7 @@ it('numbers a department sheet under the user\'s own section, and fixes Section 
 
 it('fills Requested By and Contact from the department head, ignoring what is posted', function () {
     $head = formDeptUser('production');
-    RequisitionDepartmentHead::create(['role_name' => 'production', 'user_id' => $head->id]);
+    RequisitionDepartmentHead::assign('production', $head);
     $user = formDeptUser('production', cuttingSection());
     $item = oilItem();
 
