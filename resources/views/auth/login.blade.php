@@ -3,7 +3,7 @@
         <i class="bi bi-person-check-fill" aria-hidden="true"></i>
     </div>
     <div class="brand">Humana Apparels Pvt. Ltd</div>
-    <div class="login-subtitle">Sign in to the OCR Management System</div>
+    <div class="login-subtitle">Sign in to HAPL Threadloop</div>
 
     <x-auth-session-status class="mb-3" :status="session('status')" />
 
@@ -11,10 +11,14 @@
         @csrf
 
         <div class="text-start">
-            <label class="form-label" for="login-email">Email / Username</label>
+            <label class="form-label" for="login-email">Email or Employee ID</label>
             <div class="position-relative">
-                <i class="bi bi-envelope position-absolute text-slate-400" style="left:14px;top:50%;transform:translateY(-50%);"></i>
-                <input type="email" id="login-email" placeholder="Enter your email" name="email" value="{{ old('email', $rememberedEmail ?? '') }}" required autofocus autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" class="form-control" style="padding-left:42px;">
+                <i class="bi bi-person position-absolute text-slate-400" style="left:14px;top:50%;transform:translateY(-50%);"></i>
+                {{-- type="text", not "email": the same box takes an Employee ID
+                     ("074047"), which the browser's own email check would
+                     refuse before the server ever saw it. Which one it is
+                     gets decided server-side (LoginRequest). --}}
+                <input type="text" id="login-email" placeholder="Enter email or employee ID" name="email" value="{{ old('email', $rememberedEmail ?? '') }}" required autofocus autocomplete="username" inputmode="text" autocapitalize="none" spellcheck="false" class="form-control" style="padding-left:42px;">
             </div>
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
@@ -43,7 +47,7 @@
         </button>
 
         <div class="text-center mt-4 small text-slate-500">
-            © {{ date('Y') }} Humana Apparels Pvt. Ltd — OCR Management
+            © {{ date('Y') }} Humana Apparels Pvt. Ltd — HAPL Threadloop
         </div>
     </form>
 </x-guest-layout>

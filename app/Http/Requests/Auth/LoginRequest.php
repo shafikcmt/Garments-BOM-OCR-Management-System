@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\Employee;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -9,6 +10,23 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Sign-in with ONE "Login ID" box that takes either a company email or an
+ * HR Employee ID (App\Models\Employee).
+ *
+ * The field is still named `email` — the form, the remembered-login cookie
+ * and every existing test post it that way — but it is no longer required
+ * to LOOK like an email: "@" present means email and the path is exactly
+ * what it always was; otherwise the value is looked up as an Employee ID
+ * and the linked account's email is what Auth::attempt() is given, with
+ * the password the person typed. The password is required either way.
+ *
+ * Nothing about a failure says which part was wrong. An unknown ID, an
+ * inactive employee record, an ID with no account, a wrong password and a
+ * wrong email all produce the same auth.failed message, and every one of
+ * them counts against the same throttle key (login id + IP, 5 tries), so
+ * guessing IDs is no cheaper than guessing emails.
+ */
 class LoginRequest extends FormRequest
 {
     /**
@@ -27,7 +45,7 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'email' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
         ];
     }
@@ -41,7 +59,9 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $credentials = $this->credentials();
+
+        if ($credentials === null || ! Auth::attempt($credentials, $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -59,6 +79,34 @@ class LoginRequest extends FormRequest
         }
 
         RateLimiter::clear($this->throttleKey());
+    }
+
+    /**
+     * What Auth::attempt() is given: the typed email and password as
+     * always, or — for an Employee ID — the linked account's email and the
+     * typed password. Null when the ID resolves to no account, which the
+     * caller treats exactly like a wrong password.
+     *
+     * @return array{email: string, password: string}|null
+     */
+    private function credentials(): ?array
+    {
+        $loginId = trim($this->string('email'));
+
+        if ($this->looksLikeEmail($loginId)) {
+            return ['email' => $loginId, 'password' => $this->string('password')];
+        }
+
+        $user = Employee::loginUserFor($loginId);
+
+        return $user
+            ? ['email' => $user->email, 'password' => $this->string('password')]
+            : null;
+    }
+
+    private function looksLikeEmail(string $loginId): bool
+    {
+        return str_contains($loginId, '@');
     }
 
     /**
@@ -85,10 +133,12 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Get the rate limiting throttle key for the request.
+     * Get the rate limiting throttle key for the request: the login id as
+     * typed (email or Employee ID) plus the IP — one bucket per identifier,
+     * whichever kind it is.
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(Str::lower(trim($this->string('email'))).'|'.$this->ip());
     }
 }

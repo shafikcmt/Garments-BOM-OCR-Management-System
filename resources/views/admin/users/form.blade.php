@@ -8,7 +8,31 @@
     <input type="email" name="email" class="form-control" value="{{ old('email', $user->email ?? '') }}" required>
 </div>
 
+<div class="mb-3">
+    <label class="form-label" for="userPhone">Phone Number</label>
+    <input type="tel" name="phone" id="userPhone" class="form-control @error('phone') is-invalid @enderror"
+           value="{{ old('phone', $user->phone ?? '') }}" maxlength="20" placeholder="e.g. +880 1711-000000" autocomplete="off">
+    @error('phone')<div class="invalid-feedback">{{ $message }}</div>@enderror
+</div>
+
 @if($scope->isSuperAdmin())
+    {{-- The HR Employee ID, kept on the employees table (the seed of the
+         future Employee Master) and linked to this account. Typed in, never
+         generated: it must match the group's real HR records. --}}
+    <div class="mb-3">
+        <label class="form-label" for="employeeId">Employee ID</label>
+        <input type="text" name="employee_id" id="employeeId" class="form-control @error('employee_id') is-invalid @enderror"
+               value="{{ old('employee_id', $user->employee->employee_id ?? '') }}" maxlength="50" placeholder="e.g. 074047" autocomplete="off">
+        @error('employee_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+        <div class="form-text">Letters, numbers and dashes only. The staff member's real Employee ID (e.g. from Ha-Meem Group HR records) — lets them log in without a company email. For staff with no email, enter an internal one above such as <code>074047@staff.humanaapparels.com</code>.</div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Designation</label>
+        <input type="text" name="designation" class="form-control" value="{{ old('designation', $user->designation ?? '') }}" maxlength="120" placeholder="e.g. Senior Merchandiser">
+        <div class="form-text">Printed under the name on signed documents. Leave blank to print the department instead.</div>
+    </div>
+
     {{-- The section a department user raises requisitions for. Fixes the
          Section, User Dept. and requisition number on their form. --}}
     <div class="mb-3">

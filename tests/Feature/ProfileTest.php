@@ -30,10 +30,9 @@ test('profile information can be updated', function () {
 
     $this->assertSame('Test User', $user->name);
     $this->assertSame('test@example.com', $user->email);
-    $this->assertNull($user->email_verified_at);
 });
 
-test('email verification status is unchanged when the email address is unchanged', function () {
+test('profile can be saved with the email address unchanged', function () {
     $user = User::factory()->create();
 
     $response = $this
@@ -47,7 +46,7 @@ test('email verification status is unchanged when the email address is unchanged
         ->assertSessionHasNoErrors()
         ->assertRedirect('/profile');
 
-    $this->assertNotNull($user->refresh()->email_verified_at);
+    $this->assertSame('Test User', $user->refresh()->name);
 });
 
 test('user can delete their account', function () {
@@ -82,4 +81,29 @@ test('correct password must be provided to delete account', function () {
         ->assertRedirect('/profile');
 
     $this->assertNotNull($user->fresh());
+});
+
+test('designation is shown read-only on the profile and cannot be changed from it', function () {
+    $user = User::factory()->create(['designation' => 'Senior Merchandiser']);
+
+    // Displayed, but never as an editable input: it is the administrator's
+    // to set, like Role and Department.
+    $html = $this->actingAs($user)->get('/profile')->assertOk()->getContent();
+
+    expect($html)
+        ->toContain('Senior Merchandiser')
+        ->not->toContain('name="designation"')
+        ->toContain('Role, Department, Designation and Status are managed by the administrator.');
+
+    // Server-side, not just hidden: a posted designation is ignored.
+    $this->actingAs($user)
+        ->patch('/profile', [
+            'name' => $user->name,
+            'email' => $user->email,
+            'designation' => 'Managing Director',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect('/profile');
+
+    expect($user->fresh()->designation)->toBe('Senior Merchandiser');
 });

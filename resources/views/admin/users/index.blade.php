@@ -63,7 +63,7 @@
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
                     <input type="search" id="userSearch" class="form-control" data-user-search
-                           placeholder="Name or email…" autocomplete="off">
+                           placeholder="Name, email or Employee ID…" autocomplete="off">
                 </div>
             </div>
             <div class="col-6 col-lg-3">
@@ -95,6 +95,7 @@
                 <thead>
                     <tr class="text-muted small text-uppercase">
                         <th>User</th>
+                        <th>Employee ID</th>
                         <th>Role</th>
                         <th>Status</th>
                         <th>Last signed in</th>
@@ -110,7 +111,7 @@
                         <tr data-user-row
                             data-role="{{ $roleName }}"
                             data-status="{{ $isActive ? 1 : 0 }}"
-                            data-search="{{ strtolower($user->name.' '.$user->email) }}">
+                            data-search="{{ strtolower($user->name.' '.$user->email.' '.($user->employee?->employee_id ?? '')) }}">
                             <td>
                                 <div class="d-flex align-items-center gap-2">
                                     @if($user->avatarUrl())
@@ -124,6 +125,13 @@
                                         <div class="small text-muted text-truncate">{{ $user->email }}</div>
                                     </div>
                                 </div>
+                            </td>
+                            <td class="small">
+                                @if($user->employee?->employee_id)
+                                    <span class="font-monospace">{{ $user->employee->employee_id }}</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
                             </td>
                             <td>
                                 @if($roleName)
@@ -164,11 +172,11 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="text-center text-muted py-5">No users yet.</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted py-5">No users yet.</td></tr>
                     @endforelse
 
                     <tr class="d-none" data-user-no-match>
-                        <td colspan="5" class="text-center text-muted py-4">No user matches the current filters.</td>
+                        <td colspan="6" class="text-center text-muted py-4">No user matches the current filters.</td>
                     </tr>
                 </tbody>
             </table>

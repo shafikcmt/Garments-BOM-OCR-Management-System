@@ -6,6 +6,7 @@
 @php
     $avatarUrl = $user->avatarUrl();
     $isActive = (int) ($user->status ?? 1) === 1;
+    $employeeId = $user->employee?->employee_id;
 @endphp
 
 <div class="container-fluid">
@@ -61,7 +62,7 @@
             <div class="card border-0 shadow-sm h-100" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-1">Profile Information</h5>
-                    <p class="text-muted small mb-4">Update your name, email and profile photo.</p>
+                    <p class="text-muted small mb-4">Update your name, email, phone and profile photo.</p>
 
                     <form method="POST" action="{{ route('profile.update') }}" enctype="multipart/form-data">
                         @csrf
@@ -86,18 +87,41 @@
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Full Name</label>
-                            <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
-                                   value="{{ old('name', $user->name) }}" required maxlength="255">
-                            @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Email Address</label>
-                            <input type="email" name="email" class="form-control @error('email') is-invalid @enderror"
-                                   value="{{ old('email', $user->email) }}" required maxlength="255">
-                            @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-6">
+                                <label class="form-label fw-semibold">Full Name</label>
+                                <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
+                                       value="{{ old('name', $user->name) }}" required maxlength="255">
+                                @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-semibold">Email Address</label>
+                                <input type="email" name="email" class="form-control @error('email') is-invalid @enderror"
+                                       value="{{ old('email', $user->email) }}" required maxlength="255">
+                                @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="col-sm-6">
+                                {{-- Self-set once while empty; after that it is a
+                                     login identifier and only the administrator
+                                     changes it. The request ignores a posted value. --}}
+                                @if($employeeId)
+                                    <label class="form-label fw-semibold text-muted" for="profileEmployeeId">Employee ID</label>
+                                    <input type="text" id="profileEmployeeId" class="form-control bg-light" value="{{ $employeeId }}" readonly>
+                                @else
+                                    <label class="form-label fw-semibold" for="profileEmployeeId">Employee ID</label>
+                                    <input type="text" name="employee_id" id="profileEmployeeId"
+                                           class="form-control @error('employee_id') is-invalid @enderror"
+                                           value="{{ old('employee_id') }}" maxlength="50" placeholder="e.g. 074047" autocomplete="off">
+                                    <div class="form-text">Letters, numbers and dashes. Once saved, only the administrator can change it.</div>
+                                    @error('employee_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                @endif
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-semibold" for="profilePhone">Phone Number</label>
+                                <input type="tel" name="phone" id="profilePhone" class="form-control @error('phone') is-invalid @enderror"
+                                       value="{{ old('phone', $user->phone) }}" maxlength="20" placeholder="e.g. +880 1711-000000" autocomplete="tel">
+                                @error('phone')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
                         </div>
 
                         <div class="row g-3 mb-3">
@@ -110,6 +134,10 @@
                                 <input type="text" class="form-control bg-light" value="{{ $roleLabels->implode(', ') ?: '—' }}" readonly>
                             </div>
                             <div class="col-sm-6">
+                                <label class="form-label fw-semibold text-muted">Designation</label>
+                                <input type="text" class="form-control bg-light" value="{{ $user->designation ?: '—' }}" readonly>
+                            </div>
+                            <div class="col-sm-6">
                                 <label class="form-label fw-semibold text-muted">Status</label>
                                 <input type="text" class="form-control bg-light" value="{{ $isActive ? 'Active' : 'Inactive' }}" readonly>
                             </div>
@@ -119,7 +147,7 @@
                                        value="{{ optional($user->created_at)->format('d M Y') ?? '—' }}" readonly>
                             </div>
                         </div>
-                        <p class="text-muted small mb-3"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Role, Department and Status are managed by the administrator.</p>
+                        <p class="text-muted small mb-3"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>{{ $employeeId ? 'Employee ID, Role, Department, Designation and Status are managed by the administrator.' : 'Role, Department, Designation and Status are managed by the administrator.' }}</p>
 
                         <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1" aria-hidden="true"></i>Save Profile</button>
                     </form>

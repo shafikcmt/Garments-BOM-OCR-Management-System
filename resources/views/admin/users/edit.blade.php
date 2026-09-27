@@ -88,6 +88,37 @@
                             @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
 
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="userPhone">Phone Number</label>
+                            <input type="tel" name="phone" id="userPhone" class="form-control @error('phone') is-invalid @enderror" value="{{ old('phone', $user->phone) }}" maxlength="20" placeholder="e.g. +880 1711-000000" autocomplete="off">
+                            @error('phone')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+
+                        {{-- Super admin only: this is the title printed under the
+                             user's signature on PRA documents. A department
+                             admin's form omits it, and the controller refuses it
+                             from anyone else. --}}
+                        @if($scope->isSuperAdmin())
+                            {{-- The HR Employee ID, on the employees table (the
+                                 seed of the future Employee Master) and linked
+                                 to this account. Typed in, never generated: it
+                                 must match the group's real HR records. --}}
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold" for="employeeId">Employee ID</label>
+                                <input type="text" name="employee_id" id="employeeId" class="form-control @error('employee_id') is-invalid @enderror"
+                                       value="{{ old('employee_id', $user->employee?->employee_id) }}" maxlength="50" placeholder="e.g. 074047" autocomplete="off">
+                                <div class="form-text">Letters, numbers and dashes only. The staff member's real Employee ID (e.g. from Ha-Meem Group HR records) — lets them log in without a company email. For staff with no email, enter an internal one above such as <code>074047@staff.humanaapparels.com</code>.</div>
+                                @error('employee_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Designation</label>
+                                <input type="text" name="designation" class="form-control @error('designation') is-invalid @enderror" value="{{ old('designation', $user->designation) }}" maxlength="120" placeholder="e.g. Senior Merchandiser">
+                                <div class="form-text">Printed under the name on signed documents. Leave blank to print the department instead.</div>
+                                @error('designation')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                        @endif
+
                         @php($currentDepartment = old('department', \App\Support\DepartmentRoles::departmentOf($currentRole)))
 
                         {{-- Department leads, Role follows. Department is not

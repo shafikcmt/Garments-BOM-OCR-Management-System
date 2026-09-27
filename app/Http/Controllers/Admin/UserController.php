@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Buyer;
+use App\Models\Employee;
 use App\Models\User;
 use App\Support\BuyerScope;
 use App\Support\DepartmentRoles;
@@ -62,7 +63,7 @@ class UserController extends Controller
 
         $scope = $this->scope();
 
-        $users = User::with('roles')->latest()->get();
+        $users = User::with(['roles', 'employee'])->latest()->get();
 
         // A department admin sees their own department and nobody else. Done
         // after loading so the department can be read off each user's role,
@@ -326,6 +327,27 @@ class UserController extends Controller
             403,
             'Only a super admin can make someone a Department Admin.'
         );
+
+        // 5. The designation is what prints under a signature on an official
+        //    document. Super admin only, same as the promotion above; the form
+        //    does not offer it to anyone else.
+        abort_if(
+            $request->has('designation'),
+            403,
+            'Only a super admin can set a user\'s designation.'
+        );
+    }
+
+    /**
+     * The designation as it will be stored: trimmed, and null rather than an
+     * empty string when the box was cleared, so the document falls back to the
+     * department label instead of printing a blank line.
+     */
+    private function designationValue(array $data): ?string
+    {
+        $value = trim((string) ($data['designation'] ?? ''));
+
+        return $value === '' ? null : $value;
     }
 
     /**
@@ -1002,12 +1024,14 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
+            'designation' => ['nullable', 'string', 'max:120'],
+            'phone' => User::phoneRules(),
             'requisition_section_id' => ['nullable', 'integer', 'exists:indent_sections,id'],
             'password' => ['required', 'min:6'],
             'status' => ['required', 'in:0,1'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
-        ] + $this->departmentRules() + $this->buyerAssignmentRules($request));
+        ] + $this->departmentRules() + $this->buyerAssignmentRules($request), User::phoneMessages());
 
         $assignedBuyerIds = $this->assignedBuyerIds($request);
 
@@ -1017,9 +1041,15 @@ class UserController extends Controller
 
         $this->assertBuyerScopeCoherent($buyerScopeMode, $assignedBuyerIds);
 
+        // Validated before the account exists, so a duplicate ID bounces the
+        // form rather than leaving a half-made user behind.
+        $employeeId = $this->employeeIdFrom($request);
+
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
+            'designation' => $this->designationValue($data),
+            'phone' => $data['phone'] ?? null,
             'requisition_section_id' => $data['requisition_section_id'] ?? null,
             'password' => Hash::make($data['password']),
             'status' => $data['status'],
@@ -1041,6 +1071,7 @@ class UserController extends Controller
 
         $user->syncRoles([$data['role']]);
         $this->syncDirectPermissions($user, $request);
+        $this->linkEmployee($user, $employeeId);
 
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
     }
@@ -1157,12 +1188,16 @@ class UserController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email,' . $user->id],
+            'designation' => ['nullable', 'string', 'max:120'],
+            'phone' => User::phoneRules(),
             'requisition_section_id' => ['nullable', 'integer', 'exists:indent_sections,id'],
             'status' => ['required', 'in:0,1'],
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', 'exists:permissions,name'],
-        ] + $this->departmentRules() + $this->buyerEditRules($request, $user));
+        ] + $this->departmentRules() + $this->buyerEditRules($request, $user), User::phoneMessages());
+
+        $employeeId = $this->employeeIdFrom($request, $user);
 
         $isSelf = $user->id === auth()->id();
 
@@ -1174,7 +1209,17 @@ class UserController extends Controller
 
         $user->name = $data['name'];
         $user->email = $data['email'];
-        // Only a super admin's form carries the field.
+        // Only a super admin's form carries the field; a department admin's
+        // post never has the key, so their save leaves the title untouched.
+        if (array_key_exists('designation', $data)) {
+            $user->designation = $this->designationValue($data);
+        }
+        // Every admin form carries Phone; a post without the key (an older
+        // client, a script) leaves the stored number alone.
+        if (array_key_exists('phone', $data)) {
+            $user->phone = $data['phone'] ?: null;
+        }
+        // Same rule as designation: only the super admin's form carries it.
         if (array_key_exists('requisition_section_id', $data)) {
             $user->requisition_section_id = $data['requisition_section_id'] ?: null;
         }
@@ -1216,6 +1261,8 @@ class UserController extends Controller
         if (! $isSelf) {
             $this->syncDirectPermissions($user, $request);
         }
+
+        $this->linkEmployee($user, $employeeId);
 
         $message = $isSelf
             ? 'User profile updated. Note: you cannot change your own role, status or permissions.'
@@ -1269,5 +1316,108 @@ class UserController extends Controller
 
         $user->delete();
         return redirect()->route('admin.users.index')->with('success', 'User deleted successfully.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Employee ID — the HR identifier a staff member may sign in with
+    |--------------------------------------------------------------------------
+    |
+    | Kept on the employees table (App\Models\Employee), not on users: an
+    | employee is an HR record that may or may not have a login. The Users
+    | screen only names the link. Super admin only, like designation.
+    */
+
+    /**
+     * The Employee ID posted for this account, validated.
+     *
+     * Returns FALSE when the form did not carry the field at all (a
+     * department admin's form never does), so the link is left exactly as
+     * it is; NULL when the box was cleared; else the trimmed ID.
+     *
+     * Unique across employees — except that an ID whose record is linked to
+     * nobody, or to this same account, may be (re)taken: clearing the box
+     * unlinks the record rather than deleting it (HR keeps its people), so
+     * typing the same ID back must reclaim that record, not be refused.
+     *
+     * @return string|null|false
+     */
+    private function employeeIdFrom(Request $request, ?User $user = null): string|null|false
+    {
+        if (! $request->has('employee_id')) {
+            return false;
+        }
+
+        abort_unless($this->scope()->isSuperAdmin(), 403, 'Only a super admin can set a user\'s Employee ID.');
+
+        $data = $request->validate([
+            'employee_id' => [
+                ...Employee::idFormatRules(),
+                function (string $attribute, mixed $value, \Closure $fail) use ($user) {
+                    $id = Employee::normalizeId($value);
+
+                    if ($id === null) {
+                        return;
+                    }
+
+                    $taken = Employee::query()
+                        ->where('employee_id', $id)
+                        ->whereNotNull('user_id')
+                        ->when($user, fn ($q) => $q->where('user_id', '<>', $user->id))
+                        ->exists();
+
+                    if ($taken) {
+                        $fail('This Employee ID is already linked to another user.');
+                    }
+                },
+            ],
+        ], Employee::idFormatMessages());
+
+        return Employee::normalizeId($data['employee_id'] ?? null);
+    }
+
+    /**
+     * Make the employees table say what the form said: link (creating the
+     * record if HR has none yet), move the link to a different ID, or unlink.
+     *
+     * @param  string|null|false  $employeeId  as employeeIdFrom() returned it
+     */
+    private function linkEmployee(User $user, string|null|false $employeeId): void
+    {
+        if ($employeeId === false) {
+            return;
+        }
+
+        $current = $user->employee()->first();
+
+        if ($employeeId === null) {
+            // Box cleared: the person stays on the HR books, just without a login.
+            $current?->update(['user_id' => null]);
+
+            return;
+        }
+
+        if ($current && $current->employee_id === $employeeId) {
+            $current->update(['name' => $user->name]);
+
+            return;
+        }
+
+        // A different ID (or none before): release the old record, then
+        // claim the record carrying the new ID or create it.
+        $current?->update(['user_id' => null]);
+
+        $record = Employee::query()->where('employee_id', $employeeId)->first();
+
+        if ($record) {
+            $record->update(['user_id' => $user->id, 'name' => $user->name]);
+        } else {
+            Employee::create([
+                'employee_id' => $employeeId,
+                'user_id' => $user->id,
+                'name' => $user->name,
+                'is_active' => true,
+            ]);
+        }
     }
 }

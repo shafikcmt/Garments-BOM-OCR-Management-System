@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\Employee;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -40,10 +41,13 @@ class ProfileController extends Controller
         $validated = $request->validated();
 
         $user->name = $validated['name'];
+        // No email_verified_at reset: the users table has no such column
+        // (dropped with the stock Breeze migration in 6cba30a) and User does
+        // not implement MustVerifyEmail, so there is nothing to un-verify.
         $user->email = $validated['email'];
 
-        if ($user->isDirty('email')) {
-            $user->email_verified_at = null;
+        if (array_key_exists('phone', $validated)) {
+            $user->phone = $validated['phone'] ?: null;
         }
 
         if ($request->hasFile('profile_photo')) {
@@ -56,6 +60,20 @@ class ProfileController extends Controller
         }
 
         $user->save();
+
+        // Only present while the account had no Employee ID (see
+        // ProfileUpdateRequest). A new HR record, linked and active, the same
+        // shape Admin > Users creates; from here on it is read-only.
+        $employeeId = Employee::normalizeId($validated['employee_id'] ?? null);
+
+        if ($employeeId !== null) {
+            Employee::create([
+                'employee_id' => $employeeId,
+                'user_id' => $user->id,
+                'name' => $user->name,
+                'is_active' => true,
+            ]);
+        }
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }

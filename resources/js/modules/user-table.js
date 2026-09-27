@@ -1,5 +1,5 @@
 /**
- * User list: search by name or email, filter by role and status.
+ * User list: search by name, email or Employee ID, filter by role and status.
  *
  * Filters rows the server already rendered, so nothing here decides who is
  * visible in a security sense — the controller does.

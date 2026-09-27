@@ -411,3 +411,56 @@ it('still keeps the widget off a department admin edit screen', function () {
         ->assertOk()
         ->assertDontSee('buyer_assignment_control', false);
 });
+
+// --- Designation --------------------------------------------------------------
+//
+// The job title printed under a signature on PRA documents. Super admin only:
+// a department admin's form does not offer it, and a post carrying it from
+// anyone else is refused whole, like the Department Admin promotion.
+
+it('lets a super admin set, change and clear a user\'s designation', function () {
+    $this->actingAs($this->superAdmin)
+        ->put(route('admin.users.update', $this->member), buyerEditPayload($this->member, [
+            'designation' => '  Senior Merchandiser ',
+        ]))
+        ->assertRedirect();
+
+    expect($this->member->fresh()->designation)->toBe('Senior Merchandiser');
+
+    $this->actingAs($this->superAdmin)
+        ->put(route('admin.users.update', $this->member), buyerEditPayload($this->member, [
+            'designation' => '',
+        ]))
+        ->assertRedirect();
+
+    expect($this->member->fresh()->designation)->toBeNull();
+});
+
+it('shows the designation box only to a super admin on the edit screen', function () {
+    $this->actingAs($this->superAdmin)
+        ->get(route('admin.users.edit', $this->member))
+        ->assertOk()
+        ->assertSee('name="designation"', false);
+
+    $this->actingAs($this->deptAdmin)
+        ->get(route('admin.users.edit', $this->member))
+        ->assertOk()
+        ->assertDontSee('name="designation"', false);
+});
+
+it('refuses a designation from a department admin and leaves the stored one alone', function () {
+    $this->member->forceFill(['designation' => 'Merchandiser'])->save();
+
+    $this->actingAs($this->deptAdmin)
+        ->put(route('admin.users.update', $this->member), buyerEditPayload($this->member, [
+            'designation' => 'Managing Director',
+        ]))
+        ->assertForbidden();
+
+    // And an ordinary save from them, without the field, does not blank it.
+    $this->actingAs($this->deptAdmin)
+        ->put(route('admin.users.update', $this->member), buyerEditPayload($this->member))
+        ->assertRedirect();
+
+    expect($this->member->fresh()->designation)->toBe('Merchandiser');
+});

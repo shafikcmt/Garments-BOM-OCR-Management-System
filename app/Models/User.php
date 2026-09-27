@@ -19,6 +19,8 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'designation',
+        'phone',
         'password',
         'status',
         'is_department_admin',
@@ -131,6 +133,42 @@ class User extends Authenticatable
     public function requisitionSection()
     {
         return $this->belongsTo(IndentSection::class, 'requisition_section_id');
+    }
+
+    /**
+     * The HR employee record this account belongs to, if it has one. Its
+     * employee_id is the alternative login identifier for staff without a
+     * company email. Set on Admin > Users, or once by the user on My Profile
+     * while none is linked; the table itself is the seed of the future
+     * Employee Master (App\Models\Employee).
+     */
+    public function employee()
+    {
+        return $this->hasOne(Employee::class);
+    }
+
+    /**
+     * The phone number rules, shared by Admin > Users and My Profile: digits
+     * with an optional leading "+", spaces, dashes and brackets allowed
+     * ("+880 1711-000000", "(02) 9876543"), at least 6 digits, at most 20
+     * characters in all.
+     *
+     * @return array<int, string>
+     */
+    public static function phoneRules(): array
+    {
+        return ['nullable', 'string', 'max:20', 'regex:/^(?=(?:\D*\d){6})\+?[0-9 ()\-]+$/'];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function phoneMessages(): array
+    {
+        return [
+            'phone.max' => 'Phone number may be at most 20 characters.',
+            'phone.regex' => 'Enter a valid phone number, e.g. +880 1711-000000.',
+        ];
     }
 
     public function buyers()
@@ -425,6 +463,32 @@ class User extends Authenticatable
         return $this->getRoleNames()
             ->map(fn ($role) => $options[$role] ?? Str::headline($role))
             ->implode(', ');
+    }
+
+    /**
+     * The title printed under this user's name on a signed document.
+     *
+     * The admin-set designation when there is one ("Senior Merchandiser");
+     * otherwise the department the role implies, with "Head" appended for a
+     * department admin — "Merchandising Head", "Accounts Head". The fallback is
+     * what every PRA printed before the designation column existed, so a user
+     * nobody has titled prints exactly as they always did.
+     */
+    public function signatureDesignation(): string
+    {
+        $designation = trim((string) $this->designation);
+
+        if ($designation !== '') {
+            return $designation;
+        }
+
+        $department = $this->departmentLabel();
+
+        if ($department === '') {
+            return '';
+        }
+
+        return $this->isDepartmentAdmin() ? $department . ' Head' : $department;
     }
 
     /**
