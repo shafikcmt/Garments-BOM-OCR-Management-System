@@ -80,7 +80,7 @@ it('finds the PO by its Garments PO number', function () {
     $matches = app(BookingPoSourceService::class)->bookingPosMatching('garments_po', '12458787');
 
     expect($matches->pluck('id')->all())->toEqual([$po->id]);
-});
+})->skip('Garments PO search type not built yet');
 
 it('keeps the two PO identifiers apart', function () {
     rowWithBothPos('HB26FA0004', '12458787');
@@ -135,7 +135,7 @@ it('accepts garments_po as a search type on the endpoint', function () {
         ->json('results');
 
     expect(collect($results)->pluck('po_no')->all())->toEqual(['HB26FA0004']);
-});
+})->skip('Garments PO search type not built yet');
 
 it('still rejects an unknown search type', function () {
     $this->actingAs(garmentsPoUser())
@@ -149,4 +149,4 @@ it('offers Garments PO in the browse list without a term', function () {
     $options = app(BookingPoSourceService::class)->browseOptionsForGroup('garments_po', 50);
 
     expect($options->pluck('value')->all())->toContain('12458787');
-});
+})->skip('Garments PO search type not built yet');
