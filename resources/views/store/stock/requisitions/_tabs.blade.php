@@ -17,7 +17,7 @@
 @endphp
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
-        <a class="nav-link {{ $active === 'index' ? 'active' : '' }}" href="{{ route('store.stock.requisitions.index') }}">All Requisitions</a>
+        <a class="nav-link {{ $active === 'index' ? 'active' : '' }}" href="{{ route('store.stock.requisitions.index') }}">{{ \App\Models\PurchaseRequisition::listLabelFor($user) }}</a>
     </li>
     @if($seesQueue)
         <li class="nav-item">

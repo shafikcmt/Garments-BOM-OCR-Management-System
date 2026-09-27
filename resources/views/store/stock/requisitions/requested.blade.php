@@ -31,7 +31,7 @@
                    copy="What the departments have sent to Store. Mark each one received, then approve it to go forward.">
         <x-slot:actions>
             <a href="{{ route('store.stock.requisitions.index') }}" class="btn btn-outline-secondary">
-                <i class="bi bi-list-ul me-1" aria-hidden="true"></i>All Requisitions
+                <i class="bi bi-list-ul me-1" aria-hidden="true"></i>{{ \App\Models\PurchaseRequisition::listLabelFor(auth()->user()) }}
             </a>
         </x-slot:actions>
     </x-page-header>

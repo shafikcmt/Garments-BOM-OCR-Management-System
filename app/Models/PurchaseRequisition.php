@@ -597,4 +597,15 @@ class PurchaseRequisition extends Model
     {
         return $user->hasAnyRole(['store', 'admin', 'management']);
     }
+
+    /**
+     * What the main list is called for this viewer. The list itself is
+     * visibleTo()-scoped, so for a department user or a head it holds only
+     * their own sheets and their queue — calling that "All Requisitions"
+     * would promise the whole company's.
+     */
+    public static function listLabelFor(?User $user): string
+    {
+        return $user && self::seesEveryRequisition($user) ? 'All Requisitions' : 'My Requisitions';
+    }
 }

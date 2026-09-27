@@ -113,7 +113,7 @@ it('fills Requested By and Contact from the department head, ignoring what is po
     $this->actingAs($user)
         ->get(route('store.stock.requisitions.create'))
         ->assertOk()
-        ->assertSee('value="'.$head->name.'"', false)
+        ->assertSee('value="'.e($head->name).'"', false)
         ->assertSee('value="'.$head->email.'"', false)
         ->assertDontSee('name="indent_person_id"', false);
 

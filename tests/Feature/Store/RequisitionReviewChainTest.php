@@ -135,8 +135,8 @@ it('fixes Requested By on the create form to the section head, the person the sh
     $this->actingAs($requester)
         ->get(route('store.stock.requisitions.create'))
         ->assertOk()
-        ->assertSee('value="'.$sectionHead->name.'"', false)
-        ->assertDontSee('value="'.$deptHead->name.'"', false);
+        ->assertSee('value="'.e($sectionHead->name).'"', false)
+        ->assertDontSee('value="'.e($deptHead->name).'"', false);
 
     // No section head: the department head, as before.
     $section->update(['head_user_id' => null]);
@@ -144,7 +144,7 @@ it('fixes Requested By on the create form to the section head, the person the sh
     $this->actingAs($requester->fresh())
         ->get(route('store.stock.requisitions.create'))
         ->assertOk()
-        ->assertSee('value="'.$deptHead->name.'"', false);
+        ->assertSee('value="'.e($deptHead->name).'"', false);
 });
 
 it('falls through to the department head when the section has no head', function () {
@@ -190,6 +190,45 @@ it('skips the section step for the section head\'s own sheet and stops at the de
     expect($r->review_level)->toBe(RequisitionReviewChain::LEVEL_DEPARTMENT)
         ->and($r->isDepartmentHeadFor($deptHead))->toBeTrue()
         ->and($r->isDepartmentHeadFor($sectionHead))->toBeFalse();
+});
+
+it('sends the section head\'s own sheet straight to the Store when the department has no head', function () {
+    $sectionHead = chainUser();
+    $section = chainSection('Cutting', 'production', $sectionHead);
+    $sectionHead->update(['requisition_section_id' => $section->id]);
+
+    chainSubmit($sectionHead->fresh())->assertRedirect();
+
+    $r = latestRequisition();
+
+    expect($r->department_review_status)->toBeNull()
+        ->and($r->review_level)->toBeNull()
+        ->and($r->progressLabel())->toBe('Sent to Store')
+        ->and($r->awaitingStoreReceipt())->toBeTrue();
+
+    // And their own name is never the "Requested By" head on the form: with
+    // nobody above them, the form has no head to fix and offers the picker.
+    $this->actingAs($sectionHead->fresh())
+        ->get(route('store.stock.requisitions.create'))
+        ->assertOk()
+        ->assertSee('name="indent_person_id"', false);
+});
+
+it('labels the main list "My Requisitions" for a head and "All Requisitions" for the Store', function () {
+    $sectionHead = chainUser();
+    $section = chainSection('Cutting', 'production', $sectionHead);
+    chainSubmit(chainUser('production', $section));
+
+    $this->actingAs($sectionHead)
+        ->get(route('store.stock.requisitions.department-review'))
+        ->assertOk()
+        ->assertSee('My Requisitions')
+        ->assertDontSee('All Requisitions');
+
+    $this->actingAs(chainStore())
+        ->get(route('store.stock.requisitions.index'))
+        ->assertOk()
+        ->assertSee('All Requisitions');
 });
 
 it('sends the department head\'s own sheet straight to the Store', function () {
