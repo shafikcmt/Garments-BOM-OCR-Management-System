@@ -16,7 +16,27 @@
     }
     $paymentRequiredInput = $paymentRequiredInput ?? ($paymentRequiredDate ? optional($paymentRequiredDate)->format('Y-m-d') : \App\Support\PaymentRequestSettings::defaultPaymentRequiredDate()->toDateString());
     $budgetBlock = collect($budgetBlock ?? []);
-    $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocks(false);
+    // A departmental PRA is signed by whoever actually acted, so the screen must
+    // read the same per-PRA blocks the PDF does. A legacy PRA keeps the STATIC
+    // configured officers it has always shown here, untouched — note that this
+    // differs from what its own PDF renders, a pre-existing screen/PDF mismatch
+    // that predates this work and is deliberately not changed under a
+    // departmental-flow task.
+    // BY FLOW, NOT BY exists. The create preview is an unsaved model that
+    // preview() stamps with the flow the PRA will be born into, so it prints
+    // the same four blocks the saved PRA will — an `exists` guard here sent a
+    // departmental preview to the three fixed legacy officers.
+    $signatureBlocks = $paymentRequest->isDepartmentalFlow()
+        ? \App\Support\PaymentRequestSettings::signatureBlocksFor($paymentRequest, false)
+        : \App\Support\PaymentRequestSettings::signatureBlocks(false);
+    $completionLine = $paymentRequest->exists
+        ? \App\Support\PaymentRequestSettings::completionLineFor($paymentRequest)
+        : null;
+    // Null until the Accounts Team check (step 4), and always null on a legacy
+    // PRA — which then prints the blank box exactly as it always has.
+    $ocrCheck = $paymentRequest->exists
+        ? \App\Support\PaymentRequestSettings::ocrCheckFor($paymentRequest)
+        : null;
     $logoPath = public_path('images/humana-logo.png');
     $logoData = null;
     if (file_exists($logoPath)) {
@@ -161,7 +181,19 @@
                         @endif
                     </div>
                 @else
+                    @php
+                        // The Booking PO(s) this PRA pays for, linked only where this
+                        // viewer could open the screen — see BookingPoLink. Nothing
+                        // for a PRA whose lines carry no booking_po_id.
+                        $bookingPoLinks = \App\Support\BookingPoLink::forPaymentRequest($paymentRequest, auth()->user())
+                            ->filter(fn (array $entry) => $entry['url'] !== null);
+                    @endphp
                     <div class="d-flex flex-wrap gap-2">
+                        @foreach($bookingPoLinks as $entry)
+                            <a href="{{ $entry['url'] }}" target="_blank" rel="noopener" class="btn btn-outline-secondary rounded-pill">
+                                <i class="bi bi-file-earmark-ruled me-1" aria-hidden="true"></i>Booking PO {{ $entry['po']->po_no }}
+                            </a>
+                        @endforeach
                         <button type="button" onclick="window.print()" class="btn btn-outline-primary rounded-pill">Print</button>
                         <a href="{{ route('supply_chain.payment_requests.download_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-outline-danger rounded-pill">PDF Preview</a>
                         <a href="{{ route('supply_chain.payment_requests.download_excel', $paymentRequest) }}" class="btn btn-success rounded-pill">Excel Download</a>
@@ -244,9 +276,17 @@
                 </div>
                 <div class="col-5">
                     <div class="pra-check-box">
-                        <div class="fw-bold mb-3">OCR Checked: <span class="pra-mini-box"></span> Yes <span class="pra-mini-box"></span> No</div>
-                        <div class="mb-3">Checker Name <span class="mx-3">:</span> <span class="d-inline-block border-bottom" style="width:170px;"></span></div>
-                        <div>Date <span class="mx-5">:</span> <span class="d-inline-block border-bottom" style="width:170px;"></span></div>
+                        <div class="fw-bold mb-3">
+                            OCR Checked:
+                            <span class="pra-mini-box">{{ $ocrCheck ? '×' : '' }}</span> Yes
+                            <span class="pra-mini-box"></span> No
+                        </div>
+                        <div class="mb-3">Checker Name <span class="mx-3">:</span>
+                            <span class="d-inline-block border-bottom fw-semibold" style="width:170px;">{{ $ocrCheck['name'] ?? '' }}</span>
+                        </div>
+                        <div>Date <span class="mx-5">:</span>
+                            <span class="d-inline-block border-bottom fw-semibold" style="width:170px;">{{ $ocrCheck['date'] ?? '' }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -332,15 +372,35 @@
                 </table>
             </div>
 
+            @php $signCol = count($signatureBlocks) === 4 ? 'col-3' : 'col-4'; @endphp
             <div class="row g-0 pra-sign-area">
                 @foreach($signatureBlocks as $i => $sign)
-                    <div class="col-4 {{ $i === 0 ? 'pe-4' : ($i === 2 ? 'ps-4 pra-sign-sep' : 'px-4 pra-sign-sep') }}">
+                    <div class="{{ $signCol }} {{ $i === 0 ? 'pe-4' : ($loop->last ? 'ps-4 pra-sign-sep' : 'px-4 pra-sign-sep') }}">
                         <div class="pra-sign-title">{{ $sign['title'] }}</div>
                         @if($sign['src'])
                             <img src="{{ $sign['src'] }}" alt="{{ $sign['title'] }} signature" class="pra-sign-img">
                             <div class="pra-sign-line"></div>
                             <div class="pra-sign-meta">
                                 @if($sign['name'])<div class="pra-sign-name">{{ $sign['name'] }}</div>@endif
+                                @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
+                                <div>Signature &amp; Date</div>
+                            </div>
+                        @elseif(!empty($sign['pending']))
+                            {{-- Named but unsigned. The caption is what keeps a
+                                 name on a signature line from reading as one. --}}
+                            <div class="pra-sign-text">{{ $sign['name'] ?: '' }}</div>
+                            <div class="pra-sign-line"></div>
+                            <div class="pra-sign-meta">
+                                @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
+                                <div class="fst-italic text-muted">Pending approval</div>
+                            </div>
+                        @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
+                            <div class="pra-sign-text">
+                                <span class="pra-sign-name">{{ $sign['name'] }}</span>
+                                @if($sign['date']) — {{ $sign['date'] }}@endif
+                            </div>
+                            <div class="pra-sign-line"></div>
+                            <div class="pra-sign-meta">
                                 @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
                                 <div>Signature &amp; Date</div>
                             </div>
@@ -351,6 +411,12 @@
                     </div>
                 @endforeach
             </div>
+
+            @if($completionLine)
+                <div class="mt-3 small fw-semibold" style="color:#000b6f;">
+                    Paid / Completed by: {{ $completionLine['name'] ?: '—' }}@if($completionLine['date']) on {{ $completionLine['date'] }}@endif
+                </div>
+            @endif
         </div>
 
         @if($isPreview)
@@ -385,6 +451,52 @@
                                         <p class="small text-danger mb-3">You are not authorised to override. Ask an authorised user or update the style budget.</p>
                                     @endif
                                 @endif
+                                {{-- ROUTING IS AUTOMATIC ON THE DEPARTMENTAL FLOW.
+                                     The checker/approver pickers below belong to
+                                     the legacy flow and are not read when a PRA
+                                     is created on the 6-step chain. They are
+                                     removed rather than disabled: a control that
+                                     posts a value nothing reads is worse than no
+                                     control, and a greyed-out picker still
+                                     invites the question "why can't I choose?" --}}
+                                @if($createOnDepartmentalFlow ?? false)
+                                    <div class="alert alert-info small mb-3">
+                                        <div class="fw-semibold mb-1">Reviewers are assigned automatically</div>
+                                        This PRA follows the departmental approval chain:
+                                        Merchant Team &rarr; Merchant Head &rarr; Accounts Team &rarr;
+                                        Accounts Head &rarr; Commercial Head. Each step is routed to the
+                                        right department for you.
+                                    </div>
+
+                                    {{-- THE OPTIONAL PRIMARY ASSIGNEE for the first step.
+                                         The options are the resolver's eligible set for
+                                         this PRA's buyers and nothing else — a person who
+                                         could not act on the step cannot be picked here,
+                                         and store() re-checks the id against the same set.
+                                         Blank means automatic, exactly as before: the whole
+                                         Merchant team sees it and any of them can act.
+                                         Naming someone never narrows that; it puts them
+                                         first and tells them personally. --}}
+                                    @php $assignees = $stepTwoAssignees ?? null; @endphp
+                                    <label for="assigneeStep2" class="form-label fw-semibold mb-1">
+                                        Assign Merchant Team Check to
+                                        <span class="text-muted small fw-normal">(optional)</span>
+                                    </label>
+                                    @if($assignees && $assignees->isActionable())
+                                        <select name="assignee_step2" id="assigneeStep2" class="form-select js-searchable">
+                                            <option value="">— Automatic (any eligible Merchant Team member) —</option>
+                                            @foreach($assignees->users as $person)
+                                                <option value="{{ $person->id }}" {{ (string) old('assignee_step2') === (string) $person->id ? 'selected' : '' }}>{{ $person->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <div class="form-text">
+                                            The whole Merchant team can still see and act on this PRA. The person you name is
+                                            shown as the primary assignee and notified directly.
+                                        </div>
+                                    @elseif($assignees)
+                                        <div class="alert alert-warning small mb-0">{{ $assignees->problem() }}</div>
+                                    @endif
+                                @else
                                 <p class="small text-muted mb-3">Optionally route this PRA for checking and approval. If nothing is selected, the PRA is saved without an approval request.</p>
                                 @if(($approverPool ?? collect())->isEmpty())
                                     <div class="alert alert-info small mb-0">No active approvers configured. The PRA will be created without an approval request.</div>
@@ -411,6 +523,7 @@
                                     </div>
                                     <div class="form-text">All selected approvers must approve before the PRA is marked as Approved.</div>
                                 @endif
+                                @endif
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
@@ -423,7 +536,86 @@
         @endif
 
         @unless($isPreview)
-            @if(($approvalProgress['has_flow'] ?? false))
+            {{-- THE DEPARTMENTAL CHAIN'S OWN STATUS CARD.
+                 The legacy card below reads approvalProgress(), which describes a
+                 fixed set of chosen approvers holding pending rows. A flow-2 PRA
+                 has neither, so that card would tell a creator whose PRA is at
+                 step 4 that it was never sent for approval. Separate data,
+                 separate card, chosen by flow. --}}
+            @if($paymentRequest->isDepartmentalFlow())
+                @php
+                    $steps = [
+                        2 => 'Merchant Team Check', 3 => 'Merchant Head Approval',
+                        4 => 'Accounts Team Check', 5 => 'Accounts Head Approval',
+                        6 => 'Commercial Head Completion',
+                    ];
+                    $decisionBySeq = $departmentalDecisions->keyBy('sequence');
+                    $isCreator = auth()->id() === $paymentRequest->created_by;
+                    // Who each step is pointed at right now — the live assignment
+                    // for steps still ahead, the snapshot for steps already taken.
+                    $assignmentBySeq = $paymentRequest->stageAssignments->keyBy('sequence');
+                @endphp
+                <div class="mx-auto mt-3 pra-no-print" style="max-width:1120px;">
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                <h6 class="fw-bold mb-0"><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i> Approval Progress</h6>
+                                <span class="badge rounded-pill {{ $paymentRequest->status === 'completed' ? 'bg-success-subtle text-success' : ($paymentRequest->status === 'rejected' ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning-emphasis') }}">
+                                    @if($departmentalStage)
+                                        Step {{ $departmentalStage->sequence }} — {{ $departmentalStage->label }}
+                                    @else
+                                        {{ ucfirst(str_replace('_', ' ', $paymentRequest->status)) }}
+                                    @endif
+                                </span>
+                            </div>
+
+                            @if($departmentalStage && ! $departmentalStage->isActionable())
+                                <div class="alert alert-warning border-0 small">{{ $departmentalStage->problem() }}</div>
+                            @endif
+
+                            <div class="row g-2">
+                                @foreach($steps as $seq => $label)
+                                    @php
+                                        $decision = $decisionBySeq->get($seq);
+                                        // Secondary cue only: the step is still open to the
+                                        // whole eligible team whether or not someone is named.
+                                        $assignedName = $decision
+                                            ? optional($decision->assignedUser)->name
+                                            : optional($assignmentBySeq->get($seq)?->user)->name;
+                                    @endphp
+                                    <div class="col-12 col-md-6 col-xl-4">
+                                        <div class="d-flex justify-content-between align-items-start gap-2 border rounded-3 px-3 py-2">
+                                            <div class="min-w-0">
+                                                <div class="fw-semibold small text-slate-900">{{ $seq }}. {{ $label }}</div>
+                                                <div class="small text-muted">{{ optional($decision?->approver)->name ?? '—' }}</div>
+                                                @if($assignedName)
+                                                    <div class="small text-muted"><i class="bi bi-person-check me-1" aria-hidden="true"></i>Assigned to {{ $assignedName }}</div>
+                                                @endif
+                                                @if($decision?->comment)<div class="small text-muted">{{ $decision->comment }}</div>@endif
+                                            </div>
+                                            @if($decision)
+                                                <span class="badge rounded-pill {{ $decision->isApproved() ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger' }}">{{ ucfirst($decision->status) }}</span>
+                                            @elseif($departmentalStage && $departmentalStage->sequence === $seq)
+                                                <span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">Waiting</span>
+                                            @else
+                                                <span class="badge rounded-pill bg-light text-muted border">Not yet</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            @if($paymentRequest->status === 'rejected' && $isCreator)
+                                <div class="mt-3">
+                                    <a href="{{ route('supply_chain.payment_requests.my_status') }}" class="btn btn-sm btn-primary rounded-pill px-3">
+                                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Resubmit from My PRA Status
+                                    </a>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            @elseif(($approvalProgress['has_flow'] ?? false))
                 @php
                     $stateBadge = [
                         'approved' => 'bg-success-subtle text-success',
@@ -566,6 +758,12 @@
 @endsection
 
 @section('scripts')
+@if($isPreview && ($createOnDepartmentalFlow ?? false))
+    {{-- The searchable dropdown used across the app (Bookings, Store forms).
+         Loaded only on the departmental create preview: the legacy modal has no
+         .js-searchable control and must not pick up a library it never used. --}}
+    @include('store.stock._searchable')
+@endif
 @if($isPreview)
 <script>
     document.addEventListener('DOMContentLoaded', function () {

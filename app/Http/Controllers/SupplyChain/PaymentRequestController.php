@@ -7,6 +7,7 @@ use App\Mail\PaymentRequestMail;
 use App\Models\BookingPo;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
+use App\Models\ExcelFile;
 use App\Models\PaymentRequest;
 use App\Models\PaymentRequestItem;
 use App\Models\PraApproval;
@@ -14,9 +15,12 @@ use App\Models\PraApprover;
 use App\Models\User;
 use App\Services\BookingPoSourceService;
 use App\Services\PraApprovalService;
+use App\Services\PraStageResolver;
+use App\Services\PraWorkflow;
 use App\Services\StyleBudgetService;
 use App\Support\Concerns\ScopesToAssignedBuyers;
 use App\Support\PaymentRequestSettings;
+use App\Support\PraStageActors;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +36,42 @@ class PaymentRequestController extends Controller
         protected BookingPoSourceService $sourceService,
         protected PraApprovalService $approvalService,
         protected StyleBudgetService $budgetService,
+        protected PraWorkflow $workflow,
+        protected PraStageResolver $resolver,
     ) {
+    }
+
+    /**
+     * The people the creator may name for step 2 (Merchant Team Check) of a PRA
+     * that is about to be created from these snapshots.
+     *
+     * THE DROPDOWN IS THE RESOLVER'S ANSWER, NOTHING ELSE. There is no saved PRA
+     * at preview time, so the buyers are read from the snapshots' source files
+     * — the same excelFile.buyer_id the resolver reads off a saved PRA's items —
+     * and handed to resolveForBuyers(). Anyone not in this list cannot be
+     * chosen on screen, and store() checks the posted id against the same list
+     * before writing anything, so the UI and the guard cannot disagree.
+     *
+     * Null when the departmental flow is off: the legacy modal has its own
+     * pickers and must not grow a control the legacy path never reads.
+     */
+    protected function stepTwoAssignees(\Illuminate\Support\Collection $snapshots): ?PraStageActors
+    {
+        if (! PaymentRequestSettings::departmentalFlowEnabled()) {
+            return null;
+        }
+
+        $fileIds = $snapshots
+            ->map(fn (array $row) => $row['excel_file_id'] ?? null)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $buyerIds = $fileIds->isEmpty()
+            ? []
+            : ExcelFile::query()->whereIn('id', $fileIds->all())->whereNotNull('buyer_id')->pluck('buyer_id')->all();
+
+        return $this->resolver->resolveForBuyers(PraStageResolver::SEQ_MERCHANT_CHECK, $buyerIds);
     }
 
     /*
@@ -196,6 +235,19 @@ class PaymentRequestController extends Controller
             'data' => [
                 'source' => 'supply_chain_payment_request_preview',
             ],
+            // THE PREVIEW MUST LOOK LIKE THE DOCUMENT CREATE PRA WILL PRODUCE.
+            // Unstamped, this unsaved model defaults to flow 1 and the sheet
+            // prints the three fixed legacy officers on a PRA that is about to
+            // join the departmental chain — a document whose signature area
+            // changes shape the moment the button is pressed. Same source of
+            // truth as store(): the toggle decides the flow, the creator's own
+            // signature fills Prepared By. Nothing is persisted here.
+            'flow_version' => PaymentRequestSettings::departmentalFlowEnabled()
+                ? PaymentRequest::FLOW_DEPARTMENTAL
+                : PaymentRequest::FLOW_LEGACY,
+            'prepared_signature_path' => PaymentRequestSettings::departmentalFlowEnabled()
+                ? auth()->user()?->signature_path
+                : null,
         ]);
         $paymentRequest->created_at = now();
 
@@ -207,9 +259,29 @@ class PaymentRequestController extends Controller
         $checkerPool = $this->checkerPool();
         $budgetCheck = $this->budgetService->evaluate($snapshots);
         $canOverrideBudget = (bool) auth()->user()?->can('override-style-budget');
+        $createOnDepartmentalFlow = PaymentRequestSettings::departmentalFlowEnabled();
+        $stepTwoAssignees = $this->stepTwoAssignees($snapshots);
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'checkerPool', 'budgetCheck', 'canOverrideBudget'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'checkerPool', 'budgetCheck', 'canOverrideBudget', 'createOnDepartmentalFlow', 'stepTwoAssignees'));
     }
+
+    /**
+     * Whether a newly created PRA joins the 6-step departmental chain.
+     *
+     * NOW THE FALLBACK DEFAULT, not the live answer. Ask
+     * PaymentRequestSettings::departmentalFlowEnabled(), which reads the admin
+     * toggle and lands here only when that setting has never been written — so
+     * a database that has not seen the settings screen behaves exactly as it did
+     * before the toggle existed.
+     *
+     * This started as a constant on the reasoning that a runtime toggle for an
+     * access decision is a change with no diff and no review. That reasoning was
+     * right about access and wrong about this: flow_version is stamped onto the
+     * row at creation and every later decision reads the ROW, never the setting.
+     * The toggle picks a default at birth; it governs nothing that already
+     * exists. A genuine access toggle would still belong in a commit.
+     */
+    public const CREATE_ON_DEPARTMENTAL_FLOW = true;
 
     public function store(Request $request)
     {
@@ -223,6 +295,9 @@ class PaymentRequestController extends Controller
             'checker_id' => ['nullable', 'integer'],
             'approver_ids' => ['nullable', 'array'],
             'approver_ids.*' => ['integer'],
+            // Departmental flow only: the optional primary assignee for step 2.
+            // Ignored entirely on the legacy path — see below.
+            'assignee_step2' => ['nullable', 'integer'],
         ]);
 
         // Only users that are currently in the active approver pool may be
@@ -313,9 +388,30 @@ class PaymentRequestController extends Controller
                 . '. These PO/PI cannot be used to create another PRA.');
         }
 
+        // THE PRIMARY ASSIGNEE FOR STEP 2, checked BEFORE anything is written.
+        // The posted id must be in the resolver's eligible set for this PRA's
+        // buyers — the same list the dropdown was built from. A miss is a stale
+        // form or a hand-made request, and it is refused here rather than
+        // after a PRA has been created that then cannot be assigned. Null when
+        // the departmental flow is off, so the legacy path never sees this.
+        $stepTwoAssignees = $this->stepTwoAssignees($snapshots);
+        $assigneeStepTwo = null;
+
+        if ($stepTwoAssignees && ! empty($validated['assignee_step2'])) {
+            $assigneeStepTwo = (int) $validated['assignee_step2'];
+
+            if (! $stepTwoAssignees->includes($assigneeStepTwo)) {
+                return back()->with('warning', 'The person selected for the Merchant Team Check step is not eligible to act on this PRA. Choose someone from the list, or leave it automatic.');
+            }
+        }
+
         // Snapshot the creator's personal signature for the Prepared By box, but
-        // only when the PRA actually enters an approval flow.
-        $hasFlow = $checkerUserId || $approverUserIds->isNotEmpty();
+        // only when the PRA actually enters an approval flow. A departmental PRA
+        // ALWAYS enters one — it has no picked checker or approvers to count, so
+        // the legacy test alone left every flow-2 Prepared By unsnapshotted and
+        // reading the creator's LIVE signature, which a later upload would
+        // silently rewrite on an already-issued document.
+        $hasFlow = $checkerUserId || $approverUserIds->isNotEmpty() || PaymentRequestSettings::departmentalFlowEnabled();
         $creatorSignaturePath = $hasFlow ? (auth()->user()?->signature_path) : null;
 
         $paymentRequest = DB::transaction(function () use ($snapshots, $validated, $paymentRequiredDate, $approverUserIds, $checkerUserId, $creatorSignaturePath, $overrideMeta) {
@@ -376,6 +472,25 @@ class PaymentRequestController extends Controller
                 ]);
             }
 
+            // NEW PRAs GO ON THE DEPARTMENTAL CHAIN. The creator no longer picks
+            // reviewers — routing is by department, resolved per step. The
+            // legacy row-creation below is left in place and unreachable from
+            // here on purpose: resubmit() still runs it for the flow-1 PRAs that
+            // already exist, and deleting it would strand them.
+            // THE SINGLE CONSUMPTION POINT of the toggle, and the only moment a
+            // PRA's flow is decided. From here on the row's own flow_version is
+            // the authority, which is why flipping this setting cannot disturb
+            // anything already in flight.
+            if (PaymentRequestSettings::departmentalFlowEnabled()) {
+                $paymentRequest->update([
+                    'flow_version' => PaymentRequest::FLOW_DEPARTMENTAL,
+                    'current_sequence' => PraStageResolver::FIRST_SEQUENCE,
+                    'status' => PaymentRequest::STATUS_PENDING_CHECK,
+                ]);
+
+                return $paymentRequest->fresh(['items', 'createdBy', 'approvals']);
+            }
+
             // First cycle. The checker row (if any) gates the approver rows: the
             // approvers are created now but stay hidden until the PRA moves from
             // pending_check to pending_approval once the checker approves.
@@ -401,6 +516,32 @@ class PaymentRequestController extends Controller
 
             return $paymentRequest->fresh(['items', 'createdBy', 'approvals']);
         });
+
+        // Departmental PRAs route themselves: step 2's actors are resolved from
+        // the department and the PRA's buyer, so there is no chosen recipient to
+        // name and no separate scoping to apply here.
+        if ($paymentRequest->isDepartmentalFlow()) {
+            // The creator's optional choice, recorded only when they made one.
+            // assign() re-checks eligibility against the saved PRA — belt and
+            // braces with the pre-check above — and writes nothing otherwise.
+            if ($assigneeStepTwo !== null) {
+                $paymentRequest = $this->workflow->assign(
+                    $paymentRequest, [PraStageResolver::SEQ_MERCHANT_CHECK => $assigneeStepTwo], auth()->user()
+                );
+            }
+
+            $stage = $this->workflow->currentStage($paymentRequest);
+
+            if ($stage) {
+                $this->approvalService->notifyStageActors($paymentRequest, $stage);
+            }
+
+            return redirect()
+                ->route('supply_chain.payment_requests.show', $paymentRequest)
+                ->with('success', 'PRA ' . $paymentRequest->request_no
+                    . ' created and sent to the Merchant team for checking'
+                    . ($stage?->assignee ? ', assigned to ' . $stage->assignee->name : '') . '.');
+        }
 
         // Sequential notification: notify the checker first; approvers are
         // notified only after the check step completes.
@@ -433,7 +574,9 @@ class PaymentRequestController extends Controller
     {
         $this->authorizePaymentRequest($paymentRequest);
 
-        $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy', 'approvals.approver']);
+        // assignedUser / stageAssignments: the "Assigned to" cue on the status
+        // card. Both empty on a legacy PRA, and the eager load is a no-op there.
+        $paymentRequest->load(['items', 'createdBy', 'checkedBy', 'approvedBy', 'approvals.approver', 'approvals.assignedUser', 'stageAssignments.user']);
         $approvalRows = $this->approvalRowsFromItems($paymentRequest->items);
         $summary = $this->summaryFromApprovalRows($approvalRows);
         $emailLogs = EmailLog::where('payment_request_id', $paymentRequest->id)
@@ -441,12 +584,30 @@ class PaymentRequestController extends Controller
             ->latest('id')
             ->get();
         $emailDefaults = $this->praEmailDefaults($paymentRequest, $summary);
-        $approvalProgress = $paymentRequest->approvalProgress();
-        $currentApprovals = $paymentRequest->currentApprovals()->load('approver');
+        // approvalProgress() and currentApprovals() describe FLOW 1: a fixed set
+        // of chosen approvers holding pending rows. A departmental PRA has
+        // neither, so asking them would report "Not sent for approval" to a
+        // creator whose PRA is halfway down the chain. Each flow answers with
+        // its own machine; the view picks by isDepartmentalFlow().
+        $isDepartmental = $paymentRequest->isDepartmentalFlow();
+
+        $approvalProgress = $isDepartmental ? null : $paymentRequest->approvalProgress();
+        $currentApprovals = $isDepartmental ? collect() : $paymentRequest->currentApprovals()->load('approver');
+
+        $departmentalStage = $isDepartmental ? $this->workflow->currentStage($paymentRequest) : null;
+        // No ->load('approver') here: the relation is already eager-loaded on
+        // $paymentRequest above, and currentCycleDecisions() returns a filtered
+        // in-memory slice of it — a plain Collection when empty, which has no
+        // load().
+        $departmentalDecisions = $isDepartmental
+            ? $this->workflow->currentCycleDecisions($paymentRequest)
+            : collect();
+
         $approverPool = $this->approverPool();
         $checkerPool = $this->checkerPool();
+        $createOnDepartmentalFlow = PaymentRequestSettings::departmentalFlowEnabled();
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'emailLogs', 'emailDefaults', 'approvalProgress', 'currentApprovals', 'approverPool', 'checkerPool'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'emailLogs', 'emailDefaults', 'approvalProgress', 'currentApprovals', 'departmentalStage', 'departmentalDecisions', 'approverPool', 'checkerPool', 'createOnDepartmentalFlow'));
     }
 
     /**
@@ -457,9 +618,17 @@ class PaymentRequestController extends Controller
     {
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
 
+        // whereHas('approvals') is the flow-1 test for "this PRA entered an
+        // approval flow" — flow 1 pre-creates a pending row per reviewer, so a
+        // row means it was sent. A departmental PRA writes rows only as
+        // decisions are TAKEN, so a brand-new one has none and would vanish from
+        // its own creator's status list until somebody acted on it. Its
+        // equivalent of "entered a flow" is flow_version, not row count.
         $paymentRequests = PaymentRequest::query()
             ->where('created_by', auth()->id())
-            ->whereHas('approvals')
+            ->where(fn ($query) => $query
+                ->whereHas('approvals')
+                ->orWhere('flow_version', PaymentRequest::FLOW_DEPARTMENTAL))
             ->with(['approvals.approver'])
             ->latest('id')
             ->paginate(20)
@@ -483,6 +652,30 @@ class PaymentRequestController extends Controller
 
         if ($paymentRequest->status !== PaymentRequest::STATUS_REJECTED) {
             return back()->with('warning', 'Only a rejected PRA can be resubmitted.');
+        }
+
+        // A departmental PRA has nobody to re-pick — it re-enters the chain at
+        // step 2 and routes itself again. The approver validation below would
+        // reject the submission outright for want of an approver_ids array that
+        // this flow has no way to supply.
+        if ($paymentRequest->isDepartmentalFlow()) {
+            // Refresh the Prepared By snapshot exactly as the legacy path does below.
+            $paymentRequest->update([
+                'remarks' => $request->input('remarks') ?: $paymentRequest->remarks,
+                'prepared_signature_path' => auth()->user()?->signature_path,
+            ]);
+
+            $paymentRequest = $this->workflow->resubmit($paymentRequest);
+            $stage = $this->workflow->currentStage($paymentRequest);
+
+            if ($stage) {
+                $this->approvalService->notifyStageActors($paymentRequest, $stage);
+            }
+
+            return redirect()
+                ->route('supply_chain.payment_requests.my_status')
+                ->with('success', 'PRA ' . $paymentRequest->request_no
+                    . ' resubmitted and sent to the Merchant team for checking.');
         }
 
         $validated = $request->validate([
@@ -1554,7 +1747,14 @@ class PaymentRequestController extends Controller
         $sheet->getStyle('A5:C6')->getFont()->setBold(true)->getColor()->setARGB('FF000B6F');
 
         $sheet->mergeCells('I5:L8');
-        $sheet->setCellValue('I5', "OCR Checked:     ☐ Yes      ☐ No\n\nChecker Name     : ______________________\n\nDate             : ______________________");
+        // Auto-filled from the Accounts Team check (step 4) on a departmental
+        // PRA. Null — and so the original hand-signed blank — for a legacy PRA
+        // and for any departmental one that has not reached step 4.
+        $ocrCheck = \App\Support\PaymentRequestSettings::ocrCheckFor($paymentRequest);
+        $sheet->setCellValue('I5', $ocrCheck
+            ? "OCR Checked:     ☒ Yes      ☐ No\n\nChecker Name     : " . $ocrCheck['name']
+                . "\n\nDate             : " . $ocrCheck['date']
+            : "OCR Checked:     ☐ Yes      ☐ No\n\nChecker Name     : ______________________\n\nDate             : ______________________");
         $sheet->getStyle('I5:L8')->applyFromArray([
             'font' => ['bold' => true, 'size' => 9, 'color' => ['argb' => 'FF000B6F']],
             'alignment' => ['wrapText' => true, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP],
@@ -1683,8 +1883,13 @@ class PaymentRequestController extends Controller
         // Dynamic Prepared / Checked / Approved By signatures for this PRA, with
         // the static admin signatures as the fallback. Same box layout as before.
         $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocksFor($paymentRequest, false);
-        // The last block runs to L so the three boxes still span the full table.
-        $signatureColumns = [['A', 'C'], ['E', 'G'], ['I', 'L']];
+        // The last block runs to L so the boxes still span the full table.
+        // FOUR columns on a departmental PRA, three on a legacy one — indexing a
+        // fixed three-entry list would fatal on the fourth block rather than
+        // merely look wrong.
+        $signatureColumns = count($signatureBlocks) === 4
+            ? [['A', 'C'], ['D', 'F'], ['G', 'I'], ['J', 'L']]
+            : [['A', 'C'], ['E', 'G'], ['I', 'L']];
 
         foreach ($signatureBlocks as $index => $block) {
             [$from, $to] = $signatureColumns[$index];
@@ -1694,10 +1899,18 @@ class PaymentRequestController extends Controller
             $sheet->mergeCells($from . ($rowNo + 2) . ':' . $to . ($rowNo + 2));
             $sheet->setCellValue($from . $rowNo, $block['title']);
 
-            // Typed name + date record (kept even when a signature image is shown).
+            // Typed name + date record (kept even when a signature image is shown),
+            // with the signer's title on its own line beneath the name.
             $meta = trim(($block['name'] ?? '') . (! empty($block['date']) ? '  —  ' . $block['date'] : ''));
+            if (! empty($block['designation'])) {
+                $meta = trim($meta . "\n" . $block['designation']);
+            }
+            if (! empty($block['pending'])) {
+                $meta = trim($meta . "\nPending approval");
+            }
             if ($meta !== '') {
                 $sheet->setCellValue($from . ($rowNo + 1), $meta);
+                $sheet->getStyle($from . ($rowNo + 1))->getAlignment()->setWrapText(true);
             }
 
             // Embed the signature image, if any, above the signing line.

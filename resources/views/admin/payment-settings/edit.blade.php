@@ -62,6 +62,90 @@
                 </div>
             </div>
 
+            {{-- The workflow switch. NEW PRAs only — a PRA's flow is fixed on its
+                 own record when it is created, so anything already in progress
+                 carries on exactly as it started whatever this is set to. --}}
+            <div class="col-12">
+                <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
+                    <div class="card-body p-4">
+                        <h5 class="mb-1">Approval Workflow for New PRAs</h5>
+                        <p class="text-muted small mb-3">
+                            Chooses which approval process a payment request enters when it is created.
+                            Payment requests already in progress are not affected and finish on the
+                            process they started on.
+                        </p>
+
+                        <div class="form-check form-switch mb-2">
+                            <input type="hidden" name="pra_departmental_flow_enabled" value="0">
+                            <input class="form-check-input" type="checkbox" role="switch" value="1"
+                                   id="departmentalFlowToggle" name="pra_departmental_flow_enabled"
+                                   {{ old('pra_departmental_flow_enabled', $departmentalFlowEnabled) ? 'checked' : '' }}>
+                            <label class="form-check-label fw-semibold" for="departmentalFlowToggle">
+                                Use the departmental approval chain
+                            </label>
+                        </div>
+                        <div class="form-text mb-3">
+                            On: Merchant Team &rarr; Merchant Head &rarr; Accounts Team &rarr; Accounts Head
+                            &rarr; Commercial Head, routed automatically.
+                            Off: the creator picks a checker and approvers when raising the request.
+                        </div>
+
+                        @if($activeApproverCount === 0)
+                            <div class="alert alert-warning border-0 small mb-0">
+                                <strong>No approvers are configured.</strong>
+                                With this switch off, a new payment request has nobody to send to and is
+                                saved without any approval request at all. Add approvers under
+                                <a href="{{ route('admin.pra-approvers.index') }}">Admin &rsaquo; PRA Approvers</a>
+                                before turning it off.
+                            </div>
+                        @elseif($activeCheckerCount === 0)
+                            <div class="alert alert-info border-0 small mb-0">
+                                No approver is marked as a checker, so with this switch off a new payment
+                                request goes straight to approvers with no checking step. Set one under
+                                <a href="{{ route('admin.pra-approvers.index') }}">Admin &rsaquo; PRA Approvers</a>
+                                if a check is wanted.
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            {{-- Departmental PRA signature labels. A separate card from Digital
+                 Signatures below because these are LABELS ONLY — the people are
+                 resolved from the approval chain, not configured here. --}}
+            <div class="col-12">
+                <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
+                    <div class="card-body p-4">
+                        <h5 class="mb-1">Departmental PRA — Signature Labels</h5>
+                        <p class="text-muted small mb-4">
+                            The four headings printed on a PRA that follows the departmental approval chain.
+                            Only the wording is set here — who signs each line is decided by the chain itself
+                            and cannot be changed. Leave a box empty to restore its default.
+                            These do not affect PRAs created on the older check-and-approve flow.
+                        </p>
+                        <div class="row g-3">
+                            @foreach($flow2Labels as $slug => $label)
+                                <div class="col-12 col-md-6">
+                                    <label for="flow2-label-{{ $slug }}" class="form-label fw-semibold">
+                                        {{ $flow2Defaults[$slug] }}
+                                    </label>
+                                    <input type="text" id="flow2-label-{{ $slug }}"
+                                           name="flow2_labels[{{ $slug }}]" maxlength="80"
+                                           class="form-control @error('flow2_labels.' . $slug) is-invalid @enderror"
+                                           value="{{ old('flow2_labels.' . $slug, $label) }}"
+                                           placeholder="{{ $flow2Defaults[$slug] }}">
+                                    @error('flow2_labels.' . $slug)<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="form-text mt-3">
+                            The Commercial Head's completion is printed as a "Paid / Completed by" line
+                            below the signatures, not as a signature block.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {{-- Signatures --}}
             <div class="col-12">
                 <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">

@@ -78,7 +78,7 @@
                 </thead>
                 <tbody>
                     @forelse($paymentRequests as $pr)
-                        @php $progress = $pr->approvalProgress(); $current = $pr->currentApprovals(); @endphp
+                        @php $progress = $pr->flowProgress(); $current = $pr->currentApprovals(); @endphp
                         <tr>
                             <td class="text-center">
                                 <button type="button" class="pra-toggle" data-bs-toggle="collapse" data-bs-target="#praDetail{{ $pr->id }}" aria-expanded="false" aria-controls="praDetail{{ $pr->id }}" title="Show approver details">
@@ -162,7 +162,7 @@
 
 {{-- Resubmit modals (kept outside the table for valid markup) --}}
 @foreach($paymentRequests as $pr)
-    @if($pr->approvalProgress()['state'] === 'rejected')
+    @if($pr->flowProgress()['state'] === 'rejected')
         <div class="modal fade" id="resubmitModal{{ $pr->id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content" style="border-radius:var(--gx-radius);">

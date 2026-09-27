@@ -47,6 +47,16 @@
         .grand td { background:#eaf0fb !important; color:#000b6f; font-size: 10px; font-weight:800; padding: 5px 5px; }
         .sign { margin-top: 18px; color:#000b6f; }
         .sign td { border:0; width:33.33%; padding:0 22px; vertical-align:bottom; }
+        /* Departmental PRAs print FOUR blocks instead of three. Narrower cells
+           and tighter gutters keep the row on the same single page — the widths
+           are a height budget, exactly as for the report table above. */
+        .sign.cols-4 td { width:25%; padding:0 12px; }
+        .sign-pending { font-size:8.5px; font-style:italic; color:#5b6ab0; }
+        /* An auto-filled OCR Checked value. Same width as .line so the box keeps
+           its height whether the value is printed or left blank for signing. */
+        .filled { display:inline-block; width:132px; border-bottom:1px solid #4a5cb2; font-weight:700; }
+        .completed-line { margin-top:10px; font-size:9px; color:#000b6f; }
+        .completed-line strong { font-weight:800; }
         .sign td + td { border-left:1px solid #8d9bd3; }
         .sign-title { font-size:9px; font-weight:800; margin-bottom:14px; }
         .sign-text { font-size:9px; margin-bottom:14px; }
@@ -84,6 +94,10 @@
     $logoPath = public_path('images/humana-logo.png');
     $logoData = file_exists($logoPath) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath)) : null;
     $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocksFor($paymentRequest, true);
+    // Null for legacy PRAs and for any departmental one not yet completed.
+    $completionLine = \App\Support\PaymentRequestSettings::completionLineFor($paymentRequest);
+    // Null until the Accounts Team check (step 4) — an unanswered box, not a "No".
+    $ocrCheck = \App\Support\PaymentRequestSettings::ocrCheckFor($paymentRequest);
 @endphp
 <table class="top">
     <tr>
@@ -117,10 +131,17 @@
             <div class="note">* Buyer nominated supplier.<br>&nbsp;&nbsp;No excess quantity has been booked.</div>
         </td>
         <td style="width:35%;">
+            {{-- Filled from the Accounts Team check (step 4) on a departmental
+                 PRA. Until that step is done — and always, on a legacy PRA —
+                 this prints the original blank form for signing by hand. --}}
             <div class="check">
-                <strong>OCR Checked:</strong> <span class="mini-box"></span> Yes <span class="mini-box"></span> No<br>
-                Checker Name&nbsp;&nbsp;&nbsp;&nbsp;: <span class="line"></span><br>
-                Date&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: <span class="line"></span>
+                <strong>OCR Checked:</strong>
+                <span class="mini-box">{{ $ocrCheck ? '×' : '' }}</span> Yes
+                <span class="mini-box"></span> No<br>
+                Checker Name&nbsp;&nbsp;&nbsp;&nbsp;:
+                @if($ocrCheck)<span class="filled">{{ $ocrCheck['name'] }}</span>@else<span class="line"></span>@endif<br>
+                Date&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:
+                @if($ocrCheck)<span class="filled">{{ $ocrCheck['date'] }}</span>@else<span class="line"></span>@endif
             </div>
         </td>
     </tr>
@@ -180,10 +201,12 @@
     </tbody>
 </table>
 
-<table class="sign">
+<table class="sign {{ count($signatureBlocks) === 4 ? 'cols-4' : '' }}">
     <tr>
         @foreach($signatureBlocks as $i => $sign)
-            <td style="{{ $i === 0 ? 'padding-left:0;' : ($i === 2 ? 'padding-right:0;' : '') }}">
+            {{-- $loop->last, not a hardcoded index 2: the block count is 3 on a
+                 legacy PRA and 4 on a departmental one. --}}
+            <td style="{{ $i === 0 ? 'padding-left:0;' : ($loop->last ? 'padding-right:0;' : '') }}">
                 <div class="sign-title">{{ $sign['title'] }}</div>
                 @if($sign['src'])
                     <img src="{{ $sign['src'] }}" alt="signature" class="sign-img">
@@ -193,6 +216,19 @@
                         @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
                         <div>{{ !empty($sign['date']) ? 'Signature & Date: ' . $sign['date'] : 'Signature & Date' }}</div>
                     </div>
+                @elseif(!empty($sign['pending']))
+                    {{-- Not yet signed. The name (when one person is expected)
+                         is shown to help whoever is chasing the paperwork, and
+                         the caption is what stops it reading as an endorsement.
+                         No image, ever, on a pending block. --}}
+                    <div class="sign-text">
+                        @if($sign['name'])<span class="sign-name">{{ $sign['name'] }}</span>@endif
+                    </div>
+                    <div class="sign-line"></div>
+                    <div class="sign-meta">
+                        @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
+                        <div class="sign-pending">Pending approval</div>
+                    </div>
                 @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
                     {{-- Actor known but no signature image uploaded: typed name + date --}}
                     <div class="sign-text">
@@ -200,7 +236,10 @@
                         @if($sign['date'])<span> — {{ $sign['date'] }}</span>@endif
                     </div>
                     <div class="sign-line"></div>
-                    <div class="sign-meta"><div>Signature &amp; Date</div></div>
+                    <div class="sign-meta">
+                        @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
+                        <div>Signature &amp; Date</div>
+                    </div>
                 @else
                     <div class="sign-text">Signature &amp; Date</div>
                     <div class="sign-line"></div>
@@ -209,5 +248,14 @@
         @endforeach
     </tr>
 </table>
+
+{{-- Step 6 is a payment, not an endorsement, so it gets a line rather than a
+     signature block. Present only once the Commercial Head has completed. --}}
+@if($completionLine)
+    <div class="completed-line">
+        <strong>Paid / Completed by:</strong> {{ $completionLine['name'] ?: '—' }}
+        @if($completionLine['date']) on {{ $completionLine['date'] }}@endif
+    </div>
+@endif
 </body>
 </html>

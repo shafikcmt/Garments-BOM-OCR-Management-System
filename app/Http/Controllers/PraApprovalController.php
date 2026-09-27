@@ -31,6 +31,11 @@ class PraApprovalController extends Controller
         // rows from earlier (rejected) cycles or the not-yet-active stage never
         // leak in.
         $pending = PaymentRequest::query()
+            // THE REVERSE FENCE. Flow-2 PRAs already fail to reach this list —
+            // they carry no pending approval rows for whereHas to match — but
+            // relying on that is relying on an implementation detail of the
+            // other flow. Stated explicitly so the two queues cannot converge.
+            ->where('flow_version', PaymentRequest::FLOW_LEGACY)
             ->whereIn('status', [PaymentRequest::STATUS_PENDING_CHECK, PaymentRequest::STATUS_PENDING_APPROVAL])
             ->whereHas('approvals', fn ($q) => $q->where('approver_id', $userId)->where('status', PraApproval::STATUS_PENDING))
             ->with(['createdBy', 'approvals.approver'])
@@ -46,6 +51,8 @@ class PraApprovalController extends Controller
 
     public function show(PaymentRequest $paymentRequest)
     {
+        $this->assertLegacyFlow($paymentRequest);
+
         $paymentRequest->load(['items', 'createdBy', 'approvals.approver']);
 
         $userId = auth()->id();
@@ -67,6 +74,8 @@ class PraApprovalController extends Controller
 
     public function approve(Request $request, PaymentRequest $paymentRequest)
     {
+        $this->assertLegacyFlow($paymentRequest);
+
         $validated = $request->validate([
             'comment' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -153,6 +162,8 @@ class PraApprovalController extends Controller
 
     public function reject(Request $request, PaymentRequest $paymentRequest)
     {
+        $this->assertLegacyFlow($paymentRequest);
+
         $validated = $request->validate([
             'comment' => ['required', 'string', 'max:2000'],
         ], [
@@ -188,6 +199,17 @@ class PraApprovalController extends Controller
 
         return redirect()->route('pra_approvals.index')
             ->with('success', 'PRA ' . $paymentRequest->request_no . ' has been rejected. The creator has been notified.');
+    }
+
+    /**
+     * A departmental PRA has no business on the legacy screens: its access rule
+     * is PraStageResolver, not the approver pool, and its state lives in
+     * current_sequence rather than in pending rows. 404 rather than 403 —
+     * this controller has no concept of that record.
+     */
+    protected function assertLegacyFlow(PaymentRequest $paymentRequest): void
+    {
+        abort_if($paymentRequest->isDepartmentalFlow(), 404);
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Http\Controllers\Shared\ExcelFileController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\EmailLogController;
 use App\Http\Controllers\PraApprovalController;
+use App\Http\Controllers\PraDepartmentalApprovalController;
 use App\Http\Controllers\StyleBudgetController;
 
 Route::get('/', function () {
@@ -159,6 +160,27 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/pra-approvals/{paymentRequest}', [PraApprovalController::class, 'show'])->name('pra_approvals.show');
         Route::post('/pra-approvals/{paymentRequest}/approve', [PraApprovalController::class, 'approve'])->name('pra_approvals.approve');
         Route::post('/pra-approvals/{paymentRequest}/reject', [PraApprovalController::class, 'reject'])->name('pra_approvals.reject');
+    });
+
+    // PRA departmental chain — the 6-step Merchant/Accounts/Commercial flow.
+    // A SEPARATE PERMISSION from approve-pra above, on purpose: these roles must
+    // reach flow-2 PRAs and must NOT reach the legacy hand-routed ones. The
+    // permission is the outer gate only; PraStageResolver decides per record.
+    // The read-only "All PRAs" list. role_or_perm rather than can:, so a super
+    // admin reaches their oversight view even on a database where the
+    // departmental permission was never granted to the admin role. Declared
+    // BEFORE the {paymentRequest} routes so "all" is never read as an id.
+    // The detail page sits behind the same gate, so every row the list shows
+    // can be opened; the controller's own participation rule decides per record.
+    Route::middleware('role_or_perm:admin|pra.departmental.act')->group(function () {
+        Route::get('/pra-departmental/all', [PraDepartmentalApprovalController::class, 'all'])->name('pra_departmental.all');
+        Route::get('/pra-departmental/{paymentRequest}', [PraDepartmentalApprovalController::class, 'show'])->name('pra_departmental.show');
+    });
+
+    Route::middleware('can:pra.departmental.act')->group(function () {
+        Route::get('/pra-departmental', [PraDepartmentalApprovalController::class, 'index'])->name('pra_departmental.index');
+        Route::post('/pra-departmental/{paymentRequest}/approve', [PraDepartmentalApprovalController::class, 'approve'])->name('pra_departmental.approve');
+        Route::post('/pra-departmental/{paymentRequest}/reject', [PraDepartmentalApprovalController::class, 'reject'])->name('pra_departmental.reject');
     });
 
     // Style-wise budgets — set/edit by admin + merchandising (manage-style-budgets).

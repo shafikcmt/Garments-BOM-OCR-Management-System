@@ -16,6 +16,27 @@ class PaymentRequest extends Model
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
 
+    // Flow 2 only. The departmental chain ends in a PAYMENT, not an approval,
+    // so it needs a state the legacy flow has no concept of. No flow-1 PRA can
+    // ever hold either value — nothing writes them outside PraWorkflow.
+    public const STATUS_PENDING_COMPLETION = 'pending_completion';
+    public const STATUS_COMPLETED = 'completed';
+
+    /**
+     * WHICH APPROVAL MACHINE OWNS THIS PRA.
+     *
+     *   1  the legacy optional Check -> Approve flow, reviewers hand-picked from
+     *      the pra_approvers pool. Every PRA that existed before the departmental
+     *      chain is this, and its behaviour must never change.
+     *   2  the 6-step departmental chain driven by PraWorkflow.
+     *
+     * This is the isolation boundary. PraWorkflow refuses a version-1 PRA
+     * outright rather than trying to be clever about it.
+     */
+    public const FLOW_LEGACY = 1;
+
+    public const FLOW_DEPARTMENTAL = 2;
+
     protected $fillable = [
         'request_no',
         'supplier_name',
@@ -23,6 +44,8 @@ class PaymentRequest extends Model
         'season_name',
         'total_pi_amount',
         'status',
+        'flow_version',
+        'current_sequence',
         'created_by',
         'checked_by',
         'approved_by',
@@ -37,8 +60,74 @@ class PaymentRequest extends Model
         'total_pi_amount' => 'decimal:4',
         'checked_at' => 'datetime',
         'approved_at' => 'datetime',
+        'flow_version' => 'integer',
+        'current_sequence' => 'integer',
         'data' => 'array',
     ];
+
+    /**
+     * The database default is 1, but a database default only lands on the ROW —
+     * a freshly created model holds null for it until something reloads. Code
+     * reading flow_version straight after create() would see null and, worse,
+     * a `=== FLOW_LEGACY` test would come out false for a PRA that is plainly
+     * legacy. Mirrors how PraApproval defaults `stage`.
+     */
+    protected $attributes = [
+        'flow_version' => self::FLOW_LEGACY,
+    ];
+
+    /**
+     * Whether the 6-step departmental chain owns this PRA.
+     *
+     * THE ONE CHECK EVERY SHARED CODE PATH MUST MAKE before reading approval
+     * state. approvalProgress() below, the approver queue and the PDF all
+     * describe flow 1 and would misreport a flow-2 PRA — not because they are
+     * wrong, but because they answer a question flow 2 does not ask.
+     */
+    public function isDepartmentalFlow(): bool
+    {
+        return (int) $this->flow_version === self::FLOW_DEPARTMENTAL;
+    }
+
+    /**
+     * Progress in the shape every existing view already reads, for EITHER flow.
+     *
+     * approvalProgress() below is left exactly as it was — it is flow-1 logic
+     * and 19 live PRAs depend on it. This wraps it rather than branching inside
+     * it, so a flow-1 PRA still travels the identical code path and gets the
+     * identical array, byte for byte.
+     *
+     * The departmental branch returns the same keys because the views consume
+     * `state`, `label` and `has_flow` and should not have to care which machine
+     * produced them.
+     *
+     * @return array<string, mixed>
+     */
+    public function flowProgress(): array
+    {
+        if (! $this->isDepartmentalFlow()) {
+            return $this->approvalProgress();
+        }
+
+        $label = match ($this->status) {
+            self::STATUS_COMPLETED => 'Completed — payment recorded',
+            self::STATUS_REJECTED => 'Rejected — returned to creator',
+            default => $this->current_sequence
+                ? 'Step ' . $this->current_sequence . ' — '
+                    . app(\App\Services\PraStageResolver::class)
+                        ->definitionFor((int) $this->current_sequence)['label']
+                : ucfirst(str_replace('_', ' ', (string) $this->status)),
+        };
+
+        return [
+            'total' => 0, 'approved' => 0, 'rejected' => 0, 'pending' => 0,
+            'has_check' => false, 'check_done' => false, 'check_pending' => false,
+            'stage' => $this->current_sequence ? 'step_' . $this->current_sequence : 'done',
+            'state' => $this->status,
+            'label' => $label,
+            'has_flow' => true,
+        ];
+    }
 
     public function items()
     {
@@ -63,6 +152,16 @@ class PaymentRequest extends Model
     public function approvals()
     {
         return $this->hasMany(PraApproval::class);
+    }
+
+    /**
+     * Flow 2 only: the optional primary assignee per step, keyed by sequence.
+     * Empty for every legacy PRA and for any departmental PRA whose creator
+     * left routing fully automatic. Informational — see PraStageAssignment.
+     */
+    public function stageAssignments()
+    {
+        return $this->hasMany(PraStageAssignment::class);
     }
 
     /**

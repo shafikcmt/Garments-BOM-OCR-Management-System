@@ -45,7 +45,10 @@
     <tr>
         <td colspan="5" class="no-border"><strong>Buyer</strong> &nbsp; : &nbsp; {{ $list($summary['buyers'] ?? [], $paymentRequest->buyer_name ?: '-') }}<br><strong>Season</strong> : &nbsp; {{ $list($summary['seasons'] ?? [], $paymentRequest->season_name ?: '-') }}<br><br>* Buyer nominated supplier.<br>&nbsp;&nbsp;No excess quantity has been booked.</td>
         <td colspan="3" class="no-border"></td>
-        <td colspan="4"><strong>OCR Checked:</strong> □ Yes &nbsp;&nbsp; □ No<br><br>Checker Name : __________________<br><br>Date : __________________</td>
+        @php $ocrCheck = \App\Support\PaymentRequestSettings::ocrCheckFor($paymentRequest); @endphp
+        {{-- Auto-filled from the Accounts Team check (step 4) on a departmental
+             PRA; the original blank form otherwise, legacy PRAs included. --}}
+        <td colspan="4"><strong>OCR Checked:</strong> {{ $ocrCheck ? '☒' : '□' }} Yes &nbsp;&nbsp; □ No<br><br>Checker Name : {{ $ocrCheck ? $ocrCheck['name'] : '__________________' }}<br><br>Date : {{ $ocrCheck ? $ocrCheck['date'] : '__________________' }}</td>
     </tr>
     <tr>
         <td colspan="8" class="no-border"></td>
@@ -106,9 +109,18 @@
                 <strong>{{ $sign['title'] }}</strong><br>
                 @if($sign['src'])
                     <img src="{{ $sign['src'] }}" alt="Signature of {{ $sign['name'] ?? 'approver' }}" style="max-height:40px;"><br>
-                    {{ $sign['name'] }}{{ !empty($sign['date']) ? ' — ' . $sign['date'] : '' }}<br>Signature &amp; Date
+                    {{ $sign['name'] }}{{ !empty($sign['date']) ? ' — ' . $sign['date'] : '' }}<br>
+                    @if($sign['designation']){{ $sign['designation'] }}<br>@endif
+                    Signature &amp; Date
+                @elseif(!empty($sign['pending']))
+                    {{-- Unsigned; the caption is what keeps a name from reading as a signature. --}}
+                    <br>{{ $sign['name'] }}<br>
+                    @if($sign['designation']){{ $sign['designation'] }}<br>@endif
+                    <em>Pending approval</em>
                 @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
-                    <br>{{ $sign['name'] }}{{ !empty($sign['date']) ? ' — ' . $sign['date'] : '' }}<br>Signature &amp; Date
+                    <br>{{ $sign['name'] }}{{ !empty($sign['date']) ? ' — ' . $sign['date'] : '' }}<br>
+                    @if($sign['designation']){{ $sign['designation'] }}<br>@endif
+                    Signature &amp; Date
                 @else
                     <br><br>Signature &amp; Date
                 @endif

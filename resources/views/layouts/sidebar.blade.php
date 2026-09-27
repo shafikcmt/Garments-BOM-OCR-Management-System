@@ -116,8 +116,8 @@
             <a href="{{ url('/dashboard') }}" class="sidebar-brand-link">
                 <span class="brand-mark"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i></span>
                 <span class="min-w-0">
-                    <span class="sidebar-brand-title">HAPL OCR</span>
-                    <span class="sidebar-brand-subtitle">Management System</span>
+                    <span class="sidebar-brand-title">HAPL Threadloop</span>
+                    <span class="sidebar-brand-subtitle">Workflow System</span>
                 </span>
             </a>
             <button type="button" class="btn btn-sm d-lg-none sidebar-close-btn" id="sidebarClose" aria-label="Close sidebar" >
@@ -704,9 +704,40 @@
                                 @endif
                             </a>
                         </li>
+                        {{-- The admin's oversight of the departmental chain: every
+                             flow-2 PRA, read-only. Admin has no step of its own,
+                             so it gets this list and not the My Step queue. --}}
+                        @role('admin')
+                            <li class="sidebar-item">
+                                <a href="{{ route('pra_departmental.all') }}" class="sidebar-nav-link {{ request()->routeIs('pra_departmental.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main">
+                                        <span class="sidebar-icon"><i class="bi bi-collection" aria-hidden="true"></i></span>
+                                        <span class="sidebar-link-text">All Departmental PRAs</span>
+                                    </span>
+                                </a>
+                            </li>
+                        @endrole
                     </ul>
                 </div>
             @endcan
+
+            {{-- The same oversight link for an admin who does not hold approve-pra
+                 (and so has no Approvals section above to carry it). --}}
+            @if(auth()->user()?->hasRole('admin') && ! auth()->user()->can('approve-pra'))
+                <div class="sidebar-section">
+                    <div class="sidebar-section-label">Approvals</div>
+                    <ul class="sidebar-list">
+                        <li class="sidebar-item">
+                            <a href="{{ route('pra_departmental.all') }}" class="sidebar-nav-link {{ request()->routeIs('pra_departmental.*') ? 'is-active' : '' }}">
+                                <span class="sidebar-link-main">
+                                    <span class="sidebar-icon"><i class="bi bi-collection" aria-hidden="true"></i></span>
+                                    <span class="sidebar-link-text">All Departmental PRAs</span>
+                                </span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            @endif
 
             {{-- The departmental chain's own queue. A SEPARATE ENTRY from the
                  legacy one above, matching the separate permission: the two

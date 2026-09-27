@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
+use App\Models\PraApprover;
 use App\Support\PaymentRequestSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -28,6 +29,19 @@ class PaymentSettingController extends Controller
         return view('admin.payment-settings.edit', [
             'workingDays' => PaymentRequestSettings::workingDays(),
             'officers' => $officers,
+            'departmentalFlowEnabled' => PaymentRequestSettings::departmentalFlowEnabled(),
+            // Turning the chain OFF hands new PRAs back to the legacy flow,
+            // which routes to hand-picked people from the approver pool. An
+            // empty pool means those PRAs would be created with no approval
+            // flow at all — the pre-existing legacy behaviour, but a nasty
+            // surprise for whoever flips the switch expecting a fallback.
+            'activeApproverCount' => PraApprover::where('is_active', true)->count(),
+            'activeCheckerCount' => PraApprover::where('is_active', true)->where('can_check', true)->count(),
+            'flow2Labels' => PaymentRequestSettings::flow2Labels(),
+            'flow2Defaults' => array_map(
+                fn (array $block) => $block['label'],
+                PaymentRequestSettings::FLOW2_BLOCKS
+            ),
         ]);
     }
 
@@ -46,9 +60,30 @@ class PaymentSettingController extends Controller
             $rules["officers.$slug.image"] = ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'];
         }
 
+        foreach (array_keys(PaymentRequestSettings::FLOW2_BLOCKS) as $slug) {
+            $rules["flow2_labels.$slug"] = ['nullable', 'string', 'max:80'];
+        }
+
         $validated = $request->validate($rules);
 
         AppSetting::put(PaymentRequestSettings::KEY_WORKING_DAYS, (string) $validated['pra_working_days']);
+
+        // Affects NEW PRAs only. Nothing already created is rewritten — a PRA's
+        // flow is fixed on its own row at creation.
+        AppSetting::put(
+            PaymentRequestSettings::KEY_DEPARTMENTAL_FLOW,
+            $request->boolean('pra_departmental_flow_enabled') ? '1' : '0'
+        );
+
+        // Departmental (flow 2) signature labels. Stored under their own key
+        // prefix — editing one must never re-title a legacy PRA's document, and
+        // a blank falls back to the default rather than printing no heading.
+        foreach (array_keys(PaymentRequestSettings::FLOW2_BLOCKS) as $slug) {
+            AppSetting::put(
+                PaymentRequestSettings::flow2LabelKey($slug),
+                trim((string) $request->input("flow2_labels.$slug"))
+            );
+        }
 
         foreach ($officerSlugs as $slug) {
             AppSetting::put("pra_sign_{$slug}_name", $request->input("officers.$slug.name"));
