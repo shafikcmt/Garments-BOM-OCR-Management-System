@@ -3,7 +3,6 @@
 @section('title', 'General Stock — Department Review')
 
 @php
-    $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
     $hasFilters = collect($filters)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
 @endphp
 
@@ -18,7 +17,7 @@
     @include('store.stock._stock-ui')
 
     <x-page-header icon="person-check" eyebrow="General Stock" title="Department Review"
-                   copy="Requisitions your department has raised and that need your check before they go to Store.">
+                   copy="Requisitions waiting for your check before they go to Store.">
         <x-slot:actions>
             <a href="{{ route('store.stock.requisitions.index') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-list-ul me-1" aria-hidden="true"></i>{{ \App\Models\PurchaseRequisition::listLabelFor(auth()->user()) }}
@@ -46,7 +45,12 @@
             <form method="GET" class="row g-3 gx-stock-filter mb-4">
                 <div class="col-6 col-md-3 col-xl-2">
                     <label class="form-label" for="month">Month</label>
-                    <input type="month" name="month" id="month" value="{{ $filters['month'] ?? '' }}" class="form-control">
+                    <select name="month" id="month" class="form-select">
+                        <option value="">All months</option>
+                        @foreach($monthOptions as $value => $label)
+                            <option value="{{ $value }}" @selected(($filters['month'] ?? '') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="col-12 col-md-6 col-xl-4">
                     <label class="form-label" for="search">Search</label>
@@ -84,7 +88,7 @@
                                 <td class="small">{{ $r->departmentLabel() }}</td>
                                 <td class="small">{{ optional($r->createdBy)->name ?: '—' }}</td>
                                 <td class="text-end fw-semibold">{{ $r->items_count }}</td>
-                                <td class="text-end fw-semibold">{{ $money($r->items_sum_amount) }}</td>
+                                <td class="text-end fw-semibold">@include('store.stock.requisitions._amount', ['amount' => $r->items_sum_amount])</td>
                                 <td class="text-end gx-stock-actions">
                                     <a href="{{ route('store.stock.requisitions.show', $r) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-eye me-1" aria-hidden="true"></i>View

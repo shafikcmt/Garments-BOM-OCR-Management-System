@@ -99,6 +99,7 @@ class PurchaseRequisitionController extends Controller
         return view('store.stock.requisitions.index', [
             'requisitions' => $requisitions,
             'filters' => $filters,
+            'monthOptions' => $this->monthOptions($filters['month'] ?? null),
             'sections' => IndentSection::selectable()->get(['id', 'name']),
             'statusLabels' => PurchaseRequisition::statusLabels(),
             // Drives the "Requested" tab's badge. Counted only for whoever can
@@ -113,7 +114,7 @@ class PurchaseRequisitionController extends Controller
             'departmentReviewCount' => $this->departmentReviewCount($request->user()),
             'fulfilment' => $this->fulfilment->summary($request->user(), ['month' => $month]),
             'fulfilmentPeriod' => $month
-                ? Carbon::createFromFormat('Y-m', $month)->format('F Y')
+                ? Carbon::createFromFormat('!Y-m', $month)->format('F Y')
                 : 'All dates',
         ]);
     }
@@ -192,6 +193,7 @@ class PurchaseRequisitionController extends Controller
         return view('store.stock.requisitions.requested', [
             'requisitions' => $requisitions,
             'filters' => $filters,
+            'monthOptions' => $this->monthOptions($filters['month'] ?? null),
             'sections' => IndentSection::selectable()->get(['id', 'name']),
             'statusLabels' => PurchaseRequisition::statusLabels(),
             'awaitingCount' => PurchaseRequisition::query()->fromDepartments()
@@ -254,6 +256,7 @@ class PurchaseRequisitionController extends Controller
         return view('store.stock.requisitions.department-review', [
             'requisitions' => $requisitions,
             'filters' => $filters,
+            'monthOptions' => $this->monthOptions($filters['month'] ?? null),
             'departmentReviewCount' => $this->departmentReviewCount($user),
             'awaitingCount' => PurchaseRequisition::seesEveryRequisition($user)
                 ? PurchaseRequisition::query()->fromDepartments()
@@ -302,6 +305,30 @@ class PurchaseRequisitionController extends Controller
 
         return back()->with('success',
             'Requisition '.$requisition->requisition_no.' returned to the requester.');
+    }
+
+    /**
+     * The Month filter's choices: the last 24 months, newest first, plus
+     * the selected month when it is older. A select rather than the browser's
+     * month box, which shows an unreadable "--------- ----" when empty.
+     *
+     * @return array<string, string> "Y-m" => "September 2026"
+     */
+    private function monthOptions(?string $selected): array
+    {
+        $options = [];
+        $month = now()->startOfMonth();
+
+        for ($i = 0; $i < 24; $i++) {
+            $options[$month->format('Y-m')] = $month->format('F Y');
+            $month = $month->copy()->subMonth();
+        }
+
+        if ($selected && ! isset($options[$selected])) {
+            $options[$selected] = Carbon::createFromFormat('!Y-m', $selected)->format('F Y');
+        }
+
+        return $options;
     }
 
     private function authorizeDepartmentHead(PurchaseRequisition $requisition): void
@@ -360,6 +387,12 @@ class PurchaseRequisitionController extends Controller
     {
         $this->authorizeTransition('store.requisition.review');
 
+        // Refused with a message the user actually sees: the app's 403 page
+        // prints a fixed text and would hide the reason.
+        if ($requisition->isRaisedBy(auth()->user())) {
+            return back()->with('error', 'You raised this requisition, so another person must mark it received.');
+        }
+
         abort_unless($requisition->awaitingStoreReceipt(), 422,
             'Only a requisition that has been submitted and not yet received can be marked received.');
 
@@ -397,6 +430,10 @@ class PurchaseRequisitionController extends Controller
     public function approve(PurchaseRequisition $requisition)
     {
         $this->authorizeTransition('store.requisition.approve');
+
+        if ($requisition->isRaisedBy(auth()->user())) {
+            return back()->with('error', 'You raised this requisition, so another person must approve it.');
+        }
 
         abort_unless($requisition->awaitingApproval(), 422,
             'Only a requisition the Store has received can be approved.');

@@ -58,7 +58,11 @@
     </div>
 @endif
 
-@if($requisition->awaitingStoreReceipt() && $user?->can('store.requisition.review'))
+{{-- The person who raised a sheet never receives or approves it; the
+     controller refuses it too. They get a note instead of a button. --}}
+@php($raisedByViewer = $requisition->isRaisedBy($user))
+
+@if($requisition->awaitingStoreReceipt() && $user?->can('store.requisition.review') && ! $raisedByViewer)
     <form method="POST" action="{{ route('store.stock.requisitions.received', $requisition) }}" class="d-inline">
         @csrf
         <button type="submit" class="btn {{ $size }} btn-outline-primary">
@@ -67,7 +71,7 @@
     </form>
 @endif
 
-@if($requisition->awaitingApproval() && $user?->can('store.requisition.approve'))
+@if($requisition->awaitingApproval() && $user?->can('store.requisition.approve') && ! $raisedByViewer)
     <form method="POST" action="{{ route('store.stock.requisitions.approve', $requisition) }}" class="d-inline"
           onsubmit="return confirm('Approve requisition {{ $requisition->requisition_no }}? It then goes forward for procurement.');">
         @csrf
@@ -75,4 +79,8 @@
             <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Approve
         </button>
     </form>
+@endif
+
+@if($raisedByViewer && (($requisition->awaitingStoreReceipt() && $user?->can('store.requisition.review')) || ($requisition->awaitingApproval() && $user?->can('store.requisition.approve'))))
+    <span class="small text-muted"><i class="bi bi-person-lock me-1" aria-hidden="true"></i>You raised this requisition, so another person must {{ $requisition->awaitingApproval() ? 'approve' : 'receive' }} it.</span>
 @endif

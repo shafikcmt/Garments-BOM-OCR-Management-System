@@ -256,7 +256,7 @@ it('renders the summary on the requisition screen under the month filter', funct
         // "Stock Summary" when it moved onto the Store and department
         // dashboards; the figures it reports are unchanged.
         ->assertSee('Stock Summary')
-        ->assertSee('Pending Qty')
+        ->assertSee('To Purchase')
         // 100 requested, 30 received, 70 outstanding.
         ->assertSee('70');
 });

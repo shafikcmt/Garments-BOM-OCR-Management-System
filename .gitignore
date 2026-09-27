@@ -44,3 +44,6 @@ docs/OCR Files/
 # Reference image of the buyer PO layout, kept locally for lookup while
 # matching the PDF export. Not read by any code path.
 docs/PO Format.png
+
+# Reference workbooks from the business (real data) — read locally, never committed.
+docs/reference/

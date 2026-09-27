@@ -50,7 +50,7 @@
 <p class="text-muted small mb-3">
     {{ $periodLabel }} ·
     {{ $fulfilment['scoped'] ? 'Your own requisitions' : 'All departments' }} ·
-    Submitted requisitions only, drafts excluded.
+    Drafts excluded.
 </p>
 
 @if($rows->isEmpty())
@@ -66,7 +66,7 @@
             ['label' => 'Requested Qty', 'value' => $qty($totals['requested']), 'tone' => 'primary', 'icon' => 'bi-clipboard-check'],
             ['label' => 'Current Stock', 'value' => $qty($totals['stock_in_hand']), 'tone' => 'secondary', 'icon' => 'bi-box-seam'],
             ['label' => 'Purchased Qty', 'value' => $qty($totals['purchased']), 'tone' => 'success', 'icon' => 'bi-truck'],
-            ['label' => 'Pending Qty', 'value' => $qty($totals['pending']), 'tone' => 'warning', 'icon' => 'bi-hourglass-split'],
+            ['label' => 'To Purchase', 'value' => $qty($totals['pending']), 'tone' => 'warning', 'icon' => 'bi-hourglass-split'],
         ] as $tile)
             <div class="col-6 col-xl-3">
                 <div class="card gx-stock-card h-100">
@@ -94,7 +94,7 @@
                     <th class="text-end">Requested</th>
                     <th class="text-end">Current Stock</th>
                     <th class="text-end">Purchased</th>
-                    <th class="text-end">Pending</th>
+                    <th class="text-end">To Purchase</th>
                     <th style="min-width:140px;">Status</th>
                 </tr>
             </thead>
@@ -124,7 +124,7 @@
                         <td class="small">
                             @if($row['pending'] > 0)
                                 <span class="badge bg-warning-subtle text-warning-emphasis">
-                                    <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>Pending
+                                    <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>To Purchase
                                 </span>
                             @elseif($row['over_received'] > 0)
                                 {{-- Pending is floored at zero, so the excess is
@@ -144,7 +144,7 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="3" class="text-end gx-stock-total-label">Total-</td>
+                    <td colspan="3" class="text-end gx-stock-total-label">Total</td>
                     <td class="text-end fw-bold">{{ $qty($totals['requested']) }}</td>
                     <td class="text-end fw-bold">{{ $qty($totals['stock_in_hand']) }}</td>
                     <td class="text-end fw-bold">{{ $qty($totals['purchased']) }}</td>
@@ -175,7 +175,6 @@
          delivery traced back to the request that prompted it. Said plainly
          because a reader would otherwise assume the stronger claim. --}}
     <p class="text-muted small mb-0 mt-2">
-        Purchased is what the Store received of each item in this period, from the Receiving records.
-        Current Stock is today's position, as the Stock Report shows it.
+        Purchased = received in this period. Current Stock = today's position. To Purchase = requested − purchased.
     </p>
 @endif

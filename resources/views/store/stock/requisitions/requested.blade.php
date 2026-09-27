@@ -3,7 +3,6 @@
 @section('title', 'General Stock — Requested Requisitions')
 
 @php
-    $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
     $hasFilters = collect($filters)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
 
     // Same badge set as the main list, so one status never reads two ways.
@@ -28,7 +27,7 @@
     @include('store.stock._stock-ui')
 
     <x-page-header icon="inbox" eyebrow="General Stock" title="Requested Requisitions"
-                   copy="What the departments have sent to Store. Mark each one received, then approve it to go forward.">
+                   copy="Requests sent to Store, oldest first. Receive, then approve.">
         <x-slot:actions>
             <a href="{{ route('store.stock.requisitions.index') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-list-ul me-1" aria-hidden="true"></i>{{ \App\Models\PurchaseRequisition::listLabelFor(auth()->user()) }}
@@ -55,7 +54,12 @@
             <form method="GET" class="row g-3 gx-stock-filter mb-4">
                 <div class="col-6 col-md-3 col-xl-2">
                     <label class="form-label" for="month">Month</label>
-                    <input type="month" name="month" id="month" value="{{ $filters['month'] ?? '' }}" class="form-control">
+                    <select name="month" id="month" class="form-select">
+                        <option value="">All months</option>
+                        @foreach($monthOptions as $value => $label)
+                            <option value="{{ $value }}" @selected(($filters['month'] ?? '') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="col-6 col-md-3 col-xl-2">
                     <label class="form-label" for="statusFilter">Status</label>
@@ -119,7 +123,7 @@
                                     @endif
                                 </td>
                                 <td class="text-end fw-semibold">{{ $r->items_count }}</td>
-                                <td class="text-end fw-semibold">{{ $money($r->items_sum_amount) }}</td>
+                                <td class="text-end fw-semibold">@include('store.stock.requisitions._amount', ['amount' => $r->items_sum_amount])</td>
                                 <td>
                                     @php([$class, $icon] = $badges[$r->status] ?? ['bg-light text-dark', 'bi-dot'])
                                     <span class="badge {{ $class }}"><i class="bi {{ $icon }} me-1" aria-hidden="true"></i>{{ $r->progressLabel() }}</span>

@@ -3,8 +3,6 @@
 @section('title', 'General Stock — Purchase Requisition')
 
 @php
-    $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
-
     // Drives the Clear button only — the filtering itself is the controller's.
     $hasFilters = collect($filters)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
 
@@ -29,7 +27,7 @@
     @include('store.stock._stock-ui')
 
     <x-page-header icon="clipboard-check" eyebrow="General Stock" title="Purchase Requisition"
-                   copy="What the departments have asked to be bought, and where each request stands.">
+                   copy="Purchase requests and where each one stands.">
         <x-slot:actions>
             {{-- The month compiled across the whole company — the Store's
                  view, offered only to whoever reads every requisition. The
@@ -81,7 +79,12 @@
             <form method="GET" class="row g-3 gx-stock-filter mb-4">
                 <div class="col-6 col-md-3 col-xl-2">
                     <label class="form-label" for="month">Month</label>
-                    <input type="month" name="month" id="month" value="{{ $filters['month'] ?? '' }}" class="form-control">
+                    <select name="month" id="month" class="form-select">
+                        <option value="">All months</option>
+                        @foreach($monthOptions as $value => $label)
+                            <option value="{{ $value }}" @selected(($filters['month'] ?? '') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div class="col-6 col-md-3 col-xl-2">
                     <label class="form-label" for="statusFilter">Status</label>
@@ -141,9 +144,9 @@
                                 </td>
                                 <td class="small">{{ optional($r->requisition_date)->format('d-M-Y') ?? '—' }}</td>
                                 <td class="small">{{ optional($r->indentSection)->name ?: 'All' }}</td>
-                                <td class="small text-muted">{{ optional($r->indentPerson)->name ?: '—' }}</td>
+                                <td class="small text-muted">{{ $r->requesterName() ?: '—' }}</td>
                                 <td class="text-end fw-semibold">{{ $r->items_count }}</td>
-                                <td class="text-end fw-semibold">{{ $money($r->items_sum_amount) }}</td>
+                                <td class="text-end fw-semibold">@include('store.stock.requisitions._amount', ['amount' => $r->items_sum_amount])</td>
                                 <td>
                                     @php([$class, $icon] = $badges[$r->status] ?? ['bg-light text-dark', 'bi-dot'])
                                     <span class="badge {{ $class }}"><i class="bi {{ $icon }} me-1" aria-hidden="true"></i>{{ $statusLabels[$r->status] ?? $r->status }}</span>

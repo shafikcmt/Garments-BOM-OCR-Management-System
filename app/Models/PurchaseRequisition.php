@@ -403,6 +403,17 @@ class PurchaseRequisition extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * Who asked for this sheet, as the lists print it: the Indent Person
+     * picked on the form, else the account that raised it. A department
+     * form with a head never sets an Indent Person, so without the fallback
+     * every such row read "—".
+     */
+    public function requesterName(): ?string
+    {
+        return $this->indentPerson?->name ?: $this->createdBy?->name;
+    }
+
     public function storeAckBy()
     {
         return $this->belongsTo(User::class, 'store_ack_by');
@@ -449,6 +460,17 @@ class PurchaseRequisition extends Model
     public function awaitingStoreReceipt(): bool
     {
         return $this->status === self::STATUS_SUBMITTED && ! $this->heldByDepartmentHead();
+    }
+
+    /**
+     * Whether this user raised the sheet. The one who raised it may not also
+     * mark it Received or Approve it — not even Admin — or a single person
+     * could carry a requisition from request to approved spend alone.
+     * Compared as integers: the driver may hand created_by back as a string.
+     */
+    public function isRaisedBy(?User $user): bool
+    {
+        return $user !== null && $this->created_by !== null && (int) $this->created_by === (int) $user->id;
     }
 
     /** Acknowledged by the Store and not yet approved. */
