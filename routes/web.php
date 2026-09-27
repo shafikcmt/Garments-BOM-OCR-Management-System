@@ -9,9 +9,12 @@ use App\Http\Controllers\PraApprovalController;
 use App\Http\Controllers\PraDepartmentalApprovalController;
 use App\Http\Controllers\StyleBudgetController;
 
+// The root is not a page of its own: a signed-in user goes to their
+// dashboard, anyone else to the ONE login screen (auth/login.blade.php).
+// It used to render a second copy of the login form, which drifted.
 Route::get('/', function () {
-    return view('welcome');
-});
+    return redirect()->route(auth()->check() ? 'dashboard' : 'login');
+})->name('home');
 
 Route::middleware(['auth'])->group(function () {
     /*

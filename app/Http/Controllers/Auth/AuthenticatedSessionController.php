@@ -57,6 +57,8 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        return redirect('/')->withCookie(Cookie::forget('remembered_email'));
+        // Straight to the login screen — not to '/', which is only a
+        // redirect anyway and once rendered a stale copy of this form.
+        return redirect()->route('login')->withCookie(Cookie::forget('remembered_email'));
     }
 }

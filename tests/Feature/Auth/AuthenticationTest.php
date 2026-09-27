@@ -37,5 +37,26 @@ test('users can logout', function () {
     $response = $this->actingAs($user)->post('/logout');
 
     $this->assertGuest();
-    $response->assertRedirect('/');
+    $response->assertRedirect(route('login', absolute: false));
+});
+
+test('the root sends a guest to the one login screen', function () {
+    $this->get('/')->assertRedirect(route('login', absolute: false));
+
+    // And that screen is the current one — there is no second copy.
+    $this->get('/login')->assertOk()->assertSee('Email or Employee ID');
+    expect(view()->exists('welcome'))->toBeFalse();
+});
+
+test('the root sends a signed-in user to their dashboard, never to a login form', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->get('/')->assertRedirect(route('dashboard', absolute: false));
+});
+
+test('logging out lands on the login screen', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->post('/logout')->assertRedirect(route('login', absolute: false));
+    $this->get('/login')->assertOk()->assertSee('Email or Employee ID');
 });

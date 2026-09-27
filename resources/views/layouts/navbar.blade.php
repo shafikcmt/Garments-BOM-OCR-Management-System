@@ -47,7 +47,7 @@
 
         <div class="min-w-0">
             <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.14em] text-blue-700 border border-blue-100">OCR</span>
+                <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.14em] text-blue-700 border border-blue-100">Threadloop</span>
                 <span class="text-muted small d-none d-sm-inline">Operations Workspace</span>
             </div>
             <h5 class="mb-0 fw-bold text-slate-900 text-truncate" style="font-size:1rem;letter-spacing:-.025em;">

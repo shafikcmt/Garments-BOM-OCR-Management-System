@@ -3,7 +3,7 @@
 <footer class="gx-footer">
     <span>&copy; {{ date('Y') }} Humana Apparels Pvt. Ltd. All rights reserved.</span>
     <span>
-        OCR Management
+        HAPL Threadloop
         <span class="text-muted">&middot;</span>
         v{{ config('app.version', '1.0.0') }}
     </span>
