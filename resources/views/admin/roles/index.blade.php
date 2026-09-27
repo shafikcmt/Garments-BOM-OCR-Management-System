@@ -32,6 +32,7 @@
                         <th>#</th>
                         <th>Role Name</th>
                         <th>Guard</th>
+                        <th>Department</th>
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -42,6 +43,18 @@
                             <td class="fw-semibold">{{ ucfirst(str_replace('_', ' ', $role->name)) }}</td>
                             <td>
                                 <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">{{ $role->guard_name }}</span>
+                            </td>
+                            {{-- Read-only: which department this role belongs to. Changed
+                                 only on Admin > Settings > Departments, never here. --}}
+                            <td>
+                                @php $departmentKey = \App\Support\DepartmentRoles::departmentOf($role->name); @endphp
+                                @if($departmentKey)
+                                    <a href="{{ route('admin.departments.index') }}#dept-{{ $departmentKey }}" class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle text-decoration-none" title="Open this department on the Departments screen">
+                                        {{ \App\Support\DepartmentRoles::labelOf($departmentKey) }}
+                                    </a>
+                                @else
+                                    <span class="text-muted small">Not assigned</span>
+                                @endif
                             </td>
                             <td>
                                 <div class="d-flex gap-2">
@@ -56,7 +69,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="text-center text-muted py-4">No roles found.</td>
+                            <td colspan="5" class="text-center text-muted py-4">No roles found.</td>
                         </tr>
                     @endforelse
                 </tbody>

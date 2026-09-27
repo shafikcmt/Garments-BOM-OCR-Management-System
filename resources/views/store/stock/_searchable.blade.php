@@ -98,6 +98,7 @@
         var NEW_PREFIX = 'new:';
 
         var KEY_TAB = 9;
+        var KEY_RETURN = 13;
         var KEY_UP = 38;
         var KEY_DOWN = 40;
 
@@ -227,6 +228,41 @@
                         return '<div class="create">Add <strong>' + escape(data.input) + '</strong> to the list</div>';
                     },
                 };
+            }
+
+            // A <select multiple> becomes a chip list: each chosen value is
+            // drawn as a tag with its own "×", so the user removes one
+            // without reopening the list. (Admin > Departments role picker.)
+            if (el.multiple) {
+                options.plugins = ['remove_button'];
+                options.hideSelected = true;
+                options.closeAfterSelect = false;
+
+                // Enter while the list is closed would otherwise reach the
+                // browser as an implicit form submit — a user typing a name
+                // that matches nothing must not save the whole form.
+                options.onInitialize = (function (inherited) {
+                    return function () {
+                        if (inherited) { inherited.call(this); }
+                        var parentKeyDown = this.onKeyDown;
+                        var self = this;
+                        this.onKeyDown = function (e) {
+                            if (e.keyCode === KEY_RETURN && !self.isOpen) { e.preventDefault(); return; }
+                            return parentKeyDown.call(self, e);
+                        };
+                    };
+                })(options.onInitialize);
+
+                // data-chip-separator="…": the option text before it is the
+                // chip; the rest is a note that belongs only in the list
+                // ("Cutting — now in Production" → chip "Cutting").
+                var separator = el.getAttribute('data-chip-separator');
+                if (separator) {
+                    options.render = options.render || {};
+                    options.render.item = function (data, escape) {
+                        return '<div>' + escape(String(data.text).split(separator)[0].trim()) + '</div>';
+                    };
+                }
             }
 
             new TomSelect(el, options);

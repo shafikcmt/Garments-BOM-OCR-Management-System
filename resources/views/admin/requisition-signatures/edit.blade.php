@@ -36,9 +36,13 @@
                 <div>
                     <div class="app-hero-eyebrow">Admin / Settings</div>
                     <h3 class="app-hero-title mb-0">Requisition Signatures</h3>
-                    <p class="app-hero-copy mb-0">The signature boxes printed on each Purchase Requisition, and who heads each department.</p>
+                    <p class="app-hero-copy mb-0">The signature boxes printed on each Purchase Requisition. Department and section heads, who check a sheet before it reaches Store, are named on the Departments screen.</p>
                 </div>
             </div>
+            {{-- Heads live on the Departments screen — one list, not two. --}}
+            <a href="{{ route('admin.departments.index') }}" class="btn btn-outline-primary">
+                <i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>Manage Departments
+            </a>
         </div>
     </div>
 
@@ -60,16 +64,6 @@
         @csrf
 
         <div class="row g-4">
-            {{-- Who heads each department and section — what the
-                 "Requester's Department Head" box and the Review queue
-                 resolve to — is set on the Departments screen, so there is
-                 one list of heads, not two. --}}
-            <div class="col-12">
-                <div class="alert alert-light border small d-flex align-items-center justify-content-between gap-3 flex-wrap mb-0">
-                    <span>Department and section heads, who check a department's requisition before it reaches Store, are named on the Departments screen.</span>
-                    <a href="{{ route('admin.departments.index') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>Manage Departments</a>
-                </div>
-            </div>
 
             @foreach($levels as $level => $levelLabel)
                 <div class="col-12">
