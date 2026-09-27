@@ -2615,7 +2615,9 @@ class BookingController extends Controller
         return [
             'to' => $supplier?->display_name ?: ($bookingPo->vendor_name ?: '[Supplier company name]'),
             'date' => optional($bookingPo->generated_at ?: now())->format('d/m/Y'),
-            'required_ex_mill' => optional($bookingPo->generated_at ?: now())->copy()->addMonth()->format('d/m/Y'),
+            // NoOverflow: 31 Jan + 1 month is 28 Feb, not 3 Mar — the same
+            // clamp the form's ex-mill autofill (_ex-mill-autofill) applies.
+            'required_ex_mill' => optional($bookingPo->generated_at ?: now())->copy()->addMonthNoOverflow()->format('d/m/Y'),
             'attn' => $supplier?->contact_person ?: '[Contact person]',
             'buyer' => $bookingPo->buyer_name ?: '[Buyer name]',
             'email' => $supplier?->email ?: '[Supplier email]',
