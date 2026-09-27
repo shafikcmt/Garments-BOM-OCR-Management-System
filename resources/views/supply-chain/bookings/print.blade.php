@@ -308,7 +308,7 @@
             </ol>
         </div>
 
-        <div class="footer-note">Generated from HAPL OCR Supply Chain Booking Generate module - PO {{ $bookingPo->po_no }}</div>
+        <div class="footer-note">Generated from HAPL Threadloop Supply Chain Booking Generate module - PO {{ $bookingPo->po_no }}</div>
     </div>
 </div>
 

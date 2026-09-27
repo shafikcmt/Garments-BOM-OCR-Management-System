@@ -896,7 +896,7 @@
                 </ol>
             </div>
 
-            <div class="bf-footer-note">Generated from HAPL OCR Supply Chain Booking Generate module - PO {{ $poNo }}</div>
+            <div class="bf-footer-note">Generated from HAPL Threadloop Supply Chain Booking Generate module - PO {{ $poNo }}</div>
         </div>
     </div>
 
