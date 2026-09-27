@@ -34,7 +34,7 @@ class IssueReportService
         }
 
         try {
-            return Carbon::createFromFormat('Y-m', $month)->startOfMonth();
+            return Carbon::createFromFormat('!Y-m', $month)->startOfMonth();
         } catch (\Throwable $e) {
             return null;
         }

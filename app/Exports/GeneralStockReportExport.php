@@ -41,7 +41,7 @@ class GeneralStockReportExport implements FromView, WithEvents, WithTitle
     /** Sheet name mirrors the reference file's "Stock Jul-26" convention. */
     public function title(): string
     {
-        return 'Stock '.\Illuminate\Support\Carbon::createFromFormat('Y-m', $this->data['month'])->format('M-y');
+        return 'Stock '.\Illuminate\Support\Carbon::createFromFormat('!Y-m', $this->data['month'])->format('M-y');
     }
 
     /** @return array<string, callable> */

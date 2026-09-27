@@ -93,7 +93,7 @@ class GeneralStockReportService
     public function resolveMonth(?string $month): Carbon
     {
         try {
-            return $month ? Carbon::createFromFormat('Y-m', $month)->startOfMonth() : now()->startOfMonth();
+            return $month ? Carbon::createFromFormat('!Y-m', $month)->startOfMonth() : now()->startOfMonth();
         } catch (\Throwable $e) {
             return now()->startOfMonth();
         }
