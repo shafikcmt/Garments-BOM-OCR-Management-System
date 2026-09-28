@@ -840,9 +840,8 @@ class PurchaseRequisitionController extends Controller
                 'remarks' => $data['remarks'] ?? null,
             ]);
 
-            // Lines are replaced wholesale: the form posts the complete set, and
-            // a draft has no downstream references to preserve.
-            $requisition->items()->delete();
+            // Lines are updated in place — see syncItems() — so a line keeps its
+            // id across edits for the quantity log and merge links to hang on.
             $this->syncItems($requisition, $data['items'], Carbon::parse($data['requisition_date']));
 
             if ($isStoreCorrection) {
@@ -1117,6 +1116,9 @@ class PurchaseRequisitionController extends Controller
             // required_without each way is what refuses an empty line; nullable
             // is what lets the unused half of the pair arrive blank, which it
             // always does — the form posts both fields on every row.
+            // A saved line's own id, posted back on edit. Only matched against
+            // THIS sheet's lines in syncItems(), so a foreign id does nothing.
+            'items.*.id' => ['nullable', 'integer'],
             'items.*.stock_item_id' => ['nullable', 'required_without:items.*.custom_item_name', 'integer', 'exists:stock_items,id'],
             'items.*.custom_item_name' => ['nullable', 'required_without:items.*.stock_item_id', 'string', 'max:255'],
             'items.*.specification' => ['nullable', 'string', 'max:255'],
@@ -1196,6 +1198,18 @@ class PurchaseRequisitionController extends Controller
         $snapshots = $this->requisitions->snapshots($itemIds, $on);
         $stockItems = StockItem::whereIn('id', $itemIds)->get()->keyBy('id');
 
+        // IN PLACE, not delete-and-recreate. A saved line is updated when the
+        // form posts it back with its id AND it still names the same item; a
+        // line whose item was changed is a different line, so it is replaced.
+        // A posted line with no usable id reuses an unclaimed saved line of
+        // the same item. Everything left over is inserted; saved lines nobody
+        // claimed are deleted. Every figure is recalculated exactly as before.
+        $existing = $requisition->exists ? $requisition->items()->get()->keyBy('id') : collect();
+        $itemKey = fn ($stockItemId, $customName) => $stockItemId
+            ? 'id:'.(int) $stockItemId
+            : 'custom:'.mb_strtolower(trim((string) $customName));
+        $claimed = [];
+
         foreach ($lines as $index => $line) {
             $itemId = $this->requisitions->lineItemId($line);
             $stockItem = $itemId ? $stockItems->get($itemId) : null;
@@ -1211,7 +1225,7 @@ class PurchaseRequisitionController extends Controller
                 ? (float) $typed
                 : ($snapshot['last_purchase_rate'] ?? null);
 
-            $requisition->items()->create([
+            $attributes = [
                 'stock_item_id' => $itemId,
                 // Only set when there is no master item; the two are never both
                 // filled, so a line always has exactly one name.
@@ -1233,7 +1247,27 @@ class PurchaseRequisitionController extends Controller
                 'rate_appx' => $rate,
                 'amount' => $rate !== null ? $toBeProcured * $rate : 0,
                 'remarks' => $line['remarks'] ?? null,
-            ]);
+            ];
+
+            $key = $itemKey($itemId, $attributes['custom_item_name']);
+            $sameItem = fn ($saved) => ! isset($claimed[$saved->id])
+                && $itemKey($saved->stock_item_id, $saved->custom_item_name) === $key;
+
+            $posted = $existing->get((int) ($line['id'] ?? 0));
+            $match = ($posted && $sameItem($posted)) ? $posted : $existing->first($sameItem);
+
+            if ($match) {
+                $match->update($attributes);
+                $claimed[$match->id] = true;
+            } else {
+                $requisition->items()->create($attributes);
+            }
+        }
+
+        $unclaimed = $existing->keys()->reject(fn ($id) => isset($claimed[$id]))->all();
+
+        if ($unclaimed !== []) {
+            PurchaseRequisitionItem::whereIn('id', $unclaimed)->delete();
         }
     }
 }

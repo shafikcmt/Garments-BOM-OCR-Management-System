@@ -21,6 +21,8 @@
     // the saved lines when editing a draft, else one blank line.
     $existingLines = collect(old('items', $editing
         ? $requisition->items->map(fn ($i) => [
+            // Posted back so the line is updated in place, keeping its id.
+            'id' => $i->id,
             'stock_item_id' => $i->stock_item_id,
             // Reopens a typed line as a typed line rather than an empty picker.
             'custom_item_name' => $i->custom_item_name,
@@ -257,6 +259,7 @@
                  it can also be set BEFORE the item, from anywhere in the row —
                  its position here does not change that. --}}
             <div class="gx-req-fields">
+                <input type="hidden" class="js-line-id" name="items[__INDEX__][id]" value="">
                 <div class="gx-req-field is-item">
                     <label class="form-label">Item Name <span class="text-danger">*</span></label>
                     <select class="form-select form-select-sm js-line-item js-searchable" name="items[__INDEX__][stock_item_id]" required>
@@ -824,6 +827,7 @@
                 body.appendChild(row);
 
                 if (values) {
+                    if (values.id) { row.querySelector('.js-line-id').value = values.id; }
                     if (values.stock_item_id) { row.querySelector('.js-line-item').value = values.stock_item_id; }
                     if (values.specification) { row.querySelector('.js-line-spec').value = values.specification; }
                     // Assigned even when blank, unlike its neighbours. The

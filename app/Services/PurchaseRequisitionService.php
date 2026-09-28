@@ -209,6 +209,10 @@ class PurchaseRequisitionService
                     'specification' => null,
                     'type' => null,
                     'rate_appx' => null,
+                    // The saved line this entry came from, when editing, so
+                    // syncItems can update it in place. Two form lines folded
+                    // into one keep the first id.
+                    'id' => null,
                 ];
             }
 
@@ -219,7 +223,7 @@ class PurchaseRequisitionService
             // First non-empty wins for the single-valued fields: the earliest
             // line is the one that described the item, and a later blank must
             // not wipe it out.
-            foreach (['specification', 'type', 'rate_appx'] as $field) {
+            foreach (['specification', 'type', 'rate_appx', 'id'] as $field) {
                 $value = $line[$field] ?? null;
 
                 if ($merged[$key][$field] === null && $value !== null && $value !== '') {
