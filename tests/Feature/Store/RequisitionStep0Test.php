@@ -85,7 +85,7 @@ it('prints a zero total as a dash with the reason, and a real total as money', f
 });
 
 it('labels the Stock Summary "To Purchase" and its footer "Total"', function () {
-    $store = step0User('store');
+    $store = step0User('store', [\App\Services\RequirementVsIssueService::PERMISSION]);
     step0Requisition($store, PurchaseRequisition::STATUS_SUBMITTED);
 
     $this->actingAs($store)->get(route('store.stock.requisitions.index'))

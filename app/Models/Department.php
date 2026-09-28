@@ -23,15 +23,24 @@ class Department extends Model
 
     /**
      * When the Store department gets a new head, that person is given the
-     * Requirement vs Issue permission. The previous head keeps the grant but
-     * loses access, because the view also checks they are the CURRENT head.
+     * Requirement vs Issue / Stock Summary permission, and the previous head
+     * loses it. Admin can still grant or revoke it for anyone by hand.
      */
     protected static function booted(): void
     {
         static::saved(function (Department $department) {
-            if ($department->key === 'store'
-                && $department->head_user_id
-                && ($department->wasRecentlyCreated || $department->wasChanged('head_user_id'))) {
+            if ($department->key !== 'store'
+                || ! ($department->wasRecentlyCreated || $department->wasChanged('head_user_id'))) {
+                return;
+            }
+
+            $previous = $department->wasRecentlyCreated ? null : $department->getOriginal('head_user_id');
+
+            if ($previous && (int) $previous !== (int) $department->head_user_id) {
+                \App\Services\RequirementVsIssueService::revokeFromOldStoreHead((int) $previous);
+            }
+
+            if ($department->head_user_id) {
                 \App\Services\RequirementVsIssueService::grantToStoreHead($department->head_user_id);
             }
         });

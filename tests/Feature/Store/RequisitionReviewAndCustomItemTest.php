@@ -307,7 +307,7 @@ it('keeps a typed item on the summary with no stock or purchased figure', functi
         ->and($summary['totals']['not_in_master'])->toBe(1);
 });
 
-it('carries the Stock Summary onto a department dashboard, scoped to them', function () {
+it('keeps the Stock Summary off a department dashboard unless the user holds its permission', function () {
     $item = StockItem::create(['name' => 'Bal Pen', 'uom' => 'pcs', 'is_active' => true]);
 
     $department = reviewDepartmentUser();
@@ -315,12 +315,19 @@ it('carries the Stock Summary onto a department dashboard, scoped to them', func
     submittedRequisition($department, $item, 20);
     submittedRequisition(reviewStoreUser(), $item, 500);
 
+    // A requisition user alone no longer gets the card.
     $this->actingAs($department)
         ->get(route('merchant.dashboard'))
         ->assertOk()
+        ->assertDontSee('Stock Summary');
+
+    // Granted by Admin, they see it — company-wide, like the Store.
+    $department->givePermissionTo(Permission::findOrCreate(\App\Services\RequirementVsIssueService::PERMISSION, 'web'));
+    $this->actingAs($department->fresh())
+        ->get(route('merchant.dashboard'))
+        ->assertOk()
         ->assertSee('Stock Summary')
-        // Their own 20, not the company's 520.
-        ->assertSee('Your own requisitions');
+        ->assertSee('Open Stock Summary');
 });
 
 it('leaves a department dashboard untouched without the requisition permission', function () {

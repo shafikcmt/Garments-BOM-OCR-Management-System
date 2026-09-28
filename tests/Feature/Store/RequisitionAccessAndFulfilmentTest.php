@@ -249,12 +249,13 @@ it('renders the summary on the requisition screen under the month filter', funct
         'unit_price' => 4,
     ]);
 
+    // The card is for holders of store.requirement_issue.view, and carries its
+    // own period under sum[...]. The Purchase View figures are unchanged.
+    $user->givePermissionTo(Permission::findOrCreate(\App\Services\RequirementVsIssueService::PERMISSION, 'web'));
+
     $this->actingAs($user)
-        ->get(route('store.stock.requisitions.index', ['month' => '2026-08']))
+        ->get(route('store.stock.requisitions.index', ['sum' => ['from' => '2026-08', 'to' => '2026-08']]))
         ->assertOk()
-        // The widget gained a Current Stock column and was renamed to
-        // "Stock Summary" when it moved onto the Store and department
-        // dashboards; the figures it reports are unchanged.
         ->assertSee('Stock Summary')
         ->assertSee('To Purchase')
         // 100 requested, 30 received, 70 outstanding.

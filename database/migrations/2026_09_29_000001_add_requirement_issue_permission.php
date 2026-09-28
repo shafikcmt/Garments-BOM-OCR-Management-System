@@ -12,8 +12,8 @@ use Spatie\Permission\PermissionRegistrar;
  * Granted DIRECTLY to the current Store department head only (permissions
  * in this project are per-user grants), never to a role. Nobody else is
  * touched; with no Store head set, only the permission row is created.
- * The controller also checks the user is still the Store head, so a grant
- * left behind when the head changes opens nothing.
+ * Access is the permission alone: Admin grants or revokes it per user, and a
+ * Store head change moves it automatically (Department::booted).
  *
  * Additive and safe to re-run: findOrCreate, and a grant already held is a
  * no-op.

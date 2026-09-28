@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 
 /**
- * Requirement vs Issue — the Store Head's view of requested against issued,
+ * Requirement vs Issue — requested against issued,
  * per section and item. Read only.
  *
  * Screen, Excel and PDF share build(), so the three always show the same
@@ -52,7 +52,7 @@ class RequirementVsIssueController extends Controller
     private function build(Request $request): array
     {
         abort_unless(RequirementVsIssueService::canView($request->user()), 403,
-            'Requirement vs Issue is available to the Store Head only.');
+            'You do not have access to Requirement vs Issue. Ask Admin.');
 
         $options = $this->report->options();
         $filters = $this->report->filters($request->query(), $options);

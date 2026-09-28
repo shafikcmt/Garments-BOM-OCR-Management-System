@@ -29,7 +29,7 @@
             </a>
         </li>
     @endif
-    {{-- Store Head (and Admin) only. The controller refuses everyone else
+    {{-- store.requirement_issue.view (and Admin) only. The controller refuses everyone else
          too; hiding the tab is presentation, not the guard. --}}
     @if(\App\Services\RequirementVsIssueService::canView($user))
         <li class="nav-item">

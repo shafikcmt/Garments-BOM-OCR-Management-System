@@ -50,25 +50,28 @@
 
     {{-- The Requested queue is Store-only and Department Review is for a
          department head, so the tab strip shows only to someone who has at
-         least one of those queues — a plain department user sees this screen
-         with no tabs at all, exactly as before. --}}
-    @if((auth()->user() && \App\Models\PurchaseRequisition::seesEveryRequisition(auth()->user())) || ($departmentReviewCount ?? null) !== null)
+         least one of those queues, or who holds the Requirement vs Issue
+         permission — a plain department user sees this screen with no tabs at
+         all, exactly as before. --}}
+    @if((auth()->user() && \App\Models\PurchaseRequisition::seesEveryRequisition(auth()->user()))
+        || ($departmentReviewCount ?? null) !== null
+        || \App\Services\RequirementVsIssueService::canView(auth()->user()))
         @include('store.stock.requisitions._tabs', ['active' => 'index'])
     @endif
 
-    {{-- Requested vs Purchased vs Pending, above the list it summarises. It
-         follows the Month filter below and the same visibility as the list, so
-         the figures always describe exactly the requisitions on this screen. --}}
-    <div class="card gx-stock-card mb-4">
-        <div class="gx-stock-card-body">
-            @include('store.stock.requisitions._fulfilment', [
-                'fulfilment' => $fulfilment,
-                'periodLabel' => $fulfilmentPeriod,
-                'limit' => 10,
-                'moreUrl' => null,
-            ])
+    {{-- The Stock Summary — Purchase View and Issue View. Store Head (and
+         Admin) only: the controller builds it for nobody else, so for every
+         other user this card is not in the page at all. --}}
+    @if($stockSummary)
+        <div class="card gx-stock-card mb-4" id="stock-summary">
+            <div class="gx-stock-card-body">
+                @include('store.stock.requisitions._stock-summary', [
+                    'stockSummary' => $stockSummary,
+                    'stockSummaryPage' => $stockSummaryPage,
+                ])
+            </div>
         </div>
-    </div>
+    @endif
 
     <div class="card gx-stock-card">
         <div class="gx-stock-card-body">

@@ -149,9 +149,9 @@ it('lets Admin in through the super-admin rule', function () {
     $this->actingAs($admin)->get(route('store.stock.requisitions.requirement-vs-issue'))->assertOk();
 });
 
-it('refuses everyone else, including Store staff holding the permission', function (string $role, bool $withPermission) {
+it('refuses everyone without the permission, Store staff included', function (string $role) {
     rviStoreHead();
-    $user = rviUser($role, $withPermission ? [RequirementVsIssueService::PERMISSION] : []);
+    $user = rviUser($role);
 
     $this->actingAs($user)->get(route('store.stock.requisitions.index'))->assertOk()->assertDontSee('Requirement vs Issue');
 
@@ -159,12 +159,30 @@ it('refuses everyone else, including Store staff holding the permission', functi
         $this->actingAs($user)->get(route('store.stock.requisitions.requirement-vs-issue'.$suffix))->assertForbidden();
     }
 })->with([
-    'store staff' => ['store', false],
-    'store staff with a stale grant' => ['store', true],
-    'management' => ['management', false],
-    'merchandising' => ['merchant', false],
-    'commercial' => ['commercial', false],
-    'accounts' => ['account', false],
+    'store staff' => ['store'],
+    'management' => ['management'],
+    'merchandising' => ['merchant'],
+    'commercial' => ['commercial'],
+    'accounts' => ['account'],
+]);
+
+it('admits anyone Admin grants the permission, whatever their role', function (string $role) {
+    rviStoreHead();
+    // Not the Store head: the permission alone opens it.
+    $user = rviUser($role, [RequirementVsIssueService::PERMISSION]);
+    if ($role === 'cutting') {
+        IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $user->id, 'is_active' => true]);
+    }
+
+    $this->actingAs($user)->get(route('store.stock.requisitions.index'))->assertOk()->assertSee('Requirement vs Issue');
+
+    foreach (['', '.excel', '.pdf'] as $suffix) {
+        $this->actingAs($user)->get(route('store.stock.requisitions.requirement-vs-issue'.$suffix))->assertOk();
+    }
+})->with([
+    'store staff' => ['store'],
+    'a department user' => ['production'],
+    'a section head' => ['cutting'],
 ]);
 
 it('gives the permission to the current Store head only when migrating', function () {
@@ -449,6 +467,7 @@ it('keeps checkbox mode opt-in: no other screen uses data-checkboxes', function 
     expect($users)->toEqualCanonicalizing([
         'store/stock/_searchable.blade.php',
         'store/stock/requisitions/requirement-vs-issue.blade.php',
+        'store/stock/requisitions/_stock-summary.blade.php',
     ]);
 
     // The plugin is only switched on under the attribute.
@@ -458,7 +477,7 @@ it('keeps checkbox mode opt-in: no other screen uses data-checkboxes', function 
 
 // --- Store head change -------------------------------------------------------
 
-it('gives the permission to each new Store head set on Admin > Departments, and moves access with it', function () {
+it('gives the permission to each new Store head set on Admin > Departments, and takes it from the old one', function () {
     $admin = rviUser('admin');
     $a = rviUser('store');
     $b = rviUser('store');
@@ -476,8 +495,10 @@ it('gives the permission to each new Store head set on Admin > Departments, and 
     $this->actingAs($b->fresh())->get(route('store.stock.requisitions.index'))->assertSee('Requirement vs Issue');
     $this->actingAs($b->fresh())->get(route('store.stock.requisitions.requirement-vs-issue'))->assertOk();
 
-    // A keeps the grant (nothing is revoked) but is no longer the head.
-    expect($a->fresh()->hasDirectPermission(RequirementVsIssueService::PERMISSION))->toBeTrue();
+    // The old head loses the permission when the head changes.
+    expect($a->fresh()->hasDirectPermission(RequirementVsIssueService::PERMISSION))->toBeFalse()
+        ->and($b->fresh()->hasDirectPermission(RequirementVsIssueService::PERMISSION))->toBeTrue();
+    $this->actingAs($a->fresh())->get(route('store.stock.requisitions.index'))->assertDontSee('Requirement vs Issue');
     $this->actingAs($a->fresh())->get(route('store.stock.requisitions.requirement-vs-issue'))->assertForbidden();
     $this->actingAs($a->fresh())->get(route('store.stock.requisitions.requirement-vs-issue.excel'))->assertForbidden();
 });

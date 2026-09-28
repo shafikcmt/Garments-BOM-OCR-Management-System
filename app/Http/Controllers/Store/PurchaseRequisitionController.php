@@ -18,11 +18,12 @@ use App\Services\DepartmentRequisitionDefaults;
 use App\Services\MonthlyRequisitionReportService;
 use App\Services\PurchaseRequisitionNumberGenerator;
 use App\Services\PurchaseRequisitionService;
-use App\Services\RequisitionFulfilmentService;
 use App\Services\RequisitionHeaderResolver;
 use App\Services\RequisitionHistory;
 use App\Services\RequisitionReviewChain;
 use App\Services\RequisitionSignatureResolver;
+use App\Services\RequirementVsIssueService;
+use App\Services\StockSummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -51,9 +52,9 @@ class PurchaseRequisitionController extends Controller
     public function __construct(
         private readonly PurchaseRequisitionService $requisitions,
         private readonly PurchaseRequisitionNumberGenerator $numbers,
-        private readonly RequisitionFulfilmentService $fulfilment,
         private readonly RequisitionSignatureResolver $signatures,
         private readonly RequisitionHistory $history,
+        private readonly StockSummaryService $stockSummary,
         private readonly RequisitionHeaderResolver $header,
     ) {
     }
@@ -106,10 +107,23 @@ class PurchaseRequisitionController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        // Requested vs Purchased vs Pending, under the SAME month the list is
-        // filtered by and the same visibility, so the summary describes the
-        // list it sits above rather than a different set of requisitions.
-        $month = $filters['month'] ?? null;
+        // The Stock Summary: only for users holding store.requirement_issue.view
+        // (and Admin) — the same check as Requirement vs Issue. Nobody else's screen runs its queries. It has
+        // its own filters under sum[...], separate from the list below.
+        $stockSummary = null;
+        $stockSummaryPage = null;
+
+        if (RequirementVsIssueService::canView($request->user())) {
+            $summaryInput = (array) $request->query('sum', []);
+            $stockSummary = $this->stockSummary->build($request->user(), $summaryInput);
+            $stockSummaryPage = $this->stockSummary->page(
+                $stockSummary['view'] === StockSummaryService::VIEW_ISSUE ? $stockSummary['issue']['rows'] : $stockSummary['purchase']['rows'],
+                (int) $request->query('sum_page', 1),
+                'sum_page',
+                $request->url(),
+                $request->except('sum_page'),
+            );
+        }
 
         return view('store.stock.requisitions.index', [
             'requisitions' => $requisitions,
@@ -127,10 +141,8 @@ class PurchaseRequisitionController extends Controller
             // The Department Review tab and its badge, for a department head.
             // Null hides the tab: a user who heads nothing has no such queue.
             'departmentReviewCount' => $this->departmentReviewCount($request->user()),
-            'fulfilment' => $this->fulfilment->summary($request->user(), ['month' => $month]),
-            'fulfilmentPeriod' => $month
-                ? Carbon::createFromFormat('!Y-m', $month)->format('F Y')
-                : 'All dates',
+            'stockSummary' => $stockSummary,
+            'stockSummaryPage' => $stockSummaryPage,
         ]);
     }
 

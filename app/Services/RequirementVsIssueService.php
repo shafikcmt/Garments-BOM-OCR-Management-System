@@ -90,25 +90,15 @@ class RequirementVsIssueService
     }
 
     /**
-     * Who may open this view: the current Store department head holding the
-     * permission, and Admin (the super-admin rule gives Admin every
-     * permission; the head check is waived for Admin the same way).
-     *
-     * Both halves, so a grant left behind when the head changes opens
-     * nothing.
+     * Who may open this view, the Stock Summary card and their exports:
+     * whoever holds store.requirement_issue.view. Purely the permission — no
+     * role or department is hard-coded. Admin grants or revokes it per user
+     * on the user permission screen, and passes it through the super-admin
+     * rule. The Store head gets it automatically (see Department::booted).
      */
     public static function canView(?User $user): bool
     {
-        if (! $user) {
-            return false;
-        }
-
-        if ($user->hasRole('admin')) {
-            return true;
-        }
-
-        return $user->hasPermissionTo(self::PERMISSION)
-            && (int) Department::where('key', 'store')->value('head_user_id') === (int) $user->id;
+        return $user !== null && $user->can(self::PERMISSION);
     }
 
     /**
@@ -128,6 +118,28 @@ class RequirementVsIssueService
         $user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate(self::PERMISSION, 'web'));
 
         \Illuminate\Support\Facades\Log::info('Requirement vs Issue permission granted to the new Store head.', [
+            'user_id' => $user->id,
+            'user' => $user->name,
+            'by_user_id' => auth()->id(),
+        ]);
+    }
+
+    /**
+     * Take the permission back from a Store head who has been replaced. A
+     * direct grant only — Admin can give it back by hand on the user
+     * permission screen. Logged like the grant.
+     */
+    public static function revokeFromOldStoreHead(int $userId): void
+    {
+        $user = User::find($userId);
+
+        if (! $user || ! $user->hasDirectPermission(self::PERMISSION)) {
+            return;
+        }
+
+        $user->revokePermissionTo(self::PERMISSION);
+
+        \Illuminate\Support\Facades\Log::info('Requirement vs Issue permission revoked from the previous Store head.', [
             'user_id' => $user->id,
             'user' => $user->name,
             'by_user_id' => auth()->id(),

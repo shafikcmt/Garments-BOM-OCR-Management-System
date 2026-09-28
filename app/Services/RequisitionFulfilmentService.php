@@ -37,12 +37,17 @@ class RequisitionFulfilmentService
      * One row per item: what was requested, what has been received, what is
      * still outstanding.
      *
+     * $companyWide: every requisition, whoever is asking — for the Stock
+     * Summary card, whose access (store.requirement_issue.view) already means
+     * "sees the whole company". Off by default: every other caller keeps the
+     * per-user visibility it has always had.
+     *
      * @param  array{month?: string|null, from?: string|null, to?: string|null}  $filters
      * @return array{rows: Collection<int, array<string, mixed>>, totals: array<string, float|int>, scoped: bool}
      */
-    public function summary(?User $user, array $filters = []): array
+    public function summary(?User $user, array $filters = [], bool $companyWide = false): array
     {
-        $requested = $this->requestedByItem($user, $filters);
+        $requested = $this->requestedByItem($user, $filters, $companyWide);
         $purchased = $this->purchasedByItem($filters);
         $onHand = $this->stockOnHand($requested->pluck('item_id')->all());
 
@@ -87,7 +92,7 @@ class RequisitionFulfilmentService
             ],
             // Whether the figures describe this user's own requisitions or the
             // whole company, so the widget can say which it is showing.
-            'scoped' => $user !== null && ! PurchaseRequisition::seesEveryRequisition($user),
+            'scoped' => ! $companyWide && $user !== null && ! PurchaseRequisition::seesEveryRequisition($user),
         ];
     }
 
@@ -104,7 +109,7 @@ class RequisitionFulfilmentService
      * @param  array<string, mixed>  $filters
      * @return Collection<int, array<string, mixed>>
      */
-    private function requestedByItem(?User $user, array $filters): Collection
+    private function requestedByItem(?User $user, array $filters, bool $companyWide = false): Collection
     {
         $query = PurchaseRequisitionItem::query()
             ->join('purchase_requisitions', 'purchase_requisitions.id', '=', 'purchase_requisition_items.purchase_requisition_id')
@@ -115,12 +120,12 @@ class RequisitionFulfilmentService
             ->leftJoin('stock_items', 'stock_items.id', '=', 'purchase_requisition_items.stock_item_id')
             ->whereIn('purchase_requisitions.id', PurchaseRequisition::query()
                 ->countedInTotals()
-                ->visibleTo($user)
+                ->unless($companyWide, fn ($q) => $q->visibleTo($user))
                 ->select('id'))
             // Only for a viewer who also sees the final sheets: a department
             // user never sees the Store's consolidated sheet, so hiding their
             // line would make their own request vanish from their summary.
-            ->when($user && PurchaseRequisition::seesEveryRequisition($user),
+            ->when($companyWide || ($user && PurchaseRequisition::seesEveryRequisition($user)),
                 fn ($q) => $q->notRepeatedOnFinalSheet());
 
         $this->applyPeriod($query, $filters, 'purchase_requisitions.requisition_date');

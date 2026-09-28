@@ -15,6 +15,7 @@ use App\Http\Controllers\Store\StockSetupController;
 use App\Http\Controllers\Store\PurchaseRequisitionController;
 use App\Http\Controllers\Store\MonthlyRequisitionReportController;
 use App\Http\Controllers\Store\RequirementVsIssueController;
+use App\Http\Controllers\Store\StockSummaryController;
 use App\Http\Controllers\Store\ReceivingReportController;
 use App\Http\Controllers\Store\IssueReportController;
 use App\Http\Controllers\Store\MaterialReceivingController;
@@ -382,8 +383,8 @@ Route::prefix('store')
                 ->name('requisitions.report.excel');
 
             // Requirement vs Issue — requested against issued, per section
-            // and item. Store Head (and Admin) only: the controller checks
-            // the permission AND that the user is the current Store head.
+            // and item. The controller checks store.requirement_issue.view
+            // (Admin passes it too).
             // Fixed paths, so declared above /{requisition}.
             Route::get('/requisitions/requirement-vs-issue', [RequirementVsIssueController::class, 'index'])
                 ->name('requisitions.requirement-vs-issue');
@@ -391,6 +392,13 @@ Route::prefix('store')
                 ->name('requisitions.requirement-vs-issue.excel');
             Route::get('/requisitions/requirement-vs-issue/pdf', [RequirementVsIssueController::class, 'pdf'])
                 ->name('requisitions.requirement-vs-issue.pdf');
+
+            // The Stock Summary card's exports, in the view it shows. Store Head
+            // (and Admin) only, checked in the controller like the report above.
+            Route::get('/requisitions/stock-summary/excel', [StockSummaryController::class, 'excel'])
+                ->name('requisitions.stock-summary.excel');
+            Route::get('/requisitions/stock-summary/pdf', [StockSummaryController::class, 'pdf'])
+                ->name('requisitions.stock-summary.pdf');
 
             // The Store's review queue: requisitions the DEPARTMENTS sent in.
             // Declared above /{requisition} so "requested" is never taken for a

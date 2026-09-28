@@ -67,7 +67,7 @@ class PermissionCatalog
         'receiving' => 'Receiving',
         'issues' => 'Issues',
         'requisition' => 'Purchase Requisition',
-        'requirement_issue' => 'Requirement vs Issue',
+        'requirement_issue' => 'Requisition Summary & Requirement vs Issue (view + export)',
         'setup' => 'Setup',
 
         // Buyer / Style Stock
