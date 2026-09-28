@@ -63,6 +63,53 @@
     <form method="POST" action="{{ route('admin.requisition-signatures.update') }}" id="signatureSettingsForm">
         @csrf
 
+        {{-- The header block printed on every requisition. Saved on each
+             submit as the requisition's own copy, so changing these later
+             does not rewrite a document already sent. --}}
+        @php
+            $pickable = function (?int $chosen) use ($users) {
+                // A chosen user who has since been deactivated still shows,
+                // so the admin can see who it is and replace them.
+                return $chosen && ! $users->contains('id', $chosen)
+                    ? $users->concat(\App\Models\User::whereKey($chosen)->get())
+                    : $users;
+            };
+        @endphp
+        <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--gx-radius);">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-1">Document Header</h5>
+                <p class="text-muted small mb-3">Printed in the header of every Purchase Requisition. Each requisition keeps the values it was submitted with.</p>
+                <div class="row g-3">
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label fw-semibold" for="headerUnitName">Name of Unit</label>
+                        <input type="text" name="header_unit_name" id="headerUnitName" class="form-control" maxlength="255"
+                               value="{{ old('header_unit_name', $header['unit_name']) }}" placeholder="{{ $companyName }}">
+                        <div class="form-text">Leave empty to use {{ $companyName }}.</div>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label fw-semibold" for="headerStorePersonnel">Store Personnel</label>
+                        <select name="header_store_personnel" id="headerStorePersonnel" class="form-select js-searchable" placeholder="Store department head">
+                            <option value="">Store department head</option>
+                            @foreach($pickable($header['store_personnel']) as $u)
+                                <option value="{{ $u->id }}" @selected((int) old('header_store_personnel', $header['store_personnel']) === $u->id)>{{ $u->name }} — {{ $u->email }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-text">Name, designation, department, phone and email in the Store Personnel box.</div>
+                    </div>
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label fw-semibold" for="headerContactPerson">Contact Person (final sheet)</label>
+                        <select name="header_contact_person" id="headerContactPerson" class="form-select js-searchable" placeholder="The person who prepared the sheet">
+                            <option value="">The person who prepared the sheet</option>
+                            @foreach($pickable($header['contact_person']) as $u)
+                                <option value="{{ $u->id }}" @selected((int) old('header_contact_person', $header['contact_person']) === $u->id)>{{ $u->name }} — {{ $u->email }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-text">Contact No. / Email on the Store's final sheet. A department sheet shows the requester's own.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row g-4">
 
             @foreach($levels as $level => $levelLabel)

@@ -109,6 +109,10 @@ class PurchaseRequisition extends Model
         'accounts_ack_at' => 'datetime',
         'checked_at' => 'datetime',
         'approved_at' => 'datetime',
+        // Written only by RequisitionHeaderResolver::snapshot() — deliberately
+        // not fillable, so no form can post one.
+        'header_snapshot' => 'array',
+        'header_snapshot_at' => 'datetime',
     ];
 
     /** @return array<string, string> status => label */

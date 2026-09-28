@@ -136,13 +136,13 @@
                     <dl class="row gx-stock-dl">
                         <dt class="col-5">Requisition No</dt><dd class="col-7">{{ $requisition->requisition_no }}</dd>
                         <dt class="col-5">Requisition Date</dt><dd class="col-7">{{ optional($requisition->requisition_date)->format('d F Y') ?? '—' }}</dd>
-                        <dt class="col-5">Name of Unit</dt><dd class="col-7">{{ $requisition->unit_name ?: '—' }}</dd>
-                        <dt class="col-5">Section</dt><dd class="col-7">{{ optional($requisition->indentSection)->name ?: 'All' }}</dd>
-                        {{-- A department sheet's requester is its department
-                             head, resolved from settings rather than picked
-                             from the indent-person list. --}}
-                        <dt class="col-5">Name of User</dt><dd class="col-7">{{ optional($requisition->indentPerson)->name ?: ($departmentHeadName ?? null) ?: '—' }}</dd>
-                        <dt class="col-5">Contact No. / Email</dt><dd class="col-7">{{ $requisition->contact ?: '—' }}</dd>
+                        {{-- The snapshot from the last submit; an older sheet
+                             reads its own saved columns, as before. --}}
+                        @php($header = app(\App\Services\RequisitionHeaderResolver::class)->forDocument($requisition, $departmentHeadName ?? null))
+                        <dt class="col-5">Name of Unit</dt><dd class="col-7">{{ $header['unit_name'] ?: '—' }}</dd>
+                        <dt class="col-5">Section</dt><dd class="col-7">{{ $header['section'] ?: 'All' }}</dd>
+                        <dt class="col-5">Name of User</dt><dd class="col-7">{{ $header['user_name'] ?: '—' }}</dd>
+                        <dt class="col-5">Contact No. / Email</dt><dd class="col-7">{{ $header['contact'] ?: '—' }}</dd>
                     </dl>
                 </div>
                 <div class="col-12 col-lg-6">

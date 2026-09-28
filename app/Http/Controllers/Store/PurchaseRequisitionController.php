@@ -19,6 +19,7 @@ use App\Services\MonthlyRequisitionReportService;
 use App\Services\PurchaseRequisitionNumberGenerator;
 use App\Services\PurchaseRequisitionService;
 use App\Services\RequisitionFulfilmentService;
+use App\Services\RequisitionHeaderResolver;
 use App\Services\RequisitionHistory;
 use App\Services\RequisitionReviewChain;
 use App\Services\RequisitionSignatureResolver;
@@ -53,6 +54,7 @@ class PurchaseRequisitionController extends Controller
         private readonly RequisitionFulfilmentService $fulfilment,
         private readonly RequisitionSignatureResolver $signatures,
         private readonly RequisitionHistory $history,
+        private readonly RequisitionHeaderResolver $header,
     ) {
     }
 
@@ -574,6 +576,10 @@ class PurchaseRequisitionController extends Controller
 
             $this->syncItems($requisition, $data['items'], $date);
 
+            if ($submitting) {
+                $this->header->snapshot($requisition);
+            }
+
             $this->history->record($requisition, $submitting
                 ? PurchaseRequisitionAction::SUBMITTED
                 : PurchaseRequisitionAction::CREATED, [
@@ -849,6 +855,10 @@ class PurchaseRequisitionController extends Controller
                     )],
                 ]);
             } elseif ($data['action'] === 'submit') {
+                // Every (re)submit refreshes the header snapshot; a Store
+                // correction (the branch above) never does.
+                $this->header->snapshot($requisition);
+
                 $this->history->record($requisition, $wasReturned
                     ? PurchaseRequisitionAction::RESUBMITTED
                     : PurchaseRequisitionAction::SUBMITTED, [

@@ -126,11 +126,15 @@ it('fills Requested By and Contact from the department head, ignoring what is po
     expect($requisition->contact)->toBe($head->email)
         ->and($requisition->indent_person_id)->toBeNull();
 
-    // The sheet names the head as its user, on screen and in the document.
+    // Step 2: the printed header of a NEW sheet names its raiser as the user,
+    // from the snapshot taken on submit. (The saved contact column above is
+    // untouched; old sheets without a snapshot still print the head.)
     $this->actingAs($user)
         ->get(route('store.stock.requisitions.show', $requisition))
         ->assertOk()
-        ->assertSee($head->name);
+        ->assertSee($user->name);
+
+    expect($requisition->header_snapshot['user_name'])->toBe($user->name);
 });
 
 it('keeps the open Section and Requested By fields when nothing is configured for the department', function () {

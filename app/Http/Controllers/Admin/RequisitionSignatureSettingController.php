@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AppSetting;
 use App\Models\RequisitionSignatureBlock;
 use App\Models\User;
+use App\Services\RequisitionHeaderResolver;
 use App\Services\RequisitionSignatureResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +47,14 @@ class RequisitionSignatureSettingController extends Controller
             // since deactivated is still shown by the view so the admin can
             // see who the box points at and replace them.
             'users' => User::query()->where('status', 1)->orderBy('name')->get(),
+            // The document header: Name of Unit, and the two people the
+            // header names. Read by RequisitionHeaderResolver.
+            'header' => [
+                'unit_name' => AppSetting::get(RequisitionHeaderResolver::SETTING_UNIT_NAME, ''),
+                'store_personnel' => (int) AppSetting::get(RequisitionHeaderResolver::SETTING_STORE_PERSONNEL, 0) ?: null,
+                'contact_person' => (int) AppSetting::get(RequisitionHeaderResolver::SETTING_CONTACT_PERSON, 0) ?: null,
+            ],
+            'companyName' => config('stock.company_name'),
         ]);
     }
 
@@ -62,6 +72,9 @@ class RequisitionSignatureSettingController extends Controller
             'blocks.*.*.role_name' => ['nullable', Rule::in($roles)],
             'blocks.*.*.user_id' => ['nullable', 'integer', 'exists:users,id'],
             'blocks.*.*.stamp_source' => ['nullable', Rule::in(array_filter(array_keys(RequisitionSignatureBlock::stampSourceLabels())))],
+            'header_unit_name' => ['nullable', 'string', 'max:255'],
+            'header_store_personnel' => ['nullable', 'integer', 'exists:users,id'],
+            'header_contact_person' => ['nullable', 'integer', 'exists:users,id'],
         ], [
             'blocks.*.*.label.required' => 'Every signature box needs a label.',
         ]);
@@ -97,6 +110,12 @@ class RequisitionSignatureSettingController extends Controller
                     ]);
                 }
             }
+
+            // The document header settings. Empty clears a setting, and the
+            // resolver then falls back (company name / Store head / preparer).
+            AppSetting::put(RequisitionHeaderResolver::SETTING_UNIT_NAME, trim((string) ($data['header_unit_name'] ?? '')));
+            AppSetting::put(RequisitionHeaderResolver::SETTING_STORE_PERSONNEL, (string) ($data['header_store_personnel'] ?? ''));
+            AppSetting::put(RequisitionHeaderResolver::SETTING_CONTACT_PERSON, (string) ($data['header_contact_person'] ?? ''));
         });
 
         return redirect()

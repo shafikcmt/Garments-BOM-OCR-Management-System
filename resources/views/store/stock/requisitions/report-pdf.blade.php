@@ -49,7 +49,10 @@
 
     $typeLabels = \App\Models\PurchaseRequisitionItem::typeLabels();
 
+    // Letterhead: always the company. "Name of Unit": the requisition setting
+    // (Admin > Requisition Signatures), defaulting to the company name.
     $unit = config('stock.company_name');
+    $unitName = \App\Services\RequisitionHeaderResolver::unitName();
     $headingNo = 'Monthly — '.$monthLabel;
 @endphp
 <!doctype html>
@@ -85,7 +88,7 @@
             <td class="label">Prepared By</td><td class="value">{{ optional(auth()->user())->name ?: '—' }}</td>
         </tr>
         <tr>
-            <td class="label">Name of Unit</td><td class="value">{{ $unit }}</td>
+            <td class="label">Name of Unit</td><td class="value">{{ $unitName }}</td>
             <td class="label">Requisitions</td><td class="value">{{ $summary['requisitions'] }}</td>
         </tr>
         <tr>
@@ -112,15 +115,11 @@
          Type sizes, row heights and alignment come from FormatsStoreSheet;
          HTML cannot carry them into a spreadsheet. --}}
     @php
-        $signer = auth()->user();
-
-        // Guarded rather than optional()-chained: optional() protects the first
-        // call, but getRoleNames() would then return null and ->first() on null
-        // is fatal. The export also has to survive being generated without a
-        // session — a queued or scheduled run has no auth()->user().
-        $signerRole = $signer && $signer->getRoleNames()->isNotEmpty()
-            ? $signer->getRoleNames()->first()
-            : 'Store';
+        // The Store Personnel box: the user chosen on Admin > Requisition
+        // Signatures, else the Store department head — no longer whoever
+        // happened to download the file. Same five cells as before:
+        // heading, name, designation, department, email.
+        $storePersonnel = app(\App\Services\RequisitionHeaderResolver::class)->storePersonnel();
 
         $columns = 21;
         $labelSpan = 4;
@@ -131,10 +130,10 @@
         // stands behind it. Both read top to bottom, as on the paper form.
         $infoRows = [
             ['Requisition No', $headingNo, 'Store Personnel'],
-            ['Requisition Date', $monthLabel, optional($signer)->name ?: '—'],
-            ['Name of Unit', $unit, $signerRole],
-            ['Section', array_key_first($sections), 'Store & Warehouse'],
-            ['Name of User', 'ALL', optional($signer)->email ?: '—'],
+            ['Requisition Date', $monthLabel, $storePersonnel['name'] ?: '—'],
+            ['Name of Unit', $unitName, $storePersonnel['designation'] ?: '—'],
+            ['Section', array_key_first($sections), $storePersonnel['department'] ?: '—'],
+            ['Name of User', 'ALL', $storePersonnel['email'] ?: '—'],
             ['Listing', $merge ? 'Merged — one line per item' : 'One line per requisition', ''],
         ];
     @endphp

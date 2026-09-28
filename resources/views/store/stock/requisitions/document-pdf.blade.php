@@ -31,12 +31,20 @@
 
     $typeLabels = \App\Models\PurchaseRequisitionItem::typeLabels();
 
-    // The requisition's own unit, falling back to the configured company name —
-    // an older record may have been saved before the field was filled.
-    $unit = $requisition->unit_name ?: config('stock.company_name');
+    // The header values: the snapshot taken at the last submit, or — for a
+    // sheet raised before snapshots — its own saved columns, exactly as
+    // printed before. See RequisitionHeaderResolver.
+    $header = app(\App\Services\RequisitionHeaderResolver::class)->forDocument($requisition, $departmentHeadName ?? null);
+
+    // The letterhead always carries the company name; "Name of Unit" is the
+    // header value, falling back to the company name as it always has.
+    $company = config('stock.company_name');
+    $unit = $header['unit_name'] ?: $company;
+    // An old sheet keeps the letterhead it always printed (its own unit).
+    $letterhead = $header['snapshot'] ? $company : $unit;
 
     $requisitionDate = optional($requisition->requisition_date)->format('d F Y') ?: '-';
-    $section = optional($requisition->indentSection)->name ?: 'All';
+    $section = $header['section'] ?: 'All';
 
     // Left column: what the document is. Right column: who handled it — one
     // line per configured signature box, reading name · date once the
@@ -51,8 +59,8 @@
         ['Requisition Date', $requisitionDate],
         ['Name of Unit', $unit],
         ['Section', $section],
-        ['Name of User', optional($requisition->indentPerson)->name ?: (($departmentHeadName ?? null) ?: '-')],
-        ['Contact No. / Email', $requisition->contact ?: '-'],
+        ['Name of User', $header['user_name'] ?: '-'],
+        ['Contact No. / Email', $header['contact'] ?: '-'],
         // A department's sheet says where it is in the department's words
         // ("With Department Head"); the Store's own keeps the status name.
         ['Status', $requisition->isDepartmentLevel() ? $requisition->progressLabel() : $requisition->statusLabel()],
@@ -91,7 +99,7 @@
         <tr>
             <td style="width:25%;">&nbsp;</td>
             <td style="width:50%;">
-                <div class="company">{{ $unit }}</div>
+                <div class="company">{{ $letterhead }}</div>
                 <div class="title">{{ $title }}</div>
             </td>
             <td style="width:25%;" class="date-area">
@@ -123,7 +131,7 @@
         $rightValueSpan = $columns - $labelSpan - $valueSpan - $rightLabelSpan;
     @endphp
     <table>
-        <tr><td colspan="{{ $columns }}">{{ $unit }}</td></tr>
+        <tr><td colspan="{{ $columns }}">{{ $letterhead }}</td></tr>
         <tr><td colspan="{{ $columns }}">{{ $title }}</td></tr>
         @foreach($infoRows as [$label, $value, $rightLabel, $rightValue])
             <tr>
@@ -163,7 +171,7 @@
     @include('store.stock.requisitions._signature-block', ['signatures' => $signatures, 'forExcel' => false])
 
     <div class="footer">
-        {{ $unit }} &mdash; {{ $title }} &mdash; {{ $requisition->requisition_no }}
+        {{ $letterhead }} &mdash; {{ $title }} &mdash; {{ $requisition->requisition_no }}
         <span class="right">Generated {{ now()->format('d M Y') }}</span>
     </div>
 @else
