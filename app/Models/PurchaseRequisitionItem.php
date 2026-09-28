@@ -123,6 +123,80 @@ class PurchaseRequisitionItem extends Model
         ];
     }
 
+    /**
+     * Leaves out department lines a counted final sheet repeats, so the
+     * Store's consolidated sheet and the department's own are not both
+     * counted. Interim, until final sheets link to the department sheets
+     * they merge (Step 4).
+     *
+     * A department line is repeated when a final sheet in countedInTotals(),
+     * dated in the same month, carries the same item: the same stock item,
+     * or — for a typed item with no stock item — the same name, compared
+     * trimmed, case-insensitive and with spaces collapsed. A department line
+     * the final sheet does not carry still counts.
+     *
+     * Matched in PHP rather than SQL: the month comparison would need a
+     * different date function per database (MySQL live-dev, PostgreSQL live,
+     * SQLite tests), and the lines involved are few.
+     */
+    public function scopeNotRepeatedOnFinalSheet(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->whereNotIn($query->getModel()->getTable().'.id', self::repeatedOnFinalSheetIds());
+    }
+
+    /** @return list<int> ids of the department lines a final sheet repeats */
+    public static function repeatedOnFinalSheetIds(): array
+    {
+        $counted = fn (string $level) => self::query()
+            ->join('purchase_requisitions', 'purchase_requisitions.id', '=', 'purchase_requisition_items.purchase_requisition_id')
+            ->whereIn('purchase_requisitions.id', PurchaseRequisition::query()->countedInTotals()->select('id'))
+            ->where('purchase_requisitions.level', $level)
+            ->get([
+                'purchase_requisition_items.id',
+                'purchase_requisition_items.stock_item_id',
+                'purchase_requisition_items.custom_item_name',
+                'purchase_requisitions.requisition_date',
+            ]);
+
+        $onFinal = [];
+
+        foreach ($counted(PurchaseRequisition::LEVEL_FINAL) as $line) {
+            if ($key = self::monthItemKey($line)) {
+                $onFinal[$key] = true;
+            }
+        }
+
+        if ($onFinal === []) {
+            return [];
+        }
+
+        return $counted(PurchaseRequisition::LEVEL_DEPARTMENT)
+            ->filter(fn ($line) => isset($onFinal[self::monthItemKey($line) ?? '']))
+            ->map(fn ($line) => (int) $line->id)
+            ->values()
+            ->all();
+    }
+
+    /** "2026-08|item:56" / "2026-08|name:hand sanitiser 5l", or null for a line naming nothing. */
+    private static function monthItemKey(self $line): ?string
+    {
+        $date = $line->requisition_date;
+
+        if (! $date) {
+            return null;
+        }
+
+        $month = \Illuminate\Support\Carbon::parse($date)->format('Y-m');
+
+        if ($line->stock_item_id) {
+            return $month.'|item:'.$line->stock_item_id;
+        }
+
+        $name = mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string) $line->custom_item_name)));
+
+        return $name === '' ? null : $month.'|name:'.$name;
+    }
+
     public function requisition()
     {
         return $this->belongsTo(PurchaseRequisition::class, 'purchase_requisition_id');

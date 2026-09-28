@@ -97,7 +97,9 @@ class RequisitionFulfilmentService
      * Only sheets in PurchaseRequisition::countedInTotals() count: no drafts,
      * and no department sheet still with its head or returned by one — the
      * store has not been told about that demand yet. The Monthly Requisition
-     * report reads the same scope.
+     * report reads the same scope. A department line a final sheet of the
+     * same month repeats counts once (PurchaseRequisitionItem::
+     * notRepeatedOnFinalSheet()).
      *
      * @param  array<string, mixed>  $filters
      * @return Collection<int, array<string, mixed>>
@@ -114,7 +116,12 @@ class RequisitionFulfilmentService
             ->whereIn('purchase_requisitions.id', PurchaseRequisition::query()
                 ->countedInTotals()
                 ->visibleTo($user)
-                ->select('id'));
+                ->select('id'))
+            // Only for a viewer who also sees the final sheets: a department
+            // user never sees the Store's consolidated sheet, so hiding their
+            // line would make their own request vanish from their summary.
+            ->when($user && PurchaseRequisition::seesEveryRequisition($user),
+                fn ($q) => $q->notRepeatedOnFinalSheet());
 
         $this->applyPeriod($query, $filters, 'purchase_requisitions.requisition_date');
 

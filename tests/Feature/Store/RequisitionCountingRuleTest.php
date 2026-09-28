@@ -51,7 +51,10 @@ function seedEveryCountingState(User $by, StockItem $item): void
     countingSheet($by, $item, 4, $department + ['status' => PurchaseRequisition::STATUS_DRAFT]);
     countingSheet($by, $item, 10, $department + ['department_review_status' => PurchaseRequisition::DEPT_REVIEW_APPROVED]);
     countingSheet($by, $item, 20, $department + ['department_review_status' => null]);
-    countingSheet($by, $item, 100, ['level' => PurchaseRequisition::LEVEL_FINAL, 'status' => PurchaseRequisition::STATUS_APPROVED]);
+    // A different item: a final sheet repeating a department item would be
+    // counted once instead, which is its own rule, tested further down.
+    $other = StockItem::firstOrCreate(['name' => 'Final Sheet Item'], ['uom' => 'Pcs', 'is_active' => true]);
+    countingSheet($by, $other, 100, ['level' => PurchaseRequisition::LEVEL_FINAL, 'status' => PurchaseRequisition::STATUS_APPROVED]);
 }
 
 beforeEach(function () {
@@ -75,9 +78,9 @@ it('applies the same rule to the Stock Summary', function () {
 
     $row = app(RequisitionFulfilmentService::class)
         ->summary($this->store, ['month' => '2026-08'])
-        ['rows']->firstWhere('item_id', $this->item->id);
+        ['rows'];
 
-    expect($row['requested'])->toBe(130.0);
+    expect($row->sum('requested'))->toBe(130.0);
 });
 
 it('applies the same rule to the Monthly Requisition report', function () {
@@ -100,4 +103,74 @@ it('starts counting a sheet the moment its head approves it', function () {
     $sheet->update(['department_review_status' => PurchaseRequisition::DEPT_REVIEW_APPROVED]);
 
     expect(PurchaseRequisition::countedInTotals()->pluck('id')->all())->toBe([$sheet->id]);
+});
+
+// --- Interim: a department line a final sheet repeats counts once -----------
+
+/** A department sheet (head-approved) and a final sheet, one line each. */
+function repeatSheet(User $by, string $level, array $line, string $date = '2026-08-10'): PurchaseRequisition
+{
+    $sheet = PurchaseRequisition::create([
+        'requisition_no' => 'REP-'.uniqid(),
+        'requisition_date' => $date,
+        'mode' => PurchaseRequisition::MODE_MULTI,
+        'level' => $level,
+        'department_role' => $level === PurchaseRequisition::LEVEL_DEPARTMENT ? 'production' : null,
+        'status' => PurchaseRequisition::STATUS_SUBMITTED,
+        'department_review_status' => $level === PurchaseRequisition::LEVEL_DEPARTMENT ? PurchaseRequisition::DEPT_REVIEW_APPROVED : null,
+        'submitted_at' => now(),
+        'created_by' => $by->id,
+    ]);
+
+    PurchaseRequisitionItem::create($line + ['purchase_requisition_id' => $sheet->id, 'sort_order' => 1]);
+
+    return $sheet;
+}
+
+function monthlyQty(): float
+{
+    return (float) app(MonthlyRequisitionReportService::class)->rows(Carbon::create(2026, 8, 1))->sum('qty_requested');
+}
+
+it('counts an item on both a department sheet and that month\'s final sheet once', function () {
+    repeatSheet($this->store, PurchaseRequisition::LEVEL_DEPARTMENT, ['stock_item_id' => $this->item->id, 'qty_requested' => 40]);
+    repeatSheet($this->store, PurchaseRequisition::LEVEL_FINAL, ['stock_item_id' => $this->item->id, 'qty_requested' => 45]);
+    // A typed item, matched on its name whatever the case and spacing.
+    repeatSheet($this->store, PurchaseRequisition::LEVEL_DEPARTMENT, ['custom_item_name' => 'Hand  Sanitiser 5L ', 'qty_requested' => 3]);
+    repeatSheet($this->store, PurchaseRequisition::LEVEL_FINAL, ['custom_item_name' => 'hand sanitiser 5l', 'qty_requested' => 4]);
+
+    $row = app(RequisitionFulfilmentService::class)->summary($this->store, ['month' => '2026-08'])
+        ['rows']->firstWhere('item_id', $this->item->id);
+
+    // The final sheet's figures: 45 and 4, not 85 and 7.
+    expect($row['requested'])->toBe(45.0)
+        ->and(monthlyQty())->toBe(49.0);
+});
+
+it('still counts a department item the final sheet does not carry', function () {
+    $other = StockItem::create(['name' => 'Machine Oil', 'uom' => 'Ltr', 'is_active' => true]);
+    repeatSheet($this->store, PurchaseRequisition::LEVEL_DEPARTMENT, ['stock_item_id' => $this->item->id, 'qty_requested' => 40]);
+    repeatSheet($this->store, PurchaseRequisition::LEVEL_FINAL, ['stock_item_id' => $other->id, 'qty_requested' => 5]);
+
+    expect(monthlyQty())->toBe(45.0);
+});
+
+it('counts a department sheet in a month with no final sheet', function () {
+    repeatSheet($this->store, PurchaseRequisition::LEVEL_DEPARTMENT, ['stock_item_id' => $this->item->id, 'qty_requested' => 40]);
+    // Same item on a final sheet, but in September.
+    repeatSheet($this->store, PurchaseRequisition::LEVEL_FINAL, ['stock_item_id' => $this->item->id, 'qty_requested' => 45], '2026-09-02');
+
+    expect(monthlyQty())->toBe(40.0);
+});
+
+it('keeps a department user\'s own line in their summary, which never shows the final sheet', function () {
+    Role::findOrCreate('production', 'web');
+    $raiser = User::factory()->create()->assignRole('production');
+    repeatSheet($raiser, PurchaseRequisition::LEVEL_DEPARTMENT, ['stock_item_id' => $this->item->id, 'qty_requested' => 40]);
+    repeatSheet($this->store, PurchaseRequisition::LEVEL_FINAL, ['stock_item_id' => $this->item->id, 'qty_requested' => 45]);
+
+    $row = app(RequisitionFulfilmentService::class)->summary($raiser, ['month' => '2026-08'])
+        ['rows']->firstWhere('item_id', $this->item->id);
+
+    expect($row['requested'])->toBe(40.0);
 });

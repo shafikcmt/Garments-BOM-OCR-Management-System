@@ -182,6 +182,7 @@ class MonthlyRequisitionReportService
                     ->whereMonth('requisition_date', $monthStart->month)
                     ->countedInTotals();
             })
+            ->notRepeatedOnFinalSheet()
             ->when($filters['category'] ?? null, fn ($q, $category) => $q->whereHas(
                 'itemCategory',
                 fn ($c) => $c->where('name', $category)
