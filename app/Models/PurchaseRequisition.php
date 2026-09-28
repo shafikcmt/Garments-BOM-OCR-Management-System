@@ -113,6 +113,8 @@ class PurchaseRequisition extends Model
         // not fillable, so no form can post one.
         'header_snapshot' => 'array',
         'header_snapshot_at' => 'datetime',
+        'workflow_version' => 'integer',
+        'current_stage' => 'integer',
     ];
 
     /** @return array<string, string> status => label */
@@ -407,6 +409,12 @@ class PurchaseRequisition extends Model
      */
     public function isOpenToStoreCorrection(): bool
     {
+        // A stage-engine sheet is edited only by its raiser (draft or
+        // returned); approvers change quantities at their own stage instead.
+        if ($this->usesStageEngine()) {
+            return false;
+        }
+
         return in_array($this->status, [
             self::STATUS_SUBMITTED,
             self::STATUS_STORE_REVIEWED,
@@ -416,6 +424,18 @@ class PurchaseRequisition extends Model
     public function items()
     {
         return $this->hasMany(PurchaseRequisitionItem::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /** On the stage engine (RequisitionWorkflow), rather than the old flow. */
+    public function usesStageEngine(): bool
+    {
+        return $this->workflow_version !== null;
+    }
+
+    /** Every cycle's approval plan. */
+    public function stages()
+    {
+        return $this->hasMany(PurchaseRequisitionStage::class)->orderBy('cycle')->orderBy('sequence');
     }
 
     /** The sheet's history, newest first. */
@@ -544,6 +564,9 @@ class PurchaseRequisition extends Model
      */
     public function awaitingStoreReceipt(): bool
     {
+        // True on either flow: the sheet is with the Store. On the stage
+        // engine the Store acts through its Store Head stage, not the old
+        // Received button — the controller and the buttons check that.
         return $this->status === self::STATUS_SUBMITTED && ! $this->heldByDepartmentHead();
     }
 
@@ -669,6 +692,10 @@ class PurchaseRequisition extends Model
                     ->where('status', '<>', self::STATUS_DRAFT)
                     ->whereIn('indent_section_id', $sections));
             }
+
+            // Anyone named on a stage of the sheet's approval plan (HR Audit,
+            // Finance…) must be able to open what they are asked to approve.
+            $q->orWhereHas('stages', fn (Builder $st) => $st->where('assignee_user_id', $user->id));
         });
     }
 
@@ -680,6 +707,10 @@ class PurchaseRequisition extends Model
         }
 
         if (self::seesEveryRequisition($user) || $this->created_by === $user->id) {
+            return true;
+        }
+
+        if ($this->usesStageEngine() && $this->stages()->where('assignee_user_id', $user->id)->exists()) {
             return true;
         }
 

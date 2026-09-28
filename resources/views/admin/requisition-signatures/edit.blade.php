@@ -60,6 +60,18 @@
         </div>
     @endif
 
+    {{-- Stages nobody could approve today. A sheet needing one of them
+         cannot be submitted until it is set. --}}
+    @php
+        $warningCount = collect($stageWarnings)->flatten()->count();
+    @endphp
+    @if($warningCount > 0)
+        <div class="alert alert-warning border-0 shadow-sm rounded-3">
+            <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>
+            {{ $warningCount }} approval {{ $warningCount === 1 ? 'stage is' : 'stages are' }} not set. Requisitions that need {{ $warningCount === 1 ? 'it' : 'them' }} cannot be submitted until {{ $warningCount === 1 ? 'it is' : 'they are' }} set — see the boxes marked below.
+        </div>
+    @endif
+
     <form method="POST" action="{{ route('admin.requisition-signatures.update') }}" id="signatureSettingsForm">
         @csrf
 
@@ -147,7 +159,7 @@
                                     </thead>
                                     <tbody>
                                         @foreach($rowsFor($level) as $i => $row)
-                                            @include('admin.requisition-signatures._block-row', ['level' => $level, 'index' => $i, 'row' => $row])
+                                            @include('admin.requisition-signatures._block-row', ['level' => $level, 'index' => $i, 'row' => $row, 'warning' => $stageWarnings[$level][$i] ?? null])
                                         @endforeach
                                     </tbody>
                                 </table>

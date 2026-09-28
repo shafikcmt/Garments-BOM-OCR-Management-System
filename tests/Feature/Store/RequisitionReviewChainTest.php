@@ -100,6 +100,11 @@ beforeEach(function () {
     RequisitionSignatureBlock::query()->delete();
     RequisitionSignatureBlock::create(['level' => 'department', 'sequence' => 1, 'label' => 'Prepared by', 'assignee_type' => 'requester', 'stamp_source' => 'prepared']);
     RequisitionSignatureBlock::create(['level' => 'department', 'sequence' => 2, 'label' => 'Checked by', 'assignee_type' => 'department_head', 'stamp_source' => 'department_head']);
+    // The Store Head stage, as the live settings have it: after the head,
+    // the sheet waits for the Store.
+    RequisitionSignatureBlock::create(['level' => 'department', 'sequence' => 3, 'label' => 'Checked by', 'title' => 'Store Head', 'assignee_type' => 'store_head', 'stamp_source' => 'store_head']);
+    // Stage engine: every approval stage has a person, as Admin would set it.
+    $this->approvers = requisitionApprovers();
 });
 
 // --- Routing on submit ---------------------------------------------------------
@@ -284,9 +289,9 @@ it('lets the section head approve, stamping the section box and releasing the sh
         ->and($boxes[1]['title'])->toBe('Cutting Section Head')
         ->and($boxes[1]['signed_at'])->not->toBeNull();
 
-    // And the Store may now receive it.
-    $this->actingAs(chainStore())
-        ->post(route('store.stock.requisitions.received', $r))
+    // And the Store Head may now take it, at the Store Head stage.
+    $this->actingAs($this->approvers['store_head'])
+        ->post(route('store.stock.requisitions.stage-approve', $r))
         ->assertRedirect();
 
     expect($r->fresh()->status)->toBe(PurchaseRequisition::STATUS_STORE_REVIEWED);
@@ -317,7 +322,7 @@ it('keeps the department head out of a sheet that is with the section head', fun
         ->assertSee($r->requisition_no);
 });
 
-it('lets Management stand in for a section head', function () {
+it('lets Management stand in for a section head on an old-flow sheet only', function () {
     $section = chainSection('Cutting', 'production', chainUser());
     $requester = chainUser('production', $section);
     $management = User::factory()->create()->assignRole(Role::findOrCreate('management', 'web'));
@@ -325,6 +330,13 @@ it('lets Management stand in for a section head', function () {
     chainSubmit($requester);
     $r = latestRequisition();
 
+    // Stage engine: no stand-ins, not even Management.
+    $this->actingAs($management)
+        ->post(route('store.stock.requisitions.department-approve', $r))
+        ->assertForbidden();
+
+    // An old-flow sheet keeps the old rule.
+    $r->forceFill(['workflow_version' => null, 'current_stage' => null])->save();
     $this->actingAs($management)
         ->post(route('store.stock.requisitions.department-approve', $r))
         ->assertRedirect();

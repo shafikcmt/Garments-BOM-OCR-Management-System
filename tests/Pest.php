@@ -45,3 +45,42 @@ function something()
 {
     // ..
 }
+
+/**
+ * Every requisition approval stage filled in, as Admin would on Requisition
+ * Signatures and Departments: a Store head, and the HR Audit, Finance &
+ * Commercial and Operation Head users on the final sheet's boxes. Without
+ * these the stage engine refuses to submit a sheet.
+ *
+ * @return array{store_head: \App\Models\User, hr: \App\Models\User, finance: \App\Models\User, operation: \App\Models\User}
+ */
+function requisitionApprovers(): array
+{
+    $make = fn (string $name) => \App\Models\User::factory()->create(['name' => $name]);
+
+    $approvers = [
+        'store_head' => $make('Store Head Approver'),
+        'hr' => $make('HR Audit Approver'),
+        'finance' => $make('Finance Approver'),
+        'operation' => $make('Operation Approver'),
+    ];
+
+    \App\Models\Department::updateOrCreate(
+        ['key' => 'store'],
+        ['label' => 'Store', 'head_user_id' => $approvers['store_head']->id, 'is_active' => true]
+    );
+
+    // Final sheet boxes 3, 4 and 5 are the specific-user stages.
+    $final = \App\Models\RequisitionSignatureBlock::query()->forLevel('final')->get()->values();
+    foreach (['hr', 'finance', 'operation'] as $i => $key) {
+        $final->get($i + 2)?->update(['assignee_type' => 'user', 'user_id' => $approvers[$key]->id]);
+    }
+
+    // As saving Requisition Signatures does: whoever holds a stage can open
+    // the requisition screens.
+    foreach ($approvers as $approver) {
+        \App\Services\RequisitionWorkflow::grantView($approver->id);
+    }
+
+    return $approvers;
+}

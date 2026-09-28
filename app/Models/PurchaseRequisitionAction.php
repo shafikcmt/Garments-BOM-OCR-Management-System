@@ -25,6 +25,8 @@ class PurchaseRequisitionAction extends Model
     public const APPROVED = 'approved';
     public const CORRECTED = 'corrected';
     public const DELETED = 'deleted';
+    /** A stage of the stage engine other than the head check and the final approval. */
+    public const STAGE_APPROVED = 'stage_approved';
 
     public const STAGE_RAISER = 'raiser';
     public const STAGE_SECTION_HEAD = 'section_head';
@@ -32,6 +34,8 @@ class PurchaseRequisitionAction extends Model
     public const STAGE_STORE = 'store';
     public const STAGE_FINAL_APPROVAL = 'final_approval';
     public const STAGE_ADMIN = 'admin';
+    /** A stage-engine approver named on the plan (HR Audit, Finance…); meta.stage_label says which. */
+    public const STAGE_APPROVER = 'approver';
 
     protected $fillable = [
         'purchase_requisition_id',
@@ -76,11 +80,17 @@ class PurchaseRequisitionAction extends Model
             self::APPROVED => 'Approved',
             self::CORRECTED => 'Corrected by Store',
             self::DELETED => 'Deleted',
+            self::STAGE_APPROVED => 'Stage Approved',
         ][$this->action] ?? ucfirst(str_replace('_', ' ', $this->action));
     }
 
     public function stageLabel(): ?string
     {
+        // A stage-engine row names its own stage, as set on the signature box.
+        if (! empty($this->meta['stage_label'])) {
+            return $this->meta['stage_label'];
+        }
+
         return [
             self::STAGE_RAISER => 'Requester',
             self::STAGE_SECTION_HEAD => 'Section Head',

@@ -45,6 +45,8 @@ function superAdmin(): User
 }
 
 beforeEach(function () {
+    // Stage engine: every approval stage has a person, as Admin would set it.
+    $this->approvers = requisitionApprovers();
     // Every permission the refused screens are guarded by, so role_or_perm
     // has something to look up rather than throwing "permission not found".
     foreach ([

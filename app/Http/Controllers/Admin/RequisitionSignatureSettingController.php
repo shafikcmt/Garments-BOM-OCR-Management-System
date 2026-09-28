@@ -8,6 +8,7 @@ use App\Models\RequisitionSignatureBlock;
 use App\Models\User;
 use App\Services\RequisitionHeaderResolver;
 use App\Services\RequisitionSignatureResolver;
+use App\Services\RequisitionWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -55,6 +56,8 @@ class RequisitionSignatureSettingController extends Controller
                 'contact_person' => (int) AppSetting::get(RequisitionHeaderResolver::SETTING_CONTACT_PERSON, 0) ?: null,
             ],
             'companyName' => config('stock.company_name'),
+            // Stages nobody could approve today, shown beside the box.
+            'stageWarnings' => RequisitionWorkflow::settingsWarnings(),
         ]);
     }
 
@@ -86,6 +89,16 @@ class RequisitionSignatureSettingController extends Controller
                     'blocks' => RequisitionSignatureBlock::levelLabels()[$level].' must keep at least one signature box.',
                 ]);
             }
+
+            // Every box after "Prepared" is an approval stage, and a stage is
+            // approved by one named person — never "anyone with a role".
+            foreach (array_slice(array_values($data['blocks'][$level]), 1) as $i => $row) {
+                if (in_array($row['assignee_type'], [RequisitionSignatureBlock::ASSIGNEE_ROLE, RequisitionSignatureBlock::ASSIGNEE_REQUESTER], true)) {
+                    return back()->withInput()->withErrors([
+                        'blocks' => RequisitionSignatureBlock::levelLabels()[$level].', box '.($i + 2).' ('.trim($row['label']).'): an approval stage must be a specific user, the Store Department Head or the Department Head.',
+                    ]);
+                }
+            }
         }
 
         DB::transaction(function () use ($data, $levels) {
@@ -116,6 +129,12 @@ class RequisitionSignatureSettingController extends Controller
             AppSetting::put(RequisitionHeaderResolver::SETTING_UNIT_NAME, trim((string) ($data['header_unit_name'] ?? '')));
             AppSetting::put(RequisitionHeaderResolver::SETTING_STORE_PERSONNEL, (string) ($data['header_store_personnel'] ?? ''));
             AppSetting::put(RequisitionHeaderResolver::SETTING_CONTACT_PERSON, (string) ($data['header_contact_person'] ?? ''));
+
+            // Whoever is named on a stage can open the sheets they approve.
+            RequisitionSignatureBlock::query()->whereNotNull('user_id')
+                ->where('assignee_type', RequisitionSignatureBlock::ASSIGNEE_USER)
+                ->pluck('user_id')->unique()
+                ->each(fn ($id) => RequisitionWorkflow::grantView((int) $id));
         });
 
         return redirect()

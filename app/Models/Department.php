@@ -23,8 +23,11 @@ class Department extends Model
 
     /**
      * When the Store department gets a new head, that person is given the
-     * Requirement vs Issue / Stock Summary permission, and the previous head
-     * loses it. Admin can still grant or revoke it for anyone by hand.
+     * Requirement vs Issue / Stock Summary permission and store.requisition.view
+     * (they approve the Store Head stage). The previous head loses the
+     * Requirement vs Issue permission; store.requisition.view is left alone,
+     * since they may still need the requisition screens. Admin can grant or
+     * revoke either by hand.
      */
     protected static function booted(): void
     {
@@ -42,6 +45,8 @@ class Department extends Model
 
             if ($department->head_user_id) {
                 \App\Services\RequirementVsIssueService::grantToStoreHead($department->head_user_id);
+                // The Store head approves the Store Head stage of requisitions.
+                \App\Services\RequisitionWorkflow::grantView($department->head_user_id);
             }
         });
     }

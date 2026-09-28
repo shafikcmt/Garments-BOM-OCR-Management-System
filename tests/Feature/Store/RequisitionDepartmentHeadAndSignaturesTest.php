@@ -57,7 +57,9 @@ function seedSignatureBlocks(): void
 
     RequisitionSignatureBlock::create(['level' => 'department', 'sequence' => 1, 'label' => 'Prepared by', 'assignee_type' => 'requester', 'stamp_source' => 'prepared']);
     RequisitionSignatureBlock::create(['level' => 'department', 'sequence' => 2, 'label' => 'Checked by', 'title' => 'Department Head', 'assignee_type' => 'department_head', 'stamp_source' => 'department_head']);
-    RequisitionSignatureBlock::create(['level' => 'department', 'sequence' => 3, 'label' => 'Checked by', 'title' => 'Store Head', 'assignee_type' => 'role', 'role_name' => 'store', 'stamp_source' => 'store_head']);
+    // Stage engine: an approval stage names one person — the Store
+    // department head here, a specific user on the final sheet below.
+    RequisitionSignatureBlock::create(['level' => 'department', 'sequence' => 3, 'label' => 'Checked by', 'title' => 'Store Head', 'assignee_type' => 'store_head', 'stamp_source' => 'store_head']);
 
     RequisitionSignatureBlock::create(['level' => 'final', 'sequence' => 1, 'label' => 'Prepared by', 'title' => 'Store', 'assignee_type' => 'role', 'role_name' => 'store', 'stamp_source' => 'prepared']);
     RequisitionSignatureBlock::create(['level' => 'final', 'sequence' => 2, 'label' => 'Audit by', 'title' => 'HR Head', 'assignee_type' => 'user']);
@@ -82,7 +84,12 @@ function submitAs(User $user, array $overrides = [])
     return $response;
 }
 
-beforeEach(fn () => seedSignatureBlocks());
+beforeEach(function () {
+    seedSignatureBlocks();
+    $this->approvers = requisitionApprovers();
+    RequisitionSignatureBlock::query()->forLevel('final')->where('title', 'HR Head')->update(['user_id' => $this->approvers['hr']->id]);
+    RequisitionSignatureBlock::query()->forLevel('final')->where('title', 'Operation Head')->update(['user_id' => $this->approvers['operation']->id]);
+});
 
 // --- Routing ---------------------------------------------------------------
 
@@ -291,7 +298,7 @@ it('lets the head see their department\'s submitted sheets on the main list, but
         ->assertDontSee($other->requisition_no);
 });
 
-it('lets Management stand in for any department head, and Admin too', function () {
+it('lets Management stand in for a department head on an old-flow sheet only, and Admin too', function () {
     deptHead('merchant');
     submitAs(deptUser('merchant'));
     $requisition = PurchaseRequisition::query()->latest('id')->first();
@@ -303,6 +310,14 @@ it('lets Management stand in for any department head, and Admin too', function (
         ->assertOk()
         ->assertSee($requisition->requisition_no);
 
+    // Stage engine: only the head named on the plan approves — no stand-ins.
+    $this->actingAs($management)
+        ->post(route('store.stock.requisitions.department-approve', $requisition))
+        ->assertForbidden();
+    expect($requisition->fresh()->department_review_status)->toBe(PurchaseRequisition::DEPT_REVIEW_PENDING);
+
+    // An old-flow sheet (from before the stage engine) keeps the old rule.
+    $requisition->forceFill(['workflow_version' => null, 'current_stage' => null])->save();
     $this->actingAs($management)
         ->post(route('store.stock.requisitions.department-approve', $requisition))
         ->assertRedirect();
@@ -379,9 +394,12 @@ it('resolves the configured boxes with the names of whoever actually acted', fun
         ->and($boxes[1]['name'])->toBe($head->name)
         ->and($boxes[1]['title'])->toBe('Department Head')
         ->and($boxes[1]['signed_at'])->not->toBeNull()
-        ->and($boxes[2]['name'])->toBe('')
+        // Stage engine: the box names the person the stage waits for — the
+        // Store department head — unsigned until they approve.
+        ->and($boxes[2]['name'])->toBe($this->approvers['store_head']->name)
         ->and($boxes[2]['title'])->toBe('Store Head')
-        ->and($boxes[2]['signed_at'])->toBeNull();
+        ->and($boxes[2]['signed_at'])->toBeNull()
+        ->and($boxes[2]['stamped'])->toBeTrue();
 });
 
 it('prints the final-level boxes, in order, on the Store\'s own sheet', function () {
@@ -396,7 +414,9 @@ it('prints the final-level boxes, in order, on the Store\'s own sheet', function
     expect(array_column($boxes, 'label'))->toBe(['Prepared by', 'Audit by', 'Approved by'])
         ->and($boxes[1]['name'])->toBe('Karim HR')
         ->and($boxes[1]['title'])->toBe('HR Head')
-        ->and($boxes[1]['stamped'])->toBeFalse();
+        // No longer "signed on paper only": a real stage, Pending until approved.
+        ->and($boxes[1]['stamped'])->toBeTrue()
+        ->and($boxes[1]['signed_at'])->toBeNull();
 
     // The screen shows the same boxes.
     $this->actingAs(storeReviewer())

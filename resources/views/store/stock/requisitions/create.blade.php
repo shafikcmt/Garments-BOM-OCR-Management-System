@@ -70,6 +70,21 @@
     @include('store.stock._stock-ui')
     @include('store._flash')
 
+    {{-- Anything that would stop this sheet being submitted — an approver
+         Admin has not set, or the raiser holding a stage — said before the
+         form is filled rather than after. --}}
+    @if(! empty($workflowProblems))
+        <div class="alert alert-warning border-0 shadow-sm rounded-3">
+            <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>This requisition cannot be submitted yet.</div>
+            <ul class="mb-0">
+                @foreach($workflowProblems as $problem)
+                    <li>{{ $problem }}</li>
+                @endforeach
+            </ul>
+            <div class="small mt-1">You can still save it as a draft.</div>
+        </div>
+    @endif
+
     <form method="POST"
           action="{{ $editing ? route('store.stock.requisitions.update', $requisition) : route('store.stock.requisitions.store') }}"
           id="requisitionForm">

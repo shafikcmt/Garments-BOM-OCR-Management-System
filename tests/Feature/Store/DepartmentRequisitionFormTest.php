@@ -28,6 +28,9 @@ use Spatie\Permission\Models\Role;
  * In-memory sqlite. No real record touched.
  */
 
+// Stage engine: every approval stage has a person, as Admin would set it.
+beforeEach(fn () => $this->approvers = requisitionApprovers());
+
 function formDeptUser(string $department = 'production', ?IndentSection $section = null): User
 {
     Role::findOrCreate($department, 'web');
@@ -270,9 +273,10 @@ it('lets a department raise a typed item, tells the Store on Received, and links
         ->assertOk()
         ->assertDontSee('Add to Item Master');
 
-    // …the Store is told on Received and offered the action.
-    $this->actingAs($store)
-        ->post(route('store.stock.requisitions.received', $requisition))
+    // …the Store is told when its Store Head stage takes the sheet (the old
+    // flow's Received), and offered the action.
+    $this->actingAs($this->approvers['store_head'])
+        ->post(route('store.stock.requisitions.stage-approve', $requisition))
         ->assertRedirect(route('store.stock.requisitions.show', $requisition))
         ->assertSessionHas('success', fn ($m) => str_contains($m, 'not in the Item Master'));
 

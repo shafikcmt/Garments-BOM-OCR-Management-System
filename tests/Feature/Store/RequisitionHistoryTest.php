@@ -23,6 +23,9 @@ use Spatie\Permission\Models\Role;
  *
  * In-memory sqlite. No real record touched.
  */
+// Stage engine: every approval stage has a person, as Admin would set it.
+beforeEach(fn () => $this->approvers = requisitionApprovers());
+
 function histUser(string $role, array $permissions = [], array $attributes = []): User
 {
     $r = Role::findOrCreate($role, 'web');

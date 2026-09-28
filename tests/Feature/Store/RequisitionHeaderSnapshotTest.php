@@ -24,6 +24,9 @@ use Spatie\Permission\Models\Role;
  *
  * In-memory sqlite. No real record touched.
  */
+// Stage engine: every approval stage has a person, as Admin would set it.
+beforeEach(fn () => $this->approvers = requisitionApprovers());
+
 function hdrUser(string $role, array $permissions = [], array $attributes = []): User
 {
     $r = Role::findOrCreate($role, 'web');
@@ -150,6 +153,9 @@ it('refreshes on resubmit after a return', function () {
 it('does not change on a Store correction', function () {
     $raiser = hdrRaiser();
     $sheet = hdrSubmit($raiser);
+    // The Store corrects only old-flow sheets; a stage-engine sheet is
+    // edited by its raiser alone.
+    $sheet->forceFill(['workflow_version' => null, 'current_stage' => null])->save();
     $before = $sheet->header_snapshot;
     $raiser->update(['phone' => '01999-555555']);
 
@@ -163,13 +169,18 @@ it('does not change on a Store correction', function () {
 });
 
 it('is frozen once approved, and approval does not refresh it', function () {
-    $raiser = hdrRaiser();
+    // A final sheet, walked through every stage of the stage engine.
+    $raiser = hdrUser('store', ['store.requisition.create'], ['phone' => '01711-000009']);
     $sheet = hdrSubmit($raiser);
     $before = $sheet->header_snapshot;
     $raiser->update(['phone' => '01999-555555']);
 
-    $this->actingAs(hdrUser('store', ['store.requisition.review']))->post(route('store.stock.requisitions.received', $sheet));
-    $this->actingAs(hdrUser('admin', ['store.requisition.approve']))->post(route('store.stock.requisitions.approve', $sheet));
+    foreach (['store_head', 'hr', 'finance', 'operation'] as $stage) {
+        $this->actingAs($this->approvers[$stage])->post(route('store.stock.requisitions.stage-approve', $sheet))->assertRedirect();
+        // No approval refreshes the snapshot.
+        expect($sheet->fresh()->header_snapshot)->toBe($before);
+    }
+
     expect($sheet->fresh()->status)->toBe(PurchaseRequisition::STATUS_APPROVED)
         ->and($sheet->fresh()->header_snapshot)->toBe($before);
 

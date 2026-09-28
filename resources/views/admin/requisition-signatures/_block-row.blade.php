@@ -43,6 +43,9 @@
             </select>
         </div>
         <div data-no-picker class="text-muted small {{ in_array($type, ['role', 'user'], true) ? 'd-none' : '' }}">Resolved per requisition</div>
+        @if(! empty($warning))
+            <div class="small text-danger fw-semibold mt-1"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ $warning }}</div>
+        @endif
     </td>
     <td>
         <select name="{{ $n }}[stamp_source]" class="form-select form-select-sm">

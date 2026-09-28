@@ -21,6 +21,9 @@ use Spatie\Permission\Models\Role;
  *
  * In-memory sqlite. No real record touched.
  */
+// Stage engine: every approval stage has a person, as Admin would set it.
+beforeEach(fn () => $this->approvers = requisitionApprovers());
+
 function inplaceUser(string $role, array $permissions = []): User
 {
     $user = User::factory()->create()->assignRole(Role::findOrCreate($role, 'web'));
@@ -149,6 +152,8 @@ it('keeps line ids and the history diff through a Store correction', function ()
 
     $sheet = inplacePost($raiser, [['stock_item_id' => $oil->id, 'qty_requested' => 5]], null, 'submit');
     $id = $sheet->items->sole()->id;
+    // The Store corrects only old-flow sheets.
+    $sheet->forceFill(['workflow_version' => null, 'current_stage' => null])->save();
 
     inplacePost($store, [['id' => $id, 'stock_item_id' => $oil->id, 'qty_requested' => 9]], $sheet, 'submit');
 

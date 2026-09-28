@@ -167,7 +167,8 @@
                                 @if($box['signed_at'])
                                     {{ $box['name'] }} · {{ $box['signed_at']->format('d-M-Y') }}
                                 @elseif($box['stamped'])
-                                    <span class="text-muted">Pending</span>
+                                    {{-- A stage-engine box names who it waits for. --}}
+                                    <span class="text-muted">Pending</span>@if($requisition->usesStageEngine() && $box['name'] !== '') <span class="text-muted">· {{ $box['name'] }}</span>@endif
                                 @else
                                     {{ $box['name'] !== '' ? $box['name'] : '—' }}
                                 @endif

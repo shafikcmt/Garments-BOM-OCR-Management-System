@@ -441,6 +441,10 @@ Route::prefix('store')
                 ->name('requisitions.received');
             Route::post('/requisitions/{requisition}/approve', [PurchaseRequisitionController::class, 'approve'])
                 ->name('requisitions.approve');
+            // A stage-engine sheet's current stage. The controller admits only
+            // the person named on the sheet's plan for that stage.
+            Route::post('/requisitions/{requisition}/stage-approve', [PurchaseRequisitionController::class, 'stageApprove'])
+                ->name('requisitions.stage-approve');
 
             Route::get('/requisitions/{requisition}/edit', [PurchaseRequisitionController::class, 'edit'])->name('requisitions.edit');
             Route::put('/requisitions/{requisition}', [PurchaseRequisitionController::class, 'update'])->name('requisitions.update');

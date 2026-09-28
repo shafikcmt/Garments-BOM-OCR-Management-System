@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\PurchaseRequisition;
+use App\Models\PurchaseRequisitionStage;
 use App\Models\RequisitionDepartmentHead;
 use App\Models\RequisitionSignatureBlock;
 use App\Models\User;
@@ -34,6 +35,13 @@ class RequisitionSignatureResolver
      */
     public function forRequisition(PurchaseRequisition $requisition): array
     {
+        // A stage-engine sheet signs from its own plan: every box is a stage
+        // somebody approved (name and date) or is still to approve (the
+        // person it waits for). Old sheets keep the settings-based boxes.
+        if ($requisition->usesStageEngine()) {
+            return $this->fromStages($requisition);
+        }
+
         $level = $requisition->level ?: PurchaseRequisition::LEVEL_FINAL;
 
         return $this->blocks($level)
@@ -182,6 +190,35 @@ class RequisitionSignatureResolver
     }
 
     /** @return array<string, string> role => label, for the settings screen and the printed designation */
+    /** @return list<array{label: string, name: string, title: string, signed_at: ?Carbon, stamped: bool}> */
+    private function fromStages(PurchaseRequisition $requisition): array
+    {
+        $cycle = (int) $requisition->stages()->max('cycle');
+
+        return $requisition->stages()->where('cycle', $cycle)->with('actor', 'assignee')->get()
+            ->map(function (PurchaseRequisitionStage $stage) use ($requisition) {
+                $approved = $stage->status === PurchaseRequisitionStage::STATUS_APPROVED;
+                $person = $approved ? ($stage->actor ?? $stage->assignee) : $stage->assignee;
+                $name = $approved ? ($stage->acted_by_name ?: $stage->assignee_name) : $stage->assignee_name;
+
+                return [
+                    'label' => $stage->label,
+                    'name' => (string) ($name ?? ''),
+                    // As the settings-based boxes: the box title, else the
+                    // person's designation, else "Cutting Section Head" /
+                    // "Production Head" for the head stage.
+                    'title' => trim((string) $stage->title)
+                        ?: trim((string) ($person?->designation ?? ''))
+                        ?: ($stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_DEPARTMENT_HEAD ? $this->headTitle($requisition) : ''),
+                    'signed_at' => $approved ? $stage->acted_at : null,
+                    // Every stage is a system step: an unsigned box reads Pending.
+                    'stamped' => $stage->status !== PurchaseRequisitionStage::STATUS_SKIPPED,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     public static function roleLabels(): array
     {
         return RequisitionDepartmentHead::departmentOptions() + [

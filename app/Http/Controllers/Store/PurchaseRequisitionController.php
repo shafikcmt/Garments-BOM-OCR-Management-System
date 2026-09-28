@@ -22,6 +22,7 @@ use App\Services\RequisitionHeaderResolver;
 use App\Services\RequisitionHistory;
 use App\Services\RequisitionReviewChain;
 use App\Services\RequisitionSignatureResolver;
+use App\Services\RequisitionWorkflow;
 use App\Services\RequirementVsIssueService;
 use App\Services\StockSummaryService;
 use Illuminate\Http\JsonResponse;
@@ -56,6 +57,7 @@ class PurchaseRequisitionController extends Controller
         private readonly RequisitionHistory $history,
         private readonly StockSummaryService $stockSummary,
         private readonly RequisitionHeaderResolver $header,
+        private readonly RequisitionWorkflow $workflow,
     ) {
     }
 
@@ -293,8 +295,13 @@ class PurchaseRequisitionController extends Controller
     }
 
     /** The head accepts the sheet; it now goes to the Store. */
-    public function departmentApprove(PurchaseRequisition $requisition)
+    public function departmentApprove(Request $request, PurchaseRequisition $requisition)
     {
+        // A stage-engine sheet's head check is its head stage.
+        if ($requisition->usesStageEngine()) {
+            return $this->stageApprove($request, $requisition);
+        }
+
         $this->authorizeVisible($requisition);
         $this->authorizeDepartmentHead($requisition);
 
@@ -346,6 +353,12 @@ class PurchaseRequisitionController extends Controller
                 'department_review_note' => $data['note'],
             ] + $locked->headDecisionStamp(auth()->user()));
 
+            // On the stage engine the sheet is back with its raiser: no stage
+            // waits until they resubmit, which starts the next cycle.
+            if ($locked->usesStageEngine()) {
+                $locked->forceFill(['current_stage' => null])->save();
+            }
+
             // The reason is kept here too: the sheet's own note is cleared
             // when it is resubmitted, the history row is not.
             $this->history->record($locked, PurchaseRequisitionAction::HEAD_RETURNED, [
@@ -385,11 +398,71 @@ class PurchaseRequisitionController extends Controller
 
     private function authorizeDepartmentHead(PurchaseRequisition $requisition): void
     {
+        // On the stage engine only the head named on the plan acts — not
+        // Admin or Management, and never the raiser.
+        if ($requisition->usesStageEngine()) {
+            abort_unless($this->workflow->canAct($requisition, auth()->user()), 403,
+                'Only the '.strtolower($requisition->reviewLevelLabel()).' of this requisition can check it.');
+        }
+
         abort_unless($requisition->isDepartmentHeadFor(auth()->user()), 403,
             'Only the '.strtolower($requisition->reviewLevelLabel()).' of this requisition can check it.');
 
         abort_unless($requisition->awaitingDepartmentHead(), 422,
             'Only a requisition waiting for a head\'s check can be checked.');
+    }
+
+    /**
+     * Approve the stage a stage-engine sheet waits at — the head check, the
+     * Store Head, HR Audit, Finance & Commercial, Operation Head alike. Only
+     * the person named on the sheet's plan; the raiser never.
+     */
+    public function stageApprove(Request $request, PurchaseRequisition $requisition)
+    {
+        $this->authorizeVisible($requisition);
+        $user = $request->user();
+
+        if ($requisition->isRaisedBy($user)) {
+            return back()->with('error', 'You raised this requisition, so another person must approve it.');
+        }
+
+        abort_unless($requisition->usesStageEngine(), 422, 'This requisition follows the earlier approval steps.');
+        abort_unless($this->workflow->canAct($requisition, $user), 403, 'This requisition is not waiting for your approval.');
+
+        $data = $request->validate(['comment' => ['nullable', 'string', 'max:1000']]);
+
+        $stageName = null;
+        $storeStage = false;
+        $next = null;
+
+        DB::transaction(function () use ($requisition, $user, $data, &$stageName, &$storeStage, &$next) {
+            // Re-checked under the lock: a second click finds the stage done.
+            $locked = $this->lockRequisition($requisition);
+            abort_unless($this->workflow->canAct($locked, $user), 422,
+                'This stage has already been approved. Reload the page to see where the requisition is now.');
+
+            $stage = $this->workflow->currentStage($locked);
+            $stageName = $stage?->displayLabel();
+            $storeStage = $stage?->stamp_source === \App\Models\RequisitionSignatureBlock::STAMP_STORE_HEAD;
+            $next = $this->workflow->approve($locked, $user, $data['comment'] ?? null);
+        });
+
+        $message = 'Requisition '.$requisition->requisition_no.' approved'
+            .($stageName ? ' at '.$stageName : '').'. '
+            .($next ? 'Now with '.($next->assignee_name ?: $next->displayLabel()).'.' : 'All stages are complete.');
+
+        // The Store taking the sheet is when it hears about lines the Item
+        // Master has never carried — as the old flow's Received did.
+        if ($storeStage) {
+            $unknown = $requisition->items()->notInItemMaster()->count();
+
+            return redirect()->route('store.stock.requisitions.show', $requisition)->with('success', $message
+                .($unknown > 0
+                    ? ' '.$unknown.' item'.($unknown === 1 ? ' is' : 's are').' not in the Item Master — see the notice below to add '.($unknown === 1 ? 'it' : 'them').'.'
+                    : ''));
+        }
+
+        return back()->with('success', $message);
     }
 
     /**
@@ -436,6 +509,10 @@ class PurchaseRequisitionController extends Controller
         if ($requisition->isRaisedBy(auth()->user())) {
             return back()->with('error', 'You raised this requisition, so another person must mark it received.');
         }
+
+        // The old flow's step. A stage-engine sheet is taken by its Store
+        // Head stage instead (stageApprove).
+        abort_if($requisition->usesStageEngine(), 422, 'This requisition is approved stage by stage. Use Approve at the Store Head stage.');
 
         $data = $request->validate(['comment' => ['nullable', 'string', 'max:1000']]);
 
@@ -489,6 +566,8 @@ class PurchaseRequisitionController extends Controller
         if ($requisition->isRaisedBy(auth()->user())) {
             return back()->with('error', 'You raised this requisition, so another person must approve it.');
         }
+
+        abort_if($requisition->usesStageEngine(), 422, 'This requisition is approved stage by stage. Use Approve at the current stage.');
 
         $data = $request->validate(['comment' => ['nullable', 'string', 'max:1000']]);
 
@@ -589,6 +668,10 @@ class PurchaseRequisitionController extends Controller
             $this->syncItems($requisition, $data['items'], $date);
 
             if ($submitting) {
+                // Every new submission goes onto the stage engine. Refuses,
+                // rolling the whole save back, if an approver is not set or
+                // the raiser holds a stage.
+                $this->workflow->start($requisition);
                 $this->header->snapshot($requisition);
             }
 
@@ -765,7 +848,7 @@ class PurchaseRequisitionController extends Controller
 
         $requisition->load('items.stockItem', 'createdBy.requisitionSection');
 
-        return view('store.stock.requisitions.create', $this->formData(DepartmentRequisitionDefaults::for(auth()->user(), $requisition)) + [
+        return view('store.stock.requisitions.create', $this->formData(DepartmentRequisitionDefaults::for(auth()->user(), $requisition), $requisition) + [
             'mode' => $requisition->mode,
             'requisition' => $requisition,
             'nextNo' => $requisition->requisition_no,
@@ -866,6 +949,13 @@ class PurchaseRequisitionController extends Controller
                     )],
                 ]);
             } elseif ($data['action'] === 'submit') {
+                // A draft, or a stage-engine sheet sent back to its raiser,
+                // starts (again) on the stage engine — a new cycle. An old-flow
+                // sheet returned by its head finishes on the old flow.
+                if ($fromStatus === PurchaseRequisition::STATUS_DRAFT || $requisition->usesStageEngine()) {
+                    $this->workflow->start($requisition);
+                }
+
                 // Every (re)submit refreshes the header snapshot; a Store
                 // correction (the branch above) never does.
                 $this->header->snapshot($requisition);
@@ -1037,9 +1127,18 @@ class PurchaseRequisitionController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function formData(DepartmentRequisitionDefaults $defaults): array
+    private function formData(DepartmentRequisitionDefaults $defaults, ?PurchaseRequisition $requisition = null): array
     {
         $user = auth()->user();
+
+        // Anything that would stop this sheet being submitted — an approver
+        // Admin has not set, or the raiser holding a stage — said BEFORE the
+        // form is filled. Not for an old-flow sheet being corrected: the
+        // stage engine does not apply to it.
+        $onEngine = ! $requisition || $requisition->status === PurchaseRequisition::STATUS_DRAFT || $requisition->usesStageEngine();
+        $workflowProblems = $onEngine
+            ? $this->workflow->problems($defaults->level, $requisition?->createdBy ?? $user, $defaults->section, $defaults->department)
+            : [];
 
         return [
             'items' => $this->requisitions->selectableItems(),
@@ -1050,6 +1149,7 @@ class PurchaseRequisitionController extends Controller
             'modeLabels' => PurchaseRequisition::modeLabels(),
             'unitName' => config('stock.company_name'),
             'defaults' => $defaults,
+            'workflowProblems' => $workflowProblems,
             // Stock, last purchase, rate and amount are the Store's own
             // knowledge. Decided by WHO is looking, not by the sheet's level:
             // a Store user correcting a department's sheet still sees them.

@@ -17,13 +17,38 @@
     $size = ($small ?? false) ? 'btn-sm' : '';
     $user = auth()->user();
     $returnModalId = 'returnRequisition'.$requisition->id;
+
+    // Stage engine: the one person named on the sheet's plan for the stage
+    // it waits at — never Admin or Management standing in, never the raiser.
+    $onEngine = $requisition->usesStageEngine();
+    $workflow = app(\App\Services\RequisitionWorkflow::class);
+    $canStage = $onEngine && $workflow->canAct($requisition, $user);
+    $stage = $canStage ? $workflow->currentStage($requisition) : null;
+    // The head stage can also be returned to the raiser (3c brings Return to
+    // every stage).
+    $headCanReturn = $onEngine
+        ? $canStage && $requisition->awaitingDepartmentHead()
+        : $requisition->awaitingDepartmentHead() && $requisition->isDepartmentHeadFor($user);
 @endphp
+
+@if($canStage)
+    <button type="button" class="btn {{ $size }} btn-outline-success" data-bs-toggle="modal" data-bs-target="#stageApprove{{ $requisition->id }}">
+        <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Approve
+    </button>
+    <x-action-modal :id="'stageApprove'.$requisition->id"
+                    :action="route('store.stock.requisitions.stage-approve', $requisition)"
+                    :title="'Approve '.$requisition->requisition_no"
+                    submit-label="Approve" submit-icon="bi-check2-circle" submit-class="btn-success">
+        You are approving as {{ $stage->displayLabel() }}.
+    </x-action-modal>
+@endif
 
 {{-- The Department Head's step, before the Store's. Shown only to the
      configured head of this requisition's department (or Admin /
      Management), and only while the sheet waits on them. Returning it needs
      a reason, so the requester knows what to change — hence the modal. --}}
-@if($requisition->awaitingDepartmentHead() && $requisition->isDepartmentHeadFor($user))
+@if($headCanReturn)
+    @unless($onEngine)
     <form method="POST" action="{{ route('store.stock.requisitions.department-approve', $requisition) }}" class="d-inline"
           onsubmit="return confirm('Check and send requisition {{ $requisition->requisition_no }} to Store?');">
         @csrf
@@ -31,6 +56,7 @@
             <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Approve
         </button>
     </form>
+    @endunless
     <button type="button" class="btn {{ $size }} btn-outline-danger" data-bs-toggle="modal" data-bs-target="#{{ $returnModalId }}">
         <i class="bi bi-arrow-return-left me-1" aria-hidden="true"></i>Return
     </button>
@@ -64,7 +90,7 @@
 
 {{-- Received and Approve each confirm in a modal with an optional comment,
      which goes into the requisition's history. --}}
-@if($requisition->awaitingStoreReceipt() && $user?->can('store.requisition.review') && ! $raisedByViewer)
+@if(! $onEngine && $requisition->awaitingStoreReceipt() && $user?->can('store.requisition.review') && ! $raisedByViewer)
     <button type="button" class="btn {{ $size }} btn-outline-primary" data-bs-toggle="modal" data-bs-target="#receiveRequisition{{ $requisition->id }}">
         <i class="bi bi-inbox-fill me-1" aria-hidden="true"></i>Received
     </button>
@@ -76,7 +102,7 @@
     </x-action-modal>
 @endif
 
-@if($requisition->awaitingApproval() && $user?->can('store.requisition.approve') && ! $raisedByViewer)
+@if(! $onEngine && $requisition->awaitingApproval() && $user?->can('store.requisition.approve') && ! $raisedByViewer)
     <button type="button" class="btn {{ $size }} btn-outline-success" data-bs-toggle="modal" data-bs-target="#approveRequisition{{ $requisition->id }}">
         <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Approve
     </button>
@@ -88,6 +114,6 @@
     </x-action-modal>
 @endif
 
-@if($raisedByViewer && (($requisition->awaitingStoreReceipt() && $user?->can('store.requisition.review')) || ($requisition->awaitingApproval() && $user?->can('store.requisition.approve'))))
+@if(! $onEngine && $raisedByViewer && (($requisition->awaitingStoreReceipt() && $user?->can('store.requisition.review')) || ($requisition->awaitingApproval() && $user?->can('store.requisition.approve'))))
     <span class="small text-muted"><i class="bi bi-person-lock me-1" aria-hidden="true"></i>You raised this requisition, so another person must {{ $requisition->awaitingApproval() ? 'approve' : 'receive' }} it.</span>
 @endif
