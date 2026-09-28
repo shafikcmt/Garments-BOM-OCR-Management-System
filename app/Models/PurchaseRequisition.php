@@ -442,6 +442,31 @@ class PurchaseRequisition extends Model
         return $query->whereYear('requisition_date', $year)->whereMonth('requisition_date', $m);
     }
 
+    /**
+     * Sheets whose quantities count as demand — the Stock Summary and the
+     * Monthly Requisition report both read this, so the two can never
+     * disagree on what "requested" means.
+     *
+     * Counted: anything past Draft that is either a final sheet, or a
+     * department sheet whose head step is approved or never applied (NULL —
+     * a department with no head, or a sheet from before the step existed).
+     * Not counted: drafts, sheets still with a head, and sheets a head
+     * returned — nobody has accepted those figures yet.
+     *
+     * A department sheet that a final sheet repeats is still counted twice;
+     * that needs the merge link, which does not exist yet.
+     */
+    public function scopeCountedInTotals(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query
+            ->where($table.'.status', '<>', self::STATUS_DRAFT)
+            ->where(fn (Builder $q) => $q->where($table.'.level', self::LEVEL_FINAL)
+                ->orWhereNull($table.'.department_review_status')
+                ->orWhere($table.'.department_review_status', self::DEPT_REVIEW_APPROVED));
+    }
+
     /*
     |--------------------------------------------------------------------------
     | The Store's review of a department's request

@@ -33,19 +33,6 @@ class MonthlyRequisitionReportService
     /** Separates the Requisition Nos a merged monthly row was built from. */
     private const SOURCE_SEPARATOR = ', ';
 
-    /**
-     * Statuses that count as a real request.
-     *
-     * Draft is excluded on purpose: it is something someone started typing, not
-     * something they asked for, and counting it would inflate the month.
-     */
-    public const COUNTED_STATUSES = [
-        PurchaseRequisition::STATUS_SUBMITTED,
-        PurchaseRequisition::STATUS_STORE_REVIEWED,
-        PurchaseRequisition::STATUS_APPROVED,
-        PurchaseRequisition::STATUS_PURCHASE_ACTION_TAKEN,
-    ];
-
     public function __construct(private readonly PurchaseRequisitionService $requisitions)
     {
     }
@@ -193,7 +180,7 @@ class MonthlyRequisitionReportService
             ->whereHas('requisition', function ($q) use ($monthStart) {
                 $q->whereYear('requisition_date', $monthStart->year)
                     ->whereMonth('requisition_date', $monthStart->month)
-                    ->whereIn('status', self::COUNTED_STATUSES);
+                    ->countedInTotals();
             })
             ->when($filters['category'] ?? null, fn ($q, $category) => $q->whereHas(
                 'itemCategory',

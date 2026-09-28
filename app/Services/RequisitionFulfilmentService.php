@@ -94,10 +94,10 @@ class RequisitionFulfilmentService
     /**
      * Qty requested per item, within this user's visibility.
      *
-     * DRAFTS ARE EXCLUDED. A draft has not been raised yet — its numbers are
-     * still being typed — and counting them would report demand the store has
-     * never been told about. Everything from Submitted onwards counts, whatever
-     * stage of the flow it has reached since.
+     * Only sheets in PurchaseRequisition::countedInTotals() count: no drafts,
+     * and no department sheet still with its head or returned by one — the
+     * store has not been told about that demand yet. The Monthly Requisition
+     * report reads the same scope.
      *
      * @param  array<string, mixed>  $filters
      * @return Collection<int, array<string, mixed>>
@@ -111,8 +111,8 @@ class RequisitionFulfilmentService
             // to answer — and it is the demand most at risk of being forgotten,
             // because nothing in the master will ever remind anyone of it.
             ->leftJoin('stock_items', 'stock_items.id', '=', 'purchase_requisition_items.stock_item_id')
-            ->where('purchase_requisitions.status', '<>', PurchaseRequisition::STATUS_DRAFT)
             ->whereIn('purchase_requisitions.id', PurchaseRequisition::query()
+                ->countedInTotals()
                 ->visibleTo($user)
                 ->select('id'));
 
