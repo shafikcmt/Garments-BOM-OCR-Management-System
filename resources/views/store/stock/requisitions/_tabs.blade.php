@@ -8,7 +8,7 @@
     to someone who heads a department — $departmentReviewCount is null for
     everyone else, which is what hides it.
 
-    Expects: $active ('index' | 'requested' | 'department'), $awaitingCount,
+    Expects: $active ('index' | 'requested' | 'requirement' | 'department'), $awaitingCount,
     $departmentReviewCount.
 --}}
 @php
@@ -26,6 +26,15 @@
                 @if(($awaitingCount ?? 0) > 0)
                     <span class="badge bg-primary-subtle text-primary ms-1">{{ number_format($awaitingCount) }}</span>
                 @endif
+            </a>
+        </li>
+    @endif
+    {{-- Store Head (and Admin) only. The controller refuses everyone else
+         too; hiding the tab is presentation, not the guard. --}}
+    @if(\App\Services\RequirementVsIssueService::canView($user))
+        <li class="nav-item">
+            <a class="nav-link {{ $active === 'requirement' ? 'active' : '' }}" href="{{ route('store.stock.requisitions.requirement-vs-issue') }}">
+                Requirement vs Issue
             </a>
         </li>
     @endif

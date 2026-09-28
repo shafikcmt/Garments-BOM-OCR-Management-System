@@ -14,6 +14,7 @@ use App\Http\Controllers\Store\PurchaseSetupController;
 use App\Http\Controllers\Store\StockSetupController;
 use App\Http\Controllers\Store\PurchaseRequisitionController;
 use App\Http\Controllers\Store\MonthlyRequisitionReportController;
+use App\Http\Controllers\Store\RequirementVsIssueController;
 use App\Http\Controllers\Store\ReceivingReportController;
 use App\Http\Controllers\Store\IssueReportController;
 use App\Http\Controllers\Store\MaterialReceivingController;
@@ -379,6 +380,17 @@ Route::prefix('store')
                 ->name('requisitions.report.pdf');
             Route::get('/requisitions/report/excel', [MonthlyRequisitionReportController::class, 'excel'])
                 ->name('requisitions.report.excel');
+
+            // Requirement vs Issue — requested against issued, per section
+            // and item. Store Head (and Admin) only: the controller checks
+            // the permission AND that the user is the current Store head.
+            // Fixed paths, so declared above /{requisition}.
+            Route::get('/requisitions/requirement-vs-issue', [RequirementVsIssueController::class, 'index'])
+                ->name('requisitions.requirement-vs-issue');
+            Route::get('/requisitions/requirement-vs-issue/excel', [RequirementVsIssueController::class, 'excel'])
+                ->name('requisitions.requirement-vs-issue.excel');
+            Route::get('/requisitions/requirement-vs-issue/pdf', [RequirementVsIssueController::class, 'pdf'])
+                ->name('requisitions.requirement-vs-issue.pdf');
 
             // The Store's review queue: requisitions the DEPARTMENTS sent in.
             // Declared above /{requisition} so "requested" is never taken for a

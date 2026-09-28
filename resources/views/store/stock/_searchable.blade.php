@@ -263,6 +263,47 @@
                         return '<div>' + escape(String(data.text).split(separator)[0].trim()) + '</div>';
                     };
                 }
+
+                // OPT-IN: data-checkboxes on the <select multiple> draws a
+                // checkbox beside every option, keeps chosen options in the
+                // list (so they can be un-ticked there), and adds a
+                // "Select all · Clear" row at the top. Without the attribute
+                // nothing here runs, so every existing chip select is
+                // unchanged.
+                if (el.hasAttribute('data-checkboxes')) {
+                    options.plugins = {
+                        remove_button: {},
+                        checkbox_options: {},
+                        dropdown_header: {
+                            html: function () {
+                                return '<div class="ts-select-all d-flex justify-content-between px-2 py-1 border-bottom small">'
+                                    + '<a href="#" data-ts-select="all">Select all</a>'
+                                    + '<a href="#" data-ts-select="none">Clear</a></div>';
+                            },
+                        },
+                    };
+                    options.hideSelected = false;
+
+                    options.onInitialize = (function (inherited) {
+                        return function () {
+                            if (inherited) { inherited.call(this); }
+                            var self = this;
+                            // mousedown, not click: a click would blur the
+                            // control and close the list first.
+                            self.dropdown.addEventListener('mousedown', function (e) {
+                                var link = e.target.closest('[data-ts-select]');
+                                if (!link) { return; }
+                                e.preventDefault();
+                                if (link.getAttribute('data-ts-select') === 'all') {
+                                    self.setValue(Object.keys(self.options));
+                                } else {
+                                    self.clear();
+                                }
+                                self.refreshOptions(false);
+                            });
+                        };
+                    })(options.onInitialize);
+                }
             }
 
             new TomSelect(el, options);

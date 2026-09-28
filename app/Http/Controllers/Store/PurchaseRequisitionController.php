@@ -385,15 +385,7 @@ class PurchaseRequisitionController extends Controller
      */
     private function departmentReviewCount(?\App\Models\User $user): ?int
     {
-        if (! $user) {
-            return null;
-        }
-
-        $isHead = $user->hasAnyRole(['admin', 'management'])
-            || RequisitionDepartmentHead::departmentsHeadedBy($user) !== []
-            || RequisitionDepartmentHead::sectionsHeadedBy($user) !== [];
-
-        return $isHead ? PurchaseRequisition::query()->awaitingDepartmentHead($user)->count() : null;
+        return PurchaseRequisition::departmentReviewCountFor($user);
     }
 
     /**

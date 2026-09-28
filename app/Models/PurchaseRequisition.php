@@ -356,6 +356,32 @@ class PurchaseRequisition extends Model
     }
 
     /**
+     * How many sheets wait on this user as a head — of a section or of a
+     * department — or NULL when they head neither, which is what hides the
+     * Department Review tab.
+     */
+    public static function departmentReviewCountFor(?User $user): ?int
+    {
+        if (! $user) {
+            return null;
+        }
+
+        $isHead = $user->hasAnyRole(['admin', 'management'])
+            || RequisitionDepartmentHead::departmentsHeadedBy($user) !== []
+            || RequisitionDepartmentHead::sectionsHeadedBy($user) !== [];
+
+        return $isHead ? self::query()->awaitingDepartmentHead($user)->count() : null;
+    }
+
+    /** The Requested tab's badge: department sheets waiting for the Store. */
+    public static function awaitingStoreCountFor(?User $user): int
+    {
+        return $user && self::seesEveryRequisition($user)
+            ? self::query()->fromDepartments()->where('status', self::STATUS_SUBMITTED)->count()
+            : 0;
+    }
+
+    /**
      * Whether the STORE may still correct this requisition.
      *
      * Deliberately separate from isEditable(), which is left exactly as it was:

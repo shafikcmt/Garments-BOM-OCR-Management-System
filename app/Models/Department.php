@@ -21,6 +21,22 @@ class Department extends Model
         'sort_order' => 'integer',
     ];
 
+    /**
+     * When the Store department gets a new head, that person is given the
+     * Requirement vs Issue permission. The previous head keeps the grant but
+     * loses access, because the view also checks they are the CURRENT head.
+     */
+    protected static function booted(): void
+    {
+        static::saved(function (Department $department) {
+            if ($department->key === 'store'
+                && $department->head_user_id
+                && ($department->wasRecentlyCreated || $department->wasChanged('head_user_id'))) {
+                \App\Services\RequirementVsIssueService::grantToStoreHead($department->head_user_id);
+            }
+        });
+    }
+
     public function head()
     {
         return $this->belongsTo(User::class, 'head_user_id');

@@ -67,6 +67,7 @@ class PermissionCatalog
         'receiving' => 'Receiving',
         'issues' => 'Issues',
         'requisition' => 'Purchase Requisition',
+        'requirement_issue' => 'Requirement vs Issue',
         'setup' => 'Setup',
 
         // Buyer / Style Stock
@@ -81,7 +82,7 @@ class PermissionCatalog
 
     /** Per-module sub-section order. Sections not listed follow, alphabetically. */
     private const SECTION_ORDER = [
-        'store' => ['stock_report', 'items', 'receiving', 'issues', 'requisition', 'setup'],
+        'store' => ['stock_report', 'items', 'receiving', 'issues', 'requisition', 'requirement_issue', 'setup'],
         'material' => ['closing_stock', 'receiving', 'bulk_issue', 'requisitions'],
     ];
 
