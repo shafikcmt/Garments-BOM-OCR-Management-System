@@ -612,3 +612,77 @@ it('rates an item from the latest Receiving line, else the Item Master, else a d
         ->and(rviRow($result, $mastered, $cad)['rate'])->toEqual(42.0)
         ->and(rviRow($result, $bare, $cad)['rate'])->toBeNull();
 });
+
+// --- Charts (screen only) ------------------------------------------------------------
+
+it('builds the charts from the table itself: same Issued %, same status split, same section totals', function () {
+    $sections = collect(range(1, 12))->map(fn ($n) => rviSection(sprintf('Line-%02d', $n)));
+    $pencil = rviItem('Pencil');
+    $tape = rviItem('Tape');
+    foreach ($sections as $i => $section) {
+        rviRequest($section, [[$pencil, 10 + $i, 5], [$tape, 2, 50]]);
+        rviIssue($section, $pencil, 5);
+        rviIssue($section, $tape, $i % 2 ? 3 : 0);   // every other section over-issued
+    }
+
+    $result = rviBuild();
+    $charts = \App\Services\RequirementVsIssueCharts::issue($result['rows'], $result['summary'], $result['sections']);
+
+    expect($charts['pct'])->toBe($result['summary']['pct'])
+        ->and(array_sum(array_column($charts['statuses'], 'count')))->toBe($result['rows']->count())
+        ->and(collect($charts['statuses'])->firstWhere('key', 'over_issued')['count'])->toBe($result['summary']['counts']['over_issued'])
+        // Top 10 + "Others" still add up to the table's requested and issued values.
+        ->and($charts['sections'])->toHaveCount(11)
+        ->and(end($charts['sections'])['label'])->toBe('Others (2)')
+        ->and(round(array_sum(array_column($charts['sections'], 'requested')), 2))->toEqual(round($result['summary']['requested_value'], 2))
+        ->and(round(array_sum(array_column($charts['sections'], 'issued')), 2))->toEqual(round($result['summary']['issued_value'], 2))
+        // Top items: at most 10, and never an over-issued row.
+        ->and(count($charts['items']))->toBeLessThanOrEqual(10)
+        ->and(collect($charts['items'])->every(fn ($i) => $i['value'] > 0))->toBeTrue();
+});
+
+it('draws the charts on the page, with clickable sections and items', function () {
+    $cad = rviSection('CAD & Sample');
+    $pencil = rviItem('Pencil');
+    rviRequest($cad, [[$pencil, 10, 5]]);
+    rviIssue($cad, $pencil, 4);
+
+    $this->actingAs(rviStoreHead())->get(route('store.stock.requisitions.requirement-vs-issue', ['from' => '2026-08', 'to' => '2026-08']))
+        ->assertOk()
+        ->assertSee('Issued % (by value)')
+        ->assertSee('Requested vs Issued value by Section')
+        ->assertSee('Top 10 items by Balance Value')
+        ->assertSee('sections%5B0%5D='.$cad->id, false)
+        ->assertSee('search=Pencil', false)
+        ->assertSee('class="rvi-pct', false);
+});
+
+it('says there is no data instead of drawing empty charts', function () {
+    $this->actingAs(rviStoreHead())->get(route('store.stock.requisitions.requirement-vs-issue', ['from' => '2026-08', 'to' => '2026-08']))
+        ->assertOk()
+        ->assertSee('No matching items')
+        ->assertDontSee('Top 10 items by Balance Value');
+
+    $charts = \App\Services\RequirementVsIssueCharts::issue(collect(), ['pct' => null], collect());
+    expect($charts['empty'])->toBeTrue();
+});
+
+it('exposes no chart without the permission', function () {
+    rviStoreHead();
+    $user = rviUser('store');
+
+    $this->actingAs($user)->get(route('store.stock.requisitions.requirement-vs-issue'))->assertForbidden();
+    $this->actingAs($user)->get(route('store.stock.requisitions.index'))->assertOk()
+        ->assertDontSee('Issued % (by value)')->assertDontSee('Top 10 items to purchase');
+});
+
+it('leaves the PDF and Excel without charts', function () {
+    $cad = rviSection('CAD & Sample');
+    rviRequest($cad, [[rviItem('Pencil'), 10, 5]]);
+
+    $html = view('store.stock.requisitions.requirement-vs-issue-pdf', rviBuild() + [
+        'title' => 'Month of August 2026', 'period' => 'Month of August 2026',
+    ])->render();
+
+    expect($html)->not->toContain('rvi-chart')->not->toContain('Issued % (by value)');
+});

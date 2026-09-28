@@ -115,6 +115,29 @@ it('refuses a store admin granting a permission they do not hold', function () {
     expect(User::where('name', 'Throwaway Person')->exists())->toBeFalse();
 });
 
+it('gives the Stock Summary permission to no department admin by the flag alone, nor lets them grant it', function () {
+    $permission = \App\Services\RequirementVsIssueService::PERMISSION;
+    Permission::findOrCreate($permission, 'web');
+    $admin = scopedStoreAdmin();
+
+    // The Department Admin flag is user management, not report access.
+    expect(\App\Services\RequirementVsIssueService::canView($admin))->toBeFalse();
+
+    $this->actingAs($admin)
+        ->post(route('admin.users.store'), scopedUserPayload(['permissions' => ['store.view', $permission]]))
+        ->assertForbidden();
+
+    // Once they hold it themselves, they may pass it on.
+    $admin->givePermissionTo($permission);
+    $payload = scopedUserPayload(['permissions' => [$permission]]);
+
+    $this->actingAs($admin->fresh())
+        ->post(route('admin.users.store'), $payload)
+        ->assertRedirect();
+
+    expect(User::where('email', $payload['email'])->firstOrFail()->hasDirectPermission($permission))->toBeTrue();
+});
+
 it('lets a store admin grant a permission they do hold', function () {
     $payload = scopedUserPayload(['permissions' => ['store.edit']]);
 

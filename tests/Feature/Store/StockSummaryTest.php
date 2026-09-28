@@ -177,6 +177,9 @@ it('lists every item 25 a page, with totals over all filtered rows', function ()
     $page2 = $this->actingAs($user)->get(route('store.stock.requisitions.index', SUM_AUGUST + ['sum_page' => 2]))->assertOk()->getContent();
 
     // Highest To Purchase first: Item 30 opens page 1, Item 01 closes page 2.
+    // Read from the table only — the chart above it covers every row.
+    $table = fn (string $html) => substr($html, strpos($html, 'gx-sum-table'));
+    [$page1, $page2] = [$table($page1), $table($page2)];
     expect($page1)->toContain('Item 30')->not->toContain('Item 05')->toContain('465')
         ->and($page2)->toContain('Item 01')->not->toContain('Item 30')->toContain('465');
 });
@@ -274,4 +277,30 @@ it('ignores Department and Section in the Purchase View, and keeps them for the 
         ->toMatch('/id="sumSections"[^>]*disabled/')
         // …and the Issue View link still carries the section.
         ->toContain('sum%5Bsections%5D%5B0%5D='.$cad->id);
+});
+
+// --- Charts on the card --------------------------------------------------------------
+
+it('draws the Issue View charts from its own table, and one chart on the Purchase View', function () {
+    sumCardData();
+    $user = sumUser('store', true);
+    $s = app(StockSummaryService::class)->build($user, SUM_AUGUST['sum'] + ['view' => 'issue']);
+
+    expect($s['charts']['issue']['pct'])->toBe($s['issue']['summary']['pct'])
+        ->and(array_sum(array_column($s['charts']['issue']['statuses'], 'count')))->toBe($s['issue']['rows']->count())
+        ->and(round(array_sum(array_column($s['charts']['issue']['sections'], 'requested')), 2))->toEqual(round($s['issue']['summary']['requested_value'], 2))
+        // Purchase chart: top items by To Purchase, figures from the table rows.
+        ->and(collect($s['charts']['purchase']['items'])->sum('pending'))->toEqual($s['purchase']['totals']['pending']);
+
+    $this->actingAs($user)->get(route('store.stock.requisitions.index', ['sum' => SUM_AUGUST['sum'] + ['view' => 'issue']]))
+        ->assertOk()->assertSee('Issued % (by value)')->assertDontSee('Top 10 items to purchase');
+    $this->actingAs($user)->get(route('store.stock.requisitions.index', SUM_AUGUST))
+        ->assertOk()->assertSee('Top 10 items to purchase')->assertDontSee('Issued % (by value)');
+});
+
+it('keeps the dashboard card free of charts', function () {
+    sumCardData();
+    $this->actingAs(sumUser('store', true))->get(route('store.dashboard'))->assertOk()
+        ->assertSee('Open Stock Summary')
+        ->assertDontSee('Top 10 items to purchase')->assertDontSee('Issued % (by value)');
 });

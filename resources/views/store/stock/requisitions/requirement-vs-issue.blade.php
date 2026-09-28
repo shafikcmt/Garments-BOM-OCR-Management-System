@@ -254,6 +254,13 @@
             @endif
         </p>
 
+        {{-- Charts: screen only, from the same rows and totals as the table. --}}
+        @include('store.stock.requisitions._rvi-charts', [
+            'charts' => $charts,
+            'sectionUrl' => fn (int $id) => $url(['sections' => [(string) $id]]),
+            'itemUrl' => fn (string $name) => $url(['search' => $name]),
+        ])
+
         {{-- Section table, when more than one section is in view. --}}
         @if($sections->count() > 1)
             <div class="card gx-stock-card mb-3">
@@ -356,7 +363,7 @@
                                     <td class="text-end">{{ $money($row['issued_value']) }}</td>
                                     <td class="text-end {{ $row['balance_qty'] < 0 ? 'text-danger fw-semibold' : '' }}">{{ $qty($row['balance_qty']) }}</td>
                                     <td class="text-end {{ ($row['balance_value'] ?? 0) < 0 ? 'text-danger fw-semibold' : '' }}">{{ $money($row['balance_value']) }}</td>
-                                    <td class="text-end">{{ $pct($row['pct']) }}</td>
+                                    <td class="text-end">@include('store.stock.requisitions._rvi-pct-cell', ['row' => $row])</td>
                                     <td><span class="badge {{ $statusTone[$row['status']] }}">{{ $row['status_label'] }}</span></td>
                                 </tr>
                             @endforeach

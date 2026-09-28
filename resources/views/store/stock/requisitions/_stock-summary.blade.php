@@ -188,6 +188,12 @@
     </div>
 @elseif($view === 'issue')
     @php($sum = $s['issue']['summary'])
+    {{-- Screen-only charts, from the same rows and totals as this table. --}}
+    @include('store.stock.requisitions._rvi-charts', [
+        'charts' => $s['charts']['issue'],
+        'sectionUrl' => fn (int $id) => $here(['sections' => [(string) $id]] + \App\Services\StockSummaryService::query($f, 'issue')),
+        'itemUrl' => fn (string $name) => $here(['search' => $name] + \App\Services\StockSummaryService::query($f, 'issue')),
+    ])
     <div class="table-responsive gx-sum-scroll">
         <table class="table table-sm align-middle mb-0 gx-report-table gx-sum-table">
             <thead>
@@ -212,7 +218,7 @@
                         <td class="text-end">{{ $money($row['issued_value']) }}</td>
                         <td class="text-end {{ $row['balance_qty'] < 0 ? 'text-danger fw-semibold' : '' }}">{{ $qty($row['balance_qty']) }}</td>
                         <td class="text-end {{ ($row['balance_value'] ?? 0) < 0 ? 'text-danger fw-semibold' : '' }}">{{ $money($row['balance_value']) }}</td>
-                        <td class="text-end">{{ $pct($row['pct']) }}</td>
+                        <td class="text-end">@include('store.stock.requisitions._rvi-pct-cell', ['row' => $row])</td>
                         <td><span class="badge {{ $statusTone[$row['status']] }}">{{ $row['status_label'] }}</span></td>
                     </tr>
                 @endforeach
@@ -233,6 +239,10 @@
     </div>
 @else
     @php($sum = $s['purchase']['totals'])
+    {{-- One small chart on the full card; dashboards stay light. --}}
+    @unless($compact)
+        @include('store.stock.requisitions._purchase-chart', ['chart' => $s['charts']['purchase']])
+    @endunless
     <div class="table-responsive gx-sum-scroll">
         <table class="table table-sm align-middle mb-0 gx-report-table gx-sum-table">
             <thead>

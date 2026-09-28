@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Store;
 use App\Exports\RequirementVsIssueExport;
 use App\Http\Controllers\Controller;
 use App\Models\PurchaseRequisition;
+use App\Services\RequirementVsIssueCharts;
 use App\Services\RequirementVsIssueService;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
@@ -66,6 +67,8 @@ class RequirementVsIssueController extends Controller
             'title' => $this->report->title($filters, $options),
             'period' => $this->report->periodLabel($filters),
             'query' => $this->query($filters),
+            // Screen-only charts, from the same rows and totals as the table.
+            'charts' => RequirementVsIssueCharts::issue($result['rows'], $result['summary'], $result['sections']),
         ];
     }
 

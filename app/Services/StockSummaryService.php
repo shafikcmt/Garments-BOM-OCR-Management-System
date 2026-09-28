@@ -86,6 +86,11 @@ class StockSummaryService
             'title' => $this->issue->title($view === self::VIEW_ISSUE ? $filters : $purchaseFilters, $options),
             'issue' => $issue,
             'purchase' => ['rows' => $purchaseRows, 'totals' => $purchaseTotals],
+            // Screen-only charts, from the same rows and totals as each table.
+            'charts' => [
+                self::VIEW_ISSUE => RequirementVsIssueCharts::issue($issue['rows'], $issue['summary'], $issue['sections']),
+                self::VIEW_PURCHASE => RequirementVsIssueCharts::purchase($purchaseRows),
+            ],
             // Each view's cards are that view's own totals row, so the two can
             // never disagree. Purchase rows carry no rate, so there is no
             // Requested Value on the Purchase View.
