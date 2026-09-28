@@ -27,6 +27,10 @@ class PurchaseRequisitionAction extends Model
     public const DELETED = 'deleted';
     /** A stage of the stage engine other than the head check and the final approval. */
     public const STAGE_APPROVED = 'stage_approved';
+    /** Sent back to the previous stage (Step 3c). */
+    public const RETURNED = 'returned';
+    /** Closed for good (Step 3c). */
+    public const CANCELLED = 'cancelled';
 
     public const STAGE_RAISER = 'raiser';
     public const STAGE_SECTION_HEAD = 'section_head';
@@ -81,6 +85,8 @@ class PurchaseRequisitionAction extends Model
             self::CORRECTED => 'Corrected by Store',
             self::DELETED => 'Deleted',
             self::STAGE_APPROVED => 'Stage Approved',
+            self::RETURNED => 'Returned',
+            self::CANCELLED => 'Cancelled',
         ][$this->action] ?? ucfirst(str_replace('_', ' ', $this->action));
     }
 

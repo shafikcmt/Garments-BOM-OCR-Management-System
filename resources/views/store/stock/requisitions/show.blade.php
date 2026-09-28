@@ -13,7 +13,13 @@
         'store_reviewed' => 'bg-info-subtle text-info-emphasis',
         'approved' => 'bg-success-subtle text-success',
         'purchase_action_taken' => 'bg-dark-subtle text-dark',
+        'cancelled' => 'bg-danger-subtle text-danger',
     ];
+
+    // The latest Return and the Cancel, for the banners (their reasons live
+    // in the history).
+    $lastReturn = $requisition->actions->firstWhere('action', \App\Models\PurchaseRequisitionAction::RETURNED);
+    $cancelAction = $requisition->actions->firstWhere('action', \App\Models\PurchaseRequisitionAction::CANCELLED);
 
     $total = $requisition->items->sum('amount');
 @endphp
@@ -64,6 +70,20 @@
                     <a href="{{ route('store.stock.requisitions.edit', $requisition) }}" class="btn btn-outline-secondary">
                         <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
                     </a>
+                @endif
+                @if($requisition->canBeCancelledBy(auth()->user()))
+                    {{-- Closed for good, with a reason; stays on record. --}}
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelRequisition{{ $requisition->id }}">
+                        <i class="bi bi-x-circle me-1" aria-hidden="true"></i>Cancel Requisition
+                    </button>
+                    <x-action-modal :id="'cancelRequisition'.$requisition->id"
+                                    :action="route('store.stock.requisitions.cancel', $requisition)"
+                                    :title="'Cancel '.$requisition->requisition_no"
+                                    :required="true"
+                                    placeholder="Why is this requisition being cancelled?"
+                                    submit-label="Cancel Requisition" submit-icon="bi-x-circle" submit-class="btn-danger">
+                        It is closed for good and no longer counted. It stays on record with its history.
+                    </x-action-modal>
                 @endif
                 @if($canDelete)
                     {{-- A draft: its raiser or Admin, reason optional. Once
@@ -177,6 +197,26 @@
                     </dl>
                 </div>
             </div>
+
+            @if($requisition->isCancelled())
+                <div class="alert alert-danger border-0 mt-3 mb-0 small">
+                    <strong>Cancelled</strong>@if($cancelAction) by {{ $cancelAction->actorName() }} on {{ $cancelAction->created_at?->format('d-M-Y') }}: {{ $cancelAction->comment }}@endif
+                    <span class="d-block mt-1">This requisition is closed and is not counted anywhere.</span>
+                </div>
+            @elseif($requisition->returnedToRaiser() && ! $requisition->rejectedByDepartmentHead() && $lastReturn)
+                {{-- A stage-engine sheet sent back to its raiser by a later stage. --}}
+                <div class="alert alert-warning border-0 mt-3 mb-0 small">
+                    <strong>Returned by {{ $lastReturn->actorName() }}</strong> ({{ $lastReturn->stageLabel() }}) on {{ $lastReturn->created_at?->format('d-M-Y') }}:
+                    {{ $lastReturn->comment }}
+                    <span class="d-block mt-1">Amend the requisition and submit it again, or cancel it.</span>
+                </div>
+            @elseif($requisition->usesStageEngine() && $lastReturn && $requisition->current_stage > 1 && ($lastReturn->meta['stage_sequence'] ?? 0) > $requisition->current_stage)
+                {{-- Sent back one stage, to the approver now holding it. --}}
+                <div class="alert alert-warning border-0 mt-3 mb-0 small">
+                    <strong>Returned by {{ $lastReturn->actorName() }}</strong> ({{ $lastReturn->stageLabel() }}) on {{ $lastReturn->created_at?->format('d-M-Y') }}:
+                    {{ $lastReturn->comment }}
+                </div>
+            @endif
 
             @if($requisition->rejectedByDepartmentHead())
                 <div class="alert alert-warning border-0 mt-3 mb-0 small">

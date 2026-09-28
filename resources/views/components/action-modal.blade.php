@@ -52,7 +52,7 @@
                 <div class="form-text">Saved in the requisition history.</div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
                 <button type="submit" class="btn {{ $submitClass }}">
                     @if($submitIcon)<i class="bi {{ $submitIcon }} me-1" aria-hidden="true"></i>@endif{{ $submitLabel }}
                 </button>

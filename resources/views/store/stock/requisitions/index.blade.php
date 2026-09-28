@@ -13,6 +13,7 @@
         'store_reviewed' => ['bg-info-subtle text-info-emphasis', 'bi-clipboard-check'],
         'approved' => ['bg-success-subtle text-success', 'bi-check2-circle'],
         'purchase_action_taken' => ['bg-dark-subtle text-dark', 'bi-cart-check'],
+        'cancelled' => ['bg-danger-subtle text-danger', 'bi-x-circle'],
     ];
 @endphp
 

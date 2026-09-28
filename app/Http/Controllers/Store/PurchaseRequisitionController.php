@@ -75,7 +75,7 @@ class PurchaseRequisitionController extends Controller
     {
         $filters = $request->validate([
             'month' => ['nullable', 'date_format:Y-m'],
-            'status' => ['nullable', 'string', 'in:'.implode(',', PurchaseRequisition::STATUS_FLOW)],
+            'status' => ['nullable', 'string', 'in:'.implode(',', array_keys(PurchaseRequisition::statusLabels()))],
             'section' => ['nullable', 'integer', 'exists:indent_sections,id'],
             'search' => ['nullable', 'string', 'max:100'],
         ]);
@@ -190,7 +190,7 @@ class PurchaseRequisitionController extends Controller
 
         $filters = $request->validate([
             'month' => ['nullable', 'date_format:Y-m'],
-            'status' => ['nullable', 'string', 'in:'.implode(',', PurchaseRequisition::STATUS_FLOW)],
+            'status' => ['nullable', 'string', 'in:'.implode(',', array_keys(PurchaseRequisition::statusLabels()))],
             'section' => ['nullable', 'integer', 'exists:indent_sections,id'],
             'search' => ['nullable', 'string', 'max:100'],
         ]);
@@ -334,6 +334,17 @@ class PurchaseRequisitionController extends Controller
      */
     public function departmentReject(Request $request, PurchaseRequisition $requisition)
     {
+        // A stage-engine sheet's head returns it like any other stage.
+        if ($requisition->usesStageEngine()) {
+            // Same contract as before for this form: the reason is "note".
+            $request->validate(['note' => ['required', 'string', 'max:1000']], [
+                'note.required' => 'Give the requester a reason so they know what to change.',
+            ]);
+            $request->merge(['comment' => $request->input('note')]);
+
+            return $this->stageReturn($request, $requisition);
+        }
+
         $this->authorizeVisible($requisition);
         $this->authorizeDepartmentHead($requisition);
 
@@ -463,6 +474,71 @@ class PurchaseRequisitionController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    /**
+     * Return a stage-engine sheet to the PREVIOUS stage, with a reason. From
+     * the first stage after Prepared it goes back to the raiser. Only the
+     * person the sheet waits for; the reason is kept in the history.
+     */
+    public function stageReturn(Request $request, PurchaseRequisition $requisition)
+    {
+        $this->authorizeVisible($requisition);
+        $user = $request->user();
+
+        abort_unless($requisition->usesStageEngine(), 422, 'This requisition follows the earlier approval steps.');
+        abort_unless($this->workflow->canAct($requisition, $user), 403, 'This requisition is not waiting for you.');
+
+        $data = $request->validate([
+            'comment' => ['required', 'string', 'max:1000'],
+        ], [
+            'comment.required' => 'Give a reason for returning it, so they know what to change.',
+        ]);
+
+        $next = null;
+
+        DB::transaction(function () use ($requisition, $user, $data, &$next) {
+            $locked = $this->lockRequisition($requisition);
+            abort_unless($this->workflow->canAct($locked, $user), 422,
+                'This stage has already been acted on. Reload the page to see where the requisition is now.');
+
+            $next = $this->workflow->returnToPrevious($locked, $user, $data['comment']);
+        });
+
+        return back()->with('success', 'Requisition '.$requisition->requisition_no.' returned to '
+            .($next ? ($next->assignee_name ?: $next->displayLabel()) : 'the requester').'.');
+    }
+
+    /**
+     * Cancel — close the sheet for good, with a reason. Its raiser while it
+     * is theirs (draft or sent back), Admin before approval. Either flow.
+     * Replaces deleting a submitted sheet: a cancelled one stays on record.
+     */
+    public function cancel(Request $request, PurchaseRequisition $requisition)
+    {
+        $this->authorizeVisible($requisition);
+        $user = $request->user();
+
+        if (! $requisition->canBeCancelledBy($user)) {
+            return back()->with('error', 'You cannot cancel this requisition. Its requester can while it is with them; Admin can until it is approved.');
+        }
+
+        $data = $request->validate([
+            'comment' => ['required', 'string', 'max:1000'],
+        ], [
+            'comment.required' => 'Give a reason for cancelling it.',
+        ]);
+
+        DB::transaction(function () use ($requisition, $user, $data) {
+            $locked = $this->lockRequisition($requisition);
+            abort_unless($locked->canBeCancelledBy($user), 422,
+                'This requisition has already moved on. Reload the page to see where it is now.');
+
+            $this->workflow->cancel($locked, $user, $data['comment']);
+        });
+
+        return redirect()->route('store.stock.requisitions.show', $requisition)
+            ->with('success', 'Requisition '.$requisition->requisition_no.' cancelled.');
     }
 
     /**
@@ -825,6 +901,15 @@ class PurchaseRequisitionController extends Controller
      */
     private function authorizeEditable(PurchaseRequisition $requisition): void
     {
+        // A stage-engine sheet is edited by its raiser alone (draft, or sent
+        // back to them); approvers change quantities at their own stage.
+        if ($requisition->usesStageEngine() && $requisition->isEditable()) {
+            abort_unless($requisition->isRaisedBy(auth()->user()), 403,
+                'Only the person who raised this requisition can edit it.');
+
+            return;
+        }
+
         if ($requisition->isEditable()) {
             return;
         }
@@ -884,7 +969,8 @@ class PurchaseRequisitionController extends Controller
                 'This requisition has already moved on. Reload the page to see where it is now.');
 
             $fromStatus = $requisition->status;
-            $wasReturned = $requisition->rejectedByDepartmentHead();
+            // Sent back by a head (old or new flow) or by any later stage.
+            $wasReturned = $requisition->rejectedByDepartmentHead() || $requisition->returnedToRaiser();
             $linesBefore = $isStoreCorrection
                 ? $this->history->snapshotLines($requisition->items()->get())
                 : [];
@@ -992,9 +1078,9 @@ class PurchaseRequisitionController extends Controller
 
         // Refused with a message on the page: the 403 page would hide why.
         if (! $requisition->canBeDeletedBy(auth()->user())) {
-            return back()->with('error', $requisition->deleteNeedsReason()
-                ? 'Only Admin can delete a requisition that has been submitted.'
-                : 'Only the person who raised this draft, or Admin, can delete it.');
+            return back()->with('error', $requisition->status === PurchaseRequisition::STATUS_DRAFT
+                ? 'Only the person who raised this draft, or Admin, can delete it.'
+                : 'A submitted requisition cannot be deleted. Cancel it instead, so it stays on record.');
         }
 
         $data = $request->validate([

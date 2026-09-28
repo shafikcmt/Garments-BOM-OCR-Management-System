@@ -445,6 +445,12 @@ Route::prefix('store')
             // the person named on the sheet's plan for that stage.
             Route::post('/requisitions/{requisition}/stage-approve', [PurchaseRequisitionController::class, 'stageApprove'])
                 ->name('requisitions.stage-approve');
+            // Back to the previous stage (reason required), and closing a
+            // sheet for good. The controller checks who may do each.
+            Route::post('/requisitions/{requisition}/stage-return', [PurchaseRequisitionController::class, 'stageReturn'])
+                ->name('requisitions.stage-return');
+            Route::post('/requisitions/{requisition}/cancel', [PurchaseRequisitionController::class, 'cancel'])
+                ->name('requisitions.cancel');
 
             Route::get('/requisitions/{requisition}/edit', [PurchaseRequisitionController::class, 'edit'])->name('requisitions.edit');
             Route::put('/requisitions/{requisition}', [PurchaseRequisitionController::class, 'update'])->name('requisitions.update');

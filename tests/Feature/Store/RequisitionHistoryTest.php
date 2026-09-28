@@ -217,25 +217,29 @@ it('lets only Admin delete a submitted requisition', function () {
     expect(PurchaseRequisition::find($sheet->id))->not->toBeNull();
 });
 
-it('needs a reason from Admin to delete a submitted requisition, and keeps its history', function () {
+it('refuses Admin deleting a submitted requisition, and keeps the history of a deleted draft', function () {
     $admin = histUser('admin', [], ['name' => 'System Admin']);
-    $sheet = histSheet(histUser('merchant'), PurchaseRequisition::STATUS_SUBMITTED);
-    $no = $sheet->requisition_no;
 
-    $this->actingAs($admin)->delete(route('store.stock.requisitions.destroy', $sheet))
-        ->assertSessionHasErrors('comment');
-    expect(PurchaseRequisition::find($sheet->id))->not->toBeNull();
+    // Step 3c: a submitted sheet is cancelled, never deleted.
+    $submitted = histSheet(histUser('merchant'), PurchaseRequisition::STATUS_SUBMITTED);
+    $this->actingAs($admin)->delete(route('store.stock.requisitions.destroy', $submitted), ['comment' => 'Duplicate'])
+        ->assertSessionHas('error', fn ($m) => str_contains($m, 'Cancel it instead'));
+    expect(PurchaseRequisition::find($submitted->id))->not->toBeNull();
 
-    $this->actingAs($admin)->delete(route('store.stock.requisitions.destroy', $sheet), ['comment' => 'Raised twice by mistake'])
+    // A draft is still deleted — and its history outlives it.
+    $draft = histSheet(histUser('merchant'), PurchaseRequisition::STATUS_DRAFT);
+    $no = $draft->requisition_no;
+
+    $this->actingAs($admin)->delete(route('store.stock.requisitions.destroy', $draft), ['comment' => 'Raised twice by mistake'])
         ->assertRedirect(route('store.stock.requisitions.index'));
 
     $row = PurchaseRequisitionAction::where('requisition_no', $no)->sole();
 
-    expect(PurchaseRequisition::find($sheet->id))->toBeNull()
+    expect(PurchaseRequisition::find($draft->id))->toBeNull()
         ->and($row->purchase_requisition_id)->toBeNull()
         ->and($row->action)->toBe('deleted')
         ->and($row->stage)->toBe('admin')
-        ->and($row->from_status)->toBe('submitted')
+        ->and($row->from_status)->toBe('draft')
         ->and($row->to_status)->toBeNull()
         ->and($row->comment)->toBe('Raised twice by mistake')
         ->and($row->user_name)->toBe('System Admin')

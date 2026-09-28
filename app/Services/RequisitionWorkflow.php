@@ -332,6 +332,114 @@ class RequisitionWorkflow
         return $next;
     }
 
+    /**
+     * Send the sheet back to the PREVIOUS stage, with a reason (kept in the
+     * history). The previous stage is the last one approved in this cycle —
+     * a skipped stage is passed over. Its approval is undone, so it acts
+     * again; what it had written on the sheet is taken back too.
+     *
+     * Back to "Prepared" means back to the raiser: the sheet is theirs to
+     * amend and resubmit (a new cycle) or cancel. The caller holds the row
+     * lock and the transaction, and has checked canAct().
+     *
+     * @return ?PurchaseRequisitionStage the stage now waiting, or null when the sheet is back with its raiser
+     */
+    public function returnToPrevious(PurchaseRequisition $requisition, User $user, string $reason): ?PurchaseRequisitionStage
+    {
+        $current = $this->currentStage($requisition);
+        $from = $requisition->status;
+
+        $previous = PurchaseRequisitionStage::where('purchase_requisition_id', $requisition->id)
+            ->where('cycle', $current->cycle)
+            ->where('sequence', '<', $current->sequence)
+            ->where('status', PurchaseRequisitionStage::STATUS_APPROVED)
+            ->orderByDesc('sequence')
+            ->first();
+
+        $toRaiser = ! $previous || $previous->sequence === 1;
+
+        if ($toRaiser) {
+            // A head returning the sheet keeps writing what the old flow did,
+            // so the raiser's screens read "Returned by Section Head".
+            if ($current->stamp_source === RequisitionSignatureBlock::STAMP_DEPARTMENT_HEAD) {
+                $requisition->forceFill([
+                    'department_review_status' => PurchaseRequisition::DEPT_REVIEW_REJECTED,
+                    'department_review_note' => $reason,
+                ] + $requisition->headDecisionStamp($user));
+            }
+
+            $requisition->forceFill(['current_stage' => 1])->save();
+        } else {
+            $this->undoStamp($requisition, $previous->stamp_source);
+
+            $previous->update([
+                'status' => PurchaseRequisitionStage::STATUS_PENDING,
+                'acted_by' => null,
+                'acted_by_name' => null,
+                'acted_at' => null,
+                'comment' => null,
+            ]);
+
+            $requisition->forceFill(['current_stage' => $previous->sequence])->save();
+        }
+
+        // A head returning the sheet reads "Returned by Head", as on the old flow.
+        $action = $current->stamp_source === RequisitionSignatureBlock::STAMP_DEPARTMENT_HEAD
+            ? PurchaseRequisitionAction::HEAD_RETURNED
+            : PurchaseRequisitionAction::RETURNED;
+
+        $this->history->record($requisition, $action, [
+            'stage' => $this->historyStage($current, $requisition),
+            'from' => $from,
+            'comment' => $reason,
+            'meta' => [
+                'stage_sequence' => $current->sequence,
+                'stage_label' => $current->displayLabel(),
+                'returned_to' => $toRaiser ? 'Requester' : $previous->displayLabel(),
+            ],
+        ]);
+
+        return $toRaiser ? null : $previous->fresh();
+    }
+
+    /**
+     * Close the sheet for good, with a reason. Either flow. The caller checks
+     * canBeCancelledBy(), holds the lock and the transaction.
+     */
+    public function cancel(PurchaseRequisition $requisition, User $user, string $reason): void
+    {
+        $from = $requisition->status;
+
+        $requisition->forceFill([
+            'status' => PurchaseRequisition::STATUS_CANCELLED,
+            'current_stage' => null,
+        ])->save();
+
+        $this->history->record($requisition, PurchaseRequisitionAction::CANCELLED, [
+            'stage' => $requisition->isRaisedBy($user) ? PurchaseRequisitionAction::STAGE_RAISER : PurchaseRequisitionAction::STAGE_ADMIN,
+            'from' => $from,
+            'comment' => $reason,
+        ]);
+    }
+
+    /** Take back what a stage wrote on the sheet, so it can act again. */
+    private function undoStamp(PurchaseRequisition $requisition, ?string $stamp): void
+    {
+        match ($stamp) {
+            RequisitionSignatureBlock::STAMP_DEPARTMENT_HEAD => $requisition->forceFill([
+                'department_review_status' => PurchaseRequisition::DEPT_REVIEW_PENDING,
+            ] + PurchaseRequisition::clearedHeadStamps()),
+            RequisitionSignatureBlock::STAMP_STORE_HEAD => $requisition->forceFill([
+                'status' => PurchaseRequisition::STATUS_SUBMITTED,
+                'store_ack_by' => null,
+                'store_ack_at' => null,
+            ]),
+            default => null,
+        };
+
+        $requisition->save();
+    }
+
     /** What a stage writes on the sheet, from its box's "filled from" setting. */
     private function applyStamp(PurchaseRequisition $requisition, ?string $stamp, User $user): void
     {

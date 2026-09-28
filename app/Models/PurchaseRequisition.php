@@ -41,6 +41,8 @@ class PurchaseRequisition extends Model
     public const STATUS_STORE_REVIEWED = 'store_reviewed';
     public const STATUS_APPROVED = 'approved';
     public const STATUS_PURCHASE_ACTION_TAKEN = 'purchase_action_taken';
+    /** Closed for good (Step 3c). Not counted anywhere, never edited again. */
+    public const STATUS_CANCELLED = 'cancelled';
 
     /** Workflow order, earliest first — also the order shown in the UI. */
     public const STATUS_FLOW = [
@@ -126,6 +128,7 @@ class PurchaseRequisition extends Model
             self::STATUS_STORE_REVIEWED => 'Store Reviewed',
             self::STATUS_APPROVED => 'Approved',
             self::STATUS_PURCHASE_ACTION_TAKEN => 'Purchase Action Taken',
+            self::STATUS_CANCELLED => 'Cancelled',
         ];
     }
 
@@ -153,7 +156,25 @@ class PurchaseRequisition extends Model
         // A sheet the department head sent back is the requester's again:
         // nobody downstream has accepted its figures, and the whole point of
         // returning it is that they fix it and submit it once more.
-        return $this->status === self::STATUS_DRAFT || $this->rejectedByDepartmentHead();
+        return $this->status === self::STATUS_DRAFT
+            || $this->rejectedByDepartmentHead()
+            || $this->returnedToRaiser();
+    }
+
+    /**
+     * A stage-engine sheet sent all the way back to the person who raised it
+     * (current stage 1, "Prepared"): theirs to amend and resubmit or cancel.
+     */
+    public function returnedToRaiser(): bool
+    {
+        return $this->usesStageEngine()
+            && (int) $this->current_stage === 1
+            && ! in_array($this->status, [self::STATUS_DRAFT, self::STATUS_CANCELLED], true);
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
     }
 
     /** @return array<string, string> level => label */
@@ -445,14 +466,25 @@ class PurchaseRequisition extends Model
     }
 
     /**
-     * Who may delete this sheet. A draft has been read by nobody, so its
-     * raiser may drop it, as may Admin. Once submitted, others have read or
-     * acted on the figures: Admin only, with a reason (deleteNeedsReason).
-     * Management and Store no longer delete; Cancel (Step 3) replaces it.
+     * Who may delete this sheet: a DRAFT only, by its raiser or Admin. A
+     * draft has been read by nobody. Anything submitted is cancelled instead
+     * (canBeCancelledBy), so it stays on record.
      */
     public function canBeDeletedBy(?User $user): bool
     {
-        if (! $user) {
+        return $user !== null
+            && $this->status === self::STATUS_DRAFT
+            && ($user->hasRole('admin') || $this->isRaisedBy($user));
+    }
+
+    /**
+     * Who may cancel this sheet — close it for good, with a reason. Its
+     * raiser while it is theirs (a draft, or sent back to them); Admin at any
+     * point before it is approved. An approved sheet is not cancelled here.
+     */
+    public function canBeCancelledBy(?User $user): bool
+    {
+        if (! $user || in_array($this->status, [self::STATUS_CANCELLED, self::STATUS_APPROVED, self::STATUS_PURCHASE_ACTION_TAKEN], true)) {
             return false;
         }
 
@@ -460,7 +492,7 @@ class PurchaseRequisition extends Model
             return true;
         }
 
-        return $this->status === self::STATUS_DRAFT && $this->isRaisedBy($user);
+        return $this->isRaisedBy($user) && $this->isEditable();
     }
 
     public function deleteNeedsReason(): bool
@@ -541,10 +573,15 @@ class PurchaseRequisition extends Model
         $table = $query->getModel()->getTable();
 
         return $query
-            ->where($table.'.status', '<>', self::STATUS_DRAFT)
+            ->whereNotIn($table.'.status', [self::STATUS_DRAFT, self::STATUS_CANCELLED])
             ->where(fn (Builder $q) => $q->where($table.'.level', self::LEVEL_FINAL)
                 ->orWhereNull($table.'.department_review_status')
-                ->orWhere($table.'.department_review_status', self::DEPT_REVIEW_APPROVED));
+                ->orWhere($table.'.department_review_status', self::DEPT_REVIEW_APPROVED))
+            // A stage-engine sheet sent back to its raiser is not demand until
+            // it is resubmitted. Grouped, so the OR cannot escape the rest.
+            ->where(fn (Builder $q) => $q->whereNull($table.'.workflow_version')
+                ->orWhereNull($table.'.current_stage')
+                ->orWhere($table.'.current_stage', '<>', 1));
     }
 
     /*
@@ -595,6 +632,10 @@ class PurchaseRequisition extends Model
      */
     public function progressLabel(): string
     {
+        if ($this->returnedToRaiser() && ! $this->rejectedByDepartmentHead()) {
+            return 'Returned to Requester';
+        }
+
         return match ($this->status) {
             self::STATUS_DRAFT => 'Draft',
             self::STATUS_SUBMITTED => match ($this->department_review_status) {
@@ -605,6 +646,7 @@ class PurchaseRequisition extends Model
             self::STATUS_STORE_REVIEWED => 'Received by Store',
             self::STATUS_APPROVED => 'Approved',
             self::STATUS_PURCHASE_ACTION_TAKEN => 'Purchase Action Taken',
+            self::STATUS_CANCELLED => 'Cancelled',
             default => $this->statusLabel(),
         };
     }

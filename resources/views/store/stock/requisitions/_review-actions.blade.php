@@ -24,11 +24,11 @@
     $workflow = app(\App\Services\RequisitionWorkflow::class);
     $canStage = $onEngine && $workflow->canAct($requisition, $user);
     $stage = $canStage ? $workflow->currentStage($requisition) : null;
-    // The head stage can also be returned to the raiser (3c brings Return to
-    // every stage).
-    $headCanReturn = $onEngine
-        ? $canStage && $requisition->awaitingDepartmentHead()
-        : $requisition->awaitingDepartmentHead() && $requisition->isDepartmentHeadFor($user);
+    // The old flow's head check keeps its own Approve / Return. On the stage
+    // engine every stage, the head's included, has the Approve / Return pair
+    // below.
+    $headCanReturn = ! $onEngine
+        && $requisition->awaitingDepartmentHead() && $requisition->isDepartmentHeadFor($user);
 @endphp
 
 @if($canStage)
@@ -40,6 +40,19 @@
                     :title="'Approve '.$requisition->requisition_no"
                     submit-label="Approve" submit-icon="bi-check2-circle" submit-class="btn-success">
         You are approving as {{ $stage->displayLabel() }}.
+    </x-action-modal>
+
+    {{-- Back to the previous stage; from the first stage, to the raiser. --}}
+    <button type="button" class="btn {{ $size }} btn-outline-danger" data-bs-toggle="modal" data-bs-target="#stageReturn{{ $requisition->id }}">
+        <i class="bi bi-arrow-return-left me-1" aria-hidden="true"></i>Return
+    </button>
+    <x-action-modal :id="'stageReturn'.$requisition->id"
+                    :action="route('store.stock.requisitions.stage-return', $requisition)"
+                    :title="'Return '.$requisition->requisition_no"
+                    :required="true"
+                    placeholder="What should be changed before it comes back to you?"
+                    submit-label="Return" submit-icon="bi-arrow-return-left" submit-class="btn-danger">
+        It goes back to the previous stage, which can change it and send it on again.
     </x-action-modal>
 @endif
 
