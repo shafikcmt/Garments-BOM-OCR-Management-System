@@ -388,6 +388,36 @@ class PurchaseRequisition extends Model
         return $this->hasMany(PurchaseRequisitionItem::class)->orderBy('sort_order')->orderBy('id');
     }
 
+    /** The sheet's history, newest first. */
+    public function actions()
+    {
+        return $this->hasMany(PurchaseRequisitionAction::class)->orderByDesc('created_at')->orderByDesc('id');
+    }
+
+    /**
+     * Who may delete this sheet. A draft has been read by nobody, so its
+     * raiser may drop it, as may Admin. Once submitted, others have read or
+     * acted on the figures: Admin only, with a reason (deleteNeedsReason).
+     * Management and Store no longer delete; Cancel (Step 3) replaces it.
+     */
+    public function canBeDeletedBy(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        return $this->status === self::STATUS_DRAFT && $this->isRaisedBy($user);
+    }
+
+    public function deleteNeedsReason(): bool
+    {
+        return $this->status !== self::STATUS_DRAFT;
+    }
+
     public function indentSection()
     {
         return $this->belongsTo(IndentSection::class);

@@ -66,11 +66,20 @@
                     </a>
                 @endif
                 @if($canDelete)
-                    <form method="POST" action="{{ route('store.stock.requisitions.destroy', $requisition) }}" class="d-inline"
-                          onsubmit="return confirm('Delete requisition {{ $requisition->requisition_no }} and all its item lines? This cannot be undone.');">
-                        @csrf @method('DELETE')
-                        <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
-                    </form>
+                    {{-- A draft: its raiser or Admin, reason optional. Once
+                         submitted: Admin only, reason required. --}}
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteRequisition{{ $requisition->id }}">
+                        <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
+                    </button>
+                    <x-action-modal :id="'deleteRequisition'.$requisition->id"
+                                    :action="route('store.stock.requisitions.destroy', $requisition)"
+                                    method="DELETE"
+                                    :title="'Delete '.$requisition->requisition_no"
+                                    :required="$requisition->deleteNeedsReason()"
+                                    submit-label="Delete" submit-icon="bi-trash" submit-class="btn-danger"
+                                    :placeholder="$requisition->deleteNeedsReason() ? 'Why is this submitted requisition being deleted?' : null">
+                        The requisition and all its item lines will be removed. Its history is kept.
+                    </x-action-modal>
                 @endif
                 <a href="{{ route('store.stock.requisitions.pdf', $requisition) }}" class="btn btn-outline-secondary">
                     <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF
@@ -281,6 +290,8 @@
             </p>
         </div>
     </div>
+
+    @include('store.stock.requisitions._history', ['requisition' => $requisition])
 
     <style>
         .gx-line-scroll { overflow-x: auto; }

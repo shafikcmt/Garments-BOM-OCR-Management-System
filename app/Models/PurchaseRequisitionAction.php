@@ -1,0 +1,104 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * One entry in a purchase requisition's history. Append-only: written by
+ * App\Services\RequisitionHistory, never edited. See migration
+ * 2026_09_28_000001.
+ */
+class PurchaseRequisitionAction extends Model
+{
+    public const UPDATED_AT = null;
+
+    /** The day history started being recorded; anything earlier was backfilled from stamps. */
+    public const RECORDED_FROM = '2026-09-28';
+
+    public const CREATED = 'created';
+    public const SUBMITTED = 'submitted';
+    public const RESUBMITTED = 'resubmitted';
+    public const HEAD_APPROVED = 'head_approved';
+    public const HEAD_RETURNED = 'head_returned';
+    public const RECEIVED = 'received';
+    public const APPROVED = 'approved';
+    public const CORRECTED = 'corrected';
+    public const DELETED = 'deleted';
+
+    public const STAGE_RAISER = 'raiser';
+    public const STAGE_SECTION_HEAD = 'section_head';
+    public const STAGE_DEPARTMENT_HEAD = 'department_head';
+    public const STAGE_STORE = 'store';
+    public const STAGE_FINAL_APPROVAL = 'final_approval';
+    public const STAGE_ADMIN = 'admin';
+
+    protected $fillable = [
+        'purchase_requisition_id',
+        'requisition_no',
+        'action',
+        'stage',
+        'from_status',
+        'to_status',
+        'user_id',
+        'user_name',
+        'comment',
+        'cycle',
+        'meta',
+        'created_at',
+    ];
+
+    protected $casts = [
+        'meta' => 'array',
+        'cycle' => 'integer',
+        'created_at' => 'datetime',
+    ];
+
+    public function requisition()
+    {
+        return $this->belongsTo(PurchaseRequisition::class, 'purchase_requisition_id');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function actionLabel(): string
+    {
+        return [
+            self::CREATED => 'Saved as Draft',
+            self::SUBMITTED => 'Submitted',
+            self::RESUBMITTED => 'Resubmitted',
+            self::HEAD_APPROVED => 'Checked by Head',
+            self::HEAD_RETURNED => 'Returned by Head',
+            self::RECEIVED => 'Received by Store',
+            self::APPROVED => 'Approved',
+            self::CORRECTED => 'Corrected by Store',
+            self::DELETED => 'Deleted',
+        ][$this->action] ?? ucfirst(str_replace('_', ' ', $this->action));
+    }
+
+    public function stageLabel(): ?string
+    {
+        return [
+            self::STAGE_RAISER => 'Requester',
+            self::STAGE_SECTION_HEAD => 'Section Head',
+            self::STAGE_DEPARTMENT_HEAD => 'Department Head',
+            self::STAGE_STORE => 'Store',
+            self::STAGE_FINAL_APPROVAL => 'Final Approval',
+            self::STAGE_ADMIN => 'Admin',
+        ][$this->stage] ?? null;
+    }
+
+    /** The name as it was when the action was taken; still there after the user is removed. */
+    public function actorName(): string
+    {
+        return $this->user_name ?: ($this->user?->name ?? '—');
+    }
+
+    public function isBackfilled(): bool
+    {
+        return (bool) ($this->meta['backfilled'] ?? false);
+    }
+}

@@ -9,6 +9,7 @@ use App\Models\IndentPerson;
 use App\Models\IndentSection;
 use App\Models\ItemCategory;
 use App\Models\PurchaseRequisition;
+use App\Models\PurchaseRequisitionAction;
 use App\Models\PurchaseRequisitionItem;
 use App\Models\RequisitionDepartmentHead;
 use App\Models\StockItem;
@@ -18,6 +19,7 @@ use App\Services\MonthlyRequisitionReportService;
 use App\Services\PurchaseRequisitionNumberGenerator;
 use App\Services\PurchaseRequisitionService;
 use App\Services\RequisitionFulfilmentService;
+use App\Services\RequisitionHistory;
 use App\Services\RequisitionReviewChain;
 use App\Services\RequisitionSignatureResolver;
 use Illuminate\Http\JsonResponse;
@@ -50,7 +52,18 @@ class PurchaseRequisitionController extends Controller
         private readonly PurchaseRequisitionNumberGenerator $numbers,
         private readonly RequisitionFulfilmentService $fulfilment,
         private readonly RequisitionSignatureResolver $signatures,
+        private readonly RequisitionHistory $history,
     ) {
+    }
+
+    /**
+     * The sheet re-read under a row lock, inside the caller's transaction.
+     * A double-click's second request waits here, then finds the state
+     * already moved on and is refused by the caller's check.
+     */
+    private function lockRequisition(PurchaseRequisition $requisition): PurchaseRequisition
+    {
+        return PurchaseRequisition::whereKey($requisition->getKey())->lockForUpdate()->firstOrFail();
     }
 
     public function index(Request $request)
@@ -271,10 +284,21 @@ class PurchaseRequisitionController extends Controller
         $this->authorizeVisible($requisition);
         $this->authorizeDepartmentHead($requisition);
 
-        $requisition->update([
-            'department_review_status' => PurchaseRequisition::DEPT_REVIEW_APPROVED,
-            'department_review_note' => null,
-        ] + $requisition->headDecisionStamp(auth()->user()));
+        DB::transaction(function () use ($requisition) {
+            $locked = $this->lockRequisition($requisition);
+            abort_unless($locked->awaitingDepartmentHead(), 422,
+                'Only a requisition waiting for a head\'s check can be checked.');
+
+            $locked->update([
+                'department_review_status' => PurchaseRequisition::DEPT_REVIEW_APPROVED,
+                'department_review_note' => null,
+            ] + $locked->headDecisionStamp(auth()->user()));
+
+            $this->history->record($locked, PurchaseRequisitionAction::HEAD_APPROVED, [
+                'stage' => RequisitionHistory::headStage($locked),
+                'from' => PurchaseRequisition::STATUS_SUBMITTED,
+            ]);
+        });
 
         return back()->with('success',
             'Requisition '.$requisition->requisition_no.' checked and sent to Store.');
@@ -298,10 +322,24 @@ class PurchaseRequisitionController extends Controller
             'note.required' => 'Give the requester a reason so they know what to change.',
         ]);
 
-        $requisition->update([
-            'department_review_status' => PurchaseRequisition::DEPT_REVIEW_REJECTED,
-            'department_review_note' => $data['note'],
-        ] + $requisition->headDecisionStamp(auth()->user()));
+        DB::transaction(function () use ($requisition, $data) {
+            $locked = $this->lockRequisition($requisition);
+            abort_unless($locked->awaitingDepartmentHead(), 422,
+                'Only a requisition waiting for a head\'s check can be returned.');
+
+            $locked->update([
+                'department_review_status' => PurchaseRequisition::DEPT_REVIEW_REJECTED,
+                'department_review_note' => $data['note'],
+            ] + $locked->headDecisionStamp(auth()->user()));
+
+            // The reason is kept here too: the sheet's own note is cleared
+            // when it is resubmitted, the history row is not.
+            $this->history->record($locked, PurchaseRequisitionAction::HEAD_RETURNED, [
+                'stage' => RequisitionHistory::headStage($locked),
+                'from' => PurchaseRequisition::STATUS_SUBMITTED,
+                'comment' => $data['note'],
+            ]);
+        });
 
         return back()->with('success',
             'Requisition '.$requisition->requisition_no.' returned to the requester.');
@@ -383,7 +421,7 @@ class PurchaseRequisitionController extends Controller
      * box has always meant. Gated on store.requisition.review, the permission
      * the seeder already grants to store, admin and management.
      */
-    public function markReceived(PurchaseRequisition $requisition)
+    public function markReceived(Request $request, PurchaseRequisition $requisition)
     {
         $this->authorizeTransition('store.requisition.review');
 
@@ -393,14 +431,25 @@ class PurchaseRequisitionController extends Controller
             return back()->with('error', 'You raised this requisition, so another person must mark it received.');
         }
 
-        abort_unless($requisition->awaitingStoreReceipt(), 422,
-            'Only a requisition that has been submitted and not yet received can be marked received.');
+        $data = $request->validate(['comment' => ['nullable', 'string', 'max:1000']]);
 
-        $requisition->update([
-            'status' => PurchaseRequisition::STATUS_STORE_REVIEWED,
-            'store_ack_by' => auth()->id(),
-            'store_ack_at' => now(),
-        ]);
+        DB::transaction(function () use ($requisition, $data) {
+            $locked = $this->lockRequisition($requisition);
+            abort_unless($locked->awaitingStoreReceipt(), 422,
+                'Only a requisition that has been submitted and not yet received can be marked received.');
+
+            $locked->update([
+                'status' => PurchaseRequisition::STATUS_STORE_REVIEWED,
+                'store_ack_by' => auth()->id(),
+                'store_ack_at' => now(),
+            ]);
+
+            $this->history->record($locked, PurchaseRequisitionAction::RECEIVED, [
+                'stage' => PurchaseRequisitionAction::STAGE_STORE,
+                'from' => PurchaseRequisition::STATUS_SUBMITTED,
+                'comment' => $data['comment'] ?? null,
+            ]);
+        });
 
         // Lines naming something the Item Master has never carried. The
         // Store is the one who decides whether it should, so the moment they
@@ -427,7 +476,7 @@ class PurchaseRequisitionController extends Controller
      * the whole point of the separate signature boxes on the paper form. That
      * rule is left exactly as it was found.
      */
-    public function approve(PurchaseRequisition $requisition)
+    public function approve(Request $request, PurchaseRequisition $requisition)
     {
         $this->authorizeTransition('store.requisition.approve');
 
@@ -435,14 +484,25 @@ class PurchaseRequisitionController extends Controller
             return back()->with('error', 'You raised this requisition, so another person must approve it.');
         }
 
-        abort_unless($requisition->awaitingApproval(), 422,
-            'Only a requisition the Store has received can be approved.');
+        $data = $request->validate(['comment' => ['nullable', 'string', 'max:1000']]);
 
-        $requisition->update([
-            'status' => PurchaseRequisition::STATUS_APPROVED,
-            'approved_by' => auth()->id(),
-            'approved_at' => now(),
-        ]);
+        DB::transaction(function () use ($requisition, $data) {
+            $locked = $this->lockRequisition($requisition);
+            abort_unless($locked->awaitingApproval(), 422,
+                'Only a requisition the Store has received can be approved.');
+
+            $locked->update([
+                'status' => PurchaseRequisition::STATUS_APPROVED,
+                'approved_by' => auth()->id(),
+                'approved_at' => now(),
+            ]);
+
+            $this->history->record($locked, PurchaseRequisitionAction::APPROVED, [
+                'stage' => PurchaseRequisitionAction::STAGE_FINAL_APPROVAL,
+                'from' => PurchaseRequisition::STATUS_STORE_REVIEWED,
+                'comment' => $data['comment'] ?? null,
+            ]);
+        });
 
         return back()->with('success',
             'Requisition '.$requisition->requisition_no.' approved.');
@@ -522,6 +582,12 @@ class PurchaseRequisitionController extends Controller
 
             $this->syncItems($requisition, $data['items'], $date);
 
+            $this->history->record($requisition, $submitting
+                ? PurchaseRequisitionAction::SUBMITTED
+                : PurchaseRequisitionAction::CREATED, [
+                    'stage' => PurchaseRequisitionAction::STAGE_RAISER,
+                ]);
+
             return $requisition;
         });
 
@@ -579,6 +645,7 @@ class PurchaseRequisitionController extends Controller
             'items.stockItem', 'items.itemCategory',
             'indentSection', 'indentPerson', 'createdBy',
             'departmentCheckedBy', 'sectionCheckedBy', 'storeAckBy', 'accountsAckBy', 'checkedBy', 'approvedBy',
+            'actions.user',
         ]);
 
         $user = auth()->user();
@@ -598,7 +665,7 @@ class PurchaseRequisitionController extends Controller
                 : null,
             'statusLabels' => PurchaseRequisition::statusLabels(),
             'typeLabels' => PurchaseRequisitionItem::typeLabels(),
-            'canDelete' => $this->storeCorrectionAbilities()['delete'],
+            'canDelete' => $requisition->canBeDeletedBy($user),
             // Whether this viewer holds the correction permission AND reads the
             // whole company's requisitions — the Store-correction half of
             // authorizeEditable(), asked the same way so the button and the
@@ -717,6 +784,18 @@ class PurchaseRequisitionController extends Controller
             : ['department_review_status' => null, 'review_level' => null];
 
         DB::transaction(function () use ($data, $requisition, $isStoreCorrection, $review) {
+            // Re-checked under the lock: a second click of Submit finds the
+            // sheet already submitted and is refused instead of saving twice.
+            $locked = $this->lockRequisition($requisition);
+            abort_unless($isStoreCorrection ? $locked->isOpenToStoreCorrection() : $locked->isEditable(), 422,
+                'This requisition has already moved on. Reload the page to see where it is now.');
+
+            $fromStatus = $requisition->status;
+            $wasReturned = $requisition->rejectedByDepartmentHead();
+            $linesBefore = $isStoreCorrection
+                ? $this->history->snapshotLines($requisition->items()->get())
+                : [];
+
             $requisition->update([
                 'requisition_no' => ($data['requisition_no'] ?? null) ?: $requisition->requisition_no,
                 'requisition_date' => $data['requisition_date'],
@@ -767,6 +846,24 @@ class PurchaseRequisitionController extends Controller
             // a draft has no downstream references to preserve.
             $requisition->items()->delete();
             $this->syncItems($requisition, $data['items'], Carbon::parse($data['requisition_date']));
+
+            if ($isStoreCorrection) {
+                $this->history->record($requisition, PurchaseRequisitionAction::CORRECTED, [
+                    'stage' => PurchaseRequisitionAction::STAGE_STORE,
+                    'from' => $fromStatus,
+                    'meta' => ['lines' => $this->history->diffLines(
+                        $linesBefore,
+                        $this->history->snapshotLines($requisition->items()->get())
+                    )],
+                ]);
+            } elseif ($data['action'] === 'submit') {
+                $this->history->record($requisition, $wasReturned
+                    ? PurchaseRequisitionAction::RESUBMITTED
+                    : PurchaseRequisitionAction::SUBMITTED, [
+                        'stage' => PurchaseRequisitionAction::STAGE_RAISER,
+                        'from' => $fromStatus,
+                    ]);
+            }
         });
 
         return redirect()
@@ -781,13 +878,45 @@ class PurchaseRequisitionController extends Controller
                 : $this->savedMessage($requisition->fresh()));
     }
 
-    public function destroy(PurchaseRequisition $requisition)
+    /**
+     * A draft: its raiser or Admin. Anything submitted: Admin only, with a
+     * reason. See PurchaseRequisition::canBeDeletedBy(). The history row is
+     * written first and survives the sheet (its foreign key nulls out).
+     */
+    public function destroy(Request $request, PurchaseRequisition $requisition)
     {
         $this->authorizeVisible($requisition);
-        $this->authorizeStoreDelete('purchase requisition');
+
+        // Refused with a message on the page: the 403 page would hide why.
+        if (! $requisition->canBeDeletedBy(auth()->user())) {
+            return back()->with('error', $requisition->deleteNeedsReason()
+                ? 'Only Admin can delete a requisition that has been submitted.'
+                : 'Only the person who raised this draft, or Admin, can delete it.');
+        }
+
+        $data = $request->validate([
+            'comment' => [$requisition->deleteNeedsReason() ? 'required' : 'nullable', 'string', 'max:1000'],
+        ], [
+            'comment.required' => 'Give a reason for deleting a submitted requisition.',
+        ]);
 
         $no = $requisition->requisition_no;
-        $requisition->delete();
+
+        DB::transaction(function () use ($requisition, $data) {
+            $locked = $this->lockRequisition($requisition);
+
+            $this->history->record($locked, PurchaseRequisitionAction::DELETED, [
+                'stage' => auth()->user()->hasRole('admin')
+                    ? PurchaseRequisitionAction::STAGE_ADMIN
+                    : PurchaseRequisitionAction::STAGE_RAISER,
+                'from' => $locked->status,
+                'to' => null,
+                'comment' => $data['comment'] ?? null,
+                'meta' => ['lines' => array_values($this->history->snapshotLines($locked->items()->get()))],
+            ]);
+
+            $locked->delete();
+        });
 
         return redirect()
             ->route('store.stock.requisitions.index')

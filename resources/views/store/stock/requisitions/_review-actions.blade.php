@@ -62,23 +62,30 @@
      controller refuses it too. They get a note instead of a button. --}}
 @php($raisedByViewer = $requisition->isRaisedBy($user))
 
+{{-- Received and Approve each confirm in a modal with an optional comment,
+     which goes into the requisition's history. --}}
 @if($requisition->awaitingStoreReceipt() && $user?->can('store.requisition.review') && ! $raisedByViewer)
-    <form method="POST" action="{{ route('store.stock.requisitions.received', $requisition) }}" class="d-inline">
-        @csrf
-        <button type="submit" class="btn {{ $size }} btn-outline-primary">
-            <i class="bi bi-inbox-fill me-1" aria-hidden="true"></i>Received
-        </button>
-    </form>
+    <button type="button" class="btn {{ $size }} btn-outline-primary" data-bs-toggle="modal" data-bs-target="#receiveRequisition{{ $requisition->id }}">
+        <i class="bi bi-inbox-fill me-1" aria-hidden="true"></i>Received
+    </button>
+    <x-action-modal :id="'receiveRequisition'.$requisition->id"
+                    :action="route('store.stock.requisitions.received', $requisition)"
+                    :title="'Mark '.$requisition->requisition_no.' as received'"
+                    submit-label="Mark Received" submit-icon="bi-inbox-fill">
+        The Store confirms it has this requisition.
+    </x-action-modal>
 @endif
 
 @if($requisition->awaitingApproval() && $user?->can('store.requisition.approve') && ! $raisedByViewer)
-    <form method="POST" action="{{ route('store.stock.requisitions.approve', $requisition) }}" class="d-inline"
-          onsubmit="return confirm('Approve requisition {{ $requisition->requisition_no }}? It then goes forward for procurement.');">
-        @csrf
-        <button type="submit" class="btn {{ $size }} btn-outline-success">
-            <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Approve
-        </button>
-    </form>
+    <button type="button" class="btn {{ $size }} btn-outline-success" data-bs-toggle="modal" data-bs-target="#approveRequisition{{ $requisition->id }}">
+        <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Approve
+    </button>
+    <x-action-modal :id="'approveRequisition'.$requisition->id"
+                    :action="route('store.stock.requisitions.approve', $requisition)"
+                    :title="'Approve '.$requisition->requisition_no"
+                    submit-label="Approve" submit-icon="bi-check2-circle" submit-class="btn-success">
+        It then goes forward for procurement.
+    </x-action-modal>
 @endif
 
 @if($raisedByViewer && (($requisition->awaitingStoreReceipt() && $user?->can('store.requisition.review')) || ($requisition->awaitingApproval() && $user?->can('store.requisition.approve'))))
