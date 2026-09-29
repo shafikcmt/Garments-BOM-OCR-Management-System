@@ -69,19 +69,27 @@ class MonthlyRequisitionReportService
      * The tabs the switch shows, in order, each with its kind and rows:
      *   All         → ALL
      *   By Category → ALL + one per category
-     *   By Section  → one per section
+     *   By Section  → ALL + one per section
+     *
+     * The ALL tab is the same everywhere: every section merged, one row per
+     * item, stock subtracted once — and the section tabs, allocating that
+     * stock in request order, add up to it.
      *
      * @return Collection<string, array{type: string, rows: Collection}>
      */
     public function tabs(Carbon $monthStart, string $view): Collection
     {
-        if ($view === self::VIEW_SECTION) {
-            return $this->bySection($this->rows($monthStart, [], self::VIEW_SECTION))
-                ->map(fn (Collection $rows) => ['type' => self::TAB_SECTION, 'rows' => $rows]);
-        }
-
         $all = $this->rows($monthStart);
         $tabs = collect(['ALL' => ['type' => self::TAB_ALL, 'rows' => $all]]);
+
+        if ($view === self::VIEW_SECTION) {
+            foreach ($this->bySection($this->rows($monthStart, [], self::VIEW_SECTION)) as $section => $rows) {
+                // A section literally named "ALL" must not overwrite the ALL tab.
+                $tabs->put($tabs->has((string) $section) ? $section.' (Section)' : (string) $section, ['type' => self::TAB_SECTION, 'rows' => $rows]);
+            }
+
+            return $tabs;
+        }
 
         if ($view === self::VIEW_CATEGORY) {
             foreach ($this->byCategory($all) as $category => $rows) {
@@ -94,7 +102,7 @@ class MonthlyRequisitionReportService
 
     /**
      * The tabs a download carries: ALL + one per category for All and By
-     * Category, one per section for By Section.
+     * Category, ALL + one per section for By Section.
      *
      * @return Collection<string, array{type: string, rows: Collection}>
      */

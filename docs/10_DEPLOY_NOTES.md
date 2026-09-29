@@ -160,8 +160,9 @@ Applies to the Monthly Requisition report now and to the Step 4 merge.
 
 - Screen: a switch "All | By Category | By Section" and a tab strip that
   follows it (All → ALL; By Category → ALL + each category; By Section →
-  each section), both kept in the URL (`view=`, `tab=`) with the Month.
-  Excel and PDF follow the switch: ALL + category tabs, or one per section.
+  ALL + each section), both kept in the URL (`view=`, `tab=`) with the Month.
+  Excel and PDF follow the switch: ALL + category tabs, or ALL + one tab
+  per section (the same ALL tab; the section tabs add up to it).
 - Printed header per tab — Requisition No is the report's own number, never
   the source sheets (those show on the screen only):
   - ALL and category tabs: `HAPL/Dept./ALL/<Year>/<Month>/01`, Section ALL,

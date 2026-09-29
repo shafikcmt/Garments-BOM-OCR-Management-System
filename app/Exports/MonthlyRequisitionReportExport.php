@@ -10,7 +10,8 @@ use Maatwebsite\Excel\Concerns\WithMultipleSheets;
  *
  * Reproduces the company's "Month_Of_<Month>.xlsx" workbook, following the
  * screen's switch: All / By Category → an "ALL" sheet with one row per item,
- * then one sheet per category; By Section → one sheet per section. Only
+ * then one sheet per category; By Section → the same ALL sheet, then one
+ * sheet per section. Only
  * categories/sections that actually have rows get a sheet, so the workbook
  * never opens on a row of empty tabs. Each sheet prints its own header and
  * signature boxes (MonthlyRequisitionReportService::tabHeader()).

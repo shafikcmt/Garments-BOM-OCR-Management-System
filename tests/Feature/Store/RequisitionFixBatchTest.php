@@ -322,9 +322,13 @@ it('allocates stock to sections in request order, as the owner\'s example', func
         ->assertOk()->assertSee('Stock in Hand')->assertDontSee('Stock Allocated')->assertDontSee(Report::SECTION_STOCK_NOTE);
 
     $book = IOFactory::load($this->get(route('store.stock.requisitions.report.excel', ['month' => '2026-09', 'view' => 'section']))->baseResponse->getFile()->getPathname());
+    // ALL first (full Stock in Hand), then the section tabs (Stock Allocated).
+    expect($book->getSheetNames())->toBe(['ALL', 'Cutting', 'Sewing']);
     foreach ($book->getAllSheets() as $sheet) {
         $text = collect($sheet->toArray(null, false, false))->flatten()->filter()->implode("\n");
-        expect($text)->toContain('Stock Allocated')->toContain(Report::SECTION_STOCK_NOTE)->not->toContain('Stock in Hand');
+        $sheet->getTitle() === 'ALL'
+            ? expect($text)->toContain('Stock in Hand')->not->toContain('Stock Allocated')
+            : expect($text)->toContain('Stock Allocated')->toContain(Report::SECTION_STOCK_NOTE)->not->toContain('Stock in Hand');
     }
 });
 
@@ -397,7 +401,7 @@ it('lists the source sheets on the screen only, first five then "and N more"', f
     expect($text)->not->toContain('CUT/01');
 });
 
-it('exports ALL plus one tab per category, and one tab per section Section-wise', function () {
+it('exports ALL plus one tab per category, and ALL plus one tab per section Section-wise', function () {
     $cutting = fbSection('Cutting');
     $sewing = fbSection('Sewing');
     fbSheet('CUT/01', '2026-09-03', $cutting, [[fbItem('MS Tee-2/1', 'Electrical'), 6, 0, 5]]);
@@ -413,7 +417,7 @@ it('exports ALL plus one tab per category, and one tab per section Section-wise'
 
     expect($titles(['month' => '2026-09']))->toBe(['ALL', 'Electrical', 'Stationery'])
         ->and($titles(['month' => '2026-09', 'view' => 'category']))->toBe(['ALL', 'Electrical', 'Stationery'])
-        ->and($titles(['month' => '2026-09', 'view' => 'section']))->toBe(['Cutting', 'Sewing']);
+        ->and($titles(['month' => '2026-09', 'view' => 'section']))->toBe(['ALL', 'Cutting', 'Sewing']);
 });
 
 // --- 4. The Store's side by permission -------------------------------------------------

@@ -181,7 +181,8 @@
                                         </tr>
                                         <tr>
                                             <th class="text-end">Qty Requested</th>
-                                            <th class="text-end">{{ $isSectionView ? 'Stock Allocated' : 'Stock in Hand' }}</th>
+                                            {{-- By tab, not by switch: the ALL tab of By Section keeps the full stock. --}}
+                                            <th class="text-end">{{ $tab['type'] === \App\Services\MonthlyRequisitionReportService::TAB_SECTION ? 'Stock Allocated' : 'Stock in Hand' }}</th>
                                             <th class="text-end">Safety Stock</th>
                                             <th class="text-end">Cons. (Last Month)</th>
                                             <th class="text-end">Qty</th>

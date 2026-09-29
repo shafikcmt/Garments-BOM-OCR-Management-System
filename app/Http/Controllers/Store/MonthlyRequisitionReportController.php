@@ -92,7 +92,7 @@ class MonthlyRequisitionReportController extends Controller
         $rows = $this->report->rows($monthStart);
 
         // The switch picks the screen's tabs; a download follows it (ALL +
-        // categories, or one per section). Every tab carries its own printed
+        // categories, or ALL + one per section). Every tab carries its own printed
         // header and signature boxes.
         $tabs = $this->withHeaders($this->report->tabs($monthStart, $view), $monthStart);
         $sheets = $this->withHeaders($this->report->exportTabs($monthStart, $view), $monthStart);

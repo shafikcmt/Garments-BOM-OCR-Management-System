@@ -37,13 +37,13 @@ function mhSection(string $name, ?User $head = null, ?string $department = null)
     return IndentSection::create(['name' => $name, 'is_active' => true, 'head_user_id' => $head?->id, 'department_key' => $department]);
 }
 
-function mhSheet(string $no, ?IndentSection $section, string $item, string $category, float $qty): void
+function mhSheet(string $no, ?IndentSection $section, string $item, string $category, float $qty, ?float $stockInHand = null, string $date = '2026-09-10'): void
 {
     $cat = ItemCategory::firstOrCreate(['name' => $category]);
     $stock = StockItem::firstOrCreate(['name' => $item], ['uom' => 'Pcs', 'is_active' => true, 'item_category_id' => $cat->id]);
 
     $sheet = PurchaseRequisition::create([
-        'requisition_no' => $no, 'requisition_date' => '2026-09-10', 'mode' => PurchaseRequisition::MODE_MULTI,
+        'requisition_no' => $no, 'requisition_date' => $date, 'mode' => PurchaseRequisition::MODE_MULTI,
         'level' => PurchaseRequisition::LEVEL_DEPARTMENT, 'status' => PurchaseRequisition::STATUS_STORE_REVIEWED,
         'department_review_status' => PurchaseRequisition::DEPT_REVIEW_APPROVED, 'indent_section_id' => $section?->id,
         'submitted_at' => now(), 'created_by' => test()->raiser->id,
@@ -52,6 +52,7 @@ function mhSheet(string $no, ?IndentSection $section, string $item, string $cate
     PurchaseRequisitionItem::create([
         'purchase_requisition_id' => $sheet->id, 'stock_item_id' => $stock->id, 'item_category_id' => $cat->id,
         'sort_order' => 1, 'qty_requested' => $qty, 'user_dept' => $section?->name, 'to_be_procured_qty' => $qty, 'rate_appx' => 10, 'amount' => $qty * 10,
+        'stock_in_hand_snapshot' => $stockInHand,
     ]);
 }
 
@@ -190,10 +191,14 @@ it('keeps the switch and the selected tab in the URL', function () {
         ->assertSee('class="tab-pane fade show active" id="tab-stationery-printing"', false)
         ->assertSee('class="tab-pane fade" id="tab-all"', false);
 
-    // By Section: one per section; an unknown tab falls back to the first.
-    $page(['view' => 'section', 'tab' => 'nope'])
-        ->assertDontSee('data-report-tab="all"', false)
+    // By Section: ALL, then one per section; ?tab= opens a section, and an
+    // unknown tab falls back to the first (ALL).
+    $page(['view' => 'section', 'tab' => 'cutting'])
         ->assertSee('class="tab-pane fade show active" id="tab-cutting"', false)
+        ->assertSee('class="tab-pane fade" id="tab-all"', false);
+    $page(['view' => 'section', 'tab' => 'nope'])
+        ->assertSee('class="tab-pane fade show active" id="tab-all"', false)
+        ->assertSee('class="tab-pane fade" id="tab-cutting"', false)
         ->assertSee('data-report-tab="sewing"', false);
 });
 
@@ -217,13 +222,72 @@ it('prints the Store Personnel box in the PDF header, with no item count or amou
     expect($html)->toContain('Total-');
 });
 
+it('starts the section-wise export with an ALL tab that the section tabs add up to', function () {
+    // One item, stock 6: Cutting asks 20 first, Sewing 5 later. A second item
+    // only Sewing asks for.
+    $cutting = mhSection('Cutting');
+    $sewing = mhSection('Sewing');
+    mhSheet('CUT/01', $cutting, 'MS Tee-2/1', 'Electrical Components', 20, 6, '2026-09-03');
+    mhSheet('SEW/01', $sewing, 'MS Tee-2/1', 'Electrical Components', 5, 6, '2026-09-12');
+    mhSheet('SEW/02', $sewing, 'Bal Pen', 'Stationery & Printing', 8, 2, '2026-09-12');
+
+    $file = test()->actingAs(test()->store)
+        ->get(route('store.stock.requisitions.report.excel', ['month' => '2026-09', 'view' => Report::VIEW_SECTION]))
+        ->baseResponse->getFile()->getPathname();
+    $book = IOFactory::load($file);
+
+    expect($book->getSheetNames())->toBe(['ALL', 'Cutting', 'Sewing']);
+
+    // Each tab's rows by item: [qty, stock, to be procured, amount], and its Total- amount.
+    $read = function (string $title) use ($book) {
+        $sheet = $book->getSheetByName($title);
+        $rows = [];
+        $total = null;
+        foreach ($sheet->toArray(null, false, false) as $row) {
+            if (($row[0] ?? '') === 'Total-') {
+                $total = (float) $row[15];
+            } elseif (is_numeric($row[0] ?? null) && ! empty($row[1])) {
+                $rows[$row[1]] = [(float) $row[6], (float) $row[7], (float) $row[13], (float) $row[15], $row[5]];
+            }
+        }
+
+        return ['rows' => $rows, 'total' => $total, 'text' => collect($sheet->toArray(null, false, false))->flatten()->filter()->implode("\n")];
+    };
+
+    $all = $read('ALL');
+    $cut = $read('Cutting');
+    $sew = $read('Sewing');
+
+    // ALL: one row per item, sections joined, full stock, stock taken off once.
+    expect($all['rows']['MS Tee-2/1'])->toBe([25.0, 6.0, 19.0, 190.0, 'Cutting/Sewing'])
+        ->and($all['rows']['Bal Pen'])->toBe([8.0, 2.0, 6.0, 60.0, 'Sewing'])
+        // Sections: stock allocated in request order — Cutting 6, Sewing 0.
+        ->and($cut['rows']['MS Tee-2/1'])->toBe([20.0, 6.0, 14.0, 140.0, 'Cutting'])
+        ->and($sew['rows']['MS Tee-2/1'])->toBe([5.0, 0.0, 5.0, 50.0, 'Sewing']);
+
+    // Per item and in the Total row, ALL = the sum of the section tabs.
+    foreach (['MS Tee-2/1', 'Bal Pen'] as $item) {
+        $sum = fn (int $i) => ($cut['rows'][$item][$i] ?? 0) + ($sew['rows'][$item][$i] ?? 0);
+        expect($sum(2))->toBe($all['rows'][$item][2])->and($sum(3))->toBe($all['rows'][$item][3]);
+    }
+    expect($cut['total'] + $sew['total'])->toBe($all['total'])->and($all['total'])->toBe(250.0);
+
+    // The ALL tab's header and boxes are the category export's; the section
+    // tabs keep theirs.
+    expect($all['text'])->toContain('HAPL/Dept./ALL/2026/September/01')->toContain('Stock in Hand')
+        ->not->toContain('Stock Allocated')->not->toContain(Report::SECTION_STOCK_NOTE)
+        ->and(substr_count($all['text'], 'Signature & Date'))->toBe(5)
+        ->and($cut['text'])->toContain('HAPL/Dept./CUTTING/2026/September/01')->toContain('Stock Allocated')
+        ->and(substr_count($cut['text'], 'Signature & Date'))->toBe(3);
+});
+
 it('makes the downloads follow the switch', function () {
     mhSheet('CUT/01', mhSection('Cutting'), 'MS Tee-2/1', 'Electrical Components', 5);
     mhSheet('SEW/01', mhSection('Sewing'), 'Bal Pen', 'Stationery & Printing', 5);
 
     expect(array_keys(mhWorkbook(['view' => Report::VIEW_ALL])))->toBe(['ALL', 'Electrical Components', 'Stationery & Printing'])
         ->and(array_keys(mhWorkbook(['view' => Report::VIEW_CATEGORY])))->toBe(['ALL', 'Electrical Components', 'Stationery & Printing'])
-        ->and(array_keys(mhWorkbook(['view' => Report::VIEW_SECTION])))->toBe(['Cutting', 'Sewing']);
+        ->and(array_keys(mhWorkbook(['view' => Report::VIEW_SECTION])))->toBe(['ALL', 'Cutting', 'Sewing']);
 
     // The PDF is rendered from the same download tabs.
     foreach ([Report::VIEW_ALL, Report::VIEW_CATEGORY, Report::VIEW_SECTION] as $view) {
