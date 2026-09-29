@@ -3,7 +3,7 @@
     screen under the same filters; the header repeats on every page.
 --}}
 @php
-    $qty = fn ($v) => $v === null ? '—' : (rtrim(rtrim(number_format((float) $v, 2, '.', ','), '0'), '.') ?: '0');
+    $qty = fn ($v) => \App\Support\Quantity::format($v);
     $filtersLine = str_replace(' · '.$period, '', $title);
     $t = $purchase['totals'];
 @endphp

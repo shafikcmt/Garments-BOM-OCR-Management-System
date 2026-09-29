@@ -52,7 +52,8 @@ class MonthlyRequisitionReportController extends Controller
 
         return Excel::download(
             new MonthlyRequisitionReportExport($data),
-            $this->filename($data['month']).'.xlsx',
+            $this->filename($data['month'])
+                .($data['view'] === MonthlyRequisitionReportService::VIEW_SECTION ? '-section-wise' : '').'.xlsx',
         );
     }
 
@@ -64,45 +65,58 @@ class MonthlyRequisitionReportController extends Controller
      */
     private function build(Request $request): array
     {
-        // The month is the WHOLE company's requisitions, unscoped. A
+        // The month is the WHOLE company's counted requisitions, unscoped. A
         // department user reaches this module on store.requisition.view for
-        // their own list; this compiled view is the Store's and stays with
-        // whoever reads every requisition — the same rule as the Requested
-        // queue.
+        // their own list; this compiled view is the Store's — the same rule
+        // as the Requested queue (worksStoreDesk).
         abort_unless(
-            $request->user() && PurchaseRequisition::seesEveryRequisition($request->user()),
+            PurchaseRequisition::worksStoreDesk($request->user()),
             403,
             'The monthly requisition report is available to the Store team only.'
         );
 
         $filters = $request->validate([
             'month' => ['nullable', 'string'],
-            'category' => ['nullable', 'string', 'max:160'],
-            'search' => ['nullable', 'string', 'max:100'],
-            'merge' => ['nullable', 'boolean'],
+            'view' => ['nullable', 'string', 'in:'.implode(',', array_keys(MonthlyRequisitionReportService::viewLabels()))],
         ]);
 
+        // A sheet belongs to the month of its requisition date; resolveMonth()
+        // is the month-end-safe parse.
         $monthStart = $this->report->resolveMonth($filters['month'] ?? null);
+        $view = $filters['view'] ?? MonthlyRequisitionReportService::VIEW_ALL;
+        $filters = ['month' => $monthStart->format('Y-m'), 'view' => $view];
 
-        // Off by default: the month reads as one line per requisition, with its
-        // Requisition No visible, so a figure can always be traced back to the
-        // document it came from. Turning it on collapses the month to one line
-        // per item, which is the shape the reference workbook prints and the
-        // shape someone actually places an order from.
-        $merge = (bool) ($filters['merge'] ?? false);
+        // Always one row per item (THE RULE — see the service). The ALL rows
+        // drive the totals whatever the view; the category and section views
+        // add up to them.
+        $rows = $this->report->rows($monthStart);
+        $byCategory = $this->report->byCategory($rows);
 
-        $rows = $this->report->rows($monthStart, [
-            'category' => $filters['category'] ?? null,
-            'search' => $filters['search'] ?? null,
-        ], $merge);
+        if ($view === MonthlyRequisitionReportService::VIEW_SECTION) {
+            $tabs = $this->report->bySection($this->report->rows($monthStart, [], MonthlyRequisitionReportService::VIEW_SECTION));
+            // Excel: one tab per section.
+            $sheets = $tabs;
+        } else {
+            $tabs = $view === MonthlyRequisitionReportService::VIEW_CATEGORY ? $byCategory : collect(['ALL' => $rows]);
+            // Excel: ALL, then one tab per category, as the reference workbook.
+            $sheets = collect(['ALL' => $rows])->union($byCategory);
+        }
 
         return [
             'rows' => $rows,
-            'byCategory' => $this->report->byCategory($rows),
+            'byCategory' => $byCategory,
+            'tabs' => $tabs,
+            'sheets' => $sheets,
+            'view' => $view,
+            'viewLabels' => MonthlyRequisitionReportService::viewLabels(),
             'summary' => $this->report->summary($rows),
-            'categories' => $this->report->categoriesInMonth($monthStart),
             'filters' => $filters,
-            'merge' => $merge,
+            // The printed header: the sheets included, and the section(s) —
+            // never the category.
+            'headerRequisitionNos' => $this->report->requisitionNosLabel($rows),
+            'headerSection' => $view === MonthlyRequisitionReportService::VIEW_SECTION && $tabs->isNotEmpty()
+                ? $tabs->keys()->implode(', ')
+                : 'ALL',
             'month' => $monthStart->format('Y-m'),
             'monthLabel' => $monthStart->format('F Y'),
             'title' => 'Purchase Requisition',

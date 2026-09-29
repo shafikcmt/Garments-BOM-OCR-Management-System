@@ -17,7 +17,7 @@
     $view = $compact ? \App\Services\StockSummaryService::VIEW_PURCHASE : $s['view'];
     $RVI = \App\Services\RequirementVsIssueService::class;
 
-    $qty = fn ($v) => $v === null ? '—' : (rtrim(rtrim(number_format((float) $v, 2, '.', ','), '0'), '.') ?: '0');
+    $qty = fn ($v) => \App\Support\Quantity::format($v);
     $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
     $pct = fn ($v) => $v === null ? '—' : number_format((float) $v, 1).'%';
 

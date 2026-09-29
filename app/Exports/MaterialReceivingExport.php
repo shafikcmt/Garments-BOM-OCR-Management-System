@@ -108,13 +108,16 @@ class MaterialReceivingExport implements FromView, WithEvents, WithTitle
      * this only controls how they are shown, and right-aligns them.
      */
     private const NUMBER_FORMATS = [
-        'Q' => '#,##0.####',  // Booking Qty
-        'R' => '#,##0.####',  // Invoice Qty
-        'T' => '#,##0.####',  // Physical Qty
-        'U' => '#,##0.####',  // Short/Excess
-        'W' => '#,##0.0000',  // Rate — 4dp, as on screen
-        'X' => '#,##0.00',    // Total Value — 2dp
+        'Q' => self::QTY,  // Booking Qty
+        'R' => self::QTY,  // Invoice Qty
+        'T' => self::QTY,  // Physical Qty
+        'U' => self::QTY,  // Short/Excess
+        'W' => \App\Support\Quantity::EXCEL_MONEY,  // Rate — money, 2dp in every export
+        'X' => \App\Support\Quantity::EXCEL_MONEY,  // Total Value
     ];
+
+    /** A quantity column: formatted per cell by Quantity (no trailing dot). */
+    private const QTY = 'qty';
 
     /** Columns the blade writes as 'd-M-Y' text; converted to real dates. */
     private const DATE_COLS = ['A', 'H'];
@@ -327,7 +330,11 @@ class MaterialReceivingExport implements FromView, WithEvents, WithTitle
 
         foreach (self::NUMBER_FORMATS as $col => $format) {
             $range = $col.(self::HEADER_ROW + 1).':'.$col.$lastDataRow;
-            $sheet->getStyle($range)->getNumberFormat()->setFormatCode($format);
+            if ($format === self::QTY) {
+                \App\Support\Quantity::applyExcelFormats($sheet, $range);
+            } else {
+                $sheet->getStyle($range)->getNumberFormat()->setFormatCode($format);
+            }
             $sheet->getStyle($range)->getAlignment()
                 ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         }

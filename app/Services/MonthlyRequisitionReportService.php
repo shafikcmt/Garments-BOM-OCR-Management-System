@@ -33,6 +33,31 @@ class MonthlyRequisitionReportService
     /** Separates the Requisition Nos a merged monthly row was built from. */
     private const SOURCE_SEPARATOR = ', ';
 
+    /** How many Requisition Nos the header names before "and N more". */
+    public const HEADER_NOS_SHOWN = 5;
+
+    /** Printed on the Section-wise report and on each of its tabs. */
+    public const SECTION_STOCK_NOTE = 'Stock is allocated to sections in request order.';
+
+    /** One row per item, across every section. */
+    public const VIEW_ALL = 'all';
+
+    /** One row per item per section. */
+    public const VIEW_SECTION = 'section';
+
+    /** The ALL rows, grouped by item category. */
+    public const VIEW_CATEGORY = 'category';
+
+    /** @return array<string, string> view => label */
+    public static function viewLabels(): array
+    {
+        return [
+            self::VIEW_ALL => 'All (merged)',
+            self::VIEW_SECTION => 'Section-wise',
+            self::VIEW_CATEGORY => 'Category-wise',
+        ];
+    }
+
     public function __construct(private readonly PurchaseRequisitionService $requisitions)
     {
     }
@@ -53,27 +78,71 @@ class MonthlyRequisitionReportService
     }
 
     /**
-     * One row per requisition item line raised in the month.
+     * The month's rows, by THE RULE (docs/10_DEPLOY_NOTES.md, "Monthly
+     * requisition rule"): quantities are SUMMED first — per item across every
+     * section (VIEW_ALL, VIEW_CATEGORY), or per item per section
+     * (VIEW_SECTION) — and stock is compared ONCE per item:
+     *
+     *   To Be Procured = max(0, total qty − stock in hand)
+     *   Amount         = To Be Procured × the item's latest known rate
+     *
+     * A sheet belongs to the month of its requisition date. Only counted
+     * sheets (countedInTotals(), and a department line a final sheet repeats
+     * once).
      *
      * @param  array{category?: int|string|null, search?: string|null}  $filters
      * @return Collection<int, array<string, mixed>>
      */
-    public function rows(Carbon $monthStart, array $filters = [], bool $merge = false): Collection
+    public function rows(Carbon $monthStart, array $filters = [], string $view = self::VIEW_ALL): Collection
     {
-        $lines = $this->lines($monthStart, $filters);
+        $lines = $this->lines($monthStart, $filters)
+            ->map(fn (PurchaseRequisitionItem $line) => $this->row($line));
 
-        $rows = $lines->map(fn (PurchaseRequisitionItem $line) => $this->row($line));
+        $byItem = $lines->groupBy(fn (array $row) => $this->itemKey($row));
 
-        if ($merge) {
-            $rows = $this->mergeByItem($rows);
-        }
+        $rows = $view === self::VIEW_SECTION
+            ? $byItem->flatMap(fn (Collection $group) => $this->splitBySection($group))
+            : $byItem->map(fn (Collection $group) => $this->mergeGroup($group));
 
         return $rows
             ->sortBy([
+                fn ($a, $b) => $view === self::VIEW_SECTION ? strcasecmp($a['section'], $b['section']) : 0,
                 fn ($a, $b) => strcasecmp($a['category'] ?? '', $b['category'] ?? ''),
                 fn ($a, $b) => strcasecmp($a['item_name'] ?? '', $b['item_name'] ?? ''),
             ])
             ->values();
+    }
+
+    /**
+     * Section-wise rows, keyed by section name and ordered alphabetically.
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows  rows(…, VIEW_SECTION)
+     * @return Collection<string, Collection<int, array<string, mixed>>>
+     */
+    public function bySection(Collection $rows): Collection
+    {
+        return $rows->groupBy('section')->sortKeys(SORT_NATURAL | SORT_FLAG_CASE);
+    }
+
+    /**
+     * The header's "Requisition No": the sheets these rows were built from,
+     * comma separated — the first five, then "and N more".
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     */
+    public function requisitionNosLabel(Collection $rows): string
+    {
+        $nos = $rows->pluck('requisition_nos')->flatten()->filter()->unique()
+            ->sort(fn ($a, $b) => strnatcasecmp($a, $b))->values();
+
+        if ($nos->isEmpty()) {
+            return '—';
+        }
+
+        $label = $nos->take(self::HEADER_NOS_SHOWN)->implode(self::SOURCE_SEPARATOR);
+        $more = $nos->count() - self::HEADER_NOS_SHOWN;
+
+        return $more > 0 ? $label.' and '.$more.' more' : $label;
     }
 
     /**
@@ -130,9 +199,11 @@ class MonthlyRequisitionReportService
      */
     public function summary(Collection $rows): array
     {
+        // 'lines' counts the requisition lines the rows were built from, not
+        // the rows: one merged row may stand for several lines.
         $perCategory = $this->byCategory($rows)
             ->map(fn (Collection $group) => [
-                'lines' => $group->count(),
+                'lines' => (int) $group->sum('line_count'),
                 'items' => $group->pluck('stock_item_id')->unique()->count(),
                 'qty_requested' => (float) $group->sum('qty_requested'),
                 'to_be_procured' => (float) $group->sum('to_be_procured'),
@@ -141,7 +212,7 @@ class MonthlyRequisitionReportService
 
         return [
             'requisitions' => $rows->pluck('requisition_ids')->flatten()->unique()->count(),
-            'lines' => $rows->count(),
+            'lines' => (int) $rows->sum('line_count'),
             'items' => $rows->pluck('stock_item_id')->unique()->count(),
             'qty_requested' => (float) $rows->sum('qty_requested'),
             'to_be_procured' => (float) $rows->sum('to_be_procured'),
@@ -246,8 +317,78 @@ class MonthlyRequisitionReportService
             'requisition_nos' => array_filter([$requisition?->requisition_no]),
             'requisition_ids' => array_filter([$requisition?->id]),
             'requisition_date' => $requisition?->requisition_date,
-            'section' => optional($requisition?->indentSection)->name,
+            // The Section-wise key: the sheet's section, else — a final sheet
+            // has none — the line's own User Dept.
+            'section' => trim((string) (optional($requisition?->indentSection)->name ?: $line->user_dept)) ?: 'No Section',
+            'line_count' => 1,
         ];
+    }
+
+    /**
+     * What makes two lines the same item: the stock item, or — for a typed
+     * item with no stock item — its name, trimmed, case-insensitive, spaces
+     * collapsed. (Grouping on stock_item_id alone put every typed item in
+     * one row.)
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function itemKey(array $row): string
+    {
+        return $row['stock_item_id']
+            ? 'item:'.$row['stock_item_id']
+            : 'name:'.mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string) $row['item_name'])));
+    }
+
+    /**
+     * The item's rows split per section. Each section's quantity is summed;
+     * the item's ONE stock figure is then allocated to the sections in the
+     * order they first asked (earliest requisition first), so the sections'
+     * To Be Procured add up to exactly the ALL row's (owner, 2026-09-29):
+     *
+     *   stock 6; Cutting 20 (first), Sewing 5
+     *     → Cutting: allocated 6, TBP 14; Sewing: allocated 0, TBP 5
+     *
+     * "stock_in_hand" on a section row is the ALLOCATED part (the column reads
+     * "Stock Allocated"); the item's full stock is item_stock_in_hand. Safety
+     * stock and consumption print the item's figures — per item, never split.
+     *
+     * @param  Collection<int, array<string, mixed>>  $group  one item's rows
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function splitBySection(Collection $group): Collection
+    {
+        $item = $this->mergeGroup($group);
+        $remaining = (float) ($item['stock_in_hand'] ?? 0);
+
+        return $group
+            ->groupBy('section')
+            ->map(fn (Collection $rows) => $this->mergeGroup($rows))
+            ->sortBy([
+                fn ($a, $b) => ($a['first_date'] ?? 0) <=> ($b['first_date'] ?? 0),
+                fn ($a, $b) => ($a['requisition_ids'][0] ?? 0) <=> ($b['requisition_ids'][0] ?? 0),
+            ])
+            ->map(function (array $row) use ($item, &$remaining) {
+                // The part of the item's stock given to this section.
+                $allocated = $item['stock_in_hand'] === null ? null : min($remaining, $row['qty_requested']);
+                $toBeProcured = max(0.0, $row['qty_requested'] - (float) $allocated);
+                $remaining = max(0.0, $remaining - $row['qty_requested']);
+
+                return array_merge($row, [
+                    // Printed under "Stock Allocated" on the Section-wise
+                    // report; the item's full stock stays alongside.
+                    'stock_in_hand' => $allocated,
+                    'item_stock_in_hand' => $item['stock_in_hand'],
+                    'safety_stock' => $item['safety_stock'],
+                    'consumption_last_month' => $item['consumption_last_month'],
+                    'last_purchase_qty' => $item['last_purchase_qty'],
+                    'last_purchase_rate' => $item['last_purchase_rate'],
+                    'last_purchase_date' => $item['last_purchase_date'],
+                    'rate_appx' => $item['rate_appx'],
+                    'to_be_procured' => $toBeProcured,
+                    'amount' => $item['rate_appx'] !== null ? $toBeProcured * $item['rate_appx'] : 0.0,
+                ]);
+            })
+            ->values();
     }
 
     /**
@@ -271,81 +412,80 @@ class MonthlyRequisitionReportService
     }
 
     /**
-     * Collapse the month's rows to one per item.
+     * Collapse one item's rows (all sections, or one section) into one row.
      *
-     * The same reasoning as merging inside a single requisition, one level up:
-     * an item has one stock figure for the month, so listing it once per
-     * requisition would show that figure several times and overstate what is
-     * left to buy. Quantities are summed, departments and source Requisition
-     * Nos gathered into single cells.
+     * An item has one stock figure for the month, so listing it once per
+     * requisition would show that figure several times and, with each line
+     * subtracting it again, understate what is left to buy. Quantities are
+     * summed, departments and source Requisition Nos gathered into single
+     * cells, and stock is subtracted once from the total.
      *
      * The stock, safety, consumption and last-purchase figures are taken from
      * the LATEST requisition to name the item — the most recent reading of a
-     * position that moved during the month, and the one the buyer should act
-     * on.
+     * position that moved during the month. The rate is the latest known one:
+     * the newest line's Rate Appx., else its last purchase rate.
      *
-     * @param  Collection<int, array<string, mixed>>  $rows
-     * @return Collection<int, array<string, mixed>>
+     * @param  Collection<int, array<string, mixed>>  $group
+     * @return array<string, mixed>
      */
-    private function mergeByItem(Collection $rows): Collection
+    private function mergeGroup(Collection $group): array
     {
-        return $rows
-            ->groupBy('stock_item_id')
-            ->map(function (Collection $group) {
-                // Oldest first, so "first non-empty" means the earliest
-                // description and the newest snapshot is easy to reach.
-                $ordered = $group->sortBy([
-                    fn ($a, $b) => ($a['requisition_date']?->timestamp ?? 0) <=> ($b['requisition_date']?->timestamp ?? 0),
-                    fn ($a, $b) => ($a['requisition_ids'][0] ?? 0) <=> ($b['requisition_ids'][0] ?? 0),
-                ])->values();
+        // Oldest first, so "first non-empty" means the earliest
+        // description and the newest snapshot is easy to reach.
+        $ordered = $group->sortBy([
+            fn ($a, $b) => ($a['requisition_date']?->timestamp ?? 0) <=> ($b['requisition_date']?->timestamp ?? 0),
+            fn ($a, $b) => ($a['requisition_ids'][0] ?? 0) <=> ($b['requisition_ids'][0] ?? 0),
+        ])->values();
 
-                $latest = $ordered->last();
-                $qty = (float) $ordered->sum('qty_requested');
-                $stock = $latest['stock_in_hand'];
+        $latest = $ordered->last();
+        $newestFirst = $ordered->reverse();
+        $qty = (float) $ordered->sum('qty_requested');
+        $stock = $latest['stock_in_hand'];
 
-                // Recomputed from the combined quantity against ONE stock
-                // figure — not the sum of the per-requisition shortfalls, which
-                // would each have subtracted that same stock again.
-                $toBeProcured = $this->requisitions->toBeProcured($qty, $stock);
+        // Recomputed from the combined quantity against ONE stock
+        // figure — not the sum of the per-requisition shortfalls, which
+        // would each have subtracted that same stock again.
+        $toBeProcured = $this->requisitions->toBeProcured($qty, $stock);
 
-                $rate = $ordered->pluck('rate_appx')->first(fn ($value) => $value !== null);
+        $rate = $newestFirst->pluck('rate_appx')->first(fn ($value) => $value !== null)
+            ?? $newestFirst->pluck('last_purchase_rate')->first(fn ($value) => $value !== null);
 
-                return array_merge($latest, [
-                    'qty_requested' => $qty,
-                    'to_be_procured' => $toBeProcured,
-                    'rate_appx' => $rate,
-                    'amount' => $rate !== null ? $toBeProcured * $rate : 0.0,
+        return array_merge($latest, [
+            'line_count' => (int) $ordered->sum('line_count'),
+            'first_date' => $ordered->first()['requisition_date']?->timestamp,
+            'qty_requested' => $qty,
+            'to_be_procured' => $toBeProcured,
+            'rate_appx' => $rate,
+            'amount' => $rate !== null ? $toBeProcured * $rate : 0.0,
 
-                    'specification' => $ordered->pluck('specification')->first(fn ($v) => $v !== null && $v !== ''),
-                    'type' => $ordered->pluck('type')->first(fn ($v) => $v !== null && $v !== ''),
+            'specification' => $ordered->pluck('specification')->first(fn ($v) => $v !== null && $v !== ''),
+            'type' => $ordered->pluck('type')->first(fn ($v) => $v !== null && $v !== ''),
 
-                    // Split before joining. Each stored value may ALREADY be a
-                    // merged cell ("Store/Production", written when one
-                    // requisition served two departments), so treating it as a
-                    // single name would produce "Store/Production/Store" the
-                    // moment another requisition mentions Store again. Breaking
-                    // every cell back into its parts is what makes the
-                    // department list distinct.
-                    'user_dept' => $this->requisitions->joinDistinct(
-                        $this->explodeAll($ordered->pluck('user_dept'), PurchaseRequisitionService::DEPARTMENT_SEPARATOR),
-                        PurchaseRequisitionService::DEPARTMENT_SEPARATOR
-                    ),
-                    'remarks' => $this->requisitions->joinDistinct(
-                        $this->explodeAll($ordered->pluck('remarks'), '/'),
-                        ' / '
-                    ),
+            // Split before joining. Each stored value may ALREADY be a
+            // merged cell ("Store/Production", written when one
+            // requisition served two departments), so treating it as a
+            // single name would produce "Store/Production/Store" the
+            // moment another requisition mentions Store again. Breaking
+            // every cell back into its parts is what makes the
+            // department list distinct.
+            'user_dept' => $this->requisitions->joinDistinct(
+                $this->explodeAll($ordered->pluck('user_dept'), PurchaseRequisitionService::DEPARTMENT_SEPARATOR),
+                PurchaseRequisitionService::DEPARTMENT_SEPARATOR
+            ),
+            'remarks' => $this->requisitions->joinDistinct(
+                $this->explodeAll($ordered->pluck('remarks'), '/'),
+                ' / '
+            ),
 
-                    'requisition_no' => $this->requisitions->joinDistinct(
-                        $ordered->pluck('requisition_no')->map(fn ($v) => trim((string) $v))->all(),
-                        self::SOURCE_SEPARATOR
-                    ),
-                    'requisition_nos' => $ordered->pluck('requisition_nos')->flatten()->unique()->values()->all(),
-                    'requisition_ids' => $ordered->pluck('requisition_ids')->flatten()->unique()->values()->all(),
+            'requisition_no' => $this->requisitions->joinDistinct(
+                $ordered->pluck('requisition_no')->map(fn ($v) => trim((string) $v))->all(),
+                self::SOURCE_SEPARATOR
+            ),
+            'requisition_nos' => $ordered->pluck('requisition_nos')->flatten()->unique()->values()->all(),
+            'requisition_ids' => $ordered->pluck('requisition_ids')->flatten()->unique()->values()->all(),
 
-                    'store_pending_qty' => $ordered->sum('store_pending_qty') ?: null,
-                    'accounts_pending_qty' => $ordered->sum('accounts_pending_qty') ?: null,
-                ]);
-            })
-            ->values();
+            'store_pending_qty' => $ordered->sum('store_pending_qty') ?: null,
+            'accounts_pending_qty' => $ordered->sum('accounts_pending_qty') ?: null,
+        ]);
     }
 }

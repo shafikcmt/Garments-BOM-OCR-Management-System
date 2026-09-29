@@ -12,7 +12,6 @@ use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 /**
@@ -52,7 +51,7 @@ class ItemMasterTemplateExport implements FromArray, ShouldAutoSize, WithColumnF
         $date = self::columnLetter('Counted On');
 
         return [
-            $price.'2:'.$price.'1000' => NumberFormat::FORMAT_NUMBER_00,
+            $price.'2:'.$price.'1000' => \App\Support\Quantity::EXCEL_MONEY,
             // Counted On is a REAL Excel date, formatted the way the issue and
             // receiving templates format theirs, so the three read alike and a
             // date typed here cannot come back as text.

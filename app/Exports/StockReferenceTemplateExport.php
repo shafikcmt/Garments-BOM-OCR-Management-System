@@ -14,7 +14,6 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 /**
@@ -200,7 +199,7 @@ class StockReferenceTemplateExport implements FromArray, WithColumnFormatting, W
     public function columnFormats(): array
     {
         return [
-            $this->dataRange('Unit Price') => NumberFormat::FORMAT_NUMBER_00,
+            $this->dataRange('Unit Price') => \App\Support\Quantity::EXCEL_MONEY,
             // The Receiving template's format, not a copy of it: one spelling
             // of the store's date display, changed in one place.
             $this->dataRange('Last Addition Date') => ReceivingTemplateExport::DATE_FORMAT,

@@ -717,9 +717,16 @@ class PurchaseRequisition extends Model
         // of Cutting does not see Finishing's.
         $departments = RequisitionDepartmentHead::departmentsHeadedBy($user);
         $sections = RequisitionDepartmentHead::sectionsHeadedBy($user);
+        $storeDesk = self::worksStoreDesk($user);
 
-        return $query->where(function (Builder $q) use ($user, $departments, $sections) {
+        return $query->where(function (Builder $q) use ($user, $departments, $sections, $storeDesk) {
             $q->where('created_by', $user->id);
+
+            // The Store's side by permission: every sheet that has reached
+            // the Store. Grouped, so its ORs cannot escape the closure.
+            if ($storeDesk) {
+                $q->orWhere(fn (Builder $s) => $s->reachedStore());
+            }
 
             if ($departments !== []) {
                 $q->orWhere(fn (Builder $d) => $d
@@ -752,6 +759,10 @@ class PurchaseRequisition extends Model
             return true;
         }
 
+        if (self::worksStoreDesk($user) && $this->hasReachedStore()) {
+            return true;
+        }
+
         if ($this->usesStageEngine() && $this->stages()->where('assignee_user_id', $user->id)->exists()) {
             return true;
         }
@@ -779,6 +790,45 @@ class PurchaseRequisition extends Model
     }
 
     /**
+     * Whether this user works the Store's side of requisitions: the Store
+     * roles above, or anyone granted store.requisition.review (the Store's
+     * Received step) — a Store clerk on another role, for example.
+     *
+     * By permission, not role: grants here are per user. A user on the
+     * permission alone sees what has reached the Store (see visibleTo()),
+     * never another person's draft; the Store roles keep seeing everything.
+     */
+    public static function worksStoreDesk(?User $user): bool
+    {
+        return $user !== null
+            && (self::seesEveryRequisition($user) || $user->can('store.requisition.review'));
+    }
+
+    /**
+     * Not a draft, and — for a department sheet — past its head (or it has
+     * no head step). What the Store has in front of it.
+     */
+    public function scopeReachedStore(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query
+            ->where($table.'.status', '<>', self::STATUS_DRAFT)
+            ->where(fn (Builder $q) => $q->where($table.'.level', self::LEVEL_FINAL)
+                ->orWhereNull($table.'.department_review_status')
+                ->orWhere($table.'.department_review_status', self::DEPT_REVIEW_APPROVED));
+    }
+
+    /** The single-record form of reachedStore(). */
+    public function hasReachedStore(): bool
+    {
+        return $this->status !== self::STATUS_DRAFT
+            && (! $this->isDepartmentLevel()
+                || $this->department_review_status === null
+                || $this->department_review_status === self::DEPT_REVIEW_APPROVED);
+    }
+
+    /**
      * What the main list is called for this viewer. The list itself is
      * visibleTo()-scoped, so for a department user or a head it holds only
      * their own sheets and their queue — calling that "All Requisitions"
@@ -786,6 +836,6 @@ class PurchaseRequisition extends Model
      */
     public static function listLabelFor(?User $user): string
     {
-        return $user && self::seesEveryRequisition($user) ? 'All Requisitions' : 'My Requisitions';
+        return self::worksStoreDesk($user) ? 'All Requisitions' : 'My Requisitions';
     }
 }

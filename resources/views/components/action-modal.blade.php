@@ -27,8 +27,12 @@
 
 @php($fieldId = $id.'Comment')
 
-<div class="modal fade text-start" id="{{ $id }}" tabindex="-1" aria-labelledby="{{ $id }}Label" aria-hidden="true">
-    <div class="modal-dialog">
+{{-- data-body-modal: moved to <body> on load (script below). Left where it
+     is written, a modal inside a card whose children carry a z-index (the
+     page hero does) sits under the backdrop and the fixed top header — the
+     page dims over it and its title is cut off. --}}
+<div class="modal fade text-start" id="{{ $id }}" tabindex="-1" aria-labelledby="{{ $id }}Label" aria-hidden="true" data-body-modal>
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <form method="POST" action="{{ $action }}" class="modal-content">
             @csrf
             @if(strtoupper($method) !== 'POST')
@@ -60,3 +64,13 @@
         </form>
     </div>
 </div>
+
+@once
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('[data-body-modal]').forEach(function (modal) {
+                document.body.appendChild(modal);
+            });
+        });
+    </script>
+@endonce

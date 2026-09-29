@@ -88,7 +88,9 @@ it('applies the same rule to the Monthly Requisition report', function () {
 
     $rows = app(MonthlyRequisitionReportService::class)->rows(Carbon::create(2026, 8, 1));
 
-    expect($rows)->toHaveCount(3)
+    // One row per item (the monthly rule): the thread's two counted lines
+    // (10 + 20) are one row, the final sheet's item the other.
+    expect($rows)->toHaveCount(2)
         ->and($rows->sum('qty_requested'))->toBe(130.0);
 });
 

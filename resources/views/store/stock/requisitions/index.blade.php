@@ -31,9 +31,9 @@
                    copy="Purchase requests and where each one stands.">
         <x-slot:actions>
             {{-- The month compiled across the whole company — the Store's
-                 view, offered only to whoever reads every requisition. The
-                 controller refuses everyone else. --}}
-            @if(auth()->user() && \App\Models\PurchaseRequisition::seesEveryRequisition(auth()->user()))
+                 view, offered only to whoever works the Store's side
+                 (worksStoreDesk). The controller refuses everyone else. --}}
+            @if(\App\Models\PurchaseRequisition::worksStoreDesk(auth()->user()))
             <a href="{{ route('store.stock.requisitions.report') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Monthly Report
             </a>
@@ -54,7 +54,7 @@
          least one of those queues, or who holds the Requirement vs Issue
          permission — a plain department user sees this screen with no tabs at
          all, exactly as before. --}}
-    @if((auth()->user() && \App\Models\PurchaseRequisition::seesEveryRequisition(auth()->user()))
+    @if(\App\Models\PurchaseRequisition::worksStoreDesk(auth()->user())
         || ($departmentReviewCount ?? null) !== null
         || \App\Services\RequirementVsIssueService::canView(auth()->user()))
         @include('store.stock.requisitions._tabs', ['active' => 'index'])

@@ -130,8 +130,9 @@ it('writes the template Unit Price as a formatted number, not text', function ()
         ->and(ItemMasterImport::SAMPLE_ROW[$at])->not->toBeString();
 
     // And the column carries a number format, over a range that covers the
-    // empty rows the user is going to fill in.
-    expect($export->columnFormats()['J2:J1000'])->toBe('0.00');
+    // empty rows the user is going to fill in. Money is "#,##0.00" in every
+    // export (owner, 2026-09-29).
+    expect($export->columnFormats()['J2:J1000'])->toBe('#,##0.00');
 });
 
 /**

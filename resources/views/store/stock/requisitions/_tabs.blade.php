@@ -3,8 +3,8 @@
     "what has been raised", "what is waiting on the Store", and "what is
     waiting on me as a department head".
 
-    The Requested tab shows only to whoever reads the whole company's
-    requisitions (Store / Admin / Management); the Department Review tab only
+    The Requested tab shows only to whoever works the Store's side
+    (PurchaseRequisition::worksStoreDesk()); the Department Review tab only
     to someone who heads a department — $departmentReviewCount is null for
     everyone else, which is what hides it.
 
@@ -13,7 +13,7 @@
 --}}
 @php
     $user = auth()->user();
-    $seesQueue = $user && \App\Models\PurchaseRequisition::seesEveryRequisition($user);
+    $seesQueue = \App\Models\PurchaseRequisition::worksStoreDesk($user);
 @endphp
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">

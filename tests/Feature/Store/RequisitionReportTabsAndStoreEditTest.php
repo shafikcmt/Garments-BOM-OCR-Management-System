@@ -175,12 +175,13 @@ it('totals each tab on its own rows, with the same summation', function () {
 
     expect($rendered['ALL'])->toContain($total('5500.00'));
 
-    // The sheet's letterhead names the section it lists, and carries no total
-    // of its own — so a department tab can never show the month's amount over
-    // its own rows.
-    expect($rendered['Production'])->toContain('>Production</td>')
+    // The letterhead's Section is the section(s) or ALL — never the category
+    // (owner, 2026-09-29) — and a tab carries no total of its own, so a
+    // category tab can never show the month's amount over its own rows.
+    expect($rendered['Production'])->toContain('>ALL</td>')
+        ->not->toContain('>Production</td>')
         ->and($rendered['Production'])->not->toContain('>5500.00</td>');
-    expect($rendered['Stationery'])->toContain('>Stationery</td>');
+    expect($rendered['Stationery'])->toContain('>REQ-TABS-1</td>');
 
     // A department tab prints only its own items.
     expect($rendered['Stationery'])->toContain('Bal Pen')->not->toContain('Needle DBx1 90/14');

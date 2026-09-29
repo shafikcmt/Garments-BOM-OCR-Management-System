@@ -3,19 +3,21 @@
     sheet of the Excel export ($forExcel).
 
     Reproduces the "Month_Of_<Month>.xlsx" workbook: the company heading, the
-    six-line header block, the two-tier column header, a Total- row and the
+    header block, the two-tier column header, a Total- row and the
     Prepared by / Checked by / Approved by footer.
 
-    The header block's "Requisition No" reads "Monthly — <Month Year>" because
-    this page spans many requisitions rather than being one of them.
+    The header block's "Requisition No" lists the sheets the page was built
+    from ($headerRequisitionNos: first five, then "and N more"); "Section" is
+    the section(s) or ALL ($headerSection), never the category.
 
-    $sections is a map of section name => rows. The PDF is handed every section
-    (ALL first, then each category); one Excel sheet is handed exactly one.
+    $sections is a map of section name => rows: ALL, each category, or each
+    section, as the View picks. One Excel sheet is handed exactly one.
 --}}
 @php
     $forExcel = $forExcel ?? false;
 
-    $sections = $sections ?? array_merge(['ALL' => $rows], $byCategory->all());
+    // The View picks the sections: ALL; each category; or each section.
+    $sections = $sections ?? ($tabs ?? collect(['ALL' => $rows])->union($byCategory));
 
     /*
      * The PDF header block below describes the WHOLE MONTH, and that is right
@@ -36,8 +38,8 @@
     // text. The separators and dashes are Excel's job, applied by
     // FormatsStoreSheet. The PDF, which is just ink, keeps them here.
     $qty = $forExcel
-        ? fn ($v) => $v === null ? '' : rtrim(rtrim(number_format((float) $v, 4, '.', ''), '0'), '.')
-        : fn ($v) => $v === null ? '-' : rtrim(rtrim(number_format((float) $v, 4, '.', ','), '0'), '.');
+        ? fn ($v) => \App\Support\Quantity::plain($v)
+        : fn ($v) => \App\Support\Quantity::format($v, '-');
 
     $money = $forExcel
         ? fn ($v) => $v === null ? '' : number_format((float) $v, 2, '.', '')
@@ -53,7 +55,16 @@
     // (Admin > Requisition Signatures), defaulting to the company name.
     $unit = config('stock.company_name');
     $unitName = \App\Services\RequisitionHeaderResolver::unitName();
-    $headingNo = 'Monthly — '.$monthLabel;
+    // "Requisition No": the sheets included (first five, then "and N more").
+    // "Section": the section(s), or ALL — never the category.
+    $headingNo = $headerRequisitionNos ?? ('Monthly — '.$monthLabel);
+    $headingSection = $headerSection ?? 'ALL';
+
+    // Section-wise: the stock column is the part allocated to the section,
+    // and the page says how it was allocated.
+    $sectionWise = ($view ?? null) === \App\Services\MonthlyRequisitionReportService::VIEW_SECTION;
+    $stockLabel = $sectionWise ? 'Stock Allocated' : 'Stock in Hand';
+    $stockNote = $sectionWise ? \App\Services\MonthlyRequisitionReportService::SECTION_STOCK_NOTE : null;
 @endphp
 <!doctype html>
 <html>
@@ -92,16 +103,11 @@
             <td class="label">Requisitions</td><td class="value">{{ $summary['requisitions'] }}</td>
         </tr>
         <tr>
-            <td class="label">Section</td><td class="value">{{ $filters['category'] ?? 'ALL' }}</td>
-            <td class="label">Item Lines</td><td class="value">{{ $summary['lines'] }}</td>
-        </tr>
-        <tr>
-            <td class="label">Name of User</td><td class="value">ALL</td>
+            <td class="label">Section</td><td class="value">{{ $headingSection }}</td>
             <td class="label">Distinct Items</td><td class="value">{{ $summary['items'] }}</td>
         </tr>
         <tr>
-            <td class="label">Listing</td>
-            <td class="value">{{ $merge ? 'Merged — one line per item' : 'One line per requisition' }}</td>
+            <td class="label">Name of User</td><td class="value">ALL</td>
             <td class="label">Grand Total</td><td class="value">{{ $money($summary['amount']) }}</td>
         </tr>
     </table>
@@ -132,9 +138,8 @@
             ['Requisition No', $headingNo, 'Store Personnel'],
             ['Requisition Date', $monthLabel, $storePersonnel['name'] ?: '—'],
             ['Name of Unit', $unitName, $storePersonnel['designation'] ?: '—'],
-            ['Section', array_key_first($sections), $storePersonnel['department'] ?: '—'],
+            ['Section', $headingSection, $storePersonnel['department'] ?: '—'],
             ['Name of User', 'ALL', $storePersonnel['email'] ?: '—'],
-            ['Listing', $merge ? 'Merged — one line per item' : 'One line per requisition', ''],
         ];
     @endphp
     <table>
@@ -147,18 +152,19 @@
                 <td colspan="{{ $rightSpan }}">{{ $right }}</td>
             </tr>
         @endforeach
-        <tr><td colspan="{{ $columns }}"></td></tr>
+        <tr><td colspan="{{ $columns }}">{{ $stockNote }}</td></tr>
     </table>
 @endunless
 
 @foreach($sections as $section => $sectionRows)
     @unless($forExcel)
         <div class="section-title {{ $loop->first ? '' : 'page-break' }}">
-            {{ $section }} — {{ $sectionRows->count() }} line(s)
+            {{ $section }} — {{ $sectionRows->count() }} item(s)
+            @if($stockNote)<span class="note"> · {{ $stockNote }}</span>@endif
         </div>
     @endunless
 
-    @include('store.stock.requisitions._report-rows', ['rows' => $sectionRows])
+    @include('store.stock.requisitions._report-rows', ['rows' => $sectionRows, 'stockLabel' => $stockLabel])
 @endforeach
 
 {{-- The signature footer comes from Admin > Settings > Requisition Signatures

@@ -10,7 +10,6 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 /**
@@ -48,7 +47,7 @@ class UnitPriceTemplateExport implements FromArray, ShouldAutoSize, WithColumnFo
             (int) array_search('Unit Price*', UnitPriceImport::COLUMNS, true) + 1
         );
 
-        return [$letter.'2:'.$letter.'1000' => NumberFormat::FORMAT_NUMBER_00];
+        return [$letter.'2:'.$letter.'1000' => \App\Support\Quantity::EXCEL_MONEY];
     }
 
     public function title(): string

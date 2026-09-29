@@ -3,20 +3,17 @@
 @section('title', 'General Stock — Monthly Purchase Requisition')
 
 @php
-    $qty = fn ($v) => $v === null ? '—' : rtrim(rtrim(number_format((float) $v, 4, '.', ','), '0'), '.');
+    $qty = fn ($v) => \App\Support\Quantity::format($v);
     $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
     $date = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->format('d-M-y') : '—';
 
     $typeLabels = \App\Models\PurchaseRequisitionItem::typeLabels();
 
-    $hasFilters = collect($filters)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
-
-    // "ALL" first, then each category that carries a line this month.
-    $tabs = collect(['ALL' => $rows])->union($byCategory);
-
-    // Downloads take the same query string as the screen, so a file always
-    // matches what was previewed.
-    $exportQuery = array_filter($filters, fn ($v) => $v !== null && $v !== '');
+    // $tabs comes from the controller: ALL, each category, or each section,
+    // as the View picks. Downloads take the same Month + View, so a file
+    // always matches what was previewed.
+    $exportQuery = $filters;
+    $isSectionView = $view === \App\Services\MonthlyRequisitionReportService::VIEW_SECTION;
 @endphp
 
 @section('content')
@@ -35,7 +32,7 @@
                 <div>
                     <div class="app-hero-eyebrow">General Stock</div>
                     <h3 class="app-hero-title mb-0">Monthly Purchase Requisition</h3>
-                    <p class="app-hero-copy mb-0">Every requisition raised in {{ $monthLabel }}, combined and grouped by category.</p>
+                    <p class="app-hero-copy mb-0">Requisitions dated in {{ $monthLabel }}, one line per item, stock counted once.</p>
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2">
@@ -43,7 +40,7 @@
                     <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF
                 </a>
                 <a href="{{ route('store.stock.requisitions.report.excel', $exportQuery) }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i>Excel
+                    <i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i>{{ $isSectionView ? 'Excel (Section-wise)' : 'Excel' }}
                 </a>
                 <a href="{{ route('store.stock.requisitions.index') }}" class="btn btn-outline-secondary">
                     <i class="bi bi-list-ul me-1" aria-hidden="true"></i>{{ \App\Models\PurchaseRequisition::listLabelFor(auth()->user()) }}
@@ -67,7 +64,7 @@
              something to click would be a lie. --}}
         @foreach([
             ['label' => 'Requisitions', 'value' => number_format($summary['requisitions']), 'tone' => 'secondary', 'icon' => 'bi-clipboard-check'],
-            ['label' => 'Item Lines', 'value' => number_format($summary['lines']), 'tone' => 'secondary', 'icon' => 'bi-list-ol'],
+            ['label' => 'Requisition Lines', 'value' => number_format($summary['lines']), 'tone' => 'secondary', 'icon' => 'bi-list-ol'],
             ['label' => 'Distinct Items', 'value' => number_format($summary['items']), 'tone' => 'secondary', 'icon' => 'bi-box-seam'],
             ['label' => 'To Be Procured', 'value' => $qty($summary['to_be_procured']), 'tone' => 'warning', 'icon' => 'bi-cart-plus'],
             ['label' => 'Total Amount', 'value' => $money($summary['amount']), 'tone' => 'success', 'icon' => 'bi-cash-stack'],
@@ -97,34 +94,27 @@
                     <input type="month" name="month" id="month" value="{{ $month }}" class="form-control">
                 </div>
                 <div class="col-6 col-md-3 col-xl-2">
-                    <label class="form-label" for="categoryFilter">Category</label>
-                    <select name="category" id="categoryFilter" class="form-select js-searchable">
-                        <option value="">All</option>
-                        @foreach($categories as $c)
-                            <option value="{{ $c }}" @selected(($filters['category'] ?? '') === $c)>{{ $c }}</option>
+                    <label class="form-label" for="reportView">View</label>
+                    <select name="view" id="reportView" class="form-select">
+                        @foreach($viewLabels as $value => $label)
+                            <option value="{{ $value }}" @selected($view === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
-                <div class="col-12 col-md-6 col-xl-4">
-                    <label class="form-label" for="search">Search</label>
-                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item, requisition no, department">
-                </div>
-                <div class="col-12 col-md-6 col-xl-2 d-flex align-items-end">
-                    {{-- Off by default so every figure can be traced back to the
-                         requisition it came from; on, the month reads one line
-                         per item the way an order is actually placed. --}}
-                    <div class="form-check">
-                        <input type="checkbox" name="merge" id="merge" value="1" class="form-check-input" @checked($merge)>
-                        <label class="form-check-label" for="merge">Merge by item</label>
-                    </div>
-                </div>
-                <div class="col-12 col-xl-2 d-flex gap-2 align-items-end">
-                    <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
-                    @if($hasFilters)
-                        <a href="{{ route('store.stock.requisitions.report') }}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear</a>
-                    @endif
+                <div class="col-12 col-md-3 col-xl-2 d-flex align-items-end">
+                    <button class="btn btn-primary w-100"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Show</button>
                 </div>
             </form>
+
+            @if($rows->isNotEmpty())
+                <p class="small text-muted mb-3">
+                    <span class="fw-semibold text-slate-900">Requisition No:</span> {{ $headerRequisitionNos }}
+                    · <span class="fw-semibold text-slate-900">Section:</span> {{ $headerSection }}
+                    @if($isSectionView)
+                        <br>{{ \App\Services\MonthlyRequisitionReportService::SECTION_STOCK_NOTE }}
+                    @endif
+                </p>
+            @endif
 
             @if($rows->isEmpty())
                 <div class="gx-stock-empty">
@@ -133,7 +123,7 @@
                     <div class="gx-stock-empty-hint">Drafts are not counted — a requisition appears here once it is submitted.</div>
                 </div>
             @else
-                {{-- ALL first, then one tab per category present this month. --}}
+                {{-- ALL, each category, or each section present this month. --}}
                 <ul class="nav nav-pills gx-report-tabs mb-3" role="tablist">
                     @foreach($tabs as $name => $tabRows)
                         <li class="nav-item" role="presentation">
@@ -154,7 +144,7 @@
                             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                                 <h6 class="gx-stock-subhead mb-0">{{ $name }}</h6>
                                 <span class="text-muted small">
-                                    {{ $tabRows->count() }} line(s) ·
+                                    {{ $tabRows->count() }} item(s) ·
                                     To Be Procured <strong class="text-slate-900">{{ $qty($tabRows->sum('to_be_procured')) }}</strong> ·
                                     Total <strong class="text-slate-900">{{ $money($sectionTotal) }}</strong>
                                 </span>
@@ -179,7 +169,7 @@
                                         </tr>
                                         <tr>
                                             <th class="text-end">Qty Requested</th>
-                                            <th class="text-end">Stock in Hand</th>
+                                            <th class="text-end">{{ $isSectionView ? 'Stock Allocated' : 'Stock in Hand' }}</th>
                                             <th class="text-end">Safety Stock</th>
                                             <th class="text-end">Cons. (Last Month)</th>
                                             <th class="text-end">Qty</th>
@@ -198,12 +188,7 @@
                                         @foreach($tabRows as $i => $row)
                                             <tr>
                                                 <td class="text-center gx-line-no">{{ $i + 1 }}</td>
-                                                <td class="fw-semibold text-slate-900">
-                                                    {{ $row['item_name'] }}
-                                                    {{-- Every figure traceable to the document it came
-                                                         from; a merged row lists all of them. --}}
-                                                    <span class="gx-line-src">{{ $row['requisition_no'] ?: '—' }}</span>
-                                                </td>
+                                                <td class="fw-semibold text-slate-900">{{ $row['item_name'] }}</td>
                                                 <td class="small">{{ $row['uom'] ?: '—' }}</td>
                                                 <td class="small">{{ $row['specification'] ?: '—' }}</td>
                                                 <td class="small">{{ $row['type'] ? ($typeLabels[$row['type']] ?? $row['type']) : '—' }}</td>
@@ -279,12 +264,6 @@
         .gx-line-table th.gx-line-date,
         .gx-line-table td.gx-line-date { white-space: nowrap !important; min-width: 92px; }
         .gx-line-table td.gx-line-dept { white-space: normal; min-width: 140px; }
-
-        /* The Requisition No a line came from, under the item name. */
-        .gx-line-src {
-            display: block; margin-top: .15rem;
-            font-size: .64rem; font-weight: 600; color: #94a3b8; white-space: normal;
-        }
 
         .gx-report-tabs .nav-link {
             border-radius: 999px; font-size: .78rem; font-weight: 700;

@@ -91,7 +91,7 @@ trait FormatsStoreSheet
     /** Digits, no grouping — what a reference number should look like. */
     private const FORMAT_IDENTIFIER = '0';
 
-    private const FORMAT_MONEY = '#,##0.00';
+    private const FORMAT_MONEY = \App\Support\Quantity::EXCEL_MONEY;
 
     private const FORMAT_QUANTITY = '#,##0.####';
 
@@ -468,8 +468,17 @@ trait FormatsStoreSheet
             if ($this->columnIsNumeric($sheet, $col, $firstDataRow, $lastDataRow)) {
                 $heading = $this->headingFor($sheet, $col, $headerStart, $firstDataRow - 1);
 
+                $format = $this->numberFormatFor($heading);
+
                 $sheet->getStyle($range)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-                $sheet->getStyle($range)->getNumberFormat()->setFormatCode($this->numberFormatFor($heading));
+                $sheet->getStyle($range)->getNumberFormat()->setFormatCode($format);
+
+                // Quantities per cell: "#,##0" for a whole number, decimals
+                // only where there are some — one column-wide "#,##0.####"
+                // printed every whole number with a trailing dot ("200.").
+                if ($format === self::FORMAT_QUANTITY) {
+                    \App\Support\Quantity::applyExcelFormats($sheet, $range);
+                }
 
                 continue;
             }
@@ -630,7 +639,7 @@ trait FormatsStoreSheet
             $shown = match ($format) {
                 self::FORMAT_IDENTIFIER => number_format($value, 0, '.', ''),
                 self::FORMAT_MONEY => number_format($value, 2),
-                default => rtrim(rtrim(number_format($value, 4), '0'), '.'),
+                default => \App\Support\Quantity::format($value),
             };
 
             $longest = max($longest, mb_strlen($shown));

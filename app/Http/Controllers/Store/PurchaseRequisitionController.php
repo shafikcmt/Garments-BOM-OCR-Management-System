@@ -136,7 +136,7 @@ class PurchaseRequisitionController extends Controller
             // Drives the "Requested" tab's badge. Counted only for whoever can
             // open that queue, so a department user's screen runs no extra
             // query for a tab they never see.
-            'awaitingCount' => ($request->user() && PurchaseRequisition::seesEveryRequisition($request->user()))
+            'awaitingCount' => ($request->user() && PurchaseRequisition::worksStoreDesk($request->user()))
                 ? PurchaseRequisition::query()->fromDepartments()
                     ->where('status', PurchaseRequisition::STATUS_SUBMITTED)->count()
                 : 0,
@@ -183,7 +183,7 @@ class PurchaseRequisitionController extends Controller
     public function requested(Request $request)
     {
         abort_unless(
-            $request->user() && PurchaseRequisition::seesEveryRequisition($request->user()),
+            PurchaseRequisition::worksStoreDesk($request->user()),
             403,
             'Only the Store team can review incoming requisitions.'
         );

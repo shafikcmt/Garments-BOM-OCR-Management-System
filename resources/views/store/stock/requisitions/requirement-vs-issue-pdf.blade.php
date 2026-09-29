@@ -4,7 +4,7 @@
     every page; rows never split across a page.
 --}}
 @php
-    $qty = fn ($v) => $v === null ? '—' : (rtrim(rtrim(number_format((float) $v, 2, '.', ','), '0'), '.') ?: '0');
+    $qty = fn ($v) => \App\Support\Quantity::format($v);
     $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
     $pct = fn ($v) => $v === null ? '—' : number_format((float) $v, 1).'%';
     $filtersLine = str_replace(' · '.$period, '', $title);

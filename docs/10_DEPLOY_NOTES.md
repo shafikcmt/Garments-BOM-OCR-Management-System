@@ -111,3 +111,32 @@ Roll back only together with the code: the stage engine needs all four.
   Issue and the Monthly Requisition report all read the one counting rule
   (`PurchaseRequisition::countedInTotals()`), which leaves cancelled sheets
   out. A test per report is added in Step 3d.
+
+## 7. Monthly requisition rule (owner, 2026-09-29)
+
+Applies to the Monthly Requisition report now and to the Step 4 merge.
+
+- Every month each department raises requisitions for the NEXT month's
+  requirement. The same section may raise the SAME item several times in
+  one month.
+- A sheet belongs to the month of its **requisition date** (raised in
+  September = September report). There is no "for month" field. The month
+  filter uses the month-end-safe parsing (`resolveMonth()`).
+- **Sum first, subtract once.** Sum the quantity per item (per item and
+  section in the Section-wise view, across sections for ALL), then compare
+  with stock ONCE per item:
+  `To Be Procured = max(0, total qty − stock in hand)`.
+  Never subtract stock per line. Stock, safety stock and consumption are
+  per item, never summed.
+- `Amount = To Be Procured × the item's latest known rate`.
+- Only counted sheets (`countedInTotals()`: no drafts, returned or
+  cancelled sheets; a department line a final sheet repeats counts once).
+- Section-wise: the item's one stock figure is allocated to the sections in
+  the order they first asked, so the section tabs add up to the ALL tab. The
+  column reads "Stock Allocated" and the report says "Stock is allocated to
+  sections in request order." Example: stock 6; Cutting 20 (first), Sewing 5
+  → Cutting allocated 6, TBP 14; Sewing allocated 0, TBP 5. The ALL view
+  keeps the full "Stock in Hand".
+- Excel: quantities are real numbers, "#,##0" when whole and "#,##0.00##"
+  otherwise (no trailing dot). Money (rate, amount, value, price) is always
+  "#,##0.00", in every export.

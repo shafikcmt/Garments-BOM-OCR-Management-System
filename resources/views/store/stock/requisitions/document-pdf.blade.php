@@ -18,8 +18,8 @@
     // cells so a column stays numeric, the PDF keeps separators and dashes
     // because it is only ink. See report-pdf.blade.php.
     $qty = $forExcel
-        ? fn ($v) => $v === null ? '' : rtrim(rtrim(number_format((float) $v, 4, '.', ''), '0'), '.')
-        : fn ($v) => $v === null ? '-' : rtrim(rtrim(number_format((float) $v, 4, '.', ','), '0'), '.');
+        ? fn ($v) => \App\Support\Quantity::plain($v)
+        : fn ($v) => \App\Support\Quantity::format($v, '-');
 
     $money = $forExcel
         ? fn ($v) => $v === null ? '' : number_format((float) $v, 2, '.', '')
@@ -148,9 +148,6 @@
 @include('store.stock.requisitions._report-rows', [
     'rows' => $rows,
     'emptyMessage' => 'No items on this requisition.',
-    // The header block already names the requisition; repeating it on every
-    // line would just be the same string four times over.
-    'showSource' => false,
 ])
 
 @unless($forExcel)

@@ -190,9 +190,13 @@ class GeneralStockReportExport implements FromView, WithEvents, WithTitle
         // Quantities and money read as figures, matching the body columns the
         // strip totals.
         foreach ($columns as $heading => $letter) {
+            // Money two decimals; a quantity total its own per-cell format, so
+            // a whole total never shows a trailing dot.
             $sheet->getStyle($letter.$stripRow)
                 ->getNumberFormat()
-                ->setFormatCode($heading === 'Closing Stock Value' ? '#,##0.00' : '#,##0.####');
+                ->setFormatCode($heading === 'Closing Stock Value'
+                    ? \App\Support\Quantity::EXCEL_MONEY
+                    : \App\Support\Quantity::excelFormat((float) $sheet->getCell($letter.$stripRow)->getValue()));
         }
 
         $sheet->getRowDimension($stripRow)->setRowHeight(16);

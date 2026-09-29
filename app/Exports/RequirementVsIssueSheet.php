@@ -86,11 +86,11 @@ class RequirementVsIssueSheet implements WithEvents, WithTitle
                 $row['specification'] ?? '—',
                 $row['section_name'],
                 $row['rate'] === null ? '—' : round($row['rate'], 2),
-                round($row['requested_qty'], 2),
+                round($row['requested_qty'], 4),
                 $row['requested_value'] === null ? '—' : round($row['requested_value'], 2),
-                round($row['issued_qty'], 2),
+                round($row['issued_qty'], 4),
                 $row['issued_value'] === null ? '—' : round($row['issued_value'], 2),
-                round($row['balance_qty'], 2),
+                round($row['balance_qty'], 4),
                 $row['balance_value'] === null ? '—' : round($row['balance_value'], 2),
                 $row['pct'] === null ? '—' : round($row['pct'] / 100, 4),
                 $row['status_label'],
@@ -114,9 +114,10 @@ class RequirementVsIssueSheet implements WithEvents, WithTitle
         if ($summary['not_requested_qty'] > 0) {
             $r += 2;
             $sheet->setCellValue('B'.$r, 'Not Requested (issued without a requisition) — not in the totals or Issued %');
-            $sheet->setCellValue('I'.$r, round($summary['not_requested_qty'], 2));
+            $sheet->setCellValue('I'.$r, round($summary['not_requested_qty'], 4));
             $sheet->setCellValue('J'.$r, round($summary['not_requested_value'], 2));
-            $sheet->getStyle("I{$r}:J{$r}")->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle("I{$r}:J{$r}")->getNumberFormat()->setFormatCode(\App\Support\Quantity::EXCEL_MONEY);
+            \App\Support\Quantity::applyExcelFormats($sheet, "I{$r}:I{$r}");
             $sheet->getStyle("B{$r}:J{$r}")->getFont()->setItalic(true);
         }
 
@@ -126,7 +127,12 @@ class RequirementVsIssueSheet implements WithEvents, WithTitle
         $sheet->getStyle("A6:{$last}6")->getAlignment()->setWrapText(true)->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
         $sheet->getStyle("A{$end}:{$last}{$end}")->getFont()->setBold(true);
         $sheet->getStyle("A5:{$last}{$end}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-        $sheet->getStyle("F5:L{$end}")->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle("F5:L{$end}")->getNumberFormat()->setFormatCode(\App\Support\Quantity::EXCEL_MONEY);
+        // Quantity columns (Requested, Issued, Balance): the shared per-cell
+        // format; the value columns beside them stay money.
+        foreach (['G', 'I', 'K'] as $qtyColumn) {
+            \App\Support\Quantity::applyExcelFormats($sheet, "{$qtyColumn}5:{$qtyColumn}{$end}");
+        }
         $sheet->getStyle("M5:M{$end}")->getNumberFormat()->setFormatCode('0.0%');
         $sheet->getStyle("F5:M{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $sheet->getStyle("A7:A{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -145,11 +151,11 @@ class RequirementVsIssueSheet implements WithEvents, WithTitle
     {
         $sheet->fromArray([
             '', 'Total', '', '', '', '',
-            round($summary['requested_qty'], 2),
+            round($summary['requested_qty'], 4),
             round($summary['requested_value'], 2),
-            round($summary['issued_qty'], 2),
+            round($summary['issued_qty'], 4),
             round($summary['issued_value'], 2),
-            round($summary['balance_qty'], 2),
+            round($summary['balance_qty'], 4),
             round($summary['balance_value'], 2),
             $summary['pct'] === null ? '—' : round($summary['pct'] / 100, 4),
             '',

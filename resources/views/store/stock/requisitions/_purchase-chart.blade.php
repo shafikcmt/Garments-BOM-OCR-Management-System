@@ -6,7 +6,7 @@
     Expects: $chart  RequirementVsIssueCharts::purchase()
 --}}
 @php
-    $qty = fn ($v) => rtrim(rtrim(number_format((float) $v, 2, '.', ','), '0'), '.') ?: '0';
+    $qty = fn ($v) => \App\Support\Quantity::format($v ?? 0);
 @endphp
 
 <div class="rvi-chart-card mb-3 rvi-charts">

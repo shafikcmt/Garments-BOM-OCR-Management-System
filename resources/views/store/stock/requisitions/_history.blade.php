@@ -17,7 +17,7 @@
         'deleted' => 'bg-danger-subtle text-danger',
         'corrected' => 'bg-warning-subtle text-warning-emphasis',
     ];
-    $qty = fn ($v) => $v === null ? '—' : rtrim(rtrim(number_format((float) $v, 2), '0'), '.');
+    $qty = fn ($v) => \App\Support\Quantity::format($v);
     $recordedFrom = \Illuminate\Support\Carbon::parse(\App\Models\PurchaseRequisitionAction::RECORDED_FROM);
     $predates = $requisition->created_at && $requisition->created_at->lt($recordedFrom);
 @endphp

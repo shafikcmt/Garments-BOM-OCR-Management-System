@@ -57,24 +57,24 @@ class StockSummaryPurchaseExport implements WithEvents, WithTitle
                 $i + 1,
                 $row['item_name'],
                 $row['uom'] ?: '—',
-                round($row['requested'], 2),
-                $row['stock_in_hand'] === null ? '—' : round($row['stock_in_hand'], 2),
-                round($row['purchased'], 2),
-                round($row['pending'], 2),
+                round($row['requested'], 4),
+                $row['stock_in_hand'] === null ? '—' : round($row['stock_in_hand'], 4),
+                round($row['purchased'], 4),
+                round($row['pending'], 4),
                 $row['pending'] > 0 ? 'To Purchase' : ($row['over_received'] > 0 ? 'Over Received' : 'Purchased'),
             ], null, 'A'.$r, true);
             $r++;
         }
 
         $t = $this->data['purchase']['totals'];
-        $sheet->fromArray(['', 'Total', '', round($t['requested'], 2), round($t['stock_in_hand'], 2), round($t['purchased'], 2), round($t['pending'], 2), ''], null, 'A'.$r, true);
+        $sheet->fromArray(['', 'Total', '', round($t['requested'], 4), round($t['stock_in_hand'], 4), round($t['purchased'], 4), round($t['pending'], 4), ''], null, 'A'.$r, true);
 
         $sheet->getStyle("A5:H5")->getFont()->setBold(true);
         $sheet->getStyle("A5:H5")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E8EEF7');
         $sheet->getStyle("A{$r}:H{$r}")->getFont()->setBold(true);
         $sheet->getStyle("A{$r}:H{$r}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FFF4CE');
         $sheet->getStyle("A5:H{$r}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-        $sheet->getStyle("D6:G{$r}")->getNumberFormat()->setFormatCode('#,##0.##');
+        \App\Support\Quantity::applyExcelFormats($sheet, "D6:G{$r}");
         $sheet->getStyle("D5:G{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
         foreach (['A' => 6, 'B' => 40, 'C' => 10, 'D' => 12, 'E' => 14, 'F' => 12, 'G' => 13, 'H' => 15] as $col => $w) {

@@ -6,17 +6,11 @@
     Shared by the PDF and the Excel export so a downloaded sheet can never
     disagree with the printed page.
 
-    Expects: $rows, $merge, and the $qty / $money / $date formatters.
+    Expects: $rows, and the $qty / $money / $date formatters.
 --}}
 @php
     $forExcel = $forExcel ?? false;
     $sectionTotal = $rows->sum('amount');
-
-    // Where the line came from, printed under the item name. On the monthly
-    // report that is the only way to trace a figure back to its document, so it
-    // is on by default; a single requisition's own document already names it in
-    // the header, where repeating it on every line is just noise.
-    $showSource = $showSource ?? true;
 @endphp
 
 <table class="report-table">
@@ -37,8 +31,10 @@
         </tr>
         <tr>
             <th class="num">Qty Requested</th>
-            <th class="num">Stock in Hand</th>
-            <th class="num">Saftey Stock</th>
+            {{-- "Stock Allocated" on the Section-wise report: the part of the
+                 item's stock given to that section. --}}
+            <th class="num">{{ $stockLabel ?? 'Stock in Hand' }}</th>
+            <th class="num">Safety Stock</th>
             <th class="num">Consumption (Last Month)</th>
             <th class="num">Qty</th>
             <th class="num">Approx Rate</th>
@@ -56,30 +52,15 @@
         @forelse($rows as $i => $row)
             <tr>
                 <td class="num">{{ $i + 1 }}</td>
-                {{-- Where the line came from, under the item name. On a merged
-                     row this lists every requisition that asked for the item.
-
-                     Excel gets a line break rather than a <div>: the HTML
-                     reader flattens block elements into the same cell with
-                     nothing between them, which ran the item name and the
-                     requisition number together as one unreadable string. --}}
-                {{-- A line naming something not in the Item Master says so
-                     next to the name, on paper and in the spreadsheet both —
-                     it tells Store the item has still to be added before it
-                     can ever be received against. --}}
+                {{-- The item name only; the sheets a row came from are listed
+                     in the header's Requisition No. A line naming something
+                     not in the Item Master says so next to the name, on paper
+                     and in the spreadsheet both — it tells Store the item has
+                     still to be added before it can ever be received against. --}}
                 @php($notInMaster = ($row['is_custom_item'] ?? false)
                     ? ' ('.\App\Models\PurchaseRequisitionItem::NOT_IN_MASTER_NOTE.')'
                     : '')
-                <td>
-                    @if($forExcel)
-                        {{ $row['item_name'] }}{{ $notInMaster }}@if($showSource && $row['requisition_no'])<br>{{ $row['requisition_no'] }}@endif
-                    @else
-                        {{ $row['item_name'] }}{{ $notInMaster }}
-                        @if($showSource)
-                            <div class="src">{{ $row['requisition_no'] ?: '—' }}</div>
-                        @endif
-                    @endif
-                </td>
+                <td>{{ $row['item_name'] }}{{ $notInMaster }}</td>
                 <td>{{ $row['uom'] ?: '—' }}</td>
                 <td>{{ $row['specification'] ?: '-' }}</td>
                 <td>{{ $row['type'] ? ($typeLabels[$row['type']] ?? $row['type']) : '-' }}</td>

@@ -29,7 +29,8 @@
             'specification' => $i->specification,
             'type' => $i->type,
             'user_dept' => $i->user_dept,
-            'qty_requested' => $i->qty_requested,
+            // "10", not "10.0000" — the column keeps four decimals.
+            'qty_requested' => \App\Support\Quantity::plain($i->qty_requested),
             'rate_appx' => $i->rate_appx,
             'remarks' => $i->remarks,
         ])->all()

@@ -13,7 +13,6 @@ use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
-use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 /**
@@ -90,7 +89,7 @@ class ItemMasterExport implements FromArray, ShouldAutoSize, WithColumnFormattin
 
         return [
             $letter('Counted On') => IssueTemplateExport::DATE_FORMAT,
-            $letter('Unit Price') => NumberFormat::FORMAT_NUMBER_00,
+            $letter('Unit Price') => \App\Support\Quantity::EXCEL_MONEY,
         ];
     }
 
