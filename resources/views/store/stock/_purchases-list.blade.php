@@ -349,7 +349,7 @@
                                         <label class="form-label" for="editPurchasePrice{{ $line->id }}">Unit Price <span class="text-danger">*</span></label>
                                         <input type="number" step="0.0001" min="0" id="editPurchasePrice{{ $line->id }}" name="unit_price" class="form-control @if($wasSubmitted && $errors->has('unit_price')) is-invalid @endif" required
                                                value="{{ $value('unit_price', $line->unit_price !== null ? rtrim(rtrim(number_format((float) $line->unit_price, 4, '.', ''), '0'), '.') : '') }}">
-                                        @if($wasSubmitted && $errors->has('unit_price'))<div class="invalid-feedback d-block">{{ $errors->first('unit_price') }}</div>@endif
+                                        @if($wasSubmitted && $errors->has('unit_price'))<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($errors->first('unit_price')) }}</div>@endif
                                     </div>
                                     <div class="col-12 col-md-4">
                                         <label class="form-label" for="editPurchaseRcv{{ $line->id }}">
@@ -370,7 +370,7 @@
                                                 <option value="{{ $supplier->id }}" @selected($value('general_stock_supplier_id', $line->general_stock_supplier_id) == $supplier->id)>{{ $supplier->name }}</option>
                                             @endforeach
                                         </select>
-                                        @if($wasSubmitted && $errors->has('general_stock_supplier_id'))<div class="invalid-feedback d-block">{{ $errors->first('general_stock_supplier_id') }}</div>@endif
+                                        @if($wasSubmitted && $errors->has('general_stock_supplier_id'))<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($errors->first('general_stock_supplier_id')) }}</div>@endif
                                         @if($siblingCount > 1)
                                             <div class="gx-edit-hint">
                                                 RCV Date and Supplier describe the whole delivery, so a change here is
@@ -381,7 +381,7 @@
                                     <div class="col-12">
                                         <label class="form-label" for="editPurchaseRemarks{{ $line->id }}">Remarks</label>
                                         <textarea id="editPurchaseRemarks{{ $line->id }}" name="remarks" class="form-control @if($wasSubmitted && $errors->has('remarks')) is-invalid @endif" rows="2" maxlength="1000">{{ $value('remarks', $line->remarks) }}</textarea>
-                                        @if($wasSubmitted && $errors->has('remarks'))<div class="invalid-feedback d-block">{{ $errors->first('remarks') }}</div>@endif
+                                        @if($wasSubmitted && $errors->has('remarks'))<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($errors->first('remarks')) }}</div>@endif
                                     </div>
                                 </div>
                             </div>

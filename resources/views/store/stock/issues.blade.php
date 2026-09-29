@@ -18,13 +18,15 @@
             'qty' => $line['qty'] ?? '',
             'requisition_type' => $line['requisition_type'] ?? '',
             'remarks' => $line['remarks'] ?? '',
-            'errors' => array_filter([
+            // Short tags under the fields; the full sentences are in the
+            // summary at the top of the page.
+            'errors' => array_filter(array_map(fn ($m) => \App\Support\FieldMessage::short($m), [
                 'item' => $errors->first('items.'.$index.'.stock_item_id'),
                 'qty' => $errors->first('items.'.$index.'.qty'),
                 'category' => $errors->first('items.'.$index.'.item_category_id'),
                 'type' => $errors->first('items.'.$index.'.requisition_type'),
                 'remarks' => $errors->first('items.'.$index.'.remarks'),
-            ]),
+            ])),
         ])
         ->values();
 
@@ -239,7 +241,7 @@
                              it refused the submit silently — no request, no
                              message. The script below checks the lines and says
                              what is missing; the server validates everything. --}}
-                        <form method="POST" action="{{ route('store.stock.issues.store') }}" id="issueForm" novalidate>
+                        <form method="POST" action="{{ route('store.stock.issues.store') }}" id="issueForm" class="gx-entry-form" novalidate>
                             @csrf
                             {{-- Which draft this form came from, so saving again
                                  updates it instead of leaving a second copy, and
@@ -267,7 +269,7 @@
                                             <option value="{{ $s->id }}" @selected(old('indent_section_id') == $s->id)>{{ $s->name }}</option>
                                         @endforeach
                                     </select>
-                                    @error('indent_section_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                    @error('indent_section_id')<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($message) }}</div>@enderror
                                 </div>
                                 <div class="col-12 col-md-6 col-xl-2">
                                     <label class="form-label" for="issuePerson">Indent Person <span class="text-danger">*</span></label>
@@ -280,7 +282,7 @@
                                             <option value="{{ $p->id }}" @selected(old('indent_person_id') == $p->id)>{{ $p->name }}</option>
                                         @endforeach
                                     </select>
-                                    @error('indent_person_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                    @error('indent_person_id')<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($message) }}</div>@enderror
                                 </div>
                                 <div class="col-12 col-md-6 col-xl-2">
                                     <label class="form-label" for="issueApprover">Approved By <span class="text-danger">*</span></label>
@@ -293,7 +295,7 @@
                                             <option value="{{ $a->id }}" @selected(old('issue_approver_id') == $a->id)>{{ $a->name }}</option>
                                         @endforeach
                                     </select>
-                                    @error('issue_approver_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                    @error('issue_approver_id')<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($message) }}</div>@enderror
                                 </div>
                                 {{-- Type is NOT here. New / Replace is decided per
                                      item — one requisition can replace a worn part
@@ -302,7 +304,7 @@
                                 <div class="col-6 col-md-3 col-xl-3">
                                     <label class="form-label" for="issueRequisitionNo">Requisition Number <span class="text-danger">*</span></label>
                                     <input name="requisition_no" id="issueRequisitionNo" value="{{ old('requisition_no') }}" class="form-control @error('requisition_no') is-invalid @enderror" maxlength="100" aria-required="true">
-                                    @error('requisition_no')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                    @error('requisition_no')<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($message) }}</div>@enderror
                                 </div>
                             </div>
 
@@ -422,10 +424,7 @@
                                         formnovalidate>
                                     <i class="bi bi-bookmark me-1" aria-hidden="true"></i>Save Draft
                                 </button>
-                                <p class="gx-stock-help" style="max-width:600px;">
-                                    Section, Person and Approved By accept a new value — type it in and it is saved to the list
-                                    for next time. Each item line is recorded as its own issue under this requisition.
-                                </p>
+                                <p class="gx-stock-help gx-entry-help mb-0">Type a new Section, Person or Approver to add it to the list.</p>
                             </div>
                         </form>
 
@@ -489,7 +488,7 @@
                                 {{-- Padded away from the Remarks field so a fast
                                      click on the input cannot land on Remove. --}}
                                 <td class="text-end gx-line-action">
-                                    <button type="button" class="btn btn-sm btn-outline-danger js-line-remove">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary gx-line-remove js-line-remove">
                                         <i class="bi bi-trash me-1" aria-hidden="true"></i>Remove
                                     </button>
                                 </td>
@@ -1279,43 +1278,43 @@
                 header = header || {};
 
                 if (blank(issueDate)) {
-                    problems.push({ line: null, field: 'date', message: 'Enter the issue date.' });
+                    problems.push({ line: null, field: 'date', message: 'Enter the issue date.', short: 'Required' });
                 }
                 if (blank(header.section)) {
-                    problems.push({ line: null, field: 'section', message: 'Select or type the Indent Section.' });
+                    problems.push({ line: null, field: 'section', message: 'Select or type the Indent Section.', short: 'Required' });
                 }
                 if (blank(header.person)) {
-                    problems.push({ line: null, field: 'person', message: 'Select or type the Indent Person.' });
+                    problems.push({ line: null, field: 'person', message: 'Select or type the Indent Person.', short: 'Required' });
                 }
                 if (blank(header.approver)) {
-                    problems.push({ line: null, field: 'approver', message: 'Select or type who approved the issue.' });
+                    problems.push({ line: null, field: 'approver', message: 'Select or type who approved the issue.', short: 'Required' });
                 }
                 if (blank(header.requisitionNo)) {
-                    problems.push({ line: null, field: 'requisition_no', message: 'Enter the Requisition Number.' });
+                    problems.push({ line: null, field: 'requisition_no', message: 'Enter the Requisition Number.', short: 'Required' });
                 }
 
                 var seen = {};
 
                 lines.forEach(function (l) {
                     if (blank(l.item)) {
-                        problems.push({ line: l.line, field: 'item', message: 'Select an item on line ' + l.line + '.' });
+                        problems.push({ line: l.line, field: 'item', message: 'Select an item on line ' + l.line + '.', short: 'Required' });
                     }
 
                     var qty = String(l.qty || '').trim();
                     // The same shape the field's keystroke filter allows ("1", "1.", "0.5").
                     if (!/^\d*\.?\d*$/.test(qty) || !(parseFloat(qty) > 0)) {
-                        problems.push({ line: l.line, field: 'qty', message: 'Enter the issued qty on line ' + l.line + ' (more than 0).' });
+                        problems.push({ line: l.line, field: 'qty', message: 'Enter the issued qty on line ' + l.line + ' (more than 0).', short: 'More than 0' });
                     }
 
                     if (blank(l.type)) {
-                        problems.push({ line: l.line, field: 'type', message: 'Select the type (New or Replace) on line ' + l.line + '.' });
+                        problems.push({ line: l.line, field: 'type', message: 'Select the type (New or Replace) on line ' + l.line + '.', short: 'Required' });
                     }
 
                     if (!blank(l.item) && !blank(header.requisitionNo)) {
                         var key = String(l.item) + '|' + norm(l.remarks);
                         if (seen[key]) {
                             problems.push({
-                                line: l.line, field: 'remarks',
+                                line: l.line, field: 'remarks', short: 'Same remark already used',
                                 message: 'Line ' + l.line + ': this item is already on requisition ' + String(header.requisitionNo).trim()
                                     + ' (line ' + seen[key] + ') with the same remark. Use a different remark to issue it again.',
                             });
@@ -1409,7 +1408,8 @@
                         var row = p.line ? all[p.line - 1] : null;
                         var field = p.field === 'date' ? date
                             : (headerFields[p.field] || (row && row.querySelector(lineFields[p.field])));
-                        markLineError(field, p.message);
+                        // The short tag under the field; the sentence is in the summary.
+                        markLineError(field, p.short || p.message);
                     });
                     showBlocker('Please complete the form before recording the issue.', problems.map(function (p) { return p.message; }));
 

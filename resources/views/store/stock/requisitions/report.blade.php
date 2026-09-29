@@ -149,18 +149,32 @@
                                     Total <strong class="text-slate-900">{{ $money($sectionTotal) }}</strong>
                                 </span>
                             </div>
-                            {{-- What the printed header says, and — on the screen
-                                 only — the sheets the tab was built from. --}}
-                            <p class="small text-muted mb-2 gx-report-meta">
-                                <span class="fw-semibold text-slate-900">{{ $header['requisition_no'] }}</span>
-                                · Section: {{ $header['section'] ?: '—' }}
-                                · Name of User: {{ $header['user_name'] ?: '—' }}
-                                · Contact: {{ $header['contact'] ?: '—' }}
-                                <br>From: {{ $tab['sources'] }}
-                                @if($tab['type'] === \App\Services\MonthlyRequisitionReportService::TAB_SECTION)
-                                    <br>{{ \App\Services\MonthlyRequisitionReportService::SECTION_STOCK_NOTE }}
+                            {{-- The printed header (Requisition No, Section, Name of
+                                 User, Contact) is for the PDF and Excel only. The
+                                 screen says which sheets the tab was built from,
+                                 behind one small toggle. --}}
+                            @php($sourceCount = count($tab['sources']))
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2 gx-report-meta">
+                                @if($sourceCount > 0)
+                                    <button type="button" class="btn btn-sm btn-outline-secondary gx-report-sources-toggle"
+                                            data-bs-toggle="collapse" data-bs-target="#sources-{{ $tab['slug'] }}"
+                                            aria-expanded="false" aria-controls="sources-{{ $tab['slug'] }}">
+                                        <i class="bi bi-list-ul me-1" aria-hidden="true"></i>Includes {{ $sourceCount }} requisition{{ $sourceCount === 1 ? '' : 's' }}
+                                    </button>
                                 @endif
-                            </p>
+                                @if($tab['type'] === \App\Services\MonthlyRequisitionReportService::TAB_SECTION)
+                                    <span class="small text-muted">{{ \App\Services\MonthlyRequisitionReportService::SECTION_STOCK_NOTE }}</span>
+                                @endif
+                            </div>
+                            @if($sourceCount > 0)
+                                <div class="collapse mb-2" id="sources-{{ $tab['slug'] }}">
+                                    <ul class="list-unstyled small mb-0 gx-report-sources">
+                                        @foreach($tab['sources'] as $no)
+                                            <li>{{ $no }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
 
                             <div class="gx-line-scroll">
                                 <table class="table align-middle mb-0 gx-line-table">
@@ -262,7 +276,12 @@
 
     <style>
         .gx-report-switch .btn { font-weight: 700; font-size: .78rem; padding: .3rem .9rem; }
-        .gx-report-meta { line-height: 1.5; }
+        .gx-report-meta .gx-report-sources-toggle { font-size: .72rem; font-weight: 700; padding: .15rem .6rem; }
+        .gx-report-sources {
+            display: flex; flex-wrap: wrap; gap: .3rem .5rem;
+            padding: .5rem .65rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+        }
+        .gx-report-sources li { font-weight: 600; color: #334155; }
         .gx-line-scroll { overflow-x: auto; }
         .gx-line-table { border-collapse: separate; border-spacing: 0; min-width: 2100px !important; }
 

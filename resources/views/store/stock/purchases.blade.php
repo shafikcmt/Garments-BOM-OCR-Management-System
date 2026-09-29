@@ -19,12 +19,14 @@
             'unit_price' => $line['unit_price'] ?? '',
             'remarks' => $line['remarks'] ?? '',
             // The server's message for each field of the line, shown under it.
-            'errors' => array_filter([
+            // Short tags under the fields; the full sentences are in the
+            // summary at the top of the page.
+            'errors' => array_filter(array_map(fn ($m) => \App\Support\FieldMessage::short($m), [
                 'item' => $errors->first('items.'.$index.'.stock_item_id'),
                 'qty' => $errors->first('items.'.$index.'.qty'),
                 'price' => $errors->first('items.'.$index.'.unit_price'),
                 'remarks' => $errors->first('items.'.$index.'.remarks'),
-            ]),
+            ])),
         ])
         ->values();
 @endphp
@@ -95,7 +97,7 @@
                      TomSelect has hidden (the real item select), so it refused
                      the submit silently. The script below and the server say
                      what is missing — as on Record Issue. --}}
-                <form method="POST" action="{{ route('store.stock.purchases.store') }}" id="purchaseForm" novalidate>
+                <form method="POST" action="{{ route('store.stock.purchases.store') }}" id="purchaseForm" class="gx-entry-form" novalidate>
                     {{-- Which draft this form came from, so saving again updates
                          it instead of leaving a second copy, and recording it for
                          real clears it away. Empty on a form that was not
@@ -131,7 +133,7 @@
                             <input name="challan_no" id="challanNo" value="{{ old('challan_no') }}" class="form-control @error('challan_no') is-invalid @enderror" maxlength="100" aria-required="true"
                                    data-challan-status-url="{{ route('store.stock.purchases.challan-status') }}"
                                    autocomplete="off">
-                            @error('challan_no')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                            @error('challan_no')<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($message) }}</div>@enderror
                         </div>
                         <div class="col-12 col-md-8 col-xl-3">
                             <label class="form-label" for="supplierSelect">Supplier Name <span class="text-danger">*</span></label>
@@ -148,7 +150,7 @@
                                     @endforeach
                                 </select>
                             @endif
-                            @error('general_stock_supplier_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                            @error('general_stock_supplier_id')<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($message) }}</div>@enderror
                         </div>
                     </div>
 
@@ -318,7 +320,7 @@
                             {{-- Padded away from Remarks so a fast click on the
                                  input cannot land on Remove. --}}
                             <td class="text-end gx-line-action">
-                                <button type="button" class="btn btn-sm btn-outline-danger js-line-remove">
+                                <button type="button" class="btn btn-sm btn-outline-secondary gx-line-remove js-line-remove">
                                     <i class="bi bi-trash me-1" aria-hidden="true"></i>Remove
                                 </button>
                             </td>
@@ -338,10 +340,7 @@
                                 formnovalidate>
                             <i class="bi bi-bookmark me-1" aria-hidden="true"></i>Save Draft
                         </button>
-                        <p class="gx-stock-help mb-0" style="max-width:600px;">
-                            The GRN No is generated on save and shared by every line on this challan.
-                            Each line is recorded as its own purchase against its item.
-                        </p>
+                        <p class="gx-stock-help gx-entry-help mb-0">The GRN No is assigned on save and shared by every line.</p>
                     </div>
                 </form>
             @endif
@@ -882,32 +881,32 @@
                 var figure = function (v) { return /^\d*\.?\d*$/.test(String(v || '').trim()) && String(v || '').trim() !== '' && String(v).trim() !== '.'; };
                 header = header || {};
 
-                if (blank(header.challanDate)) { problems.push({ line: null, field: 'challan_date', message: 'Enter the challan date.' }); }
-                if (blank(header.rcvDate)) { problems.push({ line: null, field: 'rcv_date', message: 'Enter the RCV date.' }); }
+                if (blank(header.challanDate)) { problems.push({ line: null, field: 'challan_date', message: 'Enter the challan date.', short: 'Required' }); }
+                if (blank(header.rcvDate)) { problems.push({ line: null, field: 'rcv_date', message: 'Enter the RCV date.', short: 'Required' }); }
                 if (!blank(header.challanDate) && !blank(header.rcvDate) && String(header.rcvDate) < String(header.challanDate)) {
-                    problems.push({ line: null, field: 'rcv_date', message: 'The RCV date cannot be earlier than the challan date.' });
+                    problems.push({ line: null, field: 'rcv_date', message: 'The RCV date cannot be earlier than the challan date.', short: 'Before challan date' });
                 }
-                if (blank(header.challanNo)) { problems.push({ line: null, field: 'challan_no', message: 'Enter the Challan / Invoice No.' }); }
-                if (blank(header.supplier)) { problems.push({ line: null, field: 'supplier', message: 'Select the supplier.' }); }
+                if (blank(header.challanNo)) { problems.push({ line: null, field: 'challan_no', message: 'Enter the Challan / Invoice No.', short: 'Required' }); }
+                if (blank(header.supplier)) { problems.push({ line: null, field: 'supplier', message: 'Select the supplier.', short: 'Required' }); }
 
                 var seen = {};
 
                 lines.forEach(function (l) {
                     if (blank(l.item)) {
-                        problems.push({ line: l.line, field: 'item', message: 'Select an item on line ' + l.line + '.' });
+                        problems.push({ line: l.line, field: 'item', message: 'Select an item on line ' + l.line + '.', short: 'Required' });
                     }
                     if (!figure(l.qty) || !(parseFloat(l.qty) > 0)) {
-                        problems.push({ line: l.line, field: 'qty', message: 'Enter the purchased qty on line ' + l.line + ' (more than 0).' });
+                        problems.push({ line: l.line, field: 'qty', message: 'Enter the purchased qty on line ' + l.line + ' (more than 0).', short: 'More than 0' });
                     }
                     if (!figure(l.price)) {
-                        problems.push({ line: l.line, field: 'price', message: 'Enter the unit price on line ' + l.line + ' (0 if free of charge).' });
+                        problems.push({ line: l.line, field: 'price', message: 'Enter the unit price on line ' + l.line + ' (0 if free of charge).', short: String(l.price || '').trim() === '' ? 'Required' : '0 or more' });
                     }
 
                     if (!blank(l.item) && !blank(header.challanNo)) {
                         var key = String(l.item) + '|' + norm(l.remarks);
                         if (seen[key]) {
                             problems.push({
-                                line: l.line, field: 'remarks',
+                                line: l.line, field: 'remarks', short: 'Same remark already used',
                                 message: 'Line ' + l.line + ': this item is already received on challan ' + String(header.challanNo).trim()
                                     + (header.supplierName ? ' from ' + header.supplierName : '')
                                     + ' (line ' + seen[key] + ') with the same remark. For a further delivery, add a remark such as \'2nd delivery\'.',
@@ -979,7 +978,8 @@
                 event.preventDefault();
                 problems.forEach(function (p) {
                     var row = p.line ? all[p.line - 1] : null;
-                    markLineError(headerFields[p.field] || (row && row.querySelector(lineFields[p.field])), p.message);
+                    // The short tag under the field; the sentence is in the summary.
+                    markLineError(headerFields[p.field] || (row && row.querySelector(lineFields[p.field])), p.short || p.message);
                 });
 
                 blocker.innerHTML = '<strong class="d-block mb-1">Please complete the form before recording the receiving.</strong>'

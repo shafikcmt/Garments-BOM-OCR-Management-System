@@ -557,6 +557,94 @@
     .gx-line-table > tfoot > tr > td:first-child { border-bottom-left-radius: 10px; }
     .gx-line-table > tfoot > tr > td:last-child { border-bottom-right-radius: 10px; }
 
+    /* --- Entry forms: Record Issue and Record Receiving -----------------
+     * One small polish for both (owner, 2026-09-29), scoped to .gx-entry-form
+     * so no other screen moves. No layout change — the same fields in the
+     * same places, drawn so a header row lines up and the line grid reads
+     * tighter.
+     */
+
+    /* One line per label, so the inputs in a header row sit on one line
+       whatever the label length or its "auto" tag. */
+    .gx-entry-form .row > [class*="col"] > .form-label {
+        display: flex;
+        align-items: center;
+        gap: .25rem;
+        min-height: 1.35rem;
+        white-space: nowrap;
+    }
+    .gx-entry-form .row > [class*="col"] > .form-label .gx-stock-auto { margin-left: .1rem; }
+
+    /* One clear required mark, in labels and in the line grid's headings. */
+    .gx-entry-form .form-label .text-danger,
+    .gx-entry-form .gx-line-table > thead > tr > th .text-danger {
+        color: #dc2626 !important;
+        font-size: .85rem;
+        font-weight: 800;
+        line-height: 1;
+        margin-left: 0;
+    }
+
+    /* Header controls one height: native inputs and TomSelect alike (the
+       TomSelect wrapper otherwise sizes to its text and sits shorter). */
+    .gx-entry-form > .row .form-control,
+    .gx-entry-form > .row .form-select,
+    .gx-entry-form > .row .ts-wrapper.form-select,
+    .gx-entry-form > .row .ts-wrapper.form-control {
+        min-height: 38px;
+        font-size: .85rem;
+    }
+
+    /* A tighter line grid, still readable: headings .7rem, fields .8rem. */
+    .gx-entry-form .gx-line-table > thead > tr > th { padding: .5rem .45rem; font-size: .7rem; }
+    .gx-entry-form .gx-line-table > tbody > tr > td { padding: .4rem .45rem; vertical-align: top; }
+    .gx-entry-form .gx-line-table .form-control-sm,
+    .gx-entry-form .gx-line-table .form-select-sm,
+    .gx-entry-form .gx-line-table .ts-wrapper.form-select-sm,
+    .gx-entry-form .gx-line-table .ts-wrapper.form-control-sm {
+        min-height: 32px;
+        font-size: .8rem;
+    }
+    .gx-entry-form .gx-line-no { padding-top: .7rem !important; font-size: .75rem; }
+
+    /* Under a field: a short tag ("Required", "More than 0"), one line, never
+       wrapped — the full sentence is in the red summary at the top. */
+    .gx-entry-form .invalid-feedback {
+        font-size: .72rem !important;
+        line-height: 1.3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* A smaller, neutral Remove — icon + text as everywhere — that turns red
+       only on hover, still well clear of the field beside it. */
+    .gx-entry-form .gx-line-action { padding-left: .9rem !important; }
+    .content .gx-stock-scope .gx-entry-form td.gx-line-action :is(a, button).btn:has(> i.bi),
+    .content .gx-stock-scope .gx-entry-form td.gx-line-action :is(a, button).btn {
+        padding: .2rem .6rem !important;
+        white-space: nowrap;
+    }
+    .gx-entry-form .gx-line-remove {
+        color: #64748b;
+        border-color: #cbd5e1;
+        background: #fff;
+    }
+    .gx-entry-form .gx-line-remove:hover:not(:disabled),
+    .gx-entry-form .gx-line-remove:focus-visible {
+        color: #fff;
+        border-color: #dc2626;
+        background: #dc2626;
+    }
+    .gx-entry-form .gx-line-remove:disabled { opacity: .45; }
+
+    /* The helper line beside the buttons: one short line. */
+    .gx-entry-form .gx-entry-help { font-size: .75rem; white-space: nowrap; }
+
+    /* The red summary above the lines, same size on both forms. */
+    .gx-entry-form #issueStockBlock,
+    .gx-entry-form #receivingBlock { font-size: .8rem; line-height: 1.5; }
+
     /* --- Auto-filled marker ----------------------------------------------
      * A tag beside the label of a field the form fills in for you. The muted
      * .gx-stock-readonly fill says "not editable" quietly; on a dense row of

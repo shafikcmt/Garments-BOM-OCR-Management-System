@@ -382,7 +382,7 @@ it('leaves drafts, sheets still with the head, and cancelled sheets out', functi
         ->and(app(Report::class)->requisitionNosLabel($rows))->toBe('OK/1');
 });
 
-it('lists the source sheets on the screen only, first five then "and N more"', function () {
+it('lists the source sheets on the screen only, behind an "Includes N requisitions" toggle', function () {
     $cutting = fbSection('Cutting');
     $tee = fbItem('MS Tee-2/1', 'Electrical');
 
@@ -393,7 +393,12 @@ it('lists the source sheets on the screen only, first five then "and N more"', f
     $this->actingAs(fbUser('store'))
         ->get(route('store.stock.requisitions.report', ['month' => '2026-09']))
         ->assertOk()
-        ->assertSee('From: CUT/01, CUT/02, CUT/03, CUT/04, CUT/05 and 2 more');
+        ->assertSee('Includes 7 requisitions')
+        // Every number, not the first five: the toggle lists them all.
+        ->assertSee('<li>CUT/07</li>', false)
+        // The printed header line is not on the screen.
+        ->assertDontSee('HAPL/Dept./ALL/2026/September/01')
+        ->assertDontSee('Name of User:');
 
     // Never in the printed header.
     $file = $this->get(route('store.stock.requisitions.report.excel', ['month' => '2026-09']))->baseResponse->getFile()->getPathname();

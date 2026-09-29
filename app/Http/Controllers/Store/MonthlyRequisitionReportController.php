@@ -128,7 +128,8 @@ class MonthlyRequisitionReportController extends Controller
         return $tabs->map(fn (array $tab, string $name) => $tab + [
             'slug' => $tab['type'] === MonthlyRequisitionReportService::TAB_ALL ? 'all' : (Str::slug($name) ?: md5($name)),
             'header' => $this->report->tabHeader($tab['type'], $name, $tab['rows'], $monthStart),
-            'sources' => $this->report->requisitionNosLabel($tab['rows']),
+            // Screen only: the sheets the tab was built from ("Includes N").
+            'sources' => $this->report->requisitionNos($tab['rows']),
         ]);
     }
 

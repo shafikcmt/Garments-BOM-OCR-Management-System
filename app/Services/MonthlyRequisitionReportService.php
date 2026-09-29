@@ -259,6 +259,19 @@ class MonthlyRequisitionReportService
     }
 
     /**
+     * Every sheet these rows were built from, in natural order — the screen's
+     * "Includes N requisitions" list.
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return list<string>
+     */
+    public function requisitionNos(Collection $rows): array
+    {
+        return $rows->pluck('requisition_nos')->flatten()->filter()->unique()
+            ->sort(fn ($a, $b) => strnatcasecmp($a, $b))->values()->all();
+    }
+
+    /**
      * The header's "Requisition No": the sheets these rows were built from,
      * comma separated — the first five, then "and N more".
      *
@@ -266,8 +279,7 @@ class MonthlyRequisitionReportService
      */
     public function requisitionNosLabel(Collection $rows): string
     {
-        $nos = $rows->pluck('requisition_nos')->flatten()->filter()->unique()
-            ->sort(fn ($a, $b) => strnatcasecmp($a, $b))->values();
+        $nos = collect($this->requisitionNos($rows));
 
         if ($nos->isEmpty()) {
             return '—';
