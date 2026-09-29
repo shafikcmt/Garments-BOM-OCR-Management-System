@@ -181,7 +181,9 @@ it('totals each tab on its own rows, with the same summation', function () {
     expect($rendered['Production'])->toContain('>ALL</td>')
         ->not->toContain('>Production</td>')
         ->and($rendered['Production'])->not->toContain('>5500.00</td>');
-    expect($rendered['Stationery'])->toContain('>REQ-TABS-1</td>');
+    // The printed Requisition No is the report's own number, not the sheets'.
+    expect($rendered['Stationery'])->toContain('>HAPL/Dept./ALL/2026/August/01</td>')
+        ->not->toContain('REQ-TABS-1');
 
     // A department tab prints only its own items.
     expect($rendered['Stationery'])->toContain('Bal Pen')->not->toContain('Needle DBx1 90/14');
@@ -198,6 +200,8 @@ function reportTabsPayload(): array
 
     return [
         'rows' => $rows,
+        // What the download carries for All / By Category: ALL + categories.
+        'sheets' => $service->exportTabs($month, MonthlyRequisitionReportService::VIEW_ALL),
         'byCategory' => $service->byCategory($rows),
         'summary' => $service->summary($rows),
         'filters' => [],

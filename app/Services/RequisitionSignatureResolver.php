@@ -52,14 +52,36 @@ class RequisitionSignatureResolver
     /**
      * The boxes for a document that is not one requisition — the monthly
      * report — where there is nobody's action to read a date from, only the
-     * configured names.
+     * configured names, printed as the single sheet prints them before
+     * anyone signs: the name under the box, the date left for the pen.
+     *
+     * A report has no sheet to find the people from, so the caller says who
+     * the Department Head box names (a Section-wise tab: that section's
+     * head), and a Store Head box names the Store department head.
      *
      * @return array<int, array{label: string, name: string, title: string, signed_at: ?Carbon, stamped: bool}>
      */
-    public function forLevel(string $level): array
+    public function forLevel(string $level, ?User $departmentHead = null): array
     {
+        $storeHead = User::find(\App\Models\Department::where('key', 'store')->value('head_user_id'));
+
         return $this->blocks($level)
-            ->map(fn (RequisitionSignatureBlock $block) => $this->resolve($block, null))
+            ->map(function (RequisitionSignatureBlock $block) use ($departmentHead, $storeHead) {
+                $person = match ($block->assignee_type) {
+                    RequisitionSignatureBlock::ASSIGNEE_USER => $block->user,
+                    RequisitionSignatureBlock::ASSIGNEE_DEPARTMENT_HEAD => $departmentHead,
+                    RequisitionSignatureBlock::ASSIGNEE_STORE_HEAD => $storeHead,
+                    default => null,
+                };
+
+                return [
+                    'label' => $block->label,
+                    'name' => $person?->name ?? '',
+                    'title' => $this->title($block, $person, null),
+                    'signed_at' => null,
+                    'stamped' => $block->stamp_source !== null && $block->stamp_source !== '',
+                ];
+            })
             ->all();
     }
 

@@ -215,11 +215,11 @@ it('writes real numbers to the monthly Excel, with no trailing dot on whole quan
         ->and($qty('Thread Oil')->getValue())->toBe(12.5)
         ->and($qty('Thread Oil')->getStyle()->getNumberFormat()->getFormatCode())->toBe('#,##0.00##');
 
-    // "Safety Stock" spelled right, no "Listing" row, no requisition number
-    // anywhere in the rows (the header names the sheets instead).
+    // "Safety Stock" spelled right, no "Listing" row, and the sheet's number
+    // nowhere in the file — the header prints the report's own number.
     $text = collect($sheet->toArray(null, false, false))->flatten()->filter()->implode("\n");
     expect($text)->toContain('Safety Stock')->not->toContain('Saftey')->not->toContain('Listing')
-        ->and(substr_count($text, 'HAPL/CUT/01'))->toBe(1);
+        ->not->toContain('HAPL/CUT/01')->toContain('HAPL/Dept./ALL/2026/September/01');
 });
 
 it('formats money — rate, amount, value, price — as "#,##0.00" in every export', function () {
@@ -378,7 +378,7 @@ it('leaves drafts, sheets still with the head, and cancelled sheets out', functi
         ->and(app(Report::class)->requisitionNosLabel($rows))->toBe('OK/1');
 });
 
-it('names the included sheets in the header, first five then "and N more", and Section ALL', function () {
+it('lists the source sheets on the screen only, first five then "and N more"', function () {
     $cutting = fbSection('Cutting');
     $tee = fbItem('MS Tee-2/1', 'Electrical');
 
@@ -389,14 +389,12 @@ it('names the included sheets in the header, first five then "and N more", and S
     $this->actingAs(fbUser('store'))
         ->get(route('store.stock.requisitions.report', ['month' => '2026-09']))
         ->assertOk()
-        ->assertSee('CUT/01, CUT/02, CUT/03, CUT/04, CUT/05 and 2 more')
-        ->assertSee('Section:</span> ALL', false);
+        ->assertSee('From: CUT/01, CUT/02, CUT/03, CUT/04, CUT/05 and 2 more');
 
-    // Section-wise: the section's own name.
-    $this->actingAs(fbUser('store'))
-        ->get(route('store.stock.requisitions.report', ['month' => '2026-09', 'view' => 'section']))
-        ->assertOk()
-        ->assertSee('Section:</span> Cutting', false);
+    // Never in the printed header.
+    $file = $this->get(route('store.stock.requisitions.report.excel', ['month' => '2026-09']))->baseResponse->getFile()->getPathname();
+    $text = collect(IOFactory::load($file)->getSheetByName('ALL')->toArray(null, false, false))->flatten()->filter()->implode("\n");
+    expect($text)->not->toContain('CUT/01');
 });
 
 it('exports ALL plus one tab per category, and one tab per section Section-wise', function () {

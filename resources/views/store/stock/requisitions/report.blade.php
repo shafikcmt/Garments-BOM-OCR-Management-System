@@ -88,33 +88,29 @@
     <div class="card gx-stock-card">
         <div class="gx-stock-card-body">
 
-            <form method="GET" class="row g-3 gx-stock-filter mb-4">
-                <div class="col-6 col-md-3 col-xl-2">
-                    <label class="form-label" for="month">Month</label>
-                    <input type="month" name="month" id="month" value="{{ $month }}" class="form-control">
-                </div>
-                <div class="col-6 col-md-3 col-xl-2">
-                    <label class="form-label" for="reportView">View</label>
-                    <select name="view" id="reportView" class="form-select">
+            {{-- The switch (All | By Category | By Section) and the Month, both
+                 kept in the URL. The switch is links, so it works without
+                 script; the Month form carries the switch along. --}}
+            <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+                <div>
+                    <div class="form-label mb-1">Show</div>
+                    <div class="btn-group gx-report-switch" role="group" aria-label="Report view">
                         @foreach($viewLabels as $value => $label)
-                            <option value="{{ $value }}" @selected($view === $value)>{{ $label }}</option>
+                            <a href="{{ route('store.stock.requisitions.report', ['month' => $month, 'view' => $value]) }}"
+                               @class(['btn btn-sm', 'btn-primary' => $view === $value, 'btn-outline-primary' => $view !== $value])
+                               @if($view === $value) aria-current="page" @endif>{{ $label }}</a>
                         @endforeach
-                    </select>
+                    </div>
                 </div>
-                <div class="col-12 col-md-3 col-xl-2 d-flex align-items-end">
-                    <button class="btn btn-primary w-100"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Show</button>
-                </div>
-            </form>
-
-            @if($rows->isNotEmpty())
-                <p class="small text-muted mb-3">
-                    <span class="fw-semibold text-slate-900">Requisition No:</span> {{ $headerRequisitionNos }}
-                    · <span class="fw-semibold text-slate-900">Section:</span> {{ $headerSection }}
-                    @if($isSectionView)
-                        <br>{{ \App\Services\MonthlyRequisitionReportService::SECTION_STOCK_NOTE }}
-                    @endif
-                </p>
-            @endif
+                <form method="GET" class="d-flex align-items-end gap-2 gx-stock-filter">
+                    <input type="hidden" name="view" value="{{ $view }}">
+                    <div>
+                        <label class="form-label mb-1" for="month">Month</label>
+                        <input type="month" name="month" id="month" value="{{ $month }}" class="form-control form-control-sm">
+                    </div>
+                    <button class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
+                </form>
+            </div>
 
             @if($rows->isEmpty())
                 <div class="gx-stock-empty">
@@ -123,25 +119,29 @@
                     <div class="gx-stock-empty-hint">Drafts are not counted — a requisition appears here once it is submitted.</div>
                 </div>
             @else
-                {{-- ALL, each category, or each section present this month. --}}
+                {{-- The tabs follow the switch: ALL; ALL + each category; or
+                     each section. The selected one is kept in the URL (?tab=). --}}
                 <ul class="nav nav-pills gx-report-tabs mb-3" role="tablist">
-                    @foreach($tabs as $name => $tabRows)
+                    @foreach($tabs as $name => $tab)
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link {{ $loop->first ? 'active' : '' }}" data-bs-toggle="pill"
-                                    data-bs-target="#tab-{{ md5((string) $name) }}" type="button" role="tab">
+                            <button @class(['nav-link', 'active' => $tab['slug'] === $activeTab]) data-bs-toggle="pill"
+                                    data-bs-target="#tab-{{ $tab['slug'] }}" data-report-tab="{{ $tab['slug'] }}" type="button" role="tab"
+                                    aria-selected="{{ $tab['slug'] === $activeTab ? 'true' : 'false' }}">
                                 {{ $name }}
-                                <span class="badge">{{ $tabRows->count() }}</span>
+                                <span class="badge">{{ $tab['rows']->count() }}</span>
                             </button>
                         </li>
                     @endforeach
                 </ul>
 
                 <div class="tab-content">
-                    @foreach($tabs as $name => $tabRows)
-                        <div class="tab-pane fade {{ $loop->first ? 'show active' : '' }}" id="tab-{{ md5((string) $name) }}" role="tabpanel">
+                    @foreach($tabs as $name => $tab)
+                        @php($tabRows = $tab['rows'])
+                        @php($header = $tab['header'])
+                        <div @class(['tab-pane fade', 'show active' => $tab['slug'] === $activeTab]) id="tab-{{ $tab['slug'] }}" role="tabpanel">
                             @php($sectionTotal = $tabRows->sum('amount'))
 
-                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
                                 <h6 class="gx-stock-subhead mb-0">{{ $name }}</h6>
                                 <span class="text-muted small">
                                     {{ $tabRows->count() }} item(s) ·
@@ -149,6 +149,18 @@
                                     Total <strong class="text-slate-900">{{ $money($sectionTotal) }}</strong>
                                 </span>
                             </div>
+                            {{-- What the printed header says, and — on the screen
+                                 only — the sheets the tab was built from. --}}
+                            <p class="small text-muted mb-2 gx-report-meta">
+                                <span class="fw-semibold text-slate-900">{{ $header['requisition_no'] }}</span>
+                                · Section: {{ $header['section'] ?: '—' }}
+                                · Name of User: {{ $header['user_name'] ?: '—' }}
+                                · Contact: {{ $header['contact'] ?: '—' }}
+                                <br>From: {{ $tab['sources'] }}
+                                @if($tab['type'] === \App\Services\MonthlyRequisitionReportService::TAB_SECTION)
+                                    <br>{{ \App\Services\MonthlyRequisitionReportService::SECTION_STOCK_NOTE }}
+                                @endif
+                            </p>
 
                             <div class="gx-line-scroll">
                                 <table class="table align-middle mb-0 gx-line-table">
@@ -234,7 +246,22 @@
 
     @include('store.stock._searchable')
 
+    {{-- Keep the selected tab in the URL, so a reload or a shared link opens it. --}}
+    <script>
+        document.querySelectorAll('[data-report-tab]').forEach(function (button) {
+            button.addEventListener('shown.bs.tab', function () {
+                try {
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('tab', button.dataset.reportTab);
+                    window.history.replaceState(null, '', url);
+                } catch (e) { /* an old browser keeps the tab without the URL */ }
+            });
+        });
+    </script>
+
     <style>
+        .gx-report-switch .btn { font-weight: 700; font-size: .78rem; padding: .3rem .9rem; }
+        .gx-report-meta { line-height: 1.5; }
         .gx-line-scroll { overflow-x: auto; }
         .gx-line-table { border-collapse: separate; border-spacing: 0; min-width: 2100px !important; }
 

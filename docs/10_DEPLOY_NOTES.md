@@ -155,3 +155,25 @@ Applies to the Monthly Requisition report now and to the Step 4 merge.
   approved" mark) and is left out of the Monthly report.
 - Section 6's "a test per report" for cancelled sheets is done (Stock
   Summary, Requirement vs Issue, Monthly report).
+
+## 9. Monthly report header and tabs (owner, 2026-09-29)
+
+- Screen: a switch "All | By Category | By Section" and a tab strip that
+  follows it (All → ALL; By Category → ALL + each category; By Section →
+  each section), both kept in the URL (`view=`, `tab=`) with the Month.
+  Excel and PDF follow the switch: ALL + category tabs, or one per section.
+- Printed header per tab — Requisition No is the report's own number, never
+  the source sheets (those show on the screen only):
+  - ALL and category tabs: `HAPL/Dept./ALL/<Year>/<Month>/01`, Section ALL,
+    Name of User ALL, Contact = the Contact Person setting; the FINAL sheet's
+    signature boxes.
+  - Section tabs: `HAPL/Dept./<SECTION>/<Year>/<Month>/01`, the section, its
+    head (section head on Admin > Departments, else the department head,
+    else the user on the department sheet's head box) with phone / email
+    from that user's profile, "—" when empty; the DEPARTMENT sheet's boxes.
+- Signature boxes come from Admin > Requisition Signatures. As on the single
+  sheet before anyone signs, each box prints the configured person's name
+  and designation; the signature and date are left for the pen.
+- The printed header's right side is the Store Personnel box only (name,
+  designation, department, email) on PDF and Excel alike; the tab's total is
+  on its Total- row. The screen still shows item counts and totals.

@@ -32,12 +32,12 @@ class MonthlyRequisitionReportSheet implements FromView, WithEvents, WithTitle
 
     /**
      * @param  array<string, mixed>  $data  payload from MonthlyRequisitionReportController
-     * @param  Collection<int, array<string, mixed>>  $rows  the lines this sheet prints
+     * @param  array{type: string, rows: Collection, header?: array}  $tab  the tab this sheet prints
      */
     public function __construct(
         private readonly array $data,
         private readonly string $sheet,
-        private readonly Collection $rows,
+        private readonly array $tab,
     ) {
     }
 
@@ -47,7 +47,7 @@ class MonthlyRequisitionReportSheet implements FromView, WithEvents, WithTitle
             'forExcel' => true,
             // One sheet prints one section, so the blade is handed just that
             // section rather than deciding for itself what to draw.
-            'sections' => [$this->sheet => $this->rows],
+            'tabs' => [$this->sheet => $this->tab],
         ]));
     }
 

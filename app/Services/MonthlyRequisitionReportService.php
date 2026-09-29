@@ -52,10 +52,136 @@ class MonthlyRequisitionReportService
     public static function viewLabels(): array
     {
         return [
-            self::VIEW_ALL => 'All (merged)',
-            self::VIEW_SECTION => 'Section-wise',
-            self::VIEW_CATEGORY => 'Category-wise',
+            self::VIEW_ALL => 'All',
+            self::VIEW_CATEGORY => 'By Category',
+            self::VIEW_SECTION => 'By Section',
         ];
+    }
+
+    /** A tab's kind, which decides its header and signature boxes. */
+    public const TAB_ALL = 'all';
+
+    public const TAB_CATEGORY = 'category';
+
+    public const TAB_SECTION = 'section';
+
+    /**
+     * The tabs the switch shows, in order, each with its kind and rows:
+     *   All         → ALL
+     *   By Category → ALL + one per category
+     *   By Section  → one per section
+     *
+     * @return Collection<string, array{type: string, rows: Collection}>
+     */
+    public function tabs(Carbon $monthStart, string $view): Collection
+    {
+        if ($view === self::VIEW_SECTION) {
+            return $this->bySection($this->rows($monthStart, [], self::VIEW_SECTION))
+                ->map(fn (Collection $rows) => ['type' => self::TAB_SECTION, 'rows' => $rows]);
+        }
+
+        $all = $this->rows($monthStart);
+        $tabs = collect(['ALL' => ['type' => self::TAB_ALL, 'rows' => $all]]);
+
+        if ($view === self::VIEW_CATEGORY) {
+            foreach ($this->byCategory($all) as $category => $rows) {
+                $tabs->put((string) $category, ['type' => self::TAB_CATEGORY, 'rows' => $rows]);
+            }
+        }
+
+        return $tabs;
+    }
+
+    /**
+     * The tabs a download carries: ALL + one per category for All and By
+     * Category, one per section for By Section.
+     *
+     * @return Collection<string, array{type: string, rows: Collection}>
+     */
+    public function exportTabs(Carbon $monthStart, string $view): Collection
+    {
+        return $this->tabs($monthStart, $view === self::VIEW_SECTION ? self::VIEW_SECTION : self::VIEW_CATEGORY);
+    }
+
+    /**
+     * What a tab's printed header and footer carry (owner, 2026-09-29):
+     *
+     *   ALL / category tab: Requisition No HAPL/Dept./ALL/<Year>/<Month>/01,
+     *     Section ALL, Name of User ALL, Contact = the Contact Person setting,
+     *     the FINAL sheet's signature boxes.
+     *   Section tab: HAPL/Dept./<SECTION>/<Year>/<Month>/01, the section's
+     *     name, its head (section head, else department head, else the
+     *     person on the department sheet's head box) with name, designation,
+     *     phone and email from the head's profile, and the DEPARTMENT sheet's
+     *     signature boxes.
+     *
+     * Empty values stay null; the templates print "—".
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array{type: string, requisition_no: string, section: string, user_name: ?string, designation: ?string, contact: ?string, signatures: array}
+     */
+    public function tabHeader(string $type, string $name, Collection $rows, Carbon $monthStart): array
+    {
+        $period = $monthStart->format('Y').'/'.$monthStart->format('F');
+        $number = fn (string $token) => PurchaseRequisitionNumberGenerator::PREFIX.'/Dept./'.$token.'/'.$period.'/01';
+        $signatures = app(RequisitionSignatureResolver::class);
+
+        if ($type === self::TAB_SECTION) {
+            $head = $this->sectionHead($this->sectionFor($name, $rows));
+
+            return [
+                'type' => $type,
+                'requisition_no' => $number(mb_strtoupper($name)),
+                'section' => $name,
+                'user_name' => $head?->name ?: null,
+                'designation' => trim((string) $head?->designation) ?: null,
+                'contact' => RequisitionHeaderResolver::contactOf($head),
+                'signatures' => $signatures->forLevel(\App\Models\RequisitionSignatureBlock::LEVEL_DEPARTMENT, $head),
+            ];
+        }
+
+        return [
+            'type' => $type,
+            'requisition_no' => $number('ALL'),
+            'section' => 'ALL',
+            'user_name' => 'ALL',
+            'designation' => null,
+            'contact' => RequisitionHeaderResolver::contactPersonContact(),
+            'signatures' => $signatures->forLevel(\App\Models\RequisitionSignatureBlock::LEVEL_FINAL),
+        ];
+    }
+
+    /** The section a Section-wise tab stands for: by the rows' section id, else by name. */
+    private function sectionFor(string $name, Collection $rows): ?\App\Models\IndentSection
+    {
+        $id = $rows->pluck('section_id')->filter()->first();
+
+        return ($id ? \App\Models\IndentSection::find($id) : null)
+            // LOWER() is the same on MySQL, PostgreSQL and SQLite.
+            ?? \App\Models\IndentSection::query()->whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->first();
+    }
+
+    /**
+     * Who a section tab names: the section head (Admin > Departments), else
+     * the department head, else the specific user on the department sheet's
+     * head box (Admin > Requisition Signatures).
+     */
+    private function sectionHead(?\App\Models\IndentSection $section): ?\App\Models\User
+    {
+        $head = $section?->head
+            ?? \App\Models\RequisitionDepartmentHead::headOf($section?->department_key);
+
+        if ($head) {
+            return $head;
+        }
+
+        $box = \App\Models\RequisitionSignatureBlock::query()
+            ->forLevel(\App\Models\RequisitionSignatureBlock::LEVEL_DEPARTMENT)
+            ->where('assignee_type', \App\Models\RequisitionSignatureBlock::ASSIGNEE_USER)
+            ->where('stamp_source', \App\Models\RequisitionSignatureBlock::STAMP_DEPARTMENT_HEAD)
+            ->with('user')->first();
+
+        return $box?->user;
     }
 
     public function __construct(private readonly PurchaseRequisitionService $requisitions)
@@ -323,6 +449,7 @@ class MonthlyRequisitionReportService
             // The Section-wise key: the sheet's section, else — a final sheet
             // has none — the line's own User Dept.
             'section' => trim((string) (optional($requisition?->indentSection)->name ?: $line->user_dept)) ?: 'No Section',
+            'section_id' => $requisition?->indent_section_id,
             'line_count' => 1,
         ];
     }

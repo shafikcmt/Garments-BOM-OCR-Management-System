@@ -2,18 +2,18 @@
 
 namespace App\Exports;
 
-use App\Services\MonthlyRequisitionReportService;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 /**
  * Excel export for the monthly Purchase Requisition report.
  *
- * Reproduces the company's "Month_Of_<Month>.xlsx" workbook: an "ALL" sheet
- * carrying one row per item for the month, then one sheet per category
- * carrying the same rows grouped. The Section-wise export is one sheet per
- * section instead. Only categories/sections that actually have rows get a
- * sheet, so the workbook never opens on a row of empty tabs.
+ * Reproduces the company's "Month_Of_<Month>.xlsx" workbook, following the
+ * screen's switch: All / By Category → an "ALL" sheet with one row per item,
+ * then one sheet per category; By Section → one sheet per section. Only
+ * categories/sections that actually have rows get a sheet, so the workbook
+ * never opens on a row of empty tabs. Each sheet prints its own header and
+ * signature boxes (MonthlyRequisitionReportService::tabHeader()).
  */
 class MonthlyRequisitionReportExport implements WithMultipleSheets
 {
@@ -27,20 +27,10 @@ class MonthlyRequisitionReportExport implements WithMultipleSheets
     /** @return list<MonthlyRequisitionReportSheet> */
     public function sheets(): array
     {
-        // The controller decides the tabs: ALL + one per category, or — the
-        // Section-wise export — one per section.
-        $tabs = $this->data['sheets'] ?? collect(['ALL' => $this->data['rows']])->union($this->data['byCategory']);
-        $sectionWise = ($this->data['view'] ?? null) === MonthlyRequisitionReportService::VIEW_SECTION;
-        $report = app(MonthlyRequisitionReportService::class);
         $sheets = [];
 
-        foreach ($tabs as $name => $rows) {
-            $sheets[] = new MonthlyRequisitionReportSheet(array_merge($this->data, [
-                // Each tab's header names its own sheets, and its section —
-                // never its category.
-                'headerRequisitionNos' => $report->requisitionNosLabel($rows),
-                'headerSection' => $sectionWise ? (string) $name : 'ALL',
-            ]), (string) $name, $rows);
+        foreach ($this->data['sheets'] as $name => $tab) {
+            $sheets[] = new MonthlyRequisitionReportSheet($this->data, (string) $name, $tab);
         }
 
         return $sheets;

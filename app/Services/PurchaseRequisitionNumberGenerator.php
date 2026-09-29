@@ -29,7 +29,7 @@ class PurchaseRequisitionNumberGenerator
     private const WIDTH = 2;
 
     /** Company prefix, matching the reference workbook. */
-    private const PREFIX = 'HAPL';
+    public const PREFIX = 'HAPL';
 
     /** Used when no section is chosen, mirroring the workbook's "ALL" sheet. */
     private const NO_SECTION = 'ALL';

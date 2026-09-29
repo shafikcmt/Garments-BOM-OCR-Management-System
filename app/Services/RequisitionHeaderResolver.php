@@ -143,8 +143,17 @@ class RequisitionHeaderResolver
         ];
     }
 
+    /**
+     * The Contact Person setting's phone / email — what a final sheet and the
+     * monthly report's ALL and category tabs print. Null when unset.
+     */
+    public static function contactPersonContact(): ?string
+    {
+        return self::contactOf(self::userSetting(self::SETTING_CONTACT_PERSON));
+    }
+
     /** "01711-000000 / name@…", either half alone, or null. */
-    private static function contactOf(?User $user): ?string
+    public static function contactOf(?User $user): ?string
     {
         if (! $user) {
             return null;
