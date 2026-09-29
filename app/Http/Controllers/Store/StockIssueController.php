@@ -165,6 +165,7 @@ class StockIssueController extends Controller
             'categories' => ItemCategory::selectable()->get(['id', 'name']),
             'requisitionTypes' => StockIssue::REQUISITION_TYPES,
             'filters' => $filters,
+            'monthOptions' => $this->monthOptions($filters['month'] ?? null),
             'canEdit' => $canEdit,
             'canDelete' => $canDelete,
             // This user's own half-finished forms. Nothing here touches stock —
@@ -193,10 +194,13 @@ class StockIssueController extends Controller
             'issue_date' => ['required', 'date'],
             // The four masters accept either an existing id or "new:<name>",
             // so they are validated as free strings and resolved below.
-            'indent_section_id' => ['nullable', 'string', 'max:160'],
-            'indent_person_id' => ['nullable', 'string', 'max:160'],
-            'issue_approver_id' => ['nullable', 'string', 'max:160'],
-            'requisition_no' => ['nullable', 'string', 'max:100'],
+            // Section, Person, Approved By and the Requisition Number are
+            // required on a recorded issue (owner, 2026-09-29); a draft may
+            // leave them empty — saveDraft() does not come through here.
+            'indent_section_id' => ['required', 'string', 'max:160'],
+            'indent_person_id' => ['required', 'string', 'max:160'],
+            'issue_approver_id' => ['required', 'string', 'max:160'],
+            'requisition_no' => ['required', 'string', 'max:100'],
 
             'items' => ['required', 'array', 'min:1'],
             'items.*.stock_item_id' => ['required', 'exists:stock_items,id'],
@@ -206,12 +210,17 @@ class StockIssueController extends Controller
             // replace a worn part on one line and hand out a new one on the
             // next. Constrained to the two known values so a hand-crafted post
             // cannot put free text into a column the reports filter on.
-            'items.*.requisition_type' => ['nullable', Rule::in(StockIssue::REQUISITION_TYPES)],
+            'items.*.requisition_type' => ['required', Rule::in(StockIssue::REQUISITION_TYPES)],
             'items.*.remarks' => ['nullable', 'string', 'max:1000'],
-        ], [
+        ], self::requiredMessages() + [
             'items.required' => 'Add at least one item to issue.',
             'items.min' => 'Add at least one item to issue.',
+            'items.*.requisition_type.required' => 'Select the type (New or Replace).',
         ], $this->lineAttributes($request));
+
+        // The same item on one requisition only with a different remark —
+        // within this form and against issues already recorded.
+        $this->assertNoRepeatedLines($data['items'], $data['requisition_no']);
 
         // Header masters resolved once, not once per line.
         $header = [];
@@ -594,6 +603,108 @@ class StockIssueController extends Controller
     }
 
     /**
+     * The Month filter's list: the last 24 months, newest first, plus the
+     * selected one if it is older — the same list the requisition page shows.
+     *
+     * @return array<string, string> "2026-09" => "September 2026"
+     */
+    private function monthOptions(?string $selected): array
+    {
+        $options = [];
+        $month = now()->startOfMonth();
+
+        for ($i = 0; $i < 24; $i++) {
+            $options[$month->format('Y-m')] = $month->format('F Y');
+            $month = $month->copy()->subMonth();
+        }
+
+        if ($selected && ! isset($options[$selected])) {
+            $options[$selected] = \Illuminate\Support\Carbon::createFromFormat('!Y-m', $selected)->format('F Y');
+        }
+
+        return $options;
+    }
+
+    /**
+     * The header messages a recorded issue shows when a required field is
+     * empty — create and edit alike.
+     *
+     * @return array<string, string>
+     */
+    private static function requiredMessages(): array
+    {
+        return [
+            'indent_section_id.required' => 'Select or type the Indent Section.',
+            'indent_person_id.required' => 'Select or type the Indent Person.',
+            'issue_approver_id.required' => 'Select or type who approved the issue.',
+            'requisition_no.required' => 'Enter the Requisition Number.',
+            'requisition_type.required' => 'Select the type (New or Replace).',
+        ];
+    }
+
+    /** Compared trimmed, spaces collapsed, case-insensitive. */
+    private static function normalized(?string $value): string
+    {
+        return mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', (string) $value)));
+    }
+
+    /**
+     * The same item may appear more than once on one requisition number only
+     * when the remarks differ (one requisition, different purposes). Same
+     * remarks — or both empty — are refused, on the line, whether the twin is
+     * another line of this form or an issue already recorded under that
+     * number. $excluding is the issue being edited, which is never its own
+     * twin.
+     *
+     * Old records are not touched; the rule applies when one is edited.
+     *
+     * @param  array<int|string, array<string, mixed>>  $lines
+     * @param  callable(int|string): string|null  $errorKey  where a repeat is reported
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    private function assertNoRepeatedLines(array $lines, ?string $requisitionNo, ?StockIssue $excluding = null, ?callable $errorKey = null): void
+    {
+        $number = self::normalized($requisitionNo);
+
+        if ($number === '') {
+            return;
+        }
+
+        $errorKey ??= fn ($index) => 'items.'.$index.'.remarks';
+        $message = 'This item is already on requisition '.trim((string) $requisitionNo)
+            .' with the same remark. Use a different remark to issue it again.';
+
+        // Already recorded under this number, for these items. LOWER/TRIM
+        // read the same on MySQL, PostgreSQL and SQLite.
+        $itemIds = array_values(array_unique(array_map(fn ($line) => (int) $line['stock_item_id'], $lines)));
+        $taken = StockIssue::query()
+            ->whereIn('stock_item_id', $itemIds)
+            ->whereRaw('LOWER(TRIM(requisition_no)) = ?', [$number])
+            ->when($excluding, fn ($q) => $q->whereKeyNot($excluding->getKey()))
+            ->get(['stock_item_id', 'remarks'])
+            ->mapWithKeys(fn ($issue) => [$issue->stock_item_id.'|'.self::normalized($issue->remarks) => true])
+            ->all();
+
+        $errors = [];
+
+        foreach ($lines as $index => $line) {
+            $key = (int) $line['stock_item_id'].'|'.self::normalized($line['remarks'] ?? null);
+
+            // Recorded already, or an earlier line of this form: this line repeats it.
+            if (isset($taken[$key])) {
+                $errors[$errorKey($index)] = $message;
+            }
+
+            $taken[$key] = true;
+        }
+
+        if ($errors) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
      * Validation attribute names that point at a line number, so an error reads
      * "The item on line 3 field is required" instead of naming items.2.
      *
@@ -691,19 +802,30 @@ class StockIssueController extends Controller
             // creates it on the way through; a correction is not the place to
             // introduce a new Section or Approver, and Issue Setup is one click
             // away for that.
-            'indent_section_id' => ['nullable', 'exists:indent_sections,id'],
-            'indent_person_id' => ['nullable', 'exists:indent_persons,id'],
-            'issue_approver_id' => ['nullable', 'exists:issue_approvers,id'],
+            // Required on an edit as on a new issue (owner, 2026-09-29): an
+            // old record with them empty is filled in when it is next edited.
+            'indent_section_id' => ['required', 'exists:indent_sections,id'],
+            'indent_person_id' => ['required', 'exists:indent_persons,id'],
+            'issue_approver_id' => ['required', 'exists:issue_approvers,id'],
             'item_category_id' => ['nullable', 'exists:item_categories,id'],
-            'requisition_no' => ['nullable', 'string', 'max:100'],
-            'requisition_type' => ['nullable', Rule::in(StockIssue::REQUISITION_TYPES)],
+            'requisition_no' => ['required', 'string', 'max:100'],
+            'requisition_type' => ['required', Rule::in(StockIssue::REQUISITION_TYPES)],
             'remarks' => ['nullable', 'string', 'max:1000'],
-        ], [], [
+        ], self::requiredMessages(), [
             'qty' => 'issued qty',
             'indent_section_id' => 'indent section',
             'indent_person_id' => 'indent person',
             'issue_approver_id' => 'approved by',
         ]);
+
+        // The same item + requisition number + remark as another recorded
+        // issue is refused; this record is not its own twin.
+        $this->assertNoRepeatedLines(
+            [['stock_item_id' => $stockIssue->stock_item_id, 'remarks' => $data['remarks'] ?? null]],
+            $data['requisition_no'],
+            $stockIssue,
+            fn () => 'remarks'
+        );
 
         DB::transaction(function () use ($data, $stockIssue) {
             // Checked against the item this issue is already against, since the

@@ -23,6 +23,7 @@
                 'qty' => $errors->first('items.'.$index.'.qty'),
                 'category' => $errors->first('items.'.$index.'.item_category_id'),
                 'type' => $errors->first('items.'.$index.'.requisition_type'),
+                'remarks' => $errors->first('items.'.$index.'.remarks'),
             ]),
         ])
         ->values();
@@ -233,7 +234,12 @@
                              line is still saved as its own issue record carrying a
                              copy of this header, so the history table and the
                              consumption report are unchanged. --}}
-                        <form method="POST" action="{{ route('store.stock.issues.store') }}" id="issueForm">
+                        {{-- novalidate: the browser's own check cannot report a
+                             field TomSelect has hidden (the real item select), so
+                             it refused the submit silently — no request, no
+                             message. The script below checks the lines and says
+                             what is missing; the server validates everything. --}}
+                        <form method="POST" action="{{ route('store.stock.issues.store') }}" id="issueForm" novalidate>
                             @csrf
                             {{-- Which draft this form came from, so saving again
                                  updates it instead of leaving a second copy, and
@@ -251,8 +257,8 @@
                                     <input type="text" id="monthLabel" class="form-control gx-stock-readonly" readonly tabindex="-1">
                                 </div>
                                 <div class="col-12 col-md-6 col-xl-2">
-                                    <label class="form-label">Indent Section</label>
-                                    <select name="indent_section_id" class="form-select js-creatable">
+                                    <label class="form-label" for="issueSection">Indent Section <span class="text-danger">*</span></label>
+                                    <select name="indent_section_id" id="issueSection" class="form-select js-creatable @error('indent_section_id') is-invalid @enderror" aria-required="true">
                                         <option value="">Select or type…</option>
                                         @if($typed = $typedOption(old('indent_section_id')))
                                             <option value="{{ $typed['value'] }}" selected>{{ $typed['label'] }}</option>
@@ -261,10 +267,11 @@
                                             <option value="{{ $s->id }}" @selected(old('indent_section_id') == $s->id)>{{ $s->name }}</option>
                                         @endforeach
                                     </select>
+                                    @error('indent_section_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                                 </div>
                                 <div class="col-12 col-md-6 col-xl-2">
-                                    <label class="form-label">Indent Person</label>
-                                    <select name="indent_person_id" class="form-select js-creatable">
+                                    <label class="form-label" for="issuePerson">Indent Person <span class="text-danger">*</span></label>
+                                    <select name="indent_person_id" id="issuePerson" class="form-select js-creatable @error('indent_person_id') is-invalid @enderror" aria-required="true">
                                         <option value="">Select or type…</option>
                                         @if($typed = $typedOption(old('indent_person_id')))
                                             <option value="{{ $typed['value'] }}" selected>{{ $typed['label'] }}</option>
@@ -273,10 +280,11 @@
                                             <option value="{{ $p->id }}" @selected(old('indent_person_id') == $p->id)>{{ $p->name }}</option>
                                         @endforeach
                                     </select>
+                                    @error('indent_person_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                                 </div>
                                 <div class="col-12 col-md-6 col-xl-2">
-                                    <label class="form-label">Approved By</label>
-                                    <select name="issue_approver_id" class="form-select js-creatable">
+                                    <label class="form-label" for="issueApprover">Approved By <span class="text-danger">*</span></label>
+                                    <select name="issue_approver_id" id="issueApprover" class="form-select js-creatable @error('issue_approver_id') is-invalid @enderror" aria-required="true">
                                         <option value="">Select or type…</option>
                                         @if($typed = $typedOption(old('issue_approver_id')))
                                             <option value="{{ $typed['value'] }}" selected>{{ $typed['label'] }}</option>
@@ -285,14 +293,16 @@
                                             <option value="{{ $a->id }}" @selected(old('issue_approver_id') == $a->id)>{{ $a->name }}</option>
                                         @endforeach
                                     </select>
+                                    @error('issue_approver_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                                 </div>
                                 {{-- Type is NOT here. New / Replace is decided per
                                      item — one requisition can replace a worn part
                                      and issue a new one on the next line — so it
                                      lives in the Items table below. --}}
                                 <div class="col-6 col-md-3 col-xl-3">
-                                    <label class="form-label">Requisition Number</label>
-                                    <input name="requisition_no" value="{{ old('requisition_no') }}" class="form-control" maxlength="100">
+                                    <label class="form-label" for="issueRequisitionNo">Requisition Number <span class="text-danger">*</span></label>
+                                    <input name="requisition_no" id="issueRequisitionNo" value="{{ old('requisition_no') }}" class="form-control @error('requisition_no') is-invalid @enderror" maxlength="100" aria-required="true">
+                                    @error('requisition_no')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                                 </div>
                             </div>
 
@@ -369,7 +379,7 @@
                                                  open — this keeps it on the row. --}}
                                             <th style="min-width:140px;">Brand/Specification <span class="gx-stock-auto">auto</span></th>
                                             <th>Issued Qty <span class="text-danger">*</span></th>
-                                            <th>Type</th>
+                                            <th>Type <span class="text-danger">*</span></th>
                                             <th>Remarks</th>
                                             <th class="text-end gx-stock-actions">Action</th>
                                         </tr>
@@ -425,7 +435,10 @@
                             <tr class="issue-line">
                                 <td class="text-center js-line-number gx-line-no"></td>
                                 <td>
-                                    <select class="form-select form-select-sm js-line-item" name="items[__INDEX__][stock_item_id]" required
+                                    {{-- No `required`: TomSelect hides this select, and a
+                                         hidden required field blocks the submit with no
+                                         message. The script and the server check it. --}}
+                                    <select class="form-select form-select-sm js-line-item" name="items[__INDEX__][stock_item_id]" aria-required="true"
                                             data-status-url="{{ route('store.stock.issues.item-status', ['stockItem' => '__ID__']) }}">
                                         <option value="">Select item…</option>
                                         @foreach($items as $it)
@@ -628,7 +641,14 @@
                           class="row g-3 gx-stock-filter mb-4" data-list-filters>
                         <div class="col-6 col-md-3">
                             <label class="form-label" for="issueFilterMonth">Month</label>
-                            <input type="month" id="issueFilterMonth" name="month" value="{{ $filters['month'] ?? '' }}" class="form-control">
+                            {{-- A list, as on the requisition page: an empty
+                                 <input type="month"> reads "--------- ----". --}}
+                            <select id="issueFilterMonth" name="month" class="form-select">
+                                <option value="">All months</option>
+                                @foreach($monthOptions as $value => $label)
+                                    <option value="{{ $value }}" @selected(($filters['month'] ?? '') === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
                         </div>
                         {{-- Search takes the room the row has left rather than
                              stopping at a third of it and stranding the rest. --}}
@@ -1061,7 +1081,12 @@
                     if (values.stock_item_id) { setSelectValue(item, values.stock_item_id); }
 
                     row.querySelector('.js-line-qty').value = values.qty || '';
-                    row.querySelector('.js-line-type').value = values.requisition_type || '';
+                    // A restored line keeps what was posted (empty included, so
+                    // its error shows); a line from Add Multiple Items has no
+                    // type yet and starts at New, as a new line does.
+                    row.querySelector('.js-line-type').value = values.requisition_type !== undefined
+                        ? (values.requisition_type || '')
+                        : 'New';
                     row.querySelector('input[name$="[remarks]"]').value = values.remarks || '';
 
                     var errors = values.errors || {};
@@ -1069,10 +1094,13 @@
                     markInvalid(row.querySelector('.js-line-qty'), errors.qty);
                     markInvalid(category, errors.category);
                     markInvalid(row.querySelector('.js-line-type'), errors.type);
+                    markInvalid(row.querySelector('.js-line-remarks'), errors.remarks);
 
                     loadStatus(row);
                 } else {
                     applyCategoryFilter(row);
+                    // A new line starts at New.
+                    row.querySelector('.js-line-type').value = 'New';
                 }
 
                 renumber();
@@ -1205,25 +1233,195 @@
              * StockIssueController::assertWithinStock is what actually refuses
              * the write, and it re-reads the position at the moment of saving.
              */
-            form.addEventListener('submit', function (event) {
-                var short = shortLines();
+            /**
+             * Point every hidden item <select> at the item its TomSelect shows.
+             * The two can drift apart (the category filter rebuilds the
+             * options), and the hidden select is what posts: a line showing an
+             * item must never post none.
+             */
+            function syncItemSelects() {
+                rows().forEach(function (row) {
+                    var select = row.querySelector('.js-line-item');
+                    var shown = itemValue(row);
+                    if (!select.tomselect || !shown || select.value === shown) { return; }
 
+                    var option = Array.prototype.find.call(select.options, function (o) { return o.value === shown; });
+                    if (!option) {
+                        option = document.createElement('option');
+                        option.value = shown;
+                        option.textContent = (itemInfo(shown) || {}).text || shown;
+                        select.appendChild(option);
+                    }
+                    option.disabled = false;
+                    select.value = shown;
+                });
+            }
+
+            /**
+             * What stops "Record Issue", from plain data — no DOM, so the same
+             * function can be run outside a browser. Returns one message per
+             * problem, each naming its line; an empty list means submit.
+             *
+             * The same rules the server applies (StockIssueController::store):
+             * the header fields, and per line item, qty and type; and the same
+             * item twice on this requisition only with different remarks
+             * (trimmed, spaces collapsed, case-insensitive). The server also
+             * checks issues already recorded, which this page cannot see.
+             *
+             * @param {string} issueDate
+             * @param {Array<{line:number, item:string, qty:string, type:string, remarks:string}>} lines
+             * @param {Object} header  section, person, approver, requisitionNo (strings)
+             */
+            window.gxIssueFormProblems = function (issueDate, lines, header) {
+                var problems = [];
+                var blank = function (v) { return !String(v || '').trim(); };
+                var norm = function (v) { return String(v || '').replace(/\s+/g, ' ').trim().toLowerCase(); };
+                header = header || {};
+
+                if (blank(issueDate)) {
+                    problems.push({ line: null, field: 'date', message: 'Enter the issue date.' });
+                }
+                if (blank(header.section)) {
+                    problems.push({ line: null, field: 'section', message: 'Select or type the Indent Section.' });
+                }
+                if (blank(header.person)) {
+                    problems.push({ line: null, field: 'person', message: 'Select or type the Indent Person.' });
+                }
+                if (blank(header.approver)) {
+                    problems.push({ line: null, field: 'approver', message: 'Select or type who approved the issue.' });
+                }
+                if (blank(header.requisitionNo)) {
+                    problems.push({ line: null, field: 'requisition_no', message: 'Enter the Requisition Number.' });
+                }
+
+                var seen = {};
+
+                lines.forEach(function (l) {
+                    if (blank(l.item)) {
+                        problems.push({ line: l.line, field: 'item', message: 'Select an item on line ' + l.line + '.' });
+                    }
+
+                    var qty = String(l.qty || '').trim();
+                    // The same shape the field's keystroke filter allows ("1", "1.", "0.5").
+                    if (!/^\d*\.?\d*$/.test(qty) || !(parseFloat(qty) > 0)) {
+                        problems.push({ line: l.line, field: 'qty', message: 'Enter the issued qty on line ' + l.line + ' (more than 0).' });
+                    }
+
+                    if (blank(l.type)) {
+                        problems.push({ line: l.line, field: 'type', message: 'Select the type (New or Replace) on line ' + l.line + '.' });
+                    }
+
+                    if (!blank(l.item) && !blank(header.requisitionNo)) {
+                        var key = String(l.item) + '|' + norm(l.remarks);
+                        if (seen[key]) {
+                            problems.push({
+                                line: l.line, field: 'remarks',
+                                message: 'Line ' + l.line + ': this item is already on requisition ' + String(header.requisitionNo).trim()
+                                    + ' (line ' + seen[key] + ') with the same remark. Use a different remark to issue it again.',
+                            });
+                        } else {
+                            seen[key] = l.line;
+                        }
+                    }
+                });
+
+                return problems;
+            };
+
+            /** A header field's value, through TomSelect when it is there. */
+            function fieldValue(el) {
+                if (!el) { return ''; }
+                return el.tomselect ? String(el.tomselect.getValue() || '') : String(el.value || '');
+            }
+
+            function clearLineErrors() {
+                form.querySelectorAll('.js-client-error').forEach(function (note) { note.remove(); });
+                form.querySelectorAll('.js-client-invalid').forEach(function (field) {
+                    field.classList.remove('is-invalid', 'js-client-invalid');
+                });
+            }
+
+            function markLineError(field, message) {
+                if (!field) { return; }
+                field.classList.add('is-invalid', 'js-client-invalid');
+
+                var note = document.createElement('div');
+                note.className = 'invalid-feedback d-block js-client-error';
+                note.style.fontSize = '.72rem';
+                note.textContent = message;
+                (field.tomselect ? field.tomselect.wrapper : field).insertAdjacentElement('afterend', note);
+            }
+
+            function showBlocker(heading, messages) {
+                blocker.innerHTML = '<strong class="d-block mb-1">' + heading + '</strong>'
+                    + messages.map(function (m) {
+                        return '<span class="d-block">' + String(m).replace(/[<>&]/g, '') + '</span>';
+                    }).join('');
+                blocker.classList.remove('d-none');
+                blocker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            /**
+             * Record Issue: stop only with a message the user can see — at the
+             * top of the form and on the line — never silently. The stock
+             * check is a courtesy; StockIssueController::assertWithinStock is
+             * what refuses the write, re-reading stock at the moment of saving.
+             *
+             * Save Draft (formnovalidate) is never stopped: a draft exists
+             * because the form is unfinished, and it moves no stock.
+             */
+            form.addEventListener('submit', function (event) {
                 // Cleared unconditionally first, so a summary left from an
                 // earlier attempt cannot survive on top of a corrected form.
                 blocker.classList.add('d-none');
+                clearLineErrors();
+                syncItemSelects();
 
-                if (! short.length) { return; }
+                if (event.submitter && event.submitter.hasAttribute('formnovalidate')) { return; }
+
+                var all = rows();
+                var headerFields = {
+                    section: document.getElementById('issueSection'),
+                    person: document.getElementById('issuePerson'),
+                    approver: document.getElementById('issueApprover'),
+                    requisition_no: document.getElementById('issueRequisitionNo'),
+                };
+                var lineFields = { item: '.js-line-item', qty: '.js-line-qty', type: '.js-line-type', remarks: '.js-line-remarks' };
+
+                var problems = window.gxIssueFormProblems(date.value, all.map(function (row, i) {
+                    return {
+                        line: i + 1,
+                        item: itemValue(row),
+                        qty: row.querySelector('.js-line-qty').value,
+                        type: row.querySelector('.js-line-type').value,
+                        remarks: row.querySelector('.js-line-remarks').value,
+                    };
+                }), {
+                    section: fieldValue(headerFields.section),
+                    person: fieldValue(headerFields.person),
+                    approver: fieldValue(headerFields.approver),
+                    requisitionNo: fieldValue(headerFields.requisition_no),
+                });
+
+                if (problems.length) {
+                    event.preventDefault();
+                    problems.forEach(function (p) {
+                        var row = p.line ? all[p.line - 1] : null;
+                        var field = p.field === 'date' ? date
+                            : (headerFields[p.field] || (row && row.querySelector(lineFields[p.field])));
+                        markLineError(field, p.message);
+                    });
+                    showBlocker('Please complete the form before recording the issue.', problems.map(function (p) { return p.message; }));
+
+                    return;
+                }
+
+                var short = shortLines();
+                if (!short.length) { return; }
 
                 event.preventDefault();
                 renderAllAlerts();
-
-                blocker.innerHTML = '<strong class="d-block mb-1">Not enough stock to issue.</strong>'
-                    + short.map(function (m) {
-                        return '<span class="d-block">' + m.replace(/[<>&]/g, '') + '</span>';
-                    }).join('');
-                blocker.classList.remove('d-none');
-
-                blocker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showBlocker('Not enough stock to issue.', short);
             });
 
             // Cleared as soon as the user starts fixing the lines, so a stale

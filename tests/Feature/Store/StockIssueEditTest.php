@@ -79,6 +79,24 @@ function recordedIssue(StockItem $item, float $qty = 10): StockIssue
     ]);
 }
 
+/**
+ * A complete header for an edit: Section, Person, Approved By, Requisition
+ * Number and Type are required on an edit (2026-09-29). Spread FIRST into a
+ * payload, so a test's own keys still win.
+ *
+ * @return array<string, mixed>
+ */
+function issueEditHeader(): array
+{
+    return [
+        'indent_section_id' => IndentSection::firstOrCreate(['name' => 'Cutting'], ['is_active' => true])->id,
+        'indent_person_id' => IndentPerson::firstOrCreate(['name' => 'Md Robeul'], ['is_active' => true])->id,
+        'issue_approver_id' => \App\Models\IssueApprover::firstOrCreate(['name' => 'Store Head'], ['is_active' => true])->id,
+        'requisition_no' => 'REQ-1',
+        'requisition_type' => 'New',
+    ];
+}
+
 // --- Permission: gated exactly as Delete is ---------------------------------
 
 it('refuses an update from a user without the edit right', function () {
@@ -91,6 +109,7 @@ it('refuses an update from a user without the edit right', function () {
 
     $this->actingAs($viewer)
         ->put(route('store.stock.issues.update', $issue), [
+                ...issueEditHeader(),
             'issue_date' => $issue->issue_date->toDateString(),
             'qty' => 99,
         ])
@@ -109,8 +128,11 @@ it('accepts the section permission and the flat one alike', function () {
 
         $this->actingAs($user)
             ->put(route('store.stock.issues.update', $issue), [
+                ...issueEditHeader(),
                 'issue_date' => $issue->issue_date->toDateString(),
                 'qty' => 12,
+                // Two issues of one item on REQ-1: each needs its own remark.
+                'remarks' => 'edited under '.$permission,
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -171,6 +193,7 @@ it('lets an edit raise a quantity when the stock is genuinely there', function (
 
     $this->actingAs(issueEditor())
         ->put(route('store.stock.issues.update', $issue), [
+                ...issueEditHeader(),
             'issue_date' => $issue->issue_date->toDateString(),
             'qty' => 25,
         ])
@@ -195,6 +218,7 @@ it('discounts the row s own quantity, so a full re-issue of it is not refused', 
 
     $this->actingAs(issueEditor())
         ->put(route('store.stock.issues.update', $issue), [
+                ...issueEditHeader(),
             'issue_date' => $issue->issue_date->toDateString(),
             'qty' => 90,
         ])
@@ -222,6 +246,7 @@ it('refuses an edit that would take the item below zero', function () {
     $this->actingAs(issueEditor())
         ->from(route('store.stock.issues.index'))
         ->put(route('store.stock.issues.update', $issue), [
+                ...issueEditHeader(),
             'issue_date' => $issue->issue_date->toDateString(),
             'qty' => 16,
         ])
@@ -235,6 +260,7 @@ it('refuses an edit that would take the item below zero', function () {
     // And 15 exactly — the last affordable figure — still goes through.
     $this->actingAs(issueEditor())
         ->put(route('store.stock.issues.update', $issue), [
+                ...issueEditHeader(),
             'issue_date' => $issue->issue_date->toDateString(),
             'qty' => 15,
         ])
@@ -252,6 +278,7 @@ it('does not light up the Record Issue form s own warning when an edit is refuse
 
     $this->actingAs(issueEditor())
         ->put(route('store.stock.issues.update', $issue), [
+                ...issueEditHeader(),
             'issue_date' => $issue->issue_date->toDateString(),
             'qty' => 50,
         ])
@@ -296,6 +323,7 @@ it('ignores an attempt to move the issue to another item', function () {
 
     $this->actingAs(issueEditor())
         ->put(route('store.stock.issues.update', $issue), [
+                ...issueEditHeader(),
             'issue_date' => $issue->issue_date->toDateString(),
             'qty' => 10,
             // Not a field of this form. A hand-crafted request naming it must
@@ -322,6 +350,7 @@ it('updates the header fields and keeps the denormalised copies in step', functi
 
     $this->actingAs(issueEditor())
         ->put(route('store.stock.issues.update', $issue), [
+                ...issueEditHeader(),
             'issue_date' => '2026-08-09',
             'qty' => 10,
             'indent_section_id' => $section->id,
@@ -355,6 +384,7 @@ it('refuses an unknown master or a bad requisition type', function () {
 
     $this->actingAs(issueEditor())
         ->put(route('store.stock.issues.update', $issue), [
+                ...issueEditHeader(),
             'issue_date' => $issue->issue_date->toDateString(),
             'qty' => 10,
             'indent_section_id' => 9999,
@@ -378,6 +408,7 @@ it('edits one row of a requisition without touching its siblings', function () {
 
     $this->actingAs(issueEditor())
         ->put(route('store.stock.issues.update', $first), [
+                ...issueEditHeader(),
             'issue_date' => $header['issue_date'],
             'qty' => 9,
             'requisition_no' => 'REQ-7',

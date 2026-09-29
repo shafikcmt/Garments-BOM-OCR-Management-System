@@ -178,3 +178,22 @@ Applies to the Monthly Requisition report now and to the Step 4 merge.
 - The printed header's right side is the Store Personnel box only (name,
   designation, department, email) on PDF and Excel alike; the tab's total is
   on its Total- row. The screen still shows item counts and totals.
+
+## 10. Record Issue — strict rules (owner, 2026-09-29)
+
+- Record Issue (create and edit) requires Indent Section, Indent Person,
+  Approved By, Requisition Number and each line's Type (new lines start at
+  New). Save Draft stays lenient; the rules run when the draft is recorded.
+- The same item on one requisition number only with a different remark
+  (trimmed, spaces collapsed, case-insensitive), within the form and against
+  issues already recorded; an edited record is not its own twin.
+- Old records are not changed; the rules apply when one is edited. Locally:
+  0 records with empty fields, 2 repeat groups (6 records, item 1160 on
+  requisitions 9848 / 9849).
+- The form is `novalidate` (a hidden required TomSelect field used to block
+  the submit silently); the page's own check and the server say what is
+  missing.
+- LATER TASK (not built): the General Stock Excel import should require
+  Section / Person / Approved By / Req No / Type (the file already has these
+  columns) and refuse in-file repeats (same item + req no + remark), keeping
+  its re-upload guard. Bulk Issuing (Buyer/Style) has no Approved By or Type.

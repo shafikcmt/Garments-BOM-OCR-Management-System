@@ -8,9 +8,9 @@ use Spatie\Permission\Models\Permission;
 
 /**
  * One requisition, the same item on several lines — e.g. issued for two
- * buyers, with a remark each. There is no duplicate rule (none existed, and
- * none is added — owner, 2026-09-29): every line saves as its own issue.
- * What IS checked is stock, on the item's TOTAL across the lines, and the
+ * buyers, with a remark each: every line saves as its own issue, as long as
+ * the remarks differ (the repeat rule is in IssueStrictRulesTest). What is
+ * checked here is stock, on the item's TOTAL across the lines, and the
  * message says so: "… is on 2 lines (6 + 5 = 11); only 3 Pkt in stock." — on
  * each affected line and once at the top of the form.
  *
@@ -44,7 +44,8 @@ function silPost(User $user, StockItem $item, array $lines)
     return test()->actingAs($user)->from(route('store.stock.issues.index'))->post(route('store.stock.issues.store'), [
         'issue_date' => now()->toDateString(),
         'requisition_no' => 'HAPL/CUTTING/2026/September/04',
-        'items' => array_map(fn ($line) => ['stock_item_id' => $item->id, 'qty' => $line[0], 'remarks' => $line[1] ?? null], $lines),
+        'indent_section_id' => 'new:Cutting', 'indent_person_id' => 'new:Md Robeul', 'issue_approver_id' => 'new:Store Head',
+        'items' => array_map(fn ($line) => ['stock_item_id' => $item->id, 'qty' => $line[0], 'remarks' => $line[1] ?? null, 'requisition_type' => 'New'], $lines),
     ]);
 }
 
@@ -61,12 +62,12 @@ it('saves the same item twice on one requisition number when the remarks differ'
         ->and((float) $issues->sum('qty'))->toBe(7.0);
 });
 
-it('still saves the same item on two lines with empty remarks, as before', function () {
+it('refuses the same item on two lines with both remarks empty (owner, 2026-09-29)', function () {
     $item = silItem(10);
 
-    silPost(silIssuer(), $item, [[3, null], [4, '']])->assertSessionHasNoErrors();
+    silPost(silIssuer(), $item, [[3, null], [4, '']])->assertSessionHasErrors('items.1.remarks');
 
-    expect(StockIssue::count())->toBe(2);
+    expect(StockIssue::count())->toBe(0);
 });
 
 it('refuses two lines whose total is above stock, naming the lines and the total', function () {

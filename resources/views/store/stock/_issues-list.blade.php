@@ -198,36 +198,40 @@
                                         </div>
                                     </div>
                                     <div class="col-12 col-md-4">
-                                        <label class="form-label" for="editIssueReqNo{{ $i->id }}">Requisition Number</label>
-                                        <input type="text" id="editIssueReqNo{{ $i->id }}" name="requisition_no" class="form-control" maxlength="100"
+                                        <label class="form-label" for="editIssueReqNo{{ $i->id }}">Requisition Number <span class="text-danger">*</span></label>
+                                        <input type="text" id="editIssueReqNo{{ $i->id }}" name="requisition_no" class="form-control @if($wasSubmitted && $errors->has('requisition_no')) is-invalid @endif" maxlength="100" required
                                                value="{{ $value('requisition_no', $i->requisition_no) }}">
+                                        @if($wasSubmitted && $errors->has('requisition_no'))<div class="invalid-feedback d-block">{{ $errors->first('requisition_no') }}</div>@endif
                                     </div>
                                     <div class="col-12 col-md-4">
-                                        <label class="form-label" for="editIssueSection{{ $i->id }}">Indent Section</label>
-                                        <select id="editIssueSection{{ $i->id }}" name="indent_section_id" class="form-select">
+                                        <label class="form-label" for="editIssueSection{{ $i->id }}">Indent Section <span class="text-danger">*</span></label>
+                                        <select id="editIssueSection{{ $i->id }}" name="indent_section_id" class="form-select @if($wasSubmitted && $errors->has('indent_section_id')) is-invalid @endif" required>
                                             <option value="">—</option>
                                             @foreach($sections as $s)
                                                 <option value="{{ $s->id }}" @selected($value('indent_section_id', $i->indent_section_id) == $s->id)>{{ $s->name }}</option>
                                             @endforeach
                                         </select>
+                                        @if($wasSubmitted && $errors->has('indent_section_id'))<div class="invalid-feedback d-block">{{ $errors->first('indent_section_id') }}</div>@endif
                                     </div>
                                     <div class="col-12 col-md-4">
-                                        <label class="form-label" for="editIssuePerson{{ $i->id }}">Indent Person</label>
-                                        <select id="editIssuePerson{{ $i->id }}" name="indent_person_id" class="form-select">
+                                        <label class="form-label" for="editIssuePerson{{ $i->id }}">Indent Person <span class="text-danger">*</span></label>
+                                        <select id="editIssuePerson{{ $i->id }}" name="indent_person_id" class="form-select @if($wasSubmitted && $errors->has('indent_person_id')) is-invalid @endif" required>
                                             <option value="">—</option>
                                             @foreach($persons as $p)
                                                 <option value="{{ $p->id }}" @selected($value('indent_person_id', $i->indent_person_id) == $p->id)>{{ $p->name }}</option>
                                             @endforeach
                                         </select>
+                                        @if($wasSubmitted && $errors->has('indent_person_id'))<div class="invalid-feedback d-block">{{ $errors->first('indent_person_id') }}</div>@endif
                                     </div>
                                     <div class="col-12 col-md-4">
-                                        <label class="form-label" for="editIssueApprover{{ $i->id }}">Approved By</label>
-                                        <select id="editIssueApprover{{ $i->id }}" name="issue_approver_id" class="form-select">
+                                        <label class="form-label" for="editIssueApprover{{ $i->id }}">Approved By <span class="text-danger">*</span></label>
+                                        <select id="editIssueApprover{{ $i->id }}" name="issue_approver_id" class="form-select @if($wasSubmitted && $errors->has('issue_approver_id')) is-invalid @endif" required>
                                             <option value="">—</option>
                                             @foreach($approvers as $a)
                                                 <option value="{{ $a->id }}" @selected($value('issue_approver_id', $i->issue_approver_id) == $a->id)>{{ $a->name }}</option>
                                             @endforeach
                                         </select>
+                                        @if($wasSubmitted && $errors->has('issue_approver_id'))<div class="invalid-feedback d-block">{{ $errors->first('issue_approver_id') }}</div>@endif
                                     </div>
                                     <div class="col-12 col-md-4">
                                         <label class="form-label" for="editIssueCategory{{ $i->id }}">Category</label>
@@ -239,17 +243,19 @@
                                         </select>
                                     </div>
                                     <div class="col-12 col-md-4">
-                                        <label class="form-label" for="editIssueType{{ $i->id }}">Type</label>
-                                        <select id="editIssueType{{ $i->id }}" name="requisition_type" class="form-select">
+                                        <label class="form-label" for="editIssueType{{ $i->id }}">Type <span class="text-danger">*</span></label>
+                                        <select id="editIssueType{{ $i->id }}" name="requisition_type" class="form-select @if($wasSubmitted && $errors->has('requisition_type')) is-invalid @endif" required>
                                             <option value="">—</option>
                                             @foreach($requisitionTypes as $type)
                                                 <option value="{{ $type }}" @selected($value('requisition_type', $i->requisition_type) === $type)>{{ $type }}</option>
                                             @endforeach
                                         </select>
+                                        @if($wasSubmitted && $errors->has('requisition_type'))<div class="invalid-feedback d-block">{{ $errors->first('requisition_type') }}</div>@endif
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label" for="editIssueRemarks{{ $i->id }}">Remarks</label>
-                                        <textarea id="editIssueRemarks{{ $i->id }}" name="remarks" class="form-control" rows="2" maxlength="1000">{{ $value('remarks', $i->remarks) }}</textarea>
+                                        <textarea id="editIssueRemarks{{ $i->id }}" name="remarks" class="form-control @if($wasSubmitted && $errors->has('remarks')) is-invalid @endif" rows="2" maxlength="1000">{{ $value('remarks', $i->remarks) }}</textarea>
+                                        @if($wasSubmitted && $errors->has('remarks'))<div class="invalid-feedback d-block">{{ $errors->first('remarks') }}</div>@endif
                                     </div>
                                 </div>
                             </div>

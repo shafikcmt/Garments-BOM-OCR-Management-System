@@ -204,7 +204,10 @@ it('records the issue and clears the draft when it is finally submitted', functi
     $this->actingAs($user)->post(route('store.stock.issues.store'), [
         'draft_id' => $draft->id,
         'issue_date' => now()->startOfMonth()->toDateString(),
-        'items' => [['stock_item_id' => $item->id, 'qty' => 5]],
+        // Recording for real needs the full header (2026-09-29).
+        'indent_section_id' => 'new:Cutting', 'indent_person_id' => 'new:Md Robeul', 'issue_approver_id' => 'new:Store Head',
+        'requisition_no' => 'REQ-DRAFT-1',
+        'items' => [['stock_item_id' => $item->id, 'qty' => 5, 'requisition_type' => 'New']],
     ])->assertRedirect()->assertSessionHas('success');
 
     expect(StockIssue::count())->toBe(1)
@@ -230,8 +233,11 @@ it('keeps the draft when the real submission is rejected', function () {
     $this->actingAs($user)->post(route('store.stock.issues.store'), [
         'draft_id' => $draft->id,
         'issue_date' => now()->startOfMonth()->toDateString(),
-        'items' => [['stock_item_id' => $item->id, 'qty' => 50]],
-    ])->assertSessionHasErrors();
+        // Recording for real needs the full header (2026-09-29).
+        'indent_section_id' => 'new:Cutting', 'indent_person_id' => 'new:Md Robeul', 'issue_approver_id' => 'new:Store Head',
+        'requisition_no' => 'REQ-DRAFT-1',
+        'items' => [['stock_item_id' => $item->id, 'qty' => 50, 'requisition_type' => 'New']],
+    ])->assertSessionHasErrors('items.0.qty');
 
     expect(StockIssue::count())->toBe(0)
         ->and(issueBalanceOf($item))->toBe(10.0)
