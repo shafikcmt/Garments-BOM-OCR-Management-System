@@ -465,6 +465,12 @@ class PurchaseRequisition extends Model
         return $this->hasMany(PurchaseRequisitionAction::class)->orderByDesc('created_at')->orderByDesc('id');
     }
 
+    /** Quantities changed by approvers at their stage (Step 3d), oldest first. */
+    public function qtyChanges()
+    {
+        return $this->hasMany(PurchaseRequisitionQtyChange::class)->orderBy('id');
+    }
+
     /**
      * Who may delete this sheet: a DRAFT only, by its raiser or Admin. A
      * draft has been read by nobody. Anything submitted is cancelled instead

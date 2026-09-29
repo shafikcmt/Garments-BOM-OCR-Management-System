@@ -274,7 +274,9 @@
                     </thead>
                     <tbody>
                         @foreach($requisition->items as $i => $line)
-                            <tr>
+                            @php($original = ($originalQty ?? [])[$line->id] ?? null)
+                            @php($notApproved = (float) $line->qty_requested <= 0)
+                            <tr @class(['gx-line-not-approved' => $notApproved])>
                                 <td class="text-center gx-line-no">{{ $i + 1 }}</td>
                                 {{-- One row per item: the entry form's per-department
                                      lines were merged on save, so nothing here can
@@ -297,7 +299,16 @@
                                 <td class="small">{{ $line->type ? ($typeLabels[$line->type] ?? $line->type) : '—' }}</td>
                                 <td class="small gx-line-dept">{{ $line->user_dept ?: '—' }}</td>
 
-                                <td class="text-end fw-bold">{{ $qty($line->qty_requested) }}</td>
+                                <td class="text-end fw-bold">
+                                    {{ $qty($line->qty_requested) }}
+                                    {{-- Changed by an approver: the original request stays in view. --}}
+                                    @if($original)
+                                        <span class="gx-line-original">Requested {{ $qty($original['qty']) }}@if($original['stages']) · changed at {{ $original['stages'] }}@endif</span>
+                                    @endif
+                                    @if($notApproved)
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis mt-1">Not approved</span>
+                                    @endif
+                                </td>
                                 <td class="text-end">{{ $qty($line->stock_in_hand_snapshot) }}</td>
                                 <td class="text-end">{{ $qty($line->safety_stock_snapshot) }}</td>
                                 <td class="text-end">{{ $qty($line->consumption_last_month_snapshot) }}</td>
@@ -332,6 +343,69 @@
         </div>
     </div>
 
+    {{-- Step 3d: the person the sheet waits for may change quantities at
+         their stage — up or down, 0 for "not approved" — with one reason
+         for the save. Approving stays a separate click above. --}}
+    @if($canChangeQty ?? false)
+        <div class="card gx-stock-card mt-4" id="changeQuantities">
+            <div class="gx-stock-card-body">
+                <div class="gx-stock-card-head">
+                    <h5 class="mb-0">Change Quantities</h5>
+                    <span class="text-muted small">Raise or lower a quantity, or enter 0 if a line is not approved. Then approve the requisition.</span>
+                </div>
+
+                @if($errors->has('qty') || $errors->has('qty.*') || $errors->has('comment'))
+                    <div class="alert alert-warning py-2 small">
+                        {{ $errors->first('qty') ?: ($errors->first('qty.*') ?: $errors->first('comment')) }}
+                    </div>
+                @endif
+
+                <form method="POST" action="{{ route('store.stock.requisitions.stage-quantities', $requisition) }}">
+                    @csrf
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-3">
+                            <thead>
+                                <tr>
+                                    <th style="width:44px;">SL</th>
+                                    <th>Name of Item</th>
+                                    <th>Uom</th>
+                                    <th class="text-end">Requested</th>
+                                    <th class="text-end" style="width:160px;">New Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($requisition->items as $i => $line)
+                                    @php($original = ($originalQty ?? [])[$line->id] ?? null)
+                                    <tr>
+                                        <td class="text-muted">{{ $i + 1 }}</td>
+                                        <td class="fw-semibold">{{ $line->displayName() }}</td>
+                                        <td class="small">{{ $line->uom_snapshot ?: '—' }}</td>
+                                        <td class="text-end">{{ $qty($original['qty'] ?? $line->qty_requested) }}</td>
+                                        <td>
+                                            <input type="number" step="0.0001" min="0" required
+                                                   class="form-control form-control-sm text-end"
+                                                   name="qty[{{ $line->id }}]" aria-label="New quantity for {{ $line->displayName() }}"
+                                                   value="{{ old('qty.'.$line->id, \App\Support\Quantity::plain($line->qty_requested)) }}">
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <label class="form-label fw-semibold" for="qtyChangeReason">Reason</label>
+                    <textarea name="comment" id="qtyChangeReason" class="form-control mb-2" rows="2" maxlength="1000" required
+                              placeholder="Why are the quantities being changed?">{{ old('comment') }}</textarea>
+                    <div class="form-text mb-3">Saved in the requisition history with every line changed.</div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1" aria-hidden="true"></i>Save Qty Changes
+                    </button>
+                </form>
+            </div>
+        </div>
+    @endif
+
     @include('store.stock.requisitions._history', ['requisition' => $requisition])
 
     <style>
@@ -352,6 +426,11 @@
         .gx-line-table tbody td { padding: .5rem .45rem; border-bottom: 1px solid #eef2f7; vertical-align: top; }
         .gx-line-table tbody tr:nth-child(even) td { background: #fcfdff; }
         .gx-line-no { font-size: .78rem; font-weight: 700; color: #94a3b8; }
+
+        /* Step 3d: the original request under a changed quantity, and a line
+           set to 0 by an approver. */
+        .gx-line-original { display: block; margin-top: .15rem; font-size: .66rem; font-weight: 600; color: #b45309; white-space: nowrap; }
+        .gx-line-table tr.gx-line-not-approved td { color: #94a3b8; }
 
         /* Last Purchase → Date. The table lays out on content width, and this
            column's heading is a single short word, so the column collapsed to

@@ -51,6 +51,10 @@ function seedEveryCountingState(User $by, StockItem $item): void
     countingSheet($by, $item, 4, $department + ['status' => PurchaseRequisition::STATUS_DRAFT]);
     countingSheet($by, $item, 10, $department + ['department_review_status' => PurchaseRequisition::DEPT_REVIEW_APPROVED]);
     countingSheet($by, $item, 20, $department + ['department_review_status' => null]);
+    // Cancelled (Step 3c), even after the head approved it: counted nowhere —
+    // so the 130 below also proves the Stock Summary and the Monthly report
+    // leave it out.
+    countingSheet($by, $item, 1000, $department + ['status' => PurchaseRequisition::STATUS_CANCELLED, 'department_review_status' => PurchaseRequisition::DEPT_REVIEW_APPROVED]);
     // A different item: a final sheet repeating a department item would be
     // counted once instead, which is its own rule, tested further down.
     $other = StockItem::firstOrCreate(['name' => 'Final Sheet Item'], ['uom' => 'Pcs', 'is_active' => true]);

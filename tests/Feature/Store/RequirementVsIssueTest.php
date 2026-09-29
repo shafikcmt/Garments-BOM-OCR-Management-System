@@ -201,6 +201,17 @@ it('gives the permission to the current Store head only when migrating', functio
 
 // --- Numbers -----------------------------------------------------------------
 
+it('leaves a cancelled sheet out of the requirement', function () {
+    $cad = rviSection('CAD & Sample');
+    $pencil = rviItem('Pencil');
+
+    rviRequest($cad, [[$pencil, 10, 5]]);
+    // Cancelled after the head approved it (Step 3c): counted nowhere.
+    rviRequest($cad, [[$pencil, 500, 5]], ['status' => PurchaseRequisition::STATUS_CANCELLED]);
+
+    expect(rviRow(rviBuild(), $pencil, $cad)['requested_qty'])->toEqual(10.0);
+});
+
 it('computes rows, statuses and a value-weighted Issued %', function () {
     $cad = rviSection('CAD & Sample');
     [$pencil, $paper, $tape, $glue] = [rviItem('Pencil'), rviItem('Paper'), rviItem('Tape'), rviItem('Glue')];

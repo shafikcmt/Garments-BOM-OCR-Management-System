@@ -16,6 +16,7 @@
         'head_returned' => 'bg-danger-subtle text-danger',
         'deleted' => 'bg-danger-subtle text-danger',
         'corrected' => 'bg-warning-subtle text-warning-emphasis',
+        'qty_changed' => 'bg-warning-subtle text-warning-emphasis',
     ];
     $qty = fn ($v) => \App\Support\Quantity::format($v);
     $recordedFrom = \Illuminate\Support\Carbon::parse(\App\Models\PurchaseRequisitionAction::RECORDED_FROM);
@@ -59,7 +60,10 @@
                                 <td class="small">{{ $action->actorName() }}</td>
                                 <td class="small">
                                     {{ $action->comment ?? '' }}
-                                    @if($action->action === 'corrected' && ! empty($action->meta['lines']))
+                                    {{-- Store correction and approver quantity change
+                                         alike: each line as "old → new", so the
+                                         original request stays readable here. --}}
+                                    @if(in_array($action->action, ['corrected', 'qty_changed'], true) && ! empty($action->meta['lines']))
                                         <ul class="list-unstyled mb-0 mt-1 text-muted">
                                             @foreach($action->meta['lines'] as $change)
                                                 <li>

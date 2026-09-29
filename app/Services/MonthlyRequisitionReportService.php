@@ -254,6 +254,9 @@ class MonthlyRequisitionReportService
                     ->countedInTotals();
             })
             ->notRepeatedOnFinalSheet()
+            // A line an approver set to 0 (not approved) is left out of the
+            // month; the single sheet's own PDF/Excel still prints it as 0.
+            ->where('qty_requested', '>', 0)
             ->when($filters['category'] ?? null, fn ($q, $category) => $q->whereHas(
                 'itemCategory',
                 fn ($c) => $c->where('name', $category)

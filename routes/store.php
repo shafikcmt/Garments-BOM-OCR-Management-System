@@ -449,6 +449,9 @@ Route::prefix('store')
             // sheet for good. The controller checks who may do each.
             Route::post('/requisitions/{requisition}/stage-return', [PurchaseRequisitionController::class, 'stageReturn'])
                 ->name('requisitions.stage-return');
+            // The same person changes quantities at their stage (Step 3d).
+            Route::post('/requisitions/{requisition}/stage-quantities', [PurchaseRequisitionController::class, 'stageQuantities'])
+                ->name('requisitions.stage-quantities');
             Route::post('/requisitions/{requisition}/cancel', [PurchaseRequisitionController::class, 'cancel'])
                 ->name('requisitions.cancel');
 

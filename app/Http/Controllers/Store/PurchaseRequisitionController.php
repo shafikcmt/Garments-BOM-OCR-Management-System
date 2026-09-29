@@ -510,6 +510,44 @@ class PurchaseRequisitionController extends Controller
     }
 
     /**
+     * Step 3d — the approver the sheet waits for changes line quantities at
+     * their stage: up or down, 0 for "not approved", one reason per save.
+     * Approving stays a separate click, so the new totals can be read first.
+     */
+    public function stageQuantities(Request $request, PurchaseRequisition $requisition)
+    {
+        $this->authorizeVisible($requisition);
+        $user = $request->user();
+
+        abort_unless($requisition->usesStageEngine(), 422, 'This requisition follows the earlier approval steps.');
+        abort_unless($this->workflow->canAct($requisition, $user), 403, 'This requisition is not waiting for you.');
+
+        $data = $request->validate([
+            'qty' => ['required', 'array', 'min:1'],
+            'qty.*' => ['required', 'numeric', 'min:0', 'max:9999999999'],
+            'comment' => ['required', 'string', 'max:1000'],
+        ], [
+            'qty.*.required' => 'Enter a quantity on every line (0 if it is not approved).',
+            'qty.*.numeric' => 'Quantities must be numbers.',
+            'qty.*.min' => 'A quantity cannot be below 0.',
+            'comment.required' => 'Give a reason for the change.',
+        ]);
+
+        $count = 0;
+
+        DB::transaction(function () use ($requisition, $user, $data, &$count) {
+            $locked = $this->lockRequisition($requisition);
+            abort_unless($this->workflow->canAct($locked, $user), 422,
+                'This stage has already been acted on. Reload the page to see where the requisition is now.');
+
+            $count = $this->workflow->changeQuantities($locked, $user, $data['qty'], $data['comment']);
+        });
+
+        return back()->with('success', $count.' quantit'.($count === 1 ? 'y' : 'ies').' changed on '
+            .$requisition->requisition_no.'. Approve when ready.');
+    }
+
+    /**
      * Cancel — close the sheet for good, with a reason. Its raiser while it
      * is theirs (draft or sent back), Admin before approval. Either flow.
      * Replaces deleting a submitted sheet: a cancelled one stays on record.
@@ -835,6 +873,11 @@ class PurchaseRequisitionController extends Controller
             'statusLabels' => PurchaseRequisition::statusLabels(),
             'typeLabels' => PurchaseRequisitionItem::typeLabels(),
             'canDelete' => $requisition->canBeDeletedBy($user),
+            // Step 3d: what each changed line was first requested at this
+            // round, and whether this viewer may change quantities now (the
+            // person the sheet waits for, at their stage).
+            'originalQty' => $this->workflow->originalQuantities($requisition),
+            'canChangeQty' => $this->workflow->canAct($requisition, $user),
             // Whether this viewer holds the correction permission AND reads the
             // whole company's requisitions — the Store-correction half of
             // authorizeEditable(), asked the same way so the button and the

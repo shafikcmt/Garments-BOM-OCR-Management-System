@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\IndentSection;
 use App\Models\PurchaseRequisition;
 use App\Models\PurchaseRequisitionAction;
+use App\Models\PurchaseRequisitionQtyChange;
 use App\Models\PurchaseRequisitionStage;
 use App\Models\RequisitionSignatureBlock;
 use App\Models\User;
@@ -54,8 +55,10 @@ class RequisitionWorkflow
 {
     public const VERSION = 1;
 
-    public function __construct(private readonly RequisitionHistory $history)
-    {
+    public function __construct(
+        private readonly RequisitionHistory $history,
+        private readonly PurchaseRequisitionService $requisitions,
+    ) {
     }
 
     /**
@@ -400,6 +403,112 @@ class RequisitionWorkflow
         ]);
 
         return $toRaiser ? null : $previous->fresh();
+    }
+
+    /**
+     * The approver the sheet waits for changes line quantities at their stage
+     * (Step 3d) — up or down, 0 meaning "not approved", with ONE reason for
+     * the save. Only quantities: no line is added, removed or re-pointed; a
+     * wrong item goes back with Return.
+     *
+     * The line is updated in place, so every report follows the approved
+     * figure. To Be Procured and Amount are recalculated from the line's
+     * FROZEN stock snapshot and rate — the snapshot is not re-read. Each
+     * change is logged (purchase_requisition_qty_changes) and recorded in the
+     * history. Approving is a separate click.
+     *
+     * The caller holds the row lock and the transaction, and has checked
+     * canAct().
+     *
+     * @param  array<int|string, int|float|string>  $quantities  line id => new qty
+     * @return int how many lines changed
+     */
+    public function changeQuantities(PurchaseRequisition $requisition, User $user, array $quantities, string $reason): int
+    {
+        $stage = $this->currentStage($requisition);
+        $lines = $requisition->items()->get()->keyBy('id');
+
+        $unknown = array_diff(array_map('intval', array_keys($quantities)), $lines->keys()->all());
+        if ($unknown !== []) {
+            throw ValidationException::withMessages(['qty' => 'A line on this form is not on the requisition. Reload the page and try again.']);
+        }
+
+        $new = fn ($line) => round((float) ($quantities[$line->id] ?? $line->qty_requested), 4);
+        $changed = $lines->filter(fn ($line) => abs($new($line) - (float) $line->qty_requested) > 0.00001);
+
+        if ($changed->isEmpty()) {
+            throw ValidationException::withMessages(['qty' => 'No quantity was changed.']);
+        }
+
+        if ($lines->every(fn ($line) => $new($line) <= 0)) {
+            throw ValidationException::withMessages(['qty' => 'Every line would be 0. Return or cancel the requisition instead.']);
+        }
+
+        $diff = [];
+
+        foreach ($changed as $line) {
+            $old = (float) $line->qty_requested;
+            $qty = $new($line);
+            $toBeProcured = $this->requisitions->toBeProcured($qty, $line->stock_in_hand_snapshot === null ? null : (float) $line->stock_in_hand_snapshot);
+
+            $line->update([
+                'qty_requested' => $qty,
+                'to_be_procured_qty' => $toBeProcured,
+                'amount' => $line->rate_appx !== null ? $toBeProcured * (float) $line->rate_appx : 0,
+            ]);
+
+            PurchaseRequisitionQtyChange::create([
+                'purchase_requisition_id' => $requisition->id,
+                'purchase_requisition_item_id' => $line->id,
+                'cycle' => $stage->cycle,
+                'stage_sequence' => $stage->sequence,
+                'stage_label' => $stage->displayLabel(),
+                'item_name' => $line->displayName(),
+                'old_qty' => $old,
+                'new_qty' => $qty,
+                'reason' => $reason,
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+            ]);
+
+            $diff[] = ['item' => $line->displayName(), 'change' => 'changed', 'old_qty' => $old, 'new_qty' => $qty];
+        }
+
+        $this->history->record($requisition, PurchaseRequisitionAction::QTY_CHANGED, [
+            'stage' => $this->historyStage($stage, $requisition),
+            'from' => $requisition->status,
+            'comment' => $reason,
+            'meta' => ['stage_sequence' => $stage->sequence, 'stage_label' => $stage->displayLabel(), 'lines' => $diff],
+        ]);
+
+        return $changed->count();
+    }
+
+    /**
+     * What each line was ORIGINALLY requested at in the current round, for
+     * the lines an approver has changed: line id => ['qty' => original,
+     * 'stages' => "HR Audit, Finance"]. A resubmitted sheet starts a new
+     * round, so the raiser's new figure is the request again.
+     *
+     * @return array<int, array{qty: float, stages: string}>
+     */
+    public function originalQuantities(PurchaseRequisition $requisition): array
+    {
+        if (! $requisition->usesStageEngine()) {
+            return [];
+        }
+
+        return PurchaseRequisitionQtyChange::where('purchase_requisition_id', $requisition->id)
+            ->where('cycle', $this->activeCycle($requisition))
+            ->whereNotNull('purchase_requisition_item_id')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('purchase_requisition_item_id')
+            ->map(fn ($changes) => [
+                'qty' => (float) $changes->first()->old_qty,
+                'stages' => $changes->pluck('stage_label')->filter()->unique()->implode(', '),
+            ])
+            ->all();
     }
 
     /**

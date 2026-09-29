@@ -31,6 +31,8 @@ class PurchaseRequisitionAction extends Model
     public const RETURNED = 'returned';
     /** Closed for good (Step 3c). */
     public const CANCELLED = 'cancelled';
+    /** An approver changed quantities at their stage (Step 3d); meta.lines lists them. */
+    public const QTY_CHANGED = 'qty_changed';
 
     public const STAGE_RAISER = 'raiser';
     public const STAGE_SECTION_HEAD = 'section_head';
@@ -87,6 +89,7 @@ class PurchaseRequisitionAction extends Model
             self::STAGE_APPROVED => 'Stage Approved',
             self::RETURNED => 'Returned',
             self::CANCELLED => 'Cancelled',
+            self::QTY_CHANGED => 'Quantity Changed',
         ][$this->action] ?? ucfirst(str_replace('_', ' ', $this->action));
     }
 

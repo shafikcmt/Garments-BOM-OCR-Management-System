@@ -140,3 +140,18 @@ Applies to the Monthly Requisition report now and to the Step 4 merge.
 - Excel: quantities are real numbers, "#,##0" when whole and "#,##0.00##"
   otherwise (no trailing dot). Money (rate, amount, value, price) is always
   "#,##0.00", in every export.
+
+## 8. Step 3d — approver quantity change
+
+- New migration `2026_10_03_000001_create_purchase_requisition_qty_changes_table`
+  (additive: one new table; constraint and index names kept under
+  PostgreSQL's 63-character limit). Runs with the others on deploy day.
+- The approver a stage-engine sheet waits for may raise or lower line
+  quantities at their stage, 0 meaning "not approved", with one required
+  reason per save. The line is updated in place (reports follow it); To Be
+  Procured and Amount are recalculated from the frozen snapshot. The show
+  page and History keep the original request readable.
+- A 0 line prints as 0 on the sheet's own PDF/Excel (Step 8 may add a "Not
+  approved" mark) and is left out of the Monthly report.
+- Section 6's "a test per report" for cancelled sheets is done (Stock
+  Summary, Requirement vs Issue, Monthly report).
