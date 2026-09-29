@@ -517,6 +517,7 @@ class StockIssueController extends Controller
 
             $wanted[$id]['qty'] = ($wanted[$id]['qty'] ?? 0) + (float) $line['qty'];
             $wanted[$id]['lines'][] = $index;
+            $wanted[$id]['qtys'][] = (float) $line['qty'];
         }
 
         // One report call for every item on the form, not one per line. Same
@@ -528,7 +529,7 @@ class StockIssueController extends Controller
             'only_active' => false,
         ])->keyBy(fn ($row) => $row['item']->id);
 
-        $format = fn ($v) => rtrim(rtrim(number_format((float) $v, 4, '.', ','), '0'), '.');
+        $format = fn ($v) => \App\Support\Quantity::format($v);
 
         $errors = [];
         foreach ($wanted as $id => $ask) {
@@ -558,7 +559,14 @@ class StockIssueController extends Controller
             $name = $row ? $row['item']->name : 'This item';
             $uom = $row && $row['item']->uom ? ' '.$row['item']->uom : '';
 
-            $message = $name.' — only '.$format(max($stock, 0)).$uom.' in stock, cannot issue '.$format($ask['qty']).'.';
+            // One item on several lines (one requisition, different purposes)
+            // is checked on its TOTAL, so the message shows how the total was
+            // reached — otherwise it reads like a refusal of the second line.
+            $message = count($ask['qtys']) > 1
+                ? $name.' is on '.count($ask['qtys']).' lines ('
+                    .implode(' + ', array_map($format, $ask['qtys'])).' = '.$format($ask['qty']).'); only '
+                    .$format(max($stock, 0)).$uom.' in stock.'
+                : $name.' — only '.$format(max($stock, 0)).$uom.' in stock, cannot issue '.$format($ask['qty']).'.';
 
             // Flagged on every line that named the item, so the operator is not
             // sent hunting for which of two rows the message belongs to.

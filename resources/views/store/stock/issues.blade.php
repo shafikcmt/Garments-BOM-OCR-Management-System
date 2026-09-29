@@ -864,9 +864,13 @@
                 }
 
                 if (short) {
+                    var qtys = qtysFor(row);
                     row.querySelector('.js-line-alert').innerHTML +=
-                        '<span class="badge bg-danger-subtle text-danger-emphasis ms-1">Only '
-                        + status.stock + ' in stock — cannot issue ' + wanted + '</span>';
+                        '<span class="badge bg-danger-subtle text-danger-emphasis ms-1">'
+                        + (qtys.length > 1
+                            ? 'On ' + qtys.length + ' lines (' + qtys.join(' + ') + ' = ' + wanted + ') · only ' + status.stock + ' in stock'
+                            : 'Only ' + status.stock + ' in stock — cannot issue ' + wanted)
+                        + '</span>';
                 }
 
                 row.querySelector('.js-line-qty').classList.toggle('is-invalid', short);
@@ -887,6 +891,21 @@
                         ? sum + (parseFloat(other.querySelector('.js-line-qty').value) || 0)
                         : sum;
                 }, 0);
+            }
+
+            /**
+             * The quantities of every row naming this row's item, in form
+             * order — "6 + 5" in the message when one item is on two lines.
+             */
+            function qtysFor(row) {
+                var id = itemValue(row);
+                if (!id) { return []; }
+
+                return rows().filter(function (other) {
+                    return itemValue(other) === id;
+                }).map(function (other) {
+                    return parseFloat(other.querySelector('.js-line-qty').value) || 0;
+                });
             }
 
             /** The chosen item id on a row, through TomSelect when it is there. */
@@ -917,9 +936,17 @@
 
                     seen[id] = true;
 
-                    var name = (itemInfo(id) || {}).text || 'This item';
-                    messages.push(name.replace(/\s*\(.*\)$/, '') + ' — only ' + status.stock
-                        + ' in stock, cannot issue ' + wanted + '.');
+                    var info = itemInfo(id) || {};
+                    var name = (info.text || 'This item').replace(/\s*\(.*\)$/, '');
+                    var qtys = qtysFor(row);
+                    var uom = info.uom ? ' ' + info.uom : '';
+
+                    // Same wording as the server: an item on several lines is
+                    // checked on its total, and the message shows that total.
+                    messages.push(qtys.length > 1
+                        ? name + ' is on ' + qtys.length + ' lines (' + qtys.join(' + ') + ' = ' + wanted
+                            + '); only ' + status.stock + uom + ' in stock.'
+                        : name + ' — only ' + status.stock + uom + ' in stock, cannot issue ' + wanted + '.');
                 });
 
                 return messages;
