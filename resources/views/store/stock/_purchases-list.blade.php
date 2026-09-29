@@ -346,9 +346,10 @@
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-4">
-                                        <label class="form-label" for="editPurchasePrice{{ $line->id }}">Unit Price</label>
-                                        <input type="number" step="0.0001" min="0" id="editPurchasePrice{{ $line->id }}" name="unit_price" class="form-control @if($wasSubmitted && $errors->has('unit_price')) is-invalid @endif"
+                                        <label class="form-label" for="editPurchasePrice{{ $line->id }}">Unit Price <span class="text-danger">*</span></label>
+                                        <input type="number" step="0.0001" min="0" id="editPurchasePrice{{ $line->id }}" name="unit_price" class="form-control @if($wasSubmitted && $errors->has('unit_price')) is-invalid @endif" required
                                                value="{{ $value('unit_price', $line->unit_price !== null ? rtrim(rtrim(number_format((float) $line->unit_price, 4, '.', ''), '0'), '.') : '') }}">
+                                        @if($wasSubmitted && $errors->has('unit_price'))<div class="invalid-feedback d-block">{{ $errors->first('unit_price') }}</div>@endif
                                     </div>
                                     <div class="col-12 col-md-4">
                                         <label class="form-label" for="editPurchaseRcv{{ $line->id }}">
@@ -360,15 +361,16 @@
                                     </div>
                                     <div class="col-12 col-md-8">
                                         <label class="form-label" for="editPurchaseSupplier{{ $line->id }}">
-                                            Supplier
+                                            Supplier <span class="text-danger">*</span>
                                             @if($siblingCount > 1)<span class="gx-edit-scope">All {{ $siblingCount }} items</span>@endif
                                         </label>
-                                        <select id="editPurchaseSupplier{{ $line->id }}" name="general_stock_supplier_id" class="form-select">
+                                        <select id="editPurchaseSupplier{{ $line->id }}" name="general_stock_supplier_id" class="form-select @if($wasSubmitted && $errors->has('general_stock_supplier_id')) is-invalid @endif" required>
                                             <option value="">—</option>
                                             @foreach($suppliers as $supplier)
                                                 <option value="{{ $supplier->id }}" @selected($value('general_stock_supplier_id', $line->general_stock_supplier_id) == $supplier->id)>{{ $supplier->name }}</option>
                                             @endforeach
                                         </select>
+                                        @if($wasSubmitted && $errors->has('general_stock_supplier_id'))<div class="invalid-feedback d-block">{{ $errors->first('general_stock_supplier_id') }}</div>@endif
                                         @if($siblingCount > 1)
                                             <div class="gx-edit-hint">
                                                 RCV Date and Supplier describe the whole delivery, so a change here is
@@ -378,7 +380,8 @@
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label" for="editPurchaseRemarks{{ $line->id }}">Remarks</label>
-                                        <textarea id="editPurchaseRemarks{{ $line->id }}" name="remarks" class="form-control" rows="2" maxlength="1000">{{ $value('remarks', $line->remarks) }}</textarea>
+                                        <textarea id="editPurchaseRemarks{{ $line->id }}" name="remarks" class="form-control @if($wasSubmitted && $errors->has('remarks')) is-invalid @endif" rows="2" maxlength="1000">{{ $value('remarks', $line->remarks) }}</textarea>
+                                        @if($wasSubmitted && $errors->has('remarks'))<div class="invalid-feedback d-block">{{ $errors->first('remarks') }}</div>@endif
                                     </div>
                                 </div>
                             </div>

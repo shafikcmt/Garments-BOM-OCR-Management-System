@@ -13,11 +13,18 @@
     // back filled in rather than blank — and so a resumed draft, which is put
     // into old() by the same route, brings its lines with it.
     $oldPurchaseLines = collect(old('items', []))
-        ->map(fn ($line) => [
+        ->map(fn ($line, $index) => [
             'stock_item_id' => $line['stock_item_id'] ?? '',
             'qty' => $line['qty'] ?? '',
             'unit_price' => $line['unit_price'] ?? '',
             'remarks' => $line['remarks'] ?? '',
+            // The server's message for each field of the line, shown under it.
+            'errors' => array_filter([
+                'item' => $errors->first('items.'.$index.'.stock_item_id'),
+                'qty' => $errors->first('items.'.$index.'.qty'),
+                'price' => $errors->first('items.'.$index.'.unit_price'),
+                'remarks' => $errors->first('items.'.$index.'.remarks'),
+            ]),
         ])
         ->values();
 @endphp
@@ -84,7 +91,11 @@
             @if($items->isEmpty())
                 <p class="text-muted small mb-0">Add a stock item first — a purchase must be received against an item in the master.</p>
             @else
-                <form method="POST" action="{{ route('store.stock.purchases.store') }}" id="purchaseForm">
+                {{-- novalidate: the browser's own check cannot report a field
+                     TomSelect has hidden (the real item select), so it refused
+                     the submit silently. The script below and the server say
+                     what is missing — as on Record Issue. --}}
+                <form method="POST" action="{{ route('store.stock.purchases.store') }}" id="purchaseForm" novalidate>
                     {{-- Which draft this form came from, so saving again updates
                          it instead of leaving a second copy, and recording it for
                          real clears it away. Empty on a form that was not
@@ -116,26 +127,28 @@
                             <input type="text" id="rvPreview" class="form-control gx-stock-readonly" readonly tabindex="-1" value="{{ $nextRv }}">
                         </div>
                         <div class="col-6 col-md-4 col-xl-2">
-                            <label class="form-label" for="challanNo">Challan / Invoice No</label>
-                            <input name="challan_no" id="challanNo" value="{{ old('challan_no') }}" class="form-control" maxlength="100"
+                            <label class="form-label" for="challanNo">Challan / Invoice No <span class="text-danger">*</span></label>
+                            <input name="challan_no" id="challanNo" value="{{ old('challan_no') }}" class="form-control @error('challan_no') is-invalid @enderror" maxlength="100" aria-required="true"
                                    data-challan-status-url="{{ route('store.stock.purchases.challan-status') }}"
                                    autocomplete="off">
+                            @error('challan_no')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-12 col-md-8 col-xl-3">
-                            <label class="form-label" for="supplierSelect">Supplier Name</label>
+                            <label class="form-label" for="supplierSelect">Supplier Name <span class="text-danger">*</span></label>
                             @if($suppliers->isEmpty())
                                 <div class="alert alert-info small py-2 mb-0">
                                     No suppliers yet — add them in
                                     <a href="{{ route('store.stock.purchase-setup.index') }}" class="alert-link">Master Setup</a>.
                                 </div>
                             @else
-                                <select name="general_stock_supplier_id" id="supplierSelect" class="form-select js-searchable">
+                                <select name="general_stock_supplier_id" id="supplierSelect" class="form-select js-searchable @error('general_stock_supplier_id') is-invalid @enderror" aria-required="true">
                                     <option value="">Select supplier…</option>
                                     @foreach($suppliers as $s)
                                         <option value="{{ $s->id }}" @selected(old('general_stock_supplier_id') == $s->id)>{{ $s->name }}</option>
                                     @endforeach
                                 </select>
                             @endif
+                            @error('general_stock_supplier_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                         </div>
                     </div>
 
@@ -156,8 +169,8 @@
                             <div class="gx-edit-alert-title">This challan number is already recorded</div>
                             <div class="gx-edit-alert-body" data-challan-matches></div>
                             <div class="gx-edit-alert-body mt-1">
-                                Carry on if this is a further delivery against the same challan. If it is the
-                                same goods being entered a second time, the stock will be counted twice.
+                                For a further delivery of an item already received on this challan, add a remark
+                                such as '2nd delivery' — the same item, challan, supplier and remark is refused.
                             </div>
                         </div>
                     </div>
@@ -167,6 +180,11 @@
                          operator's cursor already is once a line is filled in —
                          a button by this heading sends them back up the form
                          after every item. --}}
+                    {{-- What stops Record Receiving, filled by the script before
+                         the form is sent. The server's own refusals show at the top
+                         of the page and under each field. --}}
+                    <div id="receivingBlock" class="alert alert-danger py-2 small d-none" role="alert"></div>
+
                     <div class="mb-2">
                         <h6 class="gx-stock-subhead mb-0">Items</h6>
                         <span class="gx-stock-help">Everything received on this challan. All lines share the GRN No above.</span>
@@ -202,7 +220,7 @@
                                          picked until after saving. --}}
                                     <th style="min-width:140px;">Brand/Specification <span class="gx-stock-auto">auto</span></th>
                                     <th>Purchased Qty <span class="text-danger">*</span></th>
-                                    <th>Unit Price</th>
+                                    <th>Unit Price <span class="text-danger">*</span></th>
                                     {{-- Qty x Unit Price, filled in by the script.
                                          Carries the same "auto" badge as Uom,
                                          Category and Brand: it is derived and
@@ -257,7 +275,9 @@
                         <tr class="purchase-line">
                             <td class="text-center js-line-number gx-line-no"></td>
                             <td>
-                                <select class="form-select form-select-sm js-line-item js-searchable" name="items[__INDEX__][stock_item_id]" required>
+                                {{-- No `required`: TomSelect hides this select, and a hidden
+                                     required field blocks the submit with no message. --}}
+                                <select class="form-select form-select-sm js-line-item js-searchable" name="items[__INDEX__][stock_item_id]" aria-required="true">
                                     <option value="">Select item…</option>
                                     @foreach($items as $it)
                                         <option value="{{ $it->id }}" data-uom="{{ $it->uom }}" data-category="{{ $it->category }}" data-brand="{{ $it->brand }}">{{ $it->name }}</option>
@@ -417,7 +437,13 @@
                   class="row g-3 gx-stock-filter mb-4" data-list-filters>
                 <div class="col-6 col-md-3">
                     <label class="form-label" for="purchaseFilterMonth">Month</label>
-                    <input type="month" id="purchaseFilterMonth" name="month" value="{{ $filters['month'] ?? '' }}" class="form-control">
+                    {{-- A list, as on Issues: an empty <input type="month"> reads "--------- ----". --}}
+                    <select id="purchaseFilterMonth" name="month" class="form-select">
+                        <option value="">All months</option>
+                        @foreach($monthOptions as $value => $label)
+                            <option value="{{ $value }}" @selected(($filters['month'] ?? '') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 {{-- Search takes the room the row has left rather than stopping
                      at a third of it and stranding the rest. --}}
@@ -789,10 +815,183 @@
             // header. Both are fixed by the same few lines: old() carries a
             // rejected submission, and a resumed draft is put into old() too.
             if (oldLines.length) {
-                oldLines.forEach(function (line) { addRow(line); });
+                oldLines.forEach(function (line) {
+                    var row = addRow(line);
+                    var errors = line.errors || {};
+                    // The server's message under each field it refused.
+                    markLineError(row.querySelector('.js-line-item'), errors.item, false);
+                    markLineError(row.querySelector('.js-line-qty'), errors.qty, false);
+                    markLineError(row.querySelector('.js-line-price'), errors.price, false);
+                    markLineError(row.querySelector('.js-line-remarks'), errors.remarks, false);
+                });
             } else {
                 addRow();
             }
+
+            /*
+             * Record Receiving is never stopped silently (as on Record Issue):
+             * the form is novalidate, the hidden item selects are synced to
+             * what TomSelect shows, and this check stops the submit only with
+             * a red summary above the lines, a message under each field and a
+             * scroll to it. The server stays the source of truth — it also
+             * checks receipts already recorded, which this page cannot see.
+             * Save Draft (formnovalidate) is never stopped.
+             */
+            var blocker = document.getElementById('receivingBlock');
+
+            /** A select's value, through TomSelect when it is there. */
+            function fieldValue(el) {
+                if (!el) { return ''; }
+                return el.tomselect ? String(el.tomselect.getValue() || '') : String(el.value || '');
+            }
+
+            /** Point every hidden item select at the item its TomSelect shows. */
+            function syncItemSelects() {
+                rows().forEach(function (row) {
+                    var select = row.querySelector('.js-line-item');
+                    var shown = fieldValue(select);
+                    if (!select.tomselect || !shown || select.value === shown) { return; }
+
+                    var option = Array.prototype.find.call(select.options, function (o) { return o.value === shown; });
+                    if (!option) {
+                        option = document.createElement('option');
+                        option.value = shown;
+                        option.textContent = shown;
+                        select.appendChild(option);
+                    }
+                    option.disabled = false;
+                    select.value = shown;
+                });
+            }
+
+            /**
+             * What stops Record Receiving, from plain data — no DOM, so it can
+             * be run outside a browser. The server's rules
+             * (StockPurchaseController::store): the header, each line's item,
+             * qty (more than 0) and unit price (0 or more); and the same item
+             * twice on this challan only with different remarks (trimmed,
+             * spaces collapsed, case-insensitive).
+             *
+             * @param {Object} header  challanDate, rcvDate, challanNo, supplier, supplierName (strings)
+             * @param {Array<Object>} lines  line, item, qty, price, remarks (strings)
+             */
+            window.gxReceivingFormProblems = function (header, lines) {
+                var problems = [];
+                var blank = function (v) { return !String(v || '').trim(); };
+                var norm = function (v) { return String(v || '').replace(/\s+/g, ' ').trim().toLowerCase(); };
+                var figure = function (v) { return /^\d*\.?\d*$/.test(String(v || '').trim()) && String(v || '').trim() !== '' && String(v).trim() !== '.'; };
+                header = header || {};
+
+                if (blank(header.challanDate)) { problems.push({ line: null, field: 'challan_date', message: 'Enter the challan date.' }); }
+                if (blank(header.rcvDate)) { problems.push({ line: null, field: 'rcv_date', message: 'Enter the RCV date.' }); }
+                if (!blank(header.challanDate) && !blank(header.rcvDate) && String(header.rcvDate) < String(header.challanDate)) {
+                    problems.push({ line: null, field: 'rcv_date', message: 'The RCV date cannot be earlier than the challan date.' });
+                }
+                if (blank(header.challanNo)) { problems.push({ line: null, field: 'challan_no', message: 'Enter the Challan / Invoice No.' }); }
+                if (blank(header.supplier)) { problems.push({ line: null, field: 'supplier', message: 'Select the supplier.' }); }
+
+                var seen = {};
+
+                lines.forEach(function (l) {
+                    if (blank(l.item)) {
+                        problems.push({ line: l.line, field: 'item', message: 'Select an item on line ' + l.line + '.' });
+                    }
+                    if (!figure(l.qty) || !(parseFloat(l.qty) > 0)) {
+                        problems.push({ line: l.line, field: 'qty', message: 'Enter the purchased qty on line ' + l.line + ' (more than 0).' });
+                    }
+                    if (!figure(l.price)) {
+                        problems.push({ line: l.line, field: 'price', message: 'Enter the unit price on line ' + l.line + ' (0 if free of charge).' });
+                    }
+
+                    if (!blank(l.item) && !blank(header.challanNo)) {
+                        var key = String(l.item) + '|' + norm(l.remarks);
+                        if (seen[key]) {
+                            problems.push({
+                                line: l.line, field: 'remarks',
+                                message: 'Line ' + l.line + ': this item is already received on challan ' + String(header.challanNo).trim()
+                                    + (header.supplierName ? ' from ' + header.supplierName : '')
+                                    + ' (line ' + seen[key] + ') with the same remark. For a further delivery, add a remark such as \'2nd delivery\'.',
+                            });
+                        } else {
+                            seen[key] = l.line;
+                        }
+                    }
+                });
+
+                return problems;
+            };
+
+            function markLineError(field, message, fromScript) {
+                if (!field || !message) { return; }
+                field.classList.add('is-invalid');
+                if (fromScript !== false) { field.classList.add('js-client-invalid'); }
+
+                var note = document.createElement('div');
+                note.className = 'invalid-feedback d-block' + (fromScript !== false ? ' js-client-error' : '');
+                note.style.fontSize = '.72rem';
+                note.textContent = message;
+                (field.tomselect ? field.tomselect.wrapper : field).insertAdjacentElement('afterend', note);
+            }
+
+            function clearLineErrors() {
+                form.querySelectorAll('.js-client-error').forEach(function (note) { note.remove(); });
+                form.querySelectorAll('.js-client-invalid').forEach(function (field) {
+                    field.classList.remove('is-invalid', 'js-client-invalid');
+                });
+            }
+
+            form.addEventListener('submit', function (event) {
+                blocker.classList.add('d-none');
+                clearLineErrors();
+                syncItemSelects();
+
+                if (event.submitter && event.submitter.hasAttribute('formnovalidate')) { return; }
+
+                var headerFields = {
+                    challan_date: document.getElementById('challanDate'),
+                    rcv_date: document.getElementById('rcvDate'),
+                    challan_no: document.getElementById('challanNo'),
+                    supplier: document.getElementById('supplierSelect'),
+                };
+                var lineFields = { item: '.js-line-item', qty: '.js-line-qty', price: '.js-line-price', remarks: '.js-line-remarks' };
+                var supplier = headerFields.supplier;
+                var supplierOption = supplier && supplier.options ? supplier.options[supplier.selectedIndex] : null;
+                var all = rows();
+
+                var problems = window.gxReceivingFormProblems({
+                    challanDate: fieldValue(headerFields.challan_date),
+                    rcvDate: fieldValue(headerFields.rcv_date),
+                    challanNo: fieldValue(headerFields.challan_no),
+                    supplier: fieldValue(supplier),
+                    supplierName: supplierOption && supplierOption.value ? supplierOption.textContent.trim() : '',
+                }, all.map(function (row, i) {
+                    return {
+                        line: i + 1,
+                        item: fieldValue(row.querySelector('.js-line-item')),
+                        qty: row.querySelector('.js-line-qty').value,
+                        price: row.querySelector('.js-line-price').value,
+                        remarks: row.querySelector('.js-line-remarks').value,
+                    };
+                }));
+
+                if (!problems.length) { return; }
+
+                event.preventDefault();
+                problems.forEach(function (p) {
+                    var row = p.line ? all[p.line - 1] : null;
+                    markLineError(headerFields[p.field] || (row && row.querySelector(lineFields[p.field])), p.message);
+                });
+
+                blocker.innerHTML = '<strong class="d-block mb-1">Please complete the form before recording the receiving.</strong>'
+                    + problems.map(function (p) {
+                        return '<span class="d-block">' + String(p.message).replace(/[<>&]/g, '') + '</span>';
+                    }).join('');
+                blocker.classList.remove('d-none');
+                blocker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+
+            // Cleared as soon as the user starts fixing the form.
+            form.addEventListener('input', function () { blocker.classList.add('d-none'); });
         })();
 
         // The collapse label-flip listener that used to sit here is gone with

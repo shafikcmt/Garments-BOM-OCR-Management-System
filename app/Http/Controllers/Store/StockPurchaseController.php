@@ -194,7 +194,10 @@ class StockPurchaseController extends Controller
 
         return view('store.stock.purchases', compact(
             'groups', 'lines', 'items', 'suppliers', 'filters', 'canEdit', 'canDelete', 'nextRv', 'drafts'
-        ));
+        ) + [
+            // The Month filter's list ("All months" + recent months).
+            'monthOptions' => \App\Support\MonthOptions::recent($filters['month'] ?? null),
+        ]);
     }
 
     /**
@@ -214,24 +217,33 @@ class StockPurchaseController extends Controller
             // RCV date earlier than the challan date is a typo, not a case.
             'rcv_date' => ['required', 'date', 'after_or_equal:purchase_date'],
             // rv_no is no longer accepted from the form — it is allocated below.
-            'challan_no' => ['nullable', 'string', 'max:100'],
-            'general_stock_supplier_id' => ['nullable', 'exists:general_stock_suppliers,id'],
+            // Challan No, Supplier and each line's Unit Price are required on
+            // a recorded receiving (owner, 2026-09-29); Save Draft does not
+            // come through here and may leave them empty.
+            'challan_no' => ['required', 'string', 'max:100'],
+            'general_stock_supplier_id' => ['required', 'exists:general_stock_suppliers,id'],
             'supplier_name' => ['nullable', 'string', 'max:255'],
 
             'items' => ['required', 'array', 'min:1'],
             'items.*.stock_item_id' => ['required', 'exists:stock_items,id'],
             'items.*.qty' => ['required', 'numeric', 'min:0.0001'],
-            'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            // 0 is allowed (a free sample); the reports treat it as no price.
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.remarks' => ['nullable', 'string', 'max:1000'],
-        ], [
+        ], self::requiredMessages() + [
             'rcv_date.after_or_equal' => 'The RCV date cannot be earlier than the challan date.',
             'items.required' => 'Add at least one item to receive.',
             'items.min' => 'Add at least one item to receive.',
+            'items.*.unit_price.required' => 'Enter the unit price (0 if free of charge).',
         ], [
             'purchase_date' => 'challan date',
             'rcv_date' => 'RCV date',
             'general_stock_supplier_id' => 'supplier',
         ] + $this->lineAttributes($request));
+
+        // The same item on one challan from one supplier only with a
+        // different remark — within this form and against receipts recorded.
+        $this->assertNoRepeatedLines($data['items'], $data['challan_no'], (int) $data['general_stock_supplier_id']);
 
         // Header, resolved once rather than once per line.
         $header = [
@@ -495,10 +507,14 @@ class StockPurchaseController extends Controller
             // from the request — the request cannot carry it.
             'rcv_date' => ['required', 'date', 'after_or_equal:'.$stockPurchase->purchase_date->toDateString()],
             'qty' => ['required', 'numeric', 'min:0.0001'],
-            'unit_price' => ['nullable', 'numeric', 'min:0'],
-            'general_stock_supplier_id' => ['nullable', 'exists:general_stock_suppliers,id'],
+            // Required on an edit as on a new receiving (owner, 2026-09-29):
+            // an old line with them empty is filled in when next edited. The
+            // Challan No cannot be edited here, so it is not asked for.
+            'unit_price' => ['required', 'numeric', 'min:0'],
+            'general_stock_supplier_id' => ['required', 'exists:general_stock_suppliers,id'],
             'remarks' => ['nullable', 'string', 'max:1000'],
-        ], [
+        ], self::requiredMessages() + [
+            'unit_price.required' => 'Enter the unit price (0 if free of charge).',
             'rcv_date.after_or_equal' => 'The RCV date cannot be earlier than the challan date ('
                 .$stockPurchase->purchase_date->format('d-M-Y').').',
         ], [
@@ -509,6 +525,16 @@ class StockPurchaseController extends Controller
         ]);
 
         $supplierId = $data['general_stock_supplier_id'] ?? null;
+
+        // The same item + challan + supplier + remark as another recorded
+        // receipt is refused; this line is not its own twin.
+        $this->assertNoRepeatedLines(
+            [['stock_item_id' => $stockPurchase->stock_item_id, 'remarks' => $data['remarks'] ?? null]],
+            $stockPurchase->challan_no,
+            (int) $supplierId,
+            $stockPurchase,
+            fn () => 'remarks'
+        );
 
         DB::transaction(function () use ($data, $supplierId, $stockPurchase) {
             $this->assertReceiptCovers($stockPurchase, (float) $data['qty']);
@@ -533,6 +559,78 @@ class StockPurchaseController extends Controller
         });
 
         return back()->with('success', 'Receiving line updated.');
+    }
+
+    /** @return array<string, string> the header messages a required field shows, create and edit alike */
+    private static function requiredMessages(): array
+    {
+        return [
+            'challan_no.required' => 'Enter the Challan / Invoice No.',
+            'general_stock_supplier_id.required' => 'Select the supplier.',
+        ];
+    }
+
+    /** Compared trimmed, spaces collapsed, case-insensitive. */
+    private static function normalized(?string $value): string
+    {
+        return mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', (string) $value)));
+    }
+
+    /**
+     * The same item may appear more than once on one challan from one
+     * supplier only when the remarks differ — a further delivery against the
+     * same challan says so ("2nd delivery"). Same remarks, or both empty, are
+     * refused on the line, whether the twin is another line of this form or a
+     * receipt already recorded under that challan and supplier. $excluding is
+     * the line being edited, which is never its own twin.
+     *
+     * Old records are not touched; the rule applies when one is edited.
+     *
+     * @param  array<int|string, array<string, mixed>>  $lines
+     * @param  callable(int|string): string|null  $errorKey
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    private function assertNoRepeatedLines(array $lines, ?string $challanNo, int $supplierId, ?StockPurchase $excluding = null, ?callable $errorKey = null): void
+    {
+        $challan = self::normalized($challanNo);
+
+        if ($challan === '' || $supplierId <= 0) {
+            return;
+        }
+
+        $supplier = GeneralStockSupplier::find($supplierId)?->name ?? 'this supplier';
+        $errorKey ??= fn ($index) => 'items.'.$index.'.remarks';
+        $message = 'This item is already received on challan '.trim((string) $challanNo).' from '.$supplier
+            .' with the same remark. For a further delivery, add a remark such as \'2nd delivery\'.';
+
+        // Recorded already under this challan, from this supplier. LOWER/TRIM
+        // read the same on MySQL, PostgreSQL and SQLite.
+        $itemIds = array_values(array_unique(array_map(fn ($line) => (int) $line['stock_item_id'], $lines)));
+        $taken = StockPurchase::query()
+            ->whereIn('stock_item_id', $itemIds)
+            ->whereRaw('LOWER(TRIM(challan_no)) = ?', [$challan])
+            ->where('general_stock_supplier_id', $supplierId)
+            ->when($excluding, fn ($q) => $q->whereKeyNot($excluding->getKey()))
+            ->get(['stock_item_id', 'remarks'])
+            ->mapWithKeys(fn ($line) => [$line->stock_item_id.'|'.self::normalized($line->remarks) => true])
+            ->all();
+
+        $errors = [];
+
+        foreach ($lines as $index => $line) {
+            $key = (int) $line['stock_item_id'].'|'.self::normalized($line['remarks'] ?? null);
+
+            if (isset($taken[$key])) {
+                $errors[$errorKey($index)] = $message;
+            }
+
+            $taken[$key] = true;
+        }
+
+        if ($errors) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
     }
 
     /**

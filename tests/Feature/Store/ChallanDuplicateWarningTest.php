@@ -168,17 +168,20 @@ it('ignores the same number from a different supplier', function () {
     expect($sameSupplier)->toHaveCount(1);
 });
 
-it('warns without preventing the delivery from being recorded', function () {
-    // The whole rule: a repeated challan is ordinary in a partial receipt, so
-    // the second entry must still go through.
+it('records a further delivery against the same challan when it carries its own remark', function () {
+    // A repeated challan is ordinary in a partial receipt. Since 2026-09-29 the
+    // same item again on that challan from that supplier says so in its
+    // remark (ReceivingStrictRulesTest has the refusal).
     $item = challanItem();
-    recordChallan($item, '48699');
+    $supplier = \App\Models\GeneralStockSupplier::firstOrCreate(['name' => 'Test Supplier']);
+    recordChallan($item, '48699', ['general_stock_supplier_id' => $supplier->id]);
 
     $this->actingAs(challanUser())->post(route('store.stock.purchases.store'), [
         'purchase_date' => '2026-08-13',
         'rcv_date' => '2026-08-15',
         'challan_no' => '48699',
-        'items' => [['stock_item_id' => $item->id, 'qty' => 3, 'unit_price' => 750]],
+        'general_stock_supplier_id' => $supplier->id,
+        'items' => [['stock_item_id' => $item->id, 'qty' => 3, 'unit_price' => 750, 'remarks' => '2nd delivery']],
     ])->assertRedirect()->assertSessionHas('success');
 
     expect(StockPurchase::where('challan_no', '48699')->count())->toBe(2);

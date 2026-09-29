@@ -72,6 +72,10 @@ function purchasePayload(StockPurchase $line, array $overrides = []): array
     return array_merge([
         'rcv_date' => $line->rcv_date->toDateString(),
         'qty' => rtrim(rtrim(number_format((float) $line->qty, 4, '.', ''), '0'), '.'),
+        // Required on an edit (2026-09-29): the line's own, else a supplier.
+        'unit_price' => $line->unit_price !== null ? (float) $line->unit_price : 0,
+        'general_stock_supplier_id' => $line->general_stock_supplier_id
+            ?? \App\Models\GeneralStockSupplier::firstOrCreate(['name' => 'Test Supplier'])->id,
     ], $overrides);
 }
 
@@ -98,7 +102,8 @@ it('accepts the receiving section permission and the flat one alike', function (
         $user = purchaseEditor(['store.receiving.view', $permission]);
 
         $this->actingAs($user)
-            ->put(route('store.stock.purchases.update', $line), purchasePayload($line, ['qty' => 80]))
+            // Two receipts of one item on CH-77: each needs its own remark.
+            ->put(route('store.stock.purchases.update', $line), purchasePayload($line, ['qty' => 80, 'remarks' => 'edited under '.$permission]))
             ->assertRedirect()
             ->assertSessionHas('success');
 

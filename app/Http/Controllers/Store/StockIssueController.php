@@ -165,7 +165,7 @@ class StockIssueController extends Controller
             'categories' => ItemCategory::selectable()->get(['id', 'name']),
             'requisitionTypes' => StockIssue::REQUISITION_TYPES,
             'filters' => $filters,
-            'monthOptions' => $this->monthOptions($filters['month'] ?? null),
+            'monthOptions' => \App\Support\MonthOptions::recent($filters['month'] ?? null),
             'canEdit' => $canEdit,
             'canDelete' => $canDelete,
             // This user's own half-finished forms. Nothing here touches stock —
@@ -600,29 +600,6 @@ class StockIssueController extends Controller
 
             throw \Illuminate\Validation\ValidationException::withMessages($errors);
         }
-    }
-
-    /**
-     * The Month filter's list: the last 24 months, newest first, plus the
-     * selected one if it is older — the same list the requisition page shows.
-     *
-     * @return array<string, string> "2026-09" => "September 2026"
-     */
-    private function monthOptions(?string $selected): array
-    {
-        $options = [];
-        $month = now()->startOfMonth();
-
-        for ($i = 0; $i < 24; $i++) {
-            $options[$month->format('Y-m')] = $month->format('F Y');
-            $month = $month->copy()->subMonth();
-        }
-
-        if ($selected && ! isset($options[$selected])) {
-            $options[$selected] = \Illuminate\Support\Carbon::createFromFormat('!Y-m', $selected)->format('F Y');
-        }
-
-        return $options;
     }
 
     /**

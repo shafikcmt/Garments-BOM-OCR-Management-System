@@ -190,6 +190,8 @@ it('records the receiving and clears the draft when it is finally submitted', fu
         'purchase_date' => now()->startOfMonth()->toDateString(),
         'rcv_date' => now()->startOfMonth()->toDateString(),
         'challan_no' => 'CH-900',
+        // Required when the draft is recorded (2026-09-29).
+        'general_stock_supplier_id' => \App\Models\GeneralStockSupplier::firstOrCreate(['name' => 'Test Supplier'])->id,
         'items' => [['stock_item_id' => $item->id, 'qty' => 10, 'unit_price' => 5]],
     ])->assertRedirect()->assertSessionHas('success');
 
