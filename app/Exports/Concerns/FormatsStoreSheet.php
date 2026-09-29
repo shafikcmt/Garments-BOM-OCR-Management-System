@@ -477,7 +477,11 @@ trait FormatsStoreSheet
                 // only where there are some — one column-wide "#,##0.####"
                 // printed every whole number with a trailing dot ("200.").
                 if ($format === self::FORMAT_QUANTITY) {
-                    \App\Support\Quantity::applyExcelFormats($sheet, $range);
+                    // Safety Stock shows to at most 2 decimals (the cell keeps
+                    // the real figure); every other quantity to at most 4.
+                    \App\Support\Quantity::applyExcelFormats($sheet, $range, stripos($heading, 'safety') !== false
+                        ? \App\Support\Quantity::SAFETY_DECIMALS
+                        : 4);
                 }
 
                 continue;

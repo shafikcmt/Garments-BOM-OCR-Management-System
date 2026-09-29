@@ -73,7 +73,9 @@
                 <td>{{ $r['item']->category }}</td>
                 <td class="num">{{ $cell($r, $qty($r['balance_bf'])) }}</td>
                 <td class="num">{{ $cell($r, number_format($r['consumption_per_day'], 4, '.', '')) }}</td>
-                <td class="num">{{ $cell($r, $qty($r['safety'])) }}</td>
+                {{-- Safety Stock: at most 2 decimals on paper; Excel keeps the real figure
+                     and shows it to 2 decimals (FormatsStoreSheet). --}}
+                <td class="num">{{ $cell($r, $forExcel ? $qty($r['safety']) : \App\Support\Quantity::safety($r['safety'], '')) }}</td>
                 <td class="num">{{ $cell($r, $r['reorder'] === null ? '-' : $qty($r['reorder'])) }}</td>
                 <td class="num">{{ $r['lead_time_days'] }}</td>
                 <td class="num">{{ $cell($r, $qty($r['addition'])) }}</td>

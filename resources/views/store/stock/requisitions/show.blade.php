@@ -310,7 +310,7 @@
                                     @endif
                                 </td>
                                 <td class="text-end">{{ $qty($line->stock_in_hand_snapshot) }}</td>
-                                <td class="text-end">{{ $qty($line->safety_stock_snapshot) }}</td>
+                                <td class="text-end">{{ \App\Support\Quantity::safety($line->safety_stock_snapshot) }}</td>
                                 <td class="text-end">{{ $qty($line->consumption_last_month_snapshot) }}</td>
 
                                 <td class="text-end">{{ $qty($line->last_purchase_qty_snapshot) }}</td>

@@ -148,7 +148,7 @@
                     <td class="text-end fw-semibold">{{ $cell($r, $qty($r['balance_bf'])) }}</td>
                     <td class="text-end gx-ledger-quiet">{{ $cell($r, number_format($r['consumption_per_day'], 2)) }}</td>
                     <td class="text-end">
-                        {{ $cell($r, $qty($r['safety'])) }}
+                        {{ $cell($r, \App\Support\Quantity::safety($r['safety'])) }}
                         @if(! $r['not_counted'] && $r['safety_is_manual'])<i class="bi bi-pin-angle-fill text-primary ms-1" title="Set by hand in the item master" aria-hidden="true"></i>@endif
                     </td>
                     <td class="text-end">

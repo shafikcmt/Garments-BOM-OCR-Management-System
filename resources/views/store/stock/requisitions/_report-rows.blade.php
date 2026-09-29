@@ -68,7 +68,8 @@
 
                 <td class="num">{{ $qty($row['qty_requested']) }}</td>
                 <td class="num">{{ $qty($row['stock_in_hand']) }}</td>
-                <td class="num">{{ $qty($row['safety_stock']) }}</td>
+                {{-- Safety Stock: at most 2 decimals on paper; Excel keeps the real figure. --}}
+                <td class="num">{{ ($forExcel ?? false) ? $qty($row['safety_stock']) : \App\Support\Quantity::safety($row['safety_stock'], '-') }}</td>
                 <td class="num">{{ $qty($row['consumption_last_month']) }}</td>
 
                 <td class="num">{{ $qty($row['last_purchase_qty']) }}</td>

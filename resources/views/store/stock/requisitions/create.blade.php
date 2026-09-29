@@ -687,7 +687,9 @@
 
                         row.querySelector('.js-line-uom').value = data.uom || '';
                         row.querySelector('.js-line-stock').textContent = qtyText(data.stock_in_hand);
-                        row.querySelector('.js-line-safety').textContent = qtyText(data.safety_stock);
+                        // Safety Stock to at most 2 decimals, as everywhere else.
+                        row.querySelector('.js-line-safety').textContent = (data.safety_stock === null || data.safety_stock === undefined || data.safety_stock === '')
+                            ? '—' : String(parseFloat(parseFloat(data.safety_stock).toFixed(2)));
                         row.querySelector('.js-line-consumption').textContent = qtyText(data.consumption_last_month);
                         row.querySelector('.js-line-lpqty').textContent = qtyText(data.last_purchase_qty);
                         row.querySelector('.js-line-lprate').textContent = data.last_purchase_rate == null ? '—' : money(data.last_purchase_rate);

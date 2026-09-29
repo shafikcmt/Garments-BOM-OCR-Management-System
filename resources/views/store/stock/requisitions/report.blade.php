@@ -209,7 +209,7 @@
 
                                                 <td class="text-end fw-bold">{{ $qty($row['qty_requested']) }}</td>
                                                 <td class="text-end">{{ $qty($row['stock_in_hand']) }}</td>
-                                                <td class="text-end">{{ $qty($row['safety_stock']) }}</td>
+                                                <td class="text-end">{{ \App\Support\Quantity::safety($row['safety_stock']) }}</td>
                                                 <td class="text-end">{{ $qty($row['consumption_last_month']) }}</td>
 
                                                 <td class="text-end">{{ $qty($row['last_purchase_qty']) }}</td>
