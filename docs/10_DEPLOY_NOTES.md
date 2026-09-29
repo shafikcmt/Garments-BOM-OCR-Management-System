@@ -100,3 +100,14 @@ Roll back only together with the code: the stage engine needs all four.
   ```bash
   php artisan tinker --execute='print_r(DB::select("select column_name, data_type, character_maximum_length from information_schema.columns where table_name = ? and column_name = ?", ["purchase_requisitions","status"])); print_r(DB::select("select c.conname, pg_get_constraintdef(c.oid) as def from pg_constraint c join pg_class t on t.oid = c.conrelid where t.relname = ? and c.contype = ?", ["purchase_requisitions","c"]));'
   ```
+
+## 6. Open items for later steps (not built yet)
+
+- **Step 4 (merge):** once a department sheet has been merged into a final
+  sheet, it must not be cancellable. Block Cancel on it with a clear
+  message (e.g. "This requisition is part of final sheet <no>. Cancel or
+  return the final sheet instead.").
+- **Cancelled sheets and the reports:** the Stock Summary, Requirement vs
+  Issue and the Monthly Requisition report all read the one counting rule
+  (`PurchaseRequisition::countedInTotals()`), which leaves cancelled sheets
+  out. A test per report is added in Step 3d.
