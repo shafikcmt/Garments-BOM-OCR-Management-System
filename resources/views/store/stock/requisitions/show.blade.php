@@ -254,15 +254,19 @@
                             <th rowspan="2" style="min-width:140px;">Specification / Brand</th>
                             <th rowspan="2">Type</th>
                             <th rowspan="2" style="min-width:130px;">User Dept. / Section</th>
-                            <th colspan="4" class="text-center gx-line-group">Stock Details</th>
+                            {{-- Stock in Hand and Safety Stock are the Store's figures, shown to Store (and Admin / Management) only. --}}
+                            @php($showStockFigures = $showStockFigures ?? false)
+                            <th colspan="{{ $showStockFigures ? 4 : 2 }}" class="text-center gx-line-group">Stock Details</th>
                             <th colspan="3" class="text-center gx-line-group">Last Purchase Details</th>
                             <th colspan="3" class="text-center gx-line-group">To Be Procured</th>
                             <th rowspan="2" style="min-width:120px;">Remarks</th>
                         </tr>
                         <tr>
                             <th class="text-end">Qty Requested</th>
-                            <th class="text-end">Stock in Hand</th>
-                            <th class="text-end">Safety Stock</th>
+                            @if($showStockFigures)
+                                <th class="text-end">Stock in Hand</th>
+                                <th class="text-end">Safety Stock</th>
+                            @endif
                             <th class="text-end">Cons. (Last Month)</th>
                             <th class="text-end">Qty</th>
                             <th class="text-end">Rate</th>
@@ -309,8 +313,10 @@
                                         <span class="badge bg-secondary-subtle text-secondary-emphasis mt-1">Not approved</span>
                                     @endif
                                 </td>
-                                <td class="text-end">{{ $qty($line->stock_in_hand_snapshot) }}</td>
-                                <td class="text-end">{{ \App\Support\Quantity::safety($line->safety_stock_snapshot) }}</td>
+                                @if($showStockFigures)
+                                    <td class="text-end">{{ $qty($line->stock_in_hand_snapshot) }}</td>
+                                    <td class="text-end">{{ \App\Support\Quantity::safety($line->safety_stock_snapshot) }}</td>
+                                @endif
                                 <td class="text-end">{{ $qty($line->consumption_last_month_snapshot) }}</td>
 
                                 <td class="text-end">{{ $qty($line->last_purchase_qty_snapshot) }}</td>
@@ -327,7 +333,7 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="16" class="text-end gx-stock-total-label">Total-</td>
+                            <td colspan="{{ $showStockFigures ? 16 : 14 }}" class="text-end gx-stock-total-label">Total-</td>
                             <td class="text-end fw-bold">{{ $money($total) }}</td>
                             <td></td>
                         </tr>
@@ -336,7 +342,7 @@
             </div>
 
             <p class="gx-stock-help mt-3 mb-0">
-                Stock, safety, consumption and last purchase are the figures as at
+                {{ $showStockFigures ? 'Stock, safety, consumption' : 'Consumption' }} and last purchase are the figures as at
                 {{ optional($requisition->requisition_date)->format('d M Y') }} — frozen when this requisition was raised,
                 so it still shows the position that justified it.
             </p>
