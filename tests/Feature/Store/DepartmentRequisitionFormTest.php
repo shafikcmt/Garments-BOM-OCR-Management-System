@@ -342,3 +342,28 @@ it('never offers the promotion action to someone without the item-create permiss
         ->assertOk()
         ->assertDontSee('Add to Item Master');
 });
+
+it('shows Stock in Hand and Safety Stock figures on a requisition to the Store only', function () {
+    $user = formDeptUser('production', cuttingSection());
+    $item = oilItem();
+
+    $this->actingAs($user)->post(route('store.stock.requisitions.store'), requisitionPost($item));
+    $requisition = PurchaseRequisition::latest('id')->firstOrFail();
+    $requisition->items()->update(['stock_in_hand_snapshot' => 987, 'safety_stock_snapshot' => 12.34]);
+
+    // The department that raised it: the columns are there, the figures are not.
+    $this->actingAs($user)
+        ->get(route('store.stock.requisitions.show', $requisition))
+        ->assertOk()
+        ->assertSee('Stock in Hand')
+        ->assertSee('Safety Stock')
+        ->assertDontSee('987')
+        ->assertDontSee('12.34');
+
+    // The Store reads the figures as before.
+    $this->actingAs(formStoreUser())
+        ->get(route('store.stock.requisitions.show', $requisition))
+        ->assertOk()
+        ->assertSee('987')
+        ->assertSee('12.34');
+});

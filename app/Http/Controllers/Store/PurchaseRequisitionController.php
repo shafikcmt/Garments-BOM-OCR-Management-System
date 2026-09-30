@@ -873,6 +873,10 @@ class PurchaseRequisitionController extends Controller
             'statusLabels' => PurchaseRequisition::statusLabels(),
             'typeLabels' => PurchaseRequisitionItem::typeLabels(),
             'canDelete' => $requisition->canBeDeletedBy($user),
+            // Stock in Hand and Safety Stock are the Store's figures: shown
+            // only to whoever works the Store's side, the same rule the entry
+            // form uses to hide its stock chips from a department user.
+            'showStockFigures' => $user && PurchaseRequisition::seesEveryRequisition($user),
             // Step 3d: what each changed line was first requested at this
             // round, and whether this viewer may change quantities now (the
             // person the sheet waits for, at their stage).
@@ -1233,9 +1237,19 @@ class PurchaseRequisitionController extends Controller
             'departmentCheckedBy', 'sectionCheckedBy', 'storeAckBy', 'accountsAckBy', 'checkedBy', 'approvedBy',
         ]);
 
+        $rows = $report->requisitionRows($requisition);
+
+        // Stock in Hand and Safety Stock are the Store's figures. For anyone
+        // else they are blanked, not dropped, so the printed sheet keeps its
+        // exact 21-column layout.
+        $user = auth()->user();
+        if (! ($user && PurchaseRequisition::seesEveryRequisition($user))) {
+            $rows = $rows->map(fn ($row) => array_merge($row, ['stock_in_hand' => null, 'safety_stock' => null]));
+        }
+
         return [
             'requisition' => $requisition,
-            'rows' => $report->requisitionRows($requisition),
+            'rows' => $rows,
             'title' => 'Purchase Requisition',
             // The signature footer, from Admin > Settings — the same boxes the
             // screen shows, so PDF, Excel and screen cannot disagree.

@@ -254,6 +254,8 @@
                             <th rowspan="2" style="min-width:140px;">Specification / Brand</th>
                             <th rowspan="2">Type</th>
                             <th rowspan="2" style="min-width:130px;">User Dept. / Section</th>
+                            {{-- Stock in Hand and Safety Stock figures are shown to Store (and Admin / Management) only. --}}
+                            @php($showStockFigures = $showStockFigures ?? false)
                             <th colspan="4" class="text-center gx-line-group">Stock Details</th>
                             <th colspan="3" class="text-center gx-line-group">Last Purchase Details</th>
                             <th colspan="3" class="text-center gx-line-group">To Be Procured</th>
@@ -309,8 +311,9 @@
                                         <span class="badge bg-secondary-subtle text-secondary-emphasis mt-1">Not approved</span>
                                     @endif
                                 </td>
-                                <td class="text-end">{{ $qty($line->stock_in_hand_snapshot) }}</td>
-                                <td class="text-end">{{ \App\Support\Quantity::safety($line->safety_stock_snapshot) }}</td>
+                                {{-- Columns stay for everyone; the figures are shown to the Store side only. --}}
+                                <td class="text-end">{{ $showStockFigures ? $qty($line->stock_in_hand_snapshot) : '—' }}</td>
+                                <td class="text-end">{{ $showStockFigures ? \App\Support\Quantity::safety($line->safety_stock_snapshot) : '—' }}</td>
                                 <td class="text-end">{{ $qty($line->consumption_last_month_snapshot) }}</td>
 
                                 <td class="text-end">{{ $qty($line->last_purchase_qty_snapshot) }}</td>
