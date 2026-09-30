@@ -89,6 +89,9 @@
                 <tr @class(['table-danger' => $status === StockStatus::STATUS_OUT])>
                     <td>
                         <div class="fw-bold text-slate-900">{{ $item->name }}</div>
+                        @if($item->sku)
+                            <div class="gx-stock-micro">SKU: {{ $item->sku }}</div>
+                        @endif
                         {{-- Category · Brand/Specification on one line,
                              blanks dropped so a sparse item does not
                              read as a row of dashes. Set with the
