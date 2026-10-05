@@ -46,6 +46,7 @@
     <table class="table align-middle gx-stock-table">
         <thead>
             <tr>
+                <th>SKU</th>
                 <th>Item</th>
                 <th>UOM</th>
                 {{-- The counted seed, and the date it was counted on.
@@ -87,6 +88,7 @@
                     $fill = $reorder > 0 ? max(0, min(100, ($current / $reorder) * 100)) : null;
                 @endphp
                 <tr @class(['table-danger' => $status === StockStatus::STATUS_OUT])>
+                    <td class="small fw-semibold text-nowrap">{{ $item->sku ?: '—' }}</td>
                     <td>
                         <div class="fw-bold text-slate-900">{{ $item->name }}</div>
                         {{-- Category · Brand/Specification on one line,
@@ -156,7 +158,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="gx-stock-empty">
+                <tr><td colspan="8" class="gx-stock-empty">
                         <span class="gx-stock-empty-icon"><i class="bi bi-{{ $hasFilters ? 'search' : 'box-seam' }}" aria-hidden="true"></i></span>
                         @if($hasFilters)
                             <div class="gx-stock-empty-title">No items match this filter</div>
@@ -201,6 +203,11 @@
                             <button type="submit" class="btn btn-primary">Update</button>
                         </div>
                     </form>
+                    {{-- The Admin SKU correction's own form; its inputs sit in the
+                         fields above through the `form` attribute. --}}
+                    @role('admin')
+                        <form method="POST" action="{{ route('admin.item-sku.correct', $item) }}" id="itemSku{{ $item->id }}" class="d-none">@csrf</form>
+                    @endrole
                 </div>
             </div>
         </div>

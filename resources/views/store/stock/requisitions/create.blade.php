@@ -284,7 +284,7 @@
                             <option value="{{ $it->id }}"
                                     data-uom="{{ $it->uom }}"
                                     data-brand="{{ $it->brand }}"
-                                    data-category-id="{{ $it->item_category_id }}">{{ $it->name }}@if($it->brand) ({{ $it->brand }})@endif</option>
+                                    data-category-id="{{ $it->item_category_id }}">@if($it->sku){{ $it->sku }} — @endif{{ $it->name }}@if($it->brand) ({{ $it->brand }})@endif</option>
                         @endforeach
                     </select>
 

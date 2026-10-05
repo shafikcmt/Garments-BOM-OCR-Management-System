@@ -141,6 +141,11 @@
                     <td class="text-end gx-ledger-quiet">{{ $pageRows->firstItem() + $index }}</td>
                     <td class="gx-ledger-primary">
                         <div class="fw-semibold text-slate-900">{{ $r['item']->name }}</div>
+                        {{-- The SKU under the name, screen only — the PDF and
+                             Excel columns are unchanged. --}}
+                        @if($r['item']->sku)
+                            <div class="gx-stock-micro">{{ $r['item']->sku }}</div>
+                        @endif
                     </td>
                     <td>{{ $r['item']->brand ?: '—' }}</td>
                     <td class="gx-ledger-quiet">{{ $r['item']->uom ?: '—' }}</td>

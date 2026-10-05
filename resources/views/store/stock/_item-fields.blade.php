@@ -42,6 +42,46 @@
 
 <input type="hidden" name="form" value="{{ $formKey }}">
 
+@if($item)
+    {{-- The SKU: read-only, given once and never changed. Admin alone can
+         correct it, with a reason — those inputs belong to the separate
+         itemSku form after the edit form (the `form` attribute), so nothing
+         is nested and the item's own Save never sends an SKU. --}}
+    <div class="gx-stock-fieldset">
+        <div class="gx-stock-fieldset-label">SKU</div>
+        <div class="gx-edit-locked">
+            <i class="bi bi-lock-fill" aria-hidden="true"></i>
+            <span class="gx-edit-locked-value">{{ $item->sku ?: 'Not assigned yet' }}</span>
+        </div>
+        <div class="gx-edit-hint">Given once and never changed — renaming the item or moving its category keeps it.</div>
+
+        @role('admin')
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" data-bs-toggle="collapse"
+                    data-bs-target="#skuCorrect{{ $item->id }}" aria-expanded="false" aria-controls="skuCorrect{{ $item->id }}">
+                <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Correct SKU
+            </button>
+            <div class="collapse mt-2" id="skuCorrect{{ $item->id }}">
+                <div class="row g-2">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label" for="skuNew{{ $item->id }}">New SKU <span class="text-danger">*</span></label>
+                        <input type="text" id="skuNew{{ $item->id }}" name="sku" form="itemSku{{ $item->id }}" class="form-control text-uppercase"
+                               maxlength="{{ \App\Services\StockItemSku::MAX_LENGTH }}" value="{{ $item->sku }}">
+                    </div>
+                    <div class="col-12 col-md-7">
+                        <label class="form-label" for="skuReason{{ $item->id }}">Reason <span class="text-danger">*</span></label>
+                        <input type="text" id="skuReason{{ $item->id }}" name="reason" form="itemSku{{ $item->id }}" class="form-control" maxlength="1000"
+                               placeholder="Why is this SKU being changed?">
+                    </div>
+                </div>
+                <button type="submit" form="itemSku{{ $item->id }}" class="btn btn-sm btn-warning mt-2">
+                    <i class="bi bi-save me-1" aria-hidden="true"></i>Change SKU
+                </button>
+                <div class="gx-edit-hint">Logged with the old and new SKU and your reason.</div>
+            </div>
+        @endrole
+    </div>
+@endif
+
 <div class="gx-stock-fieldset">
     <div class="gx-stock-fieldset-label">What the item is</div>
 

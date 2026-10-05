@@ -76,6 +76,15 @@ Route::prefix('admin')
         Route::get('/payment-settings', [PaymentSettingController::class, 'edit'])->name('payment-settings.edit');
         Route::post('/payment-settings', [PaymentSettingController::class, 'update'])->name('payment-settings.update');
 
+        // General Stock item SKU: format, category codes, the dry-run preview,
+        // generating the missing SKUs, and the Admin correction of one SKU.
+        Route::get('/item-sku', [\App\Http\Controllers\Admin\ItemSkuSettingController::class, 'edit'])->name('item-sku.edit');
+        Route::post('/item-sku/pattern', [\App\Http\Controllers\Admin\ItemSkuSettingController::class, 'updatePattern'])->name('item-sku.pattern');
+        Route::post('/item-sku/codes', [\App\Http\Controllers\Admin\ItemSkuSettingController::class, 'updateCodes'])->name('item-sku.codes');
+        Route::get('/item-sku/preview', [\App\Http\Controllers\Admin\ItemSkuSettingController::class, 'preview'])->name('item-sku.preview');
+        Route::post('/item-sku/apply', [\App\Http\Controllers\Admin\ItemSkuSettingController::class, 'apply'])->name('item-sku.apply');
+        Route::post('/item-sku/items/{stockItem}', [\App\Http\Controllers\Admin\ItemSkuSettingController::class, 'correct'])->name('item-sku.correct');
+
         // The signature boxes printed on Purchase Requisitions.
         Route::get('/requisition-signatures', [RequisitionSignatureSettingController::class, 'edit'])->name('requisition-signatures.edit');
         Route::post('/requisition-signatures', [RequisitionSignatureSettingController::class, 'update'])->name('requisition-signatures.update');

@@ -316,7 +316,7 @@ class PurchaseRequisitionService
         return StockItem::query()
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'brand', 'uom', 'item_category_id']);
+            ->get(['id', 'sku', 'name', 'brand', 'uom', 'item_category_id']);
     }
 
     /** @return array<string, null> */

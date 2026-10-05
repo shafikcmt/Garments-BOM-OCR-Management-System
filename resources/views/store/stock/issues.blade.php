@@ -41,10 +41,11 @@
 
         return [
             'value' => (string) $it->id,
-            'text' => $it->name.($suffix !== '' ? ' ('.$suffix.')' : ''),
+            // "SKU — Item name (Brand)", so a line can be found by its SKU too.
+            'text' => ($it->sku ? $it->sku.' — ' : '').$it->name.($suffix !== '' ? ' ('.$suffix.')' : ''),
             // The bare name, beside the combined label above. The picker shows
             // brand in a column of its own, so it needs the two apart.
-            'name' => (string) $it->name,
+            'name' => ($it->sku ? $it->sku.' — ' : '').$it->name,
             'category' => (string) ($categoryNames[$it->item_category_id] ?? ''),
             'uom' => (string) ($it->uom ?? ''),
             'category_id' => $it->item_category_id ? (string) $it->item_category_id : '',
@@ -443,7 +444,7 @@
                                         @foreach($items as $it)
                                             <option value="{{ $it->id }}"
                                                     data-uom="{{ $it->uom }}"
-                                                    data-category-id="{{ $it->item_category_id }}">{{ $it->name }}@if($it->brand) ({{ $it->brand }})@endif</option>
+                                                    data-category-id="{{ $it->item_category_id }}">@if($it->sku){{ $it->sku }} — @endif{{ $it->name }}@if($it->brand) ({{ $it->brand }})@endif</option>
                                         @endforeach
                                     </select>
                                     <div class="js-line-alert mt-1"></div>

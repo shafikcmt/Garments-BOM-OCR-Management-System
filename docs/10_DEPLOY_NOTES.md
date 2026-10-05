@@ -197,3 +197,30 @@ Applies to the Monthly Requisition report now and to the Step 4 merge.
   Section / Person / Approved By / Req No / Type (the file already has these
   columns) and refuse in-file repeats (same item + req no + remark), keeping
   its re-upload guard. Bulk Issuing (Buyer/Style) has no Approved By or Type.
+
+## 11. Item SKU (owner, 2026-09-29)
+
+- Migrations (additive; constraint names under 63 characters):
+  `2026_10_04_000001_add_code_to_item_categories_table` (category `code`,
+  filled with the approved codes: ST, EL, CL, IT, PS, PC = Production +
+  Production Consumables, ND = Needle + Machine Needles, MP, MT, MD =
+  Medicine + Madeicne, others their first two letters; an inactive, deleted
+  or "ZZ…" category with no items gets none) and
+  `2026_10_04_000002_add_sku_to_stock_items_table` (`stock_items.sku`
+  unique, `stock_item_sku_sequences`, `stock_item_sku_changes`). No SKU is
+  written by the migrations.
+- From deploy on, every NEW item gets its SKU on create (format on Admin >
+  Settings > Item SKU, default `{CAT:2}-{NAME:3}-{SEQ:4}`). An SKU never
+  changes; only Admin corrects one, with a reason, logged.
+- EXISTING ITEMS ON LIVE: run the backfill AFTER deploy, with its OWN
+  dry-run preview — live items differ from local, so the local preview does
+  not apply:
+  1. `php artisan stock:generate-skus --dry-run` (or Admin > Item SKU >
+     Download Preview) — writes an Excel under storage/app/sku-preview/,
+     changes nothing.
+  2. Store team checks the live preview (and the category codes / clash
+     warnings on Admin > Item SKU) before anything is applied.
+  3. Only then: `php artisan stock:generate-skus` (asks to confirm) or the
+     "Generate Missing SKUs" button (needs the "preview checked" tick).
+  Items created between deploy and the backfill already have an SKU; the
+  backfill continues each prefix's serial after them.

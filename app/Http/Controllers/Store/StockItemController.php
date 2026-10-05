@@ -51,7 +51,8 @@ class StockItemController extends Controller
             // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE is
             // case-sensitive and quietly returns less than it should.
             $query->where(function ($q) use ($search) {
-                foreach (['name', 'brand', 'category'] as $column) {
+                // SKU too (2026-09-29): the code the Store reads off a label.
+                foreach (['sku', 'name', 'brand', 'category'] as $column) {
                     $q->orWhereLike($column, '%'.$search.'%');
                 }
             });

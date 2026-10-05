@@ -43,6 +43,31 @@ class StockItem extends Model
         'created_by',
     ];
 
+    /**
+     * The SKU is NOT fillable: no form, import or mass update can set it.
+     * It is given once on create (StockItemSku::next) and changed only by an
+     * Admin correction (StockItemSku::correct), which raises this flag.
+     */
+    public static bool $skuCorrection = false;
+
+    protected static function booted(): void
+    {
+        // Auto-generated on create, race-safe (see StockItemSku).
+        static::creating(function (StockItem $item) {
+            if (blank($item->sku)) {
+                $item->sku = app(\App\Services\StockItemSku::class)->next($item);
+            }
+        });
+
+        // Never changes once set — a rename, a category move or a format
+        // change leave it alone. Only the Admin correction gets through.
+        static::updating(function (StockItem $item) {
+            if ($item->isDirty('sku') && $item->getOriginal('sku') !== null && ! static::$skuCorrection) {
+                $item->sku = $item->getOriginal('sku');
+            }
+        });
+    }
+
     protected $casts = [
         'opening_qty' => 'decimal:4',
         'opening_as_on' => 'date',

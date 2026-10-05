@@ -165,7 +165,7 @@ class StockPurchaseController extends Controller
         $items = StockItem::where('is_active', true)->orderBy('name')
             // brand feeds the read-only Brand/Specification column on the line
             // rows, so the operator can see which brand's stock they picked.
-            ->get(['id', 'name', 'uom', 'category', 'brand']);
+            ->get(['id', 'sku', 'name', 'uom', 'category', 'brand']);
         $suppliers = GeneralStockSupplier::selectable()->get(['id', 'name']);
 
         ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
