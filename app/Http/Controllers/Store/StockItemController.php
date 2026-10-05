@@ -17,7 +17,6 @@ use App\Services\GeneralStockReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 
 /**
@@ -47,12 +46,12 @@ class StockItemController extends Controller
             ->withSum('issues as issued_qty', 'qty');
 
         if ($search = $filters['search'] ?? null) {
-            // The fields the Stock Report searches, plus the SKU, so a term that finds
+            // Same three fields the Stock Report searches, so a term that finds
             // an item there finds it here too — including the case-insensitivity.
             // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE is
             // case-sensitive and quietly returns less than it should.
             $query->where(function ($q) use ($search) {
-                foreach (['name', 'sku', 'brand', 'category'] as $column) {
+                foreach (['name', 'brand', 'category'] as $column) {
                     $q->orWhereLike($column, '%'.$search.'%');
                 }
             });
@@ -374,10 +373,6 @@ class StockItemController extends Controller
             // are no longer written from anywhere — they stay on the table
             // carrying their old values and are simply not accepted here.
             'brand' => ['nullable', 'string', 'max:255'],
-            // Optional: left blank, one is generated on save (StockSku).
-            // Letters and digits only — the format has no hyphens.
-            'sku' => ['nullable', 'string', 'max:30', 'regex:/^[A-Za-z0-9]+$/',
-                Rule::unique('stock_items', 'sku')->ignore($request->route('stockItem'))],
             'uom' => ['nullable', 'string', 'max:50'],
             // Accepts an existing master id or "new:<name>", like the four
             // dropdowns on the Issue form.
@@ -401,15 +396,7 @@ class StockItemController extends Controller
             'lead_time_days' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
             'remarks' => ['nullable', 'string', 'max:1000'],
-        ], ['sku.regex' => 'SKU may contain letters and numbers only, with no hyphens or spaces.'],
-            ['item_category_id' => 'category', 'brand' => 'brand/specification', 'sku' => 'SKU']);
-
-        // Blank keeps the item's current SKU (or gets a new one on Add).
-        if (blank($data['sku'] ?? null)) {
-            unset($data['sku']);
-        } else {
-            $data['sku'] = strtoupper($data['sku']);
-        }
+        ], [], ['item_category_id' => 'category', 'brand' => 'brand/specification']);
 
         // A counted quantity with no date would sit outside every month the
         // report can place it, so today stands in — the same fallback

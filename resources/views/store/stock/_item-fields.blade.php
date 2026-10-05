@@ -49,12 +49,6 @@
     <input name="name" value="{{ $value('name', $item?->name) }}" class="form-control mb-3" required
            @if(! $item) autofocus @endif>
 
-    {{-- Left blank, the SKU is generated on save: category code + item
-         initials + serial, no hyphens (STCPI0001). --}}
-    <label class="form-label">SKU</label>
-    <input name="sku" value="{{ $value('sku', $item?->sku) }}" class="form-control mb-3 text-uppercase" maxlength="30"
-           pattern="[A-Za-z0-9]+" placeholder="Auto-generated if left blank, e.g. STCPI0001">
-
     {{-- One field, not three. Brand, Size and Specification were filled
          inconsistently and read as a single line anyway, so the store keeps
          them together here: "Organ 14", "Groz-Beckert DBx1 90/14 ball point". --}}

@@ -9,22 +9,8 @@ class StockItem extends Model
 {
     use HasFactory;
 
-    protected static function booted(): void
-    {
-        // Every item carries an SKU. One typed on the form is kept; a blank
-        // one is generated from the category and the item name.
-        static::saving(function (StockItem $item) {
-            if (blank($item->sku)) {
-                $item->sku = \App\Support\StockSku::generate((string) $item->name, $item->category);
-            }
-        });
-    }
-
     protected $fillable = [
         'name',
-        // Category code + item initials + serial, no hyphens (STCPI0001).
-        // Filled in on save when left blank — see booted().
-        'sku',
         'brand',
         'size',
         'specification',
