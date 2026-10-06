@@ -15,7 +15,7 @@
 set -Eeuo pipefail
 
 PROJECT_DIR="/home/hapl/hapl_ocr_3002/garments-ocr"
-BRANCH="${DEPLOY_BRANCH:-production}"
+BRANCH="${DEPLOY_BRANCH:-master}"
 APP_PORT="3002"
 
 DB_CONTAINER="garments_ocr_db_3002"

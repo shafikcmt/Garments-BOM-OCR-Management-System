@@ -1,14 +1,11 @@
 name: Deploy Garments OCR Live
 
-# Live deploy runs ONLY when the "production" branch is updated
-# (or when started by hand from the Actions tab).
-# Daily work is pushed to "master" and never deploys by itself.
-#
-# To deploy:  git push origin master:production
+# Same as company-website / ksa-embassy-app / mosla-ghor:
+# every push to master deploys to the office server.
 on:
   push:
     branches:
-      - production
+      - master
   workflow_dispatch:
 
 # Never run two deploys at the same time, and never cancel one half-way
@@ -20,11 +17,9 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to live server
-    # Office server runner registered with the label "garments-ocr-deploy".
+    # Office server runner (private IP, GitHub-hosted runners can't reach it)
     runs-on: [self-hosted, garments-ocr-deploy]
     timeout-minutes: 40
     steps:
       - name: Run deployment script
-        env:
-          DEPLOY_BRANCH: production
         run: bash /home/hapl/hapl_ocr_3002/garments-ocr/deploy.sh
