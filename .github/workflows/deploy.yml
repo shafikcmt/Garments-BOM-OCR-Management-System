@@ -21,5 +21,12 @@ jobs:
     runs-on: [self-hosted, garments-ocr-deploy]
     timeout-minutes: 40
     steps:
+      # Always run the deploy.sh from the pushed commit, not the older copy
+      # sitting on the server, so safety fixes apply on the same deploy.
       - name: Run deployment script
-        run: bash /home/hapl/hapl_ocr_3002/garments-ocr/deploy.sh
+        run: |
+          cd /home/hapl/hapl_ocr_3002/garments-ocr
+          git fetch origin master
+          git show "${GITHUB_SHA}:deploy.sh" > /tmp/garments_ocr_deploy_running.sh
+          chmod +x /tmp/garments_ocr_deploy_running.sh
+          DEPLOY_SH_COPIED=1 bash /tmp/garments_ocr_deploy_running.sh
