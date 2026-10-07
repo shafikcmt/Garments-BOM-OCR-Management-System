@@ -183,14 +183,16 @@
                                  rights for. Reachable by route before this, but with
                                  no way to navigate to them. Listed in the same order
                                  as the store role's own General Stock block, so the
-                                 two sidebars read alike. --}}
-                            <a href="{{ route('store.stock.ledger') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">Stock Report</a>
-                            <a href="{{ route('store.stock.items.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">Items</a>
-                            <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">Receiving</a>
-                            <a href="{{ route('store.stock.issues.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">Issues</a>
+                                 two sidebars read alike: the work in process order
+                                 (Requisition → Receiving → Issues), then the
+                                 report, then the master data. --}}
                             {{-- Named in full to keep it distinct from the
                                  material Requisitions under Buyer/Style Stock. --}}
                             <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">Purchase Requisition</a>
+                            <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">Receiving</a>
+                            <a href="{{ route('store.stock.issues.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">Issues</a>
+                            <a href="{{ route('store.stock.ledger') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">Stock Report</a>
+                            <a href="{{ route('store.stock.items.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">Items</a>
                             {{-- Purchase Setup and Issue Setup are one screen now.
                                  Their old routes redirect here, so both spellings
                                  still highlight this entry. --}}
@@ -369,17 +371,12 @@
             <div class="sidebar-section">
                 <div class="sidebar-section-label">General Stock</div>
                 <ul class="sidebar-list">
-                    @if($seeStockReport)
+                    @if($seeRequisition)
+                    {{-- Named in full to keep it distinct from the material
+                         Requisitions under Buyer/Style Stock. --}}
                     <li class="sidebar-item">
-                        <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Stock Report</span></span>
-                        </a>
-                    </li>
-                    @endif
-                    @if($seeItems)
-                    <li class="sidebar-item">
-                        <a href="{{ route('store.stock.items.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span><span class="sidebar-link-text">Items</span></span>
+                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Purchase Requisition</span></span>
                         </a>
                     </li>
                     @endif
@@ -397,12 +394,17 @@
                         </a>
                     </li>
                     @endif
-                    @if($seeRequisition)
-                    {{-- Named in full to keep it distinct from the material
-                         Requisitions under Buyer/Style Stock. --}}
+                    @if($seeStockReport)
                     <li class="sidebar-item">
-                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Purchase Requisition</span></span>
+                        <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Stock Report</span></span>
+                        </a>
+                    </li>
+                    @endif
+                    @if($seeItems)
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.stock.items.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span><span class="sidebar-link-text">Items</span></span>
                         </a>
                     </li>
                     @endif
@@ -593,19 +595,13 @@
                          store.edit / store.delete rights for these General Stock
                          screens, so it needs a way to reach them. Same order and
                          icons as the store role's own General Stock block. --}}
+                    {{-- Named in full to keep it distinct from the material
+                         Requisitions under Buyer/Style Stock. --}}
                     <li class="sidebar-item">
-                        <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">
+                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Stock Report</span>
-                            </span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('store.stock.items.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Items</span>
+                                <span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Purchase Requisition</span>
                             </span>
                         </a>
                     </li>
@@ -625,13 +621,19 @@
                             </span>
                         </a>
                     </li>
-                    {{-- Named in full to keep it distinct from the material
-                         Requisitions under Buyer/Style Stock. --}}
                     <li class="sidebar-item">
-                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">
+                        <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Purchase Requisition</span>
+                                <span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Stock Report</span>
+                            </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.stock.items.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main">
+                                <span class="sidebar-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Items</span>
                             </span>
                         </a>
                     </li>
