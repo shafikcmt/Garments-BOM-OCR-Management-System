@@ -255,6 +255,17 @@ npm run build
 
 For UI-only changes, at least check views and build if frontend assets are changed.
 
+## Deployment
+
+Every push to `master` deploys to the live office server automatically
+(`.github/workflows/deploy.yml` on a self-hosted runner, running `deploy.sh`).
+The script runs `composer install`, `npm ci` + `npm run build`,
+`php artisan migrate --force`, `optimize:clear` and the config/route/view
+caches, then restarts the queue. Do not tell the user to run these by hand
+after a push — only Admin-side settings (data entered on screens) need a
+manual step. Because a push to `master` is a live deploy, push there only
+when the user asks.
+
 ## Git Rules
 
 Before making changes:
