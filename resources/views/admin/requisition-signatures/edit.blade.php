@@ -133,9 +133,9 @@
                                     <h5 class="mb-1">{{ $levelLabel }} — Signature Boxes</h5>
                                     <p class="text-muted small mb-0">
                                         @if($level === 'department')
-                                            Printed on a requisition a department raises for itself. Boxes print left to right in this order.
+                                            Printed on a requisition a department raises for itself. Box 1 is the person who raised it; each box after it approves in this order. The last box (Received by Store) ends the sheet — it then waits to be merged.
                                         @else
-                                            Printed on the merged Purchase Requisition the Store raises, and on the monthly report. Boxes print left to right in this order.
+                                            Printed on the merged Purchase Requisition the Store raises, and on the monthly report. Box 1 is the Store user who merges, checks and submits it (Prepared by); each box after it approves in this order, and the last box gives the final approval.
                                         @endif
                                     </p>
                                 </div>

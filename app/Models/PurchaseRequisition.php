@@ -716,6 +716,20 @@ class PurchaseRequisition extends Model
             return 'Merged into Final';
         }
 
+        // A final sheet on its way through the approvals names the stage it
+        // waits at — "With HR Head" — not the status its Store Head stage
+        // happened to write ("Received by Store").
+        if (! $this->isDepartmentLevel() && $this->usesStageEngine() && (int) $this->current_stage > 1
+            && in_array($this->status, [self::STATUS_SUBMITTED, self::STATUS_STORE_REVIEWED], true)) {
+            $stage = $this->relationLoaded('stages')
+                ? $this->stages->where('sequence', $this->current_stage)->sortByDesc('cycle')->first()
+                : $this->stages()->where('sequence', $this->current_stage)->reorder()->orderByDesc('cycle')->first();
+
+            if ($stage) {
+                return 'With '.(trim((string) $stage->title) ?: $stage->label);
+            }
+        }
+
         return match ($this->status) {
             self::STATUS_DRAFT => 'Draft',
             self::STATUS_SUBMITTED => match ($this->department_review_status) {

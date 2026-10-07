@@ -69,11 +69,11 @@ class RequisitionSignatureBlock extends Model
         ];
     }
 
-    /** @return array<string, string> stamp_source => label; '' = paper only */
+    /** @return array<string, string> stamp_source => label; '' = an approval that changes no status */
     public static function stampSourceLabels(): array
     {
         return [
-            '' => 'Signed on paper only',
+            '' => 'Approval only — no status change',
             self::STAMP_PREPARED => 'Prepared — when submitted',
             self::STAMP_DEPARTMENT_HEAD => 'Department Head — Approve',
             self::STAMP_STORE_HEAD => 'Store Head — Received',

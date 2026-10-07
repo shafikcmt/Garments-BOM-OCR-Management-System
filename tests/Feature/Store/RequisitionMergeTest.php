@@ -236,9 +236,19 @@ it('sends the submitted final sheet through Store Head, HR Audit, Finance and Op
             $clerk->name, 'Store Head Approver', 'HR Audit Approver', 'Finance Approver', 'Operation Approver',
         ]);
 
-    foreach (['store_head', 'hr', 'finance', 'operation'] as $who) {
+    // The Store user who merged and submitted is "Prepared by"; the list
+    // names the stage the sheet waits at.
+    expect($final->progressLabel())->toBe('With Store Head');
+    mgApprove($this->approvers['store_head'], $final)->assertSessionHasNoErrors();
+    expect($final->fresh()->progressLabel())->toBe('With HR Head');
+
+    // Only the Operation Head's approval makes it Approved.
+    foreach (['hr', 'finance'] as $who) {
         mgApprove($this->approvers[$who], $final)->assertSessionHasNoErrors();
     }
+    expect($final->fresh()->status)->not->toBe(PurchaseRequisition::STATUS_APPROVED)
+        ->and($final->fresh()->progressLabel())->toBe('With Operation Head');
+    mgApprove($this->approvers['operation'], $final)->assertSessionHasNoErrors();
 
     expect($final->fresh()->status)->toBe(PurchaseRequisition::STATUS_APPROVED)
         ->and($sheet->fresh()->merged_into_id)->toBe($final->id);
