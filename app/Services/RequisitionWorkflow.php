@@ -25,14 +25,16 @@ use Illuminate\Validation\ValidationException;
  * box after it is a stage somebody must approve, so the printed boxes and
  * the approvers cannot drift apart.
  *
- *   Department sheet: Prepared → Section/Department Head → Store Head
- *   Final sheet:      Prepared → Store Head → HR Audit → Finance & Commercial
- *                     → Operation Head
+ *   Department sheet: Prepared → Section/Department Head → Received by Store
+ *                     (any Store user). It then waits to be merged.
+ *   Final sheet:      Prepared (the merge) → Store Head → HR Audit →
+ *                     Finance & Commercial → Operation Head
  *
  * WHO APPROVES A STAGE is fixed at submit and saved on the plan:
  *   - Requester's Department Head: the review chain (nearest head; a head's
  *     own step is skipped). No head → the stage is skipped.
  *   - Store Department Head: the Store head on Admin > Departments.
+ *   - Store team: any Store user (see isStoreTeam()) — nobody by name.
  *   - A specific user: that user.
  * "Anyone with a role" and "Person who raised it" cannot approve a stage.
  *
@@ -54,6 +56,22 @@ use Illuminate\Validation\ValidationException;
 class RequisitionWorkflow
 {
     public const VERSION = 1;
+
+    /** What a Store-team stage reads as while it waits. */
+    public const STORE_TEAM_NAME = 'Store team';
+
+    /**
+     * Whether this user acts for the Store team: a Store user, the Store
+     * department head, or a Store clerk on another role holding the Store's
+     * Received permission. Admin and Management are not approvers, so they
+     * are left out even though they pass the permission check.
+     */
+    public static function isStoreTeam(?User $user): bool
+    {
+        return $user !== null
+            && PurchaseRequisition::worksStoreDesk($user)
+            && ($user->hasRole('store') || ! $user->hasAnyRole(['admin', 'management']));
+    }
 
     public function __construct(
         private readonly RequisitionHistory $history,
@@ -95,7 +113,8 @@ class RequisitionWorkflow
                 $warning = match ($block->assignee_type) {
                     RequisitionSignatureBlock::ASSIGNEE_USER => $block->user_id ? null : 'Not set. Choose a user.',
                     RequisitionSignatureBlock::ASSIGNEE_STORE_HEAD => $storeHead ? null : 'Not set. Set the Store department head on Departments.',
-                    RequisitionSignatureBlock::ASSIGNEE_DEPARTMENT_HEAD => null,
+                    RequisitionSignatureBlock::ASSIGNEE_DEPARTMENT_HEAD,
+                    RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM => null,
                     default => 'Must be a specific person to approve this stage.',
                 };
 
@@ -155,6 +174,10 @@ class RequisitionWorkflow
                     $stage['user'] = User::find(Department::where('key', 'store')->value('head_user_id'));
                     $stage['problem'] = $stage['user'] ? null
                         : $name.' approver is not set. Ask Admin to set the Store department head.';
+                    break;
+
+                case RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM:
+                    // Nobody by name: whoever of the Store team takes it.
                     break;
 
                 case RequisitionSignatureBlock::ASSIGNEE_USER:
@@ -235,7 +258,9 @@ class RequisitionWorkflow
                 'stamp_source' => $stage['stamp_source'],
                 'assignee_type' => $stage['assignee_type'],
                 'assignee_user_id' => $stage['user']?->id,
-                'assignee_name' => $stage['user']?->name,
+                'assignee_name' => $stage['assignee_type'] === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
+                    ? self::STORE_TEAM_NAME
+                    : $stage['user']?->name,
                 'status' => $stage['skipped'] ? PurchaseRequisitionStage::STATUS_SKIPPED : PurchaseRequisitionStage::STATUS_PENDING,
             ]);
         }
@@ -279,17 +304,22 @@ class RequisitionWorkflow
 
     /**
      * Whether this user approves the stage the sheet waits at. Only the
-     * person on the plan — not Admin, not Management, never the raiser.
+     * person on the plan — or, on a Store-team stage, any Store user — not
+     * Admin, not Management, never the raiser.
      */
     public function canAct(PurchaseRequisition $requisition, ?User $user): bool
     {
         $stage = $this->currentStage($requisition);
 
-        return $user !== null
-            && $stage !== null
-            && $stage->status === PurchaseRequisitionStage::STATUS_PENDING
-            && (int) $stage->assignee_user_id === (int) $user->id
-            && ! $requisition->isRaisedBy($user);
+        if ($user === null || $stage === null
+            || $stage->status !== PurchaseRequisitionStage::STATUS_PENDING
+            || $requisition->isRaisedBy($user)) {
+            return false;
+        }
+
+        return $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
+            ? self::isStoreTeam($user)
+            : (int) $stage->assignee_user_id === (int) $user->id;
     }
 
     /*
@@ -620,6 +650,11 @@ class RequisitionWorkflow
             return PurchaseRequisitionAction::APPROVED;
         }
 
+        // The Store taking a department's sheet reads "Received by Store".
+        if ($requisition->isDepartmentLevel() && $stage->stamp_source === RequisitionSignatureBlock::STAMP_STORE_HEAD) {
+            return PurchaseRequisitionAction::RECEIVED;
+        }
+
         return PurchaseRequisitionAction::STAGE_APPROVED;
     }
 
@@ -628,6 +663,7 @@ class RequisitionWorkflow
         return match (true) {
             $stage->stamp_source === RequisitionSignatureBlock::STAMP_DEPARTMENT_HEAD => RequisitionHistory::headStage($requisition),
             $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_HEAD,
+            $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM,
             $stage->stamp_source === RequisitionSignatureBlock::STAMP_STORE_HEAD => PurchaseRequisitionAction::STAGE_STORE,
             default => PurchaseRequisitionAction::STAGE_APPROVER,
         };

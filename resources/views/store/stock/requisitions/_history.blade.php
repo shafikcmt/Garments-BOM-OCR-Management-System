@@ -17,6 +17,8 @@
         'deleted' => 'bg-danger-subtle text-danger',
         'corrected' => 'bg-warning-subtle text-warning-emphasis',
         'qty_changed' => 'bg-warning-subtle text-warning-emphasis',
+        'merged' => 'bg-info-subtle text-info-emphasis',
+        'merge_released' => 'bg-warning-subtle text-warning-emphasis',
     ];
     $qty = fn ($v) => \App\Support\Quantity::format($v);
     $recordedFrom = \Illuminate\Support\Carbon::parse(\App\Models\PurchaseRequisitionAction::RECORDED_FROM);

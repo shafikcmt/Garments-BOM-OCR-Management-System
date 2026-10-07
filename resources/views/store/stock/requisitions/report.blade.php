@@ -116,9 +116,19 @@
                 <div class="gx-stock-empty">
                     <span class="gx-stock-empty-icon"><i class="bi bi-calendar3" aria-hidden="true"></i></span>
                     <div class="gx-stock-empty-title">No requisitions in {{ $monthLabel }}</div>
-                    <div class="gx-stock-empty-hint">Drafts are not counted — a requisition appears here once it is submitted.</div>
+                    <div class="gx-stock-empty-hint">Drafts, sheets still with a head and returned sheets are not counted — a requisition appears here once its head has checked it.</div>
                 </div>
-            @else
+            @endif
+            @if(! empty($pending))
+                {{-- What this month holds that is not counted yet, and why. --}}
+                <div class="alert alert-light border small {{ $rows->isEmpty() ? 'mt-3 mb-0' : 'mb-3' }}">
+                    <i class="bi bi-info-circle me-1" aria-hidden="true"></i><strong>Not counted yet in {{ $monthLabel }}:</strong>
+                    @foreach($pending as $why => $count)
+                        {{ number_format($count) }} {{ $why === 'draft' ? \Illuminate\Support\Str::plural('draft', $count) : 'requisition'.($count === 1 ? '' : 's').' '.$why }}{{ $loop->last ? '.' : ',' }}
+                    @endforeach
+                </div>
+            @endif
+            @if($rows->isNotEmpty())
                 {{-- The tabs follow the switch: ALL; ALL + each category; or
                      each section. The selected one is kept in the URL (?tab=). --}}
                 <ul class="nav nav-pills gx-report-tabs mb-3" role="tablist">

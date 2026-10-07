@@ -117,6 +117,8 @@ class PurchaseRequisition extends Model
         'header_snapshot_at' => 'datetime',
         'workflow_version' => 'integer',
         'current_stage' => 'integer',
+        // Written only by the merge — not fillable.
+        'merged_at' => 'datetime',
     ];
 
     /** @return array<string, string> status => label */
@@ -453,6 +455,66 @@ class PurchaseRequisition extends Model
         return $this->workflow_version !== null;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | The merge (Step 4)
+    |--------------------------------------------------------------------------
+    |
+    | A department sheet ends at "Received by Store". The Store then merges
+    | received sheets into its own final Purchase Requisition, which is the
+    | one that goes through Store Head, HR Audit, Finance & Commercial and
+    | Operation Head. merged_into_id links the two.
+    */
+
+    /** The final sheet this department sheet was merged into. */
+    public function mergedInto()
+    {
+        return $this->belongsTo(self::class, 'merged_into_id');
+    }
+
+    /** The department sheets merged into this final sheet. */
+    public function mergedSources()
+    {
+        return $this->hasMany(self::class, 'merged_into_id')->orderBy('requisition_no');
+    }
+
+    public function mergedBy()
+    {
+        return $this->belongsTo(User::class, 'merged_by');
+    }
+
+    public function isMerged(): bool
+    {
+        return $this->merged_into_id !== null;
+    }
+
+    /** Received by the Store and not yet in a final sheet. */
+    public function isReadyToMerge(): bool
+    {
+        return $this->isDepartmentLevel()
+            && $this->status === self::STATUS_STORE_REVIEWED
+            && $this->merged_into_id === null;
+    }
+
+    public function scopeReadyToMerge(Builder $query): Builder
+    {
+        return $query->where('level', self::LEVEL_DEPARTMENT)
+            ->where('status', self::STATUS_STORE_REVIEWED)
+            ->whereNull('merged_into_id');
+    }
+
+    /**
+     * Who may merge: whoever raises the final sheet (the Store side) and may
+     * create requisitions — the same pair that opens the entry form for a
+     * final sheet.
+     */
+    public static function canMerge(?User $user): bool
+    {
+        return $user !== null
+            && self::levelFor($user) === self::LEVEL_FINAL
+            && $user->can('store.requisition.create');
+    }
+
     /** Every cycle's approval plan. */
     public function stages()
     {
@@ -571,8 +633,12 @@ class PurchaseRequisition extends Model
      * Not counted: drafts, sheets still with a head, and sheets a head
      * returned — nobody has accepted those figures yet.
      *
-     * A department sheet that a final sheet repeats is still counted twice;
-     * that needs the merge link, which does not exist yet.
+     * A department sheet MERGED into a final sheet is counted through that
+     * final sheet, once it is submitted; while the final sheet is a draft,
+     * or sent back to the Store to amend, the department sheet counts on
+     * its own. A department sheet a
+     * hand-typed final sheet repeats is handled line by line by
+     * PurchaseRequisitionItem::notRepeatedOnFinalSheet().
      */
     public function scopeCountedInTotals(Builder $query): Builder
     {
@@ -587,7 +653,11 @@ class PurchaseRequisition extends Model
             // it is resubmitted. Grouped, so the OR cannot escape the rest.
             ->where(fn (Builder $q) => $q->whereNull($table.'.workflow_version')
                 ->orWhereNull($table.'.current_stage')
-                ->orWhere($table.'.current_stage', '<>', 1));
+                ->orWhere($table.'.current_stage', '<>', 1))
+            ->where(fn (Builder $q) => $q->whereNull($table.'.merged_into_id')
+                ->orWhereHas('mergedInto', fn (Builder $f) => $f->where(fn (Builder $w) => $w
+                    ->where('status', self::STATUS_DRAFT)
+                    ->orWhere(fn (Builder $r) => $r->whereNotNull('workflow_version')->where('current_stage', 1)))));
     }
 
     /*
@@ -640,6 +710,10 @@ class PurchaseRequisition extends Model
     {
         if ($this->returnedToRaiser() && ! $this->rejectedByDepartmentHead()) {
             return 'Returned to Requester';
+        }
+
+        if ($this->isMerged() && $this->status === self::STATUS_STORE_REVIEWED) {
+            return 'Merged into Final';
         }
 
         return match ($this->status) {
@@ -797,8 +871,9 @@ class PurchaseRequisition extends Model
 
     /**
      * Whether this user works the Store's side of requisitions: the Store
-     * roles above, or anyone granted store.requisition.review (the Store's
-     * Received step) — a Store clerk on another role, for example.
+     * roles above, anyone granted store.requisition.review (the Store's
+     * Received step) — a Store clerk on another role, for example — or the
+     * Store department head.
      *
      * By permission, not role: grants here are per user. A user on the
      * permission alone sees what has reached the Store (see visibleTo()),
@@ -807,7 +882,16 @@ class PurchaseRequisition extends Model
     public static function worksStoreDesk(?User $user): bool
     {
         return $user !== null
-            && (self::seesEveryRequisition($user) || $user->can('store.requisition.review'));
+            && (self::seesEveryRequisition($user)
+                || $user->can('store.requisition.review')
+                || self::isStoreHead($user));
+    }
+
+    /** The Store department head on Admin > Departments — Store, whatever their role. */
+    public static function isStoreHead(?User $user): bool
+    {
+        return $user !== null
+            && (int) \App\Models\Department::where('key', 'store')->value('head_user_id') === (int) $user->id;
     }
 
     /**

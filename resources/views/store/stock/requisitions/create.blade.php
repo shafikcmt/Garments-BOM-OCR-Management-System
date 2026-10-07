@@ -86,6 +86,14 @@
         </div>
     @endif
 
+    @if($editing && $requisition->mergedSources()->exists())
+        <div class="alert alert-info border-0 shadow-sm rounded-3 small">
+            <i class="bi bi-intersect me-1" aria-hidden="true"></i><strong>Final requisition merged from:</strong>
+            {{ $requisition->mergedSources()->pluck('requisition_no')->implode(', ') }}.
+            Check the quantities, add any Store items, then submit it for approval.
+        </div>
+    @endif
+
     <form method="POST"
           action="{{ $editing ? route('store.stock.requisitions.update', $requisition) : route('store.stock.requisitions.store') }}"
           id="requisitionForm">

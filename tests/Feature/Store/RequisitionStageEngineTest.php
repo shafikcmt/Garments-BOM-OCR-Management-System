@@ -17,7 +17,7 @@ use Spatie\Permission\Models\Role;
  * Step 3b — the requisition stage engine.
  *
  *   Final sheet:      Prepared → Store Head → HR Audit → Finance & Commercial → Operation Head
- *   Department sheet: Prepared → Section/Department Head → Store Head
+ *   Department sheet: Prepared → Section/Department Head → Received by Store (any Store user)
  *
  *   - The plan is saved per sheet at submit, with the approver resolved then.
  *   - Submit is refused when a stage has no approver, or the raiser holds one.
@@ -159,11 +159,18 @@ it('refuses to submit, and saves nothing, when a stage has no approver', functio
         ->and(session('errors')->first('workflow'))->toContain('approver is not set. Ask Admin.');
 });
 
-it('refuses to submit when there is no Store head', function () {
+it('refuses to submit a final sheet when there is no Store head', function () {
     Department::where('key', 'store')->update(['head_user_id' => null]);
 
-    engineSubmit(engineUser('production', ['store.requisition.create']))->assertSessionHasErrors('workflow');
+    engineSubmit(engineUser('store', ['store.requisition.create']))->assertSessionHasErrors('workflow');
     expect(PurchaseRequisition::count())->toBe(0);
+});
+
+it('still takes a department sheet with no Store head — any Store user receives it', function () {
+    Department::where('key', 'store')->update(['head_user_id' => null]);
+
+    engineSubmit(engineUser('production', ['store.requisition.create']))->assertSessionHasNoErrors();
+    expect(PurchaseRequisition::count())->toBe(1);
 });
 
 it('refuses a final sheet whose raiser holds one of its stages', function () {

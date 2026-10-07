@@ -110,6 +110,7 @@ class MonthlyRequisitionReportController extends Controller
             'view' => $view,
             'viewLabels' => MonthlyRequisitionReportService::viewLabels(),
             'summary' => $this->report->summary($rows),
+            'pending' => $this->notCountedYet($monthStart),
             'filters' => ['month' => $monthStart->format('Y-m'), 'view' => $view],
             'month' => $monthStart->format('Y-m'),
             'monthLabel' => $monthStart->format('F Y'),
@@ -123,6 +124,28 @@ class MonthlyRequisitionReportController extends Controller
      *
      * @param  \Illuminate\Support\Collection<string, array{type: string, rows: \Illuminate\Support\Collection}>  $tabs
      */
+    /**
+     * The month's sheets the report does not count yet, and why — so an empty
+     * or thin month reads "3 still with the head", not "nothing happened".
+     *
+     * @return array<string, int> label => count, zero counts left out
+     */
+    private function notCountedYet(\Illuminate\Support\Carbon $monthStart): array
+    {
+        $month = fn () => PurchaseRequisition::query()->forMonth($monthStart->format('Y-m'));
+
+        return array_filter([
+            'draft' => $month()->where('status', PurchaseRequisition::STATUS_DRAFT)->count(),
+            'with the section / department head' => $month()
+                ->where('status', PurchaseRequisition::STATUS_SUBMITTED)
+                ->where('department_review_status', PurchaseRequisition::DEPT_REVIEW_PENDING)->count(),
+            'returned to the requester' => $month()
+                ->whereNotIn('status', [PurchaseRequisition::STATUS_DRAFT, PurchaseRequisition::STATUS_CANCELLED])
+                ->where(fn ($q) => $q->where('department_review_status', PurchaseRequisition::DEPT_REVIEW_REJECTED)
+                    ->orWhere(fn ($r) => $r->whereNotNull('workflow_version')->where('current_stage', 1)))->count(),
+        ]);
+    }
+
     private function withHeaders(\Illuminate\Support\Collection $tabs, \Illuminate\Support\Carbon $monthStart): \Illuminate\Support\Collection
     {
         return $tabs->map(fn (array $tab, string $name) => $tab + [

@@ -229,6 +229,34 @@
                 </div>
             @endif
 
+            {{-- Step 4: where a department sheet went, and what a final sheet
+                 was made from. A sheet this viewer may not open is named,
+                 not linked. --}}
+            @if($requisition->mergedInto)
+                <div class="alert alert-info border-0 mt-3 mb-0 small">
+                    <i class="bi bi-intersect me-1" aria-hidden="true"></i><strong>Merged into final requisition</strong>
+                    @if($requisition->mergedInto->isVisibleTo(auth()->user()))
+                        <a href="{{ route('store.stock.requisitions.show', $requisition->mergedInto) }}" class="fw-semibold">{{ $requisition->mergedInto->requisition_no }}</a>
+                    @else
+                        {{ $requisition->mergedInto->requisition_no }}
+                    @endif
+                    ({{ $requisition->mergedInto->progressLabel() }})@if($requisition->merged_at) on {{ $requisition->merged_at->format('d-M-Y') }}@endif.
+                    <span class="d-block mt-1">The final requisition carries these items through Store Head, HR Audit, Finance &amp; Commercial and Operation Head approval.</span>
+                </div>
+            @elseif($requisition->isReadyToMerge())
+                <div class="alert alert-light border mt-3 mb-0 small">
+                    <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>Received by Store. Waiting to be merged into the final requisition.
+                </div>
+            @endif
+            @if($requisition->mergedSources->isNotEmpty())
+                <div class="alert alert-info border-0 mt-3 mb-0 small">
+                    <i class="bi bi-intersect me-1" aria-hidden="true"></i><strong>Merged from {{ $requisition->mergedSources->count() }} department requisition{{ $requisition->mergedSources->count() === 1 ? '' : 's' }}:</strong>
+                    @foreach($requisition->mergedSources as $source)
+                        @if($source->isVisibleTo(auth()->user()))<a href="{{ route('store.stock.requisitions.show', $source) }}">{{ $source->requisition_no }}</a>@else{{ $source->requisition_no }}@endif{{ $source->indentSection ? ' ('.$source->indentSection->name.')' : '' }}{{ $loop->last ? '' : ', ' }}
+                    @endforeach
+                </div>
+            @endif
+
             @if($requisition->remarks)
                 <div class="alert alert-light border mt-3 mb-0 small"><strong>Remarks:</strong> {{ $requisition->remarks }}</div>
             @endif

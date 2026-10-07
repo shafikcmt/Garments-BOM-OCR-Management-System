@@ -419,6 +419,11 @@ Route::prefix('store')
             Route::post('/requisitions/{requisition}/department-reject', [PurchaseRequisitionController::class, 'departmentReject'])
                 ->name('requisitions.department-reject');
 
+            // Step 4: received department sheets merged into the Store's final
+            // sheet. A fixed path, so declared above /{requisition}.
+            Route::post('/requisitions/merge', [PurchaseRequisitionController::class, 'merge'])
+                ->middleware($act('store.requisition.create'))->name('requisitions.merge');
+
             Route::get('/requisitions', [PurchaseRequisitionController::class, 'index'])->name('requisitions.index');
             Route::get('/requisitions/create', [PurchaseRequisitionController::class, 'create'])->middleware($act('store.requisition.create'))->name('requisitions.create');
             Route::post('/requisitions', [PurchaseRequisitionController::class, 'store'])->middleware($act('store.requisition.create'))->name('requisitions.store');

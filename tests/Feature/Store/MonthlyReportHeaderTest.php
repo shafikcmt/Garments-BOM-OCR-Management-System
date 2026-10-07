@@ -168,7 +168,10 @@ it('names the configured people under the boxes, as the single sheet does before
     $boxes = app(Report::class)->tabHeader(Report::TAB_SECTION, 'Cutting', collect(), now()->setDate(2026, 9, 1))['signatures'];
     $names = collect($boxes)->pluck('name')->all();
 
-    expect($names)->toContain('Cutting Head Person')->toContain('Store Head Person')
+    // The department sheet's Store box is the Store team, not a named
+    // person: any Store user receives it, so nobody is printed under it.
+    expect($names)->toContain('Cutting Head Person')->not->toContain('Store Head Person')
+        ->and(collect($boxes)->pluck('title')->all())->toContain('Store')
         ->and(collect($boxes)->pluck('signed_at')->filter()->all())->toBe([]);
 });
 

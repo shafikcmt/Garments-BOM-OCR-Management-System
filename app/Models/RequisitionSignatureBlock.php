@@ -24,6 +24,8 @@ class RequisitionSignatureBlock extends Model
     public const ASSIGNEE_USER = 'user';
     /** The Store department head, as set on Admin > Departments. */
     public const ASSIGNEE_STORE_HEAD = 'store_head';
+    /** Any Store user — the Store team receiving a department's sheet. */
+    public const ASSIGNEE_STORE_TEAM = 'store_team';
 
     public const STAMP_PREPARED = 'prepared';
     public const STAMP_DEPARTMENT_HEAD = 'department_head';
@@ -63,6 +65,7 @@ class RequisitionSignatureBlock extends Model
             self::ASSIGNEE_ROLE => 'Anyone with a role',
             self::ASSIGNEE_USER => 'A specific user',
             self::ASSIGNEE_STORE_HEAD => 'Store Department Head',
+            self::ASSIGNEE_STORE_TEAM => 'Any Store user (Store team)',
         ];
     }
 

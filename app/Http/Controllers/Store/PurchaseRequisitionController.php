@@ -193,10 +193,13 @@ class PurchaseRequisitionController extends Controller
             'status' => ['nullable', 'string', 'in:'.implode(',', array_keys(PurchaseRequisition::statusLabels()))],
             'section' => ['nullable', 'integer', 'exists:indent_sections,id'],
             'search' => ['nullable', 'string', 'max:100'],
+            'ready' => ['nullable', 'boolean'],
         ]);
 
         $requisitions = PurchaseRequisition::query()
             ->fromDepartments()
+            ->with('mergedInto')
+            ->when($filters['ready'] ?? false, fn ($q) => $q->readyToMerge())
             ->with(['indentSection', 'indentPerson', 'createdBy'])
             ->withCount('items')
             ->withSum('items', 'amount')
@@ -232,6 +235,9 @@ class PurchaseRequisitionController extends Controller
             // offered a button that would refuse them.
             'canEdit' => $this->storeCorrectionAbilities()['edit'],
             'departmentReviewCount' => $this->departmentReviewCount($request->user()),
+            // Step 4: received sheets waiting to go into a final sheet.
+            'canMerge' => PurchaseRequisition::canMerge($request->user()),
+            'readyCount' => PurchaseRequisition::query()->fromDepartments()->readyToMerge()->count(),
         ]);
     }
 
@@ -573,10 +579,166 @@ class PurchaseRequisitionController extends Controller
                 'This requisition has already moved on. Reload the page to see where it is now.');
 
             $this->workflow->cancel($locked, $user, $data['comment']);
+            $this->releaseMerged($locked, 'Final requisition '.$locked->requisition_no.' was cancelled.');
         });
 
         return redirect()->route('store.stock.requisitions.show', $requisition)
             ->with('success', 'Requisition '.$requisition->requisition_no.' cancelled.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | The merge (Step 4)
+    |--------------------------------------------------------------------------
+    |
+    | A department sheet ends at "Received by Store". The Store picks the
+    | received sheets of ONE month and merges them into its final Purchase
+    | Requisition: a draft, one line per item (quantities added, the User
+    | Dept. cell listing every department that asked). The Store checks it,
+    | adds its own items if any, and submits — the final sheet then goes
+    | Store Head → HR Audit → Finance & Commercial → Operation Head.
+    |
+    | One month per final sheet: the same items are requested every month,
+    | and the monthly report must count each month's demand in that month.
+    */
+
+    public function merge(Request $request)
+    {
+        abort_unless(PurchaseRequisition::canMerge($request->user()), 403,
+            'Only the Store team can merge requisitions into a final requisition.');
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'distinct'],
+        ], [
+            'ids.required' => 'Select at least one received requisition to merge.',
+            'ids.min' => 'Select at least one received requisition to merge.',
+        ]);
+
+        $user = $request->user();
+
+        $final = DB::transaction(function () use ($data, $user) {
+            $sources = PurchaseRequisition::whereIn('id', $data['ids'])
+                ->orderBy('requisition_date')->orderBy('id')
+                ->lockForUpdate()->get();
+
+            abort_unless($sources->count() === count($data['ids']), 422,
+                'A selected requisition no longer exists. Reload the page and try again.');
+
+            $notReady = $sources->reject(fn (PurchaseRequisition $r) => $r->isReadyToMerge());
+            if ($notReady->isNotEmpty()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['ids' => 'Only requisitions received by Store and not yet merged can be merged: '
+                    .$notReady->pluck('requisition_no')->implode(', ').'.']);
+            }
+
+            $months = $sources->map(fn (PurchaseRequisition $r) => $r->requisition_date?->format('Y-m'))->unique();
+            if ($months->count() > 1) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['ids' => 'Merge one month at a time. The selection covers '
+                    .$months->map(fn ($m) => Carbon::createFromFormat('!Y-m', $m)->format('F Y'))->implode(', ').'.']);
+            }
+
+            // Dated in the sources' month: today while that month runs, else
+            // the latest source's date — so the month's report carries it.
+            $latest = $sources->max('requisition_date');
+            $date = now()->format('Y-m') === $months->first() ? now()->startOfDay() : Carbon::parse($latest);
+
+            $sources->load('items', 'indentSection');
+            $lines = [];
+
+            foreach ($sources as $source) {
+                $dept = $source->indentSection?->name
+                    ?: ($source->department_role ? $source->departmentLabel() : null);
+
+                foreach ($source->items as $line) {
+                    if ((float) $line->qty_requested <= 0) {
+                        continue; // set to 0 — not approved — on the way through
+                    }
+
+                    $lines[] = [
+                        'stock_item_id' => $line->stock_item_id,
+                        'custom_item_name' => $line->stock_item_id ? null : $line->custom_item_name,
+                        'specification' => $line->specification,
+                        'type' => $line->type,
+                        'user_dept' => $line->user_dept ?: $dept,
+                        'qty_requested' => (float) $line->qty_requested,
+                        'rate_appx' => $line->rate_appx,
+                        'remarks' => $line->remarks,
+                    ];
+                }
+            }
+
+            if ($lines === []) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['ids' => 'The selected requisitions have no quantities to merge.']);
+            }
+
+            $defaults = DepartmentRequisitionDefaults::for($user);
+
+            $final = PurchaseRequisition::create([
+                'requisition_no' => $this->numbers->next($defaults->numberSection(), $date),
+                'requisition_date' => $date->toDateString(),
+                'mode' => PurchaseRequisition::MODE_MULTI,
+                'level' => PurchaseRequisition::LEVEL_FINAL,
+                'department_role' => null,
+                'unit_name' => config('stock.company_name'),
+                'status' => PurchaseRequisition::STATUS_DRAFT,
+                'remarks' => 'Merged from '.$sources->pluck('requisition_no')->implode(', ').'.',
+                'created_by' => $user->id,
+            ]);
+
+            $this->syncItems($final, $lines, $date);
+
+            foreach ($sources as $source) {
+                $source->forceFill([
+                    'merged_into_id' => $final->id,
+                    'merged_at' => now(),
+                    'merged_by' => $user->id,
+                ])->save();
+
+                $this->history->record($source, PurchaseRequisitionAction::MERGED, [
+                    'stage' => PurchaseRequisitionAction::STAGE_STORE,
+                    'from' => $source->status,
+                    'comment' => 'Merged into final requisition '.$final->requisition_no.'.',
+                    'meta' => ['merged_into' => $final->requisition_no],
+                ]);
+            }
+
+            $this->history->record($final, PurchaseRequisitionAction::MERGED, [
+                'stage' => PurchaseRequisitionAction::STAGE_RAISER,
+                'comment' => 'Made from '.$sources->count().' department requisition'.($sources->count() === 1 ? '' : 's')
+                    .': '.$sources->pluck('requisition_no')->implode(', ').'.',
+                'meta' => ['sources' => $sources->pluck('requisition_no')->all()],
+            ]);
+
+            return $final;
+        });
+
+        return redirect()
+            ->route('store.stock.requisitions.edit', $final)
+            ->with('success', 'Final requisition '.$final->requisition_no.' created as a draft from '
+                .count($data['ids']).' department requisition'.(count($data['ids']) === 1 ? '' : 's')
+                .'. Check the quantities, add any Store items, then submit it for approval.');
+    }
+
+    /**
+     * Free the department sheets merged into this final sheet — it is being
+     * deleted or cancelled — so they can be merged again. Recorded on each.
+     */
+    private function releaseMerged(PurchaseRequisition $final, string $reason): void
+    {
+        if ($final->isDepartmentLevel()) {
+            return;
+        }
+
+        PurchaseRequisition::where('merged_into_id', $final->id)->lockForUpdate()->get()
+            ->each(function (PurchaseRequisition $source) use ($reason) {
+                $source->forceFill(['merged_into_id' => null, 'merged_at' => null, 'merged_by' => null])->save();
+
+                $this->history->record($source, PurchaseRequisitionAction::MERGE_RELEASED, [
+                    'stage' => PurchaseRequisitionAction::STAGE_STORE,
+                    'from' => $source->status,
+                    'comment' => $reason.' This requisition can be merged again.',
+                ]);
+            });
     }
 
     /**
@@ -852,7 +1014,7 @@ class PurchaseRequisitionController extends Controller
             'items.stockItem', 'items.itemCategory',
             'indentSection', 'indentPerson', 'createdBy',
             'departmentCheckedBy', 'sectionCheckedBy', 'storeAckBy', 'accountsAckBy', 'checkedBy', 'approvedBy',
-            'actions.user',
+            'actions.user', 'mergedInto', 'mergedSources.indentSection',
         ]);
 
         $user = auth()->user();
@@ -1150,6 +1312,8 @@ class PurchaseRequisitionController extends Controller
                 'comment' => $data['comment'] ?? null,
                 'meta' => ['lines' => array_values($this->history->snapshotLines($locked->items()->get()))],
             ]);
+
+            $this->releaseMerged($locked, 'Final requisition '.$locked->requisition_no.' was deleted.');
 
             $locked->delete();
         });
