@@ -239,6 +239,20 @@ DB::connection('pg')->table('stock_items')->whereLike('name', '%num%')->toSql();
 // => select * from "stock_items" where "name"::text ilike ?
 ```
 
+## Future ERP Work
+
+The owner plans to grow this system into a full garments ERP. Before starting
+any new module or a large feature, read:
+
+- `docs/09_FUTURE_ERP_ROADMAP.md` — the target module specification.
+- `docs/12_ERP_IMPLEMENTATION_GUIDE.md` — current gap analysis, the agreed
+  phase order (Order & BOM Core first), settled business rules, item
+  codification notes and the open questions to ask the owner.
+
+Use the guide to tell the owner which phase a request belongs to, what must
+exist first, and the next sensible step. Update the guide when a phase step
+ships or a decision is taken.
+
 ## Build / Check Commands
 
 Run only relevant commands when possible:

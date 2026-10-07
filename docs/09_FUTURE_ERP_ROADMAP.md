@@ -6,6 +6,9 @@
 > but so that naming, structure and reusable services in today's work do not
 > paint us into a corner when they arrive.
 >
+> **Route and current status:** see `12_ERP_IMPLEMENTATION_GUIDE.md` (gap analysis,
+> agreed phase order, open questions).
+>
 > **How to apply while building:** before adding a new feature, ask whether it
 > is a reusable primitive rather than a one-off. The Department / Section /
 > Head hierarchy and the approval-chain pattern built for Purchase Requisition
