@@ -309,8 +309,15 @@ class RequisitionWorkflow
      */
     public function canAct(PurchaseRequisition $requisition, ?User $user): bool
     {
-        $stage = $this->currentStage($requisition);
+        return $this->mayApprove($requisition, $this->currentStage($requisition), $user);
+    }
 
+    /**
+     * THE who-can-act rule, for one stage the sheet waits at. canAct() and
+     * the My Approvals list both ask this, so the two cannot drift apart.
+     */
+    public function mayApprove(PurchaseRequisition $requisition, ?PurchaseRequisitionStage $stage, ?User $user): bool
+    {
         if ($user === null || $stage === null
             || $stage->status !== PurchaseRequisitionStage::STATUS_PENDING
             || $requisition->isRaisedBy($user)) {
@@ -320,6 +327,66 @@ class RequisitionWorkflow
         return $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
             ? self::isStoreTeam($user)
             : (int) $stage->assignee_user_id === (int) $user->id;
+    }
+
+    /**
+     * The sheets waiting for this user's action right now (My Approvals),
+     * oldest first. The database narrows to candidates — a pending stage of
+     * the sheet's active cycle that is the sheet's current stage and names
+     * this user, or the Store team when they are on it — and mayApprove()
+     * then decides each one, so the list is exactly what canAct() allows.
+     * Each sheet carries its waiting stage as the 'waitingStage' relation.
+     *
+     * @return Collection<int, PurchaseRequisition>
+     */
+    public function waitingFor(User $user): Collection
+    {
+        $storeTeam = self::isStoreTeam($user);
+
+        $stages = PurchaseRequisitionStage::query()
+            ->where('status', PurchaseRequisitionStage::STATUS_PENDING)
+            ->where('cycle', fn ($q) => $q->from('purchase_requisition_stages as latest')
+                ->selectRaw('max(latest.cycle)')
+                ->whereColumn('latest.purchase_requisition_id', 'purchase_requisition_stages.purchase_requisition_id'))
+            ->where(function ($q) use ($user, $storeTeam) {
+                $q->where('assignee_user_id', $user->id);
+
+                if ($storeTeam) {
+                    $q->orWhere('assignee_type', RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM);
+                }
+            })
+            ->whereHas('requisition', fn ($q) => $q
+                ->whereNotNull('workflow_version')
+                ->whereColumn('purchase_requisitions.current_stage', 'purchase_requisition_stages.sequence')
+                ->where(fn ($r) => $r->whereNull('created_by')->orWhere('created_by', '<>', $user->id)))
+            ->with(['requisition.indentSection', 'requisition.createdBy'])
+            ->get();
+
+        return $stages
+            ->filter(fn ($stage) => $this->mayApprove($stage->requisition, $stage, $user))
+            ->map(fn ($stage) => $stage->requisition->setRelation('waitingStage', $stage))
+            ->sortBy(fn ($requisition) => $requisition->submitted_at ?? $requisition->created_at)
+            ->values();
+    }
+
+    /**
+     * waitingFor(), worked out once per request however many places ask (the
+     * sidebar badge and the page itself), so the badge always equals the list.
+     * Kept on the request, not the service, so a long-lived process or a test
+     * making several requests never reads a stale answer.
+     *
+     * @return Collection<int, PurchaseRequisition>
+     */
+    public function waitingForOnce(User $user): Collection
+    {
+        $attributes = request()->attributes;
+        $key = 'requisition_waiting_for_'.$user->id;
+
+        if (! $attributes->has($key)) {
+            $attributes->set($key, $this->waitingFor($user));
+        }
+
+        return $attributes->get($key);
     }
 
     /*
