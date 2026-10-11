@@ -34,7 +34,21 @@
             'rate_appx' => $i->rate_appx,
             'remarks' => $i->remarks,
         ])->all()
-        : []));
+        : []))
+        // Short tags under a line's fields after a server refusal; the full
+        // sentences are in the red summary at the top. Keyed by the posted
+        // index, which is what the validator's message keys point at.
+        ->map(fn ($line, $index) => $line + [
+            'errors' => array_filter(array_map(fn ($m) => \App\Support\FieldMessage::short($m), [
+                'item' => $errors->first('items.'.$index.'.stock_item_id') ?: $errors->first('items.'.$index.'.custom_item_name'),
+                'spec' => $errors->first('items.'.$index.'.specification'),
+                'type' => $errors->first('items.'.$index.'.type'),
+                'dept' => $errors->first('items.'.$index.'.user_dept'),
+                'qty' => $errors->first('items.'.$index.'.qty_requested'),
+                'rate' => $errors->first('items.'.$index.'.rate_appx'),
+                'remarks' => $errors->first('items.'.$index.'.remarks'),
+            ])),
+        ]);
 @endphp
 
 @section('content')
@@ -94,11 +108,19 @@
         </div>
     @endif
 
+    {{-- novalidate: the browser's own check cannot report a field TomSelect
+         has hidden (each line's real item select), so it refused the submit
+         silently — no request, no message. The page's own check below says
+         what is missing; the server validates everything. --}}
     <form method="POST"
           action="{{ $editing ? route('store.stock.requisitions.update', $requisition) : route('store.stock.requisitions.store') }}"
-          id="requisitionForm">
+          id="requisitionForm" novalidate>
         @csrf
         @if($editing) @method('PUT') @endif
+
+        {{-- The page check's summary. Filled by the script before a submit is
+             sent; a server refusal shows in the flash summary above. --}}
+        <div id="requisitionFormBlock" class="alert alert-danger py-2 small d-none" role="alert"></div>
 
         {{-- One form, any number of lines — the Single/Multiple toggle is gone
              because "Multiple" with one line was already the same requisition.
@@ -241,8 +263,9 @@
 
                 <div class="d-flex flex-wrap align-items-center gap-3 mt-4 pt-3 border-top">
                     {{-- Draft keeps it editable; Submit hands it to the store
-                         lead and locks the lines. --}}
-                    <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">
+                         lead and locks the lines. formnovalidate: the page
+                         check never stops a draft; the server still checks it. --}}
+                    <button type="submit" name="action" value="draft" class="btn btn-outline-secondary" formnovalidate>
                         <i class="bi bi-save me-1" aria-hidden="true"></i>Save as Draft
                     </button>
                     <button type="submit" name="action" value="submit" class="btn btn-primary">
@@ -286,7 +309,10 @@
                 <input type="hidden" class="js-line-id" name="items[__INDEX__][id]" value="">
                 <div class="gx-req-field is-item">
                     <label class="form-label">Item Name <span class="text-danger">*</span></label>
-                    <select class="form-select form-select-sm js-line-item js-searchable" name="items[__INDEX__][stock_item_id]" required>
+                    {{-- aria-required, never `required`: TomSelect hides this
+                         select, and a hidden required field blocks the submit
+                         without a message. --}}
+                    <select class="form-select form-select-sm js-line-item js-searchable" name="items[__INDEX__][stock_item_id]" aria-required="true">
                         <option value="">Select item…</option>
                         @foreach($items as $it)
                             <option value="{{ $it->id }}"
@@ -350,7 +376,7 @@
                          an "Add Another Item" row and a row that came back from
                          validation all agree. Restoring a saved line overrides
                          it — see addLine(). --}}
-                    <select class="form-select form-select-sm" name="items[__INDEX__][type]">
+                    <select class="form-select form-select-sm js-line-type" name="items[__INDEX__][type]">
                         <option value="">—</option>
                         @foreach($typeLabels as $value => $label)
                             <option value="{{ $value }}" @selected($value === \App\Models\PurchaseRequisitionItem::TYPE_NEW)>{{ $label }}</option>
@@ -363,14 +389,14 @@
                         {{-- A department sheet is for the requester's own
                              section on every line. Locked here and written by
                              the server regardless of what is posted. --}}
-                        <input type="text" class="form-control form-control-sm gx-stock-readonly" name="items[__INDEX__][user_dept]" value="{{ $lockedUserDept }}" readonly tabindex="-1">
+                        <input type="text" class="form-control form-control-sm gx-stock-readonly js-line-dept" name="items[__INDEX__][user_dept]" value="{{ $lockedUserDept }}" readonly tabindex="-1">
                     @else
-                        <input type="text" class="form-control form-control-sm" name="items[__INDEX__][user_dept]" maxlength="255" placeholder="—">
+                        <input type="text" class="form-control form-control-sm js-line-dept" name="items[__INDEX__][user_dept]" maxlength="255" placeholder="—">
                     @endif
                 </div>
                 <div class="gx-req-field is-qty">
                     <label class="form-label">Qty Req. <span class="text-danger">*</span></label>
-                    <input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm js-line-qty" name="items[__INDEX__][qty_requested]" required placeholder="0">
+                    <input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm js-line-qty" name="items[__INDEX__][qty_requested]" aria-required="true" placeholder="0">
                 </div>
                 {{-- Rate is the Store's to set. Hidden — not removed — for a
                      department user, so the script's recalc still finds it;
@@ -772,9 +798,10 @@
              * beside a different name is how a wrong quantity gets ordered. The
              * requester keeps typing Specification, Qty and Rate themselves.
              *
-             * `required` moves with the mode so the browser asks for whichever
-             * field is actually in use; the server checks the same pair with
-             * required_without either way. */
+             * aria-required moves with the mode so whichever field is in use
+             * is announced as required. Never `required`: the form is
+             * novalidate, and the page check (gxRequisitionFormProblems) and
+             * the server's required_without ask for the pair instead. */
             function applyCustomItemMode(row) {
                 var custom = row.querySelector('.js-line-custom-toggle').checked;
                 var select = row.querySelector('.js-line-item');
@@ -782,8 +809,8 @@
                 var category = row.querySelector('.js-line-category');
 
                 nameBox.hidden = !custom;
-                nameBox.required = custom;
-                select.required = !custom;
+                nameBox.setAttribute('aria-required', custom ? 'true' : 'false');
+                select.setAttribute('aria-required', custom ? 'false' : 'true');
 
                 // TomSelect draws its own wrapper over the select, so hiding
                 // the select alone would leave the widget on screen.
@@ -875,6 +902,22 @@
                 if (window.gxInitSearchable) { window.gxInitSearchable(row); }
 
                 applyCustomItemMode(row);
+
+                // A line that came back from a server refusal: the short tag
+                // under each field it named. Placed after TomSelect is built,
+                // so the tag goes under the widget rather than the hidden select.
+                if (values && values.errors) {
+                    var errors = values.errors;
+                    var custom = row.querySelector('.js-line-custom-toggle').checked;
+                    markLineError(row.querySelector(custom ? '.js-line-custom-name' : '.js-line-item'), errors.item, false);
+                    markLineError(row.querySelector('.js-line-spec'), errors.spec, false);
+                    markLineError(row.querySelector('.js-line-type'), errors.type, false);
+                    markLineError(row.querySelector('.js-line-dept'), errors.dept, false);
+                    markLineError(row.querySelector('.js-line-qty'), errors.qty, false);
+                    markLineError(row.querySelector('.js-line-rate'), errors.rate, false);
+                    markLineError(row.querySelector('.js-line-remarks'), errors.remarks, false);
+                }
+
                 row.querySelector('.js-line-custom-toggle').addEventListener('change', function () {
                     applyCustomItemMode(row);
                 });
@@ -962,6 +1005,201 @@
                 }
             });
 
+            /**
+             * What stops "Submit Requisition", from plain data — no DOM, so the
+             * same function can be run outside a browser. One entry per
+             * problem, each naming its line; an empty list means submit.
+             *
+             * The same rules the server applies (validated() in
+             * PurchaseRequisitionController): a requisition date, at least one
+             * line, and per line an item (or a typed name when "Not in Item
+             * Master" is ticked), a qty above 0 and a rate of 0 or more when
+             * one is given. The server stays the source of truth — it also
+             * checks what this page cannot see, such as a Requisition No
+             * already used.
+             *
+             * @param {string} requisitionDate
+             * @param {Array<{line:number, custom:boolean, item:string, customName:string, qty:string, rate:string}>} lines
+             */
+            window.gxRequisitionFormProblems = function (requisitionDate, lines) {
+                var problems = [];
+                var blank = function (v) { return !String(v || '').trim(); };
+                var number = function (v) { return /^\s*\d*\.?\d+\s*$|^\s*\d+\.\s*$/.test(String(v || '')); };
+
+                if (blank(requisitionDate)) {
+                    problems.push({ line: null, field: 'date', message: 'Enter the requisition date.', short: 'Required' });
+                }
+
+                if (!lines.length) {
+                    problems.push({ line: null, field: null, message: 'Add at least one item to the requisition.', short: null });
+                }
+
+                lines.forEach(function (l) {
+                    if (l.custom && blank(l.customName)) {
+                        problems.push({ line: l.line, field: 'item', message: 'Type the item name on line ' + l.line + '.', short: 'Required' });
+                    } else if (!l.custom && blank(l.item)) {
+                        problems.push({ line: l.line, field: 'item', message: 'Select the item on line ' + l.line + ', or tick "Not in Item Master" and type its name.', short: 'Required' });
+                    }
+
+                    if (!number(l.qty) || !(parseFloat(l.qty) > 0)) {
+                        problems.push({ line: l.line, field: 'qty', message: 'Enter the qty requested on line ' + l.line + ' (more than 0).', short: 'More than 0' });
+                    }
+
+                    if (!blank(l.rate) && (!number(l.rate) || parseFloat(l.rate) < 0)) {
+                        problems.push({ line: l.line, field: 'rate', message: 'The rate on line ' + l.line + ' must be 0 or more.', short: '0 or more' });
+                    }
+                });
+
+                return problems;
+            };
+
+            var blocker = document.getElementById('requisitionFormBlock');
+
+            /** The item a line's picker shows, through TomSelect when it is there. */
+            function itemValue(row) {
+                var select = row.querySelector('.js-line-item');
+                var value = select.tomselect ? select.tomselect.getValue() : select.value;
+
+                return value ? String(value) : '';
+            }
+
+            /* The hidden <select> is what gets posted. Make it hold exactly the
+               item TomSelect shows — the category filter rebuilds TomSelect's
+               options and disables the hidden ones, and a disabled option is
+               not posted even when selected. */
+            function syncItemSelects() {
+                rows().forEach(function (row) {
+                    var select = row.querySelector('.js-line-item');
+                    var shown = itemValue(row);
+                    if (!select.tomselect || !shown) { return; }
+
+                    var option = Array.prototype.find.call(select.options, function (o) { return o.value === shown; });
+                    if (!option) {
+                        option = document.createElement('option');
+                        option.value = shown;
+                        option.textContent = shown;
+                        select.appendChild(option);
+                    }
+                    option.disabled = false;
+                    select.value = shown;
+                });
+            }
+
+            function clearLineErrors() {
+                form.querySelectorAll('.js-client-error').forEach(function (note) { note.remove(); });
+                form.querySelectorAll('.js-client-invalid').forEach(function (field) {
+                    field.classList.remove('is-invalid', 'js-client-invalid');
+                });
+            }
+
+            /* The short tag under a field. `client` marks the page check's own
+               tags, cleared on the next attempt; a server tag stays until the
+               page is submitted again. */
+            function markLineError(field, message, client) {
+                if (!field || !message) { return; }
+                field.classList.add('is-invalid');
+                if (client !== false) { field.classList.add('js-client-invalid'); }
+
+                var note = document.createElement('div');
+                note.className = 'invalid-feedback d-block' + (client !== false ? ' js-client-error' : '');
+                note.style.fontSize = '.72rem';
+                note.textContent = message;
+                (field.tomselect ? field.tomselect.wrapper : field).insertAdjacentElement('afterend', note);
+            }
+
+            function showBlocker(heading, messages) {
+                blocker.innerHTML = '<strong class="d-block mb-1">' + heading + '</strong>'
+                    + messages.map(function (m) {
+                        return '<span class="d-block">' + String(m).replace(/[<>&]/g, '') + '</span>';
+                    }).join('');
+                blocker.classList.remove('d-none');
+                blocker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            /**
+             * Submit Requisition: stop only with a message the user can see —
+             * the red summary at the top, a short tag on each field, and a
+             * scroll to it — never silently.
+             *
+             * Save as Draft (formnovalidate) is never stopped by this page; the
+             * server still checks what a draft line needs.
+             */
+            form.addEventListener('submit', function (event) {
+                // Cleared first, so a summary left from an earlier attempt
+                // cannot survive on top of a corrected form.
+                blocker.classList.add('d-none');
+                clearLineErrors();
+                syncItemSelects();
+
+                // A line with nothing on it (no item, no typed name, no qty, no
+                // remarks) is dropped, on Submit and Save as Draft alike. The
+                // server does the same. If every line is blank they stay, so
+                // the form is never emptied under the user.
+                var lineIsBlank = function (row) {
+                    return !itemValue(row)
+                        && !row.querySelector('.js-line-custom-name').value.trim()
+                        && !row.querySelector('.js-line-qty').value.trim()
+                        && !row.querySelector('.js-line-remarks').value.trim();
+                };
+                var blankRows = rows().filter(lineIsBlank);
+                var everyLineBlank = blankRows.length === rows().length;
+
+                if (!everyLineBlank) {
+                    blankRows.forEach(function (row) { row.remove(); });
+                    renumber();
+                    total();
+                }
+
+                if (event.submitter && event.submitter.hasAttribute('formnovalidate')) { return; }
+
+                if (everyLineBlank) {
+                    event.preventDefault();
+                    showBlocker('Please complete the form before submitting the requisition.', ['Add at least one item to the requisition.']);
+                    return;
+                }
+
+                var all = rows();
+                var lineFields = { item: null, qty: '.js-line-qty', rate: '.js-line-rate' };
+
+                var problems = window.gxRequisitionFormProblems(dateField ? dateField.value : '', all.map(function (row, i) {
+                    return {
+                        line: i + 1,
+                        custom: row.querySelector('.js-line-custom-toggle').checked,
+                        item: itemValue(row),
+                        customName: row.querySelector('.js-line-custom-name').value,
+                        qty: row.querySelector('.js-line-qty').value,
+                        rate: row.querySelector('.js-line-rate').value,
+                    };
+                }));
+
+                if (!problems.length) { return; }
+
+                event.preventDefault();
+
+                problems.forEach(function (p) {
+                    var row = p.line ? all[p.line - 1] : null;
+                    var field = null;
+
+                    if (p.field === 'date') {
+                        field = dateField;
+                    } else if (row && p.field === 'item') {
+                        field = row.querySelector(row.querySelector('.js-line-custom-toggle').checked ? '.js-line-custom-name' : '.js-line-item');
+                    } else if (row && lineFields[p.field]) {
+                        field = row.querySelector(lineFields[p.field]);
+                    }
+
+                    // The short tag under the field; the sentence is in the summary.
+                    markLineError(field, p.short);
+                });
+
+                showBlocker('Please complete the form before submitting the requisition.', problems.map(function (p) { return p.message; }));
+            });
+
+            // Cleared as soon as the user starts fixing the form, so a stale
+            // summary is never left sitting above a corrected one.
+            form.addEventListener('input', function () { blocker.classList.add('d-none'); });
+            form.addEventListener('change', function () { blocker.classList.add('d-none'); });
+
             // Re-suggest the Requisition No when the section or date changes —
             // the serial restarts per section per month.
             function refreshNumber() {
@@ -996,7 +1234,11 @@
                 // Dropping the name leaves the field purely informational, so
                 // the server allocates — and whoever saves second correctly
                 // gets the next number rather than an error.
-                form.addEventListener('submit', function () {
+                //
+                // Not on a submit the page check stopped: the user may still
+                // type a number of their own before sending it.
+                form.addEventListener('submit', function (event) {
+                    if (event.defaultPrevented) { return; }
                     if (numberField.dataset.touched !== '1') {
                         numberField.removeAttribute('name');
                     }

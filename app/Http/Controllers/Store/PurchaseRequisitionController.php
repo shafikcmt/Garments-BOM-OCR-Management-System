@@ -1518,6 +1518,8 @@ class PurchaseRequisitionController extends Controller
     {
         $unique = 'unique:purchase_requisitions,requisition_no'.($existing ? ','.$existing->id : '');
 
+        $this->dropBlankLines($request);
+
         $data = $request->validate([
             'action' => ['required', 'in:draft,submit'],
             'mode' => ['required', 'in:'.PurchaseRequisition::MODE_SINGLE.','.PurchaseRequisition::MODE_MULTI],
@@ -1532,14 +1534,15 @@ class PurchaseRequisitionController extends Controller
             'items' => ['required', 'array', 'min:1'],
 
             // A line names EITHER a master item or a typed one, never neither.
-            // required_without each way is what refuses an empty line; nullable
+            // required_without on the item is what refuses an empty line —
+            // one rule, so an empty line gets one message, not two. nullable
             // is what lets the unused half of the pair arrive blank, which it
             // always does — the form posts both fields on every row.
             // A saved line's own id, posted back on edit. Only matched against
             // THIS sheet's lines in syncItems(), so a foreign id does nothing.
             'items.*.id' => ['nullable', 'integer'],
             'items.*.stock_item_id' => ['nullable', 'required_without:items.*.custom_item_name', 'integer', 'exists:stock_items,id'],
-            'items.*.custom_item_name' => ['nullable', 'required_without:items.*.stock_item_id', 'string', 'max:255'],
+            'items.*.custom_item_name' => ['nullable', 'string', 'max:255'],
             'items.*.specification' => ['nullable', 'string', 'max:255'],
             'items.*.type' => ['nullable', 'in:'.PurchaseRequisitionItem::TYPE_REPLACE.','.PurchaseRequisitionItem::TYPE_NEW],
             'items.*.user_dept' => ['nullable', 'string', 'max:255'],
@@ -1550,6 +1553,8 @@ class PurchaseRequisitionController extends Controller
             'items.required' => 'Add at least one item to the requisition.',
             'items.min' => 'Add at least one item to the requisition.',
             'requisition_no.unique' => 'That Requisition No is already used by another requisition.',
+            'items.*.stock_item_id.required_without' => 'Select the :attribute, or tick "Not in Item Master" and type its name.',
+            'items.*.qty_requested.min' => 'The :attribute must be more than 0.',
         ], $this->lineAttributes($request));
 
         // Single mode is one line by definition. Enforced server-side so a
@@ -1560,6 +1565,33 @@ class PurchaseRequisitionController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * Silently drop a line with nothing on it — no item, no typed name, no qty,
+     * no remarks — before validating, on Submit and Save as Draft alike. The
+     * page does the same, so "line 2" reads the same on both. A partly filled
+     * line is kept and validated as ever; if every line was blank, nothing is
+     * left and 'items' fails with "Add at least one item".
+     */
+    private function dropBlankLines(Request $request): void
+    {
+        $items = $request->input('items');
+
+        if (! is_array($items)) {
+            return;
+        }
+
+        $blank = fn ($v) => trim((string) $v) === '';
+
+        $kept = array_values(array_filter($items, fn ($line) => ! is_array($line) || ! (
+            $blank($line['stock_item_id'] ?? null)
+            && $blank($line['custom_item_name'] ?? null)
+            && $blank($line['qty_requested'] ?? null)
+            && $blank($line['remarks'] ?? null)
+        )));
+
+        $request->merge(['items' => $kept]);
     }
 
     /**
@@ -1579,6 +1611,7 @@ class PurchaseRequisitionController extends Controller
         foreach (array_keys((array) $request->input('items', [])) as $index) {
             $line = ((int) $index) + 1;
             $attributes['items.'.$index.'.stock_item_id'] = 'item on line '.$line;
+            $attributes['items.'.$index.'.custom_item_name'] = 'item name on line '.$line;
             $attributes['items.'.$index.'.qty_requested'] = 'qty requested on line '.$line;
             $attributes['items.'.$index.'.rate_appx'] = 'rate on line '.$line;
         }
