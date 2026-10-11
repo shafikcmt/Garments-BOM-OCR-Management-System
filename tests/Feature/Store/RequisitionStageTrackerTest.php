@@ -132,3 +132,20 @@ it('shows no tracker for a sheet that never used the stage engine', function () 
 
     $this->actingAs($raiser)->get(route('store.stock.requisitions.show', $sheet))->assertOk()->assertDontSee('Approval Progress');
 });
+
+it('shows the Store stage of a department sheet as Received in the history, whichever way it was recorded', function () {
+    [$sheet, $head] = rstSheet();
+    $this->actingAs($head)->post(route('store.stock.requisitions.stage-approve', $sheet))->assertSessionHasNoErrors();
+    $this->actingAs(rstUser('store'))->post(route('store.stock.requisitions.stage-approve', $sheet))->assertSessionHasNoErrors();
+
+    // A sheet handled before the rule: the same step stored as 'stage_approved'.
+    $sheet->actions()->where('action', 'received')->update(['action' => 'stage_approved']);
+
+    $this->actingAs(rstUser('admin'))->get(route('store.stock.requisitions.show', $sheet))
+        ->assertOk()
+        ->assertSee('Received by Store')
+        ->assertDontSee('Stage Approved');
+
+    // Display only: the stored action is untouched.
+    expect($sheet->actions()->where('action', 'stage_approved')->count())->toBe(1);
+});

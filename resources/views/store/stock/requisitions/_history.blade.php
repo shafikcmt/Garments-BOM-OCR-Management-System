@@ -53,7 +53,7 @@
                             <tr>
                                 <td class="text-nowrap small">{{ optional($action->created_at)->format('d M Y, h:i A') ?? '—' }}</td>
                                 <td>
-                                    <span class="badge {{ $badge[$action->action] ?? 'bg-light text-dark' }}">{{ $action->actionLabel() }}</span>
+                                    <span class="badge {{ $badge[$action->displayAction($requisition->isDepartmentLevel())] ?? 'bg-light text-dark' }}">{{ $action->actionLabel($requisition->isDepartmentLevel()) }}</span>
                                     @if($action->cycle > 1)
                                         <span class="text-muted small ms-1">Round {{ $action->cycle }}</span>
                                     @endif

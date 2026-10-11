@@ -80,7 +80,20 @@ class PurchaseRequisitionAction extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function actionLabel(): string
+    /**
+     * The action as the history SHOWS it. The Store team's receipt of a
+     * department sheet is recorded as 'received' now, but sheets handled
+     * before that rule were written as 'stage_approved' at the Store's stage;
+     * both read as Received. Display only — the stored action is untouched.
+     */
+    public function displayAction(bool $departmentSheet): string
+    {
+        return $departmentSheet && $this->action === self::STAGE_APPROVED && $this->stage === self::STAGE_STORE
+            ? self::RECEIVED
+            : $this->action;
+    }
+
+    public function actionLabel(bool $departmentSheet = false): string
     {
         return [
             self::CREATED => 'Saved as Draft',
@@ -98,7 +111,7 @@ class PurchaseRequisitionAction extends Model
             self::QTY_CHANGED => 'Quantity Changed',
             self::MERGED => 'Merged',
             self::MERGE_RELEASED => 'Released from Final',
-        ][$this->action] ?? ucfirst(str_replace('_', ' ', $this->action));
+        ][$this->displayAction($departmentSheet)] ?? ucfirst(str_replace('_', ' ', $this->action));
     }
 
     public function stageLabel(): ?string
