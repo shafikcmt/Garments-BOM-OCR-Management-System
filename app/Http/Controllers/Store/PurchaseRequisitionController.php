@@ -761,6 +761,8 @@ class PurchaseRequisitionController extends Controller
                     'comment' => 'Merged into final requisition '.$final->requisition_no.'.',
                     'meta' => ['merged_into' => $final->requisition_no],
                 ]);
+
+                app(\App\Services\RequisitionNotifier::class)->merged($source, $final, $user);
             }
 
             $this->history->record($final, PurchaseRequisitionAction::MERGED, [

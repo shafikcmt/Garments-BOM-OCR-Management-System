@@ -76,6 +76,7 @@ class RequisitionWorkflow
     public function __construct(
         private readonly RequisitionHistory $history,
         private readonly PurchaseRequisitionService $requisitions,
+        private readonly RequisitionNotifier $notifier,
     ) {
     }
 
@@ -269,6 +270,9 @@ class RequisitionWorkflow
             'workflow_version' => self::VERSION,
             'current_stage' => $this->firstPending($requisition, $cycle)?->sequence,
         ])->save();
+
+        // The sheet has reached its first approval stage.
+        $this->notifier->stageReached($requisition, $this->currentStage($requisition), $raiser);
     }
 
     /*
@@ -558,6 +562,9 @@ class RequisitionWorkflow
             'meta' => ['stage_sequence' => $stage->sequence, 'stage_label' => $stage->displayLabel()],
         ]);
 
+        $this->notifier->stageActed($requisition, $stage->cycle, $stage->sequence);
+        $next ? $this->notifier->stageReached($requisition, $next, $user) : $this->notifier->finished($requisition, $user);
+
         return $next;
     }
 
@@ -627,6 +634,9 @@ class RequisitionWorkflow
                 'returned_to' => $toRaiser ? 'Requester' : $previous->displayLabel(),
             ],
         ]);
+
+        $this->notifier->stageActed($requisition, $current->cycle, $current->sequence);
+        $this->notifier->returned($requisition, $toRaiser ? null : $previous->fresh(), $user, $reason);
 
         return $toRaiser ? null : $previous->fresh();
     }
@@ -744,6 +754,7 @@ class RequisitionWorkflow
     public function cancel(PurchaseRequisition $requisition, User $user, string $reason): void
     {
         $from = $requisition->status;
+        $waitingAt = $this->currentStage($requisition);
 
         $requisition->forceFill([
             'status' => PurchaseRequisition::STATUS_CANCELLED,
@@ -755,6 +766,8 @@ class RequisitionWorkflow
             'from' => $from,
             'comment' => $reason,
         ]);
+
+        $this->notifier->cancelled($requisition, $waitingAt, $user);
     }
 
     /** Take back what a stage wrote on the sheet, so it can act again. */
