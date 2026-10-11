@@ -51,7 +51,7 @@
                     <tbody>
                         @foreach($actions as $action)
                             <tr>
-                                <td class="text-nowrap small">{{ optional($action->created_at)->format('d M Y, h:i A') ?? '—' }}</td>
+                                <td class="text-nowrap small">{{ \App\Support\LocalTime::show($action->created_at) }}</td>
                                 <td>
                                     <span class="badge {{ $badge[$action->displayAction($requisition->isDepartmentLevel())] ?? 'bg-light text-dark' }}">{{ $action->actionLabel($requisition->isDepartmentLevel()) }}</span>
                                     @if($action->cycle > 1)

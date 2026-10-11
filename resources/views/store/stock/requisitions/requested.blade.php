@@ -158,7 +158,7 @@
                                 <td>
                                     <div class="fw-bold text-slate-900">{{ $r->requisition_no }}</div>
                                     @if($r->store_ack_at)
-                                        <div class="gx-stock-spec">received {{ $r->store_ack_at->format('d-M-Y') }}</div>
+                                        <div class="gx-stock-spec">received {{ $r->store_ack_at->local()->format('d-M-Y') }}</div>
                                     @endif
                                     @if($r->mergedInto)
                                         <div class="gx-stock-spec">merged into
@@ -171,7 +171,7 @@
                                 <td class="small">
                                     {{ optional($r->createdBy)->name ?: '—' }}
                                     @if($r->department_role)
-                                        <div class="gx-stock-spec">{{ $r->departmentLabel() }}@if($r->department_checked_at) · head checked {{ $r->department_checked_at->format('d-M-Y') }}@endif</div>
+                                        <div class="gx-stock-spec">{{ $r->departmentLabel() }}@if($r->department_checked_at) · head checked {{ $r->department_checked_at->local()->format('d-M-Y') }}@endif</div>
                                     @endif
                                 </td>
                                 <td class="text-end fw-semibold">{{ $r->items_count }}</td>

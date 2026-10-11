@@ -21,14 +21,14 @@
                     </td>
                     <td><span class="badge {{ $s['badge'] }}">{{ $s['label'] }}</span></td>
                     <td>{{ $row['who'] ?: '—' }}</td>
-                    <td class="text-nowrap small">{{ $row['at'] ? $row['at']->format('d M Y, h:i A') : '—' }}</td>
+                    <td class="text-nowrap small">{{ \App\Support\LocalTime::show($row['at']) }}</td>
                     <td class="small">
                         @if($row['comment'])
                             {{ $row['comment'] }}
                         @endif
                         @if($row['return'])
                             <span class="d-block text-warning-emphasis">
-                                Returned by {{ $row['return']['by'] }} on {{ $row['return']['at']?->format('d M Y') }}@if($row['return']['to']), sent to {{ $row['return']['to'] }}@endif.
+                                Returned by {{ $row['return']['by'] }} on {{ \App\Support\LocalTime::show($row['return']['at'], 'd M Y') }}@if($row['return']['to']), sent to {{ $row['return']['to'] }}@endif.
                                 @if($row['return']['reason']) Reason: {{ $row['return']['reason'] }} @endif
                             </span>
                         @endif

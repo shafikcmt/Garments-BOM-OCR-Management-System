@@ -82,7 +82,7 @@
                             <tr>
                                 <td>
                                     <div class="fw-bold text-slate-900">{{ $r->requisition_no }}</div>
-                                    <div class="gx-stock-spec">submitted {{ $r->submitted_at?->format('d-M-Y') ?: '—' }}</div>
+                                    <div class="gx-stock-spec">submitted {{ $r->submitted_at?->local()->format('d-M-Y') ?: '—' }}</div>
                                 </td>
                                 <td class="small">{{ optional($r->requisition_date)->format('d-M-Y') ?? '—' }}</td>
                                 <td class="small">{{ $r->departmentLabel() }}</td>

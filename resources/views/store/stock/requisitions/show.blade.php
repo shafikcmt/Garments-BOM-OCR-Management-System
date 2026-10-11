@@ -48,7 +48,7 @@
                              "Received by Store" / "Approved". --}}
                         <span class="badge {{ $badges[$requisition->status] ?? 'bg-light text-dark' }}">{{ $requisition->progressLabel() }}</span>
                         @if($requisition->store_ack_at)
-                            · received {{ $requisition->store_ack_at->format('d M Y') }}
+                            · received {{ $requisition->store_ack_at->local()->format('d M Y') }}
                         @endif
                         · {{ optional($requisition->requisition_date)->format('d M Y') }}
                         · {{ $requisition->items->count() }} item(s)
@@ -175,7 +175,7 @@
                                 <span class="text-muted">· {{ $requisition->departmentLabel() }}</span>
                             @endif
                         </dd>
-                        <dt class="col-5">Submitted</dt><dd class="col-7">{{ $requisition->submitted_at?->format('d-M-Y H:i') ?: '—' }}</dd>
+                        <dt class="col-5">Submitted</dt><dd class="col-7">{{ $requisition->submitted_at?->local()->format('d-M-Y H:i') ?: '—' }}</dd>
                         {{-- One line per configured signature box — the same
                              boxes the PDF and Excel print, from Admin >
                              Settings. A step the system records reads
@@ -200,20 +200,20 @@
 
             @if($requisition->isCancelled())
                 <div class="alert alert-danger border-0 mt-3 mb-0 small">
-                    <strong>Cancelled</strong>@if($cancelAction) by {{ $cancelAction->actorName() }} on {{ $cancelAction->created_at?->format('d-M-Y') }}: {{ $cancelAction->comment }}@endif
+                    <strong>Cancelled</strong>@if($cancelAction) by {{ $cancelAction->actorName() }} on {{ $cancelAction->created_at?->local()->format('d-M-Y') }}: {{ $cancelAction->comment }}@endif
                     <span class="d-block mt-1">This requisition is closed and is not counted anywhere.</span>
                 </div>
             @elseif($requisition->returnedToRaiser() && ! $requisition->rejectedByDepartmentHead() && $lastReturn)
                 {{-- A stage-engine sheet sent back to its raiser by a later stage. --}}
                 <div class="alert alert-warning border-0 mt-3 mb-0 small">
-                    <strong>Returned by {{ $lastReturn->actorName() }}</strong> ({{ $lastReturn->stageLabel() }}) on {{ $lastReturn->created_at?->format('d-M-Y') }}:
+                    <strong>Returned by {{ $lastReturn->actorName() }}</strong> ({{ $lastReturn->stageLabel() }}) on {{ $lastReturn->created_at?->local()->format('d-M-Y') }}:
                     {{ $lastReturn->comment }}
                     <span class="d-block mt-1">Amend the requisition and submit it again, or cancel it.</span>
                 </div>
             @elseif($requisition->usesStageEngine() && $lastReturn && $requisition->current_stage > 1 && ($lastReturn->meta['stage_sequence'] ?? 0) > $requisition->current_stage)
                 {{-- Sent back one stage, to the approver now holding it. --}}
                 <div class="alert alert-warning border-0 mt-3 mb-0 small">
-                    <strong>Returned by {{ $lastReturn->actorName() }}</strong> ({{ $lastReturn->stageLabel() }}) on {{ $lastReturn->created_at?->format('d-M-Y') }}:
+                    <strong>Returned by {{ $lastReturn->actorName() }}</strong> ({{ $lastReturn->stageLabel() }}) on {{ $lastReturn->created_at?->local()->format('d-M-Y') }}:
                     {{ $lastReturn->comment }}
                 </div>
             @endif
@@ -240,7 +240,7 @@
                     @else
                         {{ $requisition->mergedInto->requisition_no }}
                     @endif
-                    ({{ $requisition->mergedInto->progressLabel() }})@if($requisition->merged_at) on {{ $requisition->merged_at->format('d-M-Y') }}@endif.
+                    ({{ $requisition->mergedInto->progressLabel() }})@if($requisition->merged_at) on {{ $requisition->merged_at->local()->format('d-M-Y') }}@endif.
                     <span class="d-block mt-1">The final requisition carries these items through Store Head, HR Audit, Finance &amp; Commercial and Operation Head approval.</span>
                 </div>
             @elseif($requisition->isReadyToMerge())
