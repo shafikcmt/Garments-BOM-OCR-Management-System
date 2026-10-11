@@ -397,7 +397,7 @@ class RequisitionWorkflow
      * Where each of these sheets waits and since when, for My Approvals and
      * its All Pending tab — two queries however many sheets there are.
      * 'since' is the last time the sheet moved (submitted, approved, returned
-     * or merged); 'days' is whole days since then.
+     * or merged); 'days' is calendar days since then on the Dhaka clock.
      *
      * @param  Collection<int, PurchaseRequisition>  $requisitions
      * @return array<int, array{stage: ?PurchaseRequisitionStage, since: ?\Illuminate\Support\Carbon, days: ?int}>
@@ -436,7 +436,9 @@ class RequisitionWorkflow
             $details[$requisition->id] = [
                 'stage' => $round->firstWhere('sequence', $requisition->current_stage),
                 'since' => $since,
-                'days' => $since ? (int) floor($since->diffInDays(now(), true)) : null,
+                // Calendar days on the Dhaka clock: a sheet that moved at 23:00 and is
+                // read at 01:00 the next morning is 1 day old, not Today.
+                'days' => $since ? (int) \App\Support\LocalTime::of($since)->startOfDay()->diffInDays(\App\Support\LocalTime::today(), true) : null,
             ];
         }
 

@@ -217,3 +217,21 @@ it('leads a requisition-only raiser\'s menu with My Approvals, with no Main Menu
         ->and($sidebar)->not->toContain('Main Menu')
         ->and(strpos($sidebar, 'My Approvals'))->toBeLessThan(strpos($sidebar, 'Purchase Requisition'));
 });
+
+it('counts waiting days as calendar days on the Dhaka clock, across Dhaka midnight', function () {
+    // Submitted 23:00 Dhaka on 30 Sep (17:00 UTC)...
+    Carbon::setTestNow('2026-09-30 17:00:00');
+    [$head, $raiser] = rmaSection('Cutting');
+    rmaSubmit($raiser);
+
+    $this->actingAs($head)->get(route('store.stock.requisitions.my-approvals'))->assertOk()->assertSee('Today');
+
+    // ...read two hours later, 01:00 Dhaka on 1 Oct: a different Dhaka day, so 1 day.
+    Carbon::setTestNow('2026-09-30 19:00:00');
+    $this->actingAs($head)->get(route('store.stock.requisitions.my-approvals'))->assertOk()
+        ->assertSee('1 day')->assertDontSee('Today');
+
+    // Same Dhaka day, 23 hours apart in the other direction: still Today.
+    Carbon::setTestNow('2026-09-30 17:30:00');
+    $this->actingAs($head)->get(route('store.stock.requisitions.my-approvals'))->assertOk()->assertSee('Today');
+});
