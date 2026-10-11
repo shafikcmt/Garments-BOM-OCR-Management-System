@@ -25,6 +25,7 @@ use App\Services\RequisitionSignatureResolver;
 use App\Services\RequisitionWorkflow;
 use App\Services\RequirementVsIssueService;
 use App\Services\StockSummaryService;
+use App\Support\LocalTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -460,7 +461,7 @@ class PurchaseRequisitionController extends Controller
     private function monthOptions(?string $selected): array
     {
         $options = [];
-        $month = now()->startOfMonth();
+        $month = LocalTime::now()->startOfMonth();
 
         for ($i = 0; $i < 24; $i++) {
             $options[$month->format('Y-m')] = $month->format('F Y');
@@ -701,7 +702,7 @@ class PurchaseRequisitionController extends Controller
             // Dated in the sources' month: today while that month runs, else
             // the latest source's date — so the month's report carries it.
             $latest = $sources->max('requisition_date');
-            $date = now()->format('Y-m') === $months->first() ? now()->startOfDay() : Carbon::parse($latest);
+            $date = LocalTime::now()->format('Y-m') === $months->first() ? LocalTime::today() : Carbon::parse($latest);
 
             $sources->load('items', 'indentSection');
             $lines = [];
@@ -1398,7 +1399,7 @@ class PurchaseRequisitionController extends Controller
     {
         $on = $request->filled('on')
             ? Carbon::parse($request->query('on'))
-            : Carbon::now();
+            : LocalTime::now();
 
         $snapshot = $this->requisitions->snapshot($stockItem->id, $on);
 
@@ -1440,7 +1441,7 @@ class PurchaseRequisitionController extends Controller
                 ? IndentSection::find($request->query('section'))?->name
                 : null);
 
-        $on = $request->filled('on') ? Carbon::parse($request->query('on')) : Carbon::now();
+        $on = $request->filled('on') ? Carbon::parse($request->query('on')) : LocalTime::now();
 
         return response()->json(['requisition_no' => $this->numbers->preview($section, $on)]);
     }

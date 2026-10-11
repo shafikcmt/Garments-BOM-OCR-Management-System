@@ -42,7 +42,7 @@
     ];
 
     $months = [];
-    $m = now()->startOfMonth();
+    $m = \App\Support\LocalTime::now()->startOfMonth();
     for ($i = 0; $i < 24; $i++) { $months[$m->format('Y-m')] = $m->format('F Y'); $m = $m->copy()->subMonth(); }
     foreach ([$f['from'], $f['to']] as $chosen) { $months[$chosen->format('Y-m')] ??= $chosen->format('F Y'); }
     krsort($months);

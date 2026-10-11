@@ -6,6 +6,7 @@ use App\Models\PurchaseRequisition;
 use App\Models\PurchaseRequisitionItem;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use App\Support\LocalTime;
 
 /**
  * General Stock (module A) — the monthly Purchase Requisition report: every
@@ -205,9 +206,9 @@ class MonthlyRequisitionReportService
     public function resolveMonth(?string $month): Carbon
     {
         try {
-            return $month ? Carbon::createFromFormat('!Y-m', $month)->startOfMonth() : now()->startOfMonth();
+            return $month ? Carbon::createFromFormat('!Y-m', $month)->startOfMonth() : LocalTime::now()->startOfMonth();
         } catch (\Throwable $e) {
-            return now()->startOfMonth();
+            return LocalTime::now()->startOfMonth();
         }
     }
 

@@ -104,3 +104,52 @@ it('reads the same instant as the Dhaka day after 06:00 UTC too', function () {
     $this->actingAs($raiser)->get(route('store.stock.requisitions.show', $sheet))
         ->assertOk()->assertSee('01 Oct 2026, 04:00 PM');
 });
+
+// --- "Today" and "this month" on the Dhaka clock ----------------------------------
+
+it('gives a requisition raised 1 Oct 02:00 Dhaka an October date and number, not September', function () {
+    // 02:00 on 1 Oct in Dhaka is 20:00 on 30 Sep UTC.
+    Carbon::setTestNow(Carbon::parse('2026-09-30 20:00:00', 'UTC'));
+
+    $head = rltUser('production', ['name' => 'Cutting Head']);
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $head->id, 'is_active' => true]);
+    $raiser = rltUser('production', ['name' => 'Cutting Raiser', 'requisition_section_id' => $section->id], ['store.requisition.view', 'store.requisition.create']);
+
+    // The form opens on the Dhaka date...
+    $html = $this->actingAs($raiser)->get(route('store.stock.requisitions.create'))->assertOk()->getContent();
+    expect($html)->toContain('name="requisition_date"')
+        ->and($html)->toMatch('/name="requisition_date"[^>]*value="2026-10-01"/s');
+
+    // ...the number preview names October...
+    $this->actingAs($raiser)->getJson(route('store.stock.requisitions.next-number'))
+        ->assertOk()->assertJsonPath('requisition_no', fn ($no) => str_contains($no, '/2026/October/'));
+
+    // ...and a sheet saved with that default date is numbered in October.
+    $stock = StockItem::firstOrCreate(['name' => 'Machine Oil'], ['uom' => 'Pcs', 'is_active' => true]);
+    $this->actingAs($raiser)->post(route('store.stock.requisitions.store'), [
+        'action' => 'submit', 'mode' => PurchaseRequisition::MODE_MULTI, 'requisition_date' => '2026-10-01',
+        'items' => [['stock_item_id' => $stock->id, 'qty_requested' => 5]],
+    ])->assertSessionHasNoErrors();
+
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+    expect($sheet->requisition_no)->toContain('/2026/October/')
+        ->and($sheet->requisition_date->toDateString())->toBe('2026-10-01')
+        ->and($sheet->getRawOriginal('submitted_at'))->toBe('2026-09-30 20:00:00'); // storage is still UTC
+});
+
+it('opens the monthly report on the Dhaka month at the month boundary', function () {
+    Carbon::setTestNow(Carbon::parse('2026-09-30 20:00:00', 'UTC')); // 1 Oct 02:00 Dhaka
+
+    $this->actingAs(rltUser('admin'))->get(route('store.stock.requisitions.report'))
+        ->assertOk()->assertSee('October 2026');
+});
+
+it('lists the month filter from the Dhaka month at the boundary', function () {
+    Carbon::setTestNow(Carbon::parse('2026-09-30 20:00:00', 'UTC'));
+
+    $html = $this->actingAs(rltUser('admin'))->get(route('store.stock.requisitions.index'))->assertOk()->getContent();
+
+    // October (Dhaka) is offered; the list begins there, not at September.
+    expect($html)->toContain('value="2026-10"')
+        ->and(strpos($html, 'value="2026-10"'))->toBeLessThan(strpos($html, 'value="2026-09"'));
+});

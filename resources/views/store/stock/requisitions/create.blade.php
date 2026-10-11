@@ -158,7 +158,7 @@
                         <label class="form-label" for="requisitionDate">Requisition Date <span class="text-danger">*</span></label>
                         <input type="date" name="requisition_date" id="requisitionDate" required
                                class="form-control @error('requisition_date') is-invalid @enderror"
-                               value="{{ $old('requisition_date', $editing ? $requisition->requisition_date->toDateString() : now()->toDateString()) }}">
+                               value="{{ $old('requisition_date', $editing ? $requisition->requisition_date->toDateString() : \App\Support\LocalTime::today()->toDateString()) }}">
                         @error('requisition_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
 

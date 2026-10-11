@@ -6,6 +6,7 @@ use App\Models\StockItem;
 use App\Models\StockPurchase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use App\Support\LocalTime;
 
 /**
  * General Stock (module A) — supplies the read-only figures the Purchase
@@ -53,7 +54,7 @@ class PurchaseRequisitionService
             return [];
         }
 
-        $on = ($on ?? Carbon::now())->copy();
+        $on = ($on ?? LocalTime::now())->copy();
         $thisMonth = $on->copy()->startOfMonth();
         $lastMonth = $thisMonth->copy()->subMonthNoOverflow();
 

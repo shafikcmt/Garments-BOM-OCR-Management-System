@@ -16,7 +16,7 @@ final class MonthOptions
     public static function recent(?string $selected = null, int $months = 24): array
     {
         $options = [];
-        $month = now()->startOfMonth();
+        $month = LocalTime::now()->startOfMonth();
 
         for ($i = 0; $i < $months; $i++) {
             $options[$month->format('Y-m')] = $month->format('F Y');

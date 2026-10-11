@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use App\Support\LocalTime;
 
 /**
  * Requirement vs Issue — per section and item, how much was requested on
@@ -196,7 +197,7 @@ class RequirementVsIssueService
             return Carbon::createFromFormat('!Y-m', $value)->startOfMonth();
         }
 
-        return $default?->copy() ?? now()->startOfMonth();
+        return $default?->copy() ?? LocalTime::now()->startOfMonth();
     }
 
     /**
