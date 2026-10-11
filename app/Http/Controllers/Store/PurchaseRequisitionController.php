@@ -1022,6 +1022,7 @@ class PurchaseRequisitionController extends Controller
         return view('store.stock.requisitions.show', [
             'requisition' => $requisition,
             'signatures' => $this->signatures->forRequisition($requisition),
+            'stageTracker' => $this->workflow->tracker($requisition),
             // Lines the Store may want to add to the Item Master. Offered only
             // to whoever reads every requisition AND may create items — the
             // same permission the Item Master screen's own Add button asks —

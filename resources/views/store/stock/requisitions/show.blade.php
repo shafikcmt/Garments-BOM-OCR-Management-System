@@ -263,6 +263,8 @@
         </div>
     </div>
 
+    @include('store.stock.requisitions._stage-tracker', ['stageTracker' => $stageTracker ?? [], 'requisition' => $requisition])
+
     {{-- Item table, column for column with the reference sheet. --}}
     <div class="card gx-stock-card">
         <div class="gx-stock-card-body">

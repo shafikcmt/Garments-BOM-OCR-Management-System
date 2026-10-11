@@ -389,6 +389,85 @@ class RequisitionWorkflow
         return $attributes->get($key);
     }
 
+    /**
+     * The stage tracker on the show page: every stage of every round, in
+     * order, newest round first. Built from the plan (purchase_requisition_stages)
+     * and the history (purchase_requisition_actions) — nothing is stored for it.
+     *
+     * Row state: done · current (the sheet waits here) · waiting · skipped ·
+     * returned (the sheet is back with its Requester) · closed (cancelled
+     * before it got here) · not_reached (an earlier round ended before it).
+     * 'return' is set on the stage a Return was made FROM: who, when, why and
+     * where it was sent. A sheet not on the stage engine has no tracker.
+     *
+     * @return list<array{cycle: int, active: bool, rows: list<array<string, mixed>>}>
+     */
+    public function tracker(PurchaseRequisition $requisition): array
+    {
+        if (! $requisition->usesStageEngine()) {
+            return [];
+        }
+
+        $stages = PurchaseRequisitionStage::where('purchase_requisition_id', $requisition->id)
+            ->orderBy('cycle')->orderBy('sequence')->get()->groupBy('cycle');
+
+        if ($stages->isEmpty()) {
+            return [];
+        }
+
+        $active = (int) $stages->keys()->max();
+        $cancelled = $requisition->isCancelled();
+
+        // Oldest first, so the latest Return of a stage wins when a sheet is returned twice.
+        $returns = $requisition->actions
+            ->whereIn('action', [PurchaseRequisitionAction::RETURNED, PurchaseRequisitionAction::HEAD_RETURNED])
+            ->sortBy('id')
+            ->groupBy('cycle');
+
+        $cycles = [];
+
+        foreach ($stages->sortKeysDesc() as $cycle => $rows) {
+            $isActive = (int) $cycle === $active;
+            $returnFrom = ($returns->get($cycle) ?? collect())->keyBy(fn ($a) => (int) ($a->meta['stage_sequence'] ?? 0));
+            $withRaiser = $isActive && ! $cancelled && (int) $requisition->current_stage === 1;
+
+            $cycles[] = [
+                'cycle' => (int) $cycle,
+                'active' => $isActive,
+                'rows' => $rows->map(function (PurchaseRequisitionStage $stage) use ($requisition, $isActive, $cancelled, $withRaiser, $returnFrom) {
+                    $return = $returnFrom->get($stage->sequence);
+
+                    $state = match (true) {
+                        $stage->sequence === 1 && $withRaiser => 'returned',
+                        $stage->status === PurchaseRequisitionStage::STATUS_APPROVED => 'done',
+                        $stage->status === PurchaseRequisitionStage::STATUS_SKIPPED => 'skipped',
+                        ! $isActive => $return ? 'returned' : 'not_reached',
+                        $cancelled => 'closed',
+                        (int) $requisition->current_stage === $stage->sequence => 'current',
+                        default => 'waiting',
+                    };
+
+                    return [
+                        'sequence' => $stage->sequence,
+                        'label' => $stage->displayLabel(),
+                        'state' => $state,
+                        'who' => $state === 'done' ? ($stage->acted_by_name ?: $stage->assignee_name) : $stage->assignee_name,
+                        'at' => $state === 'done' ? $stage->acted_at : null,
+                        'comment' => $state === 'done' ? $stage->comment : null,
+                        'return' => $return ? [
+                            'by' => $return->actorName(),
+                            'at' => $return->created_at,
+                            'reason' => $return->comment,
+                            'to' => $return->meta['returned_to'] ?? null,
+                        ] : null,
+                    ];
+                })->all(),
+            ];
+        }
+
+        return $cycles;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Approving
