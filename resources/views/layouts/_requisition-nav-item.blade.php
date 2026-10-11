@@ -20,5 +20,4 @@
             </span>
         </a>
     </li>
-    @include('layouts._my-approvals-link', ['variant' => 'nav'])
 @endif

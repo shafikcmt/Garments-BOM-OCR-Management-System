@@ -174,3 +174,46 @@ it('offers My Approvals in the sidebar to a department user and highlights only 
     $html = $this->actingAs($head)->get(route('store.stock.requisitions.my-approvals'))->assertOk()->getContent();
     expect(substr_count($html, 'sidebar-nav-link is-active'))->toBe(1);
 });
+
+it('puts My Approvals directly under Dashboard as a top-level item, for every role that sees it', function () {
+    $roles = [
+        'admin' => [],
+        'management' => [],
+        'store' => [],
+        'merchant' => ['store.requisition.view'],
+        'account' => ['store.requisition.view'],
+        'commercial' => ['store.requisition.view'],
+        'supply_chain' => ['store.requisition.view'],
+    ];
+
+    foreach ($roles as $role => $permissions) {
+        $user = rmaUser($role, [], $permissions);
+        $html = $this->actingAs($user)->get(route('store.stock.requisitions.my-approvals'))->assertOk()->getContent();
+
+        // Dashboard, then immediately the next top-level item is My Approvals.
+        expect($html)->toMatch('/Dashboard<\/span>(?:\s*<\/span>)?\s*<\/a>\s*<\/li>\s*<li class="sidebar-item">\s*<a href="[^"]*requisitions\/my-approvals"/', $role);
+
+        // Never as a link inside a group.
+        expect($html)->not->toMatch('/sidebar-sub-link[^>]*my-approvals/', $role);
+    }
+});
+
+it('does not offer My Approvals to a user without the requisition permission', function () {
+    $user = rmaUser('merchant', [], []);
+
+    $html = $this->actingAs($user)->get(route('merchant.dashboard'))->assertOk()->getContent();
+
+    expect($html)->not->toContain('requisitions/my-approvals');
+});
+
+it('leads a requisition-only raiser\'s menu with My Approvals, with no Main Menu heading', function () {
+    $raiser = rmaUser('requisition_raiser', [], ['store.requisition.view', 'store.requisition.create']);
+
+    $html = $this->actingAs($raiser)->get(route('store.stock.requisitions.index'))->assertOk()->getContent();
+    $sidebar = substr($html, strpos($html, 'id="appSidebar"'));
+    $sidebar = substr($sidebar, 0, strpos($sidebar, '</nav>'));
+
+    expect($sidebar)->toContain('My Approvals')
+        ->and($sidebar)->not->toContain('Main Menu')
+        ->and(strpos($sidebar, 'My Approvals'))->toBeLessThan(strpos($sidebar, 'Purchase Requisition'));
+});

@@ -4,18 +4,15 @@
     (RequisitionWorkflow::waitingForOnce, worked out once per request), so the
     badge can never disagree with the page.
 
-    Expects: $variant — 'nav' (a top-level item) or 'sub' (inside a group).
+    Always a top-level item directly under Dashboard, so the badge is seen
+    without opening any group. $gate (optional) is the permission rule of the
+    block it sits in ($seeRequisition); Admin and Management pass none.
 --}}
+@if($gate ?? true)
 @php
     $approvalsCount = app(\App\Services\RequisitionWorkflow::class)->waitingForOnce(auth()->user())->count();
     $approvalsActive = request()->routeIs('store.stock.requisitions.my-approvals');
 @endphp
-@if(($variant ?? 'nav') === 'sub')
-    <a href="{{ route('store.stock.requisitions.my-approvals') }}" class="sidebar-sub-link {{ $approvalsActive ? 'is-active' : '' }}">
-        My Approvals
-        @if($approvalsCount > 0)<span class="badge rounded-pill bg-danger ms-1">{{ $approvalsCount > 99 ? '99+' : $approvalsCount }}</span>@endif
-    </a>
-@else
     <li class="sidebar-item">
         <a href="{{ route('store.stock.requisitions.my-approvals') }}" class="sidebar-nav-link {{ $approvalsActive ? 'is-active' : '' }}">
             <span class="sidebar-link-main">
