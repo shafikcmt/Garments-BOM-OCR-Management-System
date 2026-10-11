@@ -188,7 +188,8 @@
                                  report, then the master data. --}}
                             {{-- Named in full to keep it distinct from the
                                  material Requisitions under Buyer/Style Stock. --}}
-                            <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">Purchase Requisition</a>
+                            <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.requisitions.*') && ! request()->routeIs('store.stock.requisitions.my-approvals') ? 'is-active' : '' }}">Purchase Requisition</a>
+                            @include('layouts._my-approvals-link', ['variant' => 'sub'])
                             <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">Receiving</a>
                             <a href="{{ route('store.stock.issues.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">Issues</a>
                             <a href="{{ route('store.stock.ledger') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">Stock Report</a>
@@ -375,10 +376,11 @@
                     {{-- Named in full to keep it distinct from the material
                          Requisitions under Buyer/Style Stock. --}}
                     <li class="sidebar-item">
-                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">
+                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') && ! request()->routeIs('store.stock.requisitions.my-approvals') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Purchase Requisition</span></span>
                         </a>
                     </li>
+                    @include('layouts._my-approvals-link', ['variant' => 'nav'])
                     @endif
                     @if($seeGsReceiving)
                     <li class="sidebar-item">
@@ -598,13 +600,14 @@
                     {{-- Named in full to keep it distinct from the material
                          Requisitions under Buyer/Style Stock. --}}
                     <li class="sidebar-item">
-                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">
+                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') && ! request()->routeIs('store.stock.requisitions.my-approvals') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Purchase Requisition</span>
                             </span>
                         </a>
                     </li>
+                    @include('layouts._my-approvals-link', ['variant' => 'nav'])
                     <li class="sidebar-item">
                         <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">

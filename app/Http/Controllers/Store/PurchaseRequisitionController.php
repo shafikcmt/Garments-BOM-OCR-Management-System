@@ -241,6 +241,67 @@ class PurchaseRequisitionController extends Controller
         ]);
     }
 
+    /**
+     * My Approvals: the sheets waiting for this user's action, and the ones
+     * sent back to them. Admin and Management have nothing to approve, so
+     * they get a read-only "All Pending" tab instead — every sheet waiting at
+     * any stage, limited by the same visibleTo() rule as the main list.
+     *
+     * The list is RequisitionWorkflow::waitingForOnce(): the same answer, from
+     * the same who-can-act rule, as the sidebar badge and the Approve button.
+     */
+    public function myApprovals(Request $request)
+    {
+        $user = $request->user();
+        $overview = $user->hasAnyRole(['admin', 'management']);
+        $tab = ($overview && $request->query('tab') === 'all') ? 'all' : 'mine';
+
+        $waiting = $this->workflow->waitingForOnce($user);
+
+        $returned = PurchaseRequisition::query()
+            ->where('created_by', $user->id)
+            ->whereNotNull('workflow_version')
+            ->where('current_stage', 1)
+            ->whereNotIn('status', [PurchaseRequisition::STATUS_DRAFT, PurchaseRequisition::STATUS_CANCELLED])
+            ->with('indentSection')
+            ->orderByDesc('id')
+            ->get();
+
+        $returnNotes = $returned->isEmpty() ? collect() : PurchaseRequisitionAction::query()
+            ->whereIn('purchase_requisition_id', $returned->pluck('id'))
+            ->whereIn('action', [PurchaseRequisitionAction::RETURNED, PurchaseRequisitionAction::HEAD_RETURNED])
+            ->orderBy('id')->get()->keyBy('purchase_requisition_id');
+
+        $all = null;
+
+        if ($tab === 'all') {
+            $all = PurchaseRequisition::query()
+                ->visibleTo($user)
+                ->whereNotNull('workflow_version')
+                ->whereNotNull('current_stage')
+                ->whereNotIn('status', [PurchaseRequisition::STATUS_DRAFT, PurchaseRequisition::STATUS_CANCELLED])
+                ->with(['indentSection', 'createdBy'])
+                ->orderBy('submitted_at')
+                ->orderBy('id')
+                ->paginate(25)
+                ->withQueryString();
+        }
+
+        $details = $this->workflow->waitingDetails(
+            $tab === 'all' ? collect($all->items()) : $waiting->concat($returned)
+        );
+
+        return view('store.stock.requisitions.my-approvals', [
+            'tab' => $tab,
+            'overview' => $overview,
+            'waiting' => $waiting,
+            'returned' => $returned,
+            'returnNotes' => $returnNotes,
+            'all' => $all,
+            'details' => $details,
+        ]);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | The head's step — section head or department head

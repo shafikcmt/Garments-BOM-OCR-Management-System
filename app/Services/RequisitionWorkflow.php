@@ -390,6 +390,56 @@ class RequisitionWorkflow
     }
 
     /**
+     * Where each of these sheets waits and since when, for My Approvals and
+     * its All Pending tab — two queries however many sheets there are.
+     * 'since' is the last time the sheet moved (submitted, approved, returned
+     * or merged); 'days' is whole days since then.
+     *
+     * @param  Collection<int, PurchaseRequisition>  $requisitions
+     * @return array<int, array{stage: ?PurchaseRequisitionStage, since: ?\Illuminate\Support\Carbon, days: ?int}>
+     */
+    public function waitingDetails(Collection $requisitions): array
+    {
+        $ids = $requisitions->pluck('id')->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $stages = PurchaseRequisitionStage::whereIn('purchase_requisition_id', $ids)->get()->groupBy('purchase_requisition_id');
+
+        $moved = PurchaseRequisitionAction::query()
+            ->whereIn('purchase_requisition_id', $ids)
+            ->whereIn('action', [
+                PurchaseRequisitionAction::SUBMITTED, PurchaseRequisitionAction::RESUBMITTED,
+                PurchaseRequisitionAction::HEAD_APPROVED, PurchaseRequisitionAction::HEAD_RETURNED,
+                PurchaseRequisitionAction::STAGE_APPROVED, PurchaseRequisitionAction::RECEIVED,
+                PurchaseRequisitionAction::APPROVED, PurchaseRequisitionAction::RETURNED,
+                PurchaseRequisitionAction::MERGED,
+            ])
+            ->selectRaw('purchase_requisition_id, max(created_at) as moved_at')
+            ->groupBy('purchase_requisition_id')
+            ->pluck('moved_at', 'purchase_requisition_id');
+
+        $details = [];
+
+        foreach ($requisitions as $requisition) {
+            $all = $stages->get($requisition->id, collect());
+            $round = $all->where('cycle', $all->max('cycle'));
+            $since = ($moved[$requisition->id] ?? null) ?: ($requisition->submitted_at ?? $requisition->created_at);
+            $since = $since ? \Illuminate\Support\Carbon::parse($since) : null;
+
+            $details[$requisition->id] = [
+                'stage' => $round->firstWhere('sequence', $requisition->current_stage),
+                'since' => $since,
+                'days' => $since ? (int) floor($since->diffInDays(now(), true)) : null,
+            ];
+        }
+
+        return $details;
+    }
+
+    /**
      * The stage tracker on the show page: every stage of every round, in
      * order, newest round first. Built from the plan (purchase_requisition_stages)
      * and the history (purchase_requisition_actions) — nothing is stored for it.

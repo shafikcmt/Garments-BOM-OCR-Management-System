@@ -407,6 +407,12 @@ Route::prefix('store')
             Route::get('/requisitions/requested', [PurchaseRequisitionController::class, 'requested'])
                 ->name('requisitions.requested');
 
+            // My Approvals: what waits for this user's action, and (Admin and
+            // Management) a read-only list of everything pending. A fixed
+            // path, so declared above /{requisition}.
+            Route::get('/requisitions/my-approvals', [PurchaseRequisitionController::class, 'myApprovals'])
+                ->name('requisitions.my-approvals');
+
             // The Department Head's queue and decision — a department's sheet
             // passes its head before it reaches the Store. Who the head is
             // comes from Admin > Settings; the controller refuses anyone else
