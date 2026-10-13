@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\BuyerScope;
 use App\Support\DepartmentRoles;
 use App\Support\PermissionCatalog;
+use App\Support\PortalAccess;
 use App\Support\UserAdministrationScope;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -1016,6 +1017,38 @@ class UserController extends Controller
         $user->syncPermissions($keep->values()->all());
     }
 
+    /**
+     * The Portal Access switches on the user form (see App\Support\PortalAccess).
+     *
+     * Each switch writes its listed permissions as DIRECT permissions, so it works
+     * on top of any role in any department. Run after syncDirectPermissions():
+     * the matrix posts the same boxes, and a switch has the last word. Turning
+     * one off removes only the direct grants — what a role carries stays.
+     * Skipped when the form did not carry the block, and per switch when the
+     * editor does not hold every permission in it themselves.
+     */
+    private function syncPortalAccess(User $user, Request $request): void
+    {
+        if (! $request->has('portal_access_control')) {
+            return;
+        }
+
+        foreach (PortalAccess::toggles() as $key => $toggle) {
+            $names = $toggle['permissions'];
+
+            if (! collect($names)->every(fn ($name) => $this->scope()->mayGrant($name))) {
+                continue;
+            }
+
+            if ($request->boolean('portal_access.'.$key)) {
+                $fromRole = $user->getPermissionsViaRoles()->pluck('name');
+                $user->givePermissionTo(collect($names)->reject(fn ($n) => $fromRole->contains($n))->all());
+            } else {
+                $user->revokePermissionTo($names);
+            }
+        }
+    }
+
     public function store(Request $request)
     {
         $this->authorize('create', User::class);
@@ -1071,6 +1104,7 @@ class UserController extends Controller
 
         $user->syncRoles([$data['role']]);
         $this->syncDirectPermissions($user, $request);
+        $this->syncPortalAccess($user, $request);
         $this->linkEmployee($user, $employeeId);
 
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
@@ -1260,6 +1294,7 @@ class UserController extends Controller
         // lock themselves out of the screen they would need to undo it.
         if (! $isSelf) {
             $this->syncDirectPermissions($user, $request);
+            $this->syncPortalAccess($user, $request);
         }
 
         $this->linkEmployee($user, $employeeId);

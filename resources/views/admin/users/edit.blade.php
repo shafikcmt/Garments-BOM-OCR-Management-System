@@ -184,6 +184,10 @@
                             @endif
                         </div>
 
+                        @unless($isSelf)
+                            @include('admin.users._requisition-access')
+                        @endunless
+
                         {{-- Department Admin — a promotion, not an access
                              setting. Super admin only, and never on your own
                              account, for the same reason your role and status

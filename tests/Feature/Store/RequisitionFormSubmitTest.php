@@ -99,12 +99,12 @@ it('renders the Edit Requisition form so the browser can never block it silently
     );
 });
 
-it('submits a filled form: a master line and a typed line', function () {
+it('submits a filled form with two master lines', function () {
     $item = rfsItem();
 
     $this->actingAs(rfsUser())->post(route('store.stock.requisitions.store'), rfsPayload([
         ['stock_item_id' => $item->id, 'qty_requested' => '5', 'type' => 'new', 'remarks' => 'urgent'],
-        ['stock_item_id' => '', 'custom_item_name' => 'Laser Pointer', 'qty_requested' => '1', 'type' => 'new'],
+        ['stock_item_id' => rfsItem('Laser Pointer')->id, 'qty_requested' => '1', 'type' => 'new'],
     ]))->assertRedirect()->assertSessionHasNoErrors();
 
     $sheet = PurchaseRequisition::latest('id')->firstOrFail();
@@ -130,7 +130,7 @@ it('answers a line posted without an item with one message, at the top and on th
 
     // The red summary at the top, in plain words.
     expect($html)->toContain('Please correct this:')
-        ->toContain('Select the item on line 2, or tick &quot;Not in Item Master&quot; and type its name.');
+        ->toContain('Select the item on line 2 from the Item Master.');
 
     // Everything typed comes back, and line 2 carries its short tag.
     expect($html)->toContain('"remarks":"urgent"')

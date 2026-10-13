@@ -322,19 +322,12 @@
                         @endforeach
                     </select>
 
-                    {{-- Asking for something the Item Master has never carried.
-                         A SEPARATE box rather than a "create" option on the
-                         dropdown, on purpose: a typed name here must NOT add a
-                         row to the Item Master. What belongs in the master has
-                         a category, a UOM and a re-order level behind it, and
-                         that is a Store decision taken afterwards — so the two
-                         are kept visibly apart.
-
-                         The select keeps its own markup and its own TomSelect
-                         untouched, which is what leaves item search, UOM
-                         auto-fill, the category filter and the stock chips
-                         behaving exactly as before on a master line. --}}
-                    <div class="gx-req-custom">
+                    {{-- "Not in Item Master" is retired: every line must be a master
+                         item, so a typed name can never reach the Store as a
+                         free-text item. The block stays in the page, hidden and
+                         never switched on, only so the line script below keeps
+                         finding its elements. --}}
+                    <div class="gx-req-custom" hidden>
                         <div class="form-check">
                             <input class="form-check-input js-line-custom-toggle" type="checkbox"
                                    id="customToggle__INDEX__">
@@ -893,10 +886,6 @@
                     if (values.qty_requested) { row.querySelector('.js-line-qty').value = values.qty_requested; }
                     if (values.rate_appx) { row.querySelector('.js-line-rate').value = values.rate_appx; }
                     if (values.remarks) { row.querySelector('[name$="[remarks]"]').value = values.remarks; }
-                    if (values.custom_item_name) {
-                        row.querySelector('.js-line-custom-name').value = values.custom_item_name;
-                        row.querySelector('.js-line-custom-toggle').checked = true;
-                    }
                 }
 
                 if (window.gxInitSearchable) { window.gxInitSearchable(row); }
@@ -1038,7 +1027,7 @@
                     if (l.custom && blank(l.customName)) {
                         problems.push({ line: l.line, field: 'item', message: 'Type the item name on line ' + l.line + '.', short: 'Required' });
                     } else if (!l.custom && blank(l.item)) {
-                        problems.push({ line: l.line, field: 'item', message: 'Select the item on line ' + l.line + ', or tick "Not in Item Master" and type its name.', short: 'Required' });
+                        problems.push({ line: l.line, field: 'item', message: 'Select the item on line ' + l.line + ' from the Item Master.', short: 'Required' });
                     }
 
                     if (!number(l.qty) || !(parseFloat(l.qty) > 0)) {
