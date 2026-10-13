@@ -71,8 +71,8 @@ it('shows the raise-requisition switch on the create and edit screens', function
     Role::findOrCreate('merchant', 'web');
     $user = User::factory()->create(['status' => 1])->assignRole('merchant');
 
-    $this->actingAs($admin)->get(route('admin.users.create'))->assertOk()->assertSee('Can raise General Stock Requisition');
-    $this->actingAs($admin)->get(route('admin.users.edit', $user))->assertOk()->assertSee('Can raise General Stock Requisition');
+    $this->actingAs($admin)->get(route('admin.users.create'))->assertOk()->assertSee('Portal Access')->assertSee('General Stock Requisition');
+    $this->actingAs($admin)->get(route('admin.users.edit', $user))->assertOk()->assertSee('Portal Access')->assertSee('General Stock Requisition');
 });
 
 it('turns requisition access on and off with the switch, for any department, general stock only', function () {
@@ -83,10 +83,10 @@ it('turns requisition access on and off with the switch, for any department, gen
     $base = [
         'name' => $user->name, 'email' => $user->email, 'status' => 1,
         'department' => 'merchandising', 'role' => 'merchant',
-        'can_raise_requisition_control' => 1,
+        'portal_access_control' => 1,
     ];
 
-    $this->actingAs($admin)->put(route('admin.users.update', $user), $base + ['can_raise_requisition' => 1])
+    $this->actingAs($admin)->put(route('admin.users.update', $user), $base + ['portal_access' => ['general_requisition' => 1]])
         ->assertSessionHasNoErrors();
 
     $user = $user->fresh();
@@ -112,7 +112,7 @@ it('grants requisition access through the switch when creating a user', function
     $this->actingAs($admin)->post(route('admin.users.store'), [
         'name' => 'Accounts Clerk', 'email' => 'clerk@example.test', 'password' => 'secret123',
         'status' => 1, 'department' => 'accounts', 'role' => 'account',
-        'can_raise_requisition_control' => 1, 'can_raise_requisition' => 1,
+        'portal_access_control' => 1, 'portal_access' => ['general_requisition' => 1],
     ])->assertSessionHasNoErrors();
 
     $user = User::where('email', 'clerk@example.test')->firstOrFail();

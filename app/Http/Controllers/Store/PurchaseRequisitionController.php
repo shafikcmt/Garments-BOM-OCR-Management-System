@@ -1533,16 +1533,13 @@ class PurchaseRequisitionController extends Controller
 
             'items' => ['required', 'array', 'min:1'],
 
-            // A line names EITHER a master item or a typed one, never neither.
-            // required_without on the item is what refuses an empty line —
-            // one rule, so an empty line gets one message, not two. nullable
-            // is what lets the unused half of the pair arrive blank, which it
-            // always does — the form posts both fields on every row.
+            // Every line is an Item Master item. A typed, free-text item is no
+            // longer accepted (custom_item_name is deliberately not validated,
+            // so it never reaches the save); sheets saved earlier keep theirs.
             // A saved line's own id, posted back on edit. Only matched against
             // THIS sheet's lines in syncItems(), so a foreign id does nothing.
             'items.*.id' => ['nullable', 'integer'],
-            'items.*.stock_item_id' => ['nullable', 'required_without:items.*.custom_item_name', 'integer', 'exists:stock_items,id'],
-            'items.*.custom_item_name' => ['nullable', 'string', 'max:255'],
+            'items.*.stock_item_id' => ['required', 'integer', 'exists:stock_items,id'],
             'items.*.specification' => ['nullable', 'string', 'max:255'],
             'items.*.type' => ['nullable', 'in:'.PurchaseRequisitionItem::TYPE_REPLACE.','.PurchaseRequisitionItem::TYPE_NEW],
             'items.*.user_dept' => ['nullable', 'string', 'max:255'],
@@ -1553,7 +1550,7 @@ class PurchaseRequisitionController extends Controller
             'items.required' => 'Add at least one item to the requisition.',
             'items.min' => 'Add at least one item to the requisition.',
             'requisition_no.unique' => 'That Requisition No is already used by another requisition.',
-            'items.*.stock_item_id.required_without' => 'Select the :attribute, or tick "Not in Item Master" and type its name.',
+            'items.*.stock_item_id.required' => 'Select the :attribute from the Item Master.',
             'items.*.qty_requested.min' => 'The :attribute must be more than 0.',
         ], $this->lineAttributes($request));
 
