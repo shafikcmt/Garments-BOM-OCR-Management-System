@@ -33,7 +33,12 @@ rules on the server are never loosened by these phases.
 - **Phase 4 — Buyer / Style Stock requisition toggle.** One new `PortalAccess`
   entry for `material.requisitions.view/create`, when the Buyer/Style Stock
   requisition work is ready. Not before.
-- **Decision pending — server buyer scoping for Accounts / Commercial / Store.**
-  `BuyerScope::SCOPED_DEPARTMENTS` still lists them, so a user from those
-  departments who is given specific buyers is confined. Narrowing it changes
-  live data access and many tests; check live data for such users first.
+- **Decision (2026-10-13): server buyer scoping stays as is.** Business rule
+  confirmed by the owner: only Merchandising and Supply Chain work buyer-wise;
+  Accounts, Commercial, Store and the rest work across every buyer. A live
+  check found 9 confined users in total, none outside Merchandising / Supply
+  Chain. So `BuyerScope::SCOPED_DEPARTMENTS` is left unchanged: narrowing it
+  breaks ~43 tests of the buyer-confinement feature for no live benefit, and the
+  form no longer offers Buyer Access outside the two departments
+  (`BUYER_ACCESS_FORM_DEPARTMENTS`), so no new confinement can be created there.
+  Revisit only if that confinement feature is retired on purpose.
