@@ -162,7 +162,7 @@ class UserController extends Controller
         // Which departments the block applies to, and which roles are carved
         // out of them, so the form can show and hide it as the selects change
         // rather than offering Buyer Access where nothing would ever read it.
-        $buyerScopedDepartments = BuyerScope::SCOPED_DEPARTMENTS;
+        $buyerScopedDepartments = BuyerScope::BUYER_ACCESS_FORM_DEPARTMENTS;
         $buyerUnscopedRoles = BuyerScope::UNSCOPED_ROLES;
 
         return view('admin.users.create', array_merge(
@@ -1181,7 +1181,19 @@ class UserController extends Controller
 
         // Which departments the block applies to, and which roles are carved
         // out of them, so it can be shown and hidden as the selects change.
-        $buyerScopedDepartments = BuyerScope::SCOPED_DEPARTMENTS;
+        $storedDepartment = DepartmentRoles::departmentOf($user->primaryRoleName());
+        $holdsBuyers = $assignedBuyers->isNotEmpty();
+
+        // Only Merchandising and Supply Chain are offered Buyer Access. A user
+        // OUTSIDE them who already holds buyers keeps the control (their
+        // department is added), so an existing restriction is never hidden
+        // from the admin who may need to lift it.
+        $buyerScopedDepartments = BuyerScope::BUYER_ACCESS_FORM_DEPARTMENTS;
+
+        if ($holdsBuyers && $storedDepartment) {
+            $buyerScopedDepartments = array_values(array_unique([...$buyerScopedDepartments, $storedDepartment]));
+        }
+
         $buyerUnscopedRoles = BuyerScope::UNSCOPED_ROLES;
 
         // Whether the block starts visible. The stored department decides the
@@ -1189,7 +1201,8 @@ class UserController extends Controller
         // takes over from the first change event.
         // appliesToRole(), so a store_general_stock user's screen starts closed
         // even though their department is scoped.
-        $buyerAccessStartsOpen = BuyerScope::appliesToRole($user->primaryRoleName());
+        $buyerAccessStartsOpen = BuyerScope::appliesToRole($user->primaryRoleName())
+            && in_array($storedDepartment, $buyerScopedDepartments, true);
 
         $currentBuyerIds = $assignedBuyers->pluck('id')->map(fn ($id) => (int) $id)->all();
         $currentBuyerScopeMode = $user->isBuyerConfined()

@@ -384,13 +384,18 @@
                              is absent for everyone else, so its absence must
                              read as "not shown", never as "untick it". --}}
                         @can('setCanUpload', $user)
-                            <div class="mb-4">
+                            {{-- Merchandising only. Shown and hidden with the
+                                 Department select; while hidden its inputs are
+                                 disabled, so nothing is posted and the stored
+                                 value is left alone (absent control = unchanged). --}}
+                            @php($bomUploadVisible = ($currentDepartment ?? null) === 'merchandising')
+                            <div class="mb-4 js-dept-only" data-departments="merchandising" @unless($bomUploadVisible) hidden @endunless>
                                 <label class="form-label fw-semibold d-block">BOM Upload</label>
-                                <input type="hidden" name="can_upload_control" value="1">
+                                <input type="hidden" name="can_upload_control" value="1" @unless($bomUploadVisible) disabled @endunless>
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" role="switch"
                                            id="canUploadSwitch" name="can_upload" value="1"
-                                           @checked(old('can_upload', $user->can_upload))>
+                                           @checked(old('can_upload', $user->can_upload)) @unless($bomUploadVisible) disabled @endunless>
                                     <label class="form-check-label" for="canUploadSwitch">
                                         Can upload BOM files for {{ $user->buyer?->buyer_name }}
                                     </label>

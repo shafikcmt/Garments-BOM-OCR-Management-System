@@ -63,7 +63,18 @@
     </style>
 @else
 
-<div class="gx-perm" data-role-permissions='@json($rolePermissions)'>
+@php
+    $fromRoleCount = $roleGranted->count();
+    $directCount = $direct->reject(fn ($name) => $roleGranted->contains($name))->count();
+@endphp
+
+<details class="gx-adv" @if($readonly || $errors->any() || $directCount > 0) open @endif>
+    <summary class="gx-adv-summary">
+        <span class="gx-adv-title"><i class="bi bi-chevron-right gx-adv-caret" aria-hidden="true"></i>Advanced permissions</span>
+        <span class="gx-adv-count js-adv-count">From role: {{ $fromRoleCount }} · Extra granted: {{ $directCount }}</span>
+    </summary>
+
+<div class="gx-perm" data-role-permissions='@json($rolePermissions)' data-department-modules='@json(\App\Support\DepartmentModules::map())'>
 
     <div class="gx-perm-toolbar">
         <div class="gx-perm-search">
@@ -75,7 +86,8 @@
         </div>
 
         <div class="btn-group btn-group-sm" role="group" aria-label="Permission filters">
-            <button type="button" class="btn btn-outline-secondary js-perm-chip is-active" data-filter="all">All</button>
+            <button type="button" class="btn btn-outline-secondary js-perm-chip is-active" data-filter="relevant">Relevant</button>
+            <button type="button" class="btn btn-outline-secondary js-perm-chip" data-filter="all">All</button>
             <button type="button" class="btn btn-outline-secondary js-perm-chip" data-filter="stock">Stock only</button>
             <button type="button" class="btn btn-outline-secondary js-perm-chip" data-filter="direct">Granted only</button>
             <button type="button" class="btn btn-outline-secondary js-perm-chip" data-filter="role">From role</button>
@@ -194,8 +206,18 @@
         <span><span class="gx-perm-swatch is-open"></span>Available — click to grant</span>
     </div>
 </div>
+</details>
 
 <style>
+    .gx-adv { border: 1px solid var(--gx-surface-border, #e2e8f0); border-radius: var(--gx-radius-sm, 10px); background: var(--gx-card, #fff); }
+    .gx-adv-summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .7rem 1rem; cursor: pointer; list-style: none; }
+    .gx-adv-summary::-webkit-details-marker { display: none; }
+    .gx-adv-title { font-size: .86rem; font-weight: 600; color: var(--gx-text, #1E293B); }
+    .gx-adv-caret { display: inline-block; margin-right: .45rem; font-size: .7rem; color: #94a3b8; transition: transform .12s ease; }
+    .gx-adv[open] .gx-adv-caret { transform: rotate(90deg); }
+    .gx-adv-count { font-size: .74rem; color: var(--gx-text-muted, #64748B); font-variant-numeric: tabular-nums; }
+    .gx-adv > .gx-perm { padding: 0 1rem 1rem; }
+
     /* ------------------------------------------------------------------
      * Permission matrix. Colours are the app's own tokens: slate for what
      * the role brings, --gx-secondary for what was granted here. Nothing
@@ -365,7 +387,8 @@
         var empty = matrix.querySelector('.gx-perm-empty');
         var toggleAll = matrix.querySelector('.js-perm-toggle-all');
 
-        var filter = 'all';
+        var filter = 'relevant';
+        var departmentSelect = document.querySelector('.js-department');
 
         function boxes(el) {
             return Array.prototype.slice.call(el.querySelectorAll('.js-perm-box'));
@@ -405,6 +428,17 @@
          */
         function passesChip(card) {
             if (filter === 'all') { return true; }
+            if (filter === 'relevant') {
+                var dept = departmentSelect ? departmentSelect.value : '';
+                var map = JSON.parse(matrix.dataset.departmentModules || '{}');
+
+                // No department yet, or one this map does not know: show all.
+                if (! dept || ! (dept in map) || map[dept] === '*') { return true; }
+
+                // Always keep a card where the user already holds something.
+                return map[dept].indexOf(card.dataset.module) !== -1
+                    || boxes(card).some(function (b) { return b.checked; });
+            }
             if (filter === 'stock') {
                 return card.dataset.module === 'store' || card.dataset.module === 'material';
             }
@@ -453,13 +487,24 @@
             empty.classList.toggle('d-none', visible > 0);
         }
 
+        /** The collapsed header's one-line summary, kept live. */
+        function summary() {
+            var all = boxes(matrix);
+            var role = all.filter(function (b) { return b.disabled && b.checked; }).length;
+            var direct = all.filter(function (b) { return ! b.disabled && b.checked; }).length;
+            var out = document.querySelector('.js-adv-count');
+            if (out) { out.textContent = 'From role: ' + role + ' \u00b7 Extra granted: ' + direct; }
+        }
+
         function refresh() {
             matrix.querySelectorAll('.js-perm-box').forEach(paint);
             cards.forEach(meter);
+            summary();
             apply();
         }
 
         search.addEventListener('input', apply);
+        if (departmentSelect) { departmentSelect.addEventListener('change', apply); }
 
         chips.forEach(function (chip) {
             chip.addEventListener('click', function () {
@@ -522,6 +567,7 @@
                     box.checked ? chosen.add(box.dataset.permission) : chosen.delete(box.dataset.permission);
                     paint(box);
                     meter(box.closest('.js-perm-card'));
+                    summary();
                     apply();
                 });
 

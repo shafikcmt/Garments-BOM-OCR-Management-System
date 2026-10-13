@@ -142,6 +142,24 @@ final class BuyerScope
         'store_general_stock',
     ];
 
+    /**
+     * Departments whose Users form OFFERS Buyer Access (and BOM Upload).
+     *
+     * DISPLAY ONLY. The business works buyer-by-buyer in Merchandising and
+     * Supply Chain; Accounts, Commercial and Store work across every buyer, so
+     * offering them a buyer picker only invites a mistake. This list decides
+     * what the form shows for a NEW assignment and nothing else:
+     * SCOPED_DEPARTMENTS above still decides who is actually confined, so a
+     * user who already holds buyers keeps their restriction and still sees the
+     * control (see UserController::buyerFormDepartments()).
+     *
+     * @var list<string>
+     */
+    public const BUYER_ACCESS_FORM_DEPARTMENTS = [
+        'merchandising',
+        'supply_chain',
+    ];
+
     /** Every buyer — the unrestricted mode, and the default for a new user. */
     public const MODE_ALL = 'all';
 

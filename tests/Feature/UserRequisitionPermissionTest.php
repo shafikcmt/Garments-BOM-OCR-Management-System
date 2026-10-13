@@ -118,3 +118,51 @@ it('grants requisition access through the switch when creating a user', function
     $user = User::where('email', 'clerk@example.test')->firstOrFail();
     expect($user->can('store.requisition.create'))->toBeTrue();
 });
+
+it('offers Buyer Access only to Merchandising and Supply Chain, but keeps it for an already-confined user', function () {
+    $this->withoutVite();
+    $admin = raiseAdmin();
+    Role::findOrCreate('account', 'web');
+    $buyer = \App\Models\Buyer::create(['buyer_name' => 'ACME', 'status' => 1]);
+    $plain = User::factory()->create(['status' => 1])->assignRole('account');
+    $confined = User::factory()->create(['status' => 1])->assignRole('account');
+    $confined->buyers()->sync([$buyer->id]);
+    $confined->forceFill(['buyer_id' => $buyer->id, 'buyer_scope_mode' => 'specific'])->save();
+
+    $dataAttr = fn (string $html) => preg_match('/data-scope-departments="([^"]*)"/', $html, $m) ? $m[1] : null;
+
+    $create = $this->actingAs($admin)->get(route('admin.users.create'))->assertOk()->getContent();
+    expect($dataAttr($create))->toBe('merchandising,supply_chain');
+
+    $edit = $this->actingAs($admin)->get(route('admin.users.edit', $plain))->assertOk()->getContent();
+    expect($dataAttr($edit))->toBe('merchandising,supply_chain');
+
+    $edit = $this->actingAs($admin)->get(route('admin.users.edit', $confined))->assertOk()->getContent();
+    expect($dataAttr($edit))->toBe('merchandising,supply_chain,accounts');
+});
+
+it('keeps BOM Upload off the screen of a user outside Merchandising', function () {
+    $this->withoutVite();
+    $admin = raiseAdmin();
+    Role::findOrCreate('account', 'web');
+    $user = User::factory()->create(['status' => 1])->assignRole('account');
+
+    $html = $this->actingAs($admin)->get(route('admin.users.edit', $user))->assertOk()->getContent();
+
+    expect($html)->toMatch('/class="mb-4 js-dept-only" data-departments="merchandising"\s+hidden/');
+});
+
+it('puts the permission matrix under a collapsed Advanced permissions section with a Relevant view', function () {
+    $this->withoutVite();
+    $admin = raiseAdmin();
+    Role::findOrCreate('account', 'web');
+    $user = User::factory()->create(['status' => 1])->assignRole('account');
+
+    $html = $this->actingAs($admin)->get(route('admin.users.edit', $user))->assertOk()->getContent();
+
+    expect($html)->toContain('Advanced permissions')
+        ->toContain('data-filter="relevant"')
+        ->toContain('From role:')
+        // collapsed: nothing granted directly and no errors
+        ->not->toMatch('/<details class="gx-adv"\s+open/');
+});

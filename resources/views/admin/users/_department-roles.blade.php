@@ -49,7 +49,17 @@
             }
         }
 
-        department.addEventListener('change', function () { apply(true); });
+        // Blocks marked data-departments="a,b" show only for those departments.
+        // Their inputs are disabled while hidden, so a hidden block posts nothing.
+        function applyDeptOnly() {
+            document.querySelectorAll('.js-dept-only').forEach(function (block) {
+                var on = (block.dataset.departments || '').split(',').indexOf(department.value) !== -1;
+                block.hidden = ! on;
+                block.querySelectorAll('input').forEach(function (input) { input.disabled = ! on; });
+            });
+        }
+
+        department.addEventListener('change', function () { apply(true); applyDeptOnly(); });
 
         // On load, filter without clearing — an existing user's saved role must
         // survive the first pass even if the map has since moved it.
