@@ -1016,6 +1016,39 @@ class UserController extends Controller
         $user->syncPermissions($keep->values()->all());
     }
 
+    /**
+     * The "Can raise General Stock Requisition" switch on the user form.
+     *
+     * Writes exactly store.requisition.view + store.requisition.create as DIRECT
+     * permissions, so it works on top of any role in any department and never
+     * touches Buyer / Style Stock (material.*). Run after syncDirectPermissions():
+     * the matrix posts the same two boxes, and this switch has the last word.
+     * Turning it off removes only the direct grants — what a role carries stays.
+     * Skipped when the form did not carry the switch, or the editor does not
+     * hold both permissions themselves.
+     */
+    private function syncRequisitionRaise(User $user, Request $request): void
+    {
+        if (! $request->has('can_raise_requisition_control')) {
+            return;
+        }
+
+        $names = ['store.requisition.view', 'store.requisition.create'];
+
+        foreach ($names as $name) {
+            if (! $this->scope()->mayGrant($name)) {
+                return;
+            }
+        }
+
+        if ($request->boolean('can_raise_requisition')) {
+            $fromRole = $user->getPermissionsViaRoles()->pluck('name');
+            $user->givePermissionTo(collect($names)->reject(fn ($n) => $fromRole->contains($n))->all());
+        } else {
+            $user->revokePermissionTo($names);
+        }
+    }
+
     public function store(Request $request)
     {
         $this->authorize('create', User::class);
@@ -1071,6 +1104,7 @@ class UserController extends Controller
 
         $user->syncRoles([$data['role']]);
         $this->syncDirectPermissions($user, $request);
+        $this->syncRequisitionRaise($user, $request);
         $this->linkEmployee($user, $employeeId);
 
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
@@ -1260,6 +1294,7 @@ class UserController extends Controller
         // lock themselves out of the screen they would need to undo it.
         if (! $isSelf) {
             $this->syncDirectPermissions($user, $request);
+            $this->syncRequisitionRaise($user, $request);
         }
 
         $this->linkEmployee($user, $employeeId);

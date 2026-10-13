@@ -124,3 +124,5 @@
         <option value="0" @selected(old('status', $user->status ?? 1) == 0)>Inactive</option>
     </select>
 </div>
+
+@include('admin.users._requisition-access')
