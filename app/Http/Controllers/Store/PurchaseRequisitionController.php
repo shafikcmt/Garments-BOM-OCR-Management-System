@@ -98,7 +98,7 @@ class PurchaseRequisitionController extends Controller
                 // is case-sensitive, and stays LIKE everywhere else.
                 $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
                     ->orWhereHas('indentPerson', fn ($p) => $p->whereLike('name', $like))
-                    ->orWhereHas('items.stockItem', fn ($i) => $i->whereLike('name', $like))
+                    ->orWhereHas('items.stockItem', fn ($i) => $i->where(fn ($n) => $n->whereLike('name', $like)->orWhereLike('sku', $like)))
                     // A line naming something not in the Item Master has no
                     // stockItem to search, so its typed name is searched too —
                     // otherwise the one item nobody can find in the master is
@@ -212,7 +212,7 @@ class PurchaseRequisitionController extends Controller
                 $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
                     ->orWhereHas('indentPerson', fn ($p) => $p->whereLike('name', $like))
                     ->orWhereHas('createdBy', fn ($u) => $u->whereLike('name', $like))
-                    ->orWhereHas('items.stockItem', fn ($i) => $i->whereLike('name', $like))
+                    ->orWhereHas('items.stockItem', fn ($i) => $i->where(fn ($n) => $n->whereLike('name', $like)->orWhereLike('sku', $like)))
                     ->orWhereHas('items', fn ($i) => $i->whereLike('custom_item_name', $like)));
             })
             // Oldest first: a queue is worked from the end that has waited
@@ -342,7 +342,7 @@ class PurchaseRequisitionController extends Controller
                 $like = '%'.$search.'%';
                 $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
                     ->orWhereHas('createdBy', fn ($u) => $u->whereLike('name', $like))
-                    ->orWhereHas('items.stockItem', fn ($i) => $i->whereLike('name', $like))
+                    ->orWhereHas('items.stockItem', fn ($i) => $i->where(fn ($n) => $n->whereLike('name', $like)->orWhereLike('sku', $like)))
                     ->orWhereHas('items', fn ($i) => $i->whereLike('custom_item_name', $like)));
             })
             ->orderBy('requisition_date')
@@ -1407,6 +1407,7 @@ class PurchaseRequisitionController extends Controller
         // for a duplicate key, which would send the raw timestamp instead of
         // the display date the form puts straight into a read-only box.
         $payload = array_merge($snapshot, [
+            'sku' => $stockItem->sku,
             'uom' => $stockItem->uom,
             // The item master's merged Brand/Specification field. The line's
             // own Specification stays editable — this only pre-fills it.
@@ -1417,7 +1418,7 @@ class PurchaseRequisitionController extends Controller
                 : null,
         ]);
 
-        // A department user gets the item master's descriptive fields — Uom,
+        // A department user gets the item master's descriptive fields — SKU, Uom,
         // Specification, Category — and none of the Store's figures. Hiding
         // the chips on their form is not enough when the numbers still travel
         // in the response; they are stripped here. The server re-reads the
@@ -1425,7 +1426,7 @@ class PurchaseRequisitionController extends Controller
         // Store later sees are unaffected.
         $user = $request->user();
         if (! ($user && PurchaseRequisition::seesEveryRequisition($user))) {
-            $payload = array_intersect_key($payload, array_flip(['uom', 'specification', 'item_category_id']));
+            $payload = array_intersect_key($payload, array_flip(['sku', 'uom', 'specification', 'item_category_id']));
         }
 
         return response()->json($payload);

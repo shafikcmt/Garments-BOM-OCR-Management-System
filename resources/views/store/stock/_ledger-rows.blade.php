@@ -70,7 +70,7 @@
 
 <div data-ledger-meta="{{ json_encode($meta) }}" hidden></div>
 
-{{-- 20 columns, same order as the reference sheet. The wrapper scrolls on its
+{{-- 21 columns: the reference sheet's 20, plus SKU (screen only) after Sl. The wrapper scrolls on its
      own so the page body never scrolls sideways. gx-stock-scroll caps its
      height as well, which is what lets the column headers stay pinned while a
      long month is read down. The pinning is pure CSS, so it survives this
@@ -83,6 +83,7 @@
                      reference sheet's and does not move. --}}
                 <th class="gx-ledger-primary" style="min-width:110px;">Order?</th>
                 <th class="text-end gx-ledger-quiet">Sl</th>
+                <th class="gx-ledger-quiet text-nowrap">SKU</th>
                 <th class="gx-ledger-primary" style="min-width:200px;">Item Name</th>
                 <th style="min-width:140px;">Brand/Specification</th>
                 <th class="gx-ledger-quiet">Uom</th>
@@ -139,13 +140,11 @@
                     {{-- Serial runs across the whole report, so page 2
                          starts at 101 rather than back at 1. --}}
                     <td class="text-end gx-ledger-quiet">{{ $pageRows->firstItem() + $index }}</td>
+                    {{-- SKU in a column of its own, screen only — the PDF and
+                         Excel columns are unchanged. --}}
+                    <td class="small fw-semibold text-nowrap">{{ $r['item']->sku ?: '—' }}</td>
                     <td class="gx-ledger-primary">
                         <div class="fw-semibold text-slate-900">{{ $r['item']->name }}</div>
-                        {{-- The SKU under the name, screen only — the PDF and
-                             Excel columns are unchanged. --}}
-                        @if($r['item']->sku)
-                            <div class="gx-stock-micro">{{ $r['item']->sku }}</div>
-                        @endif
                     </td>
                     <td>{{ $r['item']->brand ?: '—' }}</td>
                     <td class="gx-ledger-quiet">{{ $r['item']->uom ?: '—' }}</td>
@@ -180,7 +179,7 @@
                     <td class="gx-stock-micro">{{ $r['remarks'] ?: '—' }}</td>
                 </tr>
             @empty
-                <tr><td colspan="19" class="gx-stock-empty">
+                <tr><td colspan="20" class="gx-stock-empty">
                                 <span class="gx-stock-empty-icon"><i class="bi bi-search" aria-hidden="true"></i></span>
                                 <div class="gx-stock-empty-title">Nothing to show</div>
                                 <div class="gx-stock-empty-hint">Try a different month, category or status.</div>
@@ -190,12 +189,12 @@
         @if($rows->isNotEmpty())
             <tfoot>
                 <tr>
-                    {{-- 11: the span swallows Opening Stock, which is
+                    {{-- 12: the span swallows SKU and Opening Stock, which is
                          deliberately not totalled — summing a
                          brought-forward balance across unrelated items
                          says nothing. Was 12 while the frozen counted
                          column sat beside it. --}}
-                    <td colspan="11" class="text-end gx-stock-total-label">Total</td>
+                    <td colspan="12" class="text-end gx-stock-total-label">Total</td>
                     <td class="text-end text-success">{{ $qty($summary['addition']) }}</td>
                     <td></td>
                     <td class="text-end text-danger">{{ $qty($summary['consumption']) }}</td>

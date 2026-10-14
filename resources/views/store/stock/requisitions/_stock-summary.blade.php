@@ -138,7 +138,7 @@
         </div>
         <div class="col-12 col-md-6 col-xl-2">
             <label class="form-label small fw-semibold mb-1" for="sumSearch">Search</label>
-            <input type="search" name="sum[search]" id="sumSearch" class="form-control form-control-sm" value="{{ $f['search'] }}" placeholder="Item or specification" maxlength="100">
+            <input type="search" name="sum[search]" id="sumSearch" class="form-control form-control-sm" value="{{ $f['search'] }}" placeholder="SKU, item or specification" maxlength="100">
         </div>
         <div class="col-12 d-flex gap-2">
             <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
@@ -198,7 +198,7 @@
         <table class="table table-sm align-middle mb-0 gx-report-table gx-sum-table">
             <thead>
                 <tr>
-                    <th class="text-center">SL</th><th>Item</th><th>UOM</th><th>User Dept./Section</th>
+                    <th class="text-center">SL</th><th>SKU</th><th>Item</th><th>UOM</th><th>User Dept./Section</th>
                     <th class="text-end">Approx Rate</th><th class="text-end">Requested Qty</th><th class="text-end">Requested Value</th>
                     <th class="text-end">Issued Qty</th><th class="text-end">Issued Value</th><th class="text-end">Issue Bal. Qty</th>
                     <th class="text-end">Issue Bal. Value</th><th class="text-end">Issued %</th><th>Status</th>
@@ -208,6 +208,7 @@
                 @foreach($rows as $i => $row)
                     <tr>
                         <td class="text-center text-muted small">{{ $offset + $i + 1 }}</td>
+                        <td class="small fw-semibold text-nowrap">{{ ($row['sku'] ?? null) ?: '—' }}</td>
                         <td class="fw-semibold">{{ $row['item_name'] }}</td>
                         <td class="small">{{ $row['uom'] ?: '—' }}</td>
                         <td class="small">{{ $row['section_name'] }}</td>
@@ -225,7 +226,7 @@
                 {{-- Every filtered row, not only this page: the same totals as
                      Requirement vs Issue (requested items; net balance). --}}
                 <tr class="gx-sum-total">
-                    <td></td><td colspan="4">Total</td>
+                    <td></td><td colspan="5">Total</td>
                     <td class="text-end">{{ $qty($sum['requested_qty']) }}</td>
                     <td class="text-end">{{ $money($sum['requested_value']) }}</td>
                     <td class="text-end">{{ $qty($sum['issued_qty']) }}</td>
@@ -247,7 +248,7 @@
         <table class="table table-sm align-middle mb-0 gx-report-table gx-sum-table">
             <thead>
                 <tr>
-                    <th class="text-center">SL</th><th>Item</th><th>UOM</th>
+                    <th class="text-center">SL</th>@unless($compact)<th>SKU</th>@endunless<th>Item</th><th>UOM</th>
                     <th class="text-end">Requested</th><th class="text-end">Current Stock</th>
                     <th class="text-end">Purchased</th><th class="text-end">To Purchase</th><th>Status</th>
                 </tr>
@@ -256,6 +257,7 @@
                 @foreach($rows as $i => $row)
                     <tr>
                         <td class="text-center text-muted small">{{ $offset + $i + 1 }}</td>
+                        @unless($compact)<td class="small fw-semibold text-nowrap">{{ ($row['sku'] ?? null) ?: '—' }}</td>@endunless
                         <td class="fw-semibold">
                             {{ $row['item_name'] }}
                             @unless($row['in_master'])
@@ -280,7 +282,7 @@
                 @endforeach
                 @unless($compact)
                     <tr class="gx-sum-total">
-                        <td></td><td colspan="2">Total</td>
+                        <td></td><td colspan="3">Total</td>
                         <td class="text-end">{{ $qty($sum['requested']) }}</td>
                         <td class="text-end">{{ $qty($sum['stock_in_hand']) }}</td>
                         <td class="text-end">{{ $qty($sum['purchased']) }}</td>

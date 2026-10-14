@@ -45,7 +45,8 @@
             'text' => ($it->sku ? $it->sku.' — ' : '').$it->name.($suffix !== '' ? ' ('.$suffix.')' : ''),
             // The bare name, beside the combined label above. The picker shows
             // brand in a column of its own, so it needs the two apart.
-            'name' => ($it->sku ? $it->sku.' — ' : '').$it->name,
+            'name' => $it->name,
+            'sku' => (string) ($it->sku ?? ''),
             'category' => (string) ($categoryNames[$it->item_category_id] ?? ''),
             'uom' => (string) ($it->uom ?? ''),
             'category_id' => $it->item_category_id ? (string) $it->item_category_id : '',
@@ -362,6 +363,7 @@
                                     <colgroup>
                                         <col style="width:44px;">   {{-- # --}}
                                         <col style="width:26%;">    {{-- Item Name --}}
+                                        <col style="width:104px;">  {{-- SKU --}}
                                         <col style="width:88px;">   {{-- Uom --}}
                                         <col style="width:16%;">    {{-- Category --}}
                                         <col style="width:210px;">  {{-- Brand/Specification --}}
@@ -374,6 +376,7 @@
                                         <tr>
                                             <th class="text-center">#</th>
                                             <th>Item Name <span class="text-danger">*</span></th>
+                                            <th>SKU <span class="gx-stock-auto">auto</span></th>
                                             <th>Uom</th>
                                             <th>Category</th>
                                             {{-- Two brands can share an item name. The
@@ -449,6 +452,8 @@
                                     </select>
                                     <div class="js-line-alert mt-1"></div>
                                 </td>
+                                {{-- Derived from the item, never posted. --}}
+                                <td><input type="text" class="form-control form-control-sm js-line-sku gx-stock-readonly text-nowrap" readonly tabindex="-1" placeholder="—"></td>
                                 <td><input type="text" class="form-control form-control-sm js-line-uom gx-stock-readonly text-center" readonly tabindex="-1" placeholder="—"></td>
                                 <td>
                                     {{-- Double duty: narrows the item list on this
@@ -655,7 +660,7 @@
                         <div class="col-6 col-md-7">
                             <label class="form-label" for="issueFilterSearch">Search</label>
                             <input id="issueFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control"
-                                   placeholder="Item or requisition no">
+                                   placeholder="SKU, item or requisition no">
                         </div>
                         <div class="col-12 col-md-2 gx-stock-filter-actions">
                             <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
@@ -981,6 +986,7 @@
                 var value = item.tomselect ? item.tomselect.getValue() : item.value;
                 var info = value ? itemInfo(value) : null;
 
+                row.querySelector('.js-line-sku').value = info ? (info.sku || '') : '';
                 row.querySelector('.js-line-uom').value = info ? (info.uom || '') : '';
                 // Blank brand leaves the box empty, so its placeholder shows the
                 // em dash — the same as Uom.
@@ -1140,6 +1146,7 @@
                             return {
                                 value: entry.value,
                                 name: entry.name || entry.text,
+                                sku: entry.sku || '',
                                 brand: entry.brand || '',
                                 uom: entry.uom || '',
                                 category: entry.category || '',

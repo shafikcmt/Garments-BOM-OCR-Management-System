@@ -496,7 +496,7 @@ class RequirementVsIssueService
         $itemIds = $rows->pluck('item_id')->filter()->unique()->values()->all();
 
         $items = DB::table('stock_items')->whereIn('id', $itemIds)
-            ->get(['id', 'name', 'brand', 'specification', 'uom', 'item_category_id', 'unit_price'])->keyBy('id');
+            ->get(['id', 'sku', 'name', 'brand', 'specification', 'uom', 'item_category_id', 'unit_price'])->keyBy('id');
 
         $needRate = $rows->filter(fn ($r) => $r['rated_qty'] <= self::EPSILON && $r['item_id'])
             ->pluck('item_id')->unique()->values()->all();
@@ -515,6 +515,7 @@ class RequirementVsIssueService
             $item = $row['item_id'] ? ($items[$row['item_id']] ?? null) : null;
 
             $row['item_name'] = $item->name ?? ($row['custom_item_name'] ?: '—');
+            $row['sku'] = $item->sku ?? null;
             $row['uom'] = $row['uom'] ?: ($item->uom ?? null);
             $row['specification'] = trim(implode(' / ', array_filter([
                 $row['specification'] ?: ($item->specification ?? null),
@@ -585,7 +586,7 @@ class RequirementVsIssueService
             }
 
             if ($filters['search'] !== '') {
-                $haystack = mb_strtolower($row['item_name'].' '.($row['specification'] ?? ''));
+                $haystack = mb_strtolower(($row['sku'] ?? '').' '.$row['item_name'].' '.($row['specification'] ?? ''));
 
                 if (! str_contains($haystack, mb_strtolower($filters['search']))) {
                     return false;

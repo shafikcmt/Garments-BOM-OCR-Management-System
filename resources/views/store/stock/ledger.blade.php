@@ -256,7 +256,7 @@
                 </div>
                 <div class="col-12 col-md-4 col-xl-2">
                     <label class="form-label" for="ledgerFilterSearch">Search</label>
-                    <input id="ledgerFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item or brand/spec.">
+                    <input id="ledgerFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="SKU, item or brand/spec.">
                 </div>
                 <div class="col-6 col-md-4 col-xl-2">
                     <label class="form-label" for="ledgerFilterCategory">Category</label>

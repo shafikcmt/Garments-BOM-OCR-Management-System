@@ -126,7 +126,7 @@
                 </div>
                 <div class="col-12 col-md-6 col-xl-3">
                     <label class="form-label" for="search">Search</label>
-                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item, challan, GRN, supplier">
+                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="SKU, item, challan, GRN, supplier">
                 </div>
                 <div class="col-12 col-md-6 col-xl-3 d-flex gap-2 align-items-end">
                     <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
@@ -153,6 +153,7 @@
                                 <th>Challan Date</th>
                                 <th>RCV Date</th>
                                 <th>Supplier</th>
+                                <th>SKU</th>
                                 <th style="min-width:220px;">Item Name</th>
                                 <th style="min-width:150px;">Brand/Specification</th>
                                 <th>UOM</th>
@@ -184,6 +185,7 @@
                                         <td class="small">{{ $fmt($row->purchase_date) }}</td>
                                         <td class="small">{{ $fmt($row->rcv_date) }}</td>
                                         <td class="small">{{ $row->supplier_name ?: '—' }}</td>
+                                        <td class="small fw-semibold text-nowrap">{{ optional($line->stockItem)->sku ?: '—' }}</td>
                                         <td class="small">{{ optional($line->stockItem)->name ?: '—' }}</td>
                                         {{-- Brand/Specification and Category off
                                              the item master, the same source the
@@ -232,7 +234,7 @@
                                      rate and has no meaningful total, so its
                                      cell is left empty rather than summing
                                      rates into a number that means nothing. --}}
-                                <td colspan="10" class="text-end gx-stock-total-label">Total-</td>
+                                <td colspan="11" class="text-end gx-stock-total-label">Total-</td>
                                 <td class="text-end fw-bold">{{ $qty($summary['qty']) }}</td>
                                 <td></td>
                                 <td class="text-end fw-bold">{{ $money($summary['value']) }}</td>

@@ -138,16 +138,18 @@ class RequisitionFulfilmentService
                 'purchase_requisition_items.stock_item_id',
                 'purchase_requisition_items.custom_item_name',
                 'stock_items.name',
+                'stock_items.sku',
                 'stock_items.uom'
             )
             ->selectRaw('purchase_requisition_items.stock_item_id as item_id')
             ->selectRaw('purchase_requisition_items.custom_item_name as custom_item_name')
-            ->selectRaw('stock_items.name as item_name, stock_items.uom as uom')
+            ->selectRaw('stock_items.name as item_name, stock_items.sku as sku, stock_items.uom as uom')
             ->selectRaw('SUM(purchase_requisition_items.qty_requested) as requested_qty')
             ->get()
             ->map(fn ($row) => [
                 'item_id' => $row->item_id === null ? null : (int) $row->item_id,
                 'item_name' => (string) ($row->item_name ?? $row->custom_item_name ?? '—'),
+                'sku' => $row->sku,
                 'uom' => $row->uom,
                 'requested' => (float) $row->requested_qty,
                 // No master record behind it, so it has no stock figure and

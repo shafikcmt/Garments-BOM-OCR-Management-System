@@ -98,11 +98,15 @@ it('gives every item on a challan its own row on the screen', function () {
     $ch100 = array_values(array_filter($rows, fn ($r) => $r[1] === 'RV-100'));
 
     expect($ch100)->toHaveCount(3);
-    expect(array_column($ch100, 6))
+    // SKU sits at 6, in a column of its own ahead of the item name.
+    foreach (array_column($ch100, 6) as $sku) {
+        expect($sku)->not->toBe('—')->not->toBeEmpty();
+    }
+    expect(array_column($ch100, 7))
         ->toBe(['Needle DBx1 90/14', 'Machine Oil', 'Sewing Thread 40/2']);
-    // UOM sits at 8 now: Brand/Specification was inserted after Item Name, and
-    // Category after UOM, to match Purchase History's column set.
-    expect(array_column($ch100, 8))->toBe(['Pcs', 'Ltr', 'Cone']);
+    // UOM sits at 9 now: SKU came in before Item Name, Brand/Specification
+    // after it, and Category after UOM, to match Purchase History's column set.
+    expect(array_column($ch100, 9))->toBe(['Pcs', 'Ltr', 'Cone']);
 
     foreach ($ch100 as $row) {
         expect($row[2])->toBe('CH-100')
@@ -112,8 +116,8 @@ it('gives every item on a challan its own row on the screen', function () {
     }
 
     // Each row carries its own quantity, not the delivery total. Received Qty
-    // is column 10 since Brand/Specification and Category were added.
-    expect(array_column($ch100, 10))->toBe(['10', '5', '25']);
+    // is column 11 since SKU, Brand/Specification and Category were added.
+    expect(array_column($ch100, 11))->toBe(['10', '5', '25']);
 
     // And the footer still totals the whole filtered set: 10+5+25+7.
     expect($html)->toContain('>47<');

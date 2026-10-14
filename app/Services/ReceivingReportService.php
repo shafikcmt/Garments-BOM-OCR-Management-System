@@ -220,7 +220,7 @@ class ReceivingReportService
                 $q->where(fn ($w) => $w->whereLike('challan_no', $like)
                     ->orWhereLike('rv_no', $like)
                     ->orWhereLike('supplier_name', $like)
-                    ->orWhereHas('stockItem', fn ($i) => $i->whereLike('name', $like)));
+                    ->orWhereHas('stockItem', fn ($i) => $i->where(fn ($n) => $n->whereLike('name', $like)->orWhereLike('sku', $like))));
             })
             ->when($filters['from'] ?? null, fn ($q, $v) => $q->whereDate('purchase_date', '>=', $v))
             ->when($filters['to'] ?? null, fn ($q, $v) => $q->whereDate('purchase_date', '<=', $v))

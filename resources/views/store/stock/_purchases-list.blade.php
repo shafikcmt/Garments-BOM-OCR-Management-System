@@ -79,6 +79,7 @@
                             <th>Challan Date</th>
                             <th>RCV Date</th>
                             <th style="min-width:150px;">Supplier</th>
+                            <th>SKU</th>
                             <th style="min-width:200px;">Item Name</th>
                             <th style="min-width:150px;">Brand/Specification</th>
                             <th>UOM</th>
@@ -140,6 +141,7 @@
                                          Receiving form's own line rows read them from.
                                          stockItem is already eager loaded, so no row
                                          here costs a query. --}}
+                                    <td class="small fw-semibold text-nowrap">{{ optional($line->stockItem)->sku ?: '—' }}</td>
                                     <td class="fw-semibold text-slate-900">{{ optional($line->stockItem)->name ?? '—' }}</td>
                                     <td class="small text-muted">{{ optional($line->stockItem)->brand ?: '—' }}</td>
                                     <td class="small">{{ optional($line->stockItem)->uom ?: '—' }}</td>
@@ -216,7 +218,7 @@
                                 </tr>
                             @endforelse
                         @empty
-                            <tr><td colspan="15" class="gx-stock-empty">
+                            <tr><td colspan="16" class="gx-stock-empty">
                                     <span class="gx-stock-empty-icon"><i class="bi bi-truck" aria-hidden="true"></i></span>
                                     <div class="gx-stock-empty-title">{{ $hasFilters ? 'No receivings match this filter' : 'No purchases recorded yet' }}</div>
                                     <div class="gx-stock-empty-hint">{{ $hasFilters ? 'Try a different month or search.' : 'Record a goods receiving above.' }}</div>
@@ -233,7 +235,7 @@
                              printed above it. --}}
                         <tfoot>
                             <tr>
-                                <td colspan="10" class="text-end gx-stock-total-label">Page total-</td>
+                                <td colspan="11" class="text-end gx-stock-total-label">Page total-</td>
                                 <td class="text-end fw-bold">{{ $qty($groups->sum('group_total_qty')) }}</td>
                                 <td></td>
                                 <td class="text-end fw-bold">{{ $money($groups->sum('group_total_value')) }}</td>

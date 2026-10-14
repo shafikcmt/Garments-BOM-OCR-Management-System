@@ -191,6 +191,7 @@
                                     <thead>
                                         <tr>
                                             <th class="text-center" rowspan="2" style="width:44px;">SL</th>
+                                            <th rowspan="2" class="text-nowrap">SKU</th>
                                             <th rowspan="2" style="min-width:200px;">Name of Item</th>
                                             <th rowspan="2">Uom</th>
                                             <th rowspan="2" style="min-width:140px;">Specification / Brand</th>
@@ -225,6 +226,7 @@
                                         @foreach($tabRows as $i => $row)
                                             <tr>
                                                 <td class="text-center gx-line-no">{{ $i + 1 }}</td>
+                                                <td class="small fw-semibold text-nowrap">{{ ($row['sku'] ?? null) ?: '—' }}</td>
                                                 <td class="fw-semibold text-slate-900">{{ $row['item_name'] }}</td>
                                                 <td class="small">{{ $row['uom'] ?: '—' }}</td>
                                                 <td class="small">{{ $row['specification'] ?: '—' }}</td>
@@ -255,7 +257,7 @@
                                     </tbody>
                                     <tfoot>
                                         <tr>
-                                            <td colspan="15" class="text-end gx-stock-total-label">Total-</td>
+                                            <td colspan="16" class="text-end gx-stock-total-label">Total-</td>
                                             <td class="text-end fw-bold">{{ $money($sectionTotal) }}</td>
                                             <td colspan="5"></td>
                                         </tr>

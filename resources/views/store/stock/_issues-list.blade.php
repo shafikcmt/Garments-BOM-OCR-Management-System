@@ -53,6 +53,7 @@
                                 <tr>
                                     <th>Date</th><th>Section</th><th>Person</th><th>Approved By</th>
                                     <th>Req No</th><th>Type</th>
+                                    <th>SKU</th>
                                     <th style="min-width:160px;">Item</th>
                                     <th>Category</th>
                                     <th class="text-end">Issued Qty</th>
@@ -75,6 +76,7 @@
                                                 <span class="badge bg-secondary-subtle text-secondary">{{ $i->requisition_type }}</span>
                                             @else — @endif
                                         </td>
+                                        <td class="small fw-semibold text-nowrap">{{ optional($i->stockItem)->sku ?: '—' }}</td>
                                         <td><div class="fw-semibold">{{ optional($i->stockItem)->name ?? '—' }}</div></td>
                                         <td class="small text-muted">{{ optional($i->itemCategory)->name ?: (optional($i->stockItem)->category ?: '—') }}</td>
                                         <td class="text-end fw-bold">{{ $qty($i->qty) }}</td>
@@ -103,7 +105,7 @@
                                          same as every other General Stock list:
                                          "nothing matched" and "nothing yet" call
                                          for different next steps. --}}
-                                    <tr><td colspan="10" class="gx-stock-empty">
+                                    <tr><td colspan="11" class="gx-stock-empty">
                                             <span class="gx-stock-empty-icon"><i class="bi bi-{{ $hasFilters ? 'search' : 'box-arrow-up' }}" aria-hidden="true"></i></span>
                                             <div class="gx-stock-empty-title">{{ $hasFilters ? 'No issues match this filter' : 'No issues recorded yet' }}</div>
                                             <div class="gx-stock-empty-hint">{{ $hasFilters ? 'Try a different month or search.' : 'Record an issue using the form above.' }}</div>

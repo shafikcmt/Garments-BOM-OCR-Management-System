@@ -278,6 +278,7 @@
                     <thead>
                         <tr>
                             <th class="text-center" rowspan="2" style="width:44px;">SL</th>
+                            <th rowspan="2" class="text-nowrap">SKU</th>
                             <th rowspan="2" style="min-width:200px;">Name of Item</th>
                             <th rowspan="2">Uom</th>
                             <th rowspan="2">Category</th>
@@ -313,6 +314,7 @@
                                 {{-- One row per item: the entry form's per-department
                                      lines were merged on save, so nothing here can
                                      repeat an item or its stock figure. --}}
+                                <td class="small fw-semibold text-nowrap">{{ optional($line->stockItem)->sku ?: '—' }}</td>
                                 <td class="fw-semibold text-slate-900">
                                     {{ $line->displayName() }}
                                     {{-- Said on the row, so whoever reads this
@@ -360,7 +362,7 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="16" class="text-end gx-stock-total-label">Total-</td>
+                            <td colspan="17" class="text-end gx-stock-total-label">Total-</td>
                             <td class="text-end fw-bold">{{ $money($total) }}</td>
                             <td></td>
                         </tr>
@@ -400,6 +402,7 @@
                             <thead>
                                 <tr>
                                     <th style="width:44px;">SL</th>
+                                    <th>SKU</th>
                                     <th>Name of Item</th>
                                     <th>Uom</th>
                                     <th class="text-end">Requested</th>
@@ -411,6 +414,7 @@
                                     @php($original = ($originalQty ?? [])[$line->id] ?? null)
                                     <tr>
                                         <td class="text-muted">{{ $i + 1 }}</td>
+                                        <td class="small fw-semibold text-nowrap">{{ optional($line->stockItem)->sku ?: '—' }}</td>
                                         <td class="fw-semibold">{{ $line->displayName() }}</td>
                                         <td class="small">{{ $line->uom_snapshot ?: '—' }}</td>
                                         <td class="text-end">{{ $qty($original['qty'] ?? $line->qty_requested) }}</td>

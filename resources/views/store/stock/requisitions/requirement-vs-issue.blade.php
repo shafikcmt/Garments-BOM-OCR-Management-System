@@ -151,7 +151,7 @@
                     </div>
                     <div class="col-12 col-md-6 col-xl-2">
                         <label class="form-label small fw-semibold mb-1" for="rviSearch">Search</label>
-                        <input type="search" name="search" id="rviSearch" class="form-control form-control-sm" value="{{ $filters['search'] }}" placeholder="Item or specification" maxlength="100">
+                        <input type="search" name="search" id="rviSearch" class="form-control form-control-sm" value="{{ $filters['search'] }}" placeholder="SKU, item or specification" maxlength="100">
                     </div>
                     <div class="col-12 col-xl-2 gx-stock-filter-actions d-flex gap-2">
                         <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
@@ -312,7 +312,7 @@
         {{-- Item table: totals above and below, as in the reference file. --}}
         @php
             $totalsRow = function () use ($summary, $qty, $money, $pct) {
-                return '<tr class="rvi-total"><td></td><td colspan="5" class="fw-bold">Total</td>'
+                return '<tr class="rvi-total"><td></td><td colspan="6" class="fw-bold">Total</td>'
                     .'<td class="text-end">'.$qty($summary['requested_qty']).'</td>'
                     .'<td class="text-end">'.$money($summary['requested_value']).'</td>'
                     .'<td class="text-end">'.$qty($summary['issued_qty']).'</td>'
@@ -332,6 +332,7 @@
                         <thead>
                             <tr>
                                 <th class="text-center">SL</th>
+                                <th>SKU</th>
                                 <th>{!! $sortLink('item', 'Item Name') !!}</th>
                                 <th>UOM</th>
                                 <th>Specification / Brand</th>
@@ -352,6 +353,7 @@
                             @foreach($rows as $i => $row)
                                 <tr>
                                     <td class="text-center text-muted small">{{ $i + 1 }}</td>
+                                    <td class="small fw-semibold text-nowrap">{{ ($row['sku'] ?? null) ?: '—' }}</td>
                                     <td class="fw-semibold">{{ $row['item_name'] }}</td>
                                     <td class="small">{{ $row['uom'] ?: '—' }}</td>
                                     <td class="small">{{ $row['specification'] ?: '—' }}</td>

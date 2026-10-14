@@ -55,6 +55,7 @@ it('lays the item line out in the order the requester works through it', functio
 
     expect($labels)->toBe([
         'Item Name',
+        'SKU',
         'Uom',
         'Specification',
         'Category',

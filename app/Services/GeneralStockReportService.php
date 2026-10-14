@@ -346,6 +346,8 @@ class GeneralStockReportService
                 // case-insensitive. Same treatment as the receiving, issue and
                 // requisition searches.
                 $q->where(fn ($w) => $w->whereLike('name', $like)
+                    // The SKU, so a line can be found by the code on its label.
+                    ->orWhereLike('sku', $like)
                     ->orWhereLike('category', $like)
                     // The merged Brand/Specification field.
                     ->orWhereLike('brand', $like));

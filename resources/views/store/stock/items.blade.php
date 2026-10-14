@@ -126,7 +126,7 @@
                 <div class="col-12 col-md-4">
                     <label class="form-label" for="itemFilterSearch">Search</label>
                     <input id="itemFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control"
-                           placeholder="Item, brand/specification or category">
+                           placeholder="SKU, item, brand/specification or category">
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label" for="itemFilterCategory">Category</label>

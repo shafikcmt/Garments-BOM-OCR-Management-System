@@ -338,6 +338,11 @@
                                placeholder="Type the item name" hidden>
                     </div>
                 </div>
+                <div class="gx-req-field is-sku">
+                    <label class="form-label">SKU</label>
+                    {{-- Derived from the item, never posted. --}}
+                    <input type="text" class="form-control form-control-sm js-line-sku gx-stock-readonly text-nowrap" readonly tabindex="-1" placeholder="—">
+                </div>
                 <div class="gx-req-field is-uom">
                     <label class="form-label">Uom</label>
                     {{-- Derived from the item, never posted. --}}
@@ -481,7 +486,7 @@
         @media (min-width: 768px)  { .gx-req-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
         @media (min-width: 1200px) { .gx-req-fields { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 
-        /* One row for all nine, once there is room to do it without cramming. */
+        /* One row for all ten, once there is room to do it without cramming. */
         @media (min-width: 1500px) {
             .gx-req-fields {
                 /* In the order the fields are typed, which is the order they
@@ -489,6 +494,7 @@
                    always had; only their positions moved. */
                 grid-template-columns:
                     minmax(0, 2.1fr)   /* Item Name */
+                    minmax(0, .85fr)   /* SKU */
                     64px               /* Uom */
                     minmax(0, 1.35fr)  /* Specification */
                     minmax(0, 1.2fr)   /* Category */
@@ -698,6 +704,7 @@
                     ['stock', 'safety', 'consumption', 'lpqty', 'lprate', 'lpdate'].forEach(function (key) {
                         row.querySelector('.js-line-' + key).textContent = '—';
                     });
+                    row.querySelector('.js-line-sku').value = '';
                     row.querySelector('.js-line-uom').value = '';
                     row.dataset.stockInHand = '';
                     recalc(row);
@@ -712,6 +719,7 @@
                     .then(function (data) {
                         if (!data) { return; }
 
+                        row.querySelector('.js-line-sku').value = data.sku || '';
                         row.querySelector('.js-line-uom').value = data.uom || '';
                         row.querySelector('.js-line-stock').textContent = qtyText(data.stock_in_hand);
                         // Safety Stock to at most 2 decimals, as everywhere else.
@@ -816,6 +824,7 @@
                     // No master record behind this line, so nothing is known
                     // about it but what is typed on the row.
                     category.value = '';
+                    row.querySelector('.js-line-sku').value = '';
                     row.querySelector('.js-line-uom').value = '';
                     ['.js-line-stock', '.js-line-safety', '.js-line-consumption',
                      '.js-line-lpqty', '.js-line-lprate', '.js-line-lpdate'

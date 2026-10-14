@@ -54,7 +54,7 @@
                 </div>
                 <div class="col-12 col-md-6 col-xl-4">
                     <label class="form-label" for="search">Search</label>
-                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Requisition no, requester or item">
+                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Requisition no, requester, SKU or item">
                 </div>
                 <div class="col-12 col-xl-2 gx-stock-filter-actions">
                     <button class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>

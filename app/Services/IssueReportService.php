@@ -68,7 +68,7 @@ class IssueReportService
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $like = '%'.$search.'%';
                 $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
-                    ->orWhereHas('stockItem', fn ($i) => $i->whereLike('name', $like)));
+                    ->orWhereHas('stockItem', fn ($i) => $i->where(fn ($n) => $n->whereLike('name', $like)->orWhereLike('sku', $like))));
             })
             ->when($filters['from'] ?? null, fn ($q, $v) => $q->whereDate('issue_date', '>=', $v))
             ->when($filters['to'] ?? null, fn ($q, $v) => $q->whereDate('issue_date', '<=', $v))
