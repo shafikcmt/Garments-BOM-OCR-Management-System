@@ -56,8 +56,118 @@ class GeneralStockReportExport implements FromView, WithEvents, WithTitle
                 // above the header as a title block, which would otherwise
                 // repaint this strip in the letterhead's type.
                 $this->addVisibleTotals($sheet);
+                // Last: it only replaces cell values with formulas and leaves
+                // every format the steps above gave them.
+                $this->addRowFormulas($sheet);
             },
         ];
+    }
+
+    /**
+     * Make every counted row show HOW its figures were worked out: click a cell
+     * and the formula is there, using the cells beside it.
+     *
+     *   Stock as on Date   = Opening Stock + Addition - Consumption
+     *   Closing Stock Value = Stock as on Date x Unit Price
+     *   Safety Stock Level  = Last Month Cons. Pattern x safety days
+     *   Re-order Level      = Safety + Cons. Pattern x (Lead Time + order days)
+     *   Whether to place order or not = Out of Stock / Place Order / Low Stock / Ok,
+     *                         by the same thresholds the screen uses
+     *
+     * These are the report's own rules (GeneralStockReportService::row() and
+     * statusFor()), written as formulas, so the workbook agrees with the screen
+     * and recalculates if somebody edits an input cell.
+     *
+     * A figure is only turned into a formula when it WAS computed that way. A
+     * Safety or Re-order level typed on the item master is a pinned value, not a
+     * calculation, so it stays a plain number. A row whose stock had not been
+     * counted yet prints "-" and is left alone. Last Month Cons. Pattern needs
+     * last month's issues, which are not on this sheet, so it stays a value.
+     * Pattern and Unit Price are written at full precision here (the table
+     * rounds them for display) so the formulas land on the same numbers.
+     *
+     * The data rows are the table rows in the same order; if the two ever
+     * disagree in length nothing is converted, rather than risk a wrong row.
+     */
+    private function addRowFormulas(Worksheet $sheet): void
+    {
+        $rows = collect($this->data['rows'] ?? [])->values();
+        $headerRow = $this->locateHeaderRow($sheet);
+
+        if ($headerRow === null || $rows->isEmpty()) {
+            return;
+        }
+
+        $subTotalRow = $this->locateSubTotalRow($sheet, $headerRow);
+        $first = $headerRow + 1;
+
+        if ($subTotalRow === null || $subTotalRow - $first !== $rows->count()) {
+            return;
+        }
+
+        $col = $this->locateColumns($sheet, $headerRow, [
+            'Whether to place order or not', 'Opening Stock', 'Last Month Cons. Pattern', 'Safety Stock Level',
+            'Re-order Level', 'Lead Time', 'Addition', 'Consumption', 'Stock as on Date', 'Unit Price', 'Closing Stock Value',
+        ]);
+
+        if (count($col) < 11) {
+            return;
+        }
+
+        $config = config('stock.general_stock');
+        $safetyDays = (int) $config['safety_stock_days'];
+        $orderDays = (int) $config['order_placing_days'];
+        $labels = \App\Services\GeneralStockReportService::statusLabels();
+
+        foreach ($rows as $i => $r) {
+            if ($r['not_counted']) {
+                continue;
+            }
+
+            $n = $first + $i;
+            $at = fn (string $heading) => $col[$heading].$n;
+
+            // Inputs at full precision; the table prints them rounded.
+            $sheet->setCellValue($at('Last Month Cons. Pattern'), (float) $r['consumption_per_day']);
+
+            if ($r['unit_price'] !== null) {
+                $sheet->setCellValue($at('Unit Price'), (float) $r['unit_price']);
+            }
+
+            if (! $r['safety_is_manual']) {
+                $sheet->setCellValue($at('Safety Stock Level'), '='.$at('Last Month Cons. Pattern').'*'.$safetyDays);
+            }
+
+            if (! $r['reorder_is_manual'] && (float) $r['consumption_per_day'] > 0) {
+                $sheet->setCellValue(
+                    $at('Re-order Level'),
+                    '='.$at('Safety Stock Level').'+'.$at('Last Month Cons. Pattern')
+                        .'*('.$at('Lead Time').'+'.$orderDays.')'
+                );
+            }
+
+            $sheet->setCellValue(
+                $at('Stock as on Date'),
+                '='.$at('Opening Stock').'+'.$at('Addition').'-'.$at('Consumption')
+            );
+
+            if ($r['unit_price'] !== null) {
+                $sheet->setCellValue($at('Closing Stock Value'), '='.$at('Stock as on Date').'*'.$at('Unit Price'));
+            }
+
+            // N() reads the "-" a missing Re-order Level prints as 0, so it is
+            // never compared as text. Same order as GeneralStockReportService::statusFor().
+            $stock = $at('Stock as on Date');
+            $safety = 'N('.$at('Safety Stock Level').')';
+            $reorder = 'N('.$at('Re-order Level').')';
+
+            $sheet->setCellValue(
+                $at('Whether to place order or not'),
+                '=IF('.$stock.'<=0,"'.$labels['out'].'",'
+                    .'IF(AND('.$safety.'>0,'.$stock.'<'.$safety.'),"'.$labels['place_order'].'",'
+                    .'IF(AND('.$reorder.'>0,'.$stock.'<'.$reorder.'),"'.$labels['low'].'","'.$labels['ok'].'")))'
+            );
+        }
     }
 
     /**

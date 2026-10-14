@@ -108,11 +108,23 @@
                  across unrelated items says nothing. Was 12 while the frozen
                  counted column sat beside it. --}}
             <tr class="grand">
-                <td colspan="11">Sub-Total</td>
+                @if($forExcel)
+                    {{-- The workbook gets the same row with no merged cells, so
+                         the label sits in column A and every figure keeps its
+                         own column. --}}
+                    <td>Sub-Total</td>
+                    @for($blank = 0; $blank < 10; $blank++)<td></td>@endfor
+                @else
+                    <td colspan="11">Sub-Total</td>
+                @endif
                 <td class="num">{{ $qty($summary['addition']) }}</td>
                 <td></td>
                 <td class="num">{{ $qty($summary['consumption']) }}</td>
-                <td colspan="3"></td>
+                @if($forExcel)
+                    <td></td><td></td><td></td>
+                @else
+                    <td colspan="3"></td>
+                @endif
                 <td class="num">{{ $money($summary['closing_value']) }}</td>
                 <td></td>
             </tr>

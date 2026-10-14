@@ -149,6 +149,59 @@ trait FormatsStoreSheet
         $this->applyPrintSetup($sheet, $headerStart, $headerEnd, $lastColumn, $lastRow);
 
         $sheet->getSheetView()->setZoomScale(85);
+
+        // LAST, after the column widths: those were measured from the text, and
+        // a date's serial number is a different length from what it displays.
+        $this->convertTextDates($sheet, $headerStart, $headerEnd, $firstDataRow, $lastDataRow, $lastColumnIndex);
+    }
+
+    /**
+     * Turn the text dates ("24-Sep-26") in any column headed "...Date..." into
+     * real Excel dates shown the same way.
+     *
+     * The Blade can only hand over text, and a date stored as text cannot be
+     * sorted, filtered by month, or subtracted — Excel flags every cell with a
+     * green triangle for it. Only a cell that matches the d-Mon-yy / d-Mon-yyyy
+     * pattern is touched, so a dash or an empty cell stays as it is.
+     */
+    private function convertTextDates(Worksheet $sheet, int $headerStart, int $headerEnd, int $firstDataRow, int $lastDataRow, int $lastColumnIndex): void
+    {
+        if ($lastDataRow < $firstDataRow) {
+            return;
+        }
+
+        for ($col = 1; $col <= $lastColumnIndex; $col++) {
+            if (stripos($this->headingFor($sheet, $col, $headerStart, $headerEnd), 'date') === false) {
+                continue;
+            }
+
+            $letter = Coordinate::stringFromColumnIndex($col);
+
+            for ($row = $firstDataRow; $row <= $lastDataRow; $row++) {
+                $cell = $sheet->getCell($letter.$row);
+                $text = $cell->getValue();
+
+                if (! is_string($text) || ! preg_match('/^\d{1,2}-[A-Za-z]{3}-(\d{2}|\d{4})$/', trim($text))) {
+                    continue;
+                }
+
+                try {
+                    $date = \Illuminate\Support\Carbon::createFromFormat(
+                        strlen(substr(trim($text), strrpos(trim($text), '-') + 1)) === 4 ? 'd-M-Y' : 'd-M-y',
+                        trim($text)
+                    )->startOfDay();
+                } catch (\Throwable) {
+                    continue;
+                }
+
+                $cell->setValueExplicit(
+                    \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($date),
+                    \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_NUMERIC
+                );
+                $sheet->getStyle($letter.$row)->getNumberFormat()->setFormatCode('dd-mmm-yy');
+                $sheet->getStyle($letter.$row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            }
+        }
     }
 
     /**
@@ -387,16 +440,20 @@ trait FormatsStoreSheet
             return;
         }
 
+        // CENTER_CONTINUOUS is Excel's "Center Across Selection": the heading
+        // reads centred over the table whether the Blade merged it (the other
+        // reports) or left it in one plain cell (the Stock Report, which must
+        // stay sortable and filterable and so is not merged).
         $sheet->getStyle('A1:'.$lastColumn.'1')->applyFromArray([
             'font' => ['bold' => true, 'size' => 28],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER_CONTINUOUS, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
         $sheet->getRowDimension(1)->setRowHeight(34);
 
         if ($headerStart > 2) {
             $sheet->getStyle('A2:'.$lastColumn.'2')->applyFromArray([
                 'font' => ['bold' => true, 'size' => 14],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER_CONTINUOUS, 'vertical' => Alignment::VERTICAL_CENTER],
             ]);
             $sheet->getRowDimension(2)->setRowHeight(20);
         }

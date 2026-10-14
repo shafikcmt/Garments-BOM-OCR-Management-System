@@ -67,12 +67,10 @@ it('exports the requested month to Excel, not the current one', function () {
     Excel::assertDownloaded('Stock-Report-2026-08.xlsx', function (GeneralStockReportExport $export) {
         $html = $export->view()->render();
 
-        // The heading says August...
-        expect($html)->toContain('August 2026')
+        // The sheet is August's: the tab says so (the Month line was dropped
+        // from the letterhead) and September appears nowhere on it.
+        expect($export->title())->toBe('Stock Aug-26')
             ->and($html)->not->toContain('September 2026');
-
-        // ...and so does the row: August opens at the counted 20.
-        expect($export->title())->toBe('Stock Aug-26');
 
         return true;
     });
@@ -87,7 +85,8 @@ it('exports September as September when September is asked for', function () {
         ->assertOk();
 
     Excel::assertDownloaded('Stock-Report-2026-09.xlsx', function (GeneralStockReportExport $export) {
-        expect($export->view()->render())->toContain('September 2026');
+        expect($export->title())->toBe('Stock Sep-26')
+            ->and($export->view()->render())->not->toContain('August 2026');
 
         return true;
     });
@@ -326,4 +325,139 @@ it('renders the download links already carrying the active filters', function ()
         // export tests above; what the TOOLBAR offers is the workbook.
         ->assertSee(e(route('store.stock.ledger.excel.all', ['month' => '2026-08', 'category' => 'Stationery'])), false)
         ->assertSee(e(route('store.stock.ledger.pdf', ['month' => '2026-08', 'category' => 'Stationery'])), false);
+});
+
+// --- Letterhead, dates and formulas in the workbook ---------------------------
+
+it('prints only the company and report title above the table, with nothing merged', function () {
+    exportItem();
+    $sheet = exportedSheet(['month' => '2026-08']);
+    $header = headerRowOf($sheet);
+
+    // Company, title, a blank row, the totals strip, then the headings.
+    expect($sheet->getCell('A1')->getValue())->toBe('Humana Apparels (Pvt.) Ltd.')
+        ->and($sheet->getCell('A2')->getValue())->toBe('Stock Report')
+        ->and($header)->toBe(5);
+
+    foreach (range(1, $header) as $row) {
+        foreach (['A', 'B', 'C', 'F'] as $letter) {
+            expect((string) $sheet->getCell($letter.$row)->getValue())
+                ->not->toContain('Address')->not->toContain('Gorai')->not->toContain('Department of Store');
+        }
+    }
+
+    // Centred across the table, not merged: a merged heading breaks sorting.
+    expect($sheet->getStyle('A1')->getAlignment()->getHorizontal())->toBe('centerContinuous');
+
+    $subTotal = collect(range($header + 1, $sheet->getHighestDataRow()))
+        ->first(fn ($r) => strcasecmp(trim((string) $sheet->getCell('A'.$r)->getValue()), 'Sub-Total') === 0);
+
+    $merged = collect($sheet->getMergeCells())->filter(function ($range) use ($subTotal) {
+        return (int) preg_replace('/\D/', '', explode(':', $range)[0]) <= $subTotal;
+    });
+
+    expect($merged)->toBeEmpty();
+});
+
+it('writes the last addition and consumption dates as real dates', function () {
+    exportItem();
+    $sheet = exportedSheet(['month' => '2026-08']);
+    $row = headerRowOf($sheet) + 1;
+
+    // 15-Aug-2026 issue: Date of Last Cons. is column O.
+    $cell = $sheet->getCell('O'.$row);
+
+    expect($cell->getDataType())->toBe('n')
+        ->and((float) $cell->getValue())->toBe(
+            (float) \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(\Illuminate\Support\Carbon::parse('2026-08-15'))
+        )
+        ->and($sheet->getStyle('O'.$row)->getNumberFormat()->getFormatCode())->toBe('dd-mmm-yy');
+});
+
+it('shows how each counted row was worked out, as formulas', function () {
+    exportItem();
+    $sheet = exportedSheet(['month' => '2026-08']);
+    $n = headerRowOf($sheet) + 1;
+
+    // Stock as on Date = Opening + Addition - Consumption; Value = Stock x Price.
+    expect($sheet->getCell('P'.$n)->getValue())->toBe("=G{$n}+L{$n}-N{$n}")
+        ->and($sheet->getCell('P'.$n)->getCalculatedValue())->toEqual(10.0)
+        ->and($sheet->getCell('I'.$n)->getValue())->toBe("=H{$n}*7")
+        ->and($sheet->getCell('A'.$n)->getValue())->toStartWith('=IF(');
+});
+
+it('lands the formulas on the very figures the report computed, for every kind of row', function () {
+    $month = '2026-09';
+
+    // 1. Ordinary: opening 40, bought 5 @ 12.345, issued 12 this month and
+    //    30 last month -> automatic safety and re-order levels, a priced row.
+    $auto = StockItem::create(['name' => 'Auto Item', 'uom' => 'Pcs', 'is_active' => true, 'opening_qty' => 40, 'opening_as_on' => '2026-08-01']);
+    \App\Models\StockPurchase::create(['stock_item_id' => $auto->id, 'purchase_date' => '2026-09-03', 'qty' => 5, 'unit_price' => 12.345]);
+    StockIssue::create(['stock_item_id' => $auto->id, 'issue_date' => '2026-09-10', 'qty' => 12]);
+    StockIssue::create(['stock_item_id' => $auto->id, 'issue_date' => '2026-08-10', 'qty' => 30]);
+
+    // 2. Levels pinned by hand on the item master: must stay plain numbers.
+    $pinned = StockItem::create(['name' => 'Pinned Item', 'uom' => 'Pcs', 'is_active' => true, 'opening_qty' => 3, 'opening_as_on' => '2026-08-01',
+        'safety_stock_qty' => 5, 'reorder_level' => 9, 'lead_time_days' => 4]);
+    StockIssue::create(['stock_item_id' => $pinned->id, 'issue_date' => '2026-08-10', 'qty' => 1]);
+
+    // 3. Nothing moving and no price: no re-order point, no value.
+    StockItem::create(['name' => 'Idle Item', 'uom' => 'Pcs', 'is_active' => true, 'opening_qty' => 7, 'opening_as_on' => '2026-08-01']);
+
+    // 4. Not counted yet for this month: prints "-" and is left alone.
+    StockItem::create(['name' => 'Future Item', 'uom' => 'Pcs', 'is_active' => true, 'opening_qty' => 9, 'opening_as_on' => '2026-10-01']);
+
+    $sheet = exportedSheet(['month' => $month]);
+    $header = headerRowOf($sheet);
+
+    $expected = app(\App\Services\GeneralStockReportService::class)
+        ->rows(\Illuminate\Support\Carbon::parse('2026-09-01'), ['only_active' => true])
+        ->keyBy(fn ($r) => $r['item']->name);
+
+    $labels = \App\Services\GeneralStockReportService::statusLabels();
+    $seen = 0;
+
+    for ($row = $header + 1; $row <= $sheet->getHighestDataRow(); $row++) {
+        $name = trim((string) $sheet->getCell('C'.$row)->getValue());
+
+        if (! isset($expected[$name])) {
+            continue;
+        }
+
+        $r = $expected[$name];
+        $seen++;
+
+        if ($r['not_counted']) {
+            expect($sheet->getCell('P'.$row)->getValue())->toBe('-')
+                ->and($sheet->getCell('A'.$row)->getValue())->toBe($labels['not_counted']);
+
+            continue;
+        }
+
+        expect((float) $sheet->getCell('P'.$row)->getCalculatedValue())->toEqualWithDelta($r['stock_as_on'], 0.0001)
+            ->and((string) $sheet->getCell('A'.$row)->getCalculatedValue())->toBe($labels[$r['status']])
+            ->and((float) $sheet->getCell('I'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['safety'], 0.0001);
+
+        if ($r['reorder'] !== null) {
+            expect((float) $sheet->getCell('J'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['reorder'], 0.0001);
+        } else {
+            expect($sheet->getCell('J'.$row)->getValue())->toBe('-');
+        }
+
+        if ($r['unit_price'] !== null) {
+            expect((float) $sheet->getCell('R'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['closing_value'], 0.0001);
+        } else {
+            expect($sheet->getCell('R'.$row)->getValue())->toBeNull();
+        }
+
+        // A level pinned on the item master is a value, not a calculation.
+        if ($r['safety_is_manual']) {
+            expect($sheet->getCell('I'.$row)->isFormula())->toBeFalse();
+        }
+        if ($r['reorder_is_manual']) {
+            expect($sheet->getCell('J'.$row)->isFormula())->toBeFalse();
+        }
+    }
+
+    expect($seen)->toBe(4);
 });

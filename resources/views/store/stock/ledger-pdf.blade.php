@@ -145,65 +145,31 @@
         @endif
     </div>
 @else
-    {{-- Excel letterhead, laid out the same way as the Purchase Requisition
-         workbook so the two downloads look like one system. The colspans ARE
-         the merges: the HTML reader turns them into merged cells. Type sizes,
-         row heights and alignment are applied by FormatsStoreSheet.
+    {{-- Excel letterhead: the company and the report title, and nothing else
+         above the table. NOT merged: a merged heading breaks sorting and
+         filtering and is a nuisance to copy from, so each heading is one plain
+         cell that FormatsStoreSheet centres across the table
+         ("Center Across Selection"). The Address / Department / Month lines
+         the PDF carries are not repeated here; the sheet tab already names the
+         month.
 
-         Same four heading lines the reference workbook prints above its Stock
-         sheet — company, address, department, then the report and its month. --}}
-    @php
-        // 19, matching the report table since the frozen Opening Stock column
-        // was dropped — the letterhead merges have to span the sheet exactly.
-        $columns = 19;
-        $labelSpan = 5;
-        $valueSpan = $columns - $labelSpan;
-    @endphp
+         A Filters, Not included or Note line appears only when it applies: a
+         workbook covering one supplier's items, or short of a tab, must say so
+         on its own face or it gets quoted as the whole store. Label in the
+         first column, text beside it, no merge. --}}
     <table>
-        <tr><td colspan="{{ $columns }}">Humana Apparels (Pvt.) Ltd.</td></tr>
-        <tr><td colspan="{{ $columns }}">{{ $title }}</td></tr>
-        <tr>
-            <td colspan="{{ $labelSpan }}">Address</td>
-            <td colspan="{{ $valueSpan }}">Gorai, Mirzapur, Tangail.</td>
-        </tr>
-        <tr>
-            <td colspan="{{ $labelSpan }}">Department</td>
-            <td colspan="{{ $valueSpan }}">Department of Store.</td>
-        </tr>
-        <tr>
-            <td colspan="{{ $labelSpan }}">{{ $periodCaption }}</td>
-            <td colspan="{{ $valueSpan }}">{{ $monthLabel }}</td>
-        </tr>
-        {{-- Only when something is narrowing the sheet. A workbook that covers
-             one supplier's items, or one category, and does not say so on its
-             own face gets quoted as the whole store once it leaves this
-             system. --}}
+        <tr><td>Humana Apparels (Pvt.) Ltd.</td></tr>
+        <tr><td>{{ $title }}</td></tr>
         @if($activeFilters)
-            <tr>
-                <td colspan="{{ $labelSpan }}">Filters</td>
-                <td colspan="{{ $valueSpan }}">{{ $activeFilters }}</td>
-            </tr>
+            <tr><td>Filters</td><td>{{ $activeFilters }}</td></tr>
         @endif
-        {{-- Only ever set by the combined workbook, and only when this user was
-             not allowed one of its tabs. A workbook quietly short of a sheet
-             gets read as "there were no receipts that month", so it says so on
-             its own face instead. Absent on the standalone PDF and Excel, which
-             have no other sheets to be missing. --}}
         @if(! empty($omittedSheets ?? []))
-            <tr>
-                <td colspan="{{ $labelSpan }}">Not included</td>
-                <td colspan="{{ $valueSpan }}">{{ implode(' and ', $omittedSheets) }}: this workbook does not cover {{ count($omittedSheets) === 1 ? 'it' : 'them' }}, because your account does not have access to {{ count($omittedSheets) === 1 ? 'that report' : 'those reports' }}.</td>
-            </tr>
+            <tr><td>Not included</td><td>{{ implode(' and ', $omittedSheets) }}: this workbook does not cover {{ count($omittedSheets) === 1 ? 'it' : 'them' }}, because your account does not have access to {{ count($omittedSheets) === 1 ? 'that report' : 'those reports' }}.</td></tr>
         @endif
-        {{-- The workbook needs this as badly as the PDF does — more so, since a
-             spreadsheet invites someone to sum a column themselves. --}}
         @if(($summary['not_counted'] ?? 0) > 0)
-            <tr>
-                <td colspan="{{ $labelSpan }}">Note</td>
-                <td colspan="{{ $valueSpan }}">{{ number_format($summary['not_counted']) }} of {{ number_format($summary['items']) }} items had not been stock-counted as at {{ $monthLabel }}. They are shown as "-" and are excluded from the Sub-Total, which covers {{ number_format($summary['counted_items']) }} counted items.</td>
-            </tr>
+            <tr><td>Note</td><td>{{ number_format($summary['not_counted']) }} of {{ number_format($summary['items']) }} items had not been stock-counted as at {{ $monthLabel }}. They are shown as "-" and are excluded from the Sub-Total, which covers {{ number_format($summary['counted_items']) }} counted items.</td></tr>
         @endif
-        <tr><td colspan="{{ $columns }}"></td></tr>
+        <tr><td></td></tr>
     </table>
 @endunless
 

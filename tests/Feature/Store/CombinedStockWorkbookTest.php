@@ -503,3 +503,55 @@ it('offers the combined download on the Stock Report screen', function () {
         // this hook the button would download the month the page opened with.
         ->assertSee('data-ledger-export', false);
 });
+
+it('writes real dates and a Received Value formula in the Receiving and Issues tabs', function () {
+    combinedFixture();
+
+    $response = $this->actingAs(combinedStoreUser())
+        ->get(route('store.stock.ledger.excel.all', ['month' => '2026-08']))
+        ->assertOk()
+        ->baseResponse;
+
+    $raw = $response instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse
+        ? file_get_contents($response->getFile()->getPathname())
+        : $response->getContent();
+    $path = tempnam(sys_get_temp_dir(), 'combined').'.xlsx';
+    file_put_contents($path, $raw);
+    $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+
+    $find = function ($sheet, string $heading): array {
+        for ($row = 1; $row <= 30; $row++) {
+            for ($col = 1; $col <= 20; $col++) {
+                $letter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+                if (trim((string) $sheet->getCell($letter.$row)->getValue()) === $heading) {
+                    return [$letter, $row];
+                }
+            }
+        }
+
+        return [null, null];
+    };
+
+    $serial = fn (string $date) => (float) \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(\Illuminate\Support\Carbon::parse($date));
+
+    // Receiving: Challan Date, RCV Date, and Received Value = Qty x Unit Price.
+    $receiving = $book->getSheetByName('Receiving');
+    [$challan, $header] = $find($receiving, 'Challan Date');
+    [$rcv] = $find($receiving, 'RCV Date');
+    [$qty] = $find($receiving, 'Received Qty');
+    [$price] = $find($receiving, 'Unit Price');
+    [$value] = $find($receiving, 'Received Value');
+    $row = $header + 1;
+
+    expect((float) $receiving->getCell($challan.$row)->getValue())->toBe($serial('2026-08-10'))
+        ->and((float) $receiving->getCell($rcv.$row)->getValue())->toBe($serial('2026-08-11'))
+        ->and($receiving->getStyle($challan.$row)->getNumberFormat()->getFormatCode())->toBe('dd-mmm-yy')
+        ->and($receiving->getCell($value.$row)->getValue())->toBe("={$qty}{$row}*{$price}{$row}")
+        ->and((float) $receiving->getCell($value.$row)->getCalculatedValue())->toBe(200.0);
+
+    // Issues: Date.
+    $issues = $book->getSheetByName('Issues');
+    [$date, $issueHeader] = $find($issues, 'Date');
+
+    expect((float) $issues->getCell($date.($issueHeader + 1))->getValue())->toBe($serial('2026-08-15'));
+});
