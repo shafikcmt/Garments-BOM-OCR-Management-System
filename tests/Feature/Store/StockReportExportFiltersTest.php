@@ -346,8 +346,9 @@ it('prints only the company and report title above the table, with nothing merge
         }
     }
 
-    // Centred across the table, not merged: a merged heading breaks sorting.
-    expect($sheet->getStyle('A1')->getAlignment()->getHorizontal())->toBe('centerContinuous');
+    // Plain left-aligned text, not merged or centred: a merged heading breaks sorting.
+    expect($sheet->getStyle('A1')->getAlignment()->getHorizontal())->toBe('left')
+        ->and($sheet->getStyle('A2')->getAlignment()->getHorizontal())->toBe('left');
 
     $subTotal = collect(range($header + 1, $sheet->getHighestDataRow()))
         ->first(fn ($r) => strcasecmp(trim((string) $sheet->getCell('A'.$r)->getValue()), 'Sub-Total') === 0);

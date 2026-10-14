@@ -160,8 +160,13 @@
     <table>
         <tr><td>Humana Apparels (Pvt.) Ltd.</td></tr>
         <tr><td>{{ $title }}</td></tr>
-        @if($activeFilters)
-            <tr><td>Filters</td><td>{{ $activeFilters }}</td></tr>
+        {{-- One line, only when something narrows the sheet. The tab names the
+             month; a custom date range is said here with the other filters. --}}
+        @php
+            $narrowing = collect([($period['is_range'] ?? false) ? 'Period: '.$monthLabel : null, $activeFilters ?: null])->filter()->implode(' | ');
+        @endphp
+        @if($narrowing !== '')
+            <tr><td>Filters</td><td>{{ $narrowing }}</td></tr>
         @endif
         @if(! empty($omittedSheets ?? []))
             <tr><td>Not included</td><td>{{ implode(' and ', $omittedSheets) }}: this workbook does not cover {{ count($omittedSheets) === 1 ? 'it' : 'them' }}, because your account does not have access to {{ count($omittedSheets) === 1 ? 'that report' : 'those reports' }}.</td></tr>

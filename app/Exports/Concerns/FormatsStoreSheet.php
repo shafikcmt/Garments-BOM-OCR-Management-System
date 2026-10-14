@@ -440,20 +440,24 @@ trait FormatsStoreSheet
             return;
         }
 
-        // CENTER_CONTINUOUS is Excel's "Center Across Selection": the heading
-        // reads centred over the table whether the Blade merged it (the other
-        // reports) or left it in one plain cell (the Stock Report, which must
-        // stay sortable and filterable and so is not merged).
+        // A heading the Blade did NOT merge (the Store stock workbook: Stock,
+        // Receiving, Issues) stays plain text, left-aligned like the rest of
+        // the sheet — merge-and-center breaks sorting and filtering. One the
+        // Blade merged (the other reports) keeps the centring it was made with.
+        $align = collect(array_keys($sheet->getMergeCells()))->contains(fn ($range) => str_starts_with($range, 'A1:'))
+            ? Alignment::HORIZONTAL_CENTER
+            : Alignment::HORIZONTAL_LEFT;
+
         $sheet->getStyle('A1:'.$lastColumn.'1')->applyFromArray([
             'font' => ['bold' => true, 'size' => 28],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER_CONTINUOUS, 'vertical' => Alignment::VERTICAL_CENTER],
+            'alignment' => ['horizontal' => $align, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
         $sheet->getRowDimension(1)->setRowHeight(34);
 
         if ($headerStart > 2) {
             $sheet->getStyle('A2:'.$lastColumn.'2')->applyFromArray([
                 'font' => ['bold' => true, 'size' => 14],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER_CONTINUOUS, 'vertical' => Alignment::VERTICAL_CENTER],
+                'alignment' => ['horizontal' => $align, 'vertical' => Alignment::VERTICAL_CENTER],
             ]);
             $sheet->getRowDimension(2)->setRowHeight(20);
         }

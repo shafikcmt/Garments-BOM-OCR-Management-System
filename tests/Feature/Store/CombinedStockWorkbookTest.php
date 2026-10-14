@@ -555,3 +555,62 @@ it('writes real dates and a Received Value formula in the Receiving and Issues t
 
     expect((float) $issues->getCell($date.($issueHeader + 1))->getValue())->toBe($serial('2026-08-15'));
 });
+
+it('gives every tab the same two left-aligned, unmerged headings', function () {
+    combinedFixture();
+
+    $response = $this->actingAs(combinedStoreUser())
+        ->get(route('store.stock.ledger.excel.all', ['month' => '2026-08']))
+        ->assertOk()
+        ->baseResponse;
+
+    $raw = $response instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse
+        ? file_get_contents($response->getFile()->getPathname())
+        : $response->getContent();
+    $path = tempnam(sys_get_temp_dir(), 'headings').'.xlsx';
+    file_put_contents($path, $raw);
+    $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+
+    foreach ($book->getAllSheets() as $sheet) {
+        $title = $sheet->getTitle();
+
+        // Company, then the report title.
+        expect(trim((string) $sheet->getCell('A1')->getValue()))->not->toBe('', "{$title}: company heading")
+            ->and(trim((string) $sheet->getCell('A2')->getValue()))->not->toBe('', "{$title}: report heading");
+
+        // Left-aligned plain text, not merge-and-center.
+        expect($sheet->getStyle('A1')->getAlignment()->getHorizontal())->toBe('left', "{$title}: A1")
+            ->and($sheet->getStyle('A2')->getAlignment()->getHorizontal())->toBe('left', "{$title}: A2");
+
+        // Nothing but those two (and a blank row) above the headings, and the
+        // lines the sheets used to carry are gone.
+        $headerRow = null;
+        for ($row = 1; $row <= 12; $row++) {
+            if (trim((string) $sheet->getCell('A'.$row)->getValue()) === 'SL'
+                || trim((string) $sheet->getCell('B'.$row)->getValue()) === 'SL'
+                || trim((string) $sheet->getCell('C'.$row)->getValue()) === 'Item Name') {
+                $headerRow = $row;
+                break;
+            }
+        }
+        expect($headerRow)->not->toBeNull("{$title}: header row");
+
+        foreach (range(3, $headerRow - 1) as $row) {
+            foreach (['A', 'B'] as $letter) {
+                expect(trim((string) $sheet->getCell($letter.$row)->getValue()))
+                    ->not->toBeIn(['Period', 'Deliveries', 'Item Lines', 'Issue Lines', 'Distinct Items', 'Address', 'Department', 'Month'], "{$title}: row {$row}");
+            }
+        }
+
+        // No merged cell in the headings or in the table (the signature block
+        // at the very bottom is a separate thing).
+        $dataEnd = $sheet->getHighestDataRow();
+        $merged = collect($sheet->getMergeCells())->filter(function ($range) use ($sheet, $dataEnd) {
+            $row = (int) preg_replace('/\D/', '', explode(':', $range)[0]);
+            $label = trim((string) $sheet->getCell('A'.$row)->getValue());
+
+            return ! in_array($label, ['Prepared by', 'Store'], true) && $row < $dataEnd - 4;
+        });
+        expect($merged)->toBeEmpty("{$title}: merged cells");
+    }
+});
