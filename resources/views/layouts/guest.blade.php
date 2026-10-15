@@ -166,5 +166,6 @@
             {{ $slot }}
         </div>
     </div>
+@include('layouts._password-toggle')
 </body>
 </html>
