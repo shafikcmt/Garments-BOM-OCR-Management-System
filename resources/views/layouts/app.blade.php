@@ -278,5 +278,6 @@
         });
     </script>
     @yield('scripts')
+@include('layouts._password-toggle')
 </body>
 </html>
