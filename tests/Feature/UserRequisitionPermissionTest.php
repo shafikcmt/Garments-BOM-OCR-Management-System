@@ -166,3 +166,42 @@ it('puts the permission matrix under a collapsed Advanced permissions section wi
         // collapsed: nothing granted directly and no errors
         ->not->toMatch('/<details class="gx-adv"\s+open/');
 });
+
+it('lets an admin set and change the Requisition Section of an existing user', function () {
+    $this->withoutVite();
+    $admin = raiseAdmin();
+    Role::findOrCreate('production', 'web');
+    $cutting = \App\Models\IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'is_active' => true]);
+    $quality = \App\Models\IndentSection::create(['name' => 'Quality', 'department_key' => 'production', 'is_active' => true]);
+    $user = User::factory()->create(['status' => 1, 'requisition_section_id' => $cutting->id])->assignRole('production');
+
+    // The Edit screen carries the field, grouped under the department, with the
+    // user's current section selected.
+    $html = $this->actingAs($admin)->get(route('admin.users.edit', $user))->assertOk()->getContent();
+    expect($html)->toContain('id="requisitionSection"')
+        ->toContain('<optgroup label="Production">')
+        ->toMatch('/<option value="'.$cutting->id.'" data-department="production"\s+selected>/');
+
+    $this->actingAs($admin)->put(route('admin.users.update', $user), [
+        'name' => $user->name, 'email' => $user->email, 'status' => 1,
+        'department' => 'production', 'role' => 'production',
+        'requisition_section_id' => $quality->id,
+    ])->assertSessionHasNoErrors();
+
+    expect($user->fresh()->requisition_section_id)->toBe($quality->id);
+});
+
+it('shows the requisition approval route on the create and edit screens', function () {
+    $this->withoutVite();
+    $admin = raiseAdmin();
+    Role::findOrCreate('production', 'web');
+    $head = User::factory()->create(['status' => 1, 'name' => 'Oli-ur Rahman'])->assignRole('production');
+    $section = \App\Models\IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'is_active' => true, 'head_user_id' => $head->id]);
+
+    $create = $this->actingAs($admin)->get(route('admin.users.create'))->assertOk()->getContent();
+    expect($create)->toContain('Requisition approval route')->toContain('Oli-ur Rahman');
+
+    // On the head's own screen it says they head the section.
+    $edit = $this->actingAs($admin)->get(route('admin.users.edit', $head))->assertOk()->getContent();
+    expect($edit)->toContain('Requisition approval route')->toContain('Section Head of Cutting');
+});

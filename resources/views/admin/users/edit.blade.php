@@ -117,6 +117,8 @@
                                 <div class="form-text">Printed under the name on signed documents. Leave blank to print the department instead.</div>
                                 @error('designation')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
+
+                            @include('admin.users._requisition-section')
                         @endif
 
                         @php($currentDepartment = old('department', \App\Support\DepartmentRoles::departmentOf($currentRole)))
@@ -187,6 +189,8 @@
                         @unless($isSelf)
                             @include('admin.users._requisition-access')
                         @endunless
+
+                        @include('admin.users._requisition-route')
 
                         {{-- Department Admin — a promotion, not an access
                              setting. Super admin only, and never on your own

@@ -31,13 +31,33 @@
                 // No department chosen yet: offer everything rather than an
                 // empty list. A role mapped to no department stays offered too,
                 // or a user holding one could never be edited.
+                // A role mapped to no department (Requisition Raiser) is offered
+                // only while no department is chosen, or when it is the role
+                // the person already holds. Chosen under a department it would
+                // leave their requisitions with no head to check them.
                 var belongs = ! chosen
                     || option.dataset.department === chosen
-                    || option.dataset.department === 'other';
+                    || (option.dataset.department === 'other' && option.selected);
 
                 option.hidden = ! belongs;
                 option.disabled = ! belongs;
             });
+
+            // The Requisition Section list follows the department too.
+            var section = document.getElementById('requisitionSection');
+
+            if (section) {
+                Array.prototype.forEach.call(section.options, function (option) {
+                    if (! option.value) { return; }
+
+                    var show = ! chosen || option.dataset.department === chosen;
+
+                    if (clearMismatch && option.selected && ! show) { section.value = ''; }
+
+                    option.hidden = ! show && ! option.selected;
+                    option.disabled = ! show && ! option.selected;
+                });
+            }
 
             var selected = role.selectedOptions[0];
 
