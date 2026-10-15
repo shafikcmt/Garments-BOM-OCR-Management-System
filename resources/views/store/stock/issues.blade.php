@@ -441,7 +441,7 @@
                                     {{-- No `required`: TomSelect hides this select, and a
                                          hidden required field blocks the submit with no
                                          message. The script and the server check it. --}}
-                                    <select class="form-select form-select-sm js-line-item" name="items[__INDEX__][stock_item_id]" aria-required="true"
+                                    <select class="form-select form-select-sm js-line-item" data-sku-labels name="items[__INDEX__][stock_item_id]" aria-required="true"
                                             data-status-url="{{ route('store.stock.issues.item-status', ['stockItem' => '__ID__']) }}">
                                         <option value="">Select item…</option>
                                         @foreach($items as $it)

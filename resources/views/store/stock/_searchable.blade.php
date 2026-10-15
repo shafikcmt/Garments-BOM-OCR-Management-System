@@ -73,6 +73,16 @@
     .ts-wrapper.single.input-active .ts-control > .item { display: none; }
     .ts-wrapper.single .ts-control > .item { line-height: 1.35; }
 
+    /* Item lists that carry a SKU (data-sku-labels): the SKU is a quiet badge in
+       front of the name, the same width on every row so the names line up. */
+    .gx-sku-option { display: flex; align-items: baseline; gap: .65rem; }
+    .gx-sku-badge {
+        flex: 0 0 6.2rem; font-size: .72rem; font-weight: 700; letter-spacing: .02em;
+        color: #64748b; font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+    .gx-sku-name { min-width: 0; }
+    .ts-wrapper .ts-control > .item { max-width: 100%; }
+
     /* Focused but not yet typing: keep showing what is selected, greyed like a
        placeholder. Without this the box went blank the moment it was clicked or
        tabbed into while the SKU and Uom beside it were still filled, and the
@@ -339,6 +349,31 @@
                         };
                     })(options.onInitialize);
                 }
+            }
+
+            // OPT-IN: data-sku-labels on an item select whose option text reads
+            // "SKU — Item name". The SKU already has a column of its own beside
+            // the select, so the CHOSEN item shows its name only (one line, no
+            // repeat), while the list keeps the SKU as a quiet badge in front of
+            // each name. Search still matches the whole text, SKU included.
+            if (el.hasAttribute('data-sku-labels')) {
+                var splitSku = function (text) {
+                    var match = /^(\S+) \u2014 ([\s\S]*)$/.exec(String(text));
+
+                    return match ? { sku: match[1], name: match[2] } : { sku: '', name: String(text) };
+                };
+
+                options.render = options.render || {};
+                options.render.item = function (data, escape) {
+                    return '<div>' + escape(splitSku(data.text).name) + '</div>';
+                };
+                options.render.option = function (data, escape) {
+                    var parts = splitSku(data.text);
+
+                    return '<div class="gx-sku-option">'
+                        + '<span class="gx-sku-badge">' + escape(parts.sku || '\u2014') + '</span>'
+                        + '<span class="gx-sku-name">' + escape(parts.name) + '</span></div>';
+                };
             }
 
             new TomSelect(el, options);

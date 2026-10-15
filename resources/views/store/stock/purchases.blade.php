@@ -281,7 +281,7 @@
                             <td>
                                 {{-- No `required`: TomSelect hides this select, and a hidden
                                      required field blocks the submit with no message. --}}
-                                <select class="form-select form-select-sm js-line-item js-searchable" name="items[__INDEX__][stock_item_id]" aria-required="true">
+                                <select class="form-select form-select-sm js-line-item js-searchable" data-sku-labels name="items[__INDEX__][stock_item_id]" aria-required="true">
                                     <option value="">Select item…</option>
                                     @foreach($items as $it)
                                         <option value="{{ $it->id }}" data-sku="{{ $it->sku }}" data-uom="{{ $it->uom }}" data-category="{{ $it->category }}" data-brand="{{ $it->brand }}">@if($it->sku){{ $it->sku }} — @endif{{ $it->name }}</option>

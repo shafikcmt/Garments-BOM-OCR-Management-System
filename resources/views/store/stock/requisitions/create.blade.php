@@ -312,7 +312,7 @@
                     {{-- aria-required, never `required`: TomSelect hides this
                          select, and a hidden required field blocks the submit
                          without a message. --}}
-                    <select class="form-select form-select-sm js-line-item js-searchable" name="items[__INDEX__][stock_item_id]" aria-required="true">
+                    <select class="form-select form-select-sm js-line-item js-searchable" data-sku-labels name="items[__INDEX__][stock_item_id]" aria-required="true">
                         <option value="">Select item…</option>
                         @foreach($items as $it)
                             <option value="{{ $it->id }}"
@@ -486,25 +486,66 @@
         @media (min-width: 768px)  { .gx-req-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
         @media (min-width: 1200px) { .gx-req-fields { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 
-        /* One row for all ten, once there is room to do it without cramming. */
+        /* One row for all ten, once there is room to do it without cramming.
+           The line is then ONE ROW, like a grid: the number sits at the left
+           and Remove at the right of the fields (the head row it used to take
+           is gone), and the field labels are printed once, over the first line
+           only. Lines after it keep their labels for screen readers but not on
+           screen, so a requisition of ten items is ten tidy rows instead of ten
+           tall cards. Narrower screens keep the stacked card above. */
         @media (min-width: 1500px) {
+            .gx-req-lines { gap: .55rem; }
+
+            .gx-req-line {
+                display: grid;
+                grid-template-columns: 34px minmax(0, 1fr) auto;
+                column-gap: .75rem;
+                align-items: end;
+                padding: .7rem .9rem;
+                border-radius: 12px;
+            }
+            .gx-req-line-head { display: contents; }
+            .gx-req-line-no { grid-column: 1; grid-row: 1; align-self: end; margin-bottom: .2rem; }
+            .gx-req-line .gx-req-fields { grid-column: 2; grid-row: 1; }
+            .gx-req-line .js-line-remove { grid-column: 3; grid-row: 1; align-self: end; }
+            .gx-req-line-foot { grid-column: 1 / -1; grid-row: 2; }
+
+            .gx-req-lines > .gx-req-line:not(:first-child) .gx-req-field > .form-label {
+                position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden;
+                clip: rect(0 0 0 0); white-space: nowrap;
+            }
+
             .gx-req-fields {
                 /* In the order the fields are typed, which is the order they
-                   appear in the markup above. Each keeps the width it has
-                   always had; only their positions moved. */
+                   appear in the markup above. The auto-filled ones (SKU, Uom,
+                   User Dept.) are narrow; the ones people read and type in
+                   (Item Name, Specification, Remarks) take the room. */
                 grid-template-columns:
-                    minmax(0, 2.1fr)   /* Item Name */
-                    minmax(0, .85fr)   /* SKU */
-                    64px               /* Uom */
-                    minmax(0, 1.35fr)  /* Specification */
+                    minmax(0, 2.5fr)   /* Item Name */
+                    minmax(112px, .9fr) /* SKU */
+                    58px               /* Uom */
+                    minmax(0, 1.3fr)   /* Specification */
                     minmax(0, 1.2fr)   /* Category */
-                    minmax(0, .95fr)   /* Type */
-                    minmax(0, 1.1fr)   /* User Dept. */
-                    minmax(0, .95fr)   /* Qty Req. */
-                    minmax(0, .95fr)   /* Rate Appx. */
-                    minmax(0, 1.3fr);  /* Remarks */
+                    minmax(0, .85fr)   /* Type */
+                    minmax(0, 1fr)     /* User Dept. */
+                    minmax(0, .8fr)    /* Qty Req. */
+                    minmax(0, .85fr)   /* Rate Appx. */
+                    minmax(0, 1.4fr);  /* Remarks */
             }
         }
+
+        /* The chosen item stays on ONE line: the name is cut with an ellipsis
+           rather than wrapping and pushing the row taller than its neighbours. */
+        .gx-req-field.is-item .ts-wrapper .ts-control > .item {
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+        }
+
+        /* Auto-filled, read-only values (SKU, Uom, User Dept.) read as quiet
+           labels, not as boxes to type in. */
+        .gx-req-line .gx-stock-readonly {
+            background: #f8fafc; border-color: #eef2f7; color: #475569;
+        }
+        .gx-req-field.is-sku .gx-stock-readonly { font-variant-numeric: tabular-nums; letter-spacing: .02em; font-weight: 600; }
 
         /* The "Not in Item Master" toggle and its typed name, under the item
            picker. Small and quiet: it is the exception, not the normal path. */

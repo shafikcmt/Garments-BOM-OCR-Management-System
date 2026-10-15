@@ -205,3 +205,14 @@ it('shows the requisition approval route on the create and edit screens', functi
     $edit = $this->actingAs($admin)->get(route('admin.users.edit', $head))->assertOk()->getContent();
     expect($edit)->toContain('Requisition approval route')->toContain('Section Head of Cutting');
 });
+
+it('renders the requisition item lines with SKU badges and the one-row grid layout', function () {
+    $this->withoutVite();
+    Role::findOrCreate('production', 'web');
+    $user = User::factory()->create(['status' => 1])->assignRole('production');
+    $user->givePermissionTo(['store.requisition.view', 'store.requisition.create']);
+
+    $html = $this->actingAs($user)->get(route('store.stock.requisitions.create'))->assertOk()->getContent();
+
+    expect($html)->toContain('data-sku-labels')->toContain('gx-req-line-head');
+});
