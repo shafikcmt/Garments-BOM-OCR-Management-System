@@ -2,8 +2,8 @@
     Requisition approval route — says, as the admin fills in the form, who will
     check this person's requisitions.
 
-    Display only. It mirrors RequisitionReviewChain (section head, then
-    department head, then the Store; a head's own sheet skips their own step)
+    Display only. It mirrors RequisitionReviewChain (the nearest head only -
+    section head, else department head - then the Store; a head's own sheet skips their own step)
     from the same data the chain reads, so the admin can see a wrong
     department, role or section BEFORE saving instead of finding out when a
     requisition goes to the wrong person.
@@ -142,35 +142,43 @@
 
             var dept = data.departments[department] || null;
             var section = sectionSelect && sectionSelect.value ? data.sections[sectionSelect.value] : null;
-            var steps = [me];
             var message = '';
             var warn = false;
 
             if (section && section.department !== department) {
-                message = section.name + ' is not a ' + (dept ? dept.label : 'this department') + ' section, so its head is ignored. Pick one of this department’s sections.';
+                message = section.name + ' is not a ' + (dept ? dept.label : 'this department') + ' section, so its head is ignored. Pick one of this department\u2019s sections.';
                 warn = true;
                 section = null;
             }
 
-            if (section && section.head && section.head.id !== data.selfId) {
-                steps.push(step('Section Head', section.head.name + ' · ' + section.name, 'is-head'));
-            } else if (section && ! section.head) {
-                message = message || section.name + ' has no Section Head yet, so its requisitions go to the Department Head.';
+            var sectionHead = section && section.head ? section.head : null;
+            var departmentHead = dept && dept.head ? dept.head : null;
+
+            // The nearest head is the ONLY one a sheet stops at (the same rule
+            // as RequisitionReviewChain::stepsFor()[0]): the Section Head when
+            // the section has one, otherwise the Department Head. A head's own
+            // requisition skips their own step.
+            var head = null;
+
+            if (sectionHead && sectionHead.id !== data.selfId) {
+                head = step('Section Head', sectionHead.name + ' \u00b7 ' + section.name, 'is-head');
+            } else if (departmentHead && departmentHead.id !== data.selfId) {
+                head = step('Department Head', departmentHead.name + ' \u00b7 ' + dept.label, 'is-head');
             }
 
-            if (dept && dept.head && dept.head.id !== data.selfId) {
-                steps.push(step('Department Head', dept.head.name + ' · ' + dept.label, 'is-head'));
-            } else if (dept && ! dept.head) {
-                steps.push(step('Department Head', 'Not set', 'is-missing'));
-                message = message || 'No Department Head is set for ' + dept.label + '.';
-                warn = true;
-            }
+            var steps = head ? [me, head, store] : [me, store];
 
-            steps.push(store);
-
-            // The nearest head is the only one a sheet stops at.
-            if (! message && steps.length > 3) {
-                message = 'A requisition stops at the nearest head only: the Section Head when there is one, otherwise the Department Head.';
+            if (message === '') {
+                if (head && section && ! sectionHead) {
+                    message = section.name + ' has no Section Head yet, so its requisitions go to the Department Head.';
+                } else if (head) {
+                    message = 'A requisition stops at one head only: the Section Head when the section has one, otherwise the Department Head. Then it goes to the Store.';
+                } else if ((sectionHead && sectionHead.id === data.selfId) || (departmentHead && departmentHead.id === data.selfId)) {
+                    message = 'This person is a head, so their own requisitions skip that step.';
+                } else {
+                    message = 'No Section or Department Head is set for ' + (dept ? dept.label : 'this department') + ', so requisitions go straight to the Store.';
+                    warn = true;
+                }
             }
 
             render(steps, message, warn);

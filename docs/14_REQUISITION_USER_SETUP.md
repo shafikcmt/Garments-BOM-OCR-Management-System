@@ -1,8 +1,8 @@
 # Setting up users for the Purchase Requisition workflow
 
-A requisition is checked by the nearest head, then goes to the Store:
+A requisition is checked by ONE head, the nearest, then goes to the Store:
 
-    staff / section head  →  Section Head (if the section has one)  →  Department Head  →  Store
+    staff  →  Section Head (if their section has one, else the Department Head)  →  Store
 
 Who is a head is NOT a role. It is set on **Admin > Settings > Departments**.
 
@@ -24,3 +24,11 @@ Who is a head is NOT a role. It is set on **Admin > Settings > Departments**.
 
 A head's own requisition skips their own step and goes to the next one.
 HARC and Maintenance have no sections: their staff go straight to the Department Head.
+
+## Adding staff under a head
+
+Same form, one account per person: the head's **Department**, that department's
+**Role**, and the head's **Requisition Section** (e.g. Cutting). Nothing else is
+needed. Their requisitions then go to that section's Section Head. HARC and
+Maintenance staff: Department and Role only, no section; they go to the
+Department Head.
