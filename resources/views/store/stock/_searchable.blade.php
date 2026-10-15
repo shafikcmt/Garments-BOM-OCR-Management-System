@@ -73,6 +73,27 @@
     .ts-wrapper.single.input-active .ts-control > .item { display: none; }
     .ts-wrapper.single .ts-control > .item { line-height: 1.35; }
 
+    /* Focused but not yet typing: keep showing what is selected, greyed like a
+       placeholder. Without this the box went blank the moment it was clicked or
+       tabbed into while the SKU and Uom beside it were still filled, and the
+       name only came back on leaving the field — it looked as though nothing
+       had been chosen. The label is hidden again as soon as something is typed
+       (gx-typing, set below). */
+    .ts-wrapper.single.input-active:not(.gx-typing) .ts-control { position: relative; }
+    .ts-wrapper.single.input-active:not(.gx-typing) .ts-control > .item {
+        display: block;
+        position: absolute;
+        top: 50%;
+        left: .75rem;
+        right: 1.6rem;
+        transform: translateY(-50%);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #64748b;
+        pointer-events: none;
+    }
+
     /* The dropdown is rendered on <body> (see dropdownParent below) so it can
        never be clipped by a scrolling ancestor. It therefore needs to sit
        above cards, sticky headers and modals. */
@@ -186,7 +207,11 @@
                 dropdownParent: 'body',
                 // Blank the search box on open so the list is not filtered by
                 // whatever is already selected.
-                onFocus: function () { this.setTextboxValue(''); },
+                onFocus: function () {
+                    this.setTextboxValue('');
+                    // Nothing typed yet: the selected label stays visible, greyed.
+                    this.wrapper.classList.remove('gx-typing');
+                },
                 // With the dropdown rendered on <body> it is no longer a child
                 // of the control, so TomSelect's own outside-click handling can
                 // leave a previous one open — two lists float over the page at
@@ -201,7 +226,17 @@
                 },
                 // Typing a search counts as aiming at the highlight.
                 onType: function () { userDroveHighlight = true; },
-                onInitialize: function () { enableTabToSelect(this, function () { return userDroveHighlight; }, function () { userDroveHighlight = true; }); },
+                onInitialize: function () {
+                    var self = this;
+
+                    enableTabToSelect(this, function () { return userDroveHighlight; }, function () { userDroveHighlight = true; });
+
+                    // The selected label gives way once the user types, and comes
+                    // back if they clear what they typed.
+                    this.control_input.addEventListener('input', function () {
+                        self.wrapper.classList.toggle('gx-typing', self.control_input.value !== '');
+                    });
+                },
             };
 
             if (creatable) {

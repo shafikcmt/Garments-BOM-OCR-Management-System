@@ -77,3 +77,13 @@ it('offers a read-only SKU field on the requisition, issue and receiving lines',
         expect($this->actingAs($this->store)->get(route($route))->assertOk()->getContent())->toContain('js-line-sku');
     }
 });
+
+it('keeps the chosen item visible while its select is focused, until the user types', function () {
+    // The shared select hid the chosen name on focus, so the box looked empty
+    // while the SKU and Uom beside it were still filled.
+    $html = $this->actingAs($this->store)->get(route('store.stock.requisitions.create'))->assertOk()->getContent();
+
+    expect($html)->toContain('.ts-wrapper.single.input-active:not(.gx-typing) .ts-control > .item')
+        ->toContain("classList.toggle('gx-typing'")
+        ->toContain("classList.remove('gx-typing')");
+});
