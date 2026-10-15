@@ -159,6 +159,7 @@ class RequisitionWorkflow
                 'assignee_type' => $block->assignee_type,
                 'user' => null,
                 'skipped' => false,
+                'self_approved' => false,
                 'problem' => null,
             ];
             $name = $this->stageName($block);
@@ -169,6 +170,13 @@ class RequisitionWorkflow
                     $stage['user'] = $first['head'] ?? null;
                     // No head above the raiser: the stage does not apply.
                     $stage['skipped'] = $stage['user'] === null;
+                    // The raiser IS the head: their own sheet needs no one above
+                    // them, so the step reads as approved by them, at submit.
+                    if ($stage['skipped'] && $raiser && $this->isHead($raiser)) {
+                        $stage['skipped'] = false;
+                        $stage['self_approved'] = true;
+                        $stage['user'] = $raiser;
+                    }
                     break;
 
                 case RequisitionSignatureBlock::ASSIGNEE_STORE_HEAD:
@@ -193,7 +201,7 @@ class RequisitionWorkflow
                         .'". Ask Admin.';
             }
 
-            if (! $stage['problem'] && ! $stage['skipped'] && $raiser && $stage['user']?->id === $raiser->id) {
+            if (! $stage['problem'] && ! $stage['skipped'] && ! $stage['self_approved'] && $raiser && $stage['user']?->id === $raiser->id) {
                 $stage['problem'] = 'You are the '.$name.' approver for this sheet, and nobody may approve their own requisition. Ask another person to prepare it.';
             }
 
@@ -201,6 +209,13 @@ class RequisitionWorkflow
         }
 
         return $stages;
+    }
+
+    /** Heads a section or a department, so nobody sits above them for their own sheet. */
+    private function isHead(User $user): bool
+    {
+        return IndentSection::query()->where('head_user_id', $user->id)->exists()
+            || Department::query()->where('head_user_id', $user->id)->exists();
     }
 
     /**
@@ -262,7 +277,11 @@ class RequisitionWorkflow
                 'assignee_name' => $stage['assignee_type'] === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
                     ? self::STORE_TEAM_NAME
                     : $stage['user']?->name,
-                'status' => $stage['skipped'] ? PurchaseRequisitionStage::STATUS_SKIPPED : PurchaseRequisitionStage::STATUS_PENDING,
+                'status' => $stage['skipped'] ? PurchaseRequisitionStage::STATUS_SKIPPED
+                    : ($stage['self_approved'] ? PurchaseRequisitionStage::STATUS_APPROVED : PurchaseRequisitionStage::STATUS_PENDING),
+                'acted_by' => $stage['self_approved'] ? $raiser?->id : null,
+                'acted_by_name' => $stage['self_approved'] ? $raiser?->name : null,
+                'acted_at' => $stage['self_approved'] ? now() : null,
             ]);
         }
 

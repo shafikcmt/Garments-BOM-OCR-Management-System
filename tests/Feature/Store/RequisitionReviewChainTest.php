@@ -197,6 +197,15 @@ it('sends the section head\'s own sheet straight to the Store, not up to the dep
         ->and($r->review_level)->toBeNull()
         ->and($r->progressLabel())->toBe('Sent to Store')
         ->and($r->awaitingStoreReceipt())->toBeTrue();
+
+    // Where the sheet runs on the stage engine, the head step reads as approved
+    // by the section head themselves, not "Skipped"; only the Store is pending.
+    $head = \App\Models\PurchaseRequisitionStage::where('purchase_requisition_id', $r->id)
+        ->where('assignee_type', \App\Models\RequisitionSignatureBlock::ASSIGNEE_DEPARTMENT_HEAD)->first();
+    if ($head) {
+        expect($head->status)->toBe(\App\Models\PurchaseRequisitionStage::STATUS_APPROVED)
+            ->and($head->acted_by_name)->toBe($sectionHead->name);
+    }
 });
 
 it('does the same for a section head whose own form names no section', function () {
