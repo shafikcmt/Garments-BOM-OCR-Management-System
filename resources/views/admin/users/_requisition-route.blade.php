@@ -3,7 +3,7 @@
     check this person's requisitions.
 
     Display only. It mirrors RequisitionReviewChain (the nearest head only -
-    section head, else department head - then the Store; a head's own sheet skips their own step)
+    section head, else department head - then the Store; a head's own sheet goes straight to the Store)
     from the same data the chain reads, so the admin can see a wrong
     department, role or section BEFORE saving instead of finding out when a
     requisition goes to the wrong person.
@@ -45,7 +45,7 @@
         @if($heads->isNotEmpty())
             <p class="gx-route-heads mb-0">
                 <strong>{{ $heads->implode(' · ') }}.</strong>
-                Their own requisitions skip that step and go to the next one.
+                Their own requisitions skip the head step and go straight to the Store.
             </p>
         @endif
 
@@ -166,10 +166,19 @@
                 head = step('Department Head', departmentHead.name + ' \u00b7 ' + dept.label, 'is-head');
             }
 
+            // A Section Head's own requisition goes straight to the Store.
+            var isSectionHead = Object.keys(data.sections).some(function (id) {
+                return data.sections[id].head && data.sections[id].head.id === data.selfId;
+            });
+
+            if (isSectionHead) { head = null; }
+
             var steps = head ? [me, head, store] : [me, store];
 
             if (message === '') {
-                if (head && section && ! sectionHead) {
+                if (isSectionHead) {
+                    message = 'This person is a Section Head, so their own requisitions go straight to the Store.';
+                } else if (head && section && ! sectionHead) {
                     message = section.name + ' has no Section Head yet, so its requisitions go to the Department Head.';
                 } else if (head) {
                     message = 'A requisition stops at one head only: the Section Head when the section has one, otherwise the Department Head. Then it goes to the Store.';

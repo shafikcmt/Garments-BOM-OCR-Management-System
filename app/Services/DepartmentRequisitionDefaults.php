@@ -30,6 +30,8 @@ final class DepartmentRequisitionDefaults
         public readonly ?string $department,
         public readonly ?IndentSection $section,
         public readonly ?User $head,
+        /** The section the head heads, when the head is the raiser themself. */
+        public readonly ?IndentSection $headSection = null,
     ) {
     }
 
@@ -54,16 +56,40 @@ final class DepartmentRequisitionDefaults
         $owner = $existing?->createdBy ?: $user;
         $section = $owner?->requisitionSection ?: $existing?->indentSection;
 
+        // The sections this requester HEADS. A Section Head whose account has no
+        // Requisition Section raises for the one section they head, so their
+        // form is not left on "All" with a different department's head on it.
+        $headed = $owner
+            ? IndentSection::query()->where('head_user_id', $owner->id)->orderBy('sort_order')->orderBy('name')->get()
+            : collect();
+
+        if (! $section && $headed->count() === 1) {
+            $section = $headed->first();
+        }
+
         // Requested By is the head the sheet goes to: the section head when
         // the section has one, else the department head — the first step of
         // the same chain that routes the sheet, so form, queue and signature
-        // box all name the same person. When the chain has no step (the
-        // department head's own sheet, or no heads at all) the department
-        // head is still the one the form names, as it always was.
-        $head = RequisitionReviewChain::stepsFor($owner, $section, $department)[0]['head']
-            ?? RequisitionDepartmentHead::headOf($department);
+        // box all name the same person.
+        $head = RequisitionReviewChain::stepsFor($owner, $section, $department)[0]['head'] ?? null;
+        $headSection = null;
 
-        return new self($level, $department, $section, $head);
+        if (! $head) {
+            if ($headed->isNotEmpty()) {
+                // A Section Head raising their own sheet: they are the
+                // requester, so their own details stand in Requested By, not
+                // the Department Head's. The sheet goes straight to the Store.
+                $head = $owner;
+                $headSection = $section && $headed->contains('id', $section->id) ? $section : $headed->first();
+            } else {
+                // The department head's own sheet, or no heads at all: the
+                // department head is still the one the form names, as it
+                // always was.
+                $head = RequisitionDepartmentHead::headOf($department);
+            }
+        }
+
+        return new self($level, $department, $section, $head, $headSection);
     }
 
     public function isDepartment(): bool
@@ -86,6 +112,10 @@ final class DepartmentRequisitionDefaults
     /** "Cutting section head" / "Production department head" — who Requested By is. */
     public function headTitle(): string
     {
+        if ($this->headSection) {
+            return $this->headSection->name.' section head';
+        }
+
         if ($this->head && $this->section && (int) $this->section->head_user_id === $this->head->id) {
             return $this->section->name.' section head';
         }
