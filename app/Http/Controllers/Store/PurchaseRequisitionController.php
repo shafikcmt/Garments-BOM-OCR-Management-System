@@ -1354,7 +1354,7 @@ class PurchaseRequisitionController extends Controller
         if (! $requisition->canBeDeletedBy(auth()->user())) {
             return back()->with('error', $requisition->status === PurchaseRequisition::STATUS_DRAFT
                 ? 'Only the person who raised this draft, or Admin, can delete it.'
-                : 'A submitted requisition cannot be deleted. Cancel it instead, so it stays on record.');
+                : 'Only Admin can delete a submitted requisition, and not once it is approved or merged. Cancel it instead, so it stays on record.');
         }
 
         $data = $request->validate([

@@ -534,15 +534,26 @@ class PurchaseRequisition extends Model
     }
 
     /**
-     * Who may delete this sheet: a DRAFT only, by its raiser or Admin. A
-     * draft has been read by nobody. Anything submitted is cancelled instead
-     * (canBeCancelledBy), so it stays on record.
+     * Who may delete this sheet. A DRAFT: its raiser or Admin. A submitted (or
+     * cancelled) sheet: Admin only, with a reason — for clearing test or
+     * duplicate entries. Never once it is approved or acted on, nor while a
+     * Final requisition holds it (delete or release that first). The history
+     * row survives the sheet. Everyone else cancels instead, so it stays on
+     * record (canBeCancelledBy).
      */
     public function canBeDeletedBy(?User $user): bool
     {
-        return $user !== null
-            && $this->status === self::STATUS_DRAFT
-            && ($user->hasRole('admin') || $this->isRaisedBy($user));
+        if ($user === null) {
+            return false;
+        }
+
+        if ($this->status === self::STATUS_DRAFT) {
+            return $user->hasRole('admin') || $this->isRaisedBy($user);
+        }
+
+        return $user->hasRole('admin')
+            && ! $this->isMerged()
+            && ! in_array($this->status, [self::STATUS_APPROVED, self::STATUS_PURCHASE_ACTION_TAKEN], true);
     }
 
     /**
