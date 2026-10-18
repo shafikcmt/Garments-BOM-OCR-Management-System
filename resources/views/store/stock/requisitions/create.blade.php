@@ -299,18 +299,16 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        @if($submitRoute['type'] === 'person')
-                            <p class="mb-0">This requisition will be sent to <strong>{{ $submitRoute['name'] }}</strong> for <em>{{ $submitRoute['label'] }}</em>.</p>
-                        @else
-                            <label class="form-label fw-semibold" for="submitRouteSelect">Send to (Store)</label>
-                            <select id="submitRouteSelect" class="form-select">
+                        <label class="form-label fw-semibold" for="submitRouteSelect">Send to {{ $submitRoute['store'] ? '(Store)' : '('.$submitRoute['label'].')' }}</label>
+                        <select id="submitRouteSelect" class="form-select">
+                            @if($submitRoute['store'])
                                 <option value="">Choose a Store user…</option>
-                                @foreach($submitRoute['options'] as $option)
-                                    <option value="{{ $option['id'] }}">{{ $option['name'] }}</option>
-                                @endforeach
-                            </select>
-                            <div class="form-text text-danger d-none" id="submitRouteError">Choose who in the Store should receive it.</div>
-                        @endif
+                            @endif
+                            @foreach($submitRoute['options'] as $option)
+                                <option value="{{ $option['id'] }}" @selected(! $submitRoute['store'])>{{ $option['name'] }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-text text-danger d-none" id="submitRouteError">Choose who it should be sent to.</div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>

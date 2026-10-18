@@ -1521,17 +1521,21 @@ class PurchaseRequisitionController extends Controller
         if ($onEngine && ! $workflowProblems) {
             $raiser = $requisition?->createdBy ?? $user;
             $plan = collect($this->workflow->plan($defaults->level, $raiser, $defaults->section, $defaults->department));
-            $first = $plan->first(fn ($st) => ! $st['skipped'] && ! $st['self_approved']);
+            // The first step that really waits on someone else: not skipped,
+            // not one the raiser already clears as head of their own sheet.
+            $first = $plan->first(fn ($st) => ! $st['skipped'] && ! $st['self_approved']
+                && ! ($st['user'] && $st['user']->id === $raiser->id));
             $toStore = $first && $defaults->level === PurchaseRequisition::LEVEL_DEPARTMENT
                 && $first['sequence'] === $plan->last()['sequence'];
 
             if ($toStore) {
                 $options = $this->workflow->sendToOptions($raiser);
                 $submitRoute = $options->isNotEmpty()
-                    ? ['type' => 'choose', 'label' => $first['label'], 'options' => $options->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->all()]
+                    ? ['label' => $first['label'], 'store' => true, 'options' => $options->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->all()]
                     : null;
             } elseif ($first && $first['user']) {
-                $submitRoute = ['type' => 'person', 'label' => $first['label'], 'name' => $first['user']->name];
+                // One person checks it: shown as a pre-filled choice.
+                $submitRoute = ['label' => $first['label'], 'store' => false, 'options' => [['id' => $first['user']->id, 'name' => $first['user']->name]]];
             }
         }
 
