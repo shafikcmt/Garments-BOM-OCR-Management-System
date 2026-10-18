@@ -432,10 +432,14 @@ class PurchaseRequisition extends Model
      */
     public function isOpenToStoreCorrection(): bool
     {
-        // A stage-engine sheet is edited only by its raiser (draft or
-        // returned); approvers change quantities at their own stage instead.
+        // A stage-engine sheet is edited by its raiser (draft or returned), and
+        // approvers change quantities at their own stage. On top of that the
+        // Store may correct a DEPARTMENT's sheet once it has reached the Store
+        // and until it is merged into a Final one.
         if ($this->usesStageEngine()) {
-            return false;
+            return $this->isDepartmentLevel()
+                && $this->merged_into_id === null
+                && ($this->awaitingStoreReceipt() || $this->status === self::STATUS_STORE_REVIEWED);
         }
 
         return in_array($this->status, [

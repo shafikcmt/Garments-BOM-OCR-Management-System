@@ -17,7 +17,7 @@
 @endphp
 <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
-        <a class="nav-link {{ $active === 'index' ? 'active' : '' }}" href="{{ route('store.stock.requisitions.index') }}">{{ \App\Models\PurchaseRequisition::listLabelFor($user) }}</a>
+        <a class="nav-link {{ $active === 'index' && request('level') !== 'final' ? 'active' : '' }}" href="{{ route('store.stock.requisitions.index') }}">{{ \App\Models\PurchaseRequisition::listLabelFor($user) }}</a>
     </li>
     <li class="nav-item">
         @php($approvalsCount = app(\App\Services\RequisitionWorkflow::class)->waitingForOnce($user)->count())
@@ -29,6 +29,12 @@
         </a>
     </li>
     @if($seesQueue)
+        {{-- The Final requisitions made by merging the departments' sheets. --}}
+        <li class="nav-item">
+            <a class="nav-link {{ $active === 'index' && request('level') === 'final' ? 'active' : '' }}" href="{{ route('store.stock.requisitions.index', ['level' => 'final']) }}">
+                Final Requisitions
+            </a>
+        </li>
         <li class="nav-item">
             <a class="nav-link {{ $active === 'requested' ? 'active' : '' }}" href="{{ route('store.stock.requisitions.requested') }}">
                 Requested

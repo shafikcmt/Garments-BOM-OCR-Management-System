@@ -258,12 +258,32 @@ it('keeps an old-flow sheet on the old buttons', function () {
     engineApprove($this->approvers['store_head']->fresh(), $old->fresh())->assertStatus(422);
 });
 
-it('does not let the Store correct a stage-engine sheet', function () {
-    engineSubmit(engineUser('production', ['store.requisition.create']))->assertRedirect();
+it('lets the Store correct a department sheet only once it has reached the Store, and not after a merge', function () {
+    $this->withoutVite();
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $store = engineUser('store', ['store.requisition.edit'], ['status' => 1]);
+
+    engineSubmit($raiser)->assertRedirect();
     $sheet = PurchaseRequisition::latest('id')->firstOrFail();
 
-    $this->actingAs(engineUser('store', ['store.requisition.edit']))
-        ->get(route('store.stock.requisitions.edit', $sheet))->assertForbidden();
+    // Still with the section head: not the Store's to edit.
+    $this->actingAs($store)->get(route('store.stock.requisitions.edit', $sheet))->assertForbidden();
+
+    engineApprove($sectionHead, $sheet)->assertRedirect();
+
+    // At the Store, and after it has been received: the Store may correct it.
+    $this->actingAs($store)->get(route('store.stock.requisitions.edit', $sheet))->assertOk();
+    engineApprove($store, $sheet)->assertRedirect();
+    $this->actingAs($store)->get(route('store.stock.requisitions.edit', $sheet))->assertOk();
+
+    // Once merged into a Final sheet it is closed to edits.
+    $sheet->forceFill(['merged_into_id' => PurchaseRequisition::create([
+        'requisition_no' => 'F-1', 'requisition_date' => '2026-09-22', 'mode' => 'multi', 'level' => 'final',
+        'status' => 'draft', 'created_by' => $store->id,
+    ])->id])->save();
+    $this->actingAs($store)->get(route('store.stock.requisitions.edit', $sheet->fresh()))->assertForbidden();
 });
 
 // --- Settings ---------------------------------------------------------------------
@@ -431,4 +451,29 @@ it('lets the sender choose the Store user even when the Store box names the Stor
     expect($sheet->stages()->where('sequence', 3)->value('assignee_user_id'))->toBe($aminur->id);
     engineApprove($aminur, $sheet)->assertRedirect();
     expect($sheet->fresh()->current_stage)->toBeNull();
+});
+
+it('saves a Store correction on a department sheet without moving its stage', function () {
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $store = engineUser('store', ['store.requisition.edit'], ['status' => 1]);
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+    engineApprove($sectionHead, $sheet)->assertRedirect();
+
+    $item = StockItem::firstOrCreate(['name' => 'Machine Oil'], ['uom' => 'Ltr', 'is_active' => true]);
+
+    $this->actingAs($store)->put(route('store.stock.requisitions.update', $sheet), [
+        'action' => 'submit',
+        'mode' => PurchaseRequisition::MODE_MULTI,
+        'requisition_date' => '2026-09-22',
+        'items' => [['stock_item_id' => $item->id, 'qty_requested' => 2]],
+    ])->assertSessionHasNoErrors()->assertRedirect();
+
+    $sheet->refresh();
+    expect((float) $sheet->items()->first()->qty_requested)->toBe(2.0)
+        ->and($sheet->current_stage)->toBe(3)
+        ->and($sheet->status)->toBe(PurchaseRequisition::STATUS_SUBMITTED);
 });
