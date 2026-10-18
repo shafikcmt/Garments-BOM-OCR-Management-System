@@ -314,3 +314,21 @@ it('turns "anyone with the store role" Store Head boxes into the Store departmen
 
     expect(RequisitionSignatureBlock::where('stamp_source', 'store_head')->pluck('assignee_type')->unique()->all())->toBe(['store_head']);
 });
+
+it('does not let the section head who approved the sheet also take its Store team step', function () {
+    $sectionHead = engineUser('production', ['store.requisition.review']);
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+
+    engineApprove($sectionHead, $sheet)->assertRedirect();
+
+    // Same person, now at the Store step: refused. The Store head still can.
+    engineApprove($sectionHead, $sheet)->assertForbidden();
+    expect($sheet->fresh()->current_stage)->toBe(3);
+
+    engineApprove($this->approvers['store_head'], $sheet)->assertRedirect();
+    expect($sheet->fresh()->current_stage)->toBeNull();
+});

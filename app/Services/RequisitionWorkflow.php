@@ -347,6 +347,22 @@ class RequisitionWorkflow
             return false;
         }
 
+        // The open "Store team" step is for someone who has not already signed
+        // this sheet: whoever approved an earlier stage of this round (a
+        // Department Head who also holds Store permissions, say) cannot also
+        // take it. A step Admin names a person for is theirs, as set up.
+        $alreadyActed = $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
+            && PurchaseRequisitionStage::where('purchase_requisition_id', $stage->purchase_requisition_id)
+            ->where('cycle', $stage->cycle)
+            ->where('sequence', '<', $stage->sequence)
+            ->where('status', PurchaseRequisitionStage::STATUS_APPROVED)
+            ->where('acted_by', $user->id)
+            ->exists();
+
+        if ($alreadyActed) {
+            return false;
+        }
+
         return $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
             ? self::isStoreTeam($user)
             : (int) $stage->assignee_user_id === (int) $user->id;
