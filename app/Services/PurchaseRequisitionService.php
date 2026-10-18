@@ -129,6 +129,16 @@ class PurchaseRequisitionService
         return ($id === null || $id === '' || (int) $id === 0) ? null : (int) $id;
     }
 
+    /** The key one item goes by on the merge review: its master id, else its typed name. */
+    public function lineKey(array $line): string
+    {
+        $itemId = $this->lineItemId($line);
+
+        return md5($itemId !== null
+            ? 'id:'.$itemId
+            : 'custom:'.mb_strtolower(trim((string) ($line['custom_item_name'] ?? ''))));
+    }
+
     /** Separates the departments listed in one merged User Dept./Section cell. */
     public const DEPARTMENT_SEPARATOR = '/';
 

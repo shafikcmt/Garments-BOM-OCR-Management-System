@@ -429,6 +429,10 @@ Route::prefix('store')
             // sheet. A fixed path, so declared above /{requisition}.
             Route::post('/requisitions/merge', [PurchaseRequisitionController::class, 'merge'])
                 ->middleware($act('store.requisition.create'))->name('requisitions.merge');
+            // The review before it: every merged item with its stock, for the
+            // Store to keep, reduce or hide before the Final sheet is made.
+            Route::get('/requisitions/merge/review', [PurchaseRequisitionController::class, 'mergeReview'])
+                ->middleware($act('store.requisition.create'))->name('requisitions.merge-review');
 
             Route::get('/requisitions', [PurchaseRequisitionController::class, 'index'])->name('requisitions.index');
             Route::get('/requisitions/create', [PurchaseRequisitionController::class, 'create'])->middleware($act('store.requisition.create'))->name('requisitions.create');

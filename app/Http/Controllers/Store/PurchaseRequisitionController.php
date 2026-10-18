@@ -674,6 +674,9 @@ class PurchaseRequisitionController extends Controller
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer', 'distinct'],
+            'lines' => ['nullable', 'array'],
+            'lines.*.include' => ['nullable', 'in:0,1'],
+            'lines.*.qty' => ['nullable', 'numeric', 'min:0'],
         ], [
             'ids.required' => 'Select at least one received requisition to merge.',
             'ids.min' => 'Select at least one received requisition to merge.',
@@ -681,7 +684,7 @@ class PurchaseRequisitionController extends Controller
 
         $user = $request->user();
 
-        $final = DB::transaction(function () use ($data, $user) {
+        $final = DB::transaction(function () use ($request, $data, $user) {
             $sources = PurchaseRequisition::whereIn('id', $data['ids'])
                 ->orderBy('requisition_date')->orderBy('id')
                 ->lockForUpdate()->get();
@@ -706,33 +709,16 @@ class PurchaseRequisitionController extends Controller
             $latest = $sources->max('requisition_date');
             $date = LocalTime::now()->format('Y-m') === $months->first() ? LocalTime::today() : Carbon::parse($latest);
 
-            $sources->load('items', 'indentSection');
-            $lines = [];
+            $lines = $this->mergeSourceLines($sources);
 
-            foreach ($sources as $source) {
-                $dept = $source->indentSection?->name
-                    ?: ($source->department_role ? $source->departmentLabel() : null);
-
-                foreach ($source->items as $line) {
-                    if ((float) $line->qty_requested <= 0) {
-                        continue; // set to 0 — not approved — on the way through
-                    }
-
-                    $lines[] = [
-                        'stock_item_id' => $line->stock_item_id,
-                        'custom_item_name' => $line->stock_item_id ? null : $line->custom_item_name,
-                        'specification' => $line->specification,
-                        'type' => $line->type,
-                        'user_dept' => $line->user_dept ?: $dept,
-                        'qty_requested' => (float) $line->qty_requested,
-                        'rate_appx' => $line->rate_appx,
-                        'remarks' => $line->remarks,
-                    ];
-                }
+            // The Store's own choices from the review screen: an item hidden,
+            // or its quantity changed. Nothing is hidden by stock on its own.
+            if (is_array($request->input('lines'))) {
+                $lines = $this->applyMergeChoices($lines, $request->input('lines'));
             }
 
             if ($lines === []) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['ids' => 'The selected requisitions have no quantities to merge.']);
+                throw \Illuminate\Validation\ValidationException::withMessages(['ids' => 'The selected requisitions have no quantities to merge. Keep at least one item with a quantity.']);
             }
 
             $defaults = DepartmentRequisitionDefaults::for($user);
@@ -783,6 +769,139 @@ class PurchaseRequisitionController extends Controller
             ->with('success', 'Final requisition '.$final->requisition_no.' created as a draft from '
                 .count($data['ids']).' department requisition'.(count($data['ids']) === 1 ? '' : 's')
                 .'. Check the quantities, add any Store items, then submit it for approval.');
+    }
+
+    /**
+     * Every item line of the sheets being merged, in the shape the Final
+     * sheet is written from. Lines an approver set to 0 are left out.
+     *
+     * @param  \Illuminate\Support\Collection<int, PurchaseRequisition>  $sources
+     * @return list<array<string, mixed>>
+     */
+    private function mergeSourceLines($sources): array
+    {
+        $sources->load('items', 'indentSection');
+        $lines = [];
+
+        foreach ($sources as $source) {
+            $dept = $source->indentSection?->name
+                ?: ($source->department_role ? $source->departmentLabel() : null);
+
+            foreach ($source->items as $line) {
+                if ((float) $line->qty_requested <= 0) {
+                    continue; // set to 0 — not approved — on the way through
+                }
+
+                $lines[] = [
+                    'stock_item_id' => $line->stock_item_id,
+                    'custom_item_name' => $line->stock_item_id ? null : $line->custom_item_name,
+                    'specification' => $line->specification,
+                    'type' => $line->type,
+                    'user_dept' => $line->user_dept ?: $dept,
+                    'qty_requested' => (float) $line->qty_requested,
+                    'rate_appx' => $line->rate_appx,
+                    'remarks' => $line->remarks,
+                ];
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * One line per item, then the Store's choices from the review applied:
+     * include = 0 hides the item from the Final sheet, qty replaces the total.
+     *
+     * @param  list<array<string, mixed>>  $lines
+     * @param  array<string, array{include?: string, qty?: string|float}>  $choices keyed by PurchaseRequisitionService::lineKey()
+     * @return list<array<string, mixed>>
+     */
+    private function applyMergeChoices(array $lines, array $choices): array
+    {
+        $out = [];
+
+        foreach ($this->requisitions->mergeLines($lines) as $line) {
+            $choice = $choices[$this->requisitions->lineKey($line)] ?? null;
+
+            if ($choice !== null) {
+                if (($choice['include'] ?? '1') === '0') {
+                    continue;
+                }
+
+                if (isset($choice['qty']) && $choice['qty'] !== '') {
+                    $line['qty_requested'] = (float) $choice['qty'];
+                }
+            }
+
+            if ((float) $line['qty_requested'] > 0) {
+                $out[] = $line;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The step before merging: the selected sheets' items, one row each, with
+     * the stock on hand beside what was asked for. Items the stock already
+     * covers are highlighted; the Store keeps, reduces or hides each one, then
+     * creates the Final sheet. Read-only — nothing is saved here.
+     */
+    public function mergeReview(Request $request)
+    {
+        abort_unless(PurchaseRequisition::canMerge($request->user()), 403,
+            'Only the Store team can merge requisitions into a final requisition.');
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'distinct'],
+        ], ['ids.required' => 'Select at least one received requisition to merge.']);
+
+        $sources = PurchaseRequisition::whereIn('id', $data['ids'])->orderBy('requisition_date')->orderBy('id')->get();
+
+        $problem = match (true) {
+            $sources->count() !== count($data['ids']) => 'A selected requisition no longer exists. Reload the page and try again.',
+            $sources->reject(fn (PurchaseRequisition $r) => $r->isReadyToMerge())->isNotEmpty()
+                => 'Only requisitions received by Store and not yet merged can be merged.',
+            $sources->map(fn (PurchaseRequisition $r) => $r->requisition_date?->format('Y-m'))->unique()->count() > 1
+                => 'Merge one month at a time.',
+            default => null,
+        };
+
+        if ($problem) {
+            return redirect()->route('store.stock.requisitions.requested')->withErrors(['ids' => $problem]);
+        }
+
+        $merged = collect($this->requisitions->mergeLines($this->mergeSourceLines($sources)));
+
+        $itemIds = $merged->pluck('stock_item_id')->filter()->unique()->values()->all();
+        $snapshots = $this->requisitions->snapshots($itemIds);
+        $items = \App\Models\StockItem::whereIn('id', $itemIds)->get()->keyBy('id');
+
+        $rows = $merged->map(function (array $line) use ($snapshots, $items) {
+            $item = $line['stock_item_id'] ? $items->get($line['stock_item_id']) : null;
+            $stock = $line['stock_item_id'] ? ($snapshots[$line['stock_item_id']]['stock_in_hand'] ?? null) : null;
+            $requested = (float) $line['qty_requested'];
+            $needed = $stock === null ? $requested : $this->requisitions->toBeProcured($requested, $stock);
+
+            return [
+                'key' => $this->requisitions->lineKey($line),
+                'name' => $item?->name ?? $line['custom_item_name'],
+                'sku' => $item?->sku,
+                'uom' => $item?->uom,
+                'sections' => $line['user_dept'],
+                'requested' => $requested,
+                'stock' => $stock,
+                'needed' => $needed,
+                'covered' => $stock !== null && $stock >= $requested,
+                'partial' => $stock !== null && $stock > 0 && $stock < $requested,
+            ];
+        })->values();
+
+        return view('store.stock.requisitions.merge-review', [
+            'sources' => $sources,
+            'rows' => $rows,
+        ]);
     }
 
     /**

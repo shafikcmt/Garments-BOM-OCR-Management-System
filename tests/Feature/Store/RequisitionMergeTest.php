@@ -324,3 +324,54 @@ it('offers the merge on the Requested screen, and says what the monthly report d
     $this->actingAs($clerk)->get(route('store.stock.requisitions.report', ['month' => '2026-10']))
         ->assertOk()->assertSee('Not counted yet in October 2026')->assertSee('1 requisition with the section / department head');
 });
+
+// --- Review before merge ------------------------------------------------------------
+
+it('reviews the items before merging, highlighting what stock already covers', function () {
+    $this->withoutVite();
+    $clerk = mgUser('store', ['store.requisition.create']);
+    $cutting = mgReceived('Cutting', ['Machine Oil' => 5, 'Needle' => 100], $clerk);
+
+    // Stock covering the Machine Oil request in full: a receiving this month.
+    $oil = StockItem::where('name', 'Machine Oil')->firstOrFail();
+    \App\Models\StockPurchase::create([
+        'stock_item_id' => $oil->id, 'purchase_date' => '2026-10-02', 'qty' => 50, 'unit_price' => 10,
+    ]);
+
+    $html = $this->actingAs($clerk)->get(route('store.stock.requisitions.merge-review', ['ids' => [$cutting->id]]))
+        ->assertOk()->getContent();
+
+    expect($html)->toContain('Review Before Merge')->toContain('Machine Oil')->toContain('Needle')
+        ->toContain('Hide items in stock')->toContain('is-covered');
+
+    // Nothing is created by just looking.
+    expect(PurchaseRequisition::where('level', PurchaseRequisition::LEVEL_FINAL)->count())->toBe(0);
+});
+
+it('applies the Store\'s choices: an item hidden, another reduced', function () {
+    $clerk = mgUser('store', ['store.requisition.create']);
+    $cutting = mgReceived('Cutting', ['Machine Oil' => 5, 'Needle' => 100, 'Thread' => 20], $clerk);
+
+    $key = fn (string $name) => app(\App\Services\PurchaseRequisitionService::class)
+        ->lineKey(['stock_item_id' => StockItem::where('name', $name)->value('id')]);
+
+    $this->actingAs($clerk)->post(route('store.stock.requisitions.merge'), [
+        'ids' => [$cutting->id],
+        'lines' => [
+            $key('Machine Oil') => ['include' => '0', 'qty' => '5'],
+            $key('Needle') => ['include' => '1', 'qty' => '40'],
+        ],
+    ])->assertSessionHasNoErrors()->assertRedirect();
+
+    $final = PurchaseRequisition::where('level', PurchaseRequisition::LEVEL_FINAL)->firstOrFail();
+    $lines = $final->items()->with('stockItem')->get()->keyBy(fn ($l) => $l->stockItem->name);
+
+    expect($lines)->toHaveCount(2)
+        ->and($lines->has('Machine Oil'))->toBeFalse()
+        ->and((float) $lines['Needle']->qty_requested)->toBe(40.0)
+        ->and((float) $lines['Thread']->qty_requested)->toBe(20.0);
+
+    // The department sheet is still merged, and keeps all its own lines.
+    expect($cutting->fresh()->merged_into_id)->toBe($final->id)
+        ->and($cutting->items()->count())->toBe(3);
+});

@@ -110,12 +110,10 @@
                  their own, and forms cannot nest. --}}
             @php($mergeable = $canMerge ? $requisitions->filter(fn ($r) => $r->isReadyToMerge()) : collect())
             @if($mergeable->isNotEmpty())
-                <form id="mergeForm" method="POST" action="{{ route('store.stock.requisitions.merge') }}"
-                      class="d-flex flex-wrap align-items-center gap-2 mb-3 px-3 py-2 border rounded bg-info-subtle"
-                      onsubmit="return confirm('Merge the selected requisitions into a new final requisition?');">
-                    @csrf
+                <form id="mergeForm" method="GET" action="{{ route('store.stock.requisitions.merge-review') }}"
+                      class="d-flex flex-wrap align-items-center gap-2 mb-3 px-3 py-2 border rounded bg-info-subtle">
                     <i class="bi bi-intersect text-info-emphasis" aria-hidden="true"></i>
-                    <span class="small"><strong>Merge:</strong> tick the received requisitions of one month, then create the final requisition.</span>
+                    <span class="small"><strong>Merge:</strong> tick the received requisitions of one month, then review them before the final requisition is made.</span>
                     <span class="small text-muted ms-auto" data-merge-count>0 selected</span>
                     <button type="submit" class="btn btn-sm btn-info" data-merge-submit disabled>
                         <i class="bi bi-intersect me-1" aria-hidden="true"></i>Merge into Final Requisition
