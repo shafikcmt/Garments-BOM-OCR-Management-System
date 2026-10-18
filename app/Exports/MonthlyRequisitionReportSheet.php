@@ -66,7 +66,64 @@ class MonthlyRequisitionReportSheet implements FromView, WithEvents, WithTitle
     public function registerEvents(): array
     {
         return [
-            AfterSheet::class => fn (AfterSheet $event) => $this->formatStoreSheet($event->sheet->getDelegate()),
+            AfterSheet::class => function (AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+                $this->formatStoreSheet($sheet);
+                $this->writeFormulas($sheet);
+            },
         ];
+    }
+
+    /**
+     * To Be Procured Qty and Amount as live formulas, with the Total summing
+     * the Amounts, so a figure changed in Excel carries through (the reference
+     * workbook works this way). Only the ALL and category tabs: a section tab's
+     * stock is allocated across sections in the system, which a plain
+     * Requested − Stock formula would not reproduce. Rate and Safety Stock
+     * stay values — they are not derived from other cells here.
+     *
+     *   N  To Be Procured Qty = MAX(0, G − H)   (never negative, as in the app)
+     *   P  Amount             = N × O
+     */
+    private function writeFormulas(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet): void
+    {
+        if (($this->tab['type'] ?? null) === \App\Services\MonthlyRequisitionReportService::TAB_SECTION) {
+            return;
+        }
+
+        $last = $sheet->getHighestRow();
+        $first = null;
+
+        for ($r = 1; $r <= $last; $r++) {
+            if (trim((string) $sheet->getCell('A'.$r)->getValue()) === 'SL') {
+                $first = $r + 2; // the heading is two rows tall
+
+                break;
+            }
+        }
+
+        if ($first === null) {
+            return;
+        }
+
+        $row = $first;
+
+        while ($row <= $last && is_numeric($sheet->getCell('A'.$row)->getValue())) {
+            $sheet->setCellValue('N'.$row, '=MAX(0,G'.$row.'-H'.$row.')');
+            $sheet->setCellValue('P'.$row, '=N'.$row.'*O'.$row);
+            $row++;
+        }
+
+        if ($row === $first) {
+            return;
+        }
+
+        for ($r = $row; $r <= min($last, $row + 2); $r++) {
+            if (str_starts_with(trim((string) $sheet->getCell('A'.$r)->getValue()), 'Total')) {
+                $sheet->setCellValue('P'.$r, '=SUM(P'.$first.':P'.($row - 1).')');
+
+                break;
+            }
+        }
     }
 }
