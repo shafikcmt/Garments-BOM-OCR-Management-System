@@ -35,9 +35,9 @@
     @php
         // The Store's own step reads "Received", not "Approve". When the next
         // step is the open Store team one, the approver names who gets it.
-        $isReceive = $stage->assignee_type === \App\Models\RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM;
+        $isReceive = $workflow->isStoreStep($requisition, $stage);
         $nextStage = $workflow->nextPending($stage);
-        $sendOptions = $workflow->isDirectable($nextStage) ? $workflow->sendToOptions($user, $requisition) : collect();
+        $sendOptions = $workflow->isDirectable($requisition, $nextStage) ? $workflow->sendToOptions($user, $requisition) : collect();
     @endphp
     <button type="button" class="btn {{ $size }} {{ $isReceive ? 'btn-outline-primary' : 'btn-outline-success' }}" data-bs-toggle="modal" data-bs-target="#stageApprove{{ $requisition->id }}">
         <i class="bi {{ $isReceive ? 'bi-inbox-fill' : 'bi-check2-circle' }} me-1" aria-hidden="true"></i>{{ $isReceive ? 'Received' : 'Approve' }}

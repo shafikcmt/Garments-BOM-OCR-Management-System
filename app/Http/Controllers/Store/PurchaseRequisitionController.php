@@ -1520,10 +1520,12 @@ class PurchaseRequisitionController extends Controller
 
         if ($onEngine && ! $workflowProblems) {
             $raiser = $requisition?->createdBy ?? $user;
-            $first = collect($this->workflow->plan($defaults->level, $raiser, $defaults->section, $defaults->department))
-                ->first(fn ($st) => ! $st['skipped'] && ! $st['self_approved']);
+            $plan = collect($this->workflow->plan($defaults->level, $raiser, $defaults->section, $defaults->department));
+            $first = $plan->first(fn ($st) => ! $st['skipped'] && ! $st['self_approved']);
+            $toStore = $first && $defaults->level === PurchaseRequisition::LEVEL_DEPARTMENT
+                && $first['sequence'] === $plan->last()['sequence'];
 
-            if ($first && $first['assignee_type'] === \App\Models\RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM) {
+            if ($toStore) {
                 $options = $this->workflow->sendToOptions($raiser);
                 $submitRoute = $options->isNotEmpty()
                     ? ['type' => 'choose', 'label' => $first['label'], 'options' => $options->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->all()]

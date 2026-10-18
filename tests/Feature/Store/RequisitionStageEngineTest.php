@@ -408,3 +408,27 @@ it('shows a staff member who their requisition goes to in the Submit popup', fun
     $html = test()->actingAs($sectionHead)->get(route('store.stock.requisitions.create'))->assertOk()->getContent();
     expect($html)->toContain('id="submitRouteSelect"')->toContain('Ebrahim');
 });
+
+it('lets the sender choose the Store user even when the Store box names the Store head', function () {
+    RequisitionSignatureBlock::query()->forLevel('department')->get()->values()[2]
+        ->update(['assignee_type' => RequisitionSignatureBlock::ASSIGNEE_STORE_HEAD]);
+
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $aminur = engineUser('store', [], ['name' => 'Aminur', 'status' => 1]);
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+
+    // The head sees the Store list and the Store step reads "Received".
+    $this->withoutVite();
+    expect(test()->actingAs($sectionHead)->get(route('store.stock.requisitions.show', $sheet))->getContent())
+        ->toContain('Send to (Store)')->toContain('Aminur');
+
+    test()->actingAs($sectionHead)->post(route('store.stock.requisitions.stage-approve', $sheet), ['send_to' => $aminur->id])->assertRedirect();
+
+    expect($sheet->stages()->where('sequence', 3)->value('assignee_user_id'))->toBe($aminur->id);
+    engineApprove($aminur, $sheet)->assertRedirect();
+    expect($sheet->fresh()->current_stage)->toBeNull();
+});

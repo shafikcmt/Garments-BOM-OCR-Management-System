@@ -238,23 +238,38 @@ class RequisitionWorkflow
             ->first();
     }
 
-    /** Whether a stage is the open Store team step the sender may point at one person. */
-    public function isDirectable(?PurchaseRequisitionStage $stage): bool
+    /**
+     * Whether this stage is the Store's own step on a department's sheet: the
+     * last stage of the round, whoever the box names (the Store team, the
+     * Store head or a person). Read as "Received", and the one the sender may
+     * point at a Store user.
+     */
+    public function isStoreStep(PurchaseRequisition $requisition, ?PurchaseRequisitionStage $stage): bool
     {
         return $stage !== null
-            && $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
-            && $stage->status === PurchaseRequisitionStage::STATUS_PENDING;
+            && $requisition->isDepartmentLevel()
+            && ! PurchaseRequisitionStage::where('purchase_requisition_id', $stage->purchase_requisition_id)
+                ->where('cycle', $stage->cycle)->where('sequence', '>', $stage->sequence)->exists();
+    }
+
+    /** The Store step, still waiting: the sender may name the Store user who gets it. */
+    public function isDirectable(PurchaseRequisition $requisition, ?PurchaseRequisitionStage $stage): bool
+    {
+        return $stage !== null
+            && $stage->status === PurchaseRequisitionStage::STATUS_PENDING
+            && $this->isStoreStep($requisition, $stage);
     }
 
     /**
-     * Point an open Store team step at the person the sender chose. Ignored
-     * when the step is not one, or the person is not on the Store team —
-     * the step then simply stays with the whole team. The rest of the team
-     * can still take it, so an absent person never holds a sheet up.
+     * Point the Store step at the person the sender chose. Ignored when the
+     * step is not the Store's, or the person is not on the Store team — the
+     * step then stays as planned. An open "Store team" step stays takeable by
+     * the rest of the team, so an absent person never holds a sheet up; a
+     * step planned for one person moves to the chosen one.
      */
-    private function direct(?PurchaseRequisitionStage $stage, ?int $sendTo, ?User $sender): void
+    private function direct(PurchaseRequisition $requisition, ?PurchaseRequisitionStage $stage, ?int $sendTo, ?User $sender): void
     {
-        if (! $sendTo || ! $this->isDirectable($stage)) {
+        if (! $sendTo || ! $this->isDirectable($requisition, $stage)) {
             return;
         }
 
@@ -340,7 +355,7 @@ class RequisitionWorkflow
         }
 
         $first = $this->firstPending($requisition, $cycle);
-        $this->direct($first, $sendTo, $raiser);
+        $this->direct($requisition, $first, $sendTo, $raiser);
 
         $requisition->forceFill([
             'workflow_version' => self::VERSION,
@@ -642,7 +657,7 @@ class RequisitionWorkflow
         $this->applyStamp($requisition, $stage->stamp_source, $user);
 
         $next = $this->firstPending($requisition, $stage->cycle);
-        $this->direct($next, $sendTo, $user);
+        $this->direct($requisition, $next, $sendTo, $user);
 
         if (! $next) {
             $this->complete($requisition, $user);
