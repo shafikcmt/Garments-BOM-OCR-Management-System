@@ -238,7 +238,9 @@ class RequisitionNotifier
      */
     private function approversOf(PurchaseRequisitionStage $stage, PurchaseRequisition $requisition, ?User $actor): Collection
     {
-        $users = $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
+        // A Store team step the sender pointed at one person tells that person
+        // only; undirected, it tells the whole team.
+        $users = $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM && ! $stage->assignee_user_id
             ? $this->storeTeam()
             : collect([$stage->assignee_user_id ? User::find($stage->assignee_user_id) : null])->filter();
 
@@ -262,7 +264,7 @@ class RequisitionNotifier
      *
      * @return Collection<int, User>
      */
-    private function storeTeam(): Collection
+    public function storeTeam(): Collection
     {
         $ids = collect();
 

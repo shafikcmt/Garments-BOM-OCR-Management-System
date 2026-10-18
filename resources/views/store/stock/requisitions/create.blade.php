@@ -271,6 +271,9 @@
                     <button type="submit" name="action" value="submit" class="btn btn-primary">
                         <i class="bi bi-send me-1" aria-hidden="true"></i>Submit Requisition
                     </button>
+                    @if($submitRoute)
+                        <input type="hidden" name="send_to" id="requisitionSendTo" value="">
+                    @endif
                     <p class="gx-stock-help mb-0" style="max-width:620px;">
                         @if($hideFigures)
                             A draft stays editable. Once submitted, the request goes forward for checking and the Store
@@ -284,6 +287,41 @@
             </div>
         </div>
     </form>
+
+    @if($submitRoute)
+        {{-- Submit popup: says who the requisition goes to, and — when it goes
+             straight to the Store — lets the sender pick the Store user. --}}
+        <div class="modal fade text-start" id="submitRouteModal" tabindex="-1" aria-labelledby="submitRouteModalLabel" aria-hidden="true" data-body-modal>
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="submitRouteModalLabel">Submit requisition</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if($submitRoute['type'] === 'person')
+                            <p class="mb-0">This requisition will be sent to <strong>{{ $submitRoute['name'] }}</strong> for <em>{{ $submitRoute['label'] }}</em>.</p>
+                        @else
+                            <label class="form-label fw-semibold" for="submitRouteSelect">Send to (Store)</label>
+                            <select id="submitRouteSelect" class="form-select">
+                                <option value="">Choose a Store user…</option>
+                                @foreach($submitRoute['options'] as $option)
+                                    <option value="{{ $option['id'] }}">{{ $option['name'] }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text text-danger d-none" id="submitRouteError">Choose who in the Store should receive it.</div>
+                        @endif
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" id="submitRouteConfirm">
+                            <i class="bi bi-send me-1" aria-hidden="true"></i>Submit
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- Line template. Cloned by the script below, with __INDEX__ replaced by
          the line's array index. --}}
@@ -1163,6 +1201,31 @@
              * Save as Draft (formnovalidate) is never stopped by this page; the
              * server still checks what a draft line needs.
              */
+            // The Submit popup (who it goes to). Confirming re-sends the form.
+            var routeModalEl = document.getElementById('submitRouteModal');
+            var routeConfirmed = false;
+            var routeSubmitter = null;
+
+            if (routeModalEl) {
+                document.body.appendChild(routeModalEl);
+                document.getElementById('submitRouteConfirm').addEventListener('click', function () {
+                    var select = document.getElementById('submitRouteSelect');
+                    var hidden = document.getElementById('requisitionSendTo');
+
+                    if (select) {
+                        if (!select.value) {
+                            document.getElementById('submitRouteError').classList.remove('d-none');
+                            return;
+                        }
+                        hidden.value = select.value;
+                    }
+
+                    routeConfirmed = true;
+                    bootstrap.Modal.getOrCreateInstance(routeModalEl).hide();
+                    form.requestSubmit(routeSubmitter || undefined);
+                });
+            }
+
             form.addEventListener('submit', function (event) {
                 // Cleared first, so a summary left from an earlier attempt
                 // cannot survive on top of a corrected form.
@@ -1211,7 +1274,15 @@
                     };
                 }));
 
-                if (!problems.length) { return; }
+                if (!problems.length) {
+                    // Valid: ask who it goes to first, once.
+                    if (routeModalEl && !routeConfirmed) {
+                        event.preventDefault();
+                        routeSubmitter = event.submitter;
+                        bootstrap.Modal.getOrCreateInstance(routeModalEl).show();
+                    }
+                    return;
+                }
 
                 event.preventDefault();
 

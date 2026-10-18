@@ -514,7 +514,7 @@ class PurchaseRequisitionController extends Controller
         $storeStage = false;
         $next = null;
 
-        DB::transaction(function () use ($requisition, $user, $data, &$stageName, &$storeStage, &$next) {
+        DB::transaction(function () use ($request, $requisition, $user, $data, &$stageName, &$storeStage, &$next) {
             // Re-checked under the lock: a second click finds the stage done.
             $locked = $this->lockRequisition($requisition);
             abort_unless($this->workflow->canAct($locked, $user), 422,
@@ -523,7 +523,7 @@ class PurchaseRequisitionController extends Controller
             $stage = $this->workflow->currentStage($locked);
             $stageName = $stage?->displayLabel();
             $storeStage = $stage?->stamp_source === \App\Models\RequisitionSignatureBlock::STAMP_STORE_HEAD;
-            $next = $this->workflow->approve($locked, $user, $data['comment'] ?? null);
+            $next = $this->workflow->approve($locked, $user, $data['comment'] ?? null, (int) $request->input('send_to') ?: null);
         });
 
         $message = 'Requisition '.$requisition->requisition_no.' approved'
@@ -1011,7 +1011,7 @@ class PurchaseRequisitionController extends Controller
                 // Every new submission goes onto the stage engine. Refuses,
                 // rolling the whole save back, if an approver is not set or
                 // the raiser holds a stage.
-                $this->workflow->start($requisition);
+                $this->workflow->start($requisition, (int) request()->input('send_to') ?: null);
                 $this->header->snapshot($requisition);
             }
 
@@ -1313,7 +1313,7 @@ class PurchaseRequisitionController extends Controller
                 // starts (again) on the stage engine — a new cycle. An old-flow
                 // sheet returned by its head finishes on the old flow.
                 if ($fromStatus === PurchaseRequisition::STATUS_DRAFT || $requisition->usesStageEngine()) {
-                    $this->workflow->start($requisition);
+                    $this->workflow->start($requisition, (int) request()->input('send_to') ?: null);
                 }
 
                 // Every (re)submit refreshes the header snapshot; a Store
@@ -1513,7 +1513,28 @@ class PurchaseRequisitionController extends Controller
             ? $this->workflow->problems($defaults->level, $requisition?->createdBy ?? $user, $defaults->section, $defaults->department)
             : [];
 
+        // Who the sheet goes to when it is submitted, said in the Submit popup:
+        // the head who checks it, or — when it goes straight to the Store —
+        // the Store users to choose from.
+        $submitRoute = null;
+
+        if ($onEngine && ! $workflowProblems) {
+            $raiser = $requisition?->createdBy ?? $user;
+            $first = collect($this->workflow->plan($defaults->level, $raiser, $defaults->section, $defaults->department))
+                ->first(fn ($st) => ! $st['skipped'] && ! $st['self_approved']);
+
+            if ($first && $first['assignee_type'] === \App\Models\RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM) {
+                $options = $this->workflow->sendToOptions($raiser);
+                $submitRoute = $options->isNotEmpty()
+                    ? ['type' => 'choose', 'label' => $first['label'], 'options' => $options->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->all()]
+                    : null;
+            } elseif ($first && $first['user']) {
+                $submitRoute = ['type' => 'person', 'label' => $first['label'], 'name' => $first['user']->name];
+            }
+        }
+
         return [
+            'submitRoute' => $submitRoute,
             'items' => $this->requisitions->selectableItems(),
             'categories' => ItemCategory::selectable()->get(['id', 'name']),
             'sections' => IndentSection::selectable()->get(['id', 'name']),

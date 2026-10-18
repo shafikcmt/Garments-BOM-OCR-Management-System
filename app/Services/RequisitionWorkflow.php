@@ -211,6 +211,60 @@ class RequisitionWorkflow
         return $stages;
     }
 
+    /**
+     * The Store users a sheet can be sent to by name: active, on the Store
+     * team, and neither the sender nor the raiser. Empty when there is nobody
+     * to choose from, which the screens treat as "no choice to make".
+     *
+     * @return Collection<int, User>
+     */
+    public function sendToOptions(?User $sender = null, ?PurchaseRequisition $requisition = null): Collection
+    {
+        return $this->notifier->storeTeam()
+            ->filter(fn (User $u) => (int) $u->status === 1
+                && (! $sender || $u->id !== $sender->id)
+                && (! $requisition || ! $requisition->isRaisedBy($u)))
+            ->sortBy('name')->values();
+    }
+
+    /** The stage after this one that still waits (skipped ones passed over). */
+    public function nextPending(PurchaseRequisitionStage $stage): ?PurchaseRequisitionStage
+    {
+        return PurchaseRequisitionStage::where('purchase_requisition_id', $stage->purchase_requisition_id)
+            ->where('cycle', $stage->cycle)
+            ->where('sequence', '>', $stage->sequence)
+            ->where('status', PurchaseRequisitionStage::STATUS_PENDING)
+            ->orderBy('sequence')
+            ->first();
+    }
+
+    /** Whether a stage is the open Store team step the sender may point at one person. */
+    public function isDirectable(?PurchaseRequisitionStage $stage): bool
+    {
+        return $stage !== null
+            && $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
+            && $stage->status === PurchaseRequisitionStage::STATUS_PENDING;
+    }
+
+    /**
+     * Point an open Store team step at the person the sender chose. Ignored
+     * when the step is not one, or the person is not on the Store team —
+     * the step then simply stays with the whole team. The rest of the team
+     * can still take it, so an absent person never holds a sheet up.
+     */
+    private function direct(?PurchaseRequisitionStage $stage, ?int $sendTo, ?User $sender): void
+    {
+        if (! $sendTo || ! $this->isDirectable($stage)) {
+            return;
+        }
+
+        $chosen = $this->sendToOptions($sender)->firstWhere('id', $sendTo);
+
+        if ($chosen) {
+            $stage->forceFill(['assignee_user_id' => $chosen->id, 'assignee_name' => $chosen->name])->save();
+        }
+    }
+
     /** Heads a section or a department, so nobody sits above them for their own sheet. */
     private function isHead(User $user): bool
     {
@@ -235,7 +289,7 @@ class RequisitionWorkflow
      * Refuses — having written nothing — if any stage has no approver or
      * the raiser holds a stage. Called inside the submit transaction.
      */
-    public function start(PurchaseRequisition $requisition): void
+    public function start(PurchaseRequisition $requisition, ?int $sendTo = null): void
     {
         $raiser = $requisition->createdBy()->first();
         $section = $requisition->indentSection()->first() ?: $raiser?->requisitionSection;
@@ -285,9 +339,12 @@ class RequisitionWorkflow
             ]);
         }
 
+        $first = $this->firstPending($requisition, $cycle);
+        $this->direct($first, $sendTo, $raiser);
+
         $requisition->forceFill([
             'workflow_version' => self::VERSION,
-            'current_stage' => $this->firstPending($requisition, $cycle)?->sequence,
+            'current_stage' => $first?->sequence,
         ])->save();
 
         // The sheet has reached its first approval stage.
@@ -569,7 +626,7 @@ class RequisitionWorkflow
      * Approve the current stage and move to the next. The caller holds the
      * row lock and the transaction, and has checked canAct().
      */
-    public function approve(PurchaseRequisition $requisition, User $user, ?string $comment = null): ?PurchaseRequisitionStage
+    public function approve(PurchaseRequisition $requisition, User $user, ?string $comment = null, ?int $sendTo = null): ?PurchaseRequisitionStage
     {
         $stage = $this->currentStage($requisition);
         $from = $requisition->status;
@@ -585,6 +642,7 @@ class RequisitionWorkflow
         $this->applyStamp($requisition, $stage->stamp_source, $user);
 
         $next = $this->firstPending($requisition, $stage->cycle);
+        $this->direct($next, $sendTo, $user);
 
         if (! $next) {
             $this->complete($requisition, $user);

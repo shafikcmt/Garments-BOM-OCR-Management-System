@@ -332,3 +332,79 @@ it('does not let the section head who approved the sheet also take its Store tea
     engineApprove($this->approvers['store_head'], $sheet)->assertRedirect();
     expect($sheet->fresh()->current_stage)->toBeNull();
 });
+
+it('lets the sender name which Store user gets the sheet, and tells only that person', function () {
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $ebrahim = engineUser('store', [], ['name' => 'Ebrahim', 'status' => 1]);
+    engineUser('store', [], ['name' => 'Aminur', 'status' => 1]);
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+
+    test()->actingAs($sectionHead)->post(route('store.stock.requisitions.stage-approve', $sheet), ['send_to' => $ebrahim->id])
+        ->assertRedirect();
+
+    $store = $sheet->stages()->where('sequence', 3)->first();
+    expect($store->assignee_user_id)->toBe($ebrahim->id)
+        ->and($store->assignee_name)->toBe('Ebrahim');
+
+    // The rest of the Store team can still take it, so an absent person never blocks it.
+    engineApprove(engineUser('store', [], ['status' => 1]), $sheet)->assertRedirect();
+    expect($sheet->fresh()->current_stage)->toBeNull();
+});
+
+it('ignores a send_to who is not on the Store team', function () {
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $outsider = engineUser('merchant');
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+
+    test()->actingAs($sectionHead)->post(route('store.stock.requisitions.stage-approve', $sheet), ['send_to' => $outsider->id])
+        ->assertRedirect();
+
+    expect($sheet->stages()->where('sequence', 3)->value('assignee_user_id'))->toBeNull();
+});
+
+it('offers Received, not Approve, to the Store at its step, and a Send-to list to the head before it', function () {
+    $this->withoutVite();
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $store = engineUser('store', [], ['name' => 'Ebrahim', 'status' => 1]);
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+
+    // The head, before the Store step: a Send-to choice listing the Store user.
+    $html = test()->actingAs($sectionHead)->get(route('store.stock.requisitions.show', $sheet))->assertOk()->getContent();
+    expect($html)->toContain('Send to (Store)')->toContain('Ebrahim');
+
+    engineApprove($sectionHead, $sheet)->assertRedirect();
+
+    // The Store at its own step: Received.
+    $html = test()->actingAs($store)->get(route('store.stock.requisitions.show', $sheet))->assertOk()->getContent();
+    expect($html)->toContain('Mark Received');
+});
+
+it('shows a staff member who their requisition goes to in the Submit popup', function () {
+    $this->withoutVite();
+    $sectionHead = engineUser('production', [], ['name' => 'Oli-ur Rahman']);
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $staff = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+
+    $html = test()->actingAs($staff)->get(route('store.stock.requisitions.create'))->assertOk()->getContent();
+    expect($html)->toContain('id="submitRouteModal"')->toContain('Oli-ur Rahman');
+
+    // A section head's own sheet goes straight to the Store: they pick the user.
+    $ebrahim = engineUser('store', [], ['name' => 'Ebrahim', 'status' => 1]);
+    $sectionHead->givePermissionTo(Permission::findOrCreate('store.requisition.create', 'web'));
+    $sectionHead->update(['requisition_section_id' => $section->id]);
+
+    $html = test()->actingAs($sectionHead)->get(route('store.stock.requisitions.create'))->assertOk()->getContent();
+    expect($html)->toContain('id="submitRouteSelect"')->toContain('Ebrahim');
+});
