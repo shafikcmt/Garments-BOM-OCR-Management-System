@@ -246,7 +246,8 @@ it('starts the section-wise export with an ALL tab that the section tabs add up 
         $sheet = $book->getSheetByName($title);
         $rows = [];
         $total = null;
-        foreach ($sheet->toArray(null, false, false) as $row) {
+        // Calculated, so the ALL tab's To Be Procured / Amount formulas read as numbers.
+        foreach ($sheet->toArray(null, true, false) as $row) {
             if (($row[0] ?? '') === 'Total-') {
                 $total = (float) $row[15];
             } elseif (is_numeric($row[0] ?? null) && ! empty($row[1])) {
