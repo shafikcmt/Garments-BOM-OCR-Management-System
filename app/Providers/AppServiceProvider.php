@@ -14,7 +14,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // One instance per request, so every PO / PRA change in that request
+        // shares a single recalculation per workspace file.
+        $this->app->singleton(\App\Services\SupplyChainWorkspaceSync::class);
     }
 
     /**
@@ -22,6 +24,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \App\Services\SupplyChainWorkspaceSync::observe();
+
         // $timestamp->local(): the same instant on the Dhaka clock, for display.
         \Illuminate\Support\Carbon::macro('local', fn () => \App\Support\LocalTime::of($this));
 

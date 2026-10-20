@@ -20,6 +20,22 @@ return [
     'sync_workspace_cells' => env('STOCK_SYNC_WORKSPACE_CELLS', true),
 
     /*
+    |--------------------------------------------------------------------------
+    | Refresh BOM Workspace cells when Supply Chain changes a PO / PRA
+    |--------------------------------------------------------------------------
+    |
+    | PI Status, PI Amount, Payment Required Date, Payment Status and the order
+    | status columns are calculated from the booking PO and payment request. They
+    | used to refresh only when someone next saved the workspace. When true, the
+    | file is recalculated right after a PO or PRA is created, changed or
+    | removed, so Merchandising, Store and Accounts see it at once.
+    |
+    | Set SUPPLY_CHAIN_SYNC_WORKSPACE=false to go back to refresh-on-save.
+    |
+    */
+    'sync_supply_chain_cells' => env('SUPPLY_CHAIN_SYNC_WORKSPACE', true),
+
+    /*
     | Login-less user that the sync attributes excel_cells.updated_by to, so
     | auto-writes are never blamed on whichever human triggered the recompute.
     */
