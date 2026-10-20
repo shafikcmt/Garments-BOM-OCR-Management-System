@@ -29,21 +29,48 @@ Decision (2026-10-20, owner): **do not copy any one buyer's Excel or folder layo
 
 Always report which stage a change belongs to, and keep upstream data flowing downstream.
 
-## 3. Standard field groups (what every buyer's BOM maps into)
+## 3. Standard data model: real tables + workspace sheet as a synced view
 
-Derived from the real 82-column BOM sheet, but named generically. Each is an `ExcelHeader` group, owned by a role.
+Decision (2026-10-20, owner): the 82-column BOM sheet is too complicated to keep as one flat set of custom headers. Split it into **proper tables, one per business area**. The Merchant Workspace sheet stays (users like it), but it becomes a *view* of those tables, and editing in either place updates the other.
 
-| Group | Standard fields (examples) | Owner |
-|---|---|---|
-| Order | buyer, season, style (mother/child), color, PO no, ship date, order qty | Merchandising |
-| Material | type, description, item code, material color, BOM qty, consumption, wastage %, requirement | Merchandising |
-| Sourcing | vendor, vendor type, currency, material PO no/date, ordered qty, rate | Merchandising / Procurement |
-| Proforma & Payment | PI no/status/date/amount, HS code, payment term, payment doc/status | Commercial / Accounts |
-| Shipment | ship mode, forwarder, BL/AWB, port, vessel, ETD/ETA (committed vs actual) | Commercial |
-| Receive | committed / actual inhouse date, receipt qty, invoice no/qty/amount | Store |
-| Issue & Balance | bulk issue, sample issue, return, excess/short, liability | Store |
+### 3.1 Tables (each owned by one department)
 
-Buyers differ in names ("PCD Required", "Order to be placed by"...). Extra buyer-only columns become *custom headers* in the matching group, not new tables.
+| Table | One row is | Owner | Sheet columns it feeds |
+|---|---|---|---|
+| `order_lines` | child style x color x PO | Merchandising | style, color, PO no, ship date, order qty |
+| `bom_items` | one material requirement of an order line | Merchandising | material type/description/code/color, BOM qty, consumption, wastage %, requirement |
+| `material_orders` | one purchase order line against a bom_item (many allowed) | Procurement | vendor, currency, material PO no/date, ordered qty, rate |
+| `proforma_invoices` + `payments` | one PI / one payment against a material order | Commercial / Accounts | PI no/status/amount, HS code, payment term, payment doc/status |
+| `shipments` | one shipment leg of a material order | Commercial | ship mode, forwarder, BL/AWB, port, vessel, ETD/ETA (committed vs actual) |
+| `receipts` | one receiving against a material order | Store | inhouse dates, receipt qty, invoice no/qty/amount |
+| `issues` | one issue/return against a bom_item | Store | bulk issue, sample issue, return, liability |
+
+Chain: `buyer -> season -> mother_style -> child_style -> order_line -> bom_item -> material_order -> (PI, payment, shipment, receipt)`; `issues` hang on `bom_item`.
+
+Why this is better than one flat sheet: partial deliveries, several POs or several shipments for one material become normal rows instead of squeezed cells; each department edits only its own table (matches roles and buyer scope); reports and the Kandaree-style "Status of Material" are plain queries; a new buyer's extra columns attach to the right table as custom fields instead of widening one sheet.
+
+### 3.2 Field registry (the bridge)
+
+One table `workspace_field_map`: `excel_header_id` -> (`table`, `column`, `aggregate`). `aggregate` says how a many-to-one table shows in one sheet cell: `latest`, `sum`, `min`, `max`, or `first`. Example: Ordered Qty = `sum(material_orders.qty)`, Actual Inhouse = `max(receipts.received_on)`, Receipt Qty = `sum(receipts.qty)`.
+
+Headers with no mapping stay **sheet-only** exactly as today, so migration can be done department by department and nothing breaks half-way. Computed columns (requirement, excess/short, liability, status) stay formulas (`formula_key`) and are never stored in the tables.
+
+### 3.3 Two-way sync without loops
+
+- ONE write path: `FieldWriter::set(bom_item, header, value, user)`. Every screen (table screens AND the workspace sheet) calls it.
+- Sheet edit: `FieldWriter` finds the mapping, writes the table, then refreshes the cell. Table-screen edit: writes the table, then refreshes the affected sheet cells. The cell is never the source for a mapped field.
+- Where one sheet cell maps to many table rows (sum/latest), an edit in the sheet creates or adjusts a row (for example "Receipt Qty 500" creates a receipt of the difference) and the user sees what was created. Ambiguous edits are refused with a plain message that points to the table screen.
+- Every write records user, old value, new value, source (sheet/table/import) in the existing change log; `excel_rows.origin` is reused to prevent echo.
+- Permissions: the existing header owner role decides who may edit a mapped field; buyer scope applies to every table through `buyer_id` on `order_lines`.
+
+### 3.4 Migration plan (safe, additive)
+
+1. New tables and `workspace_field_map` only. Nothing existing is altered.
+2. Backfill command (dry-run first): read existing `excel_rows/cells` through the field map into tables; report rows it cannot place. Idempotent, can be re-run.
+3. Switch one department at a time to table-backed (Merchandising: `order_lines` + `bom_items` first), behind a setting, keeping the old cells as a fallback.
+4. After a department is stable, hide nothing from users: the workspace sheet looks the same, only the source changed.
+
+Old standard field groups (Order, Material, Sourcing, Proforma & Payment, Shipment, Receive, Issue & Balance) remain the grouping of sheet columns and map 1:1 to the tables above. Buyer-only extra columns become *custom fields* on the matching table (`custom_values` JSON column), never a new table per buyer.
 
 ## 4. Import profile (Phase 2 spec)
 
@@ -83,4 +110,4 @@ Use the same words on every screen and report:
 
 ## 8. Backlog order (one phase per task)
 
-Phase 2 import profile + wizard -> Phase 3 link files/rows to style -> Phase 4 standard Order/PO table (color/size/destination) -> Phase 5 pre-costing with revisions -> Phase 6 BOM approval + BOM-based purchase -> Phase 7 style-wise material status and traffic light -> Phase 8 TnA -> Sample -> Planning -> SAP FICO-style Accounts integration.
+Phase 2 `order_lines` + `bom_items` tables, field registry, `FieldWriter`, Merchandising columns table-backed with two-way sync and backfill -> Phase 3 import profile + 3-step wizard writing through `FieldWriter` -> Phase 4 `material_orders` (Procurement) -> Phase 5 `receipts` + `issues` (Store) -> Phase 6 `proforma_invoices`, `payments`, `shipments` (Commercial/Accounts) -> Phase 7 pre-costing with revisions, BOM approval -> Phase 8 style-wise material status and traffic light -> TnA -> Sample -> Planning -> SAP FICO-style Accounts integration.
