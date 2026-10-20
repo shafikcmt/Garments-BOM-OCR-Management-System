@@ -54,6 +54,7 @@ class PraPaymentReferenceWriter
         }
 
         $header = \App\Models\ExcelHeader::find($headerId);
+        $fileIds = [];
         $batchId = (string) Str::uuid();
         $written = 0;
 
@@ -93,7 +94,14 @@ class PraPaymentReferenceWriter
                 'batch_id' => $batchId,
             ]);
 
+            $fileIds[$row->excel_file_id] = true;
             $written++;
+        }
+
+        // Payment Status is calculated from Pmt Doc No, so the files whose
+        // cells just changed are recalculated (once each, after the request).
+        foreach (array_keys($fileIds) as $fileId) {
+            app(SupplyChainWorkspaceSync::class)->queueFile((int) $fileId, $actor->id);
         }
 
         return $written;

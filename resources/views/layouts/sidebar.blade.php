@@ -318,6 +318,11 @@
                     </li>
                     @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
                     <li class="sidebar-item">
+                        <a href="{{ route('account.payments.index') }}" class="sidebar-nav-link {{ request()->routeIs('account.payments.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-cash-coin" aria-hidden="true"></i></span><span class="sidebar-link-text">Payments</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="{{ route('account.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('account.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
                         </a>
