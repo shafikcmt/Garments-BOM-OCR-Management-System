@@ -728,6 +728,28 @@ class BookingController extends Controller
         return $changes;
     }
 
+    /**
+     * Re-check the booking POs built from the given BOM rows against their
+     * stored baseline and return the ones now flagged as needing regeneration.
+     *
+     * Called when a Merchant saves the workspace, so Supply Chain hears about a
+     * source change immediately instead of only when a PO screen is next opened.
+     * It reuses the same snapshot comparison as every PO screen — nothing about
+     * what counts as a change is decided here.
+     */
+    public function refreshSourceControlForRows(array $rowIds): \Illuminate\Support\Collection
+    {
+        if ($rowIds === []) {
+            return collect();
+        }
+
+        return BookingPo::whereIn('excel_row_id', $rowIds)
+            ->get()
+            ->map(fn (BookingPo $po) => $this->syncBookingPoSourceControl($po))
+            ->filter(fn (BookingPo $po) => $po->needs_regenerate)
+            ->values();
+    }
+
     protected function syncBookingPoSourceControl(BookingPo $bookingPo, bool $resetBaseline = false): BookingPo
     {
         $bookingPo = $bookingPo->fresh(['excelRow.cells.header', 'generatedBy', 'completedBy']) ?: $bookingPo;

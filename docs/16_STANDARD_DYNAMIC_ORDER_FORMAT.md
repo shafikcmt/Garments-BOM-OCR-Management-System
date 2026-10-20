@@ -39,8 +39,8 @@ Decision (2026-10-20, owner): the 82-column BOM sheet is too complicated to keep
 |---|---|---|---|
 | `order_lines` | child style x color x PO | Merchandising | style, color, PO no, ship date, order qty |
 | `bom_items` | one material requirement of an order line | Merchandising | material type/description/code/color, BOM qty, consumption, wastage %, requirement |
-| `material_orders` | one purchase order line against a bom_item (many allowed) | Procurement | vendor, currency, material PO no/date, ordered qty, rate |
-| `proforma_invoices` + `payments` | one PI / one payment against a material order | Commercial / Accounts | PI no/status/amount, HS code, payment term, payment doc/status |
+| `material_orders` = **existing `booking_pos`** (do not create a second PO table) | one PO / booking | **Supply Chain** | vendor, currency, material PO no/date, ordered qty, rate |
+| PI / payment = **existing `payment_requests` + `payment_request_items`** (PRA, check -> approve) | one PI / payment request line | Supply Chain (raises) / Accounts (approves) | PI no/status/amount, HS code, payment term, payment doc/status |
 | `shipments` | one shipment leg of a material order | Commercial | ship mode, forwarder, BL/AWB, port, vessel, ETD/ETA (committed vs actual) |
 | `receipts` | one receiving against a material order | Store | inhouse dates, receipt qty, invoice no/qty/amount |
 | `issues` | one issue/return against a bom_item | Store | bulk issue, sample issue, return, liability |
@@ -54,6 +54,12 @@ Why this is better than one flat sheet: partial deliveries, several POs or sever
 One table `workspace_field_map`: `excel_header_id` -> (`table`, `column`, `aggregate`). `aggregate` says how a many-to-one table shows in one sheet cell: `latest`, `sum`, `min`, `max`, or `first`. Example: Ordered Qty = `sum(material_orders.qty)`, Actual Inhouse = `max(receipts.received_on)`, Receipt Qty = `sum(receipts.qty)`.
 
 Headers with no mapping stay **sheet-only** exactly as today, so migration can be done department by department and nothing breaks half-way. Computed columns (requirement, excess/short, liability, status) stay formulas (`formula_key`) and are never stored in the tables.
+
+### 3.2b Supply Chain comparison (done 2026-10-20)
+
+PO/Booking (`BookingController`, `booking_pos`), PI/PRA (`PaymentRequestController`) and `BookingPoSourceService` already behave as the Procurement tables of this model, and `MaterialStockLedgerCellSyncService` is the existing precedent for "table is the source, workspace cells follow" (never blanks a cell, skips locked files, writes as the system user, config switch). Extend these; do not duplicate them. Supply Chain has priority; every Merchant change must reach the departments that build on it.
+
+Known limitation: a PO's change detection compares only the leader BOM row (`booking_pos.excel_row_id`); edits to sibling rows of a batch PO are not detected yet.
 
 ### 3.3 Two-way sync without loops
 
@@ -109,5 +115,9 @@ Use the same words on every screen and report:
 7. Report: summary, changed files, how to test, risks.
 
 ## 8. Backlog order (one phase per task)
+
+**Done:** Step 1 — Merchant -> Supply Chain: a workspace save re-checks the POs built from the edited rows (`BookingController::refreshSourceControlForRows`), flags them "Source changed", and `BookingPoChangeNotifier` sends Supply Chain one notification naming the PO, the fields and any payment request already holding it (once per new change set). Tests: `tests/Feature/SupplyChain/BookingPoChangeNotifierTest.php`.
+
+**Next:** Step 2 — Supply Chain -> Merchant/Store/Accounts: PO no, vendor, ordered qty, PI and payment status written back to workspace cells (ledger-sync pattern). Then the phases below.
 
 Phase 2 `order_lines` + `bom_items` tables, field registry, `FieldWriter`, Merchandising columns table-backed with two-way sync and backfill -> Phase 3 import profile + 3-step wizard writing through `FieldWriter` -> Phase 4 `material_orders` (Procurement) -> Phase 5 `receipts` + `issues` (Store) -> Phase 6 `proforma_invoices`, `payments`, `shipments` (Commercial/Accounts) -> Phase 7 pre-costing with revisions, BOM approval -> Phase 8 style-wise material status and traffic light -> TnA -> Sample -> Planning -> SAP FICO-style Accounts integration.
