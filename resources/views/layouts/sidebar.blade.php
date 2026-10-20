@@ -283,6 +283,11 @@
                     </li>
                     @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
                     <li class="sidebar-item">
+                        <a href="{{ route('merchant.styles.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.styles.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-diagram-3" aria-hidden="true"></i></span><span class="sidebar-link-text">Style Library</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="{{ route('merchant.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
                         </a>

@@ -64,6 +64,16 @@ class Buyer extends Model
         return $this->belongsToMany(User::class)->orderBy('users.id');
     }
 
+    public function seasons()
+    {
+        return $this->hasMany(BuyerSeason::class)->orderByDesc('id');
+    }
+
+    public function motherStyles()
+    {
+        return $this->hasMany(MotherStyle::class);
+    }
+
     public function excelFiles()
     {
         return $this->hasMany(ExcelFile::class);

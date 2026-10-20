@@ -45,6 +45,16 @@ Common work types:
 - Git/deployment support
 - Bug fixing after pull/merge/deploy
 
+## Dynamic Buyer Orders (Style Hierarchy) — read before Merchandising work
+
+Structure: **Buyer -> Season -> Mother Style -> Child Style** (`buyer_seasons`, `mother_styles`, `child_styles`; screen: Merchant -> Style Library). Every buyer keeps orders in a different Excel layout, so:
+
+- Never write buyer-specific code. Handle buyer differences through data (seasons, product groups, import profiles) that users manage on screens.
+- Style codes like `720193(PETITE)` and `748268 (866317)` go through `App\Support\StyleCodeParser`; extend it and add a test for any new pattern.
+- New buyer Excel layouts are handled by a per-buyer import profile (column mapping), not by forking `ExcelUploadController`.
+- Reference products: Kandaree Apparel ERP for the order/BOM/procurement flow; SAP FICO for the Accounts side (future).
+- Full plan, rules and phase list: `docs/15_BUYER_STYLE_HIERARCHY_AND_DYNAMIC_ORDERS.md`. Work one phase at a time.
+
 ## Business Context
 
 Before the software, company teams managed BOM and related operations using many separate Excel files. That caused duplicate entry, missing file versions, slow follow-up, and poor visibility for management.
