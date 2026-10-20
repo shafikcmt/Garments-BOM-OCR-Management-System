@@ -1,3 +1,5 @@
+> **Superseded in direction by `docs/16_STANDARD_DYNAMIC_ORDER_FORMAT.md`.** The Ann Taylor examples below only illustrate why a buyer-independent standard is needed; do not model the system on that layout.
+
 # Buyer -> Season -> Mother Style -> Child Style (Dynamic Buyer Orders)
 
 Reference for every future change to Merchandising order handling. Read before touching styles, BOM import, or buyer-wise screens.

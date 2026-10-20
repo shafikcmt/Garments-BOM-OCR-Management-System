@@ -53,7 +53,8 @@ Structure: **Buyer -> Season -> Mother Style -> Child Style** (`buyer_seasons`, 
 - Style codes like `720193(PETITE)` and `748268 (866317)` go through `App\Support\StyleCodeParser`; extend it and add a test for any new pattern.
 - New buyer Excel layouts are handled by a per-buyer import profile (column mapping), not by forking `ExcelUploadController`.
 - Reference products: Kandaree Apparel ERP for the order/BOM/procurement flow; SAP FICO for the Accounts side (future).
-- Full plan, rules and phase list: `docs/15_BUYER_STYLE_HIERARCHY_AND_DYNAMIC_ORDERS.md`. Work one phase at a time.
+- **Do not copy any single buyer's Excel/folder layout.** Build to the standard format in `docs/16_STANDARD_DYNAMIC_ORDER_FORMAT.md` (standard field groups, import profile + 3-step upload wizard, status vocabulary, user-friendly UI rules). Buyer files are only converted into it.
+- Full plan, rules and phase list: `docs/15_BUYER_STYLE_HIERARCHY_AND_DYNAMIC_ORDERS.md` and `docs/16_...`. Work one phase at a time.
 
 ## Business Context
 
