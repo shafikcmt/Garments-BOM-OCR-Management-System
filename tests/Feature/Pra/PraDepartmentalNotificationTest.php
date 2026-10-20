@@ -178,6 +178,45 @@ it('tells the creator when the chain completes', function () {
     expect($notification->message)->toContain('Payment has been recorded');
 });
 
+it('carries the payment reference to the worksheet lines when the chain completes', function () {
+    $header = \App\Models\ExcelHeader::create([
+        'header_name' => 'Pmt doc no', 'header_key' => 'pmt_doc_no', 'owner_role_id' => 1, 'position' => 1,
+    ]);
+    $item = $this->pra->items()->first();
+    $row = \App\Models\ExcelRow::create(['excel_file_id' => $item->excel_file_id, 'row_number' => 1]);
+    $item->update(['excel_row_id' => $row->id]);
+
+    foreach ([$this->merchantTeam, $this->merchantHead, $this->accountsTeam, $this->accountsHead] as $actor) {
+        $this->workflow->approve($this->pra->fresh(), $actor);
+    }
+
+    $this->actingAs($this->commercialHead)
+        ->post(route('pra_departmental.approve', $this->pra->fresh()), ['payment_reference' => 'PV-0042'])
+        ->assertRedirect()
+        ->assertSessionHas('success', fn ($m) => str_contains($m, 'Payment reference added to 1 worksheet line'));
+
+    expect(\App\Models\ExcelCell::where('row_id', $row->id)->where('header_id', $header->id)->value('value'))->toBe('PV-0042');
+});
+
+it('asks for the payment reference only on the payment step', function () {
+    $this->actingAs($this->merchantTeam)
+        ->get(route('pra_departmental.show', $this->pra))->assertOk()->assertDontSee('payment_reference', false);
+
+    foreach ([$this->merchantTeam, $this->merchantHead, $this->accountsTeam, $this->accountsHead] as $actor) {
+        $this->workflow->approve($this->pra->fresh(), $actor);
+    }
+
+    $this->actingAs($this->commercialHead)
+        ->get(route('pra_departmental.show', $this->pra->fresh()))->assertOk()->assertSee('payment_reference', false);
+});
+
+it('ignores a payment reference sent on a step that is not the payment step', function () {
+    $this->actingAs($this->merchantTeam)
+        ->post(route('pra_departmental.approve', $this->pra), ['payment_reference' => 'PV-1'])->assertRedirect();
+
+    expect($this->pra->fresh()->data['payment_reference'] ?? null)->toBeNull();
+});
+
 // --- Rejection ---------------------------------------------------------------
 
 it('tells the creator AND everyone who already approved when it is rejected', function () {

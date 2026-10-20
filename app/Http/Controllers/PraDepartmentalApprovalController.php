@@ -193,6 +193,8 @@ class PraDepartmentalApprovalController extends Controller
             // approval is recorded, so a bad pick refuses the whole submission
             // rather than approving and then failing to assign.
             'assign_next' => ['nullable', 'integer'],
+            // Only used on the final (payment) step; ignored everywhere else.
+            'payment_reference' => ['nullable', 'string', 'max:100'],
         ]);
 
         $assignNext = ! empty($validated['assign_next']) ? (int) $validated['assign_next'] : null;
@@ -226,6 +228,13 @@ class PraDepartmentalApprovalController extends Controller
             return redirect()->route('pra_departmental.index')->with('warning', $e->getMessage());
         }
 
+        // The payment step just finished: carry its reference to every line.
+        $linesUpdated = 0;
+        if ($paymentRequest->status === PaymentRequest::STATUS_COMPLETED && filled($validated['payment_reference'] ?? null)) {
+            $linesUpdated = app(\App\Services\PraPaymentReferenceWriter::class)
+                ->write($paymentRequest, $validated['payment_reference'], auth()->user());
+        }
+
         $next = $this->workflow->currentStage($paymentRequest);
 
         // Hand the baton on. A blocked next step notifies nobody — nobody holds
@@ -244,7 +253,8 @@ class PraDepartmentalApprovalController extends Controller
         $message = $next
             ? 'PRA ' . $paymentRequest->request_no . ' approved and sent to ' . $next->label
                 . ($next->assignee ? ', assigned to ' . $next->assignee->name : '') . '.'
-            : 'PRA ' . $paymentRequest->request_no . ' is complete. Payment has been recorded.';
+            : 'PRA ' . $paymentRequest->request_no . ' is complete. Payment has been recorded.'
+                . ($linesUpdated > 0 ? ' Payment reference added to ' . $linesUpdated . ' worksheet line(s).' : '');
 
         // A step nobody can act on must say so here, at the moment it becomes
         // somebody's problem, rather than waiting for them to find it.

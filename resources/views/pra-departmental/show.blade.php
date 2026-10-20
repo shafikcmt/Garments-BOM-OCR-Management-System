@@ -419,6 +419,12 @@
                                 <label for="approve-comment" class="po-field-label">Comment (optional)</label>
                                 <textarea id="approve-comment" name="comment" rows="2" class="form-control mb-3" maxlength="2000"></textarea>
 
+                                @if($stage->stage === \App\Models\PraApproval::STAGE_COMPLETE)
+                                    <label for="payment-reference" class="po-field-label">Payment reference no. <span class="fw-normal text-lowercase">(optional)</span></label>
+                                    <input id="payment-reference" type="text" name="payment_reference" class="form-control mb-1" maxlength="100" value="{{ old('payment_reference') }}">
+                                    <div class="form-text mb-3">Added to Pmt Doc No on every line of this PRA, so Payment Status shows Pmt Done.</div>
+                                @endif
+
                                 @if($nextStage && $nextStage->isActionable())
                                     {{-- OPTIONAL PRIMARY ASSIGNEE FOR THE NEXT STEP. Options
                                          are the resolver's eligible set for that step and
