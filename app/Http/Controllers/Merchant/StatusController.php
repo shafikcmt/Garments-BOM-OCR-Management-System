@@ -8,6 +8,7 @@ use App\Models\BuyerSeason;
 use App\Models\FollowUpTask;
 use App\Models\BomApproval;
 use App\Services\BomApprovals;
+use App\Services\Costings;
 use App\Services\StyleRollup;
 use Illuminate\Http\Request;
 
@@ -45,7 +46,7 @@ class StatusController extends Controller
         return view('merchant.status-index', compact('buyers', 'buyer', 'rows'));
     }
 
-    public function season(Request $request, BuyerSeason $season, StyleRollup $rollup, BomApprovals $approvals)
+    public function season(Request $request, BuyerSeason $season, StyleRollup $rollup, BomApprovals $approvals, Costings $costings)
     {
         abort_unless($request->user()->hasBuyerAccess($season->buyer_id), 403);
 
@@ -71,6 +72,9 @@ class StatusController extends Controller
             'approval' => $approvalsByStyle->get($m->id),
         ]]);
 
-        return view('merchant.status-season', ['season' => $season, 'styles' => $styles, 'totals' => $data['totals'], 'openFollowUps' => $openFollowUps, 'bomStates' => $bomStates]);
+        // Margin of each style's latest FINAL buyer costing.
+        $margins = $costings->latestFinal($mothers, 'buyer')->map(fn ($c) => $c->marginPct());
+
+        return view('merchant.status-season', ['season' => $season, 'styles' => $styles, 'totals' => $data['totals'], 'openFollowUps' => $openFollowUps, 'bomStates' => $bomStates, 'margins' => $margins]);
     }
 }

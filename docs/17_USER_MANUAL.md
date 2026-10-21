@@ -1,6 +1,6 @@
 # User Manual — Garments BOM Management System
 
-> **Status: living draft.** Updated up to 2026-10-23. Every new screen or change that users can see adds or edits a section here in the same change. When all modules are finished this file is turned into the final manual (Word / PDF). Sections marked **Not built yet** are listed at the end.
+> **Status: living draft.** Updated up to 2026-10-24. Every new screen or change that users can see adds or edits a section here in the same change. When all modules are finished this file is turned into the final manual (Word / PDF). Sections marked **Not built yet** are listed at the end.
 >
 > Written in simple English for factory and office staff. No technical words.
 
@@ -171,6 +171,37 @@ The **Season page** of Style Status shows this status for every style.
 - **Second approval by Management**: adds the Management step.
 - **Supply Chain cannot generate a PO until the BOM is approved**: when ticked, Supply Chain gets the message "The BOM of style 748268 is not approved…" if they try to generate a PO for an unapproved style. Both boxes are **off** until Admin ticks them, so nothing changes by itself. Styles that are not linked to an imported BOM (older files) are never blocked.
 
+### 2.7 Pre-costing
+
+Pre-costing is the **cost sheet of a style, before the order is booked**: what each part of the garment costs, and what is left of the price. It is an *estimate*. The BOM (sections 2.2 and 2.6) is the *actual* material list after the order.
+
+**Open it:** open the style (**Style Status**, then **View Status**) and press **Open Pre-costing**.
+
+**Two costings per style**
+
+| Costing | What it is |
+|---|---|
+| **Buyer** | The price build-up you quote to the buyer |
+| **In-house** | What the factory expects to spend |
+
+Use the two buttons at the top to switch. When both exist, the page shows both margins side by side.
+
+**Make a costing**
+1. Press **Start Buyer Costing** (or In-house). The sheet starts with five rows: Fabric, Trims, CM, Overhead, Commission.
+2. Choose the **Currency** and whether costs are **per piece or per dozen**. Type the **Quoted price**.
+3. Under each **cost head** (Fabric, Trims and accessories, Embroidery / print, Washing, Testing / other, CM, Overhead, Commission) fill the lines: **Description, Qty, Unit, Wastage %, Rate**. The **Amount** is worked out for you: `Qty x (1 + Wastage %) x Rate`. For CM or Commission use Qty 1 and type the amount in Rate.
+4. Press **Add Line** for more lines under a head, **Remove** to take one away. Empty rows are ignored.
+5. Press **Save Costing**. The cards at the top show **Total cost, Quoted price, Profit and Margin** (profit as a share of the quoted price).
+
+**Finalize and revise**
+- When the costing is agreed, press **Finalize Revision 1** (save first). A final revision **cannot be edited**.
+- To change it, press **New Revision**. Revision 2 starts as a copy and is a draft until you finalize it. Old revisions stay as they were; the **Revision history** table at the bottom compares total cost and margin of every revision.
+- Only one draft can exist at a time.
+
+**Who can do what.** Merchandising and Admin make and change costings. Management can open and read them. Other roles cannot.
+
+The **Season page** of Style Status shows the **Margin** of each style's latest *final* buyer costing.
+
 ---
 
 ## 3. Supply Chain
@@ -250,6 +281,8 @@ On the live server, every push to `master` runs the migrations by itself. Only `
 
 ## 8. Common questions
 
+**Who makes the BOM? Is it created by the system after I upload the Excel?** The system does **not invent** a BOM. The **merchant prepares it** (materials, consumption, wastage, quantities from the buyer's tech pack or the costing) in Excel or directly in the Workspace. When you **upload or import** the file, the system takes over: it stores every material line, splits it into order lines and materials under the right style and season, **calculates** the formula columns (for example consumption with wastage and materials to be ordered), and passes it on: BOM approval, then PO, payment, receiving and issue. Generating a BOM automatically from an order and a consumption master is **not built yet**.
+
 **The Style status page says "No orders are linked".** The style has no order yet. Import the buyer's Excel with the same season code, or run `bom:sync-tables` for older files.
 
 **My buyer's Excel has no Season column.** That is fine. You type the season in Step 1 of the import.
@@ -276,10 +309,12 @@ On the live server, every push to `master` runs the migrations by itself. Only `
 | Pmt Doc No | Payment reference recorded against a line |
 | Follow-up | A task asking one person to chase a style by a date |
 | BOM approval | Checking and approving a style's BOM before it is ordered |
+| Pre-costing | Cost sheet of a style by cost head, before the order; Buyer and In-house, in revisions |
+| Margin | Profit as a share of the quoted price |
 | TnA | Time and Action: a to-do list with due dates and traffic lights |
 
 ---
 
 ## 10. Not built yet
 
-Pre-costing, buyer inquiry and quotation, sample management, the rest of TnA (task templates by lead time, tasks created automatically, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
+Automatic BOM from an order and consumption master, comparison of pre-costing with the BOM, size-wise costing, buyer inquiry and quotation, sample management, the rest of TnA (task templates by lead time, tasks created automatically, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.

@@ -43,6 +43,34 @@
         </div>
     @endif
 
+    {{-- Pre-costing --}}
+    <x-card title="Pre-costing" class="mb-3" body-class="p-3">
+        <x-slot:actions>
+            <a href="{{ route('costing.show', $mother) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-calculator me-1" aria-hidden="true"></i>Open Pre-costing</a>
+        </x-slot:actions>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>Costing</th><th>Revision</th><th class="text-end">Total cost</th><th class="text-end">Quoted price</th><th class="text-end">Margin</th></tr></thead>
+                <tbody>
+                @foreach(\App\Models\Costing::MODES as $key => $label)
+                    @php($c = $costingCards[$key])
+                    <tr>
+                        <td class="fw-semibold">{{ $label }}</td>
+                        @if($c)
+                            <td>{{ $c['costing']->revision }} <span class="text-muted">({{ $c['costing']->isDraft() ? 'draft' : 'final' }})</span></td>
+                            <td class="text-end">{{ $c['costing']->currency }} {{ number_format($c['summary']['total'], 2) }}</td>
+                            <td class="text-end">{{ $c['summary']['quoted'] !== null ? number_format($c['summary']['quoted'], 2) : '—' }}</td>
+                            <td class="text-end">{{ $c['summary']['margin'] !== null ? $c['summary']['margin'] . '%' : '—' }}</td>
+                        @else
+                            <td colspan="4" class="text-muted">Not started</td>
+                        @endif
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
+    </x-card>
+
     {{-- BOM approval --}}
     <x-card title="BOM approval" class="mb-3" body-class="p-3">
         <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
