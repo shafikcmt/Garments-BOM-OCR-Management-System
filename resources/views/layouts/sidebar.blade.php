@@ -144,6 +144,11 @@
                          roles those routes admit, so they need a way in that is
                          not a hand-typed URL. --}}
                     <li class="sidebar-item">
+                        <a href="{{ route('merchant.status.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.status.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-bar-chart-steps" aria-hidden="true"></i></span><span class="sidebar-link-text">Style Status</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="{{ route('merchant.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.reports.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
@@ -290,6 +295,11 @@
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.status.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.status.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-bar-chart-steps" aria-hidden="true"></i></span><span class="sidebar-link-text">Style Status</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
@@ -571,6 +581,11 @@
                         </a>
                     </li>
                     @include('layouts._my-approvals-link', [])
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.status.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.status.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-bar-chart-steps" aria-hidden="true"></i></span><span class="sidebar-link-text">Style Status</span></span>
+                        </a>
+                    </li>
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.reports.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">

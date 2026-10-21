@@ -58,9 +58,19 @@ class StyleLibraryController extends Controller
         $childId = $request->integer('child') ?: null;
         $data = $rollup->forMother($mother, $childId);
 
+        // Admin / Management reach this page read-only from the status views and
+        // have no Style Library to go back to.
+        $isMerchant = $request->user()->hasRole('merchant');
+
         return view('merchant.style-show', [
             'mother' => $mother,
             'childId' => $childId,
+            'showRoute' => $isMerchant ? 'merchant.styles.mothers.show' : 'merchant.status.style',
+            'backUrl' => $isMerchant
+                ? route('merchant.styles.index', ['buyer' => $mother->buyer_id, 'season' => $mother->buyer_season_id])
+                : route('merchant.status.season', $mother->buyer_season_id),
+            'backLabel' => $isMerchant ? 'Back to Style Library' : 'Back to Season Status',
+            'homeUrl' => $isMerchant ? route('merchant.dashboard') : route('merchant.status.index'),
         ] + $data);
     }
 

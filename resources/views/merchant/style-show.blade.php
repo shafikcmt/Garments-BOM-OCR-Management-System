@@ -16,8 +16,8 @@
 @endphp
 <div class="container-fluid">
     <x-breadcrumb :items="[
-        ['label' => 'Merchandising', 'url' => route('merchant.dashboard')],
-        ['label' => 'Style Library', 'url' => route('merchant.styles.index', ['buyer' => $mother->buyer_id, 'season' => $mother->buyer_season_id])],
+        ['label' => 'Merchandising', 'url' => $homeUrl],
+        ['label' => $backLabel === 'Back to Style Library' ? 'Style Library' : 'Season Status', 'url' => $backUrl],
         ['label' => 'Style ' . $mother->style_no],
     ]" />
 
@@ -25,8 +25,8 @@
                    :title="'Style ' . $mother->style_no"
                    copy="Orders and materials for this style, and how far each material has come.">
         <x-slot:actions>
-            <a href="{{ route('merchant.styles.index', ['buyer' => $mother->buyer_id, 'season' => $mother->buyer_season_id]) }}" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Style Library
+            <a href="{{ $backUrl }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>{{ $backLabel }}
             </a>
         </x-slot:actions>
     </x-page-header>
@@ -36,9 +36,9 @@
     @if($children->isNotEmpty())
         <div class="mb-3">
             <span class="text-muted me-2">Child style:</span>
-            <a href="{{ route('merchant.styles.mothers.show', $mother) }}" class="btn btn-sm {{ ! $childId ? 'btn-primary' : 'btn-outline-secondary' }} me-1">All</a>
+            <a href="{{ route($showRoute, $mother) }}" class="btn btn-sm {{ ! $childId ? 'btn-primary' : 'btn-outline-secondary' }} me-1">All</a>
             @foreach($children as $c)
-                <a href="{{ route('merchant.styles.mothers.show', [$mother, 'child' => $c->id]) }}" class="btn btn-sm {{ $childId === $c->id ? 'btn-primary' : 'btn-outline-secondary' }} me-1">{{ $c->style_no }}</a>
+                <a href="{{ route($showRoute, [$mother, 'child' => $c->id]) }}" class="btn btn-sm {{ $childId === $c->id ? 'btn-primary' : 'btn-outline-secondary' }} me-1">{{ $c->style_no }}</a>
             @endforeach
         </div>
     @endif
@@ -46,7 +46,7 @@
     @if($kpis['order_lines'] === 0)
         <x-card>
             <p class="mb-1 fw-semibold">No orders are linked to this style yet.</p>
-            <p class="text-muted mb-0">Import the buyer's Excel with the season <strong>{{ $mother->season?->code }}</strong> (Workspace → Import Buyer Excel). Its order lines and materials will appear here.</p>
+            <p class="text-muted mb-0">Import the buyer's Excel with the season <strong>{{ $mother->season?->code }}</strong> (Merchant Workspace → Import Buyer Excel). Its order lines and materials will appear here.</p>
         </x-card>
     @else
         @if($kpis['late'] > 0 || $kpis['due_soon'] > 0)

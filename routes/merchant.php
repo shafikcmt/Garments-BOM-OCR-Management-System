@@ -7,6 +7,7 @@ use App\Http\Controllers\Merchant\ExcelUploadController;
 use App\Http\Controllers\Merchant\ReportController;
 use App\Http\Controllers\Merchant\StyleLibraryController;
 use App\Http\Controllers\Merchant\ImportWizardController;
+use App\Http\Controllers\Merchant\StatusController;
 
 // Merchandising reports — read-only summaries of the BOM columns this
 // department owns. Kept in their own group because they are shared with Admin /
@@ -19,6 +20,17 @@ Route::prefix('merchant/reports')
         Route::get('/', [ReportController::class, 'index'])->name('index');
         Route::get('/pdf', [ReportController::class, 'pdf'])->name('pdf');
         Route::get('/excel', [ReportController::class, 'excel'])->name('excel');
+    });
+
+// Style / season status — read-only progress views shared with Admin and
+// Management. The editable Style Library stays merchant-only below.
+Route::prefix('merchant/status')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.status.')
+    ->group(function () {
+        Route::get('/', [StatusController::class, 'index'])->name('index');
+        Route::get('/seasons/{season}', [StatusController::class, 'season'])->name('season');
+        Route::get('/styles/{mother}', [StyleLibraryController::class, 'show'])->name('style');
     });
 
 Route::prefix('merchant')

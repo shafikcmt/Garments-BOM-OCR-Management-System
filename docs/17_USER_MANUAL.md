@@ -29,7 +29,7 @@ Who does what:
 | Supply Chain | Raises POs, collects PIs, raises payment requests (PRA) |
 | Accounts | Pays approved requests and records the payment reference |
 | Store | Receives and issues material |
-| Management / Admin | Watches progress, controls who can do what |
+| Management / Admin | Watches progress (Style Status), controls who can do what |
 
 You only see the screens your role needs.
 
@@ -89,7 +89,7 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 
 ### 2.3 Style status (how far each style has come)
 
-**Open it:** **Style Library**, choose the season, press **View Status** on a style.
+**Open it:** **Style Library**, choose the season, press **View Status** on a style. (Or from **Style Status**, section 2.4.)
 
 **What you see**
 - Top row: order lines, order quantity, number of materials, and how many are **Ordered, PI received, Paid, Received, Issued** (with percentages).
@@ -112,7 +112,19 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 
 These figures come from the same Workspace columns the other departments fill in. If a number looks wrong, check the Workspace row for that material.
 
-### 2.4 When you change an order that already has a PO
+### 2.4 Style Status: a whole season at a glance
+
+**Open it:** left menu, **Style Status**. Merchandising, Admin and Management can all open it. It is for watching progress; nothing can be edited here.
+
+**Seasons list.** Choose a **buyer** (or leave "All buyers"). Each season shows how many styles, order lines and materials it has, bars for **Ordered** and **Received**, and the number that are **Late**. Press **View Season**.
+
+**Season page.** Every style of the season in one table, with bars for **Ordered, PI received, Paid, Received, Issued**. The styles that need attention (most **late**, then most **due soon**) are listed first. Press **View Status** on a style to see its materials one by one (section 2.3).
+
+The cards at the top are the totals of the whole season. The red or yellow bar warns about materials that are not ordered yet and are late or due soon (same rule as in 2.3).
+
+If a season shows "No orders linked", import the buyer's Excel with that season code first (section 2.2).
+
+### 2.5 When you change an order that already has a PO
 
 If you change a field that a purchase order is built from (style, color, quantity, item and similar) and press Save in the Workspace, **Supply Chain is told at once**. They get a message such as "PO source changed: Qty on HB26FA0007. Regenerate before sending", and the PO shows **Source changed** until they regenerate it. If the PO is already in a payment request, the message says so. You do not need to phone them.
 

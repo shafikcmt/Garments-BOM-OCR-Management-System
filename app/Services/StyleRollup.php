@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BomItem;
+use App\Models\BuyerSeason;
 use App\Models\ExcelCell;
 use App\Models\MotherStyle;
 use App\Models\OrderLine;
@@ -42,6 +43,9 @@ class StyleRollup
     {
     }
 
+    /** @var array<int, string>|null header id => canonical key, resolved once per instance */
+    private ?array $keyByHeader = null;
+
     /**
      * @return array{
      *   kpis: array<string, int|float>,
@@ -60,9 +64,47 @@ class StyleRollup
             ->orderBy('customer_po_no')->orderBy('gmts_color')
             ->get();
 
-        $items = $lines->flatMap->bomItems;
-        $values = $this->statusValues($items->pluck('excel_row_id')->all());
+        $values = $this->statusValues($lines->flatMap->bomItems->pluck('excel_row_id')->all());
 
+        return $this->build($lines, $values, $today) + ['children' => $mother->children()->get()];
+    }
+
+    /**
+     * Every style of a season, one summary row each, plus the season's totals.
+     * One query for the lines and one for the status cells, however many styles.
+     *
+     * @return array{styles: Collection, totals: array<string, int|float>}
+     */
+    public function forSeason(BuyerSeason $season, ?Carbon $today = null): array
+    {
+        $today ??= Carbon::today();
+
+        $mothers = $season->motherStyles()->with('children')->get();
+
+        $lines = OrderLine::whereIn('mother_style_id', $mothers->pluck('id'))
+            ->with(['bomItems', 'childStyle'])
+            ->get();
+
+        $values = $this->statusValues($lines->flatMap->bomItems->pluck('excel_row_id')->all());
+        $byMother = $lines->groupBy('mother_style_id');
+
+        $styles = $mothers->map(function (MotherStyle $mother) use ($byMother, $values, $today) {
+            $built = $this->build($byMother->get($mother->id, collect()), $values, $today);
+
+            return ['mother' => $mother, 'kpis' => $built['kpis']];
+        })->values();
+
+        return ['styles' => $styles, 'totals' => $this->sumKpis($styles->pluck('kpis'))];
+    }
+
+    /**
+     * Shared by the style page and the season page, so the two can never disagree.
+     *
+     * @param  Collection<int, OrderLine>  $lines  with bomItems (and childStyle / excelFile when wanted)
+     * @param  array<int, array<string, string>>  $values  status cells by workspace row
+     */
+    private function build(Collection $lines, array $values, Carbon $today): array
+    {
         $materials = $lines->flatMap(function (OrderLine $line) use ($values, $today) {
             return $line->bomItems->map(fn (BomItem $item) => $this->materialRow($line, $item, $values[$item->excel_row_id] ?? [], $today));
         })->values();
@@ -77,7 +119,7 @@ class StyleRollup
                 'ship_date' => $line->ship_date,
                 'order_qty' => $line->order_qty !== null ? (float) $line->order_qty : null,
                 'child' => $line->childStyle?->style_no,
-                'file' => $line->excelFile?->original_file_name,
+                'file' => $line->relationLoaded('excelFile') ? $line->excelFile?->original_file_name : null,
                 'materials' => $own->count(),
                 'ordered' => $own->where('is_ordered', true)->count(),
                 'received' => $own->where('is_received', true)->count(),
@@ -100,8 +142,20 @@ class StyleRollup
             ],
             'lines' => $lineRows,
             'materials' => $materials,
-            'children' => $mother->children()->get(),
         ];
+    }
+
+    /**
+     * Add up KPI sets (styles of a season, or seasons of a buyer).
+     *
+     * @param  Collection<int, array<string, int|float>>  $sets
+     * @return array<string, int|float>
+     */
+    public function sumKpis(Collection $sets): array
+    {
+        $keys = ['order_lines', 'order_qty', 'materials', 'ordered', 'pi_received', 'paid', 'received', 'issued', 'late', 'due_soon'];
+
+        return collect($keys)->mapWithKeys(fn ($k) => [$k => $sets->sum($k)])->all();
     }
 
     /**
@@ -178,12 +232,15 @@ class StyleRollup
             return [];
         }
 
-        $keyByHeader = [];
-        foreach (self::FIELDS as $canonical) {
-            foreach ($this->headers->headerIdsForCanonical($canonical) as $headerId) {
-                $keyByHeader[$headerId] ??= $canonical;
+        if ($this->keyByHeader === null) {
+            $this->keyByHeader = [];
+            foreach (self::FIELDS as $canonical) {
+                foreach ($this->headers->headerIdsForCanonical($canonical) as $headerId) {
+                    $this->keyByHeader[$headerId] ??= $canonical;
+                }
             }
         }
+        $keyByHeader = $this->keyByHeader;
 
         if ($keyByHeader === []) {
             return [];
