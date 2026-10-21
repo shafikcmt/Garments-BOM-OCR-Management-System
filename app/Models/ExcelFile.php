@@ -15,6 +15,7 @@ class ExcelFile extends Model
         'file_path',
         'uploaded_by',
         'buyer_id',
+        'buyer_season_id',
         'upload_batch_no',
         'total_rows',
         'status',
@@ -76,6 +77,12 @@ class ExcelFile extends Model
     public function buyer()
     {
         return $this->belongsTo(Buyer::class);
+    }
+
+    /** The season this file was uploaded for (import wizard); null for older files. */
+    public function season()
+    {
+        return $this->belongsTo(BuyerSeason::class, 'buyer_season_id');
     }
 
     public function lockedBy()

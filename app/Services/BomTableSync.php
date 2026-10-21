@@ -183,7 +183,17 @@ class BomTableSync
     {
         $season = trim((string) $season);
 
-        if (! $file->buyer_id || $season === '') {
+        if (! $file->buyer_id) {
+            return;
+        }
+
+        // The row's own Season cell is the more specific (a file may mix
+        // seasons); the season chosen when the file was uploaded fills the gap.
+        if ($season === '' && $file->buyer_season_id) {
+            $season = (string) $file->season?->code;
+        }
+
+        if ($season === '') {
             return;
         }
 
