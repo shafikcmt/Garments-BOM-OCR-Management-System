@@ -7,6 +7,8 @@ use App\Models\Buyer;
 use App\Models\BuyerSeason;
 use App\Models\ChildStyle;
 use App\Models\MotherStyle;
+use App\Models\FollowUpTask;
+use App\Services\FollowUps;
 use App\Services\StyleRollup;
 use App\Support\StyleCodeParser;
 use Illuminate\Http\Request;
@@ -50,7 +52,7 @@ class StyleLibraryController extends Controller
     }
 
     /** Where one mother style stands: orders, materials, PO, PI, payment, receipt, issue. */
-    public function show(Request $request, MotherStyle $mother, StyleRollup $rollup)
+    public function show(Request $request, MotherStyle $mother, StyleRollup $rollup, FollowUps $followUps)
     {
         $this->authorizeBuyer($request, $mother->buyer_id);
 
@@ -62,6 +64,12 @@ class StyleLibraryController extends Controller
         // have no Style Library to go back to.
         $isMerchant = $request->user()->hasRole('merchant');
 
+        // Follow-up (Time and Action): who has been asked to chase this style.
+        $canFollowUp = $request->user()->hasAnyRole(['merchant', 'admin', 'management']);
+        $followUpTasks = FollowUpTask::open()->where('mother_style_id', $mother->id)
+            ->with('assignee:id,name')->orderBy('due_date')->get();
+        $assignees = $canFollowUp ? $followUps->assigneesFor($mother) : collect();
+
         return view('merchant.style-show', [
             'mother' => $mother,
             'childId' => $childId,
@@ -71,6 +79,9 @@ class StyleLibraryController extends Controller
                 : route('merchant.status.season', $mother->buyer_season_id),
             'backLabel' => $isMerchant ? 'Back to Style Library' : 'Back to Season Status',
             'homeUrl' => $isMerchant ? route('merchant.dashboard') : route('merchant.status.index'),
+            'canFollowUp' => $canFollowUp,
+            'followUpTasks' => $followUpTasks,
+            'assignees' => $assignees,
         ] + $data);
     }
 

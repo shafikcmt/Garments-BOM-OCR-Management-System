@@ -139,6 +139,7 @@
                         </a>
                     </li>
                     @include('layouts._my-approvals-link', [])
+                    @include('layouts._followup-link')
 
                     {{-- Each department's own report. Admin is one of the three
                          roles those routes admit, so they need a way in that is
@@ -287,6 +288,7 @@
                         </a>
                     </li>
                     @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
+                    @include('layouts._followup-link')
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.styles.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.styles.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-diagram-3" aria-hidden="true"></i></span><span class="sidebar-link-text">Style Library</span></span>
@@ -327,6 +329,7 @@
                         </a>
                     </li>
                     @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
+                    @include('layouts._followup-link')
                     <li class="sidebar-item">
                         <a href="{{ route('account.payments.index') }}" class="sidebar-nav-link {{ request()->routeIs('account.payments.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-cash-coin" aria-hidden="true"></i></span><span class="sidebar-link-text">Payments</span></span>
@@ -352,6 +355,7 @@
                         </a>
                     </li>
                     @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
+                    @include('layouts._followup-link')
                     <li class="sidebar-item">
                         <a href="{{ route('commercial.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
@@ -510,6 +514,7 @@
                         </a>
                     </li>
                     @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
+                    @include('layouts._followup-link')
                     <li class="sidebar-item">
                         <a href="{{ route('supply_chain.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
@@ -581,6 +586,7 @@
                         </a>
                     </li>
                     @include('layouts._my-approvals-link', [])
+                    @include('layouts._followup-link')
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.status.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.status.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-bar-chart-steps" aria-hidden="true"></i></span><span class="sidebar-link-text">Style Status</span></span>

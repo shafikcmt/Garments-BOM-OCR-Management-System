@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('po:check-missing-pi-alerts')->dailyAt('09:00')->timezone('Asia/Dhaka');
+Schedule::command('followups:remind')->dailyAt('08:30')->timezone('Asia/Dhaka');

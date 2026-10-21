@@ -1,6 +1,6 @@
 # User Manual — Garments BOM Management System
 
-> **Status: living draft.** Updated up to 2026-10-21. Every new screen or change that users can see adds or edits a section here in the same change. When all modules are finished this file is turned into the final manual (Word / PDF). Sections marked **Not built yet** are listed at the end.
+> **Status: living draft.** Updated up to 2026-10-22. Every new screen or change that users can see adds or edits a section here in the same change. When all modules are finished this file is turned into the final manual (Word / PDF). Sections marked **Not built yet** are listed at the end.
 >
 > Written in simple English for factory and office staff. No technical words.
 
@@ -29,7 +29,7 @@ Who does what:
 | Supply Chain | Raises POs, collects PIs, raises payment requests (PRA) |
 | Accounts | Pays approved requests and records the payment reference |
 | Store | Receives and issues material |
-| Management / Admin | Watches progress (Style Status), controls who can do what |
+| Management / Admin | Watches progress (Style Status), gives follow-ups, controls who can do what |
 
 You only see the screens your role needs.
 
@@ -156,7 +156,40 @@ No change to how you receive and issue material. What you record now also shows 
 
 ---
 
-## 6. For IT / Admin
+## 6. Follow-ups: asking someone to chase
+
+A follow-up is a small task: **one person, one style, one due date.** It follows the "Time and Action" way of working used by garments ERP systems: everyone has a to-do list, tasks have a traffic light, and nothing is forgotten.
+
+### 6.1 Ask someone to follow up (Merchandising, Admin, Management)
+
+1. Open the style: **Style Status** or **Style Library**, then **View Status** on the style.
+2. In the **Follow-up** box choose **Who should follow up**, the **Due date** (three days ahead is filled in) and, if you want, a **Note**.
+3. Press **Create Follow-up**.
+
+If the style has late or due-soon materials, the task is named after them, for example "Order 4 late material(s) for style 748268". The person gets a message in the bell icon straight away.
+
+You can only choose people who may see that buyer. One person cannot be given two open follow-ups for the same style. The due date cannot be in the past.
+
+### 6.2 Your to-do list (everyone who can be given a task)
+
+**Open it:** left menu, **Follow-ups**. A red number next to it is how many of your follow-ups are due today or overdue.
+
+- **My follow-ups** are the ones given to you. **Given by me** are the ones you asked others to do. Admin and Management also see **Everyone**.
+- Tasks are grouped **Overdue** (red), **Due today** (yellow), **Coming up** (green). **Show done** also lists finished ones.
+- Press **Mark Done** when finished. The person who gave the task is told. **Reopen** brings a finished task back.
+- Click the style number to see the materials behind the task.
+
+Only the person it was given to, the person who gave it, and Admin can change a task.
+
+### 6.3 Reminders
+
+Every morning (about 8:30) anyone with a follow-up that is **due today or overdue** gets one message: "You have 2 overdue and 1 due today follow-up(s)." You get at most one a day.
+
+The **Season page** of Style Status shows how many follow-ups are open for each style.
+
+---
+
+## 7. For IT / Admin
 
 | Task | How |
 |---|---|
@@ -164,12 +197,13 @@ No change to how you receive and issue material. What you record now also shows 
 | Fill the standard order tables for files that were uploaded before | `php artisan bom:sync-tables --dry-run` to see what would happen, then `php artisan bom:sync-tables` |
 | Switch off automatic refresh of Workspace columns from PO / PRA | `.env`: `SUPPLY_CHAIN_SYNC_WORKSPACE=false` |
 | Switch off automatic filling of the standard order tables | `.env`: `BOM_SYNC_TABLES=false` |
+| Send the daily follow-up reminders by hand | `php artisan followups:remind` (the scheduler runs it every morning at 08:30, Dhaka time; the server's scheduler must be running) |
 
 On the live server, every push to `master` runs the migrations by itself. Only `bom:sync-tables` needs to be run once by hand for files that already exist.
 
 ---
 
-## 7. Common questions
+## 8. Common questions
 
 **The Style status page says "No orders are linked".** The style has no order yet. Import the buyer's Excel with the same season code, or run `bom:sync-tables` for older files.
 
@@ -183,7 +217,7 @@ On the live server, every push to `master` runs the migrations by itself. Only `
 
 ---
 
-## 8. Words used in this system
+## 9. Words used in this system
 
 | Word | Meaning |
 |---|---|
@@ -195,9 +229,11 @@ On the live server, every push to `master` runs the migrations by itself. Only `
 | PRA | Payment Request Approval |
 | Workspace | The shared sheet of order and material columns |
 | Pmt Doc No | Payment reference recorded against a line |
+| Follow-up | A task asking one person to chase a style by a date |
+| TnA | Time and Action: a to-do list with due dates and traffic lights |
 
 ---
 
-## 9. Not built yet
+## 10. Not built yet
 
-Pre-costing, BOM approval, buyer inquiry and quotation, sample management, TnA (time and action), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
+Pre-costing, BOM approval, buyer inquiry and quotation, sample management, the rest of TnA (task templates by lead time, tasks created automatically, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.

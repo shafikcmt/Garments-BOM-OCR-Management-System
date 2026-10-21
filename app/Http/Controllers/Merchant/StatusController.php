@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Merchant;
 use App\Http\Controllers\Controller;
 use App\Models\Buyer;
 use App\Models\BuyerSeason;
+use App\Models\FollowUpTask;
 use App\Services\StyleRollup;
 use Illuminate\Http\Request;
 
@@ -55,6 +56,10 @@ class StatusController extends Controller
                 <=> [$a['kpis']['late'], $a['kpis']['due_soon'], $b['mother']->style_no];
         })->values();
 
-        return view('merchant.status-season', ['season' => $season, 'styles' => $styles, 'totals' => $data['totals']]);
+        // Open follow-ups per style, so the table shows who is already chasing what.
+        $openFollowUps = FollowUpTask::open()->whereIn('mother_style_id', $styles->pluck('mother.id'))
+            ->selectRaw('mother_style_id, count(*) as total')->groupBy('mother_style_id')->pluck('total', 'mother_style_id');
+
+        return view('merchant.status-season', ['season' => $season, 'styles' => $styles, 'totals' => $data['totals'], 'openFollowUps' => $openFollowUps]);
     }
 }

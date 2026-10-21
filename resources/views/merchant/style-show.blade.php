@@ -43,6 +43,67 @@
         </div>
     @endif
 
+    @if($canFollowUp || $followUpTasks->isNotEmpty())
+    <x-card title="Follow-up" class="mb-3" body-class="p-3">
+        @if($followUpTasks->isNotEmpty())
+            <div class="table-responsive mb-3">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Task</th><th>Assigned to</th><th>Due</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach($followUpTasks as $t)
+                        @php($light = $t->light())
+                        <tr>
+                            <td>{{ $t->title }}</td>
+                            <td>{{ $t->assignee?->name }}</td>
+                            <td class="text-nowrap">
+                                {{ $t->due_date->format('d M Y') }}
+                                @if($light === 'red')<span class="badge bg-danger text-white ms-1">Overdue</span>
+                                @elseif($light === 'amber')<span class="badge bg-warning text-dark ms-1">Due soon</span>@endif
+                            </td>
+                            <td class="text-end">
+                                @if(auth()->user()->hasRole('admin') || in_array(auth()->id(), [$t->assigned_to, $t->created_by], true))
+                                    <form method="POST" action="{{ route('follow_ups.done', $t) }}">@csrf
+                                        <button class="btn btn-outline-success btn-sm"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Mark Done</button>
+                                    </form>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+
+        @if($canFollowUp)
+            @if($kpis['late'] > 0 || $kpis['due_soon'] > 0)
+                <p class="mb-2 text-muted">Ask someone to chase the {{ $kpis['late'] + $kpis['due_soon'] }} material(s) that are late or due soon.</p>
+            @endif
+            <form method="POST" action="{{ route('follow_ups.store') }}" class="row g-2 align-items-end">
+                @csrf
+                <input type="hidden" name="mother_style_id" value="{{ $mother->id }}">
+                <div class="col-12 col-md-3">
+                    <label class="form-label mb-1" for="fuAssignee">Who should follow up</label>
+                    <select name="assigned_to" id="fuAssignee" class="form-select form-select-sm" required>
+                        <option value="">Select person</option>
+                        @foreach($assignees as $a)<option value="{{ $a->id }}" {{ (int) old('assigned_to') === $a->id ? 'selected' : '' }}>{{ $a->name }}{{ $a->designation ? ' — ' . $a->designation : '' }}</option>@endforeach
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label mb-1" for="fuDue">Due date</label>
+                    <input type="date" name="due_date" id="fuDue" class="form-control form-control-sm" min="{{ now()->toDateString() }}" value="{{ old('due_date', now()->addDays(3)->toDateString()) }}" required>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label mb-1" for="fuNote">Note <span class="text-muted fw-normal">(optional)</span></label>
+                    <input type="text" name="note" id="fuNote" class="form-control form-control-sm" maxlength="1000" value="{{ old('note') }}" placeholder="What exactly needs to be done">
+                </div>
+                <div class="col-12 col-md-3">
+                    <button class="btn btn-primary btn-sm w-100"><i class="bi bi-person-check me-1" aria-hidden="true"></i>Create Follow-up</button>
+                </div>
+            </form>
+        @endif
+    </x-card>
+    @endif
+
     @if($kpis['order_lines'] === 0)
         <x-card>
             <p class="mb-1 fw-semibold">No orders are linked to this style yet.</p>

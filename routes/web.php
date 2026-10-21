@@ -205,4 +205,5 @@ require __DIR__.'/commercial.php';
 require __DIR__.'/store.php';
 require __DIR__.'/supply-chain.php';
 require __DIR__.'/management.php';
+require __DIR__.'/follow-ups.php';
 require __DIR__.'/auth.php';

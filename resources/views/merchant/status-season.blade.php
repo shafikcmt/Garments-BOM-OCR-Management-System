@@ -57,7 +57,7 @@
                     <th>Style</th><th>Group</th><th class="text-end">Order lines</th><th class="text-end">Order qty</th>
                     <th class="text-end">Materials</th>
                     <th style="min-width:130px">Ordered</th><th style="min-width:130px">PI received</th><th style="min-width:130px">Paid</th>
-                    <th style="min-width:130px">Received</th><th style="min-width:130px">Issued</th><th>Attention</th><th></th>
+                    <th style="min-width:130px">Received</th><th style="min-width:130px">Issued</th><th>Attention</th><th>Follow-up</th><th></th>
                 </tr></thead>
                 <tbody>
                 @forelse($styles as $row)
@@ -86,10 +86,11 @@
                             @if($k['due_soon'] > 0)<span class="badge bg-warning text-dark">{{ $k['due_soon'] }} due soon</span>@endif
                             @if($k['late'] === 0 && $k['due_soon'] === 0)—@endif
                         </td>
+                        <td>@if(($openFollowUps[$m->id] ?? 0) > 0)<span class="badge bg-primary-subtle text-primary">{{ $openFollowUps[$m->id] }} open</span>@else — @endif</td>
                         <td class="text-end"><a href="{{ route($route, $m) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-eye me-1" aria-hidden="true"></i>View Status</a></td>
                     </tr>
                 @empty
-                    <tr><td colspan="12" class="text-center text-muted py-4">No styles in this season yet.</td></tr>
+                    <tr><td colspan="13" class="text-center text-muted py-4">No styles in this season yet.</td></tr>
                 @endforelse
                 </tbody>
             </table>
