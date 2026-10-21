@@ -55,6 +55,7 @@ Structure: **Buyer -> Season -> Mother Style -> Child Style** (`buyer_seasons`, 
 - Reference products: Kandaree Apparel ERP for the order/BOM/procurement flow; SAP FICO for the Accounts side (future).
 - **Do not copy any single buyer's Excel/folder layout.** Build to the standard format in `docs/16_STANDARD_DYNAMIC_ORDER_FORMAT.md` (standard field groups, import profile + 3-step upload wizard, status vocabulary, user-friendly UI rules). Buyer files are only converted into it.
 - Full plan, rules and phase list: `docs/15_BUYER_STYLE_HIERARCHY_AND_DYNAMIC_ORDERS.md` and `docs/16_...`. Work one phase at a time.
+- **What a merchandiser does and how the system should follow it: `docs/18_MERCHANDISER_WORKFLOW_GUIDE.md`.** Read it before designing any Merchandising screen; it lists the order life-cycle, what is built, and the open questions to ask a merchandiser.
 - **User manual (`docs/17_USER_MANUAL.md`) is a living document.** The owner asked for a complete manual when all modules are finished. So every change that users can see (a screen, a button, a message, a new automatic behaviour) adds or edits its section in that file in the same change, in simple non-technical English with step-by-step instructions. When the owner says the modules are finished, turn it into the final manual (Word or PDF) and move "Not built yet" items into real sections.
 
 ## Business Context
