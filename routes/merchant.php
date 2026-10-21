@@ -30,6 +30,7 @@ Route::prefix('merchant')
 
         // Buyer -> Season -> Mother Style -> Child Style.
         Route::get('/styles', [StyleLibraryController::class, 'index'])->name('styles.index');
+        Route::get('/styles/mothers/{mother}', [StyleLibraryController::class, 'show'])->name('styles.mothers.show');
         Route::post('/styles/seasons', [StyleLibraryController::class, 'storeSeason'])->name('styles.seasons.store');
         Route::post('/styles/seasons/{season}/mothers', [StyleLibraryController::class, 'storeMother'])->name('styles.mothers.store');
         Route::post('/styles/mothers/{mother}/children', [StyleLibraryController::class, 'storeChild'])->name('styles.children.store');

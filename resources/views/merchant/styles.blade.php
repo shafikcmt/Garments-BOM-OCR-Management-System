@@ -94,7 +94,7 @@
                         <tbody>
                         @forelse($season->motherStyles as $m)
                             <tr>
-                                <td class="fw-semibold">{{ $m->style_no }}</td>
+                                <td class="fw-semibold">{{ $m->style_no }} @if($m->order_lines_count)<span class="badge bg-success-subtle text-success ms-1">{{ $m->order_lines_count }} order line(s)</span>@endif</td>
                                 <td>{{ $m->product_group ?: '—' }}</td>
                                 <td>
                                     @foreach($m->children as $c)
@@ -115,8 +115,11 @@
                                         <button class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add</button>
                                     </form>
                                 </td>
-                                <td class="text-end">
-                                    <form method="POST" action="{{ route('merchant.styles.mothers.destroy', $m) }}" onsubmit="return confirm('Delete this style and its child styles?')">
+                                <td class="text-end text-nowrap">
+                                    <a href="{{ route('merchant.styles.mothers.show', $m) }}" class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-bar-chart-steps me-1" aria-hidden="true"></i>View Status
+                                    </a>
+                                    <form method="POST" class="d-inline" action="{{ route('merchant.styles.mothers.destroy', $m) }}" onsubmit="return confirm('Delete this style and its child styles?')">
                                         @csrf @method('DELETE')
                                         <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                     </form>

@@ -7,6 +7,7 @@ use App\Models\Buyer;
 use App\Models\BuyerSeason;
 use App\Models\ChildStyle;
 use App\Models\MotherStyle;
+use App\Services\StyleRollup;
 use App\Support\StyleCodeParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +34,7 @@ class StyleLibraryController extends Controller
         $buyer = $buyers->firstWhere('id', (int) $request->query('buyer')) ?? $buyers->first();
 
         $seasons = $buyer
-            ? $buyer->seasons()->with('motherStyles.children')->get()
+            ? $buyer->seasons()->with(['motherStyles' => fn ($q) => $q->withCount('orderLines')->with('children')])->get()
             : collect();
 
         $season = $seasons->firstWhere('id', (int) $request->query('season')) ?? $seasons->first();
@@ -46,6 +47,21 @@ class StyleLibraryController extends Controller
         ];
 
         return view('merchant.styles', compact('buyers', 'buyer', 'seasons', 'season', 'totals'));
+    }
+
+    /** Where one mother style stands: orders, materials, PO, PI, payment, receipt, issue. */
+    public function show(Request $request, MotherStyle $mother, StyleRollup $rollup)
+    {
+        $this->authorizeBuyer($request, $mother->buyer_id);
+
+        $mother->load(['buyer', 'season']);
+        $childId = $request->integer('child') ?: null;
+        $data = $rollup->forMother($mother, $childId);
+
+        return view('merchant.style-show', [
+            'mother' => $mother,
+            'childId' => $childId,
+        ] + $data);
     }
 
     public function storeSeason(Request $request)

@@ -21,6 +21,11 @@ class MotherStyle extends Model
         return $this->belongsTo(BuyerSeason::class, 'buyer_season_id');
     }
 
+    public function orderLines()
+    {
+        return $this->hasMany(OrderLine::class);
+    }
+
     public function children()
     {
         return $this->hasMany(ChildStyle::class)->orderBy('style_no');
