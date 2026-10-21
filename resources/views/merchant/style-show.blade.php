@@ -25,6 +25,11 @@
                    :title="'Style ' . $mother->style_no"
                    copy="Orders and materials for this style, and how far each material has come.">
         <x-slot:actions>
+            @if($canSubmitBom)
+                <a href="{{ route('merchant.bom.create', $mother) }}" class="btn btn-primary">
+                    <i class="bi bi-journal-plus me-1" aria-hidden="true"></i>{{ $kpis['materials'] > 0 ? 'Add to BOM' : 'Create BOM' }}
+                </a>
+            @endif
             <a href="{{ $backUrl }}" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>{{ $backLabel }}
             </a>
@@ -187,7 +192,11 @@
     @if($kpis['order_lines'] === 0)
         <x-card>
             <p class="mb-1 fw-semibold">No orders are linked to this style yet.</p>
-            <p class="text-muted mb-0">Import the buyer's Excel with the season <strong>{{ $mother->season?->code }}</strong> (Merchant Workspace → Import Buyer Excel). Its order lines and materials will appear here.</p>
+            @if($canSubmitBom)
+                <p class="text-muted mb-0">Press <strong>Create BOM</strong> to enter the order lines and materials here, or import the buyer's Excel with the season <strong>{{ $mother->season?->code }}</strong> (Merchant Workspace → Import Buyer Excel).</p>
+            @else
+                <p class="text-muted mb-0">Merchandising has not made the BOM of this style yet.</p>
+            @endif
         </x-card>
     @else
         @if($kpis['late'] > 0 || $kpis['due_soon'] > 0)

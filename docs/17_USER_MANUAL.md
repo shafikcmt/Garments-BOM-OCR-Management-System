@@ -1,6 +1,6 @@
 # User Manual — Garments BOM Management System
 
-> **Status: living draft.** Updated up to 2026-10-24. Every new screen or change that users can see adds or edits a section here in the same change. When all modules are finished this file is turned into the final manual (Word / PDF). Sections marked **Not built yet** are listed at the end.
+> **Status: living draft.** Updated up to 2026-10-25. Every new screen or change that users can see adds or edits a section here in the same change. When all modules are finished this file is turned into the final manual (Word / PDF). Sections marked **Not built yet** are listed at the end.
 >
 > Written in simple English for factory and office staff. No technical words.
 
@@ -86,6 +86,35 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 - Formulas in the buyer's file are not recalculated. The value saved in Excel is used.
 - Large files take 10 to 20 seconds to import. Please wait for the page to finish.
 - If you stop half way, press **Cancel Import**.
+
+### 2.2a Create a BOM on screen (no Excel needed)
+
+You can make a style's BOM directly in the system.
+
+**Open it:** open the style (**Style Library** or **Style Status**, then **View Status**) and press **Create BOM**. Once the style has a BOM the button says **Add to BOM**.
+
+**1. Order lines.** One line for each colour and customer PO of the style:
+- **GMTS color**, **Customer PO**, **Ship date**
+- **Garment qty** (required): the quantity of that order line. The material quantity is worked out from it.
+- **Child style** (only if the style has child styles): choose which child this line is for.
+- **Add Order Line** adds a row, **Remove** takes one away. If the style already has order lines they are filled in for you, so you can add more materials without typing them again.
+
+**2. Materials.** One line for each material:
+- **Type** (SHELL, TRIMS, LINING and so on), **Description** (required), **SAP code**, **Material color**, **Unit**
+- **Consumption** (required) per garment, and **Wastage %** if there is any.
+- **Add Material** adds a row.
+
+**3. Create BOM.** Under the buttons the page says, for example, "3 order line(s) x 4 material(s) = 12 BOM line(s)": **every order line gets every material.** (The limit is 500 BOM lines at once; the number turns red above that.)
+
+**What happens next**
+- The lines go into the Workspace like any imported BOM, in one file per buyer and season called "BOM [buyer] [season] (created in the system)". Formula columns such as consumption with wastage and **Materials to be ordered** are calculated for you.
+- The style then appears in **Style Status** with its orders and materials, and you can **Submit for Approval** (section 2.6).
+- A material that is already on an order line is **never added twice**. If you press Create BOM again with the same lines and materials you are told "Nothing was added".
+- To change a line that already exists, use the Workspace (the file named above), not this screen.
+- If a Workspace column does not exist, or your role may not edit it, you are told which one at the top of the page and after saving. The rest is still saved.
+- If a BOM was already approved and you add material, it shows **Changed after approval** and must be approved again.
+
+Use the Excel import (section 2.2) when the buyer sends a ready file; use this screen when you build the BOM yourself.
 
 ### 2.3 Style status (how far each style has come)
 
@@ -281,7 +310,7 @@ On the live server, every push to `master` runs the migrations by itself. Only `
 
 ## 8. Common questions
 
-**Who makes the BOM? Is it created by the system after I upload the Excel?** The system does **not invent** a BOM. The **merchant prepares it** (materials, consumption, wastage, quantities from the buyer's tech pack or the costing) in Excel or directly in the Workspace. When you **upload or import** the file, the system takes over: it stores every material line, splits it into order lines and materials under the right style and season, **calculates** the formula columns (for example consumption with wastage and materials to be ordered), and passes it on: BOM approval, then PO, payment, receiving and issue. Generating a BOM automatically from an order and a consumption master is **not built yet**.
+**Who makes the BOM? Is it created by the system after I upload the Excel?** The **merchant** makes it: either on screen with **Create BOM** (section 2.2a) or in an Excel file that is uploaded or imported (section 2.2). The system does **not invent** materials or consumption; they come from the merchant (from the buyer's tech pack or the costing). Once the BOM is in, the system takes over: it arranges every line under the right style, season and colour, **calculates** the formula columns, and passes it on to BOM approval, PO, payment, receiving and issue. Making a BOM automatically from an order and a consumption master is **not built yet**.
 
 **The Style status page says "No orders are linked".** The style has no order yet. Import the buyer's Excel with the same season code, or run `bom:sync-tables` for older files.
 
@@ -308,6 +337,7 @@ On the live server, every push to `master` runs the migrations by itself. Only `
 | Workspace | The shared sheet of order and material columns |
 | Pmt Doc No | Payment reference recorded against a line |
 | Follow-up | A task asking one person to chase a style by a date |
+| BOM builder | The Create BOM screen: order lines and materials of a style entered on screen |
 | BOM approval | Checking and approving a style's BOM before it is ordered |
 | Pre-costing | Cost sheet of a style by cost head, before the order; Buyer and In-house, in revisions |
 | Margin | Profit as a share of the quoted price |

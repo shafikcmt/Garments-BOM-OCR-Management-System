@@ -140,7 +140,9 @@ class BomTableSync
         $createdLine = ! $line->exists;
 
         $shipDate = $this->source->dateValue($this->source->sourceValueForRow($row, 'contract_shipment'));
-        $orderQty = $this->canonicalNumber($row, self::ORDER_QTY_CANONICAL);
+        // The workspace itself works the order quantity out from BOM Quantity, so a
+        // sheet without a Customer Contract Quantity column falls back to it.
+        $orderQty = $this->canonicalNumber($row, self::ORDER_QTY_CANONICAL) ?? $this->canonicalNumber($row, 'bom_quantity');
 
         $line->fill([
             'style_no' => $style,

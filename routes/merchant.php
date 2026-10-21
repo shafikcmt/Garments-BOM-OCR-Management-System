@@ -8,6 +8,7 @@ use App\Http\Controllers\Merchant\ReportController;
 use App\Http\Controllers\Merchant\StyleLibraryController;
 use App\Http\Controllers\Merchant\ImportWizardController;
 use App\Http\Controllers\Merchant\StatusController;
+use App\Http\Controllers\Merchant\BomBuilderController;
 
 // Merchandising reports — read-only summaries of the BOM columns this
 // department owns. Kept in their own group because they are shared with Admin /
@@ -31,6 +32,16 @@ Route::prefix('merchant/status')
         Route::get('/', [StatusController::class, 'index'])->name('index');
         Route::get('/seasons/{season}', [StatusController::class, 'season'])->name('season');
         Route::get('/styles/{mother}', [StyleLibraryController::class, 'show'])->name('style');
+    });
+
+// BOM builder: make a style's BOM on a screen. Merchandising and Admin; the
+// controller checks the buyer.
+Route::prefix('merchant/bom')
+    ->middleware(['auth', 'role:merchant,admin'])
+    ->name('merchant.bom.')
+    ->group(function () {
+        Route::get('/styles/{mother}', [BomBuilderController::class, 'create'])->name('create');
+        Route::post('/styles/{mother}', [BomBuilderController::class, 'store'])->name('store');
     });
 
 Route::prefix('merchant')
