@@ -233,6 +233,16 @@ class ExcelUploadController extends Controller
         app(\App\Http\Controllers\Shared\ExcelFileController::class)
             ->recalculateFile($excelFile, $userId);
 
+        // Standard tables (order_lines, bom_items) + Style Library links. The
+        // upload is already saved, so a failure here is logged, never raised.
+        try {
+            if (app(\App\Services\BomTableSync::class)->enabled()) {
+                app(\App\Services\BomTableSync::class)->syncFile($excelFile);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('BOM table sync failed for upload ' . $excelFile->id . ': ' . $e->getMessage());
+        }
+
         $this->notifyOtherRoles(
             $excelFile,
             'excel_uploaded',

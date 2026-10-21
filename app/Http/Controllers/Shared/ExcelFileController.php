@@ -588,6 +588,15 @@ class ExcelFileController extends Controller
             $this->notifyOtherRolesAboutFileUpdate($excelFile, $changedCells, $batchId, $user);
         }
 
+        // Keep the standard tables (order_lines / bom_items) in step with the
+        // edited rows. Never raises: the save has already succeeded.
+        if (count($changedCells) > 0) {
+            app(\App\Services\BomTableSync::class)->syncRows(
+                $excelFile,
+                collect($changedCells)->pluck('row_id')->unique()->values()->all()
+            );
+        }
+
         // Tell Supply Chain which POs the merchant's edit has made stale. A
         // failure here must never undo or hide a save that already succeeded.
         if (count($changedCells) > 0 && $user->hasRole('merchant')) {

@@ -36,6 +36,19 @@ return [
     'sync_supply_chain_cells' => env('SUPPLY_CHAIN_SYNC_WORKSPACE', true),
 
     /*
+    |--------------------------------------------------------------------------
+    | Keep order_lines / bom_items in step with the BOM workspace
+    |--------------------------------------------------------------------------
+    |
+    | The workspace stays the place users edit. When true, a workspace save or
+    | upload refreshes the standard tables (order_lines, bom_items) and links
+    | styles into the Style Library. Set BOM_SYNC_TABLES=false to stop it; the
+    | `bom:sync-tables` command can still be run by hand.
+    |
+    */
+    'sync_bom_tables' => env('BOM_SYNC_TABLES', true),
+
+    /*
     | Login-less user that the sync attributes excel_cells.updated_by to, so
     | auto-writes are never blamed on whichever human triggered the recompute.
     */
