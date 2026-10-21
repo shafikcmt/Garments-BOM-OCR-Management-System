@@ -597,6 +597,18 @@ class ExcelFileController extends Controller
             );
         }
 
+        // An approved BOM that this save has changed must go back for approval.
+        // Never raises: the save has already succeeded.
+        if (count($changedCells) > 0) {
+            try {
+                app(\App\Services\BomApprovals::class)->afterRowsChanged(
+                    collect($changedCells)->pluck('row_id')->unique()->values()->all()
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('BOM change check failed: ' . $e->getMessage());
+            }
+        }
+
         // Tell Supply Chain which POs the merchant's edit has made stale. A
         // failure here must never undo or hide a save that already succeeded.
         if (count($changedCells) > 0 && $user->hasRole('merchant')) {

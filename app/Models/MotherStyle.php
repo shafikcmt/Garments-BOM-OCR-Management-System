@@ -21,6 +21,11 @@ class MotherStyle extends Model
         return $this->belongsTo(BuyerSeason::class, 'buyer_season_id');
     }
 
+    public function bomApproval()
+    {
+        return $this->hasOne(BomApproval::class);
+    }
+
     public function orderLines()
     {
         return $this->hasMany(OrderLine::class);

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Buyer;
 use App\Models\BuyerSeason;
 use App\Models\FollowUpTask;
+use App\Models\BomApproval;
+use App\Services\BomApprovals;
 use App\Services\StyleRollup;
 use Illuminate\Http\Request;
 
@@ -43,7 +45,7 @@ class StatusController extends Controller
         return view('merchant.status-index', compact('buyers', 'buyer', 'rows'));
     }
 
-    public function season(Request $request, BuyerSeason $season, StyleRollup $rollup)
+    public function season(Request $request, BuyerSeason $season, StyleRollup $rollup, BomApprovals $approvals)
     {
         abort_unless($request->user()->hasBuyerAccess($season->buyer_id), 403);
 
@@ -60,6 +62,15 @@ class StatusController extends Controller
         $openFollowUps = FollowUpTask::open()->whereIn('mother_style_id', $styles->pluck('mother.id'))
             ->selectRaw('mother_style_id, count(*) as total')->groupBy('mother_style_id')->pluck('total', 'mother_style_id');
 
-        return view('merchant.status-season', ['season' => $season, 'styles' => $styles, 'totals' => $data['totals'], 'openFollowUps' => $openFollowUps]);
+        // BOM approval state per style (one fingerprint query for the whole season).
+        $mothers = $styles->pluck('mother');
+        $approvalsByStyle = BomApproval::whereIn('mother_style_id', $mothers->pluck('id'))->get()->keyBy('mother_style_id');
+        $fingerprints = $approvals->fingerprintsFor($mothers);
+        $bomStates = $mothers->mapWithKeys(fn ($m) => [$m->id => [
+            'state' => $approvals->state($m, $approvalsByStyle->get($m->id), $fingerprints[$m->id]),
+            'approval' => $approvalsByStyle->get($m->id),
+        ]]);
+
+        return view('merchant.status-season', ['season' => $season, 'styles' => $styles, 'totals' => $data['totals'], 'openFollowUps' => $openFollowUps, 'bomStates' => $bomStates]);
     }
 }

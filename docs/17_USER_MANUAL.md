@@ -1,6 +1,6 @@
 # User Manual — Garments BOM Management System
 
-> **Status: living draft.** Updated up to 2026-10-22. Every new screen or change that users can see adds or edits a section here in the same change. When all modules are finished this file is turned into the final manual (Word / PDF). Sections marked **Not built yet** are listed at the end.
+> **Status: living draft.** Updated up to 2026-10-23. Every new screen or change that users can see adds or edits a section here in the same change. When all modules are finished this file is turned into the final manual (Word / PDF). Sections marked **Not built yet** are listed at the end.
 >
 > Written in simple English for factory and office staff. No technical words.
 
@@ -128,11 +128,55 @@ If a season shows "No orders linked", import the buyer's Excel with that season 
 
 If you change a field that a purchase order is built from (style, color, quantity, item and similar) and press Save in the Workspace, **Supply Chain is told at once**. They get a message such as "PO source changed: Qty on HB26FA0007. Regenerate before sending", and the PO shows **Source changed** until they regenerate it. If the PO is already in a payment request, the message says so. You do not need to phone them.
 
+### 2.6 BOM approval
+
+Before Supply Chain orders material, the BOM of a style is **checked and approved**.
+
+```
+Merchant submits  ->  Merchandising Head approves  ->  (Management approves)  ->  Approved
+```
+
+The Management step is optional; Admin switches it on (see below).
+
+**Submit a BOM (Merchandising)**
+1. Open the style (**Style Status**, then **View Status**).
+2. In the **BOM approval** box press **Submit for Approval**. The style must already have its BOM (import the buyer's Excel first).
+3. The Merchandising Head gets a message in the bell icon.
+
+**Approve or return (Merchandising Head, then Management)**
+1. Left menu, **BOM Approvals**. The red number is how many are waiting for **you**. Open **Waiting for me**.
+2. Press **Open Style**, check the materials, then in the **BOM approval** box press **Approve**.
+3. If something is wrong, write the reason in **Comment** and press **Return to Merchant**. A reason is required.
+4. You cannot approve a BOM you submitted yourself, unless nobody else is able to.
+
+**After it is returned.** The merchant fixes the BOM in the Workspace and presses **Submit Again**. Every step (who, when, comment) is kept in the history table of the same box.
+
+**After it is approved.** The merchant and Supply Chain are told: "BOM approved and ready to order."
+
+**If the BOM changes after approval.** Changing a material, quantity, consumption or order quantity after approval shows **Changed after approval** (red). It must be submitted and approved again. A BOM that was changed after it was submitted cannot be approved; return it instead.
+
+**Status you will see**
+
+| Status | Meaning |
+|---|---|
+| Not submitted | Nobody has asked for approval yet |
+| Waiting for Merchandising Head / Management | Submitted, waiting for that person |
+| Returned | Sent back with a reason |
+| Approved | Approved and unchanged |
+| Changed after approval | Approved before, edited since, needs approval again |
+
+The **Season page** of Style Status shows this status for every style.
+
+**Admin settings** (top of **BOM Approvals**, Admin only)
+- **Second approval by Management**: adds the Management step.
+- **Supply Chain cannot generate a PO until the BOM is approved**: when ticked, Supply Chain gets the message "The BOM of style 748268 is not approved…" if they try to generate a PO for an unapproved style. Both boxes are **off** until Admin ticks them, so nothing changes by itself. Styles that are not linked to an imported BOM (older files) are never blocked.
+
 ---
 
 ## 3. Supply Chain
 
 - **Merchant changed an order:** you get a message (bell icon) and the PO shows **Source changed**. Open the PO and use **Regenerate** before sending it to the supplier.
+- **BOM not approved:** if Admin has switched the gate on, you cannot generate a PO for a style whose BOM is not approved. You are told which style. Ask Merchandising to get it approved (section 2.6). You are told when it is approved.
 - **You raise a PO or a payment request (PRA):** the Workspace columns PI Status, PI Amount, Payment Required Date, Payment Status and order status update **by themselves**. Nobody has to press Save in the Workspace.
 
 ## 4. Accounts
@@ -195,6 +239,7 @@ The **Season page** of Style Status shows how many follow-ups are open for each 
 |---|---|
 | After pulling new code | `php artisan migrate`, then `php artisan view:clear` |
 | Fill the standard order tables for files that were uploaded before | `php artisan bom:sync-tables --dry-run` to see what would happen, then `php artisan bom:sync-tables` |
+| Turn the second (Management) BOM approval or the PO gate on or off | Screen: **BOM Approvals**, Settings box (Admin only). Both are off by default. |
 | Switch off automatic refresh of Workspace columns from PO / PRA | `.env`: `SUPPLY_CHAIN_SYNC_WORKSPACE=false` |
 | Switch off automatic filling of the standard order tables | `.env`: `BOM_SYNC_TABLES=false` |
 | Send the daily follow-up reminders by hand | `php artisan followups:remind` (the scheduler runs it every morning at 08:30, Dhaka time; the server's scheduler must be running) |
@@ -230,10 +275,11 @@ On the live server, every push to `master` runs the migrations by itself. Only `
 | Workspace | The shared sheet of order and material columns |
 | Pmt Doc No | Payment reference recorded against a line |
 | Follow-up | A task asking one person to chase a style by a date |
+| BOM approval | Checking and approving a style's BOM before it is ordered |
 | TnA | Time and Action: a to-do list with due dates and traffic lights |
 
 ---
 
 ## 10. Not built yet
 
-Pre-costing, BOM approval, buyer inquiry and quotation, sample management, the rest of TnA (task templates by lead time, tasks created automatically, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
+Pre-costing, buyer inquiry and quotation, sample management, the rest of TnA (task templates by lead time, tasks created automatically, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.

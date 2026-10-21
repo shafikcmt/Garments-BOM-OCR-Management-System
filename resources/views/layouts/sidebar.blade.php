@@ -140,6 +140,7 @@
                     </li>
                     @include('layouts._my-approvals-link', [])
                     @include('layouts._followup-link')
+                    @include('layouts._bom-approval-link')
 
                     {{-- Each department's own report. Admin is one of the three
                          roles those routes admit, so they need a way in that is
@@ -289,6 +290,7 @@
                     </li>
                     @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
                     @include('layouts._followup-link')
+                    @include('layouts._bom-approval-link')
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.styles.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.styles.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-diagram-3" aria-hidden="true"></i></span><span class="sidebar-link-text">Style Library</span></span>
@@ -587,6 +589,7 @@
                     </li>
                     @include('layouts._my-approvals-link', [])
                     @include('layouts._followup-link')
+                    @include('layouts._bom-approval-link')
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.status.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.status.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-bar-chart-steps" aria-hidden="true"></i></span><span class="sidebar-link-text">Style Status</span></span>

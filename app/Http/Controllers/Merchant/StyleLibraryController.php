@@ -8,6 +8,7 @@ use App\Models\BuyerSeason;
 use App\Models\ChildStyle;
 use App\Models\MotherStyle;
 use App\Models\FollowUpTask;
+use App\Services\BomApprovals;
 use App\Services\FollowUps;
 use App\Services\StyleRollup;
 use App\Support\StyleCodeParser;
@@ -52,7 +53,7 @@ class StyleLibraryController extends Controller
     }
 
     /** Where one mother style stands: orders, materials, PO, PI, payment, receipt, issue. */
-    public function show(Request $request, MotherStyle $mother, StyleRollup $rollup, FollowUps $followUps)
+    public function show(Request $request, MotherStyle $mother, StyleRollup $rollup, FollowUps $followUps, BomApprovals $approvals)
     {
         $this->authorizeBuyer($request, $mother->buyer_id);
 
@@ -63,6 +64,12 @@ class StyleLibraryController extends Controller
         // Admin / Management reach this page read-only from the status views and
         // have no Style Library to go back to.
         $isMerchant = $request->user()->hasRole('merchant');
+
+        // BOM approval: where this style's BOM stands, and what this person may do.
+        $bomApproval = $mother->bomApproval()->with(['steps.user:id,name', 'submitter:id,name'])->first();
+        $bomState = $approvals->state($mother, $bomApproval);
+        $canSubmitBom = $request->user()->hasAnyRole(['merchant', 'admin']);
+        $canDecideBom = $bomApproval && $approvals->canDecide($request->user(), $bomApproval);
 
         // Follow-up (Time and Action): who has been asked to chase this style.
         $canFollowUp = $request->user()->hasAnyRole(['merchant', 'admin', 'management']);
@@ -79,6 +86,10 @@ class StyleLibraryController extends Controller
                 : route('merchant.status.season', $mother->buyer_season_id),
             'backLabel' => $isMerchant ? 'Back to Style Library' : 'Back to Season Status',
             'homeUrl' => $isMerchant ? route('merchant.dashboard') : route('merchant.status.index'),
+            'bomApproval' => $bomApproval,
+            'bomState' => $bomState,
+            'canSubmitBom' => $canSubmitBom,
+            'canDecideBom' => $canDecideBom,
             'canFollowUp' => $canFollowUp,
             'followUpTasks' => $followUpTasks,
             'assignees' => $assignees,

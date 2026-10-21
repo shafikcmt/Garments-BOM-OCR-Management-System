@@ -43,6 +43,58 @@
         </div>
     @endif
 
+    {{-- BOM approval --}}
+    <x-card title="BOM approval" class="mb-3" body-class="p-3">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            @include('bom-approvals._badge', ['state' => $bomState, 'approval' => $bomApproval])
+            @if($bomApproval?->submitted_at)<span class="text-muted small">Submitted by {{ $bomApproval->submitter?->name }} on {{ $bomApproval->submitted_at->format('d M Y') }}</span>@endif
+
+            @if($canSubmitBom && in_array($bomState, ['not_submitted', 'returned', 'changed'], true))
+                <form method="POST" action="{{ route('bom_approvals.submit', $mother) }}" class="ms-auto">@csrf
+                    <button class="btn btn-primary btn-sm" {{ $kpis['materials'] === 0 ? 'disabled' : '' }}>
+                        <i class="bi bi-send-check me-1" aria-hidden="true"></i>{{ $bomState === 'not_submitted' ? 'Submit for Approval' : 'Submit Again' }}
+                    </button>
+                </form>
+            @endif
+        </div>
+
+        @if($bomState === 'changed')
+            <div class="alert alert-danger py-2 mb-2">The BOM changed after it was approved. Submit it again for approval.</div>
+        @endif
+
+        @if($canDecideBom)
+            <form method="POST" class="row g-2 align-items-end mb-2">
+                @csrf
+                <div class="col-12 col-md-6">
+                    <label class="form-label mb-1" for="bomComment">Comment <span class="text-muted fw-normal">(required to return)</span></label>
+                    <input type="text" name="comment" id="bomComment" class="form-control form-control-sm" maxlength="1000">
+                </div>
+                <div class="col-auto">
+                    <button formaction="{{ route('bom_approvals.approve', $bomApproval) }}" class="btn btn-success btn-sm"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Approve</button>
+                    <button formaction="{{ route('bom_approvals.return', $bomApproval) }}" class="btn btn-outline-danger btn-sm"><i class="bi bi-arrow-return-left me-1" aria-hidden="true"></i>Return to Merchant</button>
+                </div>
+            </form>
+        @endif
+
+        @if($bomApproval && $bomApproval->steps->isNotEmpty())
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>When</th><th>Step</th><th>By</th><th>Comment</th></tr></thead>
+                    <tbody>
+                    @foreach($bomApproval->steps->reverse() as $step)
+                        <tr>
+                            <td class="text-nowrap">{{ $step->created_at?->format('d M Y H:i') }}</td>
+                            <td>{{ ucfirst($step->action) }}@if($step->action !== 'submitted') · {{ \App\Models\BomApproval::LEVEL_LABELS[$step->level] ?? '' }}@endif</td>
+                            <td>{{ $step->user?->name ?: '—' }}</td>
+                            <td>{{ $step->comment ?: '—' }}</td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </x-card>
+
     @if($canFollowUp || $followUpTasks->isNotEmpty())
     <x-card title="Follow-up" class="mb-3" body-class="p-3">
         @if($followUpTasks->isNotEmpty())

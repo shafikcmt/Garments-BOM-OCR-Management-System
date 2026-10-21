@@ -139,6 +139,13 @@ class BookingController extends Controller
 
     public function generate(Request $request, ExcelRow $excelRow)
     {
+        // Optional gate: no PO for a style whose BOM is not approved (admin switch, off by default).
+        if ($blocked = app(\App\Services\BomApprovals::class)->blockReason($excelRow)) {
+            return $this->isAjaxRequest($request)
+                ? response()->json(['success' => false, 'message' => $blocked], 422)
+                : redirect()->route($this->bookingRouteName('index'))->with('warning', e($blocked));
+        }
+
         $editData = $this->requestHasBookingEdits($request) ? $this->validateBookingEditRequest($request) : null;
         $bookingPo = $this->generateBookingForRow($excelRow, $editData, $request);
         $bookingPo = $this->syncBookingPoSourceControl($bookingPo, true);
@@ -271,6 +278,12 @@ class BookingController extends Controller
             ->whereIn('id', $rowIds)
             ->with(['excelFile', 'cells.header', 'bookingPo'])
             ->get();
+
+        foreach ($rows as $row) {
+            if ($blocked = app(\App\Services\BomApprovals::class)->blockReason($row)) {
+                return response()->json(['success' => false, 'message' => $blocked], 422);
+            }
+        }
 
         $generated = [];
         $seenGroups = [];
@@ -595,6 +608,10 @@ class BookingController extends Controller
         foreach ($leaders as $leader) {
             if (! $leader->excelFile) {
                 throw new \RuntimeException('Unable to generate PO. Please check selected orders and try again.');
+            }
+
+            if ($blocked = app(\App\Services\BomApprovals::class)->blockReason($leader)) {
+                throw new \RuntimeException($blocked);
             }
 
             if ($leader->bookingPo) {
