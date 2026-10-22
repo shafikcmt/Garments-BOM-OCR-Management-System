@@ -42,6 +42,7 @@ Route::prefix('merchant/bom')
     ->group(function () {
         Route::get('/styles/{mother}', [BomBuilderController::class, 'create'])->name('create');
         Route::post('/styles/{mother}', [BomBuilderController::class, 'store'])->name('store');
+        Route::get('/styles/{mother}/materials', [BomBuilderController::class, 'suggest'])->name('suggest');
     });
 
 Route::prefix('merchant')

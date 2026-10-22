@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MotherStyle;
 use App\Models\OrderLine;
 use App\Services\BomBuilder;
+use App\Services\BomMaterialLibrary;
 use Illuminate\Http\Request;
 
 /**
@@ -16,7 +17,7 @@ use Illuminate\Http\Request;
  */
 class BomBuilderController extends Controller
 {
-    public function create(Request $request, MotherStyle $mother, BomBuilder $builder)
+    public function create(Request $request, MotherStyle $mother, BomBuilder $builder, BomMaterialLibrary $library)
     {
         $this->authorizeBuild($request, $mother);
 
@@ -30,13 +31,53 @@ class BomBuilderController extends Controller
                 'qty' => $l->order_qty !== null ? (float) $l->order_qty : '', 'child' => $l->child_style_id,
             ])->all();
 
+        // Copy the materials of an earlier BOM of the SAME buyer into the form.
+        $copied = null;
+        $copyNote = null;
+
+        if ($request->filled('from')) {
+            $source = MotherStyle::where('buyer_id', $mother->buyer_id)->find($request->integer('from'));
+            $lineId = $request->integer('line') ?: null;
+
+            if ($source && $lineId && ! OrderLine::where('id', $lineId)->where('mother_style_id', $source->id)->exists()) {
+                $lineId = null;
+            }
+
+            $rows = $source ? $library->materialsOf($source, $lineId) : [];
+
+            if ($rows === []) {
+                $copyNote = $source ? 'Style ' . $source->style_no . ' has no materials to copy.' : 'That style is not available to copy from.';
+            } else {
+                $copied = ['rows' => $rows, 'from' => $source->style_no];
+            }
+        }
+
+        // Styles (and their order lines) of this buyer that have a BOM, to copy from.
+        $sources = MotherStyle::where('buyer_id', $mother->buyer_id)
+            ->whereHas('orderLines.bomItems')
+            ->with(['season:id,code', 'orderLines' => fn ($q) => $q->withCount('bomItems')->orderBy('customer_po_no')->orderBy('gmts_color')])
+            ->orderBy('style_no')->limit(200)->get();
+
         return view('merchant.bom-builder', [
             'mother' => $mother,
+            'sources' => $sources,
+            'copied' => $copied,
+            'copyNote' => $copyNote,
+            'copyFrom' => $request->integer('from') ?: null,
+            'copyLine' => $request->integer('line') ?: null,
             'prefill' => old('lines', $lines ?: [['color' => '', 'po' => '', 'ship_date' => '', 'qty' => '', 'child' => '']]),
-            'materials' => old('materials', [['type' => '', 'description' => '', 'sap_code' => '', 'color' => '', 'uom' => '', 'consumption' => '', 'wastage' => '']]),
+            'materials' => $copied ? $copied['rows'] : old('materials', [['type' => '', 'description' => '', 'sap_code' => '', 'color' => '', 'uom' => '', 'consumption' => '', 'wastage' => '']]),
             'columns' => $builder->fieldColumns($request->user()),
             'limits' => ['lines' => BomBuilder::MAX_LINES, 'materials' => BomBuilder::MAX_MATERIALS],
         ]);
+    }
+
+    /** Past materials of this buyer that match what is being typed (JSON, for the form). */
+    public function suggest(Request $request, MotherStyle $mother, BomMaterialLibrary $library)
+    {
+        $this->authorizeBuild($request, $mother);
+
+        return response()->json($library->suggest($mother, (string) $request->query('q', '')));
     }
 
     public function store(Request $request, MotherStyle $mother, BomBuilder $builder)

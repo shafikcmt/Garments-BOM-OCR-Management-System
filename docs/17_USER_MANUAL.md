@@ -1,6 +1,6 @@
 # User Manual — Garments BOM Management System
 
-> **Status: living draft.** Updated up to 2026-10-25. Every new screen or change that users can see adds or edits a section here in the same change. When all modules are finished this file is turned into the final manual (Word / PDF). Sections marked **Not built yet** are listed at the end.
+> **Status: living draft.** Updated up to 2026-10-26. Every new screen or change that users can see adds or edits a section here in the same change. When all modules are finished this file is turned into the final manual (Word / PDF). Sections marked **Not built yet** are listed at the end.
 >
 > Written in simple English for factory and office staff. No technical words.
 
@@ -113,6 +113,17 @@ You can make a style's BOM directly in the system.
 - To change a line that already exists, use the Workspace (the file named above), not this screen.
 - If a Workspace column does not exist, or your role may not edit it, you are told which one at the top of the page and after saving. The rest is still saved.
 - If a BOM was already approved and you add material, it shows **Changed after approval** and must be approved again.
+
+**Save typing: copy an earlier BOM, and let the system suggest materials**
+
+*Start from an earlier BOM.* At the top of **Create BOM**, the box **Start from an earlier BOM** lists this buyer's styles that already have a BOM (this style too, for example to copy one colour's materials to another colour).
+1. Choose the style, and, if you want only one colour or PO, choose it in **From**. The default is all its order lines, with a material that appears on several lines counted once.
+2. Press **Copy Materials**. The **Materials** table below is filled with the type, description, SAP code, material color, unit, consumption and wastage of that BOM. **It replaces anything you had typed in that table.**
+3. Check the consumption and wastage (they may differ this season), add your own order lines, and press **Create BOM**. Nothing is saved until you press it.
+
+You can only copy from a style of the **same buyer**.
+
+*Suggestions while you type.* In the **Description** or **SAP code** of a material, type two or more letters. The system offers materials this buyer has used before (from every BOM made or imported so far; there is no list to maintain). Choose one and the empty boxes of that row are filled: type, SAP code, color, unit, consumption and wastage as they were last time. **Anything you already typed is left alone.** If the same material was used twice, the newest figures are offered.
 
 Use the Excel import (section 2.2) when the buyer sends a ready file; use this screen when you build the BOM yourself.
 
@@ -338,6 +349,7 @@ On the live server, every push to `master` runs the migrations by itself. Only `
 | Pmt Doc No | Payment reference recorded against a line |
 | Follow-up | A task asking one person to chase a style by a date |
 | BOM builder | The Create BOM screen: order lines and materials of a style entered on screen |
+| Material suggestions | Materials this buyer used before, offered while you type; learned from earlier BOMs |
 | BOM approval | Checking and approving a style's BOM before it is ordered |
 | Pre-costing | Cost sheet of a style by cost head, before the order; Buyer and In-house, in revisions |
 | Margin | Profit as a share of the quoted price |

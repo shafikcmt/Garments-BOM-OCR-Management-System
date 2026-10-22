@@ -136,13 +136,13 @@ class BomBuilder
             $prepared = [];
 
             foreach ($lines as $line) {
-                $styleCode = $line['child'] ? $mother->style_no . ' (' . $line['child'] . ')' : $mother->style_no;
-                $color = $this->clean($line['color']);
-                $po = $this->clean($line['po']);
+                $styleCode = ! empty($line['child']) ? $mother->style_no . ' (' . $line['child'] . ')' : $mother->style_no;
+                $color = $this->clean($line['color'] ?? null);
+                $po = $this->clean($line['po'] ?? null);
                 $lineKey = md5(mb_strtolower($styleCode . '|' . $color . '|' . $po));
 
                 foreach ($materials as $material) {
-                    $dupe = $lineKey . '|' . mb_strtolower(trim($material['description'])) . '|' . mb_strtolower(trim((string) $material['sap_code']));
+                    $dupe = $lineKey . '|' . mb_strtolower(trim((string) ($material['description'] ?? ''))) . '|' . mb_strtolower(trim((string) ($material['sap_code'] ?? '')));
 
                     if (isset($existing[$dupe])) {
                         $skipped++;
@@ -256,22 +256,23 @@ class BomBuilder
      */
     private function values(array $ids, MotherStyle $mother, string $styleCode, array $line, array $material): array
     {
-        $wastage = $material['wastage'] === null || $material['wastage'] === '' ? null : (float) $material['wastage'];
+        $wastage = $material['wastage'] ?? null;
+        $wastage = $wastage === null || $wastage === '' ? null : (float) $wastage;
 
         $by = [
             'season' => $mother->season?->code,
             'style' => $styleCode,
-            'gmts_color' => $this->clean($line['color']),
-            'customer_po' => $this->clean($line['po']),
-            'ship_date' => $this->clean($line['ship_date']),
-            'material_type' => $this->clean($material['type']),
-            'material_description' => $this->clean($material['description']),
-            'sap_code' => $this->clean($material['sap_code']),
-            'material_color' => $this->clean($material['color']),
-            'uom' => $this->clean($material['uom']),
+            'gmts_color' => $this->clean($line['color'] ?? null),
+            'customer_po' => $this->clean($line['po'] ?? null),
+            'ship_date' => $this->clean($line['ship_date'] ?? null),
+            'material_type' => $this->clean($material['type'] ?? null),
+            'material_description' => $this->clean($material['description'] ?? null),
+            'sap_code' => $this->clean($material['sap_code'] ?? null),
+            'material_color' => $this->clean($material['color'] ?? null),
+            'uom' => $this->clean($material['uom'] ?? null),
             // BOM Quantity is the garment quantity of the order line; the workspace works the rest out from it.
-            'bom_qty' => $this->number($line['qty']),
-            'consumption' => $this->number($material['consumption']),
+            'bom_qty' => $this->number($line['qty'] ?? null),
+            'consumption' => $this->number($material['consumption'] ?? null),
             // Stored as a fraction (5% -> 0.05), the way the workspace reads it.
             'wastage' => $wastage === null ? null : $this->number($wastage / 100, 6),
         ];

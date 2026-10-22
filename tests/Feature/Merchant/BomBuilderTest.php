@@ -226,3 +226,120 @@ it('is for Merchandising and Admin with access to the buyer, and offers itself o
     $this->actingAs($merchant)->post(route('merchant.bom.store', $mother), bbPayload());
     $this->actingAs($merchant)->get(route('merchant.styles.mothers.show', $mother))->assertOk()->assertSee('Add to BOM');
 });
+
+// ---------------------------------------------------------------------------
+// Material library (learned from earlier BOMs) and copying a BOM
+// ---------------------------------------------------------------------------
+
+/** One order line + one material through the builder. */
+function bbBuild(User $user, MotherStyle $mother, string $color, array $material, ?string $po = null): void
+{
+    test()->actingAs($user)->post(route('merchant.bom.store', $mother), [
+        'lines' => [['color' => $color, 'po' => $po ?? $color . '-PO', 'qty' => 100, 'child' => '']],
+        'materials' => [$material],
+    ])->assertSessionHas('success');
+}
+
+function bbMaterial(string $description, string $sap, float $consumption = 1.0, $wastage = 5, string $type = 'TRIMS'): array
+{
+    return ['type' => $type, 'description' => $description, 'sap_code' => $sap, 'color' => 'RED', 'uom' => 'PCS', 'consumption' => $consumption, 'wastage' => $wastage];
+}
+
+it('copies the materials of an earlier style, merging duplicates and honouring the chosen order line', function () {
+    bbHeaders();
+    $source = bbStyle();
+    $target = MotherStyle::create(['buyer_id' => $source->buyer_id, 'buyer_season_id' => $source->buyer_season_id, 'style_no' => '999111']);
+    $merchant = bbUser();
+
+    bbBuild($merchant, $source, 'WHITE', bbMaterial('Zipper', 'Z1', 1.0, 5));
+    bbBuild($merchant, $source, 'BLACK', bbMaterial('Zipper', 'Z1', 1.0, 5));          // the same material on a second colour
+    bbBuild($merchant, $source, 'BLACK', bbMaterial('Main label', 'L1', 1.0, 2));
+    $whiteLine = OrderLine::where('mother_style_id', $source->id)->where('gmts_color', 'WHITE')->value('id');
+
+    $all = $this->actingAs($merchant)->get(route('merchant.bom.create', [$target, 'from' => $source->id]))->assertOk()->assertSee('Copied 2 material(s) from style 748268');
+    expect(collect($all->viewData('materials'))->pluck('description')->sort()->values()->all())->toBe(['Main label', 'Zipper']);
+
+    $row = collect($all->viewData('materials'))->firstWhere('description', 'Zipper');
+    expect($row)->toMatchArray(['type' => 'TRIMS', 'sap_code' => 'Z1', 'color' => 'RED', 'uom' => 'PCS'])->and((float) $row['consumption'])->toBe(1.0)->and((float) $row['wastage'])->toBe(5.0);
+
+    $one = $this->actingAs($merchant)->get(route('merchant.bom.create', [$target, 'from' => $source->id, 'line' => $whiteLine]))->assertOk()->assertSee('Copied 1 material(s)');
+    expect(collect($one->viewData('materials'))->pluck('description')->all())->toBe(['Zipper']);
+
+    // The copy card lists this buyer's styles with a BOM; copying from the style itself is allowed.
+    expect($all->viewData('sources')->pluck('style_no')->all())->toBe(['748268'])->and($all->viewData('sources')->first()->orderLines)->toHaveCount(2);
+    $this->actingAs($merchant)->get(route('merchant.bom.create', $source))->assertOk()->assertSee('(this style)')->assertSee('Copy Materials');
+
+    // Nothing but the copy is written until Create BOM is pressed; then the copied rows go in as usual.
+    expect(OrderLine::where('mother_style_id', $target->id)->count())->toBe(0);
+    $this->actingAs($merchant)->post(route('merchant.bom.store', $target), [
+        'lines' => [['color' => 'GREEN', 'po' => 'G1', 'qty' => 300, 'child' => '']],
+        'materials' => collect($all->viewData('materials'))->map(fn ($m) => array_map(fn ($v) => $v ?? '', $m))->all(),
+    ])->assertSessionHas('success', '2 BOM line(s) created.');
+    expect(BomItem::whereHas('orderLine', fn ($q) => $q->where('mother_style_id', $target->id))->count())->toBe(2);
+});
+
+it('will not copy from another buyer, an unknown style, or a style with no materials', function () {
+    bbHeaders();
+    $mine = bbStyle();
+    $theirs = bbStyle(Buyer::create(['buyer_name' => 'Other', 'is_active' => true]));
+    $merchant = bbUser();
+    bbBuild($merchant, $theirs, 'WHITE', bbMaterial('Secret trim', 'S1'));
+
+    $foreign = $this->actingAs($merchant)->get(route('merchant.bom.create', [$mine, 'from' => $theirs->id]))->assertOk()->assertSee('not available to copy from')->assertDontSee('Secret trim');
+    expect(collect($foreign->viewData('materials'))->pluck('description')->filter()->all())->toBe([]);
+
+    $this->actingAs($merchant)->get(route('merchant.bom.create', [$mine, 'from' => 99999]))->assertOk()->assertSee('not available to copy from');
+
+    $emptySource = MotherStyle::create(['buyer_id' => $mine->buyer_id, 'buyer_season_id' => $mine->buyer_season_id, 'style_no' => 'EMPTY']);
+    $this->actingAs($merchant)->get(route('merchant.bom.create', [$mine, 'from' => $emptySource->id]))->assertOk()->assertSee('has no materials to copy');
+});
+
+it('suggests materials from past BOMs of the same buyer only, newest first, one per material', function () {
+    bbHeaders();
+    $style = bbStyle();
+    $other = bbStyle(Buyer::create(['buyer_name' => 'Other', 'is_active' => true]));
+    $merchant = bbUser();
+
+    bbBuild($merchant, $style, 'WHITE', bbMaterial('Metal Zipper', 'Z1', 1.0, 5));
+    bbBuild($merchant, $style, 'BLACK', bbMaterial('Metal Zipper', 'Z1', 1.2, 8));        // newer figures for the same material
+    bbBuild($merchant, $style, 'RED', bbMaterial('Plastic Zipper', 'Z2', 1.0, 0));
+    bbBuild($merchant, $other, 'WHITE', bbMaterial('Zipper of another buyer', 'ZX'));
+
+    $url = route('merchant.bom.suggest', $style);
+
+    $hits = $this->actingAs($merchant)->getJson($url . '?q=zip')->assertOk()->json();
+    expect(collect($hits)->pluck('description')->all())->toBe(['Plastic Zipper', 'Metal Zipper']);
+    $metal = collect($hits)->firstWhere('description', 'Metal Zipper');
+    expect($metal)->toMatchArray(['sap_code' => 'Z1', 'type' => 'TRIMS', 'uom' => 'PCS'])->and((float) $metal['consumption'])->toBe(1.2)->and((float) $metal['wastage'])->toBe(8.0);
+
+    expect(collect($this->actingAs($merchant)->getJson($url . '?q=ZIP')->json())->count())->toBe(2);                 // any capitalisation
+    expect(collect($this->actingAs($merchant)->getJson($url . '?q=Z2')->json())->pluck('description')->all())->toBe(['Plastic Zipper']);  // by SAP code
+    expect($this->actingAs($merchant)->getJson($url . '?q=z')->json())->toBe([]);                                         // too short
+    expect($this->actingAs($merchant)->getJson($url . '?q=%25%25')->json())->toBe([]);                                    // a typed "%%" is not a wildcard
+    expect($this->actingAs($merchant)->getJson($url . '?q=another')->json())->toBe([]);                                   // other buyer's material
+});
+
+it('keeps the suggestions to Merchandising and Admin of that buyer', function () {
+    bbHeaders();
+    $style = bbStyle();
+    $url = route('merchant.bom.suggest', $style);
+
+    $this->actingAs(bbUser('admin'))->getJson($url . '?q=zip')->assertOk();
+    foreach (['management', 'store', 'supply_chain'] as $role) {
+        $this->actingAs(bbUser($role))->getJson($url . '?q=zip')->assertForbidden();
+    }
+
+    $mine = Buyer::create(['buyer_name' => 'Mine', 'is_active' => true]);
+    $scoped = User::factory()->create(['buyer_id' => $mine->id, 'status' => 1])->assignRole('merchant');
+    $scoped->buyers()->attach($mine->id);
+    $this->actingAs($scoped->fresh())->getJson($url . '?q=zip')->assertForbidden();
+});
+
+it('wires the suggestion fields into the material rows', function () {
+    bbHeaders();
+    $style = bbStyle();
+
+    $this->actingAs(bbUser())->get(route('merchant.bom.create', $style))->assertOk()
+        ->assertSee('data-suggest="description"', false)->assertSee('data-suggest="sap"', false)->assertSee('id="matSuggest"', false)
+        ->assertDontSee('Start from an earlier BOM');   // nothing to copy from yet
+});

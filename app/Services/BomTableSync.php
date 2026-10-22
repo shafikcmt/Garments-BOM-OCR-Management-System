@@ -168,6 +168,11 @@ class BomTableSync
         foreach (self::BOM_ITEM_TEXT as $column => $group) {
             $item->{$column} = $text($group);
         }
+
+        // The group lookup for material colour also answers to the GMTS colour
+        // column (for sheets with one colour column). When the sheet has its own
+        // Material Color column, that one is the material's colour.
+        $item->material_color = $this->canonicalText($row, 'material_color') ?? $item->material_color;
         foreach (self::BOM_ITEM_NUMBER as $column => $canonical) {
             $item->{$column} = $this->canonicalNumber($row, $canonical);
         }
@@ -228,6 +233,19 @@ class BomTableSync
     private function pruneEmptyLines(ExcelFile $file): void
     {
         OrderLine::where('excel_file_id', $file->id)->whereDoesntHave('bomItems')->delete();
+    }
+
+    private function canonicalText(ExcelRow $row, string $canonical): ?string
+    {
+        $ids = $this->canonicalIds[$canonical] ??= $this->headers->headerIdsForCanonical($canonical);
+
+        foreach ($row->cells as $cell) {
+            if (in_array((int) $cell->header_id, $ids, true) && trim((string) $cell->value) !== '') {
+                return trim((string) $cell->value);
+            }
+        }
+
+        return null;
     }
 
     private function canonicalNumber(ExcelRow $row, string $canonical): ?float

@@ -42,7 +42,7 @@ Common to all of them: **the style is the centre**; costing, samples, BOM, order
 | 2 Pre-costing | **Built** (cost heads, Buyer / In-house, revisions, margin). Not built: costing approval, size/colour costing, comparison with the BOM |
 | 3 Sampling | Not built |
 | 4 Order confirmation | Partly: orders arrive through the BOM file (order lines: colour, customer PO, ship date, quantity). No separate buyer-PO screen, no size breakdown |
-| 5 BOM | **Built**: Excel import for any buyer layout, **Create BOM** on screen, calculated columns, **BOM approval**. Not built: copy from another style/season, material library, size-wise, automatic BOM |
+| 5 BOM | **Built**: Excel import for any buyer layout, **Create BOM** on screen, calculated columns, **BOM approval**. **Copy from another style/season and a learned material library are built.** Not built: size-wise, automatic BOM |
 | 6 Material booking | **Built** on the Supply Chain side (booking / PO, PI, payment request, payment); changes by the merchant reach Supply Chain; PO / PI / payment status flows back |
 | 7 TnA | **Partly**: follow-up tasks, to-do list, reminders, late-material lights. Not built: task templates by lead time, automatic tasks, critical path, e-mail |
 | 8 Production | Not built |
@@ -54,8 +54,8 @@ Common to all of them: **the style is the centre**; costing, samples, BOM, order
 Real merchandisers get a BOM from **three places**, so the system should accept all three and end in the SAME place (the workspace rows):
 
 1. **The buyer sends a BOM / sheet** -> **Import Buyer Excel** (built; any layout, remembered per buyer).
-2. **Carry-over style**: "this style is like last season's, change a few materials" -> **copy a BOM** from another style or season (not built; the biggest time saver after import).
-3. **Build it by hand** from the tech pack -> **Create BOM** (built); faster with a **material library** (not built).
+2. **Carry-over style**: "this style is like last season's, change a few materials" -> **copy a BOM** from another style or season (built, same buyer).
+3. **Build it by hand** from the tech pack -> **Create BOM** (built); faster with the **material library** (built; learned from earlier BOMs).
 
 Fully automatic BOM generation is the Kandaree way, but it needs a **consumption master** and the order's size and colour breakdown first. It is a later step, not a replacement for the three above.
 
@@ -77,7 +77,7 @@ Ask them to show you a real order, not describe it.
 
 ## 7. Suggested build order from here
 
-1. **Copy BOM + material library**: removes the most typing. Small and safe.
+1. ~~Copy BOM + material library~~ (done).
 2. **TnA depth**: task templates by lead time, tasks created from rules (for example a late material), e-mail reminders.
 3. **Sampling** (if question 4 says it matters): sample requests, status, buyer comments.
 4. **Order / buyer PO screen** with colour and size breakdown (needed before size-wise BOM and costing).
