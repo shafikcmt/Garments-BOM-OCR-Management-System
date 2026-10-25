@@ -116,11 +116,6 @@
                 <a href="{{ route('store.stock.items.export') }}" class="btn btn-outline-secondary">
                     <i class="bi bi-download me-1" aria-hidden="true"></i>Export Items
                 </a>
-                @if($canEdit)
-                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#importPrices">
-                        <i class="bi bi-currency-dollar me-1" aria-hidden="true"></i>Import Prices
-                    </button>
-                @endif
                 <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#importItems">
                     <i class="bi bi-upload me-1" aria-hidden="true"></i>Import Items
                 </button>
@@ -302,56 +297,6 @@
 
          Gated on the correction right, not create: it changes items that
          already exist. --}}
-    @if($canEdit)
-        <div class="modal fade" id="importPrices" tabindex="-1" aria-labelledby="importPricesTitle" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content gx-stock-card">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="importPricesTitle">Import Unit Prices</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="gx-stock-help mb-3">
-                            Sets the Unit Price on items that already exist. Nothing else on the item is
-                            touched, and no new item is ever created.
-                        </p>
-
-                        <div class="gx-edit-alert mb-3">
-                            <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
-                            <div>
-                                <div class="gx-edit-alert-title">Start from Export Items</div>
-                                <div class="gx-edit-alert-body">
-                                    Items are matched on <strong>Item Name and Brand/Specification together</strong>.
-                                    107 names in this master are stocked under more than one brand, so a name on
-                                    its own can point at the wrong one. The export spells both exactly as stored —
-                                    keep those two columns, delete the rest, and fill in Unit Price.
-                                </div>
-                            </div>
-                        </div>
-
-                        <a href="{{ route('store.stock.items.prices.template') }}" class="btn btn-outline-secondary w-100 mb-3">
-                            <i class="bi bi-download me-1" aria-hidden="true"></i>Download Blank Template
-                        </a>
-
-                        <form method="POST" action="{{ route('store.stock.items.prices.import') }}" enctype="multipart/form-data" id="importPricesForm">
-                            @csrf
-                            <input type="file" name="file" class="form-control mb-2" accept=".csv,.txt,.xlsx,.xls" required
-                                   aria-label="CSV or Excel file of unit prices to import">
-                            <p class="gx-stock-help mb-0">
-                                Three columns: Item Name, Brand/Specification, Unit Price. A row with no price is
-                                left alone rather than cleared, and a row matching no item is reported instead of
-                                being created.
-                            </p>
-                        </form>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" form="importPricesForm" class="btn btn-primary"><i class="bi bi-upload me-1" aria-hidden="true"></i>Import Prices</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    @endif
 
     @include('store.stock._searchable')
 
