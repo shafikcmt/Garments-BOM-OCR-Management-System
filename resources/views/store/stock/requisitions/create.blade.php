@@ -522,6 +522,19 @@
         @media (min-width: 768px)  { .gx-req-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
         @media (min-width: 1200px) { .gx-req-fields { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 
+        /* Between tablet and the one-row layout the Item Name gets two of the
+           six columns, and Remarks the last two, so the name a person is
+           choosing is never squeezed into a sixth of a card. At 100% browser
+           zoom on a laptop the sidebar already takes ~210px, which is why the
+           one-row layout only starts at 1900px. */
+        @media (min-width: 768px) and (max-width: 1899.98px) {
+            .gx-req-field.is-item { grid-column: span 2; }
+            .gx-req-field.is-remarks { grid-column: span 2; }
+        }
+        @media (max-width: 767.98px) {
+            .gx-req-field.is-item, .gx-req-field.is-remarks { grid-column: 1 / -1; }
+        }
+
         /* One row for all ten, once there is room to do it without cramming.
            The line is then ONE ROW, like a grid: the number sits at the left
            and Remove at the right of the fields (the head row it used to take
@@ -529,7 +542,7 @@
            only. Lines after it keep their labels for screen readers but not on
            screen, so a requisition of ten items is ten tidy rows instead of ten
            tall cards. Narrower screens keep the stacked card above. */
-        @media (min-width: 1500px) {
+        @media (min-width: 1900px) {
             .gx-req-lines { gap: .55rem; }
 
             .gx-req-line {

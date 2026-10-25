@@ -116,6 +116,10 @@
         margin-top: 4px;
         overflow: hidden;
     }
+    /* Item lists with a SKU: the list opens wider than the (often narrow) box it
+       hangs from, so the SKU and the whole item name read on one line. */
+    .ts-dropdown.gx-wide { min-width: min(560px, calc(100vw - 24px)); max-width: calc(100vw - 24px); }
+    .ts-dropdown.gx-wide .gx-sku-name { overflow-wrap: anywhere; }
     .ts-dropdown .option { padding: .4rem .7rem; }
     .ts-dropdown .active { background: #dbeafe; color: #1d4ed8; }
     .ts-dropdown .create { padding: .4rem .7rem; }
@@ -228,6 +232,22 @@
                 // once. Closing the others on open keeps it to one.
                 onDropdownOpen: function () {
                     userDroveHighlight = false;
+
+                    if (this.input.hasAttribute('data-sku-labels')) {
+                        var dd = this.dropdown;
+                        dd.classList.add('gx-wide');
+
+                        // Keep the wider list on screen: TomSelect anchors it to
+                        // the box's left edge, which may be near the right side.
+                        window.requestAnimationFrame(function () {
+                            var box = dd.getBoundingClientRect();
+                            var over = box.right - (window.innerWidth - 12);
+
+                            if (over > 0) {
+                                dd.style.left = Math.max(8, box.left - over) + 'px';
+                            }
+                        });
+                    }
 
                     var self = this;
                     document.querySelectorAll('select.tomselected').forEach(function (el) {
