@@ -88,6 +88,29 @@ class StockItem extends Model
     public const PENDING = 'pending';
     public const REJECTED = 'rejected';
 
+    /**
+     * The Store admin: a Store user marked Department Admin on Users & Roles.
+     * Approves new items and maintains the Item Master.
+     */
+    public static function isStoreAdmin(?User $user): bool
+    {
+        return $user !== null && $user->hasRole('store') && $user->isDepartmentAdmin();
+    }
+
+    /**
+     * Who is told a new item waits for approval: the Store admins, or the
+     * super admins when the Store has none set.
+     *
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    public static function approvers(): \Illuminate\Support\Collection
+    {
+        $storeAdmins = User::whereHas('roles', fn ($r) => $r->where('name', 'store'))->where('is_department_admin', true)->where('status', 1)->get()
+            ->filter(fn (User $u) => self::isStoreAdmin($u));
+
+        return $storeAdmins->isNotEmpty() ? $storeAdmins->values() : User::whereHas('roles', fn ($r) => $r->where('name', 'admin'))->where('status', 1)->get();
+    }
+
     public function isApproved(): bool
     {
         return ($this->approval_status ?? self::APPROVED) === self::APPROVED;

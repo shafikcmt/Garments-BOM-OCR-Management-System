@@ -88,6 +88,8 @@ class StockItemController extends Controller
             ->appends(Arr::except($request->query(), ['partial', 'page']));
 
         ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
+        // The Store admin maintains the Item Master as well.
+        $canEdit = $canEdit || $this->isStoreAdmin();
 
         $categories = ItemCategory::selectable()->get(['id', 'name']);
 
@@ -322,6 +324,10 @@ class StockItemController extends Controller
 
         $pending = $this->canApproveItems() ? '' : ' They are waiting for approval before they can be used.';
 
+        if (! $this->canApproveItems()) {
+            $this->notifyApprovers(count($items).' new item(s) imported by '.auth()->user()->name.' are waiting for your approval.');
+        }
+
         return back()
             ->with('success', count($items).' item(s) imported.'.$pending
                 .($skipped ? ' '.count($skipped).' row(s) were skipped.' : ''))
@@ -339,6 +345,10 @@ class StockItemController extends Controller
 
         $item = StockItem::create($data);
         $awaiting = ! $item->isApproved();
+
+        if ($awaiting) {
+            $this->notifyApprovers('New item "'.$item->name.'" added by '.auth()->user()->name.' is waiting for your approval.');
+        }
 
         // Opened from a requisition line that named an item the master did
         // not have ("Not in Item Master"). Now that it does, the line is
@@ -359,13 +369,17 @@ class StockItemController extends Controller
         }
 
         return back()->with('success', $awaiting
-            ? 'Stock item "'.$data['name'].'" submitted for approval. It will be usable once a store admin approves it.'
+            ? 'Stock item "'.$data['name'].'" submitted for approval. It will be usable once the Store admin approves it.'
             : 'Stock item "'.$data['name'].'" added.');
     }
 
     public function update(Request $request, StockItem $stockItem)
     {
-        $this->authorizeStoreEdit('stock item');
+        // The Store admin maintains the Item Master; everyone else needs the
+        // usual correction permission.
+        if (! $this->isStoreAdmin()) {
+            $this->authorizeStoreEdit('stock item');
+        }
 
         $data = $this->validated($request);
 
@@ -432,12 +446,36 @@ class StockItemController extends Controller
         return back()->with('success', '"'.$data['from_uom'].'" merged into "'.$data['to_uom'].'" — '.$moved.' item(s) updated.');
     }
 
-    /** Admin, or anyone granted store.items.approve. */
+    /**
+     * Who approves new items: the super admin, the Store admin (a Store user
+     * marked Department Admin), or anyone granted store.items.approve.
+     */
     protected function canApproveItems(): bool
     {
         $user = auth()->user();
 
-        return (bool) $user && ($user->hasRole('admin') || $user->can('store.items.approve'));
+        return (bool) $user && ($user->hasRole('admin') || $this->isStoreAdmin() || $user->can('store.items.approve'));
+    }
+
+    /** Tell the item approvers (the Store admins) that items wait for them. */
+    protected function notifyApprovers(string $message): void
+    {
+        foreach (StockItem::approvers() as $approver) {
+            \App\Models\AppNotification::create([
+                'user_id' => $approver->id,
+                'actor_id' => auth()->id(),
+                'type' => 'stock_item_approval',
+                'title' => 'Item Approval Request',
+                'message' => $message,
+                'url' => route('store.stock.items.index', ['approval' => 'pending']),
+            ]);
+        }
+    }
+
+    /** A Store user marked Department Admin on Users & Roles. */
+    protected function isStoreAdmin(): bool
+    {
+        return StockItem::isStoreAdmin(auth()->user());
     }
 
     protected function authorizeApproval(): void
