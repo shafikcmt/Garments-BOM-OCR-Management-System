@@ -555,9 +555,10 @@ class PurchaseRequisition extends Model
             return $user->hasRole('admin') || $this->isRaisedBy($user);
         }
 
-        return $user->hasRole('admin')
-            && ! $this->isMerged()
-            && ! in_array($this->status, [self::STATUS_APPROVED, self::STATUS_PURCHASE_ACTION_TAKEN], true);
+        // Admin may remove a sheet at any stage, so requisitions raised only to
+        // test the workflow can be cleared out. A reason is required (see
+        // deleteNeedsReason) and the history row survives the sheet.
+        return $user->hasRole('admin');
     }
 
     /**
