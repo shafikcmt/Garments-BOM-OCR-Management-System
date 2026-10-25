@@ -188,7 +188,7 @@ it('shows the department its own progress in words it uses', function () {
 
 // --- PART 2: an item that is not in the Item Master ---------------------------
 
-it('saves a typed item with no stock_items row created', function () {
+it('refuses a typed item and creates no stock_items row', function () {
     $department = reviewDepartmentUser();
     $itemsBefore = StockItem::count();
 
@@ -199,17 +199,10 @@ it('saves a typed item with no stock_items row created', function () {
         'items' => [
             ['stock_item_id' => '', 'custom_item_name' => 'Hand Sanitiser 5L', 'qty_requested' => 12],
         ],
-    ])->assertRedirect();
+    ])->assertSessionHasErrors('items.0.stock_item_id');
 
-    $line = PurchaseRequisitionItem::latest('id')->first();
-
-    expect($line->stock_item_id)->toBeNull()
-        ->and($line->custom_item_name)->toBe('Hand Sanitiser 5L')
-        ->and($line->isCustomItem())->toBeTrue()
-        ->and($line->displayName())->toBe('Hand Sanitiser 5L');
-
-    // The whole point: naming an item here must never add it to the master.
-    expect(StockItem::count())->toBe($itemsBefore);
+    expect(PurchaseRequisitionItem::count())->toBe(0)
+        ->and(StockItem::count())->toBe($itemsBefore);
 });
 
 it('refuses a line that names neither a master item nor a typed one', function () {
@@ -221,30 +214,6 @@ it('refuses a line that names neither a master item nor a typed one', function (
             'items' => [['stock_item_id' => '', 'custom_item_name' => '', 'qty_requested' => 5]],
         ])
         ->assertSessionHasErrors('items.0.stock_item_id');
-});
-
-it('keeps two different typed items apart instead of merging them', function () {
-    // mergeLines() keys on stock_item_id; a typed line has none, so without
-    // keying on the NAME every typed item on the form would collapse into one
-    // line carrying the sum of all their quantities.
-    $this->actingAs(reviewDepartmentUser())->post(route('store.stock.requisitions.store'), [
-        'action' => 'submit',
-        'mode' => PurchaseRequisition::MODE_MULTI,
-        'requisition_date' => '2026-08-10',
-        'items' => [
-            ['stock_item_id' => '', 'custom_item_name' => 'Hand Sanitiser 5L', 'qty_requested' => 12],
-            ['stock_item_id' => '', 'custom_item_name' => 'Floor Mop', 'qty_requested' => 3],
-            ['stock_item_id' => '', 'custom_item_name' => 'Hand Sanitiser 5L', 'qty_requested' => 8],
-        ],
-    ])->assertRedirect();
-
-    $lines = PurchaseRequisition::latest('id')->first()->items;
-
-    // Two items, and the repeated one merged into 20 — the same rule master
-    // items have always followed.
-    expect($lines)->toHaveCount(2);
-    expect($lines->firstWhere('custom_item_name', 'Hand Sanitiser 5L')->qty_requested)->toEqual(20);
-    expect($lines->firstWhere('custom_item_name', 'Floor Mop')->qty_requested)->toEqual(3);
 });
 
 it('names the typed item on the requisition screen and flags it for Store', function () {

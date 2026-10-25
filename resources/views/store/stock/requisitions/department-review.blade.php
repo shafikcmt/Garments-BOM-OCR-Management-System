@@ -54,7 +54,7 @@
                 </div>
                 <div class="col-12 col-md-6 col-xl-4">
                     <label class="form-label" for="search">Search</label>
-                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Requisition no, requester or item">
+                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Requisition no, requester, SKU or item">
                 </div>
                 <div class="col-12 col-xl-2 gx-stock-filter-actions">
                     <button class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
@@ -82,7 +82,7 @@
                             <tr>
                                 <td>
                                     <div class="fw-bold text-slate-900">{{ $r->requisition_no }}</div>
-                                    <div class="gx-stock-spec">submitted {{ $r->submitted_at?->format('d-M-Y') ?: '—' }}</div>
+                                    <div class="gx-stock-spec">submitted {{ $r->submitted_at?->local()->format('d-M-Y') ?: '—' }}</div>
                                 </td>
                                 <td class="small">{{ optional($r->requisition_date)->format('d-M-Y') ?? '—' }}</td>
                                 <td class="small">{{ $r->departmentLabel() }}</td>

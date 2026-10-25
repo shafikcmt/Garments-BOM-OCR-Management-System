@@ -99,7 +99,13 @@
     <div class="row g-3">
         <div class="col-5">
             <label class="form-label">UOM</label>
-            <input name="uom" value="{{ $value('uom', $item?->uom) }}" class="form-control" placeholder="pcs / kg / yd">
+            @php($currentUom = $value('uom', $item?->uom))
+            <select name="uom" class="form-select">
+                <option value="">Select UOM…</option>
+                @foreach(\App\Support\UomOptions::list($currentUom) as $uomOption)
+                    <option value="{{ $uomOption }}" @selected(mb_strtolower((string) $currentUom) === mb_strtolower($uomOption))>{{ $uomOption }}</option>
+                @endforeach
+            </select>
         </div>
         <div class="col-7">
             <label class="form-label">Category</label>

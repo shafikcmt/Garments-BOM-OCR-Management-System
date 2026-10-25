@@ -96,9 +96,10 @@ it('renders a healthy row as quiet text, not a green badge', function () {
  *
  * Nineteen since the frozen "Opening Stock" column was dropped: the report now
  * carries ONE opening column, the carry-forward, which is what the client's
- * Excel has. This guard is what caught the footer when that column went.
+ * Excel has, plus the screen-only SKU column (twenty). This guard is what
+ * caught the footer when that column went.
  */
-it('keeps the total row aligned with the nineteen header columns', function () {
+it('keeps the total row aligned with the twenty header columns', function () {
     StockItem::create([
         'name' => 'Cotton Thread White',
         'uom' => 'PCS',
@@ -125,7 +126,7 @@ it('keeps the total row aligned with the nineteen header columns', function () {
         $footCols += max(1, (int) $td->getAttribute('colspan'));
     }
 
-    expect($headCols)->toBe(19);
+    expect($headCols)->toBe(20);
     expect($footCols)->toBe($headCols);
 });
 

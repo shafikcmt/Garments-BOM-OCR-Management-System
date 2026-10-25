@@ -297,3 +297,38 @@ it('does not let a department user edit its own submitted sheet', function () {
         ->get(route('store.stock.requisitions.edit', PurchaseRequisition::first()))
         ->assertForbidden();
 });
+
+it('writes To Be Procured and Amount as formulas on the ALL and category tabs, not on section tabs', function () {
+    $this->withoutVite();
+    $store = reportTabsUser();
+    reportTabsFixture($store);
+
+    $load = function (array $query) use ($store) {
+        $response = $this->actingAs($store)->get(route('store.stock.requisitions.report.excel', ['month' => '2026-08'] + $query));
+        $path = tempnam(sys_get_temp_dir(), 'rep').'.xlsx';
+        file_put_contents($path, $response->baseResponse->getFile()->getContent());
+
+        return \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+    };
+
+    $book = $load([]);
+    $all = $book->getSheetByName('ALL');
+
+    expect($all->getCell('N13')->getValue())->toBe('=MAX(0,G13-H13)')
+        ->and($all->getCell('P13')->getValue())->toBe('=N13*O13')
+        ->and($all->getCell('P14')->getValue())->toBe('=N14*O14');
+
+    // The Total row sums the Amount formulas.
+    $total = collect(range(15, 24))->first(fn ($r) => str_starts_with(trim((string) $all->getCell('A'.$r)->getValue()), 'Total'));
+    expect($all->getCell('P'.$total)->getValue())->toBe('=SUM(P13:P14)');
+
+    // Category tabs carry them too.
+    expect($book->getSheetByName('Stationery')->getCell('P13')->getValue())->toBe('=N13*O13');
+
+    // A section tab keeps plain values.
+    $section = $load(['view' => 'section']);
+    foreach ($section->getAllSheets() as $sheet) {
+        if ($sheet->getTitle() === 'ALL') { continue; }
+        expect((string) $sheet->getCell('P13')->getValue())->not->toStartWith('=');
+    }
+});

@@ -46,6 +46,7 @@
                 @if(trim($slot) !== '')
                     <p class="mb-3">{{ $slot }}</p>
                 @endif
+                {{ $fields ?? '' }}
                 <label class="form-label fw-semibold" for="{{ $fieldId }}">
                     {{ $fieldLabel ?? ($required ? 'Reason' : 'Comment') }}
                     @unless($required)<span class="text-muted fw-normal">(optional)</span>@endunless

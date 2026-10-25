@@ -96,15 +96,24 @@
         </tr>
     </table>
 @else
+    {{-- Excel letterhead: the unit and the report title, left-aligned and NOT
+         merged (a merged heading breaks sorting and filtering). One Filters line
+         (date range and filters) appears only when something narrows the sheet. --}}
     <table>
-        <tr><td colspan="{{ $columns }}">{{ $unit }}</td></tr>
-        <tr><td colspan="{{ $columns }}">{{ $title }}</td></tr>
-        <tr><td colspan="2">Period</td><td colspan="{{ $columns - 2 }}">{{ $periodLabel }}</td></tr>
-        <tr><td colspan="2">Issue Lines</td><td colspan="{{ $columns - 2 }}">{{ $summary['lines'] }}</td></tr>
-        <tr><td colspan="2">Distinct Items</td><td colspan="{{ $columns - 2 }}">{{ $summary['items'] }}</td></tr>
-        <tr><td colspan="2">Filters</td>
-            <td colspan="{{ $columns - 2 }}">{{ $applied ? collect($applied)->map(fn ($v, $k) => $k.': '.$v)->implode(' · ') : 'None' }}</td></tr>
-        <tr><td colspan="{{ $columns }}"></td></tr>
+        <tr><td>{{ $unit }}</td></tr>
+        <tr><td>{{ $title }}</td></tr>
+        @php
+            // One line, and only when something narrows the sheet: the date
+            // range (when it is not "All dates") and any other filter.
+            $narrowing = collect($applied ?: [])->map(fn ($v, $k) => $k.': '.$v);
+            if ($periodLabel !== 'All dates') {
+                $narrowing->prepend('Period: '.$periodLabel);
+            }
+        @endphp
+        @if($narrowing->isNotEmpty())
+            <tr><td>Filters</td><td>{{ $narrowing->implode(' · ') }}</td></tr>
+        @endif
+        <tr><td></td></tr>
     </table>
 @endunless
 
@@ -151,7 +160,12 @@
     @if($rows->isNotEmpty())
         <tfoot>
             <tr class="total">
-                <td colspan="10" class="total-label">Total-</td>
+                @if($forExcel)
+                    <td class="total-label">Total-</td>
+                    @for($blank = 0; $blank < 9; $blank++)<td></td>@endfor
+                @else
+                    <td colspan="10" class="total-label">Total-</td>
+                @endif
                 <td class="num">{{ $qty($summary['qty']) }}</td>
                 <td></td>
             </tr>
@@ -187,7 +201,11 @@
         </tbody>
         <tfoot>
             <tr class="total">
-                <td colspan="2" class="total-label">Total-</td>
+                @if($forExcel)
+                    <td class="total-label">Total-</td><td></td>
+                @else
+                    <td colspan="2" class="total-label">Total-</td>
+                @endif
                 <td class="num">{{ number_format($summary['items']) }}</td>
                 <td class="num">{{ number_format($summary['lines']) }}</td>
                 <td class="num">{{ $qty($summary['qty']) }}</td>

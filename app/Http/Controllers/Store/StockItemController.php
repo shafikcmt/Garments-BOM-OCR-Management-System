@@ -39,6 +39,8 @@ class StockItemController extends Controller
             'search' => ['nullable', 'string', 'max:100'],
             'category' => ['nullable', 'string', 'max:160'],
             'status' => ['nullable', 'string', 'in:attention,out,place_order,low,ok'],
+            // Approval queue: only items waiting for, or refused, approval.
+            'approval' => ['nullable', 'string', 'in:pending,rejected'],
         ]);
 
         $query = StockItem::query()
@@ -60,6 +62,10 @@ class StockItemController extends Controller
 
         if ($category = $filters['category'] ?? null) {
             $query->where('category', $category);
+        }
+
+        if ($approval = $filters['approval'] ?? null) {
+            $query->where('approval_status', $approval);
         }
 
         // Stock on hand is a sum across two relations, so status cannot be a
@@ -85,6 +91,13 @@ class StockItemController extends Controller
 
         $categories = ItemCategory::selectable()->get(['id', 'name']);
 
+        $canApprove = $this->canApproveItems();
+        $pendingCount = StockItem::where('approval_status', StockItem::PENDING)->count();
+        $uomCounts = $canApprove
+            ? StockItem::query()->whereNotNull('uom')->where('uom', '<>', '')
+                ->selectRaw('uom, COUNT(*) as items')->groupBy('uom')->orderBy('uom')->pluck('items', 'uom')
+            : collect();
+
         // Counts for the toolbar chips. Whole master, not the current page —
         // "3 out of stock" has to mean three items, not three on this page.
         $statusCounts = $statuses->countBy();
@@ -97,7 +110,7 @@ class StockItemController extends Controller
             // `categories` too: the Edit modals ride inside this fragment and
             // their _item-fields include needs the category list.
             return view('store.stock._items-list', compact(
-                'items', 'categories', 'canEdit', 'canDelete', 'filters', 'statusCounts'
+                'items', 'categories', 'canEdit', 'canDelete', 'filters', 'statusCounts', 'canApprove', 'pendingCount'
             ));
         }
 
@@ -121,7 +134,7 @@ class StockItemController extends Controller
         }
 
         return view('store.stock.items', compact(
-            'items', 'categories', 'canEdit', 'canDelete', 'filters', 'statusCounts', 'addFrom'
+            'items', 'categories', 'canEdit', 'canDelete', 'filters', 'statusCounts', 'addFrom', 'canApprove', 'pendingCount', 'uomCounts'
         ));
     }
 
@@ -303,12 +316,14 @@ class StockItemController extends Controller
                 // "needle" and "Needle" end up reading identically.
                 $item['category'] = ItemCategory::find($categories[$key])?->name ?? $name;
 
-                StockItem::create($item + ['created_by' => $userId]);
+                StockItem::create($item + ['created_by' => $userId] + $this->approvalFor());
             }
         });
 
+        $pending = $this->canApproveItems() ? '' : ' They are waiting for approval before they can be used.';
+
         return back()
-            ->with('success', count($items).' item(s) imported.'
+            ->with('success', count($items).' item(s) imported.'.$pending
                 .($skipped ? ' '.count($skipped).' row(s) were skipped.' : ''))
             ->with('import_skipped', $skipped);
     }
@@ -318,7 +333,12 @@ class StockItemController extends Controller
         $data = $this->validated($request);
         $data['created_by'] = auth()->id();
 
+        // A user who cannot approve submits the item for approval: it is kept
+        // inactive, so it stays out of every picker and report, until approved.
+        $data = array_merge($data, $this->approvalFor());
+
         $item = StockItem::create($data);
+        $awaiting = ! $item->isApproved();
 
         // Opened from a requisition line that named an item the master did
         // not have ("Not in Item Master"). Now that it does, the line is
@@ -335,19 +355,104 @@ class StockItemController extends Controller
 
             return redirect()
                 ->route('store.stock.requisitions.show', $line->purchase_requisition_id)
-                ->with('success', 'Stock item "'.$data['name'].'" added to the Item Master and linked to this requisition.');
+                ->with('success', 'Stock item "'.$data['name'].'" added to the Item Master and linked to this requisition.'.($awaiting ? ' It is waiting for approval before it can be issued or received.' : ''));
         }
 
-        return back()->with('success', 'Stock item "' . $data['name'] . '" added.');
+        return back()->with('success', $awaiting
+            ? 'Stock item "'.$data['name'].'" submitted for approval. It will be usable once a store admin approves it.'
+            : 'Stock item "'.$data['name'].'" added.');
     }
 
     public function update(Request $request, StockItem $stockItem)
     {
         $this->authorizeStoreEdit('stock item');
 
-        $stockItem->update($this->validated($request));
+        $data = $this->validated($request);
+
+        // An unapproved item cannot be switched on by editing it.
+        if (! $stockItem->isApproved()) {
+            $data['is_active'] = false;
+        }
+
+        $stockItem->update($data);
 
         return back()->with('success', 'Stock item updated.');
+    }
+
+    /** Approve a pending (or previously rejected) item: it becomes usable. */
+    public function approve(StockItem $stockItem)
+    {
+        $this->authorizeApproval();
+
+        $stockItem->update([
+            'approval_status' => StockItem::APPROVED,
+            'approved_by' => auth()->id(),
+            'approved_at' => now(),
+            'is_active' => true,
+        ]);
+
+        return back()->with('success', 'Stock item "'.$stockItem->name.'" approved and added to the Item Master.');
+    }
+
+    /** Refuse a pending item. It stays on file, inactive, and can be approved later. */
+    public function reject(StockItem $stockItem)
+    {
+        $this->authorizeApproval();
+
+        if ($stockItem->isApproved()) {
+            return back()->with('warning', 'This item is already approved.');
+        }
+
+        $stockItem->update([
+            'approval_status' => StockItem::REJECTED,
+            'approved_by' => auth()->id(),
+            'approved_at' => now(),
+            'is_active' => false,
+        ]);
+
+        return back()->with('success', 'Stock item "'.$stockItem->name.'" rejected.');
+    }
+
+    /**
+     * Merge a duplicate UOM into the one to keep. Every item carrying the
+     * duplicate is moved across, which is what removes the duplicate from the
+     * list: there is no separate UOM table, the list is what items use.
+     */
+    public function mergeUom(Request $request)
+    {
+        $this->authorizeApproval();
+
+        $data = $request->validate([
+            'from_uom' => ['required', 'string', 'max:50'],
+            'to_uom' => ['required', 'string', 'max:50', 'different:from_uom'],
+        ], [], ['from_uom' => 'UOM to remove', 'to_uom' => 'UOM to keep']);
+
+        $moved = StockItem::where('uom', $data['from_uom'])->update(['uom' => $data['to_uom']]);
+
+        return back()->with('success', '"'.$data['from_uom'].'" merged into "'.$data['to_uom'].'" — '.$moved.' item(s) updated.');
+    }
+
+    /** Admin, or anyone granted store.items.approve. */
+    protected function canApproveItems(): bool
+    {
+        $user = auth()->user();
+
+        return (bool) $user && ($user->hasRole('admin') || $user->can('store.items.approve'));
+    }
+
+    protected function authorizeApproval(): void
+    {
+        abort_unless($this->canApproveItems(), 403, 'You do not have permission to approve items.');
+    }
+
+    /** @return array<string, mixed> approval fields for a newly created item */
+    protected function approvalFor(): array
+    {
+        if ($this->canApproveItems()) {
+            return ['approval_status' => StockItem::APPROVED, 'approved_by' => auth()->id(), 'approved_at' => now()];
+        }
+
+        return ['approval_status' => StockItem::PENDING, 'is_active' => false];
     }
 
     public function destroy(StockItem $stockItem)

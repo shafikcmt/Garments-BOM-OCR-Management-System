@@ -67,11 +67,6 @@
             <a href="{{ route('store.stock.ledger.excel.all', request()->query()) }}" class="btn btn-outline-secondary" data-ledger-export>
                 <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Download Excel
             </a>
-            @if($canImport ?? false)
-                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importReference">
-                    <i class="bi bi-upload me-1" aria-hidden="true"></i>Import Reference Data
-                </button>
-            @endif
         </x-slot:actions>
     </x-page-header>
 
@@ -256,7 +251,7 @@
                 </div>
                 <div class="col-12 col-md-4 col-xl-2">
                     <label class="form-label" for="ledgerFilterSearch">Search</label>
-                    <input id="ledgerFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item or brand/spec.">
+                    <input id="ledgerFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="SKU, item or brand/spec.">
                 </div>
                 <div class="col-6 col-md-4 col-xl-2">
                     <label class="form-label" for="ledgerFilterCategory">Category</label>
@@ -325,7 +320,4 @@
 
     @include('store.stock._searchable')
 </div>
-    @if($canImport ?? false)
-        @include('store.stock._import-reference-modal')
-    @endif
 @endsection

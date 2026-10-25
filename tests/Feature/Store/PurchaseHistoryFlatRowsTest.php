@@ -117,15 +117,19 @@ it('repeats the delivery on each item row, in the agreed column order', function
 
     expect($ch100)->toHaveCount(3);
 
-    // SL, GRN, Challan, Challan Date, RCV Date, Supplier, Item Name,
+    // SL, GRN, Challan, Challan Date, RCV Date, Supplier, SKU, Item Name,
     // Brand/Specification, UOM, Category, Received Qty, Unit Price,
-    // Received Value, Remarks — the Receiving Report's order.
-    expect(array_column($ch100, 6))
+    // Received Value, Remarks — the Receiving Report's order, with SKU in a
+    // column of its own ahead of the item name.
+    foreach (array_column($ch100, 6) as $sku) {
+        expect($sku)->not->toBe('—')->not->toBeEmpty();
+    }
+    expect(array_column($ch100, 7))
         ->toBe(['Needle DBx1 90/14', 'Machine Oil', 'Sewing Thread 40/2']);
-    expect(array_column($ch100, 7))->toBe(['Organ', 'Shell', 'Coats']);
-    expect(array_column($ch100, 8))->toBe(['Pcs', 'Ltr', 'Cone']);
-    expect(array_column($ch100, 9))->toBe(['Machine Needles', 'Lubricants', 'Threads']);
-    expect(array_column($ch100, 10))->toBe(['10', '5', '25']);
+    expect(array_column($ch100, 8))->toBe(['Organ', 'Shell', 'Coats']);
+    expect(array_column($ch100, 9))->toBe(['Pcs', 'Ltr', 'Cone']);
+    expect(array_column($ch100, 10))->toBe(['Machine Needles', 'Lubricants', 'Threads']);
+    expect(array_column($ch100, 11))->toBe(['10', '5', '25']);
 
     // The delivery's own fields repeat on every one of its item rows.
     foreach ($ch100 as $row) {

@@ -111,7 +111,7 @@ class StockIssueController extends Controller
                 // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE
                 // is case-sensitive, and stays LIKE everywhere else.
                 $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
-                    ->orWhereHas('stockItem', fn ($i) => $i->whereLike('name', $like)));
+                    ->orWhereHas('stockItem', fn ($i) => $i->where(fn ($n) => $n->whereLike('name', $like)->orWhereLike('sku', $like))));
             })
             ->when($filters['month'] ?? null, function ($q, $month) {
                 [$year, $m] = explode('-', $month);

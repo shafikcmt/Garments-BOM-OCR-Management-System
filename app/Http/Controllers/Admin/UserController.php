@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\BuyerScope;
 use App\Support\DepartmentRoles;
 use App\Support\PermissionCatalog;
+use App\Support\PortalAccess;
 use App\Support\UserAdministrationScope;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -161,7 +162,7 @@ class UserController extends Controller
         // Which departments the block applies to, and which roles are carved
         // out of them, so the form can show and hide it as the selects change
         // rather than offering Buyer Access where nothing would ever read it.
-        $buyerScopedDepartments = BuyerScope::SCOPED_DEPARTMENTS;
+        $buyerScopedDepartments = BuyerScope::BUYER_ACCESS_FORM_DEPARTMENTS;
         $buyerUnscopedRoles = BuyerScope::UNSCOPED_ROLES;
 
         return view('admin.users.create', array_merge(
@@ -1016,6 +1017,38 @@ class UserController extends Controller
         $user->syncPermissions($keep->values()->all());
     }
 
+    /**
+     * The Portal Access switches on the user form (see App\Support\PortalAccess).
+     *
+     * Each switch writes its listed permissions as DIRECT permissions, so it works
+     * on top of any role in any department. Run after syncDirectPermissions():
+     * the matrix posts the same boxes, and a switch has the last word. Turning
+     * one off removes only the direct grants — what a role carries stays.
+     * Skipped when the form did not carry the block, and per switch when the
+     * editor does not hold every permission in it themselves.
+     */
+    private function syncPortalAccess(User $user, Request $request): void
+    {
+        if (! $request->has('portal_access_control')) {
+            return;
+        }
+
+        foreach (PortalAccess::toggles() as $key => $toggle) {
+            $names = $toggle['permissions'];
+
+            if (! collect($names)->every(fn ($name) => $this->scope()->mayGrant($name))) {
+                continue;
+            }
+
+            if ($request->boolean('portal_access.'.$key)) {
+                $fromRole = $user->getPermissionsViaRoles()->pluck('name');
+                $user->givePermissionTo(collect($names)->reject(fn ($n) => $fromRole->contains($n))->all());
+            } else {
+                $user->revokePermissionTo($names);
+            }
+        }
+    }
+
     public function store(Request $request)
     {
         $this->authorize('create', User::class);
@@ -1071,6 +1104,7 @@ class UserController extends Controller
 
         $user->syncRoles([$data['role']]);
         $this->syncDirectPermissions($user, $request);
+        $this->syncPortalAccess($user, $request);
         $this->linkEmployee($user, $employeeId);
 
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
@@ -1147,7 +1181,19 @@ class UserController extends Controller
 
         // Which departments the block applies to, and which roles are carved
         // out of them, so it can be shown and hidden as the selects change.
-        $buyerScopedDepartments = BuyerScope::SCOPED_DEPARTMENTS;
+        $storedDepartment = DepartmentRoles::departmentOf($user->primaryRoleName());
+        $holdsBuyers = $assignedBuyers->isNotEmpty();
+
+        // Only Merchandising and Supply Chain are offered Buyer Access. A user
+        // OUTSIDE them who already holds buyers keeps the control (their
+        // department is added), so an existing restriction is never hidden
+        // from the admin who may need to lift it.
+        $buyerScopedDepartments = BuyerScope::BUYER_ACCESS_FORM_DEPARTMENTS;
+
+        if ($holdsBuyers && $storedDepartment) {
+            $buyerScopedDepartments = array_values(array_unique([...$buyerScopedDepartments, $storedDepartment]));
+        }
+
         $buyerUnscopedRoles = BuyerScope::UNSCOPED_ROLES;
 
         // Whether the block starts visible. The stored department decides the
@@ -1155,7 +1201,8 @@ class UserController extends Controller
         // takes over from the first change event.
         // appliesToRole(), so a store_general_stock user's screen starts closed
         // even though their department is scoped.
-        $buyerAccessStartsOpen = BuyerScope::appliesToRole($user->primaryRoleName());
+        $buyerAccessStartsOpen = BuyerScope::appliesToRole($user->primaryRoleName())
+            && in_array($storedDepartment, $buyerScopedDepartments, true);
 
         $currentBuyerIds = $assignedBuyers->pluck('id')->map(fn ($id) => (int) $id)->all();
         $currentBuyerScopeMode = $user->isBuyerConfined()
@@ -1260,6 +1307,7 @@ class UserController extends Controller
         // lock themselves out of the screen they would need to undo it.
         if (! $isSelf) {
             $this->syncDirectPermissions($user, $request);
+            $this->syncPortalAccess($user, $request);
         }
 
         $this->linkEmployee($user, $employeeId);

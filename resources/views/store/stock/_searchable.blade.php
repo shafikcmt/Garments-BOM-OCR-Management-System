@@ -73,6 +73,37 @@
     .ts-wrapper.single.input-active .ts-control > .item { display: none; }
     .ts-wrapper.single .ts-control > .item { line-height: 1.35; }
 
+    /* Item lists that carry a SKU (data-sku-labels): the SKU is a quiet badge in
+       front of the name, the same width on every row so the names line up. */
+    .gx-sku-option { display: flex; align-items: baseline; gap: .65rem; }
+    .gx-sku-badge {
+        flex: 0 0 6.2rem; font-size: .72rem; font-weight: 700; letter-spacing: .02em;
+        color: #64748b; font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+    .gx-sku-name { min-width: 0; }
+    .ts-wrapper .ts-control > .item { max-width: 100%; }
+
+    /* Focused but not yet typing: keep showing what is selected, greyed like a
+       placeholder. Without this the box went blank the moment it was clicked or
+       tabbed into while the SKU and Uom beside it were still filled, and the
+       name only came back on leaving the field — it looked as though nothing
+       had been chosen. The label is hidden again as soon as something is typed
+       (gx-typing, set below). */
+    .ts-wrapper.single.input-active:not(.gx-typing) .ts-control { position: relative; }
+    .ts-wrapper.single.input-active:not(.gx-typing) .ts-control > .item {
+        display: block;
+        position: absolute;
+        top: 50%;
+        left: .75rem;
+        right: 1.6rem;
+        transform: translateY(-50%);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #64748b;
+        pointer-events: none;
+    }
+
     /* The dropdown is rendered on <body> (see dropdownParent below) so it can
        never be clipped by a scrolling ancestor. It therefore needs to sit
        above cards, sticky headers and modals. */
@@ -85,6 +116,10 @@
         margin-top: 4px;
         overflow: hidden;
     }
+    /* Item lists with a SKU: the list opens wider than the (often narrow) box it
+       hangs from, so the SKU and the whole item name read on one line. */
+    .ts-dropdown.gx-wide { min-width: min(560px, calc(100vw - 24px)); max-width: calc(100vw - 24px); }
+    .ts-dropdown.gx-wide .gx-sku-name { overflow-wrap: anywhere; }
     .ts-dropdown .option { padding: .4rem .7rem; }
     .ts-dropdown .active { background: #dbeafe; color: #1d4ed8; }
     .ts-dropdown .create { padding: .4rem .7rem; }
@@ -186,13 +221,33 @@
                 dropdownParent: 'body',
                 // Blank the search box on open so the list is not filtered by
                 // whatever is already selected.
-                onFocus: function () { this.setTextboxValue(''); },
+                onFocus: function () {
+                    this.setTextboxValue('');
+                    // Nothing typed yet: the selected label stays visible, greyed.
+                    this.wrapper.classList.remove('gx-typing');
+                },
                 // With the dropdown rendered on <body> it is no longer a child
                 // of the control, so TomSelect's own outside-click handling can
                 // leave a previous one open — two lists float over the page at
                 // once. Closing the others on open keeps it to one.
                 onDropdownOpen: function () {
                     userDroveHighlight = false;
+
+                    if (this.input.hasAttribute('data-sku-labels')) {
+                        var dd = this.dropdown;
+                        dd.classList.add('gx-wide');
+
+                        // Keep the wider list on screen: TomSelect anchors it to
+                        // the box's left edge, which may be near the right side.
+                        window.requestAnimationFrame(function () {
+                            var box = dd.getBoundingClientRect();
+                            var over = box.right - (window.innerWidth - 12);
+
+                            if (over > 0) {
+                                dd.style.left = Math.max(8, box.left - over) + 'px';
+                            }
+                        });
+                    }
 
                     var self = this;
                     document.querySelectorAll('select.tomselected').forEach(function (el) {
@@ -201,7 +256,17 @@
                 },
                 // Typing a search counts as aiming at the highlight.
                 onType: function () { userDroveHighlight = true; },
-                onInitialize: function () { enableTabToSelect(this, function () { return userDroveHighlight; }, function () { userDroveHighlight = true; }); },
+                onInitialize: function () {
+                    var self = this;
+
+                    enableTabToSelect(this, function () { return userDroveHighlight; }, function () { userDroveHighlight = true; });
+
+                    // The selected label gives way once the user types, and comes
+                    // back if they clear what they typed.
+                    this.control_input.addEventListener('input', function () {
+                        self.wrapper.classList.toggle('gx-typing', self.control_input.value !== '');
+                    });
+                },
             };
 
             if (creatable) {
@@ -304,6 +369,31 @@
                         };
                     })(options.onInitialize);
                 }
+            }
+
+            // OPT-IN: data-sku-labels on an item select whose option text reads
+            // "SKU — Item name". The SKU already has a column of its own beside
+            // the select, so the CHOSEN item shows its name only (one line, no
+            // repeat), while the list keeps the SKU as a quiet badge in front of
+            // each name. Search still matches the whole text, SKU included.
+            if (el.hasAttribute('data-sku-labels')) {
+                var splitSku = function (text) {
+                    var match = /^(\S+) \u2014 ([\s\S]*)$/.exec(String(text));
+
+                    return match ? { sku: match[1], name: match[2] } : { sku: '', name: String(text) };
+                };
+
+                options.render = options.render || {};
+                options.render.item = function (data, escape) {
+                    return '<div>' + escape(splitSku(data.text).name) + '</div>';
+                };
+                options.render.option = function (data, escape) {
+                    var parts = splitSku(data.text);
+
+                    return '<div class="gx-sku-option">'
+                        + '<span class="gx-sku-badge">' + escape(parts.sku || '\u2014') + '</span>'
+                        + '<span class="gx-sku-name">' + escape(parts.name) + '</span></div>';
+                };
             }
 
             new TomSelect(el, options);

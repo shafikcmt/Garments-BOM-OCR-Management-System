@@ -432,10 +432,14 @@ class PurchaseRequisition extends Model
      */
     public function isOpenToStoreCorrection(): bool
     {
-        // A stage-engine sheet is edited only by its raiser (draft or
-        // returned); approvers change quantities at their own stage instead.
+        // A stage-engine sheet is edited by its raiser (draft or returned), and
+        // approvers change quantities at their own stage. On top of that the
+        // Store may correct a DEPARTMENT's sheet once it has reached the Store
+        // and until it is merged into a Final one.
         if ($this->usesStageEngine()) {
-            return false;
+            return $this->isDepartmentLevel()
+                && $this->merged_into_id === null
+                && ($this->awaitingStoreReceipt() || $this->status === self::STATUS_STORE_REVIEWED);
         }
 
         return in_array($this->status, [
@@ -534,15 +538,27 @@ class PurchaseRequisition extends Model
     }
 
     /**
-     * Who may delete this sheet: a DRAFT only, by its raiser or Admin. A
-     * draft has been read by nobody. Anything submitted is cancelled instead
-     * (canBeCancelledBy), so it stays on record.
+     * Who may delete this sheet. A DRAFT: its raiser or Admin. A submitted (or
+     * cancelled) sheet: Admin only, with a reason — for clearing test or
+     * duplicate entries. Never once it is approved or acted on, nor while a
+     * Final requisition holds it (delete or release that first). The history
+     * row survives the sheet. Everyone else cancels instead, so it stays on
+     * record (canBeCancelledBy).
      */
     public function canBeDeletedBy(?User $user): bool
     {
-        return $user !== null
-            && $this->status === self::STATUS_DRAFT
-            && ($user->hasRole('admin') || $this->isRaisedBy($user));
+        if ($user === null) {
+            return false;
+        }
+
+        if ($this->status === self::STATUS_DRAFT) {
+            return $user->hasRole('admin') || $this->isRaisedBy($user);
+        }
+
+        // Admin may remove a sheet at any stage, so requisitions raised only to
+        // test the workflow can be cleared out. A reason is required (see
+        // deleteNeedsReason) and the history row survives the sheet.
+        return $user->hasRole('admin');
     }
 
     /**

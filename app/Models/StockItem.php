@@ -39,6 +39,9 @@ class StockItem extends Model
         'reorder_level',
         'lead_time_days',
         'is_active',
+        'approval_status',
+        'approved_by',
+        'approved_at',
         'remarks',
         'created_by',
     ];
@@ -78,7 +81,17 @@ class StockItem extends Model
         'reorder_level' => 'decimal:4',
         'lead_time_days' => 'integer',
         'is_active' => 'boolean',
+        'approved_at' => 'datetime',
     ];
+
+    public const APPROVED = 'approved';
+    public const PENDING = 'pending';
+    public const REJECTED = 'rejected';
+
+    public function isApproved(): bool
+    {
+        return ($this->approval_status ?? self::APPROVED) === self::APPROVED;
+    }
 
     public function itemCategory()
     {

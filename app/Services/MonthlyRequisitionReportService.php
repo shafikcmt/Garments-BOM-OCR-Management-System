@@ -6,6 +6,7 @@ use App\Models\PurchaseRequisition;
 use App\Models\PurchaseRequisitionItem;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use App\Support\LocalTime;
 
 /**
  * General Stock (module A) — the monthly Purchase Requisition report: every
@@ -205,9 +206,9 @@ class MonthlyRequisitionReportService
     public function resolveMonth(?string $month): Carbon
     {
         try {
-            return $month ? Carbon::createFromFormat('!Y-m', $month)->startOfMonth() : now()->startOfMonth();
+            return $month ? Carbon::createFromFormat('!Y-m', $month)->startOfMonth() : LocalTime::now()->startOfMonth();
         } catch (\Throwable $e) {
-            return now()->startOfMonth();
+            return LocalTime::now()->startOfMonth();
         }
     }
 
@@ -414,7 +415,7 @@ class MonthlyRequisitionReportService
                 // miss here reads as a requisition that never happened.
                 $q->where(fn ($w) => $w->whereLike('user_dept', $like)
                     ->orWhereLike('specification', $like)
-                    ->orWhereHas('stockItem', fn ($i) => $i->whereLike('name', $like))
+                    ->orWhereHas('stockItem', fn ($i) => $i->where(fn ($n) => $n->whereLike('name', $like)->orWhereLike('sku', $like)))
                     // Lines naming something not in the Item Master have no
                     // stockItem to search; their typed name is searched here.
                     ->orWhereLike('custom_item_name', $like)
@@ -440,6 +441,7 @@ class MonthlyRequisitionReportService
             // something not in the Item Master, so such a line prints its item
             // rather than a dash on the report, the PDF and the Excel alike.
             'item_name' => $line->displayName(),
+            'sku' => optional($line->stockItem)->sku,
             'is_custom_item' => $line->isCustomItem(),
             'uom' => $line->uom_snapshot,
             'category' => optional($line->itemCategory)->name,

@@ -138,6 +138,7 @@
                             </span>
                         </a>
                     </li>
+                    @include('layouts._my-approvals-link', [])
 
                     {{-- Each department's own report. Admin is one of the three
                          roles those routes admit, so they need a way in that is
@@ -188,7 +189,7 @@
                                  report, then the master data. --}}
                             {{-- Named in full to keep it distinct from the
                                  material Requisitions under Buyer/Style Stock. --}}
-                            <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">Purchase Requisition</a>
+                            <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.requisitions.*') && ! request()->routeIs('store.stock.requisitions.my-approvals') ? 'is-active' : '' }}">Purchase Requisition</a>
                             <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">Receiving</a>
                             <a href="{{ route('store.stock.issues.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">Issues</a>
                             <a href="{{ route('store.stock.ledger') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">Stock Report</a>
@@ -280,6 +281,7 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span><span class="sidebar-link-text">Dashboard</span></span>
                         </a>
                     </li>
+                    @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
@@ -309,6 +311,7 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span><span class="sidebar-link-text">Dashboard</span></span>
                         </a>
                     </li>
+                    @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
                     <li class="sidebar-item">
                         <a href="{{ route('account.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('account.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
@@ -328,6 +331,7 @@
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span><span class="sidebar-link-text">Dashboard</span></span>
                         </a>
                     </li>
+                    @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
                     <li class="sidebar-item">
                         <a href="{{ route('commercial.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
@@ -357,6 +361,7 @@
                         </a>
                     </li>
                     @endif
+                    @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
                     @if($seeWorkspace)
                     <li class="sidebar-item">
                         <a href="{{ route('store.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('store.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
@@ -371,11 +376,16 @@
             <div class="sidebar-section">
                 <div class="sidebar-section-label">General Stock</div>
                 <ul class="sidebar-list">
+                    {{-- A requisition-only user has no Dashboard to sit under, so
+                         My Approvals leads this list instead — still top level. --}}
+                    @unless($seeStoreDashboard || $seeWorkspace)
+                    @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
+                    @endunless
                     @if($seeRequisition)
                     {{-- Named in full to keep it distinct from the material
                          Requisitions under Buyer/Style Stock. --}}
                     <li class="sidebar-item">
-                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">
+                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') && ! request()->routeIs('store.stock.requisitions.my-approvals') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Purchase Requisition</span></span>
                         </a>
                     </li>
@@ -479,6 +489,7 @@
                             </span>
                         </a>
                     </li>
+                    @include('layouts._my-approvals-link', ['gate' => $seeRequisition])
                     <li class="sidebar-item">
                         <a href="{{ route('supply_chain.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
@@ -549,6 +560,7 @@
                             </span>
                         </a>
                     </li>
+                    @include('layouts._my-approvals-link', [])
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.reports.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
@@ -598,7 +610,7 @@
                     {{-- Named in full to keep it distinct from the material
                          Requisitions under Buyer/Style Stock. --}}
                     <li class="sidebar-item">
-                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">
+                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') && ! request()->routeIs('store.stock.requisitions.my-approvals') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Purchase Requisition</span>

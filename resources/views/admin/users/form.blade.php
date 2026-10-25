@@ -33,18 +33,7 @@
         <div class="form-text">Printed under the name on signed documents. Leave blank to print the department instead.</div>
     </div>
 
-    {{-- The section a department user raises requisitions for. Fixes the
-         Section, User Dept. and requisition number on their form. --}}
-    <div class="mb-3">
-        <label class="form-label" for="requisitionSection">Requisition Section</label>
-        <select name="requisition_section_id" id="requisitionSection" class="form-select">
-            <option value="">— Not set (user picks the section on each requisition) —</option>
-            @foreach(\App\Models\IndentSection::selectable()->get(['id', 'name']) as $section)
-                <option value="{{ $section->id }}" @selected((string) old('requisition_section_id', $user->requisition_section_id ?? '') === (string) $section->id)>{{ $section->name }}</option>
-            @endforeach
-        </select>
-        <div class="form-text">For users outside the Store: their General Stock requisitions are numbered and filed under this section (e.g. Cutting, Line-04).</div>
-    </div>
+    @include('admin.users._requisition-section')
 @endif
 
 <div class="mb-3">
@@ -124,3 +113,7 @@
         <option value="0" @selected(old('status', $user->status ?? 1) == 0)>Inactive</option>
     </select>
 </div>
+
+@include('admin.users._requisition-access')
+
+@include('admin.users._requisition-route')

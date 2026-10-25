@@ -31,13 +31,33 @@
                 // No department chosen yet: offer everything rather than an
                 // empty list. A role mapped to no department stays offered too,
                 // or a user holding one could never be edited.
+                // A role mapped to no department (Requisition Raiser) is offered
+                // only while no department is chosen, or when it is the role
+                // the person already holds. Chosen under a department it would
+                // leave their requisitions with no head to check them.
                 var belongs = ! chosen
                     || option.dataset.department === chosen
-                    || option.dataset.department === 'other';
+                    || (option.dataset.department === 'other' && option.selected);
 
                 option.hidden = ! belongs;
                 option.disabled = ! belongs;
             });
+
+            // The Requisition Section list follows the department too.
+            var section = document.getElementById('requisitionSection');
+
+            if (section) {
+                Array.prototype.forEach.call(section.options, function (option) {
+                    if (! option.value) { return; }
+
+                    var show = ! chosen || option.dataset.department === chosen;
+
+                    if (clearMismatch && option.selected && ! show) { section.value = ''; }
+
+                    option.hidden = ! show && ! option.selected;
+                    option.disabled = ! show && ! option.selected;
+                });
+            }
 
             var selected = role.selectedOptions[0];
 
@@ -49,7 +69,17 @@
             }
         }
 
-        department.addEventListener('change', function () { apply(true); });
+        // Blocks marked data-departments="a,b" show only for those departments.
+        // Their inputs are disabled while hidden, so a hidden block posts nothing.
+        function applyDeptOnly() {
+            document.querySelectorAll('.js-dept-only').forEach(function (block) {
+                var on = (block.dataset.departments || '').split(',').indexOf(department.value) !== -1;
+                block.hidden = ! on;
+                block.querySelectorAll('input').forEach(function (input) { input.disabled = ! on; });
+            });
+        }
+
+        department.addEventListener('change', function () { apply(true); applyDeptOnly(); });
 
         // On load, filter without clearing — an existing user's saved role must
         // survive the first pass even if the map has since moved it.

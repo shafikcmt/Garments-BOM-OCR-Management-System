@@ -25,6 +25,7 @@ use App\Services\RequisitionSignatureResolver;
 use App\Services\RequisitionWorkflow;
 use App\Services\RequirementVsIssueService;
 use App\Services\StockSummaryService;
+use App\Support\LocalTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -78,6 +79,7 @@ class PurchaseRequisitionController extends Controller
             'status' => ['nullable', 'string', 'in:'.implode(',', array_keys(PurchaseRequisition::statusLabels()))],
             'section' => ['nullable', 'integer', 'exists:indent_sections,id'],
             'search' => ['nullable', 'string', 'max:100'],
+            'level' => ['nullable', 'in:'.PurchaseRequisition::LEVEL_FINAL],
         ]);
 
         $requisitions = PurchaseRequisition::query()
@@ -91,13 +93,14 @@ class PurchaseRequisitionController extends Controller
             ->when($filters['month'] ?? null, fn ($q, $month) => $q->forMonth($month))
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($filters['section'] ?? null, fn ($q, $id) => $q->where('indent_section_id', $id))
+            ->when($filters['level'] ?? null, fn ($q, $level) => $q->where('level', $level))
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $like = '%'.$search.'%';
                 // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE
                 // is case-sensitive, and stays LIKE everywhere else.
                 $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
                     ->orWhereHas('indentPerson', fn ($p) => $p->whereLike('name', $like))
-                    ->orWhereHas('items.stockItem', fn ($i) => $i->whereLike('name', $like))
+                    ->orWhereHas('items.stockItem', fn ($i) => $i->where(fn ($n) => $n->whereLike('name', $like)->orWhereLike('sku', $like)))
                     // A line naming something not in the Item Master has no
                     // stockItem to search, so its typed name is searched too —
                     // otherwise the one item nobody can find in the master is
@@ -211,7 +214,7 @@ class PurchaseRequisitionController extends Controller
                 $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
                     ->orWhereHas('indentPerson', fn ($p) => $p->whereLike('name', $like))
                     ->orWhereHas('createdBy', fn ($u) => $u->whereLike('name', $like))
-                    ->orWhereHas('items.stockItem', fn ($i) => $i->whereLike('name', $like))
+                    ->orWhereHas('items.stockItem', fn ($i) => $i->where(fn ($n) => $n->whereLike('name', $like)->orWhereLike('sku', $like)))
                     ->orWhereHas('items', fn ($i) => $i->whereLike('custom_item_name', $like)));
             })
             // Oldest first: a queue is worked from the end that has waited
@@ -238,6 +241,67 @@ class PurchaseRequisitionController extends Controller
             // Step 4: received sheets waiting to go into a final sheet.
             'canMerge' => PurchaseRequisition::canMerge($request->user()),
             'readyCount' => PurchaseRequisition::query()->fromDepartments()->readyToMerge()->count(),
+        ]);
+    }
+
+    /**
+     * My Approvals: the sheets waiting for this user's action, and the ones
+     * sent back to them. Admin and Management have nothing to approve, so
+     * they get a read-only "All Pending" tab instead — every sheet waiting at
+     * any stage, limited by the same visibleTo() rule as the main list.
+     *
+     * The list is RequisitionWorkflow::waitingForOnce(): the same answer, from
+     * the same who-can-act rule, as the sidebar badge and the Approve button.
+     */
+    public function myApprovals(Request $request)
+    {
+        $user = $request->user();
+        $overview = $user->hasAnyRole(['admin', 'management']);
+        $tab = ($overview && $request->query('tab') === 'all') ? 'all' : 'mine';
+
+        $waiting = $this->workflow->waitingForOnce($user);
+
+        $returned = PurchaseRequisition::query()
+            ->where('created_by', $user->id)
+            ->whereNotNull('workflow_version')
+            ->where('current_stage', 1)
+            ->whereNotIn('status', [PurchaseRequisition::STATUS_DRAFT, PurchaseRequisition::STATUS_CANCELLED])
+            ->with('indentSection')
+            ->orderByDesc('id')
+            ->get();
+
+        $returnNotes = $returned->isEmpty() ? collect() : PurchaseRequisitionAction::query()
+            ->whereIn('purchase_requisition_id', $returned->pluck('id'))
+            ->whereIn('action', [PurchaseRequisitionAction::RETURNED, PurchaseRequisitionAction::HEAD_RETURNED])
+            ->orderBy('id')->get()->keyBy('purchase_requisition_id');
+
+        $all = null;
+
+        if ($tab === 'all') {
+            $all = PurchaseRequisition::query()
+                ->visibleTo($user)
+                ->whereNotNull('workflow_version')
+                ->whereNotNull('current_stage')
+                ->whereNotIn('status', [PurchaseRequisition::STATUS_DRAFT, PurchaseRequisition::STATUS_CANCELLED])
+                ->with(['indentSection', 'createdBy'])
+                ->orderBy('submitted_at')
+                ->orderBy('id')
+                ->paginate(25)
+                ->withQueryString();
+        }
+
+        $details = $this->workflow->waitingDetails(
+            $tab === 'all' ? collect($all->items()) : $waiting->concat($returned)
+        );
+
+        return view('store.stock.requisitions.my-approvals', [
+            'tab' => $tab,
+            'overview' => $overview,
+            'waiting' => $waiting,
+            'returned' => $returned,
+            'returnNotes' => $returnNotes,
+            'all' => $all,
+            'details' => $details,
         ]);
     }
 
@@ -280,7 +344,7 @@ class PurchaseRequisitionController extends Controller
                 $like = '%'.$search.'%';
                 $q->where(fn ($w) => $w->whereLike('requisition_no', $like)
                     ->orWhereHas('createdBy', fn ($u) => $u->whereLike('name', $like))
-                    ->orWhereHas('items.stockItem', fn ($i) => $i->whereLike('name', $like))
+                    ->orWhereHas('items.stockItem', fn ($i) => $i->where(fn ($n) => $n->whereLike('name', $like)->orWhereLike('sku', $like)))
                     ->orWhereHas('items', fn ($i) => $i->whereLike('custom_item_name', $like)));
             })
             ->orderBy('requisition_date')
@@ -399,7 +463,7 @@ class PurchaseRequisitionController extends Controller
     private function monthOptions(?string $selected): array
     {
         $options = [];
-        $month = now()->startOfMonth();
+        $month = LocalTime::now()->startOfMonth();
 
         for ($i = 0; $i < 24; $i++) {
             $options[$month->format('Y-m')] = $month->format('F Y');
@@ -452,7 +516,7 @@ class PurchaseRequisitionController extends Controller
         $storeStage = false;
         $next = null;
 
-        DB::transaction(function () use ($requisition, $user, $data, &$stageName, &$storeStage, &$next) {
+        DB::transaction(function () use ($request, $requisition, $user, $data, &$stageName, &$storeStage, &$next) {
             // Re-checked under the lock: a second click finds the stage done.
             $locked = $this->lockRequisition($requisition);
             abort_unless($this->workflow->canAct($locked, $user), 422,
@@ -461,7 +525,7 @@ class PurchaseRequisitionController extends Controller
             $stage = $this->workflow->currentStage($locked);
             $stageName = $stage?->displayLabel();
             $storeStage = $stage?->stamp_source === \App\Models\RequisitionSignatureBlock::STAMP_STORE_HEAD;
-            $next = $this->workflow->approve($locked, $user, $data['comment'] ?? null);
+            $next = $this->workflow->approve($locked, $user, $data['comment'] ?? null, (int) $request->input('send_to') ?: null);
         });
 
         $message = 'Requisition '.$requisition->requisition_no.' approved'
@@ -610,6 +674,9 @@ class PurchaseRequisitionController extends Controller
         $data = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer', 'distinct'],
+            'lines' => ['nullable', 'array'],
+            'lines.*.include' => ['nullable', 'in:0,1'],
+            'lines.*.qty' => ['nullable', 'numeric', 'min:0'],
         ], [
             'ids.required' => 'Select at least one received requisition to merge.',
             'ids.min' => 'Select at least one received requisition to merge.',
@@ -617,7 +684,7 @@ class PurchaseRequisitionController extends Controller
 
         $user = $request->user();
 
-        $final = DB::transaction(function () use ($data, $user) {
+        $final = DB::transaction(function () use ($request, $data, $user) {
             $sources = PurchaseRequisition::whereIn('id', $data['ids'])
                 ->orderBy('requisition_date')->orderBy('id')
                 ->lockForUpdate()->get();
@@ -640,35 +707,18 @@ class PurchaseRequisitionController extends Controller
             // Dated in the sources' month: today while that month runs, else
             // the latest source's date — so the month's report carries it.
             $latest = $sources->max('requisition_date');
-            $date = now()->format('Y-m') === $months->first() ? now()->startOfDay() : Carbon::parse($latest);
+            $date = LocalTime::now()->format('Y-m') === $months->first() ? LocalTime::today() : Carbon::parse($latest);
 
-            $sources->load('items', 'indentSection');
-            $lines = [];
+            $lines = $this->mergeSourceLines($sources);
 
-            foreach ($sources as $source) {
-                $dept = $source->indentSection?->name
-                    ?: ($source->department_role ? $source->departmentLabel() : null);
-
-                foreach ($source->items as $line) {
-                    if ((float) $line->qty_requested <= 0) {
-                        continue; // set to 0 — not approved — on the way through
-                    }
-
-                    $lines[] = [
-                        'stock_item_id' => $line->stock_item_id,
-                        'custom_item_name' => $line->stock_item_id ? null : $line->custom_item_name,
-                        'specification' => $line->specification,
-                        'type' => $line->type,
-                        'user_dept' => $line->user_dept ?: $dept,
-                        'qty_requested' => (float) $line->qty_requested,
-                        'rate_appx' => $line->rate_appx,
-                        'remarks' => $line->remarks,
-                    ];
-                }
+            // The Store's own choices from the review screen: an item hidden,
+            // or its quantity changed. Nothing is hidden by stock on its own.
+            if (is_array($request->input('lines'))) {
+                $lines = $this->applyMergeChoices($lines, $request->input('lines'));
             }
 
             if ($lines === []) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['ids' => 'The selected requisitions have no quantities to merge.']);
+                throw \Illuminate\Validation\ValidationException::withMessages(['ids' => 'The selected requisitions have no quantities to merge. Keep at least one item with a quantity.']);
             }
 
             $defaults = DepartmentRequisitionDefaults::for($user);
@@ -700,6 +750,8 @@ class PurchaseRequisitionController extends Controller
                     'comment' => 'Merged into final requisition '.$final->requisition_no.'.',
                     'meta' => ['merged_into' => $final->requisition_no],
                 ]);
+
+                app(\App\Services\RequisitionNotifier::class)->merged($source, $final, $user);
             }
 
             $this->history->record($final, PurchaseRequisitionAction::MERGED, [
@@ -717,6 +769,139 @@ class PurchaseRequisitionController extends Controller
             ->with('success', 'Final requisition '.$final->requisition_no.' created as a draft from '
                 .count($data['ids']).' department requisition'.(count($data['ids']) === 1 ? '' : 's')
                 .'. Check the quantities, add any Store items, then submit it for approval.');
+    }
+
+    /**
+     * Every item line of the sheets being merged, in the shape the Final
+     * sheet is written from. Lines an approver set to 0 are left out.
+     *
+     * @param  \Illuminate\Support\Collection<int, PurchaseRequisition>  $sources
+     * @return list<array<string, mixed>>
+     */
+    private function mergeSourceLines($sources): array
+    {
+        $sources->load('items', 'indentSection');
+        $lines = [];
+
+        foreach ($sources as $source) {
+            $dept = $source->indentSection?->name
+                ?: ($source->department_role ? $source->departmentLabel() : null);
+
+            foreach ($source->items as $line) {
+                if ((float) $line->qty_requested <= 0) {
+                    continue; // set to 0 — not approved — on the way through
+                }
+
+                $lines[] = [
+                    'stock_item_id' => $line->stock_item_id,
+                    'custom_item_name' => $line->stock_item_id ? null : $line->custom_item_name,
+                    'specification' => $line->specification,
+                    'type' => $line->type,
+                    'user_dept' => $line->user_dept ?: $dept,
+                    'qty_requested' => (float) $line->qty_requested,
+                    'rate_appx' => $line->rate_appx,
+                    'remarks' => $line->remarks,
+                ];
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * One line per item, then the Store's choices from the review applied:
+     * include = 0 hides the item from the Final sheet, qty replaces the total.
+     *
+     * @param  list<array<string, mixed>>  $lines
+     * @param  array<string, array{include?: string, qty?: string|float}>  $choices keyed by PurchaseRequisitionService::lineKey()
+     * @return list<array<string, mixed>>
+     */
+    private function applyMergeChoices(array $lines, array $choices): array
+    {
+        $out = [];
+
+        foreach ($this->requisitions->mergeLines($lines) as $line) {
+            $choice = $choices[$this->requisitions->lineKey($line)] ?? null;
+
+            if ($choice !== null) {
+                if (($choice['include'] ?? '1') === '0') {
+                    continue;
+                }
+
+                if (isset($choice['qty']) && $choice['qty'] !== '') {
+                    $line['qty_requested'] = (float) $choice['qty'];
+                }
+            }
+
+            if ((float) $line['qty_requested'] > 0) {
+                $out[] = $line;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The step before merging: the selected sheets' items, one row each, with
+     * the stock on hand beside what was asked for. Items the stock already
+     * covers are highlighted; the Store keeps, reduces or hides each one, then
+     * creates the Final sheet. Read-only — nothing is saved here.
+     */
+    public function mergeReview(Request $request)
+    {
+        abort_unless(PurchaseRequisition::canMerge($request->user()), 403,
+            'Only the Store team can merge requisitions into a final requisition.');
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'distinct'],
+        ], ['ids.required' => 'Select at least one received requisition to merge.']);
+
+        $sources = PurchaseRequisition::whereIn('id', $data['ids'])->orderBy('requisition_date')->orderBy('id')->get();
+
+        $problem = match (true) {
+            $sources->count() !== count($data['ids']) => 'A selected requisition no longer exists. Reload the page and try again.',
+            $sources->reject(fn (PurchaseRequisition $r) => $r->isReadyToMerge())->isNotEmpty()
+                => 'Only requisitions received by Store and not yet merged can be merged.',
+            $sources->map(fn (PurchaseRequisition $r) => $r->requisition_date?->format('Y-m'))->unique()->count() > 1
+                => 'Merge one month at a time.',
+            default => null,
+        };
+
+        if ($problem) {
+            return redirect()->route('store.stock.requisitions.requested')->withErrors(['ids' => $problem]);
+        }
+
+        $merged = collect($this->requisitions->mergeLines($this->mergeSourceLines($sources)));
+
+        $itemIds = $merged->pluck('stock_item_id')->filter()->unique()->values()->all();
+        $snapshots = $this->requisitions->snapshots($itemIds);
+        $items = \App\Models\StockItem::whereIn('id', $itemIds)->get()->keyBy('id');
+
+        $rows = $merged->map(function (array $line) use ($snapshots, $items) {
+            $item = $line['stock_item_id'] ? $items->get($line['stock_item_id']) : null;
+            $stock = $line['stock_item_id'] ? ($snapshots[$line['stock_item_id']]['stock_in_hand'] ?? null) : null;
+            $requested = (float) $line['qty_requested'];
+            $needed = $stock === null ? $requested : $this->requisitions->toBeProcured($requested, $stock);
+
+            return [
+                'key' => $this->requisitions->lineKey($line),
+                'name' => $item?->name ?? $line['custom_item_name'],
+                'sku' => $item?->sku,
+                'uom' => $item?->uom,
+                'sections' => $line['user_dept'],
+                'requested' => $requested,
+                'stock' => $stock,
+                'needed' => $needed,
+                'covered' => $stock !== null && $stock >= $requested,
+                'partial' => $stock !== null && $stock > 0 && $stock < $requested,
+            ];
+        })->values();
+
+        return view('store.stock.requisitions.merge-review', [
+            'sources' => $sources,
+            'rows' => $rows,
+        ]);
     }
 
     /**
@@ -947,7 +1132,7 @@ class PurchaseRequisitionController extends Controller
                 // Every new submission goes onto the stage engine. Refuses,
                 // rolling the whole save back, if an approver is not set or
                 // the raiser holds a stage.
-                $this->workflow->start($requisition);
+                $this->workflow->start($requisition, (int) request()->input('send_to') ?: null);
                 $this->header->snapshot($requisition);
             }
 
@@ -1022,6 +1207,7 @@ class PurchaseRequisitionController extends Controller
         return view('store.stock.requisitions.show', [
             'requisition' => $requisition,
             'signatures' => $this->signatures->forRequisition($requisition),
+            'stageTracker' => $this->workflow->tracker($requisition),
             // Lines the Store may want to add to the Item Master. Offered only
             // to whoever reads every requisition AND may create items — the
             // same permission the Item Master screen's own Add button asks —
@@ -1248,7 +1434,7 @@ class PurchaseRequisitionController extends Controller
                 // starts (again) on the stage engine — a new cycle. An old-flow
                 // sheet returned by its head finishes on the old flow.
                 if ($fromStatus === PurchaseRequisition::STATUS_DRAFT || $requisition->usesStageEngine()) {
-                    $this->workflow->start($requisition);
+                    $this->workflow->start($requisition, (int) request()->input('send_to') ?: null);
                 }
 
                 // Every (re)submit refreshes the header snapshot; a Store
@@ -1289,7 +1475,7 @@ class PurchaseRequisitionController extends Controller
         if (! $requisition->canBeDeletedBy(auth()->user())) {
             return back()->with('error', $requisition->status === PurchaseRequisition::STATUS_DRAFT
                 ? 'Only the person who raised this draft, or Admin, can delete it.'
-                : 'A submitted requisition cannot be deleted. Cancel it instead, so it stays on record.');
+                : 'Only Admin can delete a submitted requisition. Cancel it instead, so it stays on record.');
         }
 
         $data = $request->validate([
@@ -1334,7 +1520,7 @@ class PurchaseRequisitionController extends Controller
     {
         $on = $request->filled('on')
             ? Carbon::parse($request->query('on'))
-            : Carbon::now();
+            : LocalTime::now();
 
         $snapshot = $this->requisitions->snapshot($stockItem->id, $on);
 
@@ -1342,6 +1528,7 @@ class PurchaseRequisitionController extends Controller
         // for a duplicate key, which would send the raw timestamp instead of
         // the display date the form puts straight into a read-only box.
         $payload = array_merge($snapshot, [
+            'sku' => $stockItem->sku,
             'uom' => $stockItem->uom,
             // The item master's merged Brand/Specification field. The line's
             // own Specification stays editable — this only pre-fills it.
@@ -1352,7 +1539,7 @@ class PurchaseRequisitionController extends Controller
                 : null,
         ]);
 
-        // A department user gets the item master's descriptive fields — Uom,
+        // A department user gets the item master's descriptive fields — SKU, Uom,
         // Specification, Category — and none of the Store's figures. Hiding
         // the chips on their form is not enough when the numbers still travel
         // in the response; they are stripped here. The server re-reads the
@@ -1360,7 +1547,7 @@ class PurchaseRequisitionController extends Controller
         // Store later sees are unaffected.
         $user = $request->user();
         if (! ($user && PurchaseRequisition::seesEveryRequisition($user))) {
-            $payload = array_intersect_key($payload, array_flip(['uom', 'specification', 'item_category_id']));
+            $payload = array_intersect_key($payload, array_flip(['sku', 'uom', 'specification', 'item_category_id']));
         }
 
         return response()->json($payload);
@@ -1376,7 +1563,7 @@ class PurchaseRequisitionController extends Controller
                 ? IndentSection::find($request->query('section'))?->name
                 : null);
 
-        $on = $request->filled('on') ? Carbon::parse($request->query('on')) : Carbon::now();
+        $on = $request->filled('on') ? Carbon::parse($request->query('on')) : LocalTime::now();
 
         return response()->json(['requisition_no' => $this->numbers->preview($section, $on)]);
     }
@@ -1447,7 +1634,34 @@ class PurchaseRequisitionController extends Controller
             ? $this->workflow->problems($defaults->level, $requisition?->createdBy ?? $user, $defaults->section, $defaults->department)
             : [];
 
+        // Who the sheet goes to when it is submitted, said in the Submit popup:
+        // the head who checks it, or — when it goes straight to the Store —
+        // the Store users to choose from.
+        $submitRoute = null;
+
+        if ($onEngine && ! $workflowProblems) {
+            $raiser = $requisition?->createdBy ?? $user;
+            $plan = collect($this->workflow->plan($defaults->level, $raiser, $defaults->section, $defaults->department));
+            // The first step that really waits on someone else: not skipped,
+            // not one the raiser already clears as head of their own sheet.
+            $first = $plan->first(fn ($st) => ! $st['skipped'] && ! $st['self_approved']
+                && ! ($st['user'] && $st['user']->id === $raiser->id));
+            $toStore = $first && $defaults->level === PurchaseRequisition::LEVEL_DEPARTMENT
+                && $first['sequence'] === $plan->last()['sequence'];
+
+            if ($toStore) {
+                $options = $this->workflow->sendToOptions($raiser);
+                $submitRoute = $options->isNotEmpty()
+                    ? ['label' => $first['label'], 'store' => true, 'options' => $options->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->all()]
+                    : null;
+            } elseif ($first && $first['user']) {
+                // One person checks it: shown as a pre-filled choice.
+                $submitRoute = ['label' => $first['label'], 'store' => false, 'options' => [['id' => $first['user']->id, 'name' => $first['user']->name]]];
+            }
+        }
+
         return [
+            'submitRoute' => $submitRoute,
             'items' => $this->requisitions->selectableItems(),
             'categories' => ItemCategory::selectable()->get(['id', 'name']),
             'sections' => IndentSection::selectable()->get(['id', 'name']),
@@ -1518,6 +1732,8 @@ class PurchaseRequisitionController extends Controller
     {
         $unique = 'unique:purchase_requisitions,requisition_no'.($existing ? ','.$existing->id : '');
 
+        $this->dropBlankLines($request);
+
         $data = $request->validate([
             'action' => ['required', 'in:draft,submit'],
             'mode' => ['required', 'in:'.PurchaseRequisition::MODE_SINGLE.','.PurchaseRequisition::MODE_MULTI],
@@ -1531,15 +1747,13 @@ class PurchaseRequisitionController extends Controller
 
             'items' => ['required', 'array', 'min:1'],
 
-            // A line names EITHER a master item or a typed one, never neither.
-            // required_without each way is what refuses an empty line; nullable
-            // is what lets the unused half of the pair arrive blank, which it
-            // always does — the form posts both fields on every row.
+            // Every line is an Item Master item. A typed, free-text item is no
+            // longer accepted (custom_item_name is deliberately not validated,
+            // so it never reaches the save); sheets saved earlier keep theirs.
             // A saved line's own id, posted back on edit. Only matched against
             // THIS sheet's lines in syncItems(), so a foreign id does nothing.
             'items.*.id' => ['nullable', 'integer'],
-            'items.*.stock_item_id' => ['nullable', 'required_without:items.*.custom_item_name', 'integer', 'exists:stock_items,id'],
-            'items.*.custom_item_name' => ['nullable', 'required_without:items.*.stock_item_id', 'string', 'max:255'],
+            'items.*.stock_item_id' => ['required', 'integer', 'exists:stock_items,id'],
             'items.*.specification' => ['nullable', 'string', 'max:255'],
             'items.*.type' => ['nullable', 'in:'.PurchaseRequisitionItem::TYPE_REPLACE.','.PurchaseRequisitionItem::TYPE_NEW],
             'items.*.user_dept' => ['nullable', 'string', 'max:255'],
@@ -1550,6 +1764,8 @@ class PurchaseRequisitionController extends Controller
             'items.required' => 'Add at least one item to the requisition.',
             'items.min' => 'Add at least one item to the requisition.',
             'requisition_no.unique' => 'That Requisition No is already used by another requisition.',
+            'items.*.stock_item_id.required' => 'Select the :attribute from the Item Master.',
+            'items.*.qty_requested.min' => 'The :attribute must be more than 0.',
         ], $this->lineAttributes($request));
 
         // Single mode is one line by definition. Enforced server-side so a
@@ -1560,6 +1776,33 @@ class PurchaseRequisitionController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * Silently drop a line with nothing on it — no item, no typed name, no qty,
+     * no remarks — before validating, on Submit and Save as Draft alike. The
+     * page does the same, so "line 2" reads the same on both. A partly filled
+     * line is kept and validated as ever; if every line was blank, nothing is
+     * left and 'items' fails with "Add at least one item".
+     */
+    private function dropBlankLines(Request $request): void
+    {
+        $items = $request->input('items');
+
+        if (! is_array($items)) {
+            return;
+        }
+
+        $blank = fn ($v) => trim((string) $v) === '';
+
+        $kept = array_values(array_filter($items, fn ($line) => ! is_array($line) || ! (
+            $blank($line['stock_item_id'] ?? null)
+            && $blank($line['custom_item_name'] ?? null)
+            && $blank($line['qty_requested'] ?? null)
+            && $blank($line['remarks'] ?? null)
+        )));
+
+        $request->merge(['items' => $kept]);
     }
 
     /**
@@ -1579,6 +1822,7 @@ class PurchaseRequisitionController extends Controller
         foreach (array_keys((array) $request->input('items', [])) as $index) {
             $line = ((int) $index) + 1;
             $attributes['items.'.$index.'.stock_item_id'] = 'item on line '.$line;
+            $attributes['items.'.$index.'.custom_item_name'] = 'item name on line '.$line;
             $attributes['items.'.$index.'.qty_requested'] = 'qty requested on line '.$line;
             $attributes['items.'.$index.'.rate_appx'] = 'rate on line '.$line;
         }

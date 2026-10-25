@@ -22,6 +22,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // $timestamp->local(): the same instant on the Dhaka clock, for display.
+        \Illuminate\Support\Carbon::macro('local', fn () => \App\Support\LocalTime::of($this));
+
         /*
          * Pagination is drawn in this application's own language.
          *

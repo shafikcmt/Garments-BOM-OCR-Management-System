@@ -258,12 +258,32 @@ it('keeps an old-flow sheet on the old buttons', function () {
     engineApprove($this->approvers['store_head']->fresh(), $old->fresh())->assertStatus(422);
 });
 
-it('does not let the Store correct a stage-engine sheet', function () {
-    engineSubmit(engineUser('production', ['store.requisition.create']))->assertRedirect();
+it('lets the Store correct a department sheet only once it has reached the Store, and not after a merge', function () {
+    $this->withoutVite();
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $store = engineUser('store', ['store.requisition.edit'], ['status' => 1]);
+
+    engineSubmit($raiser)->assertRedirect();
     $sheet = PurchaseRequisition::latest('id')->firstOrFail();
 
-    $this->actingAs(engineUser('store', ['store.requisition.edit']))
-        ->get(route('store.stock.requisitions.edit', $sheet))->assertForbidden();
+    // Still with the section head: not the Store's to edit.
+    $this->actingAs($store)->get(route('store.stock.requisitions.edit', $sheet))->assertForbidden();
+
+    engineApprove($sectionHead, $sheet)->assertRedirect();
+
+    // At the Store, and after it has been received: the Store may correct it.
+    $this->actingAs($store)->get(route('store.stock.requisitions.edit', $sheet))->assertOk();
+    engineApprove($store, $sheet)->assertRedirect();
+    $this->actingAs($store)->get(route('store.stock.requisitions.edit', $sheet))->assertOk();
+
+    // Once merged into a Final sheet it is closed to edits.
+    $sheet->forceFill(['merged_into_id' => PurchaseRequisition::create([
+        'requisition_no' => 'F-1', 'requisition_date' => '2026-09-22', 'mode' => 'multi', 'level' => 'final',
+        'status' => 'draft', 'created_by' => $store->id,
+    ])->id])->save();
+    $this->actingAs($store)->get(route('store.stock.requisitions.edit', $sheet->fresh()))->assertForbidden();
 });
 
 // --- Settings ---------------------------------------------------------------------
@@ -313,4 +333,147 @@ it('turns "anyone with the store role" Store Head boxes into the Store departmen
     (require database_path('migrations/2026_10_01_000003_store_head_signature_blocks.php'))->up();
 
     expect(RequisitionSignatureBlock::where('stamp_source', 'store_head')->pluck('assignee_type')->unique()->all())->toBe(['store_head']);
+});
+
+it('does not let the section head who approved the sheet also take its Store team step', function () {
+    $sectionHead = engineUser('production', ['store.requisition.review']);
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+
+    engineApprove($sectionHead, $sheet)->assertRedirect();
+
+    // Same person, now at the Store step: refused. The Store head still can.
+    engineApprove($sectionHead, $sheet)->assertForbidden();
+    expect($sheet->fresh()->current_stage)->toBe(3);
+
+    engineApprove($this->approvers['store_head'], $sheet)->assertRedirect();
+    expect($sheet->fresh()->current_stage)->toBeNull();
+});
+
+it('lets the sender name which Store user gets the sheet, and tells only that person', function () {
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $ebrahim = engineUser('store', [], ['name' => 'Ebrahim', 'status' => 1]);
+    engineUser('store', [], ['name' => 'Aminur', 'status' => 1]);
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+
+    test()->actingAs($sectionHead)->post(route('store.stock.requisitions.stage-approve', $sheet), ['send_to' => $ebrahim->id])
+        ->assertRedirect();
+
+    $store = $sheet->stages()->where('sequence', 3)->first();
+    expect($store->assignee_user_id)->toBe($ebrahim->id)
+        ->and($store->assignee_name)->toBe('Ebrahim');
+
+    // The rest of the Store team can still take it, so an absent person never blocks it.
+    engineApprove(engineUser('store', [], ['status' => 1]), $sheet)->assertRedirect();
+    expect($sheet->fresh()->current_stage)->toBeNull();
+});
+
+it('ignores a send_to who is not on the Store team', function () {
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $outsider = engineUser('merchant');
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+
+    test()->actingAs($sectionHead)->post(route('store.stock.requisitions.stage-approve', $sheet), ['send_to' => $outsider->id])
+        ->assertRedirect();
+
+    expect($sheet->stages()->where('sequence', 3)->value('assignee_user_id'))->toBeNull();
+});
+
+it('offers Received, not Approve, to the Store at its step, and a Send-to list to the head before it', function () {
+    $this->withoutVite();
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $store = engineUser('store', [], ['name' => 'Ebrahim', 'status' => 1]);
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+
+    // The head, before the Store step: a Send-to choice listing the Store user.
+    $html = test()->actingAs($sectionHead)->get(route('store.stock.requisitions.show', $sheet))->assertOk()->getContent();
+    expect($html)->toContain('Send to (Store)')->toContain('Ebrahim');
+
+    engineApprove($sectionHead, $sheet)->assertRedirect();
+
+    // The Store at its own step: Received.
+    $html = test()->actingAs($store)->get(route('store.stock.requisitions.show', $sheet))->assertOk()->getContent();
+    expect($html)->toContain('Mark Received');
+});
+
+it('shows a staff member who their requisition goes to in the Submit popup', function () {
+    $this->withoutVite();
+    $sectionHead = engineUser('production', [], ['name' => 'Oli-ur Rahman']);
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $staff = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+
+    $html = test()->actingAs($staff)->get(route('store.stock.requisitions.create'))->assertOk()->getContent();
+    expect($html)->toContain('id="submitRouteModal"')->toContain('Oli-ur Rahman');
+
+    // A section head's own sheet goes straight to the Store: they pick the user.
+    $ebrahim = engineUser('store', [], ['name' => 'Ebrahim', 'status' => 1]);
+    $sectionHead->givePermissionTo(Permission::findOrCreate('store.requisition.create', 'web'));
+    $sectionHead->update(['requisition_section_id' => $section->id]);
+
+    $html = test()->actingAs($sectionHead)->get(route('store.stock.requisitions.create'))->assertOk()->getContent();
+    expect($html)->toContain('id="submitRouteSelect"')->toContain('Ebrahim');
+});
+
+it('lets the sender choose the Store user even when the Store box names the Store head', function () {
+    RequisitionSignatureBlock::query()->forLevel('department')->get()->values()[2]
+        ->update(['assignee_type' => RequisitionSignatureBlock::ASSIGNEE_STORE_HEAD]);
+
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $aminur = engineUser('store', [], ['name' => 'Aminur', 'status' => 1]);
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+
+    // The head sees the Store list and the Store step reads "Received".
+    $this->withoutVite();
+    expect(test()->actingAs($sectionHead)->get(route('store.stock.requisitions.show', $sheet))->getContent())
+        ->toContain('Send to (Store)')->toContain('Aminur');
+
+    test()->actingAs($sectionHead)->post(route('store.stock.requisitions.stage-approve', $sheet), ['send_to' => $aminur->id])->assertRedirect();
+
+    expect($sheet->stages()->where('sequence', 3)->value('assignee_user_id'))->toBe($aminur->id);
+    engineApprove($aminur, $sheet)->assertRedirect();
+    expect($sheet->fresh()->current_stage)->toBeNull();
+});
+
+it('saves a Store correction on a department sheet without moving its stage', function () {
+    $sectionHead = engineUser('production');
+    $section = IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'head_user_id' => $sectionHead->id, 'is_active' => true]);
+    $raiser = engineUser('production', ['store.requisition.create'], ['requisition_section_id' => $section->id]);
+    $store = engineUser('store', ['store.requisition.edit'], ['status' => 1]);
+
+    engineSubmit($raiser)->assertRedirect();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+    engineApprove($sectionHead, $sheet)->assertRedirect();
+
+    $item = StockItem::firstOrCreate(['name' => 'Machine Oil'], ['uom' => 'Ltr', 'is_active' => true]);
+
+    $this->actingAs($store)->put(route('store.stock.requisitions.update', $sheet), [
+        'action' => 'submit',
+        'mode' => PurchaseRequisition::MODE_MULTI,
+        'requisition_date' => '2026-09-22',
+        'items' => [['stock_item_id' => $item->id, 'qty_requested' => 2]],
+    ])->assertSessionHasNoErrors()->assertRedirect();
+
+    $sheet->refresh();
+    expect((float) $sheet->items()->first()->qty_requested)->toBe(2.0)
+        ->and($sheet->current_stage)->toBe(3)
+        ->and($sheet->status)->toBe(PurchaseRequisition::STATUS_SUBMITTED);
 });

@@ -36,7 +36,7 @@
 
                 <div class="mb-2">
                     <input type="search" class="form-control form-control-sm" id="gxItemPickerSearch"
-                           placeholder="Type to search item name, brand or category…"
+                           placeholder="Type to search SKU, item name, brand or category…"
                            autocomplete="off" aria-label="Search the item list">
                 </div>
 
@@ -49,6 +49,7 @@
                         <thead>
                             <tr>
                                 <th style="width:34px;"></th>
+                                <th style="width:104px;">SKU</th>
                                 <th>Item Name</th>
                                 <th style="width:26%;">Brand/Specification</th>
                                 <th style="width:76px;">Uom</th>
@@ -201,7 +202,7 @@
 
                     // Brand and category are searchable too: "gum tape 3m" and
                     // "packing" are both how store staff look for a line.
-                    return [item.name, item.brand, item.category]
+                    return [item.sku, item.name, item.brand, item.category]
                         .join(' ')
                         .toLowerCase()
                         .indexOf(wanted) !== -1;
@@ -214,6 +215,7 @@
                     return '<tr class="' + (on ? 'gx-picked' : '') + '" data-gx-id="' + escapeHtml(id) + '">'
                         + '<td><input type="checkbox" class="form-check-input" ' + (on ? 'checked' : '')
                         + ' aria-label="Select ' + escapeHtml(item.name) + '"></td>'
+                        + '<td class="small fw-semibold text-nowrap">' + dash(item.sku) + '</td>'
                         + '<td>' + escapeHtml(item.name) + '</td>'
                         + '<td>' + dash(item.brand) + '</td>'
                         + '<td>' + dash(item.uom) + '</td>'

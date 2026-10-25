@@ -286,9 +286,11 @@ it('puts the Buyer Access block in the page for a user in an unscoped department
         //
         // Built from the const rather than spelled out, so switching another
         // department on does not fail a test that has nothing to say about it.
-        // What is worth pinning is that the page carries the list at all.
+        // What is worth pinning is that the page carries the list at all. It is
+        // the list the FORM offers (Merchandising, Supply Chain), not the wider
+        // one that decides who is confined.
         ->assertSee(
-            'data-scope-departments="'.implode(',', BuyerScope::SCOPED_DEPARTMENTS).'"',
+            'data-scope-departments="'.implode(',', BuyerScope::BUYER_ACCESS_FORM_DEPARTMENTS).'"',
             false
         );
 });

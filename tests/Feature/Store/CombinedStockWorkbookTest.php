@@ -335,6 +335,26 @@ it('carries month, dates and search through to both sheets unchanged', function 
     }
 });
 
+it('limits Receiving and Issues to the Stock sheet month when no month is in the request', function () {
+    // A plain Download Excel carries no query string. The Stock sheet falls
+    // back to the current month; the other two tabs must follow it, not pull
+    // every delivery and issue ever recorded (which timed out in production).
+    combinedFixture();
+    Excel::fake();
+
+    $this->travelTo(\Illuminate\Support\Carbon::parse('2026-08-20'));
+
+    $this->actingAs(combinedStoreUser())
+        ->get(route('store.stock.ledger.excel.all'))
+        ->assertOk();
+
+    $sheets = collect(combinedSheets());
+
+    foreach ([ReceivingReportExport::class, IssueReportExport::class] as $class) {
+        expect($sheets->first(fn ($s) => $s instanceof $class)->view()->getData()['filters']['month'])->toBe('2026-08');
+    }
+});
+
 // --- 4. The payload extraction did not change the standalone reports ---------
 
 /**
@@ -502,4 +522,116 @@ it('offers the combined download on the Stock Report screen', function () {
         // The filter JS re-points every [data-ledger-export] href, so without
         // this hook the button would download the month the page opened with.
         ->assertSee('data-ledger-export', false);
+});
+
+it('writes real dates and a Received Value formula in the Receiving and Issues tabs', function () {
+    combinedFixture();
+
+    $response = $this->actingAs(combinedStoreUser())
+        ->get(route('store.stock.ledger.excel.all', ['month' => '2026-08']))
+        ->assertOk()
+        ->baseResponse;
+
+    $raw = $response instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse
+        ? file_get_contents($response->getFile()->getPathname())
+        : $response->getContent();
+    $path = tempnam(sys_get_temp_dir(), 'combined').'.xlsx';
+    file_put_contents($path, $raw);
+    $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+
+    $find = function ($sheet, string $heading): array {
+        for ($row = 1; $row <= 30; $row++) {
+            for ($col = 1; $col <= 20; $col++) {
+                $letter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+                if (trim((string) $sheet->getCell($letter.$row)->getValue()) === $heading) {
+                    return [$letter, $row];
+                }
+            }
+        }
+
+        return [null, null];
+    };
+
+    $serial = fn (string $date) => (float) \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(\Illuminate\Support\Carbon::parse($date));
+
+    // Receiving: Challan Date, RCV Date, and Received Value = Qty x Unit Price.
+    $receiving = $book->getSheetByName('Receiving');
+    [$challan, $header] = $find($receiving, 'Challan Date');
+    [$rcv] = $find($receiving, 'RCV Date');
+    [$qty] = $find($receiving, 'Received Qty');
+    [$price] = $find($receiving, 'Unit Price');
+    [$value] = $find($receiving, 'Received Value');
+    $row = $header + 1;
+
+    expect((float) $receiving->getCell($challan.$row)->getValue())->toBe($serial('2026-08-10'))
+        ->and((float) $receiving->getCell($rcv.$row)->getValue())->toBe($serial('2026-08-11'))
+        ->and($receiving->getStyle($challan.$row)->getNumberFormat()->getFormatCode())->toBe('dd-mmm-yy')
+        ->and($receiving->getCell($value.$row)->getValue())->toBe("={$qty}{$row}*{$price}{$row}")
+        ->and((float) $receiving->getCell($value.$row)->getCalculatedValue())->toBe(200.0);
+
+    // Issues: Date.
+    $issues = $book->getSheetByName('Issues');
+    [$date, $issueHeader] = $find($issues, 'Date');
+
+    expect((float) $issues->getCell($date.($issueHeader + 1))->getValue())->toBe($serial('2026-08-15'));
+});
+
+it('gives every tab the same two left-aligned, unmerged headings', function () {
+    combinedFixture();
+
+    $response = $this->actingAs(combinedStoreUser())
+        ->get(route('store.stock.ledger.excel.all', ['month' => '2026-08']))
+        ->assertOk()
+        ->baseResponse;
+
+    $raw = $response instanceof \Symfony\Component\HttpFoundation\BinaryFileResponse
+        ? file_get_contents($response->getFile()->getPathname())
+        : $response->getContent();
+    $path = tempnam(sys_get_temp_dir(), 'headings').'.xlsx';
+    file_put_contents($path, $raw);
+    $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+
+    foreach ($book->getAllSheets() as $sheet) {
+        $title = $sheet->getTitle();
+
+        // Company, then the report title.
+        expect(trim((string) $sheet->getCell('A1')->getValue()))->not->toBe('', "{$title}: company heading")
+            ->and(trim((string) $sheet->getCell('A2')->getValue()))->not->toBe('', "{$title}: report heading");
+
+        // Left-aligned plain text, not merge-and-center.
+        expect($sheet->getStyle('A1')->getAlignment()->getHorizontal())->toBe('left', "{$title}: A1")
+            ->and($sheet->getStyle('A2')->getAlignment()->getHorizontal())->toBe('left', "{$title}: A2");
+
+        // Nothing but those two (and a blank row) above the headings, and the
+        // lines the sheets used to carry are gone.
+        $headerRow = null;
+        for ($row = 1; $row <= 12; $row++) {
+            if (trim((string) $sheet->getCell('A'.$row)->getValue()) === 'SL'
+                || trim((string) $sheet->getCell('B'.$row)->getValue()) === 'SL'
+                || trim((string) $sheet->getCell('C'.$row)->getValue()) === 'Item Name'
+                || trim((string) $sheet->getCell('D'.$row)->getValue()) === 'Item Name') {
+                $headerRow = $row;
+                break;
+            }
+        }
+        expect($headerRow)->not->toBeNull("{$title}: header row");
+
+        foreach (range(3, $headerRow - 1) as $row) {
+            foreach (['A', 'B'] as $letter) {
+                expect(trim((string) $sheet->getCell($letter.$row)->getValue()))
+                    ->not->toBeIn(['Period', 'Deliveries', 'Item Lines', 'Issue Lines', 'Distinct Items', 'Address', 'Department', 'Month'], "{$title}: row {$row}");
+            }
+        }
+
+        // No merged cell in the headings or in the table (the signature block
+        // at the very bottom is a separate thing).
+        $dataEnd = $sheet->getHighestDataRow();
+        $merged = collect($sheet->getMergeCells())->filter(function ($range) use ($sheet, $dataEnd) {
+            $row = (int) preg_replace('/\D/', '', explode(':', $range)[0]);
+            $label = trim((string) $sheet->getCell('A'.$row)->getValue());
+
+            return ! in_array($label, ['Prepared by', 'Store'], true) && $row < $dataEnd - 4;
+        });
+        expect($merged)->toBeEmpty("{$title}: merged cells");
+    }
 });

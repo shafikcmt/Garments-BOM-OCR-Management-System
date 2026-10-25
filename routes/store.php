@@ -253,6 +253,10 @@ Route::prefix('store')
             Route::post('/items/import', [StockItemController::class, 'import'])->middleware($act('store.items.create'))->name('items.import');
             Route::post('/items', [StockItemController::class, 'store'])->middleware($act('store.items.create'))->name('items.store');
             Route::put('/items/{stockItem}', [StockItemController::class, 'update'])->name('items.update');
+            // Approval point for new items and UOM clean-up; the controller checks admin / store.items.approve.
+            Route::post('/items/{stockItem}/approve', [StockItemController::class, 'approve'])->name('items.approve');
+            Route::post('/items/{stockItem}/reject', [StockItemController::class, 'reject'])->name('items.reject');
+            Route::post('/items-uom/merge', [StockItemController::class, 'mergeUom'])->name('items.uom.merge');
             Route::delete('/items/{stockItem}', [StockItemController::class, 'destroy'])->name('items.destroy');
             });
 
@@ -407,6 +411,12 @@ Route::prefix('store')
             Route::get('/requisitions/requested', [PurchaseRequisitionController::class, 'requested'])
                 ->name('requisitions.requested');
 
+            // My Approvals: what waits for this user's action, and (Admin and
+            // Management) a read-only list of everything pending. A fixed
+            // path, so declared above /{requisition}.
+            Route::get('/requisitions/my-approvals', [PurchaseRequisitionController::class, 'myApprovals'])
+                ->name('requisitions.my-approvals');
+
             // The Department Head's queue and decision — a department's sheet
             // passes its head before it reaches the Store. Who the head is
             // comes from Admin > Settings; the controller refuses anyone else
@@ -423,6 +433,10 @@ Route::prefix('store')
             // sheet. A fixed path, so declared above /{requisition}.
             Route::post('/requisitions/merge', [PurchaseRequisitionController::class, 'merge'])
                 ->middleware($act('store.requisition.create'))->name('requisitions.merge');
+            // The review before it: every merged item with its stock, for the
+            // Store to keep, reduce or hide before the Final sheet is made.
+            Route::get('/requisitions/merge/review', [PurchaseRequisitionController::class, 'mergeReview'])
+                ->middleware($act('store.requisition.create'))->name('requisitions.merge-review');
 
             Route::get('/requisitions', [PurchaseRequisitionController::class, 'index'])->name('requisitions.index');
             Route::get('/requisitions/create', [PurchaseRequisitionController::class, 'create'])->middleware($act('store.requisition.create'))->name('requisitions.create');

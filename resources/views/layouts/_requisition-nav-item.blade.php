@@ -13,7 +13,7 @@
 --}}
 @if($seeRequisition)
     <li class="sidebar-item">
-        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') ? 'is-active' : '' }}">
+        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') && ! request()->routeIs('store.stock.requisitions.my-approvals') ? 'is-active' : '' }}">
             <span class="sidebar-link-main">
                 <span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
                 <span class="sidebar-link-text">Purchase Requisition</span>

@@ -32,14 +32,34 @@
 @endphp
 
 @if($canStage)
-    <button type="button" class="btn {{ $size }} btn-outline-success" data-bs-toggle="modal" data-bs-target="#stageApprove{{ $requisition->id }}">
-        <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Approve
+    @php
+        // The Store's own step reads "Received", not "Approve". When the next
+        // step is the open Store team one, the approver names who gets it.
+        $isReceive = $workflow->isStoreStep($requisition, $stage);
+        $nextStage = $workflow->nextPending($stage);
+        $sendOptions = $workflow->isDirectable($requisition, $nextStage) ? $workflow->sendToOptions($user, $requisition) : collect();
+    @endphp
+    <button type="button" class="btn {{ $size }} {{ $isReceive ? 'btn-outline-primary' : 'btn-outline-success' }}" data-bs-toggle="modal" data-bs-target="#stageApprove{{ $requisition->id }}">
+        <i class="bi {{ $isReceive ? 'bi-inbox-fill' : 'bi-check2-circle' }} me-1" aria-hidden="true"></i>{{ $isReceive ? 'Received' : 'Approve' }}
     </button>
     <x-action-modal :id="'stageApprove'.$requisition->id"
                     :action="route('store.stock.requisitions.stage-approve', $requisition)"
-                    :title="'Approve '.$requisition->requisition_no"
-                    submit-label="Approve" submit-icon="bi-check2-circle" submit-class="btn-success">
-        You are approving as {{ $stage->displayLabel() }}.
+                    :title="($isReceive ? 'Mark '.$requisition->requisition_no.' as received' : 'Approve '.$requisition->requisition_no)"
+                    :submit-label="$isReceive ? 'Mark Received' : 'Approve'"
+                    :submit-icon="$isReceive ? 'bi-inbox-fill' : 'bi-check2-circle'"
+                    :submit-class="$isReceive ? 'btn-primary' : 'btn-success'">
+        {{ $isReceive ? 'The Store confirms it has this requisition.' : 'You are approving as '.$stage->displayLabel().'.' }}
+        @if($sendOptions->isNotEmpty())
+            <x-slot:fields>
+                <label class="form-label fw-semibold" for="sendTo{{ $requisition->id }}">Send to (Store)</label>
+                <select name="send_to" id="sendTo{{ $requisition->id }}" class="form-select mb-3" required>
+                    <option value="">Choose a Store user…</option>
+                    @foreach($sendOptions as $option)
+                        <option value="{{ $option->id }}">{{ $option->name }}</option>
+                    @endforeach
+                </select>
+            </x-slot:fields>
+        @endif
     </x-action-modal>
 
     {{-- Back to the previous stage; from the first stage, to the raiser. --}}

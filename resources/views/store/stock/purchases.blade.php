@@ -200,6 +200,7 @@
                             <colgroup>
                                 <col style="width:44px;">
                                 <col style="width:30%;">
+                                <col style="width:104px;">
                                 <col style="width:80px;">
                                 <col style="width:15%;">
                                 <col style="width:110px;">
@@ -215,6 +216,7 @@
                                 <tr>
                                     <th class="text-center">#</th>
                                     <th>Item Name <span class="text-danger">*</span></th>
+                                    <th>SKU <span class="gx-stock-auto">auto</span></th>
                                     <th>Uom <span class="gx-stock-auto">auto</span></th>
                                     <th>Category <span class="gx-stock-auto">auto</span></th>
                                     {{-- Two brands can share an item name, so without
@@ -244,7 +246,7 @@
                                 <tr>
                                     {{-- 7, not 6: Unit Price joined the span when
                                          the total moved one column right. --}}
-                                    <td colspan="7" class="text-end gx-stock-total-label">Total Value</td>
+                                    <td colspan="8" class="text-end gx-stock-total-label">Total Value</td>
                                     <td>
                                         <input type="text" id="grandTotal" class="form-control form-control-sm gx-stock-readonly fw-bold text-end" readonly tabindex="-1" value="0.00">
                                     </td>
@@ -279,14 +281,15 @@
                             <td>
                                 {{-- No `required`: TomSelect hides this select, and a hidden
                                      required field blocks the submit with no message. --}}
-                                <select class="form-select form-select-sm js-line-item js-searchable" name="items[__INDEX__][stock_item_id]" aria-required="true">
+                                <select class="form-select form-select-sm js-line-item js-searchable" data-sku-labels name="items[__INDEX__][stock_item_id]" aria-required="true">
                                     <option value="">Select item…</option>
                                     @foreach($items as $it)
-                                        <option value="{{ $it->id }}" data-uom="{{ $it->uom }}" data-category="{{ $it->category }}" data-brand="{{ $it->brand }}">@if($it->sku){{ $it->sku }} — @endif{{ $it->name }}</option>
+                                        <option value="{{ $it->id }}" data-sku="{{ $it->sku }}" data-uom="{{ $it->uom }}" data-category="{{ $it->category }}" data-brand="{{ $it->brand }}">@if($it->sku){{ $it->sku }} — @endif{{ $it->name }}</option>
                                     @endforeach
                                 </select>
                             </td>
                             {{-- Derived from the item, never posted. --}}
+                            <td><input type="text" class="form-control form-control-sm js-line-sku gx-stock-readonly text-nowrap" readonly tabindex="-1" placeholder="—"></td>
                             <td><input type="text" class="form-control form-control-sm js-line-uom gx-stock-readonly text-center" readonly tabindex="-1" placeholder="—"></td>
                             <td><input type="text" class="form-control form-control-sm js-line-category gx-stock-readonly" readonly tabindex="-1" placeholder="—"></td>
                             <td><input type="text" class="form-control form-control-sm js-line-brand gx-stock-readonly" readonly tabindex="-1" placeholder="—"></td>
@@ -449,7 +452,7 @@
                 <div class="col-6 col-md-7">
                     <label class="form-label" for="purchaseFilterSearch">Search</label>
                     <input id="purchaseFilterSearch" name="search" value="{{ $filters['search'] ?? '' }}" class="form-control"
-                           placeholder="Item, challan, GRN, supplier">
+                           placeholder="SKU, item, challan, GRN, supplier">
                 </div>
                 <div class="col-12 col-md-2 gx-stock-filter-actions">
                     <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
@@ -609,6 +612,7 @@
 
             function wire(row) {
                 var select = row.querySelector('.js-line-item');
+                var sku = row.querySelector('.js-line-sku');
                 var uom = row.querySelector('.js-line-uom');
                 var category = row.querySelector('.js-line-category');
                 var brand = row.querySelector('.js-line-brand');
@@ -618,6 +622,7 @@
                 // its placeholder shows the em dash, same as the other two.
                 select.addEventListener('change', function () {
                     var opt = select.options[select.selectedIndex];
+                    sku.value = opt ? (opt.dataset.sku || '') : '';
                     uom.value = opt ? (opt.dataset.uom || '') : '';
                     category.value = opt ? (opt.dataset.category || '') : '';
                     brand.value = opt ? (opt.dataset.brand || '') : '';
@@ -711,9 +716,15 @@
                             .call(tpl.content.querySelectorAll('.js-line-item option'))
                             .filter(function (option) { return option.value !== ''; })
                             .map(function (option) {
+                                var sku = option.dataset.sku || '';
+                                var label = option.textContent.trim();
+
                                 return {
                                     value: option.value,
-                                    name: option.textContent.trim(),
+                                    // The label reads "SKU — name"; the picker
+                                    // has a column for each.
+                                    name: sku && label.indexOf(sku + ' — ') === 0 ? label.slice(sku.length + 3) : label,
+                                    sku: sku,
                                     brand: option.dataset.brand || '',
                                     uom: option.dataset.uom || '',
                                     category: option.dataset.category || '',

@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Support\LocalTime;
 
 /**
  * Allocates the Requisition No: HAPL/PRODUCTION/2026/August/01.
@@ -48,7 +49,7 @@ class PurchaseRequisitionNumberGenerator
             );
         }
 
-        $on = $on ?? Carbon::now();
+        $on = $on ?? LocalTime::now();
         $period = $this->period($section, $on);
 
         // Create the counter if this is the section's first requisition of the
@@ -114,7 +115,7 @@ class PurchaseRequisitionNumberGenerator
      */
     public function preview(?string $section, ?Carbon $on = null): string
     {
-        $on = $on ?? Carbon::now();
+        $on = $on ?? LocalTime::now();
         $next = (int) (DB::table('purchase_requisition_sequences')
             ->where('period', $this->period($section, $on))
             ->value('last_no') ?? 0);

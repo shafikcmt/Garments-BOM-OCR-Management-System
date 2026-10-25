@@ -104,7 +104,7 @@
             </td>
             <td style="width:25%;" class="date-area">
                 <div>Printed On</div>
-                <div>{{ now()->format('d M Y, h:i A') }}</div>
+                <div>{{ \App\Support\LocalTime::now()->format('d M Y, h:i A') }}</div>
             </td>
         </tr>
     </table>
@@ -169,7 +169,7 @@
 
     <div class="footer">
         {{ $letterhead }} &mdash; {{ $title }} &mdash; {{ $requisition->requisition_no }}
-        <span class="right">Generated {{ now()->format('d M Y') }}</span>
+        <span class="right">Generated {{ \App\Support\LocalTime::now()->format('d M Y') }}</span>
     </div>
 @else
     @include('store.stock.requisitions._signature-block', ['signatures' => $signatures, 'forExcel' => true, 'columns' => 21])

@@ -248,10 +248,11 @@ it('hides stock, last purchase, rate and amount from a department user and drops
 
 // --- Not in Item Master ---------------------------------------------------------
 
-it('lets a department raise a typed item, tells the Store on Received, and links the line once added', function () {
+it('refuses a typed item from a department, and still links a legacy typed line once added', function () {
     $user = formDeptUser('production', cuttingSection());
     $store = formStoreUser();
 
+    // A free-text item is no longer accepted.
     $this->actingAs($user)
         ->post(route('store.stock.requisitions.store'), [
             'action' => 'submit',
@@ -259,7 +260,21 @@ it('lets a department raise a typed item, tells the Store on Received, and links
             'requisition_date' => '2026-09-22',
             'items' => [['custom_item_name' => 'Laser Pointer', 'specification' => 'Green', 'qty_requested' => 2]],
         ])
+        ->assertSessionHasErrors('items.0.stock_item_id');
+    expect(PurchaseRequisition::count())->toBe(0);
+
+    // A sheet saved before that change keeps its typed line and the promotion flow.
+    $master = StockItem::create(['name' => 'Placeholder', 'uom' => 'Pcs', 'is_active' => true]);
+    $this->actingAs($user)
+        ->post(route('store.stock.requisitions.store'), [
+            'action' => 'submit',
+            'mode' => PurchaseRequisition::MODE_MULTI,
+            'requisition_date' => '2026-09-22',
+            'items' => [['stock_item_id' => $master->id, 'specification' => 'Green', 'qty_requested' => 2]],
+        ])
         ->assertRedirect();
+    PurchaseRequisitionItem::query()->latest('id')->first()
+        ->update(['stock_item_id' => null, 'custom_item_name' => 'Laser Pointer']);
 
     $requisition = PurchaseRequisition::query()->latest('id')->with('items')->first();
     $line = $requisition->items->first();

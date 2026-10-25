@@ -284,7 +284,7 @@ class GeneralStockLedgerController extends Controller
         // quietly short of a tab gets read as "there were no receipts".
         if ($this->satisfiesSection('store.receiving.view')) {
             $sheets[] = new ReceivingReportExport(
-                $this->receiving->reportPayload($this->receivingFilters($filters))
+                $this->receiving->reportPayload($this->receivingFilters(array_merge($filters, $this->periodFilters($stock))))
             );
         } else {
             $omitted[] = 'Receiving';
@@ -292,7 +292,7 @@ class GeneralStockLedgerController extends Controller
 
         if ($this->satisfiesSection('store.issues.view')) {
             $sheets[] = new IssueReportExport(
-                $this->issues->reportPayload($this->issueFilters($filters))
+                $this->issues->reportPayload($this->issueFilters(array_merge($filters, $this->periodFilters($stock))))
             );
         } else {
             $omitted[] = 'Issues';
@@ -330,6 +330,35 @@ class GeneralStockLedgerController extends Controller
         $tokens = ['store', 'admin', 'management', $permission];
 
         return $user->canAny($tokens) || $user->hasAnyRole($tokens);
+    }
+
+    /**
+     * The period the Stock sheet ACTUALLY covers, as filters the Receiving and
+     * Issue reports understand.
+     *
+     * The Stock Report falls back to the current month when the request has no
+     * month, but the Receiving and Issue reports treat a blank month as "every
+     * delivery / every issue ever". Passing the raw request filters therefore
+     * made a plain Download Excel pull the whole history into those two tabs —
+     * wrong figures, and a workbook large enough to run the server out of time
+     * or memory (a 500). Both tabs must follow the resolved period instead.
+     *
+     * @param  array<string, mixed>  $stock
+     * @return array<string, string>
+     */
+    private function periodFilters(array $stock): array
+    {
+        $period = $stock['period'];
+
+        if ($period['is_range']) {
+            return [
+                'month' => null,
+                'from' => $period['start']->toDateString(),
+                'to' => $period['end']->toDateString(),
+            ];
+        }
+
+        return ['month' => $stock['month'], 'from' => null, 'to' => null];
     }
 
     /**

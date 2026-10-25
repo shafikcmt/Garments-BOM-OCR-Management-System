@@ -225,16 +225,21 @@ it('lists cancelled sheets under their own status', function () {
 
 // --- Delete -------------------------------------------------------------------------
 
-it('deletes drafts only; a submitted sheet is cancelled instead', function () {
+it('lets a draft be deleted by its raiser, and a submitted sheet only by Admin', function () {
     $clerk = rcUser('store', ['store.requisition.create']);
     $this->actingAs($clerk)->post(route('store.stock.requisitions.store'), rcPayload('draft'))->assertRedirect();
     $draft = PurchaseRequisition::latest('id')->firstOrFail();
 
     [, $submitted] = rcFinal($clerk);
 
-    $this->actingAs(rcUser('admin'))->delete(route('store.stock.requisitions.destroy', $submitted), ['comment' => 'x'])
+    // The Store clerk who raised it cannot delete it once submitted; Admin can.
+    $this->actingAs($clerk)->delete(route('store.stock.requisitions.destroy', $submitted), ['comment' => 'x'])
         ->assertSessionHas('error', fn ($m) => str_contains($m, 'Cancel it instead'));
     expect(PurchaseRequisition::find($submitted->id))->not->toBeNull();
+
+    $this->actingAs(rcUser('admin'))->delete(route('store.stock.requisitions.destroy', $submitted), ['comment' => 'Test entry'])
+        ->assertRedirect();
+    expect(PurchaseRequisition::find($submitted->id))->toBeNull();
 
     $this->actingAs($clerk)->delete(route('store.stock.requisitions.destroy', $draft))->assertRedirect();
     expect(PurchaseRequisition::find($draft->id))->toBeNull();

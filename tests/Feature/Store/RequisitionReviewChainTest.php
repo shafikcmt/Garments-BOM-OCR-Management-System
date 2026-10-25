@@ -181,7 +181,7 @@ it('goes straight to the Store when neither section nor department has a head', 
         ->and($r->awaitingStoreReceipt())->toBeTrue();
 });
 
-it('skips the section step for the section head\'s own sheet and stops at the department head', function () {
+it('sends the section head\'s own sheet straight to the Store, not up to the department head', function () {
     $deptHead = chainUser();
     RequisitionDepartmentHead::assign('production', $deptHead);
     $sectionHead = chainUser();
@@ -192,9 +192,46 @@ it('skips the section step for the section head\'s own sheet and stops at the de
 
     $r = latestRequisition();
 
-    expect($r->review_level)->toBe(RequisitionReviewChain::LEVEL_DEPARTMENT)
-        ->and($r->isDepartmentHeadFor($deptHead))->toBeTrue()
-        ->and($r->isDepartmentHeadFor($sectionHead))->toBeFalse();
+    // A department head exists, and the sheet still does not go to them.
+    expect($r->department_review_status)->toBeNull()
+        ->and($r->review_level)->toBeNull()
+        ->and($r->progressLabel())->toBe('Sent to Store')
+        ->and($r->awaitingStoreReceipt())->toBeTrue();
+
+    // Where the sheet runs on the stage engine, the head step reads as approved
+    // by the section head themselves, not "Skipped"; only the Store is pending.
+    $head = \App\Models\PurchaseRequisitionStage::where('purchase_requisition_id', $r->id)
+        ->where('assignee_type', \App\Models\RequisitionSignatureBlock::ASSIGNEE_DEPARTMENT_HEAD)->first();
+    if ($head) {
+        expect($head->status)->toBe(\App\Models\PurchaseRequisitionStage::STATUS_APPROVED)
+            ->and($head->acted_by_name)->toBe($sectionHead->name);
+    }
+});
+
+it('does the same for a section head whose own form names no section', function () {
+    $deptHead = chainUser();
+    RequisitionDepartmentHead::assign('production', $deptHead);
+    $sectionHead = chainUser();
+    chainSection('Quality', 'production', $sectionHead);
+
+    expect(RequisitionReviewChain::stepsFor($sectionHead, null, 'production'))->toBe([]);
+});
+
+it('still sends a staff member\'s sheet to their section head, and to the department head when the section has none', function () {
+    $deptHead = chainUser();
+    RequisitionDepartmentHead::assign('production', $deptHead);
+    $sectionHead = chainUser();
+    $cutting = chainSection('Cutting', 'production', $sectionHead);
+    $quality = chainSection('Quality', 'production', null);
+    $staff = chainUser();
+
+    $viaSection = RequisitionReviewChain::stepsFor($staff, $cutting, 'production');
+    $viaDepartment = RequisitionReviewChain::stepsFor($staff, $quality, 'production');
+
+    expect($viaSection[0]['level'])->toBe(RequisitionReviewChain::LEVEL_SECTION)
+        ->and($viaSection[0]['head']->id)->toBe($sectionHead->id)
+        ->and($viaDepartment[0]['level'])->toBe(RequisitionReviewChain::LEVEL_DEPARTMENT)
+        ->and($viaDepartment[0]['head']->id)->toBe($deptHead->id);
 });
 
 it('sends the section head\'s own sheet straight to the Store when the department has no head', function () {
@@ -211,12 +248,41 @@ it('sends the section head\'s own sheet straight to the Store when the departmen
         ->and($r->progressLabel())->toBe('Sent to Store')
         ->and($r->awaitingStoreReceipt())->toBeTrue();
 
-    // And their own name is never the "Requested By" head on the form: with
-    // nobody above them, the form has no head to fix and offers the picker.
+    // Requested By on the form is the section head's own details: they are
+    // the requester, and nobody above them is named.
     $this->actingAs($sectionHead->fresh())
         ->get(route('store.stock.requisitions.create'))
         ->assertOk()
-        ->assertSee('name="indent_person_id"', false);
+        ->assertSee($sectionHead->name)
+        ->assertSee('Cutting section head');
+});
+
+it('names the section head, not the department head, in Requested By on a section head\'s own form', function () {
+    $deptHead = chainUser();
+    $deptHead->update(['name' => 'Harun Or Rashid']);
+    RequisitionDepartmentHead::assign('production', $deptHead);
+    $sectionHead = chainUser();
+    $sectionHead->update(['name' => 'Asraf Ali Khan']);
+    // The account has NO Requisition Section; they head Technical.
+    chainSection('Technical', 'production', $sectionHead);
+
+    $this->actingAs($sectionHead->fresh())
+        ->get(route('store.stock.requisitions.create'))
+        ->assertOk()
+        ->assertSee('Asraf Ali Khan')
+        ->assertSee('Technical section head')
+        ->assertDontSee('Harun Or Rashid')
+        ->assertDontSee('Production department head');
+
+    // A staff member of that section still sees their section head.
+    $staff = chainUser();
+    $staff->update(['requisition_section_id' => \App\Models\IndentSection::where('name', 'Technical')->value('id')]);
+
+    $this->actingAs($staff->fresh())
+        ->get(route('store.stock.requisitions.create'))
+        ->assertOk()
+        ->assertSee('Asraf Ali Khan')
+        ->assertSee('Technical section head');
 });
 
 it('labels the main list "My Requisitions" for a head and "All Requisitions" for the Store', function () {

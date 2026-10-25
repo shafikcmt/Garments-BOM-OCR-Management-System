@@ -127,13 +127,13 @@ it('stores exactly the figures the old delete-and-recreate stored', function () 
     [$oil, $thread] = [inplaceItem('Oil'), inplaceItem('Thread')];
     $lines = [
         ['stock_item_id' => $oil->id, 'qty_requested' => 5, 'rate_appx' => 12.5, 'specification' => 'Brand A', 'remarks' => 'urgent', 'user_dept' => 'Cutting'],
-        ['custom_item_name' => 'Hand Sanitiser 5L', 'qty_requested' => 3, 'rate_appx' => 900],
+        ['stock_item_id' => $thread->id, 'qty_requested' => 3, 'rate_appx' => 900],
         // Folded into the first line, as before.
         ['stock_item_id' => $oil->id, 'qty_requested' => 2, 'user_dept' => 'Finishing'],
     ];
 
     $fresh = inplacePost($store, $lines);          // a brand-new sheet: every line inserted
-    $edited = inplacePost($store, [['stock_item_id' => $thread->id, 'qty_requested' => 1]]);
+    $edited = inplacePost($store, [['stock_item_id' => inplaceItem('Paper')->id, 'qty_requested' => 1]]);
     $savedIds = $edited->items->pluck('id');
     inplacePost($store, $lines, $edited);           // the same lines, saved over an existing sheet
 
@@ -163,16 +163,14 @@ it('keeps line ids and the history diff through a Store correction', function ()
     expect($diff->meta['lines'])->toEqual([['item' => 'Oil', 'change' => 'changed', 'old_qty' => 5, 'new_qty' => 9]]);
 });
 
-it('keeps the Add to Item Master link working after an edit', function () {
+it('keeps the Add to Item Master link working for a sheet saved before typed items were retired', function () {
     $store = inplaceUser('store', ['store.requisition.create', 'store.items.create']);
+    $sheet = inplacePost($store, [['stock_item_id' => inplaceItem('Oil')->id, 'qty_requested' => 3]]);
+    $line = $sheet->items->sole();
+    // An older sheet: its line names a free-text item.
+    $line->update(['stock_item_id' => null, 'custom_item_name' => 'Hand Sanitiser 5L']);
 
-    $sheet = inplacePost($store, [['custom_item_name' => 'Hand Sanitiser 5L', 'qty_requested' => 3]]);
-    $id = $sheet->items->sole()->id;
-
-    inplacePost($store, [['id' => $id, 'custom_item_name' => 'Hand Sanitiser 5L', 'qty_requested' => 4]], $sheet);
-
-    expect($sheet->fresh()->items->sole()->id)->toBe($id);
-    $this->actingAs($store)->get(route('store.stock.items.index', ['requisition_item' => $id]))
+    $this->actingAs($store)->get(route('store.stock.items.index', ['requisition_item' => $line->id]))
         ->assertOk()->assertSee('Hand Sanitiser 5L');
 });
 

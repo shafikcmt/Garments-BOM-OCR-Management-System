@@ -67,12 +67,10 @@ it('exports the requested month to Excel, not the current one', function () {
     Excel::assertDownloaded('Stock-Report-2026-08.xlsx', function (GeneralStockReportExport $export) {
         $html = $export->view()->render();
 
-        // The heading says August...
-        expect($html)->toContain('August 2026')
+        // The sheet is August's: the tab says so (the Month line was dropped
+        // from the letterhead) and September appears nowhere on it.
+        expect($export->title())->toBe('Stock Aug-26')
             ->and($html)->not->toContain('September 2026');
-
-        // ...and so does the row: August opens at the counted 20.
-        expect($export->title())->toBe('Stock Aug-26');
 
         return true;
     });
@@ -87,7 +85,8 @@ it('exports September as September when September is asked for', function () {
         ->assertOk();
 
     Excel::assertDownloaded('Stock-Report-2026-09.xlsx', function (GeneralStockReportExport $export) {
-        expect($export->view()->render())->toContain('September 2026');
+        expect($export->title())->toBe('Stock Sep-26')
+            ->and($export->view()->render())->not->toContain('August 2026');
 
         return true;
     });
@@ -179,7 +178,7 @@ function exportedSheet(array $query = []): \PhpOffice\PhpSpreadsheet\Worksheet\W
 function headerRowOf(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet): ?int
 {
     for ($row = 1; $row <= 40; $row++) {
-        if (trim((string) $sheet->getCell('C'.$row)->getValue()) === 'Item Name') {
+        if (in_array(trim((string) $sheet->getCell('C'.$row)->getValue()), ['Item Name'], true) || trim((string) $sheet->getCell('D'.$row)->getValue()) === 'Item Name') {
             return $row;
         }
     }
@@ -196,14 +195,14 @@ it('writes live SUBTOTAL formulas above the five figure columns', function () {
 
     // SUBTOTAL(9, …), not SUM: 9 sums only the rows Excel's filter leaves
     // visible, which is the whole point of the client's format.
-    expect($sheet->getCell('G'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,G')
-        ->and($sheet->getCell('L'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,L')
-        ->and($sheet->getCell('N'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,N')
-        ->and($sheet->getCell('P'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,P')
-        ->and($sheet->getCell('R'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,R')
+    expect($sheet->getCell('H'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,H')
+        ->and($sheet->getCell('M'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,M')
+        ->and($sheet->getCell('O'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,O')
+        ->and($sheet->getCell('Q'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,Q')
+        ->and($sheet->getCell('S'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,S')
         // Named plainly: the Sub-Total row is filter-aware too now, so calling
         // this one "Visible Total" would imply a difference that is not there.
-        ->and($sheet->getCell('F'.$strip)->getValue())->toBe('Total');
+        ->and($sheet->getCell('G'.$strip)->getValue())->toBe('Total');
 });
 
 it('computes the same figures the report does', function () {
@@ -214,9 +213,9 @@ it('computes the same figures the report does', function () {
     $sheet = exportedSheet(['month' => '2026-08']);
     $strip = headerRowOf($sheet) - 1;
 
-    expect($sheet->getCell('G'.$strip)->getCalculatedValue())->toEqual(20.0)  // Opening
-        ->and($sheet->getCell('N'.$strip)->getCalculatedValue())->toEqual(10.0)  // Consumption
-        ->and($sheet->getCell('P'.$strip)->getCalculatedValue())->toEqual(10.0); // Stock as on
+    expect($sheet->getCell('H'.$strip)->getCalculatedValue())->toEqual(20.0)  // Opening
+        ->and($sheet->getCell('O'.$strip)->getCalculatedValue())->toEqual(10.0)  // Consumption
+        ->and($sheet->getCell('Q'.$strip)->getCalculatedValue())->toEqual(10.0); // Stock as on
 });
 
 it('ranges the formulas over the real data rows, wherever the header lands', function () {
@@ -231,10 +230,10 @@ it('ranges the formulas over the real data rows, wherever the header lands', fun
     $shiftedHeader = headerRowOf($shifted);
 
     // Whatever row the header is on, the range starts on the row after it.
-    expect($plain->getCell('G'.($plainHeader - 1))->getValue())
-        ->toContain('G'.($plainHeader + 1).':')
-        ->and($shifted->getCell('G'.($shiftedHeader - 1))->getValue())
-        ->toContain('G'.($shiftedHeader + 1).':');
+    expect($plain->getCell('H'.($plainHeader - 1))->getValue())
+        ->toContain('H'.($plainHeader + 1).':')
+        ->and($shifted->getCell('H'.($shiftedHeader - 1))->getValue())
+        ->toContain('H'.($shiftedHeader + 1).':');
 });
 
 it('makes the bottom Sub-Total row filter-aware too', function () {
@@ -257,17 +256,17 @@ it('makes the bottom Sub-Total row filter-aware too', function () {
     expect($subTotal)->not->toBeNull();
 
     // The three the Blade actually totals, now live.
-    expect($sheet->getCell('L'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,L')
-        ->and($sheet->getCell('N'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,N')
-        ->and($sheet->getCell('R'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,R')
+    expect($sheet->getCell('M'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,M')
+        ->and($sheet->getCell('O'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,O')
+        ->and($sheet->getCell('S'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,S')
         // ...and it still adds up.
-        ->and($sheet->getCell('N'.$subTotal)->getCalculatedValue())->toEqual(10.0);
+        ->and($sheet->getCell('O'.$subTotal)->getCalculatedValue())->toEqual(10.0);
 
     // Opening Stock and Stock as on Date are left out of this row on purpose —
     // summing a brought-forward balance across unrelated items says nothing.
     // Writing a formula into those blanks would invent a total.
-    expect($sheet->getCell('G'.$subTotal)->getValue())->toBeEmpty()
-        ->and($sheet->getCell('P'.$subTotal)->getValue())->toBeEmpty();
+    expect($sheet->getCell('H'.$subTotal)->getValue())->toBeEmpty()
+        ->and($sheet->getCell('Q'.$subTotal)->getValue())->toBeEmpty();
 });
 
 it('enables AutoFilter over the header and data, excluding the Sub-Total row', function () {
@@ -291,11 +290,11 @@ it('enables AutoFilter over the header and data, excluding the Sub-Total row', f
 
 it('writes no totals strip when the report has no rows', function () {
     // No Sub-Total row exists on an empty report, so there is nothing to range
-    // over. It must degrade quietly rather than emit =SUBTOTAL(9,G9:G8).
+    // over. It must degrade quietly rather than emit =SUBTOTAL(9,H9:H8).
     $sheet = exportedSheet(['month' => '2026-08', 'search' => 'zzz-no-such-item-zzz']);
     $header = headerRowOf($sheet);
 
-    expect($sheet->getCell('G'.($header - 1))->getValue())->toBeEmpty()
+    expect($sheet->getCell('H'.($header - 1))->getValue())->toBeEmpty()
         ->and($sheet->getAutoFilter()->getRange())->toBeEmpty();
 });
 
@@ -326,4 +325,140 @@ it('renders the download links already carrying the active filters', function ()
         // export tests above; what the TOOLBAR offers is the workbook.
         ->assertSee(e(route('store.stock.ledger.excel.all', ['month' => '2026-08', 'category' => 'Stationery'])), false)
         ->assertSee(e(route('store.stock.ledger.pdf', ['month' => '2026-08', 'category' => 'Stationery'])), false);
+});
+
+// --- Letterhead, dates and formulas in the workbook ---------------------------
+
+it('prints only the company and report title above the table, with nothing merged', function () {
+    exportItem();
+    $sheet = exportedSheet(['month' => '2026-08']);
+    $header = headerRowOf($sheet);
+
+    // Company, title, a blank row, the totals strip, then the headings.
+    expect($sheet->getCell('A1')->getValue())->toBe('Humana Apparels (Pvt.) Ltd.')
+        ->and($sheet->getCell('A2')->getValue())->toBe('Consumable Stock Report')
+        ->and($header)->toBe(5);
+
+    foreach (range(1, $header) as $row) {
+        foreach (['A', 'B', 'C', 'F'] as $letter) {
+            expect((string) $sheet->getCell($letter.$row)->getValue())
+                ->not->toContain('Address')->not->toContain('Gorai')->not->toContain('Department of Store');
+        }
+    }
+
+    // Plain left-aligned text, not merged or centred: a merged heading breaks sorting.
+    expect($sheet->getStyle('A1')->getAlignment()->getHorizontal())->toBe('left')
+        ->and($sheet->getStyle('A2')->getAlignment()->getHorizontal())->toBe('left');
+
+    $subTotal = collect(range($header + 1, $sheet->getHighestDataRow()))
+        ->first(fn ($r) => strcasecmp(trim((string) $sheet->getCell('A'.$r)->getValue()), 'Sub-Total') === 0);
+
+    $merged = collect($sheet->getMergeCells())->filter(function ($range) use ($subTotal) {
+        return (int) preg_replace('/\D/', '', explode(':', $range)[0]) <= $subTotal;
+    });
+
+    expect($merged)->toBeEmpty();
+});
+
+it('writes the last addition and consumption dates as real dates', function () {
+    exportItem();
+    $sheet = exportedSheet(['month' => '2026-08']);
+    $row = headerRowOf($sheet) + 1;
+
+    // 15-Aug-2026 issue: Date of Last Cons. is column O.
+    $cell = $sheet->getCell('P'.$row);
+
+    expect($cell->getDataType())->toBe('n')
+        ->and((float) $cell->getValue())->toBe(
+            (float) \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(\Illuminate\Support\Carbon::parse('2026-08-15'))
+        )
+        ->and($sheet->getStyle('P'.$row)->getNumberFormat()->getFormatCode())->toBe('dd-mmm-yy');
+});
+
+it('shows how each counted row was worked out, as formulas', function () {
+    exportItem();
+    $sheet = exportedSheet(['month' => '2026-08']);
+    $n = headerRowOf($sheet) + 1;
+
+    // Stock as on Date = Opening + Addition - Consumption; Value = Stock x Price.
+    expect($sheet->getCell('Q'.$n)->getValue())->toBe("=H{$n}+M{$n}-O{$n}")
+        ->and($sheet->getCell('Q'.$n)->getCalculatedValue())->toEqual(10.0)
+        ->and($sheet->getCell('J'.$n)->getValue())->toBe("=I{$n}*7")
+        ->and($sheet->getCell('A'.$n)->getValue())->toStartWith('=IF(');
+});
+
+it('lands the formulas on the very figures the report computed, for every kind of row', function () {
+    $month = '2026-09';
+
+    // 1. Ordinary: opening 40, bought 5 @ 12.345, issued 12 this month and
+    //    30 last month -> automatic safety and re-order levels, a priced row.
+    $auto = StockItem::create(['name' => 'Auto Item', 'uom' => 'Pcs', 'is_active' => true, 'opening_qty' => 40, 'opening_as_on' => '2026-08-01']);
+    \App\Models\StockPurchase::create(['stock_item_id' => $auto->id, 'purchase_date' => '2026-09-03', 'qty' => 5, 'unit_price' => 12.345]);
+    StockIssue::create(['stock_item_id' => $auto->id, 'issue_date' => '2026-09-10', 'qty' => 12]);
+    StockIssue::create(['stock_item_id' => $auto->id, 'issue_date' => '2026-08-10', 'qty' => 30]);
+
+    // 2. Levels pinned by hand on the item master: must stay plain numbers.
+    $pinned = StockItem::create(['name' => 'Pinned Item', 'uom' => 'Pcs', 'is_active' => true, 'opening_qty' => 3, 'opening_as_on' => '2026-08-01',
+        'safety_stock_qty' => 5, 'reorder_level' => 9, 'lead_time_days' => 4]);
+    StockIssue::create(['stock_item_id' => $pinned->id, 'issue_date' => '2026-08-10', 'qty' => 1]);
+
+    // 3. Nothing moving and no price: no re-order point, no value.
+    StockItem::create(['name' => 'Idle Item', 'uom' => 'Pcs', 'is_active' => true, 'opening_qty' => 7, 'opening_as_on' => '2026-08-01']);
+
+    // 4. Not counted yet for this month: prints "-" and is left alone.
+    StockItem::create(['name' => 'Future Item', 'uom' => 'Pcs', 'is_active' => true, 'opening_qty' => 9, 'opening_as_on' => '2026-10-01']);
+
+    $sheet = exportedSheet(['month' => $month]);
+    $header = headerRowOf($sheet);
+
+    $expected = app(\App\Services\GeneralStockReportService::class)
+        ->rows(\Illuminate\Support\Carbon::parse('2026-09-01'), ['only_active' => true])
+        ->keyBy(fn ($r) => $r['item']->name);
+
+    $labels = \App\Services\GeneralStockReportService::statusLabels();
+    $seen = 0;
+
+    for ($row = $header + 1; $row <= $sheet->getHighestDataRow(); $row++) {
+        $name = trim((string) $sheet->getCell('D'.$row)->getValue());
+
+        if (! isset($expected[$name])) {
+            continue;
+        }
+
+        $r = $expected[$name];
+        $seen++;
+
+        if ($r['not_counted']) {
+            expect($sheet->getCell('Q'.$row)->getValue())->toBe('-')
+                ->and($sheet->getCell('A'.$row)->getValue())->toBe($labels['not_counted']);
+
+            continue;
+        }
+
+        expect((float) $sheet->getCell('Q'.$row)->getCalculatedValue())->toEqualWithDelta($r['stock_as_on'], 0.0001)
+            ->and((string) $sheet->getCell('A'.$row)->getCalculatedValue())->toBe($labels[$r['status']])
+            ->and((float) $sheet->getCell('J'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['safety'], 0.0001);
+
+        if ($r['reorder'] !== null) {
+            expect((float) $sheet->getCell('K'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['reorder'], 0.0001);
+        } else {
+            expect($sheet->getCell('K'.$row)->getValue())->toBe('-');
+        }
+
+        if ($r['unit_price'] !== null) {
+            expect((float) $sheet->getCell('S'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['closing_value'], 0.0001);
+        } else {
+            expect($sheet->getCell('S'.$row)->getValue())->toBeNull();
+        }
+
+        // A level pinned on the item master is a value, not a calculation.
+        if ($r['safety_is_manual']) {
+            expect($sheet->getCell('J'.$row)->isFormula())->toBeFalse();
+        }
+        if ($r['reorder_is_manual']) {
+            expect($sheet->getCell('K'.$row)->isFormula())->toBeFalse();
+        }
+    }
+
+    expect($seen)->toBe(4);
 });

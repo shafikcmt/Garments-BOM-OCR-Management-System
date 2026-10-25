@@ -151,7 +151,7 @@
                 </div>
                 <div class="col-12 col-md-6 col-xl-3">
                     <label class="form-label" for="search">Search</label>
-                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Item or requisition no">
+                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="SKU, item or requisition no">
                 </div>
                 <div class="col-12 col-md-6 col-xl-3 d-flex gap-2 align-items-end">
                     <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
@@ -179,6 +179,7 @@
                                 <th>Approved By</th>
                                 <th>Req No</th>
                                 <th>Type</th>
+                                <th>SKU</th>
                                 <th>Item</th>
                                 {{-- Between the item and its quantity, the
                                      order the two are read in, and the same
@@ -205,6 +206,7 @@
                                             —
                                         @endif
                                     </td>
+                                    <td class="small fw-semibold text-nowrap">{{ optional($row->stockItem)->sku ?: '—' }}</td>
                                     <td class="fw-semibold text-slate-900">{{ optional($row->stockItem)->name ?: '—' }}</td>
                                     <td class="small">{{ optional($row->stockItem)->uom ?: '—' }}</td>
                                     <td class="small text-muted">{{ optional($row->itemCategory)->name ?: '—' }}</td>
@@ -217,7 +219,7 @@
                             <tr>
                                 {{-- One column further than before: UOM now sits
                                      between Item and Issued Qty. --}}
-                                <td colspan="10" class="text-end gx-stock-total-label">Total-</td>
+                                <td colspan="11" class="text-end gx-stock-total-label">Total-</td>
                                 <td class="text-end fw-bold">{{ $qty($summary['qty']) }}</td>
                                 <td></td>
                             </tr>

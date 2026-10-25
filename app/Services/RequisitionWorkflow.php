@@ -76,6 +76,7 @@ class RequisitionWorkflow
     public function __construct(
         private readonly RequisitionHistory $history,
         private readonly PurchaseRequisitionService $requisitions,
+        private readonly RequisitionNotifier $notifier,
     ) {
     }
 
@@ -158,6 +159,7 @@ class RequisitionWorkflow
                 'assignee_type' => $block->assignee_type,
                 'user' => null,
                 'skipped' => false,
+                'self_approved' => false,
                 'problem' => null,
             ];
             $name = $this->stageName($block);
@@ -168,6 +170,13 @@ class RequisitionWorkflow
                     $stage['user'] = $first['head'] ?? null;
                     // No head above the raiser: the stage does not apply.
                     $stage['skipped'] = $stage['user'] === null;
+                    // The raiser IS the head: their own sheet needs no one above
+                    // them, so the step reads as approved by them, at submit.
+                    if ($stage['skipped'] && $raiser && $this->isHead($raiser)) {
+                        $stage['skipped'] = false;
+                        $stage['self_approved'] = true;
+                        $stage['user'] = $raiser;
+                    }
                     break;
 
                 case RequisitionSignatureBlock::ASSIGNEE_STORE_HEAD:
@@ -192,7 +201,7 @@ class RequisitionWorkflow
                         .'". Ask Admin.';
             }
 
-            if (! $stage['problem'] && ! $stage['skipped'] && $raiser && $stage['user']?->id === $raiser->id) {
+            if (! $stage['problem'] && ! $stage['skipped'] && ! $stage['self_approved'] && $raiser && $stage['user']?->id === $raiser->id) {
                 $stage['problem'] = 'You are the '.$name.' approver for this sheet, and nobody may approve their own requisition. Ask another person to prepare it.';
             }
 
@@ -200,6 +209,82 @@ class RequisitionWorkflow
         }
 
         return $stages;
+    }
+
+    /**
+     * The Store users a sheet can be sent to by name: active, on the Store
+     * team, and neither the sender nor the raiser. Empty when there is nobody
+     * to choose from, which the screens treat as "no choice to make".
+     *
+     * @return Collection<int, User>
+     */
+    public function sendToOptions(?User $sender = null, ?PurchaseRequisition $requisition = null): Collection
+    {
+        return $this->notifier->storeTeam()
+            ->filter(fn (User $u) => (int) $u->status === 1
+                && (! $sender || $u->id !== $sender->id)
+                && (! $requisition || ! $requisition->isRaisedBy($u)))
+            ->sortBy('name')->values();
+    }
+
+    /** The stage after this one that still waits (skipped ones passed over). */
+    public function nextPending(PurchaseRequisitionStage $stage): ?PurchaseRequisitionStage
+    {
+        return PurchaseRequisitionStage::where('purchase_requisition_id', $stage->purchase_requisition_id)
+            ->where('cycle', $stage->cycle)
+            ->where('sequence', '>', $stage->sequence)
+            ->where('status', PurchaseRequisitionStage::STATUS_PENDING)
+            ->orderBy('sequence')
+            ->first();
+    }
+
+    /**
+     * Whether this stage is the Store's own step on a department's sheet: the
+     * last stage of the round, whoever the box names (the Store team, the
+     * Store head or a person). Read as "Received", and the one the sender may
+     * point at a Store user.
+     */
+    public function isStoreStep(PurchaseRequisition $requisition, ?PurchaseRequisitionStage $stage): bool
+    {
+        return $stage !== null
+            && $requisition->isDepartmentLevel()
+            && ! PurchaseRequisitionStage::where('purchase_requisition_id', $stage->purchase_requisition_id)
+                ->where('cycle', $stage->cycle)->where('sequence', '>', $stage->sequence)->exists();
+    }
+
+    /** The Store step, still waiting: the sender may name the Store user who gets it. */
+    public function isDirectable(PurchaseRequisition $requisition, ?PurchaseRequisitionStage $stage): bool
+    {
+        return $stage !== null
+            && $stage->status === PurchaseRequisitionStage::STATUS_PENDING
+            && $this->isStoreStep($requisition, $stage);
+    }
+
+    /**
+     * Point the Store step at the person the sender chose. Ignored when the
+     * step is not the Store's, or the person is not on the Store team — the
+     * step then stays as planned. An open "Store team" step stays takeable by
+     * the rest of the team, so an absent person never holds a sheet up; a
+     * step planned for one person moves to the chosen one.
+     */
+    private function direct(PurchaseRequisition $requisition, ?PurchaseRequisitionStage $stage, ?int $sendTo, ?User $sender): void
+    {
+        if (! $sendTo || ! $this->isDirectable($requisition, $stage)) {
+            return;
+        }
+
+        $chosen = $this->sendToOptions($sender)->firstWhere('id', $sendTo);
+
+        if ($chosen) {
+            $stage->forceFill(['assignee_user_id' => $chosen->id, 'assignee_name' => $chosen->name])->save();
+        }
+    }
+
+    /** Heads a section or a department, so nobody sits above them for their own sheet. */
+    private function isHead(User $user): bool
+    {
+        return IndentSection::query()->where('head_user_id', $user->id)->exists()
+            || Department::query()->where('head_user_id', $user->id)->exists();
     }
 
     /**
@@ -219,7 +304,7 @@ class RequisitionWorkflow
      * Refuses — having written nothing — if any stage has no approver or
      * the raiser holds a stage. Called inside the submit transaction.
      */
-    public function start(PurchaseRequisition $requisition): void
+    public function start(PurchaseRequisition $requisition, ?int $sendTo = null): void
     {
         $raiser = $requisition->createdBy()->first();
         $section = $requisition->indentSection()->first() ?: $raiser?->requisitionSection;
@@ -261,14 +346,24 @@ class RequisitionWorkflow
                 'assignee_name' => $stage['assignee_type'] === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
                     ? self::STORE_TEAM_NAME
                     : $stage['user']?->name,
-                'status' => $stage['skipped'] ? PurchaseRequisitionStage::STATUS_SKIPPED : PurchaseRequisitionStage::STATUS_PENDING,
+                'status' => $stage['skipped'] ? PurchaseRequisitionStage::STATUS_SKIPPED
+                    : ($stage['self_approved'] ? PurchaseRequisitionStage::STATUS_APPROVED : PurchaseRequisitionStage::STATUS_PENDING),
+                'acted_by' => $stage['self_approved'] ? $raiser?->id : null,
+                'acted_by_name' => $stage['self_approved'] ? $raiser?->name : null,
+                'acted_at' => $stage['self_approved'] ? now() : null,
             ]);
         }
 
+        $first = $this->firstPending($requisition, $cycle);
+        $this->direct($requisition, $first, $sendTo, $raiser);
+
         $requisition->forceFill([
             'workflow_version' => self::VERSION,
-            'current_stage' => $this->firstPending($requisition, $cycle)?->sequence,
+            'current_stage' => $first?->sequence,
         ])->save();
+
+        // The sheet has reached its first approval stage.
+        $this->notifier->stageReached($requisition, $this->currentStage($requisition), $raiser);
     }
 
     /*
@@ -309,17 +404,231 @@ class RequisitionWorkflow
      */
     public function canAct(PurchaseRequisition $requisition, ?User $user): bool
     {
-        $stage = $this->currentStage($requisition);
+        return $this->mayApprove($requisition, $this->currentStage($requisition), $user);
+    }
 
+    /**
+     * THE who-can-act rule, for one stage the sheet waits at. canAct() and
+     * the My Approvals list both ask this, so the two cannot drift apart.
+     */
+    public function mayApprove(PurchaseRequisition $requisition, ?PurchaseRequisitionStage $stage, ?User $user): bool
+    {
         if ($user === null || $stage === null
             || $stage->status !== PurchaseRequisitionStage::STATUS_PENDING
             || $requisition->isRaisedBy($user)) {
             return false;
         }
 
+        // The open "Store team" step is for someone who has not already signed
+        // this sheet: whoever approved an earlier stage of this round (a
+        // Department Head who also holds Store permissions, say) cannot also
+        // take it. A step Admin names a person for is theirs, as set up.
+        $alreadyActed = $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
+            && PurchaseRequisitionStage::where('purchase_requisition_id', $stage->purchase_requisition_id)
+            ->where('cycle', $stage->cycle)
+            ->where('sequence', '<', $stage->sequence)
+            ->where('status', PurchaseRequisitionStage::STATUS_APPROVED)
+            ->where('acted_by', $user->id)
+            ->exists();
+
+        if ($alreadyActed) {
+            return false;
+        }
+
         return $stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM
             ? self::isStoreTeam($user)
             : (int) $stage->assignee_user_id === (int) $user->id;
+    }
+
+    /**
+     * The sheets waiting for this user's action right now (My Approvals),
+     * oldest first. The database narrows to candidates — a pending stage of
+     * the sheet's active cycle that is the sheet's current stage and names
+     * this user, or the Store team when they are on it — and mayApprove()
+     * then decides each one, so the list is exactly what canAct() allows.
+     * Each sheet carries its waiting stage as the 'waitingStage' relation.
+     *
+     * @return Collection<int, PurchaseRequisition>
+     */
+    public function waitingFor(User $user): Collection
+    {
+        $storeTeam = self::isStoreTeam($user);
+
+        $stages = PurchaseRequisitionStage::query()
+            ->where('status', PurchaseRequisitionStage::STATUS_PENDING)
+            ->where('cycle', fn ($q) => $q->from('purchase_requisition_stages as latest')
+                ->selectRaw('max(latest.cycle)')
+                ->whereColumn('latest.purchase_requisition_id', 'purchase_requisition_stages.purchase_requisition_id'))
+            ->where(function ($q) use ($user, $storeTeam) {
+                $q->where('assignee_user_id', $user->id);
+
+                if ($storeTeam) {
+                    $q->orWhere('assignee_type', RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM);
+                }
+            })
+            ->whereHas('requisition', fn ($q) => $q
+                ->whereNotNull('workflow_version')
+                ->whereColumn('purchase_requisitions.current_stage', 'purchase_requisition_stages.sequence')
+                ->where(fn ($r) => $r->whereNull('created_by')->orWhere('created_by', '<>', $user->id)))
+            ->with(['requisition.indentSection', 'requisition.createdBy'])
+            ->get();
+
+        return $stages
+            ->filter(fn ($stage) => $this->mayApprove($stage->requisition, $stage, $user))
+            ->map(fn ($stage) => $stage->requisition->setRelation('waitingStage', $stage))
+            ->sortBy(fn ($requisition) => $requisition->submitted_at ?? $requisition->created_at)
+            ->values();
+    }
+
+    /**
+     * waitingFor(), worked out once per request however many places ask (the
+     * sidebar badge and the page itself), so the badge always equals the list.
+     * Kept on the request, not the service, so a long-lived process or a test
+     * making several requests never reads a stale answer.
+     *
+     * @return Collection<int, PurchaseRequisition>
+     */
+    public function waitingForOnce(User $user): Collection
+    {
+        $attributes = request()->attributes;
+        $key = 'requisition_waiting_for_'.$user->id;
+
+        if (! $attributes->has($key)) {
+            $attributes->set($key, $this->waitingFor($user));
+        }
+
+        return $attributes->get($key);
+    }
+
+    /**
+     * Where each of these sheets waits and since when, for My Approvals and
+     * its All Pending tab — two queries however many sheets there are.
+     * 'since' is the last time the sheet moved (submitted, approved, returned
+     * or merged); 'days' is calendar days since then on the Dhaka clock.
+     *
+     * @param  Collection<int, PurchaseRequisition>  $requisitions
+     * @return array<int, array{stage: ?PurchaseRequisitionStage, since: ?\Illuminate\Support\Carbon, days: ?int}>
+     */
+    public function waitingDetails(Collection $requisitions): array
+    {
+        $ids = $requisitions->pluck('id')->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $stages = PurchaseRequisitionStage::whereIn('purchase_requisition_id', $ids)->get()->groupBy('purchase_requisition_id');
+
+        $moved = PurchaseRequisitionAction::query()
+            ->whereIn('purchase_requisition_id', $ids)
+            ->whereIn('action', [
+                PurchaseRequisitionAction::SUBMITTED, PurchaseRequisitionAction::RESUBMITTED,
+                PurchaseRequisitionAction::HEAD_APPROVED, PurchaseRequisitionAction::HEAD_RETURNED,
+                PurchaseRequisitionAction::STAGE_APPROVED, PurchaseRequisitionAction::RECEIVED,
+                PurchaseRequisitionAction::APPROVED, PurchaseRequisitionAction::RETURNED,
+                PurchaseRequisitionAction::MERGED,
+            ])
+            ->selectRaw('purchase_requisition_id, max(created_at) as moved_at')
+            ->groupBy('purchase_requisition_id')
+            ->pluck('moved_at', 'purchase_requisition_id');
+
+        $details = [];
+
+        foreach ($requisitions as $requisition) {
+            $all = $stages->get($requisition->id, collect());
+            $round = $all->where('cycle', $all->max('cycle'));
+            $since = ($moved[$requisition->id] ?? null) ?: ($requisition->submitted_at ?? $requisition->created_at);
+            $since = $since ? \Illuminate\Support\Carbon::parse($since) : null;
+
+            $details[$requisition->id] = [
+                'stage' => $round->firstWhere('sequence', $requisition->current_stage),
+                'since' => $since,
+                // Calendar days on the Dhaka clock: a sheet that moved at 23:00 and is
+                // read at 01:00 the next morning is 1 day old, not Today.
+                'days' => $since ? (int) \App\Support\LocalTime::of($since)->startOfDay()->diffInDays(\App\Support\LocalTime::today(), true) : null,
+            ];
+        }
+
+        return $details;
+    }
+
+    /**
+     * The stage tracker on the show page: every stage of every round, in
+     * order, newest round first. Built from the plan (purchase_requisition_stages)
+     * and the history (purchase_requisition_actions) — nothing is stored for it.
+     *
+     * Row state: done · current (the sheet waits here) · waiting · skipped ·
+     * returned (the sheet is back with its Requester) · closed (cancelled
+     * before it got here) · not_reached (an earlier round ended before it).
+     * 'return' is set on the stage a Return was made FROM: who, when, why and
+     * where it was sent. A sheet not on the stage engine has no tracker.
+     *
+     * @return list<array{cycle: int, active: bool, rows: list<array<string, mixed>>}>
+     */
+    public function tracker(PurchaseRequisition $requisition): array
+    {
+        if (! $requisition->usesStageEngine()) {
+            return [];
+        }
+
+        $stages = PurchaseRequisitionStage::where('purchase_requisition_id', $requisition->id)
+            ->orderBy('cycle')->orderBy('sequence')->get()->groupBy('cycle');
+
+        if ($stages->isEmpty()) {
+            return [];
+        }
+
+        $active = (int) $stages->keys()->max();
+        $cancelled = $requisition->isCancelled();
+
+        // Oldest first, so the latest Return of a stage wins when a sheet is returned twice.
+        $returns = $requisition->actions
+            ->whereIn('action', [PurchaseRequisitionAction::RETURNED, PurchaseRequisitionAction::HEAD_RETURNED])
+            ->sortBy('id')
+            ->groupBy('cycle');
+
+        $cycles = [];
+
+        foreach ($stages->sortKeysDesc() as $cycle => $rows) {
+            $isActive = (int) $cycle === $active;
+            $returnFrom = ($returns->get($cycle) ?? collect())->keyBy(fn ($a) => (int) ($a->meta['stage_sequence'] ?? 0));
+            $withRaiser = $isActive && ! $cancelled && (int) $requisition->current_stage === 1;
+
+            $cycles[] = [
+                'cycle' => (int) $cycle,
+                'active' => $isActive,
+                'rows' => $rows->map(function (PurchaseRequisitionStage $stage) use ($requisition, $isActive, $cancelled, $withRaiser, $returnFrom) {
+                    $return = $returnFrom->get($stage->sequence);
+
+                    $state = match (true) {
+                        $stage->sequence === 1 && $withRaiser => 'returned',
+                        $stage->status === PurchaseRequisitionStage::STATUS_APPROVED => 'done',
+                        $stage->status === PurchaseRequisitionStage::STATUS_SKIPPED => 'skipped',
+                        ! $isActive => $return ? 'returned' : 'not_reached',
+                        $cancelled => 'closed',
+                        (int) $requisition->current_stage === $stage->sequence => 'current',
+                        default => 'waiting',
+                    };
+
+                    return [
+                        'sequence' => $stage->sequence,
+                        'label' => $stage->displayLabel(),
+                        'state' => $state,
+                        'who' => $state === 'done' ? ($stage->acted_by_name ?: $stage->assignee_name) : $stage->assignee_name,
+                        'at' => $state === 'done' ? $stage->acted_at : null,
+                        'comment' => $state === 'done' ? $stage->comment : null,
+                        'return' => $return ? [
+                            'by' => $return->actorName(),
+                            'at' => $return->created_at,
+                            'reason' => $return->comment,
+                            'to' => $return->meta['returned_to'] ?? null,
+                        ] : null,
+                    ];
+                })->all(),
+            ];
+        }
+
+        return $cycles;
     }
 
     /*
@@ -332,7 +641,7 @@ class RequisitionWorkflow
      * Approve the current stage and move to the next. The caller holds the
      * row lock and the transaction, and has checked canAct().
      */
-    public function approve(PurchaseRequisition $requisition, User $user, ?string $comment = null): ?PurchaseRequisitionStage
+    public function approve(PurchaseRequisition $requisition, User $user, ?string $comment = null, ?int $sendTo = null): ?PurchaseRequisitionStage
     {
         $stage = $this->currentStage($requisition);
         $from = $requisition->status;
@@ -348,6 +657,7 @@ class RequisitionWorkflow
         $this->applyStamp($requisition, $stage->stamp_source, $user);
 
         $next = $this->firstPending($requisition, $stage->cycle);
+        $this->direct($requisition, $next, $sendTo, $user);
 
         if (! $next) {
             $this->complete($requisition, $user);
@@ -361,6 +671,9 @@ class RequisitionWorkflow
             'comment' => $comment,
             'meta' => ['stage_sequence' => $stage->sequence, 'stage_label' => $stage->displayLabel()],
         ]);
+
+        $this->notifier->stageActed($requisition, $stage->cycle, $stage->sequence);
+        $next ? $this->notifier->stageReached($requisition, $next, $user) : $this->notifier->finished($requisition, $user);
 
         return $next;
     }
@@ -431,6 +744,9 @@ class RequisitionWorkflow
                 'returned_to' => $toRaiser ? 'Requester' : $previous->displayLabel(),
             ],
         ]);
+
+        $this->notifier->stageActed($requisition, $current->cycle, $current->sequence);
+        $this->notifier->returned($requisition, $toRaiser ? null : $previous->fresh(), $user, $reason);
 
         return $toRaiser ? null : $previous->fresh();
     }
@@ -548,6 +864,7 @@ class RequisitionWorkflow
     public function cancel(PurchaseRequisition $requisition, User $user, string $reason): void
     {
         $from = $requisition->status;
+        $waitingAt = $this->currentStage($requisition);
 
         $requisition->forceFill([
             'status' => PurchaseRequisition::STATUS_CANCELLED,
@@ -559,6 +876,8 @@ class RequisitionWorkflow
             'from' => $from,
             'comment' => $reason,
         ]);
+
+        $this->notifier->cancelled($requisition, $waitingAt, $user);
     }
 
     /** Take back what a stage wrote on the sheet, so it can act again. */

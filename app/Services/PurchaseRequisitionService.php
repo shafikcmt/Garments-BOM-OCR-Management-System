@@ -6,6 +6,7 @@ use App\Models\StockItem;
 use App\Models\StockPurchase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use App\Support\LocalTime;
 
 /**
  * General Stock (module A) — supplies the read-only figures the Purchase
@@ -53,7 +54,7 @@ class PurchaseRequisitionService
             return [];
         }
 
-        $on = ($on ?? Carbon::now())->copy();
+        $on = ($on ?? LocalTime::now())->copy();
         $thisMonth = $on->copy()->startOfMonth();
         $lastMonth = $thisMonth->copy()->subMonthNoOverflow();
 
@@ -126,6 +127,16 @@ class PurchaseRequisitionService
         $id = $line['stock_item_id'] ?? null;
 
         return ($id === null || $id === '' || (int) $id === 0) ? null : (int) $id;
+    }
+
+    /** The key one item goes by on the merge review: its master id, else its typed name. */
+    public function lineKey(array $line): string
+    {
+        $itemId = $this->lineItemId($line);
+
+        return md5($itemId !== null
+            ? 'id:'.$itemId
+            : 'custom:'.mb_strtolower(trim((string) ($line['custom_item_name'] ?? ''))));
     }
 
     /** Separates the departments listed in one merged User Dept./Section cell. */

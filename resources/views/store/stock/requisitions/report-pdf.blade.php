@@ -100,7 +100,7 @@
                     </td>
                     <td style="width:25%;" class="date-area">
                         <div>Printed On</div>
-                        <div>{{ now()->format('d M Y, h:i A') }}</div>
+                        <div>{{ \App\Support\LocalTime::now()->format('d M Y, h:i A') }}</div>
                     </td>
                 </tr>
             </table>
@@ -183,7 +183,7 @@
 @unless($forExcel)
     <div class="footer">
         {{ $unit }} &mdash; {{ $title }} &mdash; {{ $monthLabel }}
-        <span class="right">Generated {{ now()->format('d M Y') }}</span>
+        <span class="right">Generated {{ \App\Support\LocalTime::now()->format('d M Y') }}</span>
     </div>
 @endunless
 

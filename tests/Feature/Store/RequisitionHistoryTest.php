@@ -217,14 +217,14 @@ it('lets only Admin delete a submitted requisition', function () {
     expect(PurchaseRequisition::find($sheet->id))->not->toBeNull();
 });
 
-it('refuses Admin deleting a submitted requisition, and keeps the history of a deleted draft', function () {
+it('lets Admin delete a submitted requisition, and keeps the history of a deleted draft', function () {
     $admin = histUser('admin', [], ['name' => 'System Admin']);
 
-    // Step 3c: a submitted sheet is cancelled, never deleted.
+    // A submitted sheet: Admin may clear it (test/duplicate), with a reason.
     $submitted = histSheet(histUser('merchant'), PurchaseRequisition::STATUS_SUBMITTED);
     $this->actingAs($admin)->delete(route('store.stock.requisitions.destroy', $submitted), ['comment' => 'Duplicate'])
-        ->assertSessionHas('error', fn ($m) => str_contains($m, 'Cancel it instead'));
-    expect(PurchaseRequisition::find($submitted->id))->not->toBeNull();
+        ->assertRedirect();
+    expect(PurchaseRequisition::find($submitted->id))->toBeNull();
 
     // A draft is still deleted — and its history outlives it.
     $draft = histSheet(histUser('merchant'), PurchaseRequisition::STATUS_DRAFT);

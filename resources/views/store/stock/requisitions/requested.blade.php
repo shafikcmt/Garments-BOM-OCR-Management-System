@@ -89,7 +89,7 @@
                 </div>
                 <div class="col-12 col-md-6 col-xl-4">
                     <label class="form-label" for="search">Search</label>
-                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Requisition no, requester or item">
+                    <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Requisition no, requester, SKU or item">
                 </div>
                 <div class="col-12 col-xl-2 gx-stock-filter-actions">
                     @if($filters['ready'] ?? false)
@@ -110,12 +110,10 @@
                  their own, and forms cannot nest. --}}
             @php($mergeable = $canMerge ? $requisitions->filter(fn ($r) => $r->isReadyToMerge()) : collect())
             @if($mergeable->isNotEmpty())
-                <form id="mergeForm" method="POST" action="{{ route('store.stock.requisitions.merge') }}"
-                      class="d-flex flex-wrap align-items-center gap-2 mb-3 px-3 py-2 border rounded bg-info-subtle"
-                      onsubmit="return confirm('Merge the selected requisitions into a new final requisition?');">
-                    @csrf
+                <form id="mergeForm" method="GET" action="{{ route('store.stock.requisitions.merge-review') }}"
+                      class="d-flex flex-wrap align-items-center gap-2 mb-3 px-3 py-2 border rounded bg-info-subtle">
                     <i class="bi bi-intersect text-info-emphasis" aria-hidden="true"></i>
-                    <span class="small"><strong>Merge:</strong> tick the received requisitions of one month, then create the final requisition.</span>
+                    <span class="small"><strong>Merge:</strong> tick the received requisitions of one month, then review them before the final requisition is made.</span>
                     <span class="small text-muted ms-auto" data-merge-count>0 selected</span>
                     <button type="submit" class="btn btn-sm btn-info" data-merge-submit disabled>
                         <i class="bi bi-intersect me-1" aria-hidden="true"></i>Merge into Final Requisition
@@ -158,7 +156,7 @@
                                 <td>
                                     <div class="fw-bold text-slate-900">{{ $r->requisition_no }}</div>
                                     @if($r->store_ack_at)
-                                        <div class="gx-stock-spec">received {{ $r->store_ack_at->format('d-M-Y') }}</div>
+                                        <div class="gx-stock-spec">received {{ $r->store_ack_at->local()->format('d-M-Y') }}</div>
                                     @endif
                                     @if($r->mergedInto)
                                         <div class="gx-stock-spec">merged into
@@ -171,7 +169,7 @@
                                 <td class="small">
                                     {{ optional($r->createdBy)->name ?: '—' }}
                                     @if($r->department_role)
-                                        <div class="gx-stock-spec">{{ $r->departmentLabel() }}@if($r->department_checked_at) · head checked {{ $r->department_checked_at->format('d-M-Y') }}@endif</div>
+                                        <div class="gx-stock-spec">{{ $r->departmentLabel() }}@if($r->department_checked_at) · head checked {{ $r->department_checked_at->local()->format('d-M-Y') }}@endif</div>
                                     @endif
                                 </td>
                                 <td class="text-end fw-semibold">{{ $r->items_count }}</td>

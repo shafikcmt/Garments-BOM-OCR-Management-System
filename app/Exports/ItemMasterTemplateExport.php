@@ -49,6 +49,8 @@ class ItemMasterTemplateExport implements FromArray, ShouldAutoSize, WithColumnF
     {
         $price = self::columnLetter('Unit Price');
         $date = self::columnLetter('Counted On');
+        $lastAdd = self::columnLetter('Last Addition Date');
+        $lastCons = self::columnLetter('Last Consumption Date');
 
         return [
             $price.'2:'.$price.'1000' => \App\Support\Quantity::EXCEL_MONEY,
@@ -56,6 +58,8 @@ class ItemMasterTemplateExport implements FromArray, ShouldAutoSize, WithColumnF
             // receiving templates format theirs, so the three read alike and a
             // date typed here cannot come back as text.
             $date.'2:'.$date.'1000' => IssueTemplateExport::DATE_FORMAT,
+            $lastAdd.'2:'.$lastAdd.'1000' => IssueTemplateExport::DATE_FORMAT,
+            $lastCons.'2:'.$lastCons.'1000' => IssueTemplateExport::DATE_FORMAT,
         ];
     }
 

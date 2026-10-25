@@ -50,6 +50,12 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
         // accounts for.
         'Unit Price',
         'Remarks',
+        // Appended AFTER Remarks so every earlier column keeps its position.
+        // The dates the old sheets carried for "last received / last issued",
+        // read only when the item has no real transaction yet (the Stock
+        // Report shows the transaction date as soon as there is one).
+        'Last Addition Date',
+        'Last Consumption Date',
     ];
 
     /**
@@ -76,6 +82,8 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
         'lead_time_days' => ['leadtime', 'leadtimedays', 'lead'],
         'unit_price' => ['unitprice', 'price', 'rate', 'unitrate'],
         'remarks' => ['remarks', 'remark', 'note', 'notes'],
+        'last_addition_reference' => ['lastadditiondate', 'lastaddition', 'dateoflastaddition', 'lastreceivingdate'],
+        'last_consumption_reference' => ['lastconsumptiondate', 'lastconsumption', 'dateoflastcons', 'dateoflastconsumption', 'lastissuedate'],
     ];
 
     /**
@@ -86,7 +94,7 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
      */
     public const SAMPLE_ROW = [
         'EXAMPLE — delete this row', 'Organ DPX17-14 FFG, chrome',
-        'Pkt', 'Needle', 25, '2026-08-01', '', '', 7, 12.5, 'Optional note',
+        'Pkt', 'Needle', 25, '2026-08-01', '', '', 7, 12.5, 'Optional note', '', '',
     ];
 
     /** Item names starting with this are treated as template placeholders. */
@@ -241,6 +249,18 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
                 continue;
             }
 
+            $lastAddition = self::date($cell('last_addition_reference'));
+            if ($lastAddition === false) {
+                $errors[] = 'Row '.$line.': Last Addition Date is not a valid date. Use YYYY-MM-DD.';
+                continue;
+            }
+
+            $lastConsumption = self::date($cell('last_consumption_reference'));
+            if ($lastConsumption === false) {
+                $errors[] = 'Row '.$line.': Last Consumption Date is not a valid date. Use YYYY-MM-DD.';
+                continue;
+            }
+
             $seen[$key] = true;
 
             $items[] = [
@@ -261,6 +281,8 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
                     : (int) config('stock.general_stock.default_lead_time_days', 7),
                 'unit_price' => $unitPrice,
                 'remarks' => self::text($cell('remarks'), 1000),
+                'last_addition_reference' => $lastAddition,
+                'last_consumption_reference' => $lastConsumption,
                 'is_active' => true,
             ];
         }
@@ -342,6 +364,8 @@ class ItemMasterImport implements ToArray, WithCustomCsvSettings
             'lead_time_days' => 8,
             'unit_price' => 9,
             'remarks' => 10,
+            'last_addition_reference' => 11,
+            'last_consumption_reference' => 12,
         ];
     }
 

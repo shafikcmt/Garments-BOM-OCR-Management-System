@@ -107,7 +107,7 @@ class RequisitionSignatureResolver
             'label' => $block->label,
             'name' => $person?->name ?? '',
             'title' => $this->title($block, $person, $requisition),
-            'signed_at' => $signedAt,
+            'signed_at' => $signedAt?->local(),
             'stamped' => $block->stamp_source !== null && $block->stamp_source !== '',
         ];
     }
@@ -232,7 +232,7 @@ class RequisitionSignatureResolver
                     'title' => trim((string) $stage->title)
                         ?: trim((string) ($person?->designation ?? ''))
                         ?: ($stage->assignee_type === RequisitionSignatureBlock::ASSIGNEE_DEPARTMENT_HEAD ? $this->headTitle($requisition) : ''),
-                    'signed_at' => $approved ? $stage->acted_at : null,
+                    'signed_at' => $approved ? $stage->acted_at?->local() : null,
                     // Every stage is a system step: an unsigned box reads Pending.
                     'stamped' => $stage->status !== PurchaseRequisitionStage::STATUS_SKIPPED,
                 ];

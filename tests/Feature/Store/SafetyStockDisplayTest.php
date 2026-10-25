@@ -68,7 +68,8 @@ it('shows 2.69 on the Stock Report screen and keeps the real figure in its Excel
                 $column = $cell->getColumn();
                 $value = $sheet->getCell($column.($row->getRowIndex() + 1));
 
-                expect(round((float) $value->getValue(), 4))->toBe(2.6923)
+                // The cell is a formula now (Cons. Pattern x safety days), so read its result.
+                expect(round((float) $value->getCalculatedValue(), 4))->toBe(2.6923)
                     ->and($value->getStyle()->getNumberFormat()->getFormatCode())->toBe('#,##0.0#')
                     ->and($value->getFormattedValue())->toBe('2.69');
                 $found = true;

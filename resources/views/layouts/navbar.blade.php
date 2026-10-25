@@ -116,6 +116,16 @@
                             : ($isPiMissingAlert ? 'bg-danger-subtle' : 'bg-sky-50');
                         $notificationIconClass = $isPiMissingAlert ? 'bg-danger text-white' : 'bg-primary text-white';
                         $notificationIcon = $isPiMissingAlert ? 'bi-exclamation-octagon-fill' : 'bi-info-lg';
+
+                        // Requisition notices: an icon and colour per kind. The
+                        // heading and the sentence beside it are what say it.
+                        [$notificationIconClass, $notificationIcon] = [
+                            'requisition_waiting' => ['bg-primary text-white', 'bi-hourglass-split'],
+                            'requisition_returned' => ['bg-warning text-dark', 'bi-arrow-return-left'],
+                            'requisition_approved' => ['bg-success text-white', 'bi-check-lg'],
+                            'requisition_cancelled' => ['bg-danger text-white', 'bi-x-lg'],
+                            'requisition_merged' => ['bg-info text-dark', 'bi-intersect'],
+                        ][$notification->type] ?? [$notificationIconClass, $notificationIcon];
                     @endphp
                     <a href="{{ route('notifications.open', $notification->id) }}"
                        class="dropdown-item py-3 px-3 {{ $notificationBg }}">

@@ -21,10 +21,10 @@ use App\Support\DepartmentRoles;
  *
  * ONE CHECK, BY THE NEAREST HEAD. The first step that applies is the only
  * one the sheet stops at; after that head approves it goes to the Store.
- * A section head's own sheet therefore skips the section step and stops
- * at the department head; a department head's own sheet skips both and
- * goes straight to the Store; a department with nothing configured
- * behaves exactly as before. Which head is "the same person" is decided
+ * A section head's own sheet has no head step at all and goes straight to
+ * the Store (it is NOT sent up to the department head); a department
+ * head's own sheet likewise goes straight to the Store; a department
+ * with nothing configured behaves exactly as before. Which head is "the same person" is decided
  * by comparing users, never by naming anyone, so it stays right when
  * heads change.
  *
@@ -66,6 +66,15 @@ class RequisitionReviewChain
     public static function stepsFor(?User $requester, ?IndentSection $section, ?string $departmentKey): array
     {
         if (! $requester) {
+            return [];
+        }
+
+        // A SECTION HEAD's own requisition goes straight to the Store: it is
+        // not sent up to the Department Head. Any section they head counts,
+        // not only the one on their form. (A Department Head's own sheet has
+        // no step either, below.) The Store still receives and approves it
+        // like any other.
+        if (IndentSection::query()->where('head_user_id', $requester->id)->exists()) {
             return [];
         }
 
