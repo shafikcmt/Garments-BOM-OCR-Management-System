@@ -41,13 +41,14 @@ class ItemMasterExport implements FromArray, ShouldAutoSize, WithColumnFormattin
     {
         // The importer's own columns, so what comes out lines up with what goes
         // in and neither can drift from the other.
-        return ItemMasterImport::COLUMNS;
+        return ['SKU', ...ItemMasterImport::COLUMNS];
     }
 
     /** @return array<int, array<int, mixed>> */
     public function array(): array
     {
-        $at = fn (string $heading) => (int) array_search($heading, ItemMasterImport::COLUMNS, true);
+        // +1: the SKU column sits first, ahead of the importer's own columns.
+        $at = fn (string $heading) => 1 + (int) array_search($heading, ItemMasterImport::COLUMNS, true);
 
         // Inactive items included. They are still part of the master, they
         // still hold stock the report values, and leaving them out of a file
@@ -56,7 +57,9 @@ class ItemMasterExport implements FromArray, ShouldAutoSize, WithColumnFormattin
             ->orderBy('name')
             ->get()
             ->map(function (StockItem $item) use ($at) {
-                $row = array_fill(0, count(ItemMasterImport::COLUMNS), null);
+                $row = array_fill(0, count(ItemMasterImport::COLUMNS) + 1, null);
+
+                $row[0] = $item->sku;
 
                 $row[$at('Item Name*')] = $item->name;
                 $row[$at('Brand/Specification')] = $item->brand;
@@ -84,7 +87,7 @@ class ItemMasterExport implements FromArray, ShouldAutoSize, WithColumnFormattin
     public function columnFormats(): array
     {
         $letter = fn (string $heading) => Coordinate::stringFromColumnIndex(
-            (int) array_search($heading, ItemMasterImport::COLUMNS, true) + 1
+            (int) array_search($heading, ItemMasterImport::COLUMNS, true) + 2
         );
 
         return [
@@ -104,7 +107,7 @@ class ItemMasterExport implements FromArray, ShouldAutoSize, WithColumnFormattin
         // The two identity columns are frozen and greyed: change either and the
         // price importer stops recognising the row. Nothing enforces that in a
         // spreadsheet, so it is at least said in the only way a spreadsheet can.
-        $sheet->freezePane('C2');
+        $sheet->freezePane('D2');
 
         return [
             1 => ['font' => ['bold' => true]],

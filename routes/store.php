@@ -253,6 +253,10 @@ Route::prefix('store')
             Route::post('/items/import', [StockItemController::class, 'import'])->middleware($act('store.items.create'))->name('items.import');
             Route::post('/items', [StockItemController::class, 'store'])->middleware($act('store.items.create'))->name('items.store');
             Route::put('/items/{stockItem}', [StockItemController::class, 'update'])->name('items.update');
+            // Approval point for new items and UOM clean-up; the controller checks admin / store.items.approve.
+            Route::post('/items/{stockItem}/approve', [StockItemController::class, 'approve'])->name('items.approve');
+            Route::post('/items/{stockItem}/reject', [StockItemController::class, 'reject'])->name('items.reject');
+            Route::post('/items-uom/merge', [StockItemController::class, 'mergeUom'])->name('items.uom.merge');
             Route::delete('/items/{stockItem}', [StockItemController::class, 'destroy'])->name('items.destroy');
             });
 
