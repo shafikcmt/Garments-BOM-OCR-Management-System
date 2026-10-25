@@ -318,8 +318,11 @@ class GeneralStockReportExport implements FromView, WithEvents, WithTitle
         $limit = min($sheet->getHighestDataRow(), 40);
 
         for ($row = 1; $row <= $limit; $row++) {
-            if (trim((string) $sheet->getCell('C'.$row)->getValue()) === 'Item Name') {
-                return $row;
+            // SKU sits before Item Name, so the heading is in C or D.
+            foreach (['C', 'D'] as $letter) {
+                if (trim((string) $sheet->getCell($letter.$row)->getValue()) === 'Item Name') {
+                    return $row;
+                }
             }
         }
 

@@ -49,7 +49,7 @@
             font-size: 5.5px; line-height: 1.15; font-weight: 800; text-align: right; vertical-align: middle;
         }
         .report-table th.col-sl, .report-table th.col-flag { text-align: center; }
-        .report-table th.col-name, .report-table th.col-txt,
+        .report-table th.col-name, .report-table th.col-sku, .report-table th.col-txt,
         .report-table th.col-brand { text-align: left; }
         .report-table td {
             border: 1px solid #e2e6ef; padding: 3px 2px; font-size: 6px; line-height: 1.2;
@@ -57,6 +57,7 @@
         }
         .report-table td.num { text-align: right; }
         .report-table td.col-sl { text-align: center; }
+        .report-table td.col-sku { font-size: 5.5px; }
         .report-table td.flag-order { background: #fde8e8; color: #9b1c1c; font-weight: 800; }
         .report-table td.empty { text-align: center; padding: 18px 4px; color: #4a5cb2; }
         .report-table tfoot .grand td {
@@ -78,11 +79,15 @@
            Brand/Specification, +2.4 and +2 — rather than being spread across
            the figures, which do not need it. The budget still lands just under
            100 so table-layout:fixed has nothing to redistribute.
-           5 + 2 + 14.4 + 14.5 + (5 x 4) + (10 x 4.4) = 99.9%. */
+           5 + 2 + 14.4 + 14.5 + (5 x 4) + (10 x 4.4) = 99.9%.
+
+           SKU column added after Sl: 5% taken from item name (-3) and
+           Brand/Specification (-2), so the total is unchanged at 99.9%. */
         .report-table .col-flag { width: 5%; }
         .report-table .col-sl { width: 2%; }
-        .report-table .col-name { width: 14.4%; }
-        .report-table .col-brand { width: 14.5%; }
+        .report-table .col-sku { width: 5%; }
+        .report-table .col-name { width: 11.4%; }
+        .report-table .col-brand { width: 12.5%; }
         .report-table .col-txt { width: 4%; }
         .report-table th.num, .report-table td.num { width: 4.4%; }
 
