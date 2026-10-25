@@ -178,7 +178,7 @@ function exportedSheet(array $query = []): \PhpOffice\PhpSpreadsheet\Worksheet\W
 function headerRowOf(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet): ?int
 {
     for ($row = 1; $row <= 40; $row++) {
-        if (trim((string) $sheet->getCell('C'.$row)->getValue()) === 'Item Name') {
+        if (in_array(trim((string) $sheet->getCell('C'.$row)->getValue()), ['Item Name'], true) || trim((string) $sheet->getCell('D'.$row)->getValue()) === 'Item Name') {
             return $row;
         }
     }
@@ -195,14 +195,14 @@ it('writes live SUBTOTAL formulas above the five figure columns', function () {
 
     // SUBTOTAL(9, …), not SUM: 9 sums only the rows Excel's filter leaves
     // visible, which is the whole point of the client's format.
-    expect($sheet->getCell('G'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,G')
-        ->and($sheet->getCell('L'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,L')
-        ->and($sheet->getCell('N'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,N')
-        ->and($sheet->getCell('P'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,P')
-        ->and($sheet->getCell('R'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,R')
+    expect($sheet->getCell('H'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,H')
+        ->and($sheet->getCell('M'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,M')
+        ->and($sheet->getCell('O'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,O')
+        ->and($sheet->getCell('Q'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,Q')
+        ->and($sheet->getCell('S'.$strip)->getValue())->toStartWith('=SUBTOTAL(9,S')
         // Named plainly: the Sub-Total row is filter-aware too now, so calling
         // this one "Visible Total" would imply a difference that is not there.
-        ->and($sheet->getCell('F'.$strip)->getValue())->toBe('Total');
+        ->and($sheet->getCell('G'.$strip)->getValue())->toBe('Total');
 });
 
 it('computes the same figures the report does', function () {
@@ -213,9 +213,9 @@ it('computes the same figures the report does', function () {
     $sheet = exportedSheet(['month' => '2026-08']);
     $strip = headerRowOf($sheet) - 1;
 
-    expect($sheet->getCell('G'.$strip)->getCalculatedValue())->toEqual(20.0)  // Opening
-        ->and($sheet->getCell('N'.$strip)->getCalculatedValue())->toEqual(10.0)  // Consumption
-        ->and($sheet->getCell('P'.$strip)->getCalculatedValue())->toEqual(10.0); // Stock as on
+    expect($sheet->getCell('H'.$strip)->getCalculatedValue())->toEqual(20.0)  // Opening
+        ->and($sheet->getCell('O'.$strip)->getCalculatedValue())->toEqual(10.0)  // Consumption
+        ->and($sheet->getCell('Q'.$strip)->getCalculatedValue())->toEqual(10.0); // Stock as on
 });
 
 it('ranges the formulas over the real data rows, wherever the header lands', function () {
@@ -230,10 +230,10 @@ it('ranges the formulas over the real data rows, wherever the header lands', fun
     $shiftedHeader = headerRowOf($shifted);
 
     // Whatever row the header is on, the range starts on the row after it.
-    expect($plain->getCell('G'.($plainHeader - 1))->getValue())
-        ->toContain('G'.($plainHeader + 1).':')
-        ->and($shifted->getCell('G'.($shiftedHeader - 1))->getValue())
-        ->toContain('G'.($shiftedHeader + 1).':');
+    expect($plain->getCell('H'.($plainHeader - 1))->getValue())
+        ->toContain('H'.($plainHeader + 1).':')
+        ->and($shifted->getCell('H'.($shiftedHeader - 1))->getValue())
+        ->toContain('H'.($shiftedHeader + 1).':');
 });
 
 it('makes the bottom Sub-Total row filter-aware too', function () {
@@ -256,17 +256,17 @@ it('makes the bottom Sub-Total row filter-aware too', function () {
     expect($subTotal)->not->toBeNull();
 
     // The three the Blade actually totals, now live.
-    expect($sheet->getCell('L'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,L')
-        ->and($sheet->getCell('N'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,N')
-        ->and($sheet->getCell('R'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,R')
+    expect($sheet->getCell('M'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,M')
+        ->and($sheet->getCell('O'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,O')
+        ->and($sheet->getCell('S'.$subTotal)->getValue())->toStartWith('=SUBTOTAL(9,S')
         // ...and it still adds up.
-        ->and($sheet->getCell('N'.$subTotal)->getCalculatedValue())->toEqual(10.0);
+        ->and($sheet->getCell('O'.$subTotal)->getCalculatedValue())->toEqual(10.0);
 
     // Opening Stock and Stock as on Date are left out of this row on purpose —
     // summing a brought-forward balance across unrelated items says nothing.
     // Writing a formula into those blanks would invent a total.
-    expect($sheet->getCell('G'.$subTotal)->getValue())->toBeEmpty()
-        ->and($sheet->getCell('P'.$subTotal)->getValue())->toBeEmpty();
+    expect($sheet->getCell('H'.$subTotal)->getValue())->toBeEmpty()
+        ->and($sheet->getCell('Q'.$subTotal)->getValue())->toBeEmpty();
 });
 
 it('enables AutoFilter over the header and data, excluding the Sub-Total row', function () {
@@ -290,11 +290,11 @@ it('enables AutoFilter over the header and data, excluding the Sub-Total row', f
 
 it('writes no totals strip when the report has no rows', function () {
     // No Sub-Total row exists on an empty report, so there is nothing to range
-    // over. It must degrade quietly rather than emit =SUBTOTAL(9,G9:G8).
+    // over. It must degrade quietly rather than emit =SUBTOTAL(9,H9:H8).
     $sheet = exportedSheet(['month' => '2026-08', 'search' => 'zzz-no-such-item-zzz']);
     $header = headerRowOf($sheet);
 
-    expect($sheet->getCell('G'.($header - 1))->getValue())->toBeEmpty()
+    expect($sheet->getCell('H'.($header - 1))->getValue())->toBeEmpty()
         ->and($sheet->getAutoFilter()->getRange())->toBeEmpty();
 });
 
@@ -366,13 +366,13 @@ it('writes the last addition and consumption dates as real dates', function () {
     $row = headerRowOf($sheet) + 1;
 
     // 15-Aug-2026 issue: Date of Last Cons. is column O.
-    $cell = $sheet->getCell('O'.$row);
+    $cell = $sheet->getCell('P'.$row);
 
     expect($cell->getDataType())->toBe('n')
         ->and((float) $cell->getValue())->toBe(
             (float) \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(\Illuminate\Support\Carbon::parse('2026-08-15'))
         )
-        ->and($sheet->getStyle('O'.$row)->getNumberFormat()->getFormatCode())->toBe('dd-mmm-yy');
+        ->and($sheet->getStyle('P'.$row)->getNumberFormat()->getFormatCode())->toBe('dd-mmm-yy');
 });
 
 it('shows how each counted row was worked out, as formulas', function () {
@@ -381,9 +381,9 @@ it('shows how each counted row was worked out, as formulas', function () {
     $n = headerRowOf($sheet) + 1;
 
     // Stock as on Date = Opening + Addition - Consumption; Value = Stock x Price.
-    expect($sheet->getCell('P'.$n)->getValue())->toBe("=G{$n}+L{$n}-N{$n}")
-        ->and($sheet->getCell('P'.$n)->getCalculatedValue())->toEqual(10.0)
-        ->and($sheet->getCell('I'.$n)->getValue())->toBe("=H{$n}*7")
+    expect($sheet->getCell('Q'.$n)->getValue())->toBe("=H{$n}+M{$n}-O{$n}")
+        ->and($sheet->getCell('Q'.$n)->getCalculatedValue())->toEqual(10.0)
+        ->and($sheet->getCell('J'.$n)->getValue())->toBe("=I{$n}*7")
         ->and($sheet->getCell('A'.$n)->getValue())->toStartWith('=IF(');
 });
 
@@ -419,7 +419,7 @@ it('lands the formulas on the very figures the report computed, for every kind o
     $seen = 0;
 
     for ($row = $header + 1; $row <= $sheet->getHighestDataRow(); $row++) {
-        $name = trim((string) $sheet->getCell('C'.$row)->getValue());
+        $name = trim((string) $sheet->getCell('D'.$row)->getValue());
 
         if (! isset($expected[$name])) {
             continue;
@@ -429,34 +429,34 @@ it('lands the formulas on the very figures the report computed, for every kind o
         $seen++;
 
         if ($r['not_counted']) {
-            expect($sheet->getCell('P'.$row)->getValue())->toBe('-')
+            expect($sheet->getCell('Q'.$row)->getValue())->toBe('-')
                 ->and($sheet->getCell('A'.$row)->getValue())->toBe($labels['not_counted']);
 
             continue;
         }
 
-        expect((float) $sheet->getCell('P'.$row)->getCalculatedValue())->toEqualWithDelta($r['stock_as_on'], 0.0001)
+        expect((float) $sheet->getCell('Q'.$row)->getCalculatedValue())->toEqualWithDelta($r['stock_as_on'], 0.0001)
             ->and((string) $sheet->getCell('A'.$row)->getCalculatedValue())->toBe($labels[$r['status']])
-            ->and((float) $sheet->getCell('I'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['safety'], 0.0001);
+            ->and((float) $sheet->getCell('J'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['safety'], 0.0001);
 
         if ($r['reorder'] !== null) {
-            expect((float) $sheet->getCell('J'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['reorder'], 0.0001);
+            expect((float) $sheet->getCell('K'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['reorder'], 0.0001);
         } else {
-            expect($sheet->getCell('J'.$row)->getValue())->toBe('-');
+            expect($sheet->getCell('K'.$row)->getValue())->toBe('-');
         }
 
         if ($r['unit_price'] !== null) {
-            expect((float) $sheet->getCell('R'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['closing_value'], 0.0001);
+            expect((float) $sheet->getCell('S'.$row)->getCalculatedValue())->toEqualWithDelta((float) $r['closing_value'], 0.0001);
         } else {
-            expect($sheet->getCell('R'.$row)->getValue())->toBeNull();
+            expect($sheet->getCell('S'.$row)->getValue())->toBeNull();
         }
 
         // A level pinned on the item master is a value, not a calculation.
         if ($r['safety_is_manual']) {
-            expect($sheet->getCell('I'.$row)->isFormula())->toBeFalse();
+            expect($sheet->getCell('J'.$row)->isFormula())->toBeFalse();
         }
         if ($r['reorder_is_manual']) {
-            expect($sheet->getCell('J'.$row)->isFormula())->toBeFalse();
+            expect($sheet->getCell('K'.$row)->isFormula())->toBeFalse();
         }
     }
 

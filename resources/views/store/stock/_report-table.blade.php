@@ -26,6 +26,7 @@
         <tr>
             <th class="col-flag">Whether to place order or not</th>
             <th class="col-sl">Sl</th>
+            <th class="col-sku">SKU</th>
             <th class="col-name">Item Name</th>
             <th class="col-brand">Brand/Specification</th>
             <th class="col-txt">Uom</th>
@@ -67,6 +68,7 @@
                      that are. --}}
                 <td @class(['flag-order' => ! $forExcel && ! in_array($r['status'], ['ok', 'not_counted'], true)])>{{ $labels[$r['status']] }}</td>
                 <td class="col-sl">{{ $index + 1 }}</td>
+                <td>{{ $r['item']->sku }}</td>
                 <td>{{ $r['item']->name }}</td>
                 <td>{{ $r['item']->brand }}</td>
                 <td>{{ $r['item']->uom }}</td>
@@ -98,12 +100,12 @@
                 <td>{{ $r['remarks'] }}</td>
             </tr>
         @empty
-            <tr><td colspan="19" class="empty">No items match this filter.</td></tr>
+            <tr><td colspan="20" class="empty">No items match this filter.</td></tr>
         @endforelse
     </tbody>
     @if($rows->isNotEmpty())
         <tfoot>
-            {{-- 11: the leading span swallows Opening Stock, which is
+            {{-- 12 (SKU included): the leading span swallows Opening Stock, which is
                  deliberately not totalled — summing a brought-forward balance
                  across unrelated items says nothing. Was 12 while the frozen
                  counted column sat beside it. --}}
@@ -113,9 +115,9 @@
                          the label sits in column A and every figure keeps its
                          own column. --}}
                     <td>Sub-Total</td>
-                    @for($blank = 0; $blank < 10; $blank++)<td></td>@endfor
+                    @for($blank = 0; $blank < 11; $blank++)<td></td>@endfor
                 @else
-                    <td colspan="11">Sub-Total</td>
+                    <td colspan="12">Sub-Total</td>
                 @endif
                 <td class="num">{{ $qty($summary['addition']) }}</td>
                 <td></td>

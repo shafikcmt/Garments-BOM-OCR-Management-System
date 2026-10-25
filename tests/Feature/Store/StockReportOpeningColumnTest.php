@@ -253,7 +253,7 @@ it('keeps the PDF and Excel total row aligned with its header columns', function
         $footCols += max(1, (int) $td->getAttribute('colspan'));
     }
 
-    expect($headCols)->toBe(19)
+    expect($headCols)->toBe(20)
         ->and($footCols)->toBe($headCols)
         ->and($html)->toContain('Opening Stock')
         ->and($html)->not->toContain('Balance B/F');

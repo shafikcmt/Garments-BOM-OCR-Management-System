@@ -335,6 +335,26 @@ it('carries month, dates and search through to both sheets unchanged', function 
     }
 });
 
+it('limits Receiving and Issues to the Stock sheet month when no month is in the request', function () {
+    // A plain Download Excel carries no query string. The Stock sheet falls
+    // back to the current month; the other two tabs must follow it, not pull
+    // every delivery and issue ever recorded (which timed out in production).
+    combinedFixture();
+    Excel::fake();
+
+    $this->travelTo(\Illuminate\Support\Carbon::parse('2026-08-20'));
+
+    $this->actingAs(combinedStoreUser())
+        ->get(route('store.stock.ledger.excel.all'))
+        ->assertOk();
+
+    $sheets = collect(combinedSheets());
+
+    foreach ([ReceivingReportExport::class, IssueReportExport::class] as $class) {
+        expect($sheets->first(fn ($s) => $s instanceof $class)->view()->getData()['filters']['month'])->toBe('2026-08');
+    }
+});
+
 // --- 4. The payload extraction did not change the standalone reports ---------
 
 /**
@@ -588,7 +608,8 @@ it('gives every tab the same two left-aligned, unmerged headings', function () {
         for ($row = 1; $row <= 12; $row++) {
             if (trim((string) $sheet->getCell('A'.$row)->getValue()) === 'SL'
                 || trim((string) $sheet->getCell('B'.$row)->getValue()) === 'SL'
-                || trim((string) $sheet->getCell('C'.$row)->getValue()) === 'Item Name') {
+                || trim((string) $sheet->getCell('C'.$row)->getValue()) === 'Item Name'
+                || trim((string) $sheet->getCell('D'.$row)->getValue()) === 'Item Name') {
                 $headerRow = $row;
                 break;
             }
