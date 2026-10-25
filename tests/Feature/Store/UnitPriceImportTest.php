@@ -236,7 +236,7 @@ it('exports every item under the import s own headings', function () {
 
     $export = new ItemMasterExport;
 
-    expect($export->headings())->toBe(ItemMasterImport::COLUMNS);
+    expect($export->headings())->toBe(['SKU', ...ItemMasterImport::COLUMNS]);
 
     $rows = $export->array();
 
@@ -244,7 +244,7 @@ it('exports every item under the import s own headings', function () {
     // leaving them out would mean one could never be given a price.
     expect($rows)->toHaveCount(2);
 
-    $at = fn (string $h) => (int) array_search($h, ItemMasterImport::COLUMNS, true);
+    $at = fn (string $h) => 1 + (int) array_search($h, ItemMasterImport::COLUMNS, true);
     $needle = collect($rows)->firstWhere($at('Item Name*'), 'Sewing Needle');
 
     expect($needle[$at('Brand/Specification')])->toBe('Organ')
@@ -262,7 +262,7 @@ it('exports a blank where a value is blank, never a zero', function () {
         'safety_stock_qty' => null, 'reorder_level' => null, 'unit_price' => null,
     ]);
 
-    $at = fn (string $h) => (int) array_search($h, ItemMasterImport::COLUMNS, true);
+    $at = fn (string $h) => 1 + (int) array_search($h, ItemMasterImport::COLUMNS, true);
     [$row] = (new ItemMasterExport)->array();
 
     expect($row[$at('Safety Stock')])->toBeNull()
@@ -276,7 +276,7 @@ it('round-trips the export into the price importer', function () {
     $item = pricedItem('B/S Needle DPX17-09', 'Generic');
     pricedItem('B/S Needle DPX17-09', 'Organ');
 
-    $at = fn (string $h) => (int) array_search($h, ItemMasterImport::COLUMNS, true);
+    $at = fn (string $h) => 1 + (int) array_search($h, ItemMasterImport::COLUMNS, true);
     $exported = collect((new ItemMasterExport)->array())
         ->firstWhere($at('Brand/Specification'), 'Generic');
 
@@ -300,7 +300,7 @@ it('takes the full export file as-is, without the other columns being trimmed of
     $needle = pricedItem('Sewing Needle', 'Organ');
     $thread = pricedItem('Sewing Thread', null);
 
-    $at = fn (string $h) => (int) array_search($h, ItemMasterImport::COLUMNS, true);
+    $at = fn (string $h) => 1 + (int) array_search($h, ItemMasterImport::COLUMNS, true);
 
     $rows = (new ItemMasterExport)->array();
 
@@ -312,7 +312,7 @@ it('takes the full export file as-is, without the other columns being trimmed of
     }
 
     // The FULL export headings, not the price importer's three.
-    $result = UnitPriceImport::parse(array_merge([ItemMasterImport::COLUMNS], $rows));
+    $result = UnitPriceImport::parse(array_merge([['SKU', ...ItemMasterImport::COLUMNS]], $rows));
 
     expect($result['errors'])->toBeEmpty()
         ->and($result['updates'])->toHaveCount(1)

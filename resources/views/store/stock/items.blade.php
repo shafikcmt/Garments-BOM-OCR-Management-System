@@ -77,6 +77,12 @@
          table it heads, and spent a second card's padding saying nothing. --}}
     <div class="card gx-stock-card">
         <div class="gx-stock-card-body">
+            @if(($canApprove ?? false) && ($pendingCount ?? 0) > 0)
+                <div class="alert alert-warning d-flex align-items-center justify-content-between mb-3" role="alert">
+                    <span><strong>{{ $pendingCount }}</strong> new item(s) waiting for your approval.</span>
+                    <a href="{{ route('store.stock.items.index', ['approval' => 'pending']) }}" class="btn btn-sm btn-warning">View Pending</a>
+                </div>
+            @endif
             <div class="gx-stock-toolbar mb-3">
                 <h5>Item Master</h5>
                 <span class="badge bg-primary-subtle text-primary"><span data-list-count>{{ $items->total() }}</span> items</span>
@@ -102,6 +108,11 @@
 
                 <span class="gx-stock-toolbar-gap"></span>
 
+                @if($canApprove ?? false)
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#mergeUom">
+                        <i class="bi bi-intersect me-1" aria-hidden="true"></i>Merge UOM
+                    </button>
+                @endif
                 <a href="{{ route('store.stock.items.export') }}" class="btn btn-outline-secondary">
                     <i class="bi bi-download me-1" aria-hidden="true"></i>Export Items
                 </a>
@@ -208,6 +219,43 @@
 
     {{-- Bulk upload. Adding items is routine store work, so this needs no
          permission beyond reaching the screen — the same as Add Item. --}}
+    @if($canApprove ?? false)
+        <div class="modal fade" id="mergeUom" tabindex="-1" aria-labelledby="mergeUomTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="POST" action="{{ route('store.stock.items.uom.merge') }}">
+                        @csrf
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="mergeUomTitle">Merge Duplicate UOM</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label class="form-label" for="mergeFromUom">UOM to remove</label>
+                            <select id="mergeFromUom" name="from_uom" class="form-select mb-3" required>
+                                <option value="">Select…</option>
+                                @foreach($uomCounts as $uomName => $uomItems)
+                                    <option value="{{ $uomName }}">{{ $uomName }} ({{ $uomItems }} items)</option>
+                                @endforeach
+                            </select>
+                            <label class="form-label" for="mergeToUom">UOM to keep</label>
+                            <select id="mergeToUom" name="to_uom" class="form-select" required>
+                                <option value="">Select…</option>
+                                @foreach(\App\Support\UomOptions::list() as $uomName)
+                                    <option value="{{ $uomName }}">{{ $uomName }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text mt-2">All items using the removed UOM are moved to the one you keep.</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-intersect me-1" aria-hidden="true"></i>Merge</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="modal fade" id="importItems" tabindex="-1" aria-labelledby="importItemsTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content gx-stock-card">

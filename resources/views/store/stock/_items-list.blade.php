@@ -48,6 +48,7 @@
             <tr>
                 <th>SKU</th>
                 <th>Item</th>
+                <th>Brand/Specification</th>
                 <th>UOM</th>
                 {{-- The counted seed, and the date it was counted on.
 
@@ -97,9 +98,10 @@
                              section's shared secondary-detail size,
                              the same as the Stock Report. --}}
                         <div class="gx-stock-micro">
-                            {{ collect([$item->category, $item->brand])->filter()->implode(' · ') ?: '—' }}
+                            {{ $item->category ?: '—' }}
                         </div>
                     </td>
+                    <td class="small">{{ $item->brand ?: '—' }}</td>
                     <td class="small">{{ $item->uom ?: '—' }}</td>
                     {{-- The count date is printed, not hidden in a tooltip. A
                          seed quantity with no date beside it cannot be audited,
@@ -134,15 +136,29 @@
                                  rather than under it — on its own line it
                                  set the height of every row in the table
                                  for the sake of the rare inactive one. --}}
-                            @unless($item->is_active)
+                            @if(! $item->isApproved())
+                                <span class="badge {{ $item->approval_status === 'rejected' ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning-emphasis' }}">{{ $item->approval_status === 'rejected' ? 'Rejected' : 'Pending Approval' }}</span>
+                            @elseunless($item->is_active)
                                 <span class="badge bg-secondary-subtle text-secondary">Inactive</span>
-                            @endunless
+                            @endif
                         </div>
                     </td>
                     {{-- Edit and Delete are Admin / Management rights
                          (store.edit / store.delete); both controller
                          methods enforce the same check server-side. --}}
                     <td class="text-end gx-stock-actions">
+                        @if(($canApprove ?? false) && ! $item->isApproved())
+                            <form method="POST" action="{{ route('store.stock.items.approve', $item) }}" class="d-inline">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Approve</button>
+                            </form>
+                            @if($item->approval_status === 'pending')
+                                <form method="POST" action="{{ route('store.stock.items.reject', $item) }}" class="d-inline" onsubmit="return confirm('Reject this item?');">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Reject</button>
+                                </form>
+                            @endif
+                        @endif
                         @if($canEdit)
                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editItem{{ $item->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
                         @endif
@@ -158,7 +174,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="8" class="gx-stock-empty">
+                <tr><td colspan="9" class="gx-stock-empty">
                         <span class="gx-stock-empty-icon"><i class="bi bi-{{ $hasFilters ? 'search' : 'box-seam' }}" aria-hidden="true"></i></span>
                         @if($hasFilters)
                             <div class="gx-stock-empty-title">No items match this filter</div>
