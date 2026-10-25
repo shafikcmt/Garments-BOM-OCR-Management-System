@@ -164,6 +164,20 @@
                                             <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
                                         </a>
                                     @endif
+                                    @if($r->canBeDeletedBy(auth()->user()) && auth()->user()->hasRole('admin'))
+                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteRequisition{{ $r->id }}">
+                                            <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
+                                        </button>
+                                        <x-action-modal :id="'deleteRequisition'.$r->id"
+                                                        :action="route('store.stock.requisitions.destroy', $r)"
+                                                        method="DELETE"
+                                                        :title="'Delete '.$r->requisition_no"
+                                                        :required="$r->deleteNeedsReason()"
+                                                        submit-label="Delete" submit-icon="bi-trash" submit-class="btn-danger"
+                                                        :placeholder="$r->deleteNeedsReason() ? 'Why is this requisition being deleted?' : null">
+                                            The requisition and all its item lines will be removed. Its history is kept.
+                                        </x-action-modal>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
