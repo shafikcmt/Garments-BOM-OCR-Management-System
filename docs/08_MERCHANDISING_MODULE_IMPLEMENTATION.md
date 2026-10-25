@@ -2,6 +2,11 @@
 
 *এই ডকুমেন্টটা আপনার প্রজেক্টের `docs/` ফোল্ডারে রাখুন (যেমন `08_MERCHANDISING_MODULE_IMPLEMENTATION.md`)। এটা `Full_Garments_ERP_Module_Spec.docx`-এর Merchandising অংশকে ছোট ছোট, নিরাপদ VS Code task-এ ভেঙে দিয়েছে, যাতে আপনার existing workflow না ভেঙে ধাপে ধাপে implement করা যায়।*
 
+> **Superseded for planning (2026-10-25):** the concrete, code-based plan is
+> `12_ERP_IMPLEMENTATION_GUIDE.md` §10 (Merchandising & OCR plan, steps
+> O1–O6). The feature scope and the "inspect before coding" rule below still
+> apply.
+
 ## Reference
 
 - Source spec: `Full_Garments_ERP_Module_Spec.docx`, Section 3 → **"1. Merchandising"**

@@ -7,7 +7,8 @@
 > this file to guide the owner — suggest the next step, ask the open
 > questions, and push back when a request would build on the wrong base.
 >
-> Written 2026-10-07 from a gap analysis of the codebase against the spec.
+> Written 2026-10-07 from a gap analysis of the codebase against the spec;
+> §10 (Merchandising & OCR plan) added 2026-10-25.
 > Update it when a phase ships or a decision is taken.
 
 ## 1. Owner's intent
@@ -67,7 +68,8 @@ stock currently has no item master at all.
 
 **Phase 1 — Foundation**
 1. Order & BOM Core: Style / Order / PO master, color-size breakdown,
-   structured BOM; Excel upload imports into it.
+   structured BOM; Excel upload imports into it. Detailed as steps O1–O6
+   in §10 (Merchandising & OCR plan).
 2. Material Item Master + codification (see §6).
 3. Procurement link: BOM line → material requisition → Booking PO.
 4. Store upgrade: BOM-based receive/issue for Buyer stock, lot/shade/roll,
@@ -141,6 +143,14 @@ Spare Part. Production Material waits for the Phase 1 Material Item Master.
 3. Which software runs HR/Payroll and Accounting today (Tally or other)?
 4. Will the system ever exchange codes with a DATATEX ERP? (If yes, item
    codes must match exactly.)
+5. Is the full OCR uploaded today, or only the merchant's columns (the code
+   uploads a "Merchant Input" template)? Which file is uploaded in practice?
+6. Is a size breakdown (XS–XXL) present on every buyer's PO (HB's "PO
+   Summary" has it)?
+7. Does management read the OCR summary sheets (Contract / Payment /
+   Material Summary, Style Status) regularly? If yes, O5 can move earlier.
+8. Is the HB-style "OCR" order-closing cost sheet made for every buyer, or
+   only HB?
 
 ## 9. How Claude should guide the owner
 
@@ -151,3 +161,82 @@ Spare Part. Production Material waits for the Phase 1 Material Item Master.
 - Keep MySQL/PostgreSQL compatibility, role safety and export rules from
   CLAUDE.md for every module.
 - After a phase step ships, update §2 and §5 of this file.
+
+## 10. Merchandising & OCR plan (analysed 2026-10-25)
+
+### What the OCR is
+
+The factory calls its order-wise material control workbook the **OCR**.
+Samples analysed: `03. OCR - ANNTAYLOR SU-26`, `04. OCR - MACYS SP26`,
+`OCR -HB-FA-26`.
+
+- The main **"Database"** sheet is the same company format for every buyer,
+  not a different format per buyer: ANN TAYLOR and MACY'S have the identical
+  74 columns; HB has the same 74 plus Label, INV No, Value, Dead Stock
+  Qty/Value. The header sits on row 3 (row 4 in HB).
+- One row = one material of one style-color-contract, carrying its whole
+  life: order → BOM → booking → PI → payment → inbound shipment → receipt →
+  issue → liability. Five or six departments fill the same row.
+- What changes between buyers/seasons/years is small: column names
+  ("Style Name" ↔ "Style", "For Formula" ↔ "For Formulea"), header row
+  position, a few added columns.
+- Extra sheets (Contract Summary, Payment Summary, Material Summary, Style
+  Status, Clearance Summary, PO Summary) are hand-made pivots the system can
+  generate. HB's PO Summary holds the color × size (XS–XXL) PO quantities.
+- HB's **"OCR" sheet** is a different report: Order → Cut → Sew → Finish →
+  Ship quantities and budget vs actual cost, CM and efficiency — an order
+  closing / post-costing report (spec Module 3, post-costing).
+- HB's Database sheet reports ~1,048,000 rows because formatting runs to the
+  end of the sheet; an import must stop at the last row with data.
+
+Today the system stores this as the Excel workspace (`excel_files` /
+`excel_rows` / `excel_cells`, role-owned `excel_headers`). The merchant
+downloads a "Merchant Input" template of their own columns and uploads it
+(header on row 1, matched by name); other departments fill their columns
+on screen. `BookingPo` and the material stock ledger read from those rows.
+
+### Where the 74 columns belong
+
+| OCR columns | Structured record | Entered by | Exists today |
+|---|---|---|---|
+| Style, GMTS Color, Contract No, Contract Shipment Date, Contract Qty, PCD, Order-by date, GMTS PO No/Qty, size breakdown | **Order** (Style → Contract/PO → Color × Size) | Merchandiser | No |
+| Material Type, Description, SAP Code, Material Color, BOM Qty, Costing YY, Initial Consumption, Wastage %, Consumption incl. YY, Materials to be Ordered | **BOM line** — "to be ordered" calculated by the system | Merchandiser | No (row text only) |
+| Vendor, Vendor Type, Consolidator, Materials Ordered, (Short)/Excess, Order Status, PO No/Date, PI No/Status, HS Code, PI Rate/Amount, Committed Ex-Mill | **Booking PO / PI** | Supply Chain | `BookingPo` |
+| Delivery Term, Payment Term, Pmt Doc No, Payment Status | **Payment** | Accounts / SC | PRA |
+| Ship Mode, Container, Forwarder, BL/AWB, BL Status, COO, Port, Vessel, Container No, ETD/ATD/ETA/ATA, Arrival Status, Committed/Actual In-house | **Inbound Shipment** | Commercial | No (columns only) |
+| Invoiced Qty/Rate/Amount, Receipt Qty, Garment Cut Qty, Issued, Return to Store, Production Consumption/Wastage, Requirement, Excess/Shortage, Liability, Dead Stock | **Store receive/issue + calculated liability** | Store | Material stock |
+
+### How format changes are absorbed
+
+1. A fixed internal field list (canonical fields) — buyer files never rename
+   what the system stores.
+2. **Import mapping profiles** per buyer/season (Admin screen): on first
+   upload the file's headers are shown and matched to canonical fields;
+   the mapping is saved and reused.
+3. Synonyms per field, so known variants match automatically.
+4. Header row detected automatically (row 1, 3, 4…); import stops at the
+   last row holding data.
+5. An unknown column never blocks the upload: it is reported ("3 new
+   columns not mapped") and either mapped or kept as an extra field.
+6. Columns the system calculates (to be ordered, short/excess, requirement)
+   are compared with the file's values and mismatches flagged.
+
+### Steps (replace the generic phases in `08_MERCHANDISING_MODULE_IMPLEMENTATION.md`)
+
+| Step | Work | Why |
+|---|---|---|
+| **O1** | Season + Style + Order masters, created from existing workspace data; **Style 360° page** (rows, Booking POs, budget, receipt/issue status) | Low risk, new tables only; immediate management value |
+| **O2** | **Smart OCR import**: mapping profiles, synonyms, header detection, preview + validation before saving | Ends the format-change confusion |
+| **O3** | **Structured BOM line**, system-calculated to-be-ordered, short/excess, requirement; workspace rows link to BOM lines (nullable) | Formula errors stop |
+| **O4** | Department screens (Merchandiser / Supply Chain / Commercial / Store) over the same line | Replaces one giant sheet |
+| **O5** | **Auto reports**: Contract, Material, Payment, Style Status, Clearance Summary | No hand-made pivots |
+| **O6** | **OCR export** per buyer/season in the familiar layout | Excel stays available; the system is the source |
+| Later | Inbound Shipment module; Order Closing / post-costing (HB "OCR" sheet); pre-costing with revisions | Towards the full ERP |
+
+Principle: data is entered in the system; Excel is for import (at first)
+and export (reports). Each step ships, is tested and goes live before the
+next; O3 and O4 must keep the existing BookingPo, PRA and material stock
+flows working unchanged.
+
+Recommended start: **O1 then O2** — O1 touches no existing flow, O2 solves
+the most painful problem. Ask the §8 questions 5–8 before designing O2/O3.
