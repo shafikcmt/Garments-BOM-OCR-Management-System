@@ -205,7 +205,7 @@
         <div class="modal fade" id="editItem{{ $item->id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content gx-stock-card">
-                    <form method="POST" action="{{ route('store.stock.items.update', $item) }}">
+                    <form method="POST" action="{{ route('store.stock.items.update', $item) }}" class="d-flex flex-column overflow-hidden" style="min-height:0;">
                         @csrf @method('PUT')
                         <div class="modal-header">
                             <h5 class="modal-title">Edit Item</h5>

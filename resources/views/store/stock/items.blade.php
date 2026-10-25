@@ -177,7 +177,10 @@
     <div class="modal fade" id="addItem" tabindex="-1" aria-labelledby="addItemTitle" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content gx-stock-card">
-                <form method="POST" action="{{ route('store.stock.items.store') }}">
+{{-- The form wraps header, body and footer, so it has to be the flex
+                     column the scrollable dialog expects: then only the body
+                     scrolls and the footer's button stays in view. --}}
+                <form method="POST" action="{{ route('store.stock.items.store') }}" class="d-flex flex-column overflow-hidden" style="min-height:0;">
                     @csrf
                     <div class="modal-header">
                         <h5 class="modal-title" id="addItemTitle">Add Item</h5>
