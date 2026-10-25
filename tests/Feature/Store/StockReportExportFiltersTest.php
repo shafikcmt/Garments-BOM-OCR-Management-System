@@ -336,7 +336,7 @@ it('prints only the company and report title above the table, with nothing merge
 
     // Company, title, a blank row, the totals strip, then the headings.
     expect($sheet->getCell('A1')->getValue())->toBe('Humana Apparels (Pvt.) Ltd.')
-        ->and($sheet->getCell('A2')->getValue())->toBe('Stock Report')
+        ->and($sheet->getCell('A2')->getValue())->toBe('Consumable Stock Report')
         ->and($header)->toBe(5);
 
     foreach (range(1, $header) as $row) {

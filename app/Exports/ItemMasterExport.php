@@ -77,6 +77,11 @@ class ItemMasterExport implements FromArray, ShouldAutoSize, WithColumnFormattin
                 $row[$at('Lead Time')] = $item->lead_time_days;
                 $row[$at('Unit Price')] = $item->unit_price !== null ? (float) $item->unit_price : null;
                 $row[$at('Remarks')] = $item->remarks;
+                foreach (['Last Addition Date' => 'last_addition_reference', 'Last Consumption Date' => 'last_consumption_reference'] as $heading => $column) {
+                    $row[$at($heading)] = $item->{$column}
+                        ? ExcelDate::PHPToExcel(Carbon::parse($item->{$column})->startOfDay())
+                        : null;
+                }
 
                 return $row;
             })
@@ -93,6 +98,8 @@ class ItemMasterExport implements FromArray, ShouldAutoSize, WithColumnFormattin
         return [
             $letter('Counted On') => IssueTemplateExport::DATE_FORMAT,
             $letter('Unit Price') => \App\Support\Quantity::EXCEL_MONEY,
+            $letter('Last Addition Date') => IssueTemplateExport::DATE_FORMAT,
+            $letter('Last Consumption Date') => IssueTemplateExport::DATE_FORMAT,
         ];
     }
 

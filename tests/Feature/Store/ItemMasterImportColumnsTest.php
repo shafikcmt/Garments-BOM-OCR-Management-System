@@ -46,6 +46,8 @@ it('offers one merged column in place of the three', function () {
         'Lead Time',
         'Unit Price',
         'Remarks',
+        'Last Addition Date',
+        'Last Consumption Date',
     ]);
 
     // The downloadable template writes exactly those, with a full sample row.

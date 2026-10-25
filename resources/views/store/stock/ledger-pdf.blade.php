@@ -5,6 +5,8 @@
 --}}
 @php
     $forExcel = $forExcel ?? false;
+    // The printed and Excel heading names the report in full.
+    $title = 'Consumable '.$title;
     $activeFilters = collect([
         'Search' => $filters['search'] ?? null,
         'Category' => $filters['category'] ?? null,

@@ -600,6 +600,16 @@ trait FormatsStoreSheet
      */
     private function styleSignatureBlock(Worksheet $sheet, int $from, int $labelRow, int $to, string $lastColumn): void
     {
+        // The Blade lays the block out with colspans, which become merged
+        // cells. Merge-and-center is not wanted here: split them back into
+        // plain cells and print the text left-aligned.
+        foreach (array_keys($sheet->getMergeCells()) as $range) {
+            if (preg_match('/^[A-Z]+(\d+):[A-Z]+(\d+)$/', $range, $m)
+                && (int) $m[1] >= $labelRow && (int) $m[2] <= $labelRow + 1) {
+                $sheet->unmergeCells($range);
+            }
+        }
+
         // Room to sign between the total and the line.
         for ($row = $from; $row < $labelRow; $row++) {
             $sheet->getRowDimension($row)->setRowHeight(18);
@@ -607,7 +617,7 @@ trait FormatsStoreSheet
 
         $sheet->getStyle('A'.$labelRow.':'.$lastColumn.$labelRow)->applyFromArray([
             'font' => ['bold' => true, 'size' => 10],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
             'borders' => ['top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => self::BORDER_STRONG]]],
         ]);
         $sheet->getRowDimension($labelRow)->setRowHeight(18);
@@ -616,7 +626,7 @@ trait FormatsStoreSheet
         if ($labelRow + 1 <= $to) {
             $sheet->getStyle('A'.($labelRow + 1).':'.$lastColumn.($labelRow + 1))->applyFromArray([
                 'font' => ['size' => 9, 'italic' => true],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
             ]);
             $sheet->getRowDimension($labelRow + 1)->setRowHeight(15);
         }
