@@ -225,6 +225,7 @@
                             <span class="sidebar-submenu-rail"></span>
                             <a href="{{ route('admin.workspace') }}" class="sidebar-sub-link {{ request()->routeIs('admin.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">Workspace</a>
                             <a href="{{ route('admin.headers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.headers.*') ? 'is-active' : '' }}">Excel Headers</a>
+                            <a href="{{ route('admin.tna.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.tna.*') ? 'is-active' : '' }}">TnA Templates</a>
                         </div>
                     </li>
 

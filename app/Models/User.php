@@ -396,6 +396,12 @@ class User extends Authenticatable
      * what a filter is for. Narrow lists in SQL, with the null branch written
      * out where it can be read.
      */
+    /** Follow-up tasks given to this user. */
+    public function followUpTasks()
+    {
+        return $this->hasMany(FollowUpTask::class, 'assigned_to');
+    }
+
     public function hasBuyerAccess(?int $buyerId): bool
     {
         if (! $this->isBuyerConfined()) {

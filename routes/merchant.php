@@ -59,6 +59,11 @@ Route::prefix('merchant/sizes')
         Route::post('/styles/{mother}/sets', [SizeBreakdownController::class, 'storeSet'])->name('sets.store');
     });
 
+// Apply a TnA template to a style (Merchandising, Admin, Management).
+Route::post('merchant/tna/styles/{mother}', [\App\Http\Controllers\Merchant\TnaApplyController::class, 'store'])
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.tna.apply');
+
 // BOM builder: make a style's BOM on a screen. Merchandising and Admin; the
 // controller checks the buyer.
 Route::prefix('merchant/bom')

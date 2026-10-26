@@ -407,6 +407,21 @@ Every morning (about 8:30) anyone with a follow-up that is **due today or overdu
 
 The **Season page** of Style Status shows how many follow-ups are open for each style.
 
+### 6.4 TnA plans (Time and Action)
+
+A TnA template is a ready list of tasks for an order, for example "Fabric booking 60 days before ship date (Supply Chain)", "PP sample approval 30 days before ship date (Merchandising)".
+
+**Make a template (Admin):** left menu, Admin, **TnA Templates**, **New Template**.
+1. Type a **Template name** and choose a **Buyer** (or All buyers).
+2. For each task type the **Task**, the **Days** (negative = before, positive = after), **From** (Ship date or Order received) and **Given to role**. **Add Task** adds a row.
+3. Tick **Apply automatically every morning** if every style of that buyer should get the plan by itself. Press **Save Template**.
+
+**Apply it to a style:** open the style, in the **TnA Plan** box choose the template and press **Apply TnA Plan**.
+- One follow-up task is made per template task, due on the anchor date plus the days. It goes to someone with that role who can see the buyer: you, if you have the role, otherwise the person with the fewest open tasks.
+- Each person gets one message. The tasks appear in **Follow-ups** with the same red / yellow / green lights and the 8:30 reminder.
+- Applying again only adds tasks that are not there yet. A task that cannot be made (no ship date yet, nobody with the role) is named in a yellow message.
+- The **TnA Plan** box shows every TnA task of the style with its status and "done / total".
+
 ---
 
 ## 7. For IT / Admin
@@ -421,6 +436,7 @@ The **Season page** of Style Status shows how many follow-ups are open for each 
 | Turn the second (Management) BOM approval or the PO gate on or off | Screen: **BOM Approvals**, Settings box (Admin only). Both are off by default. |
 | Switch off automatic refresh of Workspace columns from PO / PRA | `.env`: `SUPPLY_CHAIN_SYNC_WORKSPACE=false` |
 | Switch off automatic filling of the standard order tables | `.env`: `BOM_SYNC_TABLES=false` |
+| Make TnA tasks from the auto-apply templates by hand | `php artisan tna:apply` (the scheduler runs it every morning at 08:15, Dhaka time) |
 | Send the daily follow-up reminders by hand | `php artisan followups:remind` (the scheduler runs it every morning at 08:30, Dhaka time; the server's scheduler must be running) |
 
 On the live server, every push to `master` runs the migrations by itself, and the one-time `bom:sync-tables` fill too. If the Merchandising dashboard stays empty after a deploy, look in the log for "Backfilling order_lines" and run `php artisan bom:sync-tables` by hand.

@@ -81,7 +81,8 @@ class StyleLibraryController extends Controller
 
         // Follow-up (Time and Action): who has been asked to chase this style.
         $canFollowUp = $request->user()->hasAnyRole(['merchant', 'admin', 'management']);
-        $followUpTasks = FollowUpTask::open()->where('mother_style_id', $mother->id)
+        // TnA tasks have their own box (TnA Plan), so they are not listed twice.
+        $followUpTasks = FollowUpTask::open()->where('mother_style_id', $mother->id)->where('source', '!=', \App\Services\TnaPlans::SOURCE)
             ->with('assignee:id,name')->orderBy('due_date')->get();
         $assignees = $canFollowUp ? $followUps->assigneesFor($mother) : collect();
 
@@ -97,6 +98,10 @@ class StyleLibraryController extends Controller
             'costingCards' => $costingCards,
             // Who changed the order (qty, ship date, PO ...) and when.
             'orderChanges' => app(\App\Services\OrderChanges::class)->forMother($mother, 50),
+            // TnA: templates that may be applied, and the tasks already made from them.
+            'tnaTemplates' => \App\Models\TnaTemplate::forBuyer($mother->buyer_id)->orderBy('name')->get(),
+            'tnaTasks' => FollowUpTask::where('mother_style_id', $mother->id)->where('source', \App\Services\TnaPlans::SOURCE)
+                ->with('assignee:id,name')->orderBy('due_date')->get(),
             'bomApproval' => $bomApproval,
             'bomState' => $bomState,
             'canSubmitBom' => $canSubmitBom,

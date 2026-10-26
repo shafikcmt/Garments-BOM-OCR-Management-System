@@ -158,6 +158,52 @@
     </div>
     </div>
 
+    {{-- TnA plan: tasks made from a Time and Action template. --}}
+    @if($canFollowUp && ($tnaTemplates->isNotEmpty() || $tnaTasks->isNotEmpty()))
+    <x-card class="mb-3" body-class="p-3">
+        <x-slot:title>TnA Plan @if($tnaTasks->isNotEmpty())<span class="badge bg-light text-muted border ms-1">{{ $tnaTasks->where('status', \App\Models\FollowUpTask::DONE)->count() }} / {{ $tnaTasks->count() }} done</span>@endif</x-slot:title>
+        @if($tnaTasks->isNotEmpty())
+            <div class="table-responsive mb-3">
+                <table class="table table-sm align-middle mb-0" style="min-width:0">
+                    <thead><tr><th>Task</th><th>Given to</th><th>Due</th><th>Status</th></tr></thead>
+                    <tbody>
+                    @foreach($tnaTasks as $t)
+                        @php($light = $t->light())
+                        <tr>
+                            <td>{{ $t->title }}<div class="small text-muted">{{ $t->note }}</div></td>
+                            <td>{{ $t->assignee?->name }}</td>
+                            <td class="text-nowrap">{{ $t->due_date->format('d M Y') }}</td>
+                            <td>
+                                @if(! $t->isOpen())<span class="badge bg-success-subtle text-success">Done</span>
+                                @elseif($light === 'red')<span class="badge bg-danger text-white">Overdue</span>
+                                @elseif($light === 'amber')<span class="badge bg-warning text-dark">Due soon</span>
+                                @else<span class="badge bg-light text-muted border">Open</span>@endif
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+        @if($tnaTemplates->isNotEmpty())
+            <form method="POST" action="{{ route('merchant.tna.apply', $mother) }}" class="row g-2 align-items-end">
+                @csrf
+                <div class="col-12 col-md-6">
+                    <label class="form-label mb-1" for="tnaTemplate">TnA template</label>
+                    <select name="tna_template_id" id="tnaTemplate" class="form-select form-select-sm" required>
+                        <option value="">Choose a template</option>
+                        @foreach($tnaTemplates as $tpl)<option value="{{ $tpl->id }}">{{ $tpl->name }}{{ $tpl->buyer_id ? '' : ' (all buyers)' }}</option>@endforeach
+                    </select>
+                </div>
+                <div class="col-12 col-md-3">
+                    <button class="btn btn-outline-primary btn-sm w-100"><i class="bi bi-calendar2-plus me-1" aria-hidden="true"></i>Apply TnA Plan</button>
+                </div>
+                <div class="col-12 col-md-3 small text-muted">Adds only tasks not already on this style.</div>
+            </form>
+        @endif
+    </x-card>
+    @endif
+
     @if($canFollowUp || $followUpTasks->isNotEmpty())
     <x-card title="Follow-up" class="mb-3" body-class="p-3">
         @if($followUpTasks->isNotEmpty())
