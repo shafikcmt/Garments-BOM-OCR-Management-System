@@ -1,0 +1,180 @@
+<?php
+
+use App\Models\Buyer;
+use App\Models\BuyerImportProfile;
+use App\Models\BomItem;
+use App\Models\ExcelFile;
+use App\Models\ExcelHeader;
+use App\Models\MotherStyle;
+use App\Models\OrderLine;
+use App\Models\User;
+use App\Services\ImportColumnMatcher;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Spatie\Permission\Models\Role;
+
+/**
+ * The import wizard: any layout in, matched once, remembered per buyer.
+ */
+beforeEach(function () {
+    Storage::fake('local');
+
+    $role = Role::findOrCreate('merchant', 'web');
+    $this->merchant = User::factory()->create()->assignRole('merchant');
+    $this->buyer = Buyer::create(['buyer_name' => 'Ann Taylor', 'is_active' => true]);
+
+    $pos = 1;
+    foreach ([
+        ['Style', 'style_name'], ['GMTS Color Name', 'gmts_color_name'], ['Material Description', 'material_description'],
+        ['BOM Quantity', 'bom_quantity'], ['Season Name', 'season_name'],
+    ] as [$name, $key]) {
+        $this->headers[$key] = ExcelHeader::create([
+            'header_name' => $name, 'header_key' => $key, 'owner_role_id' => $role->id, 'position' => $pos++,
+        ]);
+    }
+    // A Supply Chain column, which the wizard must never offer.
+    $this->vendorHeader = ExcelHeader::create(['header_name' => 'Vendor Name', 'header_key' => 'vendor_name', 'owner_role_id' => Role::findOrCreate('supply_chain', 'web')->id, 'position' => 9]);
+});
+
+/** A buyer-style workbook: a summary sheet first, the data on sheet two under a 3-row banner. */
+function lotWorkbook(array $rows, array $titles = ['Style', 'GMTS Color Name', 'Material Description', 'BOM Qty', 'Vendor']): UploadedFile
+{
+    $book = new Spreadsheet();
+    $book->getActiveSheet()->setTitle('Summary')->setCellValue('A1', 'Payment summary');
+    $sheet = $book->createSheet()->setTitle('Database');
+    $sheet->setCellValue('A1', 'Ann Taylor lot file');
+    foreach ($titles as $i => $title) {
+        $sheet->setCellValue([$i + 1, 3], $title);
+    }
+    foreach ($rows as $r => $values) {
+        foreach ($values as $i => $value) {
+            $sheet->setCellValue([$i + 1, 4 + $r], $value);
+        }
+    }
+
+    $path = tempnam(sys_get_temp_dir(), 'lot') . '.xlsx';
+    (new Xlsx($book))->save($path);
+
+    return new UploadedFile($path, 'lot.xlsx', null, null, true);
+}
+
+function sampleLotRows(): array
+{
+    return [
+        ['748268 (866317)', 'WHITE', 'Zipper', '1,200', 'Acme'],
+        ['748268 (866317)', 'WHITE', 'Button', '500', 'Acme'],
+        ['720193(PETITE)', 'INDIGO', 'Zipper', '300', 'Beta'],
+    ];
+}
+
+it('finds the data sheet and title row and matches differently named columns', function () {
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), [
+        'buyer_id' => $this->buyer->id, 'season_code' => 'sp27', 'file' => lotWorkbook(sampleLotRows()),
+    ])->assertRedirect(route('merchant.import.map'));
+
+    $page = $this->actingAs($this->merchant)->get(route('merchant.import.map'))->assertOk();
+
+    $page->assertSee('Database')->assertSee('4 of 5 columns matched')->assertSee('Vendor');
+    expect($page->viewData('sheet'))->toBe('Database')->and($page->viewData('headerRow'))->toBe(3);
+
+    // "BOM Qty" found "BOM Quantity"; "Vendor" belongs to another department.
+    $map = collect($page->viewData('suggestions'));
+    expect($map[4]['header_id'])->toBe($this->headers['bom_quantity']->id)->and($map[5]['header_id'])->toBeNull();
+});
+
+it('previews, imports, links the season and styles, and remembers the matching', function () {
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), [
+        'buyer_id' => $this->buyer->id, 'season_code' => 'sp27', 'file' => lotWorkbook(sampleLotRows()),
+    ]);
+
+    $map = [1 => $this->headers['style_name']->id, 2 => $this->headers['gmts_color_name']->id, 3 => $this->headers['material_description']->id, 4 => $this->headers['bom_quantity']->id, 5 => ''];
+
+    $this->actingAs($this->merchant)->post(route('merchant.import.preview'), [
+        'sheet' => 'Database', 'header_row' => 3, 'map' => $map, 'save_profile' => 1, 'profile_name' => 'Denim lot',
+    ])->assertOk()->assertSee('Import 3 Rows')->assertSee('748268')->assertSee('866317');
+
+    $this->actingAs($this->merchant)->post(route('merchant.import.confirm'))
+        ->assertRedirect()->assertSessionHas('success');
+
+    $file = ExcelFile::firstOrFail();
+    expect($file->buyer_id)->toBe($this->buyer->id)->and($file->season->code)->toBe('SP27')->and($file->total_rows)->toBe(3);
+
+    // Standard tables + Style Library, season taken from the upload.
+    expect(OrderLine::count())->toBe(2)->and(BomItem::count())->toBe(3);
+    expect(MotherStyle::orderBy('style_no')->pluck('style_no')->all())->toBe(['720193', '748268']);
+    expect((float) BomItem::where('material_description', 'Button')->value('bom_qty'))->toBe(500.0);
+
+    // The vendor column was skipped, never written.
+    expect(\App\Models\ExcelCell::where('header_id', $this->vendorHeader->id)->whereNotNull('value')->count())->toBe(0);
+
+    $profile = BuyerImportProfile::with('columns')->firstOrFail();
+    expect($profile->name)->toBe('Denim lot')->and($profile->sheet_name)->toBe('Database')->and($profile->header_row)->toBe(3);
+    expect($profile->columns->firstWhere('source_key', 'bom_qty')->excel_header_id)->toBe($this->headers['bom_quantity']->id);
+    expect($profile->columns->firstWhere('source_key', 'vendor')->excel_header_id)->toBeNull();
+});
+
+it('applies the saved profile automatically to the next file with the same layout', function () {
+    $profile = BuyerImportProfile::create(['buyer_id' => $this->buyer->id, 'name' => 'Denim lot', 'sheet_name' => 'Database', 'header_row' => 3]);
+    foreach ([['Style', 'style_name'], ['GMTS Color Name', 'gmts_color_name'], ['Material Description', 'material_description'], ['BOM Qty', 'bom_quantity'], ['Vendor', null]] as [$title, $key]) {
+        $profile->columns()->create([
+            'source_header' => $title, 'source_key' => app(ImportColumnMatcher::class)->key($title),
+            'excel_header_id' => $key ? $this->headers[$key]->id : null,
+        ]);
+    }
+
+    // Titles reordered in the new file: the saved matching still wins.
+    $file = lotWorkbook([['720193', 'RED', 'Thread', '70', 'Acme']], ['Style', 'GMTS Color Name', 'Material Description', 'BOM Qty', 'Vendor']);
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), ['buyer_id' => $this->buyer->id, 'season_code' => 'FA26', 'file' => $file]);
+
+    $this->actingAs($this->merchant)->get(route('merchant.import.map'))
+        ->assertOk()->assertSee('Matched automatically with the saved matching');
+});
+
+it('refuses another buyer, a header the wizard does not offer, and a doubled header', function () {
+    $other = Buyer::create(['buyer_name' => 'Other', 'is_active' => true]);
+    $scoped = User::factory()->create(['buyer_id' => $this->buyer->id, 'can_upload' => true])->assignRole('merchant');
+    $scoped->buyers()->attach($this->buyer->id);
+
+    $this->actingAs($scoped->fresh())->post(route('merchant.import.upload'), [
+        'buyer_id' => $other->id, 'season_code' => 'SP27', 'file' => lotWorkbook(sampleLotRows()),
+    ])->assertSessionHasErrors('buyer_id');
+
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), [
+        'buyer_id' => $this->buyer->id, 'season_code' => 'SP27', 'file' => lotWorkbook(sampleLotRows()),
+    ]);
+
+    $this->actingAs($this->merchant)->post(route('merchant.import.preview'), [
+        'sheet' => 'Database', 'header_row' => 3, 'map' => [1 => $this->vendorHeader->id],
+    ])->assertSessionHas('warning');
+
+    $this->actingAs($this->merchant)->post(route('merchant.import.preview'), [
+        'sheet' => 'Database', 'header_row' => 3, 'map' => [1 => $this->headers['style_name']->id, 2 => $this->headers['style_name']->id],
+    ])->assertSessionHas('warning', fn ($m) => str_contains($m, 'more than one column'));
+
+    expect(ExcelFile::count())->toBe(0);
+});
+
+it('detects the title row and picks only recognisable titles', function () {
+    $matcher = app(ImportColumnMatcher::class);
+    $headers = collect($this->headers)->values();
+
+    $rows = [1 => [1 => 'Ann Taylor lot file'], 2 => [], 3 => [1 => 'Style', 2 => 'GMTS Color Name', 3 => 'BOM Qty'], 4 => [1 => '748268', 2 => 'WHITE', 3 => '10']];
+
+    expect($matcher->detectHeaderRow($rows, $headers))->toBe(3);
+});
+
+it('reads the value Excel saved for a formula instead of calculating it', function () {
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), [
+        'buyer_id' => $this->buyer->id, 'season_code' => 'SP27',
+        'file' => lotWorkbook([['333', 'RED', 'Zipper', '=2*3', 'Acme']]),
+    ]);
+
+    $map = [1 => $this->headers['style_name']->id, 2 => $this->headers['gmts_color_name']->id, 3 => $this->headers['material_description']->id, 4 => $this->headers['bom_quantity']->id];
+
+    $this->actingAs($this->merchant)->post(route('merchant.import.preview'), ['sheet' => 'Database', 'header_row' => 3, 'map' => $map])->assertOk();
+    $this->actingAs($this->merchant)->post(route('merchant.import.confirm'))->assertRedirect();
+
+    expect((float) BomItem::first()->bom_qty)->toBe(6.0);
+});

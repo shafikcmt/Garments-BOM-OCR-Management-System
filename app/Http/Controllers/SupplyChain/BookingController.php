@@ -139,6 +139,13 @@ class BookingController extends Controller
 
     public function generate(Request $request, ExcelRow $excelRow)
     {
+        // Optional gate: no PO for a style whose BOM is not approved (admin switch, off by default).
+        if ($blocked = app(\App\Services\BomApprovals::class)->blockReason($excelRow)) {
+            return $this->isAjaxRequest($request)
+                ? response()->json(['success' => false, 'message' => $blocked], 422)
+                : redirect()->route($this->bookingRouteName('index'))->with('warning', e($blocked));
+        }
+
         $editData = $this->requestHasBookingEdits($request) ? $this->validateBookingEditRequest($request) : null;
         $bookingPo = $this->generateBookingForRow($excelRow, $editData, $request);
         $bookingPo = $this->syncBookingPoSourceControl($bookingPo, true);
@@ -271,6 +278,12 @@ class BookingController extends Controller
             ->whereIn('id', $rowIds)
             ->with(['excelFile', 'cells.header', 'bookingPo'])
             ->get();
+
+        foreach ($rows as $row) {
+            if ($blocked = app(\App\Services\BomApprovals::class)->blockReason($row)) {
+                return response()->json(['success' => false, 'message' => $blocked], 422);
+            }
+        }
 
         $generated = [];
         $seenGroups = [];
@@ -597,6 +610,10 @@ class BookingController extends Controller
                 throw new \RuntimeException('Unable to generate PO. Please check selected orders and try again.');
             }
 
+            if ($blocked = app(\App\Services\BomApprovals::class)->blockReason($leader)) {
+                throw new \RuntimeException($blocked);
+            }
+
             if ($leader->bookingPo) {
                 throw new \RuntimeException('Some selected orders already have PO generated.');
             }
@@ -726,6 +743,28 @@ class BookingController extends Controller
         }
 
         return $changes;
+    }
+
+    /**
+     * Re-check the booking POs built from the given BOM rows against their
+     * stored baseline and return the ones now flagged as needing regeneration.
+     *
+     * Called when a Merchant saves the workspace, so Supply Chain hears about a
+     * source change immediately instead of only when a PO screen is next opened.
+     * It reuses the same snapshot comparison as every PO screen — nothing about
+     * what counts as a change is decided here.
+     */
+    public function refreshSourceControlForRows(array $rowIds): \Illuminate\Support\Collection
+    {
+        if ($rowIds === []) {
+            return collect();
+        }
+
+        return BookingPo::whereIn('excel_row_id', $rowIds)
+            ->get()
+            ->map(fn (BookingPo $po) => $this->syncBookingPoSourceControl($po))
+            ->filter(fn (BookingPo $po) => $po->needs_regenerate)
+            ->values();
     }
 
     protected function syncBookingPoSourceControl(BookingPo $bookingPo, bool $resetBaseline = false): BookingPo

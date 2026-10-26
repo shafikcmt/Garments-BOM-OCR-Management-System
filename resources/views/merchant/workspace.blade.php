@@ -52,6 +52,11 @@
                     <span class="d-block fw-normal text-muted small mt-1">Upload only merchant input headers. Formula fields are calculated automatically.</span>
                 </x-slot:title>
                 <x-slot:actions>
+                    @if($canUpload)
+                        <a href="{{ route('merchant.import.index') }}" class="btn btn-primary btn-sm">
+                            <i class="bi bi-magic me-1" aria-hidden="true"></i>Import Buyer Excel
+                        </a>
+                    @endif
                     <a href="{{ route('merchant.excel.sample') }}" class="btn btn-outline-primary btn-sm">
                         Download Sample
                     </a>

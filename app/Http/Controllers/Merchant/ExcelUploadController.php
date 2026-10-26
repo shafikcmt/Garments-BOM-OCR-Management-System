@@ -233,6 +233,16 @@ class ExcelUploadController extends Controller
         app(\App\Http\Controllers\Shared\ExcelFileController::class)
             ->recalculateFile($excelFile, $userId);
 
+        // Standard tables (order_lines, bom_items) + Style Library links. The
+        // upload is already saved, so a failure here is logged, never raised.
+        try {
+            if (app(\App\Services\BomTableSync::class)->enabled()) {
+                app(\App\Services\BomTableSync::class)->syncFile($excelFile);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('BOM table sync failed for upload ' . $excelFile->id . ': ' . $e->getMessage());
+        }
+
         $this->notifyOtherRoles(
             $excelFile,
             'excel_uploaded',
@@ -245,7 +255,7 @@ class ExcelUploadController extends Controller
             ->with('success', 'Excel file uploaded successfully. Formula and conditional fields calculated automatically.');
     }
 
-    private function extractUploadedCellValue($sheet, int $columnIndex, int $rowNumber, $header): ?string
+    protected function extractUploadedCellValue($sheet, int $columnIndex, int $rowNumber, $header): ?string
     {
         $cell = $sheet->getCell($this->cellAddress($columnIndex, $rowNumber));
         $rawValue = $cell->isFormula() ? $cell->getCalculatedValue() : $cell->getValue();
@@ -375,7 +385,7 @@ class ExcelUploadController extends Controller
         return Str::contains($key, ['date', '_dt', 'etd', 'eta', 'ata', 'inhouse', 'in_house']);
     }
 
-    private function cleanHeaderName($value): string
+    protected function cleanHeaderName($value): string
     {
         return trim(preg_replace('/\s+/', ' ', (string) ($value ?? '')));
     }
@@ -456,7 +466,7 @@ class ExcelUploadController extends Controller
         return Coordinate::stringFromColumnIndex($columnIndex) . $rowNumber;
     }
 
-    private function merchantInputHeaders(): Collection
+    protected function merchantInputHeaders(): Collection
     {
         $merchantRoleId = Role::where('name', 'merchant')->value('id');
 
@@ -474,14 +484,14 @@ class ExcelUploadController extends Controller
             ->get();
     }
 
-    private function allActiveHeaders(): Collection
+    protected function allActiveHeaders(): Collection
     {
         return ExcelHeader::where('is_active', true)
             ->orderBy('position')
             ->get();
     }
 
-    private function bulkCreateRowsAndCells(ExcelFile $excelFile, Collection $allHeaders, array $rows, int $userId): void
+    protected function bulkCreateRowsAndCells(ExcelFile $excelFile, Collection $allHeaders, array $rows, int $userId): void
     {
         if (empty($rows)) {
             return;
@@ -620,7 +630,7 @@ class ExcelUploadController extends Controller
      * belongs to no buyer, and every live BOM file is untagged today, so
      * anything stricter would silence these notifications entirely.
      */
-    private function notifyOtherRoles($excelFile, string $type, string $title, string $message, ?string $batchId = null): void
+    protected function notifyOtherRoles($excelFile, string $type, string $title, string $message, ?string $batchId = null): void
     {
         $users = User::where('id', '!=', auth()->id())
             ->whereDoesntHave('roles', function ($query) {

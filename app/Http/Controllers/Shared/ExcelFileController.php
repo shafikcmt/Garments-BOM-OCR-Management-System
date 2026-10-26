@@ -588,6 +588,41 @@ class ExcelFileController extends Controller
             $this->notifyOtherRolesAboutFileUpdate($excelFile, $changedCells, $batchId, $user);
         }
 
+        // Keep the standard tables (order_lines / bom_items) in step with the
+        // edited rows. Never raises: the save has already succeeded.
+        if (count($changedCells) > 0) {
+            app(\App\Services\BomTableSync::class)->syncRows(
+                $excelFile,
+                collect($changedCells)->pluck('row_id')->unique()->values()->all()
+            );
+        }
+
+        // An approved BOM that this save has changed must go back for approval.
+        // Never raises: the save has already succeeded.
+        if (count($changedCells) > 0) {
+            try {
+                app(\App\Services\BomApprovals::class)->afterRowsChanged(
+                    collect($changedCells)->pluck('row_id')->unique()->values()->all()
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('BOM change check failed: ' . $e->getMessage());
+            }
+        }
+
+        // Tell Supply Chain which POs the merchant's edit has made stale. A
+        // failure here must never undo or hide a save that already succeeded.
+        if (count($changedCells) > 0 && $user->hasRole('merchant')) {
+            try {
+                app(\App\Services\BookingPoChangeNotifier::class)->notify(
+                    $excelFile,
+                    collect($changedCells)->pluck('row_id')->unique()->values()->all(),
+                    $user
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('PO change notification failed: ' . $e->getMessage());
+            }
+        }
+
         $queryParams = array_filter([
             'page' => $request->query('page'),
             'per_page' => $request->query('per_page'),
