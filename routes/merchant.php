@@ -9,6 +9,7 @@ use App\Http\Controllers\Merchant\StyleLibraryController;
 use App\Http\Controllers\Merchant\ImportWizardController;
 use App\Http\Controllers\Merchant\StatusController;
 use App\Http\Controllers\Merchant\BomBuilderController;
+use App\Http\Controllers\Merchant\OcrSummaryController;
 
 // Merchandising reports — read-only summaries of the BOM columns this
 // department owns. Kept in their own group because they are shared with Admin /
@@ -32,6 +33,17 @@ Route::prefix('merchant/status')
         Route::get('/', [StatusController::class, 'index'])->name('index');
         Route::get('/seasons/{season}', [StatusController::class, 'season'])->name('season');
         Route::get('/styles/{mother}', [StyleLibraryController::class, 'show'])->name('style');
+    });
+
+// OCR summaries (Contract, Material, Payment, Clearance) and the OCR workbook
+// download. Read-only, shared with Admin and Management; buyer-scoped in the
+// controller.
+Route::prefix('merchant/ocr')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.ocr.')
+    ->group(function () {
+        Route::get('/', [OcrSummaryController::class, 'index'])->name('index');
+        Route::get('/excel', [OcrSummaryController::class, 'excel'])->name('excel');
     });
 
 // BOM builder: make a style's BOM on a screen. Merchandising and Admin; the

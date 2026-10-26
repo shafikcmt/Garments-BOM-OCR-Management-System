@@ -43,8 +43,8 @@ class StyleRollup
     {
     }
 
-    /** @var array<int, string>|null header id => canonical key, resolved once per instance */
-    private ?array $keyByHeader = null;
+    /** @var array<string, list<int>> canonical key => header ids, resolved once per instance */
+    private array $headerIdsByCanonical = [];
 
     /**
      * @return array{
@@ -120,15 +120,41 @@ class StyleRollup
     }
 
     /**
+     * Every order line of the given buyers (null = all) and, optionally, one
+     * season — for the OCR summaries. $extra names more workspace columns
+     * (canonical keys, resolved by header name like the status columns) to
+     * carry on each material row under 'extra', e.g. pi_amount or eta.
+     *
+     * @param  list<int>|null  $buyerIds
+     * @param  list<string>  $extra
+     * @return array{kpis: array<string, int|float>, lines: Collection, materials: Collection, orderLines: Collection}
+     */
+    public function forScope(?array $buyerIds, ?int $seasonId = null, array $extra = [], ?Carbon $today = null): array
+    {
+        $today ??= Carbon::today();
+
+        $lines = OrderLine::query()
+            ->when($buyerIds !== null, fn ($q) => $q->whereIn('buyer_id', $buyerIds))
+            ->when($seasonId, fn ($q) => $q->where('buyer_season_id', $seasonId))
+            ->with(['bomItems', 'childStyle', 'motherStyle:id,style_no,buyer_id', 'buyer:id,buyer_name', 'season:id,code'])
+            ->orderBy('style_no')->orderBy('customer_po_no')->orderBy('gmts_color')
+            ->get();
+
+        $values = $this->statusValues($lines->flatMap->bomItems->pluck('excel_row_id')->all(), $extra);
+
+        return $this->build($lines, $values, $today, $extra) + ['orderLines' => $lines];
+    }
+
+    /**
      * Shared by the style page and the season page, so the two can never disagree.
      *
      * @param  Collection<int, OrderLine>  $lines  with bomItems (and childStyle / excelFile when wanted)
      * @param  array<int, array<string, string>>  $values  status cells by workspace row
      */
-    private function build(Collection $lines, array $values, Carbon $today): array
+    private function build(Collection $lines, array $values, Carbon $today, array $extra = []): array
     {
-        $materials = $lines->flatMap(function (OrderLine $line) use ($values, $today) {
-            return $line->bomItems->map(fn (BomItem $item) => $this->materialRow($line, $item, $values[$item->excel_row_id] ?? [], $today));
+        $materials = $lines->flatMap(function (OrderLine $line) use ($values, $today, $extra) {
+            return $line->bomItems->map(fn (BomItem $item) => $this->materialRow($line, $item, $values[$item->excel_row_id] ?? [], $today, $extra));
         })->values();
 
         $lineRows = $lines->map(function (OrderLine $line) use ($materials) {
@@ -183,7 +209,7 @@ class StyleRollup
     /**
      * @param  array<string, mixed>  $v  status values of this material's workspace row
      */
-    private function materialRow(OrderLine $line, BomItem $item, array $v, Carbon $today): array
+    private function materialRow(OrderLine $line, BomItem $item, array $v, Carbon $today, array $extra = []): array
     {
         $po = $this->real($v['po_no'] ?? null);
         $piStatus = trim((string) ($v['pi_status'] ?? ''));
@@ -224,6 +250,10 @@ class StyleRollup
                 default => 'Not ordered',
             },
             'light' => $ordered ? null : $this->light($v['order_to_be_placed_by'] ?? null, $today),
+            'excel_row_id' => $item->excel_row_id,
+            'material_color' => $item->material_color,
+            // Extra workspace columns asked for by the caller (forScope), raw.
+            'extra' => array_intersect_key($v, array_flip($extra)),
         ];
     }
 
@@ -248,21 +278,19 @@ class StyleRollup
      * @param  list<int>  $rowIds
      * @return array<int, array<string, string>>  row id => canonical key => value
      */
-    private function statusValues(array $rowIds): array
+    private function statusValues(array $rowIds, array $extra = []): array
     {
         if ($rowIds === []) {
             return [];
         }
 
-        if ($this->keyByHeader === null) {
-            $this->keyByHeader = [];
-            foreach (self::FIELDS as $canonical) {
-                foreach ($this->headers->headerIdsForCanonical($canonical) as $headerId) {
-                    $this->keyByHeader[$headerId] ??= $canonical;
-                }
+        $keyByHeader = [];
+        foreach (array_unique(array_merge(self::FIELDS, $extra)) as $canonical) {
+            $this->headerIdsByCanonical[$canonical] ??= $this->headers->headerIdsForCanonical($canonical);
+            foreach ($this->headerIdsByCanonical[$canonical] as $headerId) {
+                $keyByHeader[$headerId] ??= $canonical;
             }
         }
-        $keyByHeader = $this->keyByHeader;
 
         if ($keyByHeader === []) {
             return [];
@@ -270,16 +298,20 @@ class StyleRollup
 
         $out = [];
 
-        ExcelCell::whereIn('row_id', $rowIds)->whereIn('header_id', array_keys($keyByHeader))
-            ->whereNotNull('value')->get(['row_id', 'header_id', 'value'])
-            ->each(function ($cell) use (&$out, $keyByHeader) {
-                $key = $keyByHeader[$cell->header_id];
+        // In chunks, so a whole buyer's rows stay under the database's limit
+        // on bound parameters.
+        foreach (array_chunk(array_values(array_unique($rowIds)), 900) as $chunk) {
+            ExcelCell::whereIn('row_id', $chunk)->whereIn('header_id', array_keys($keyByHeader))
+                ->whereNotNull('value')->get(['row_id', 'header_id', 'value'])
+                ->each(function ($cell) use (&$out, $keyByHeader) {
+                    $key = $keyByHeader[$cell->header_id];
 
-                // First non-blank value wins when two headers answer to one key.
-                if (trim((string) $cell->value) !== '' && ! isset($out[$cell->row_id][$key])) {
-                    $out[$cell->row_id][$key] = (string) $cell->value;
-                }
-            });
+                    // First non-blank value wins when two headers answer to one key.
+                    if (trim((string) $cell->value) !== '' && ! isset($out[$cell->row_id][$key])) {
+                        $out[$cell->row_id][$key] = (string) $cell->value;
+                    }
+                });
+        }
 
         return $out;
     }

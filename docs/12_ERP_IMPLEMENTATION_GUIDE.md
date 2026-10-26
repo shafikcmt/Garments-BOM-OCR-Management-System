@@ -230,8 +230,8 @@ on screen. `BookingPo` and the material stock ledger read from those rows.
 | **O2** | **Smart OCR import**: mapping profiles, synonyms, header detection, preview + validation before saving | Ends the format-change confusion | **Done** (3-step wizard, `BuyerImportProfile`, header detection) |
 | **O3** | **Structured BOM line**, system-calculated to-be-ordered, short/excess, requirement; workspace rows link to BOM lines (nullable) | Formula errors stop | **Partly**: `bom_items` linked by `excel_row_id`, but filled one-way from the workspace |
 | **O4** | Department screens (Merchandiser / Supply Chain / Commercial / Store) over the same line | Replaces one giant sheet | **Partly**: Booking PO, PRA, Payments, Receiving exist; Commercial has none. See §11 |
-| **O5** | **Auto reports**: Contract, Material, Payment, Style Status, Clearance Summary | No hand-made pivots | Style Status done; the other four not built |
-| **O6** | **OCR export** per buyer/season in the familiar layout | Excel stays available; the system is the source | Not built |
+| **O5** | **Auto reports**: Contract, Material, Payment, Style Status, Clearance Summary | No hand-made pivots | **Done** (OCR Summary screen, 2026-10-26) |
+| **O6** | **OCR export** per buyer/season in the familiar layout | Excel stays available; the system is the source | **Done**: Database sheet in the buyer's import-profile layout + 4 summary sheets |
 | Later | Inbound Shipment module; Order Closing / post-costing (HB "OCR" sheet); pre-costing with revisions | Towards the full ERP | Pre-costing done; rest in §11 |
 
 Principle: data is entered in the system; Excel is for import (at first)

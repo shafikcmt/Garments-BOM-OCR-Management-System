@@ -194,6 +194,24 @@ The cards at the top are the totals of the whole season. The red or yellow bar w
 
 If a season shows "No orders linked", import the buyer's Excel with that season code first (section 2.2).
 
+### 2.4a OCR Summary (no more hand-made pivots)
+
+**Open it:** left menu, **OCR Summary**. Merchandising, Admin and Management can open it; you see only your buyers.
+
+1. Choose a **Buyer** (or All buyers) and, if you want, a **Season**.
+2. Pick a tab:
+
+| Tab | One row per | What it shows |
+|---|---|---|
+| Contract Summary | Order line (style, colour, contract / PO) | Ship date, order qty, materials, % ordered / PI received / paid / received, late materials |
+| Material Summary | Material (name, colour, unit) | BOM qty, ordered qty, (short) / excess, received qty and %, lines not ordered yet, vendors |
+| Payment Summary | Supplier | POs, PIs, lines without PI, PI amount, paid, pending, next payment due (red if past) |
+| Clearance Summary | BL / AWB (ordered material not yet received) | Ship mode, forwarder, suppliers, ETA, committed in-house, arrival status |
+
+3. Press **Download OCR Excel** for the workbook: a **Database** sheet (every material line, every column you may see) plus the four summary sheets. When one buyer is chosen and a column matching is saved for that buyer (Import Buyer Excel, Step 2), the Database sheet starts with the buyer's own columns in the buyer's order and titles.
+
+Good to know: a PI repeated on several lines is counted once in the Payment Summary. (Short) / excess counts only lines that have an ordered quantity. Columns are found by their name, so if a buyer's sheet has no ETA column, the ETA shows "—".
+
 ### 2.5 When you change an order that already has a PO
 
 If you change a field that a purchase order is built from (style, color, quantity, item and similar) and press Save in the Workspace, **Supply Chain is told at once**. They get a message such as "PO source changed: Qty on HB26FA0007. Regenerate before sending", and the PO shows **Source changed** until they regenerate it. If the PO is already in a payment request, the message says so. You do not need to phone them.
