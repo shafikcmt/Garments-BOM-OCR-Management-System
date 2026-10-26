@@ -24,6 +24,7 @@ class ExcelHeader extends Model
         'can_view_all',
         'can_edit_owner_only',
         'merchant_can_upload',
+        'track_order_changes',
     ];
 
     protected $casts = [
@@ -33,6 +34,7 @@ class ExcelHeader extends Model
         'can_view_all' => 'boolean',
         'can_edit_owner_only' => 'boolean',
         'merchant_can_upload' => 'boolean',
+        'track_order_changes' => 'boolean',
     ];
 
     public function ownerRole()

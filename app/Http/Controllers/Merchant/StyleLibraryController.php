@@ -95,6 +95,8 @@ class StyleLibraryController extends Controller
             'backLabel' => $isMerchant ? 'Back to Style Library' : 'Back to Season Status',
             'homeUrl' => $isMerchant ? route('merchant.dashboard') : route('merchant.status.index'),
             'costingCards' => $costingCards,
+            // Who changed the order (qty, ship date, PO ...) and when.
+            'orderChanges' => app(\App\Services\OrderChanges::class)->forMother($mother, 50),
             'bomApproval' => $bomApproval,
             'bomState' => $bomState,
             'canSubmitBom' => $canSubmitBom,

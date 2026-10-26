@@ -166,6 +166,7 @@ Use the Excel import (section 2.2) when the buyer sends a ready file; use this s
 - **Child style** buttons narrow everything to one child style.
 - **Orders:** one line per color and customer PO, with ship date, quantity and how many materials are ordered or received.
 - **Materials:** every material of the style with its PO, vendor, PI and payment status, received quantity, and its **Stage**. Use the search box or the stage list to find a material.
+- **Order Changes:** every change to the order columns (ship date, PO, colour, BOM quantity, consumption and the like) made in the Workspace: when, who, which colour / PO, the old and the new value. A change saved on several material lines at once shows once ("on 9 material lines"). Which columns count is set by Admin (**Show in Order Changes** on Excel Header Control).
 
 **Stage means the furthest step the material has reached:**
 
@@ -415,6 +416,7 @@ The **Season page** of Style Status shows how many follow-ups are open for each 
 | After pulling new code | `php artisan migrate`, then `php artisan view:clear` |
 | Fill the standard order tables for files that were uploaded before | Done once by itself on the deploy that added the Merchandising dashboard. To run it again by hand: `php artisan bom:sync-tables --dry-run` to see what would happen, then `php artisan bom:sync-tables` |
 | Show each buyer only the columns it uses on the workspace | **Admin > Buyers**, **Edit** the buyer, **Choose Columns**. Press **Use Saved Matching** to tick the Merchandising columns from the buyer's saved import matching, or tick by hand, then **Save Columns**. On that buyer's files the workspace says "Showing the N columns … uses"; anyone can press **Show All Columns**. Nothing is deleted. |
+| Choose which columns appear in a style's **Order Changes** box | **Admin > Excel Headers**, **Edit** the column, tick **Show in Order Changes**, **Update Header**. Order qty, ship date, contract, colour, BOM qty and consumption start ticked. |
 | Let another department edit a column (for example shipment columns for both Merchandising and Commercial) | **Admin > Excel Headers**, press **Edit** on the column, tick the roles under **Also Editable By**, press **Update Header**. The owner role can always edit; untick all for owner only. The list shows "Also editable by …" or "Owner Edit Only". |
 | Turn the second (Management) BOM approval or the PO gate on or off | Screen: **BOM Approvals**, Settings box (Admin only). Both are off by default. |
 | Switch off automatic refresh of Workspace columns from PO / PRA | `.env`: `SUPPLY_CHAIN_SYNC_WORKSPACE=false` |

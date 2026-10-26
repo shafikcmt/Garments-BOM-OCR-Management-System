@@ -163,6 +163,7 @@ class HeaderController extends Controller
             'is_required' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'can_view_all' => ['nullable', 'boolean'],
+            'track_order_changes' => ['nullable', 'boolean'],
             'editor_role_ids' => ['nullable', 'array'],
             'editor_role_ids.*' => ['integer', 'exists:roles,id'],
         ], [
@@ -188,6 +189,7 @@ class HeaderController extends Controller
         $data['is_required'] = $request->boolean('is_required');
         $data['is_active'] = $request->boolean('is_active');
         $data['can_view_all'] = $request->boolean('can_view_all');
+        $data['track_order_changes'] = $request->boolean('track_order_changes');
         // Extra editor roles; the owner role is never listed as its own extra.
         $data['editor_role_ids'] = collect($data['editor_role_ids'] ?? [])
             ->map(fn ($id) => (int) $id)

@@ -232,6 +232,20 @@
                     </div>
                 </div>
 
+                <div class="check-item">
+                    <div class="form-check">
+                        <input
+                            type="checkbox"
+                            name="track_order_changes"
+                            value="1"
+                            class="form-check-input"
+                            id="track_order_changes"
+                            @checked(old('track_order_changes', isset($header) ? $header->track_order_changes : false))
+                        >
+                        <label class="form-check-label" for="track_order_changes">Show in Order Changes</label>
+                    </div>
+                </div>
+
             </div>
 
             {{-- Who besides the owner role may type into this column, e.g.

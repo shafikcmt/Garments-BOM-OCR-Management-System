@@ -258,6 +258,32 @@
             </div>
         </x-card>
 
+        {{-- Order change history: edits to the columns marked "Show in Order Changes". --}}
+        <x-card class="mb-3" body-class="p-3">
+            <x-slot:title>Order Changes <span class="badge bg-light text-muted border ms-1">{{ $orderChanges->count() }}</span></x-slot:title>
+            @if($orderChanges->isEmpty())
+                <p class="text-muted mb-0">No changes to the order since it came in.</p>
+            @else
+                <div class="table-responsive" style="max-height:340px; overflow-y:auto;">
+                    <table class="table table-sm align-middle mb-0" style="min-width:0">
+                        <thead><tr><th>When</th><th>Who</th><th>Colour / PO</th><th>Field</th><th>Old</th><th>New</th></tr></thead>
+                        <tbody>
+                        @foreach($orderChanges as $c)
+                            <tr>
+                                <td class="text-nowrap">{{ $c['at']?->format('d M Y H:i') }}</td>
+                                <td>{{ $c['by'] ?? '—' }}</td>
+                                <td>{{ trim(($c['color'] ?? '') . ' / ' . ($c['po'] ?? ''), ' /') ?: '—' }}</td>
+                                <td>{{ $c['field'] }}@if($c['lines'] > 1)<div class="small text-muted">on {{ $c['lines'] }} material lines</div>@endif</td>
+                                <td class="text-muted">{{ $c['old'] !== null && $c['old'] !== '' ? $c['old'] : '—' }}</td>
+                                <td class="fw-semibold">{{ $c['new'] !== null && $c['new'] !== '' ? $c['new'] : '—' }}</td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </x-card>
+
         <x-card title="Materials" body-class="p-3">
             <div class="d-flex flex-wrap gap-2 mb-3">
                 <input type="search" id="matSearch" class="form-control form-control-sm" style="max-width:260px" placeholder="Search material, SAP code, PO, vendor">
