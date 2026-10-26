@@ -156,6 +156,11 @@
                         </a>
                     </li>
                     <li class="sidebar-item">
+                        <a href="{{ route('merchant.samples.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.samples.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-scissors" aria-hidden="true"></i></span><span class="sidebar-link-text">Samples</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="{{ route('merchant.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.reports.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
@@ -315,6 +320,11 @@
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.ocr.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.ocr.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-table" aria-hidden="true"></i></span><span class="sidebar-link-text">OCR Summary</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.samples.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.samples.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-scissors" aria-hidden="true"></i></span><span class="sidebar-link-text">Samples</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
@@ -609,6 +619,11 @@
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.ocr.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.ocr.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-table" aria-hidden="true"></i></span><span class="sidebar-link-text">OCR Summary</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.samples.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.samples.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-scissors" aria-hidden="true"></i></span><span class="sidebar-link-text">Samples</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">

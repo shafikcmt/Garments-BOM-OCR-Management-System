@@ -64,6 +64,20 @@ Route::post('merchant/tna/styles/{mother}', [\App\Http\Controllers\Merchant\TnaA
     ->middleware(['auth', 'role:merchant,admin,management'])
     ->name('merchant.tna.apply');
 
+// Sample tracking. Merchandising and Admin edit, Management reads; the
+// controller checks the buyer.
+Route::prefix('merchant/samples')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.samples.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\Merchant\SampleController::class, 'index'])->name('index');
+        Route::post('/styles/{mother}', [\App\Http\Controllers\Merchant\SampleController::class, 'store'])->name('store');
+        Route::put('/{sample}', [\App\Http\Controllers\Merchant\SampleController::class, 'update'])->name('update');
+        Route::delete('/{sample}', [\App\Http\Controllers\Merchant\SampleController::class, 'destroy'])->name('destroy');
+        Route::post('/types', [\App\Http\Controllers\Merchant\SampleController::class, 'storeType'])->name('types.store');
+        Route::put('/types/{type}', [\App\Http\Controllers\Merchant\SampleController::class, 'toggleType'])->name('types.toggle');
+    });
+
 // BOM builder: make a style's BOM on a screen. Merchandising and Admin; the
 // controller checks the buyer.
 Route::prefix('merchant/bom')

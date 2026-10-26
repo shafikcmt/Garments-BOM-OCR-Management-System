@@ -31,6 +31,11 @@ class MotherStyle extends Model
         return $this->hasOne(BomApproval::class);
     }
 
+    public function samples()
+    {
+        return $this->hasMany(Sample::class);
+    }
+
     public function sizeSet()
     {
         return $this->belongsTo(SizeSet::class);

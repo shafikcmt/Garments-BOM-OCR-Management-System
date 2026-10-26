@@ -39,12 +39,12 @@ Common to all of them: **the style is the centre**; costing, samples, BOM, order
 | Step | Status in the system |
 |---|---|
 | 1 Enquiry | Not built |
-| 2 Pre-costing | **Built** (cost heads, Buyer / In-house, revisions, margin). Not built: costing approval, size/colour costing, comparison with the BOM |
-| 3 Sampling | Not built |
+| 2 Pre-costing | **Built** (cost heads, Buyer / In-house, revisions, margin, **approval**, **comparison with the BOM**). Not built: size/colour costing |
+| 3 Sampling | **Built**: samples per style (type, colour, size, needed-by, sent / AWB, buyer verdict and comment), Samples list with late flag; types kept on screen |
 | 4 Order confirmation | Partly: orders arrive through the BOM file (order lines: colour, customer PO, ship date, quantity). **Colour x size breakdown built** (size sets per buyer). No separate buyer-PO screen |
 | 5 BOM | **Built**: Excel import for any buyer layout, **Create BOM** on screen, calculated columns, **BOM approval**. **Copy from another style/season and a learned material library are built.** Not built: size-wise, automatic BOM |
 | 6 Material booking | **Built** on the Supply Chain side (booking / PO, PI, payment request, payment); changes by the merchant reach Supply Chain; PO / PI / payment status flows back |
-| 7 TnA | **Partly**: follow-up tasks, to-do list, reminders, late-material lights. Not built: task templates by lead time, automatic tasks, critical path, e-mail |
+| 7 TnA | **Built**: follow-up tasks, to-do list, reminders, late-material lights, **TnA templates by lead time, applied by hand or automatically**. Not built: critical path, e-mail |
 | 8 Production | Not built |
 | 9 Shipment | Partly in Commercial; not tied to the style |
 | 10 Reporting | **Built**: Style Status by buyer, season and style; Management view |

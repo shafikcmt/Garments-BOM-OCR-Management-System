@@ -158,6 +158,67 @@
     </div>
     </div>
 
+    {{-- Samples of this style. --}}
+    @php($canSample = auth()->user()->hasAnyRole(['merchant', 'admin']))
+    <x-card class="mb-3" body-class="p-3">
+        <x-slot:title>Samples <span class="badge bg-light text-muted border ms-1">{{ $samples->count() }}</span></x-slot:title>
+        <x-slot:actions><a href="{{ route('merchant.samples.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-list-ul me-1" aria-hidden="true"></i>All Samples</a></x-slot:actions>
+        @if($samples->isNotEmpty())
+            <div class="table-responsive mb-3">
+                <table class="table table-sm align-middle mb-0" style="min-width:0">
+                    <thead><tr><th>Type</th><th>Colour / Size</th><th class="text-end">Qty</th><th>Needed By</th><th>Sent</th><th>Status</th><th>Buyer Comment</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach($samples as $s)
+                        @include('merchant._sample-row', ['s' => $s, 'canEdit' => $canSample, 'showStyle' => false])
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @elseif(! $canSample)
+            <p class="text-muted mb-0">No samples recorded for this style.</p>
+        @endif
+        @if($canSample && $sampleTypes->isNotEmpty())
+            <form method="POST" action="{{ route('merchant.samples.store', $mother) }}" class="row g-2 align-items-end">
+                @csrf
+                <div class="col-6 col-md-2">
+                    <label class="form-label mb-1" for="smType">Sample type</label>
+                    <select name="sample_type_id" id="smType" class="form-select form-select-sm" required>
+                        <option value="">Choose</option>
+                        @foreach($sampleTypes as $t)<option value="{{ $t->id }}">{{ $t->name }}</option>@endforeach
+                    </select>
+                </div>
+                @if($children->isNotEmpty())
+                    <div class="col-6 col-md-2">
+                        <label class="form-label mb-1" for="smChild">Child style</label>
+                        <select name="child_style_id" id="smChild" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            @foreach($children as $c)<option value="{{ $c->id }}">{{ $c->style_no }}</option>@endforeach
+                        </select>
+                    </div>
+                @endif
+                <div class="col-6 col-md-2">
+                    <label class="form-label mb-1" for="smColor">Colour</label>
+                    <input type="text" name="gmts_color" id="smColor" class="form-control form-control-sm" maxlength="120">
+                </div>
+                <div class="col-3 col-md-1">
+                    <label class="form-label mb-1" for="smSize">Size</label>
+                    <input type="text" name="size" id="smSize" class="form-control form-control-sm" maxlength="40">
+                </div>
+                <div class="col-3 col-md-1">
+                    <label class="form-label mb-1" for="smQty">Qty</label>
+                    <input type="number" name="qty" id="smQty" class="form-control form-control-sm" min="1" max="10000" value="1" required>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label mb-1" for="smDate">Needed by</label>
+                    <input type="date" name="required_date" id="smDate" class="form-control form-control-sm">
+                </div>
+                <div class="col-12 col-md-2">
+                    <button class="btn btn-outline-primary btn-sm w-100"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Sample</button>
+                </div>
+            </form>
+        @endif
+    </x-card>
+
     {{-- TnA plan: tasks made from a Time and Action template. --}}
     @if($canFollowUp && ($tnaTemplates->isNotEmpty() || $tnaTasks->isNotEmpty()))
     <x-card class="mb-3" body-class="p-3">

@@ -285,7 +285,7 @@ Rules for every step below:
 | M2 | **Order change log**: quantity / ship-date changes with who and when, pushed to Supply Chain and Store — **log done 2026-10-26** (style page "Order Changes", columns chosen by `excel_headers.track_order_changes`); Store notification still to do | "Source changed" on Booking PO already exists; extend to the order line |
 | M3 | **TnA templates**: tasks created from ship date / PCD by lead time (booking, PI, in-house, PP, cut) with traffic light — **Done 2026-10-26** (Admin > TnA Templates, style page TnA Plan, daily `tna:apply`) | Reuse `FollowUpTask` and reminders |
 | M4 | Costing approval and **pre-costing vs BOM** comparison — **Done 2026-10-26** (approve / return on the costing page; comparison by material name with BOM consumption and PI rate) | After M1 |
-| M5 | Sample tracking | Only if the merchandiser interview says it matters |
+| M5 | Sample tracking — **Done 2026-10-26** (Samples page + style page box; sample types kept on screen) | Only if the merchandiser interview says it matters |
 
 **Supply Chain**
 

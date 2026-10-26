@@ -224,6 +224,28 @@ If a season shows "No orders linked", import the buyer's Excel with that season 
 
 Good to know: a PI repeated on several lines is counted once in the Payment Summary. (Short) / excess counts only lines that have an ordered quantity. Columns are found by their name, so if a buyer's sheet has no ETA column, the ETA shows "—".
 
+### 2.4b Samples
+
+**Add a sample:** open the style, in the **Samples** box choose the **Sample type**, and if you want the child style, **Colour**, **Size**, **Qty** and **Needed by** (the buyer's date). Press **Add Sample**.
+
+**Update it:** press **Update** on the sample, change the **Status**, **Sent date**, **Courier / AWB** or **Buyer comment**, press **Save**.
+
+| Status | Meaning |
+|---|---|
+| Requested | Asked for, not started |
+| In progress | Being made |
+| Sent to buyer | Sent (the sent date fills in by itself if left empty) |
+| Approved / Approved with comments / Rejected | The buyer's verdict |
+
+- A sample not yet sent whose **Needed by** date has passed shows **Late** in red.
+- The buyer comment gets today's date when you type it.
+
+**All samples:** left menu, **Samples**. Every sample of your buyers, late ones first; filter by buyer, status (default: open ones) and type. Press the style number to open the style.
+
+**Sample types:** at the bottom of the Samples page. Press a type to switch it off (not offered for new samples) or on; type a **New sample type** and press **Add Type**. Proto, Fit, Size Set, PP, Photo, TOP and Shipment are there to start with.
+
+Management can see samples but not change them.
+
 ### 2.5 When you change an order that already has a PO
 
 If you change a field that a purchase order is built from (style, color, quantity, item and similar) and press Save in the Workspace, **Supply Chain is told at once**. They get a message such as "PO source changed: Qty on HB26FA0007. Regenerate before sending", and the PO shows **Source changed** until they regenerate it. If the PO is already in a payment request, the message says so. You do not need to phone them.
@@ -492,4 +514,4 @@ On the live server, every push to `master` runs the migrations by itself, and th
 
 ## 10. Not built yet
 
-Automatic BOM from an order and consumption master, comparison of pre-costing with the BOM, size-wise costing, buyer inquiry and quotation, sample management, the rest of TnA (task templates by lead time, tasks created automatically, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
+Automatic BOM from an order and consumption master, size-wise costing, buyer inquiry and quotation, the rest of TnA (critical path, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
