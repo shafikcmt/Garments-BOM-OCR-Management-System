@@ -64,6 +64,12 @@ class Buyer extends Model
         return $this->belongsToMany(User::class)->orderBy('users.id');
     }
 
+    /** Workspace columns hidden for this buyer's files (Admin > Buyers > Workspace Columns). */
+    public function hiddenHeaders()
+    {
+        return $this->belongsToMany(ExcelHeader::class, 'buyer_hidden_headers', 'buyer_id', 'excel_header_id')->withTimestamps();
+    }
+
     public function seasons()
     {
         return $this->hasMany(BuyerSeason::class)->orderByDesc('id');

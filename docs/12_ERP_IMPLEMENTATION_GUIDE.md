@@ -378,9 +378,9 @@ Rules for every step below:
 
 | Release | Slices | Why this order |
 |---|---|---|
-| 1 | **R1 + R2 + R3** OCR summaries, OCR export, management dashboard (overall for top management, own department first for heads) | Read-only, zero risk; management stops making pivots by hand at once |
+| 1 | **R1 + R2** done 2026-10-26 (OCR Summary screen + OCR Excel); **R3** management dashboard (overall for top management, own department first for heads) still to do | Read-only, zero risk; management stops making pivots by hand at once |
 | 2 | **C1 + C2** Inbound shipment and clearance | Commercial has no screen at all; new tables only |
-| 2a | **Per-buyer column view** on the workspace (from the import profile) | Fixes "133 columns for a 40-column buyer"; no data change |
+| 2a | **Per-buyer column view** on the workspace (from the import profile) — **Done 2026-10-26** (Admin > Buyers > Workspace Columns, table `buyer_hidden_headers`) | Fixes "133 columns for a 40-column buyer"; no data change |
 | 3 | **S1 + S2** Booking from BOM lines, PI register | Removes the most typing from the workspace; builds on Booking PO |
 | 4 | **St1 + St2** GRN against booking, QC gate | Needs S1 / S2 |
 | 5 | **A1 + A2** Payment calendar, supplier ledger | Needs S2 |

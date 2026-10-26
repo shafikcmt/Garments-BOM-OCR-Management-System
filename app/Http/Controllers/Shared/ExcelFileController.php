@@ -52,6 +52,24 @@ class ExcelFileController extends Controller
             ->filter(fn ($header) => $this->canViewHeader($header, $roleIds))
             ->values();
 
+        // Per-buyer column view (Admin > Buyers > Workspace Columns): the
+        // columns this buyer does not use are hidden from its files, unless
+        // the user chose "Show all columns" (remembered per file). Display
+        // only — saving and formulas never depend on what is shown.
+        $columnsKey = 'workspace_all_columns.' . $excelFile->id;
+        if (request()->has('columns')) {
+            session([$columnsKey => request()->query('columns') === 'all']);
+        }
+        $showAllColumns = (bool) session($columnsKey, false);
+        $hiddenForBuyer = $excelFile->buyer_id
+            ? DB::table('buyer_hidden_headers')->where('buyer_id', $excelFile->buyer_id)->pluck('excel_header_id')->map(fn ($id) => (int) $id)->all()
+            : [];
+        $hiddenColumnCount = $headers->whereIn('id', $hiddenForBuyer)->count();
+        $totalColumnCount = $headers->count();
+        if (! $showAllColumns && $hiddenColumnCount > 0) {
+            $headers = $headers->reject(fn ($header) => in_array((int) $header->id, $hiddenForBuyer, true))->values();
+        }
+
         $visibleHeaderIds = $headers->pluck('id')->all();
 
         $calculatedHeaderKeys = $this->calculatedHeaderKeys();
@@ -259,6 +277,9 @@ class ExcelFileController extends Controller
         return view('shared.excel-files.show', compact(
             'excelFile',
             'headers',
+            'showAllColumns',
+            'hiddenColumnCount',
+            'totalColumnCount',
             'rows',
             'myDepartmentProgress',
             'activityLog',

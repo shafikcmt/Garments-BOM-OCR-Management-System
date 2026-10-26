@@ -2059,6 +2059,21 @@
                 <span class="search-help-text">All {{ $excelFile->total_rows ?: $rows->total() }} rows</span>
             </div>
 
+            {{-- Per-buyer column view: columns this buyer does not use are
+                 hidden (Admin > Buyers > Workspace Columns). --}}
+            @if(($hiddenColumnCount ?? 0) > 0)
+                <div class="alert alert-info py-2 px-3 mt-2 mb-0 d-flex flex-wrap align-items-center gap-2 small">
+                    <i class="bi bi-layout-three-columns" aria-hidden="true"></i>
+                    @if($showAllColumns)
+                        <span>Showing all {{ $totalColumnCount }} columns.</span>
+                        <a href="{{ request()->fullUrlWithQuery(['columns' => 'buyer']) }}" class="btn btn-sm btn-outline-primary ms-auto"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Show {{ $excelFile->buyer?->buyer_name ?? 'Buyer' }} Columns Only</a>
+                    @else
+                        <span>Showing the {{ $totalColumnCount - $hiddenColumnCount }} columns {{ $excelFile->buyer?->buyer_name ?? 'this buyer' }} uses. {{ $hiddenColumnCount }} other columns are hidden.</span>
+                        <a href="{{ request()->fullUrlWithQuery(['columns' => 'all']) }}" class="btn btn-sm btn-outline-primary ms-auto"><i class="bi bi-eye me-1" aria-hidden="true"></i>Show All Columns</a>
+                    @endif
+                </div>
+            @endif
+
             <div class="excel-table-wrap">
                 {{-- data-cell-select opts this table into drag/shift-click range
                      selection and Ctrl+C copy (resources/js/modules/sheet-range-select.js).

@@ -54,6 +54,11 @@ Route::prefix('admin')
         // written here; Admin > Users is the one screen that changes it.
         Route::post('buyers/{buyer}/users', [BuyerController::class, 'attachUser'])->name('buyers.users.attach');
         Route::delete('buyers/{buyer}/users/{user}', [BuyerController::class, 'detachUser'])->name('buyers.users.detach');
+
+        // Which workspace columns a buyer uses (per-buyer column view).
+        Route::get('buyers/{buyer}/columns', [\App\Http\Controllers\Admin\BuyerColumnController::class, 'edit'])->name('buyers.columns.edit');
+        Route::put('buyers/{buyer}/columns', [\App\Http\Controllers\Admin\BuyerColumnController::class, 'update'])->name('buyers.columns.update');
+        Route::post('buyers/{buyer}/columns/from-profile', [\App\Http\Controllers\Admin\BuyerColumnController::class, 'fromProfile'])->name('buyers.columns.from_profile');
         Route::resource('booking-delivery-destinations', BookingDeliveryDestinationController::class)->except(['show']);
 
         Route::get('/po-generate-control', [PoGenerateControlController::class, 'index'])->name('po-generate-control.index');
