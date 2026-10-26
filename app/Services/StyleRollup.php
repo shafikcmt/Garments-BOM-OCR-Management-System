@@ -98,6 +98,28 @@ class StyleRollup
     }
 
     /**
+     * Every order line of the given buyers (null = every buyer), built the same
+     * way as the style and season pages — for the Merchandising dashboard. One
+     * query for the lines and one for the status cells.
+     *
+     * @param  list<int>|null  $buyerIds
+     * @return array{kpis: array<string, int|float>, lines: Collection, materials: Collection, orderLines: Collection}
+     */
+    public function forBuyers(?array $buyerIds, ?Carbon $today = null): array
+    {
+        $today ??= Carbon::today();
+
+        $lines = OrderLine::query()
+            ->when($buyerIds !== null, fn ($q) => $q->whereIn('buyer_id', $buyerIds))
+            ->with(['bomItems', 'motherStyle:id,style_no,buyer_id', 'buyer:id,buyer_name'])
+            ->get();
+
+        $values = $this->statusValues($lines->flatMap->bomItems->pluck('excel_row_id')->all());
+
+        return $this->build($lines, $values, $today) + ['orderLines' => $lines];
+    }
+
+    /**
      * Shared by the style page and the season page, so the two can never disagree.
      *
      * @param  Collection<int, OrderLine>  $lines  with bomItems (and childStyle / excelFile when wanted)

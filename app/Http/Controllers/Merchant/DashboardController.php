@@ -3,37 +3,44 @@
 namespace App\Http\Controllers\Merchant;
 
 use App\Http\Controllers\Controller;
-use App\Models\ExcelFile;
-use App\Models\ExcelRow;
-use App\Services\DashboardMetricsService;
+use App\Models\PaymentRequest;
 use App\Services\DepartmentActivityService;
+use App\Services\MerchantDashboard;
+use App\Support\Concerns\ScopesToAssignedBuyers;
 
 /**
- * Merchandising owns the largest share of the BOM columns, so the dashboard
- * reports on that share: how many columns this role owns, how much of it is
- * filled in, and what is still outstanding.
+ * The Merchandising dashboard: orders, the material pipeline (booking, PI,
+ * payment), PRAs, approvals and shipments, for the buyers this user may see,
+ * plus their share of the BOM workspace.
  */
 class DashboardController extends Controller
 {
     use \App\Http\Controllers\Concerns\ShowsRequisitionSummary;
+    use ScopesToAssignedBuyers;
 
-    public function index(DashboardMetricsService $metrics)
+    public function index(MerchantDashboard $dashboard)
     {
+        $user = auth()->user();
+
         // Required-column progress for this department only, from the same
-        // service the Admin Dashboard reads — so a department and admin
-        // never see two different numbers for the same work.
+        // service the Admin Dashboard reads.
         $activity = app(DepartmentActivityService::class);
         $workspace = $activity->forRole('merchant') ?? $activity->emptyProgressFor('merchant');
 
-        $trend = $metrics->monthlyTrend(ExcelRow::query());
-        $delta = $metrics->deltaFor($trend);
+        // A merchant confined to some buyers sees only theirs, as on every
+        // other merchandising screen.
+        $buyerIds = $user->isBuyerConfined() ? $user->merchantBuyerIds() : null;
 
-        $stats = [
-            'files' => ExcelFile::count(),
-            'rows' => ExcelRow::count(),
-            'my_files' => ExcelFile::where('uploaded_by', auth()->id())->count(),
-        ];
+        $data = $dashboard->build($user, $buyerIds);
 
-        return view('merchant.dashboard', compact('stats', 'workspace', 'trend', 'delta') + $this->requisitionSummary(auth()->user()));
+        $pra = PaymentRequest::query();
+        $this->applyBuyerScopeToPaymentRequests($pra);
+        $data['kpis']['pra_pending'] = (clone $pra)->whereIn('status', [
+            PaymentRequest::STATUS_PENDING_CHECK,
+            PaymentRequest::STATUS_PENDING_APPROVAL,
+        ])->count();
+        $data['kpis']['pra_approved'] = (clone $pra)->where('status', PaymentRequest::STATUS_APPROVED)->count();
+
+        return view('merchant.dashboard', $data + compact('workspace') + $this->requisitionSummary($user));
     }
 }
