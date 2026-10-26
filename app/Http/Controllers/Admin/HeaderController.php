@@ -17,7 +17,7 @@ class HeaderController extends Controller
         // Existing duplicate/gap position thakle list open korlei sequence fix hobe.
         $this->normalizeHeaderPositions();
 
-        $headers = ExcelHeader::with('ownerRole')->orderBy('position')->get();
+        $headers = ExcelHeader::with(['ownerRole', 'editorRoles'])->orderBy('position')->get();
 
         return view('admin.headers.index', compact('headers'));
     }
@@ -49,7 +49,8 @@ class HeaderController extends Controller
             ExcelHeader::where('position', '>=', $insertPosition)->increment('position');
 
             $data['position'] = $insertPosition;
-            ExcelHeader::create($data);
+            $header = ExcelHeader::create(collect($data)->except('editor_role_ids')->all());
+            $header->editorRoles()->sync($data['editor_role_ids']);
         });
 
         return redirect()
@@ -94,7 +95,8 @@ class HeaderController extends Controller
             }
 
             $data['position'] = $newPosition;
-            $header->update($data);
+            $header->update(collect($data)->except('editor_role_ids')->all());
+            $header->editorRoles()->sync($data['editor_role_ids']);
 
             // Final safety: kono unexpected gap/duplicate thakle abar clean kore dibe.
             $this->resequencePositions();
@@ -161,7 +163,8 @@ class HeaderController extends Controller
             'is_required' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'can_view_all' => ['nullable', 'boolean'],
-            'can_edit_owner_only' => ['nullable', 'boolean'],
+            'editor_role_ids' => ['nullable', 'array'],
+            'editor_role_ids.*' => ['integer', 'exists:roles,id'],
         ], [
             'header_name.required' => 'Header name is required.',
             'header_name.unique' => 'Header name already exists. Please use a unique name.',
@@ -185,7 +188,12 @@ class HeaderController extends Controller
         $data['is_required'] = $request->boolean('is_required');
         $data['is_active'] = $request->boolean('is_active');
         $data['can_view_all'] = $request->boolean('can_view_all');
-        $data['can_edit_owner_only'] = $request->boolean('can_edit_owner_only');
+        // Extra editor roles; the owner role is never listed as its own extra.
+        $data['editor_role_ids'] = collect($data['editor_role_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->reject(fn ($id) => $id === (int) $data['owner_role_id'])
+            ->unique()->values()->all();
+        $data['can_edit_owner_only'] = $data['editor_role_ids'] === [];
 
         if ($isInputMode) {
             $data['formula_key'] = null;

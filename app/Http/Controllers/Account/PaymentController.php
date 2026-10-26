@@ -100,9 +100,9 @@ class PaymentController extends Controller
         $headerId = app(HeaderAliasResolver::class)->resolveHeaderId('pmt_doc_no');
         $header = $headerId ? ExcelHeader::find($headerId) : null;
 
-        // Same rule as editing the column in the workspace: admin, or the role
-        // that owns it.
-        if ($header && ! $user->hasRole('admin') && ! $user->roles->pluck('id')->contains($header->owner_role_id)) {
+        // Same rule as editing the column in the workspace: admin, the role
+        // that owns it, or a role Admin added as an extra editor.
+        if ($header && ! $user->hasRole('admin') && ! $header->isEditableByRoleIds($user->roles->pluck('id'))) {
             return back()->with('warning', 'Your role cannot edit the Pmt Doc No column.');
         }
 

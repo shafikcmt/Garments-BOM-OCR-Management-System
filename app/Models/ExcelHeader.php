@@ -40,6 +40,27 @@ class ExcelHeader extends Model
         return $this->belongsTo(Role::class, 'owner_role_id');
     }
 
+    /** Roles that may edit this column besides the owner role (Admin > Excel Header Control). */
+    public function editorRoles()
+    {
+        return $this->belongsToMany(Role::class, 'excel_header_editor_roles', 'excel_header_id', 'role_id')->withTimestamps();
+    }
+
+    /**
+     * Whether a user holding these role ids may edit the column: its owner
+     * role or one of the extra editor roles. Admin is checked by the caller.
+     */
+    public function isEditableByRoleIds($roleIds): bool
+    {
+        $roleIds = collect($roleIds)->map(fn ($id) => (int) $id);
+
+        if ($roleIds->contains((int) $this->owner_role_id)) {
+            return true;
+        }
+
+        return $this->editorRoles->pluck('id')->map(fn ($id) => (int) $id)->intersect($roleIds)->isNotEmpty();
+    }
+
     public function cells()
     {
         return $this->hasMany(ExcelCell::class, 'header_id');

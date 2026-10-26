@@ -567,9 +567,11 @@
                                         <span class="soft-badge {{ $header->can_view_all ? 'soft-badge-info' : 'soft-badge-muted' }}">
                                             {{ $header->can_view_all ? 'View All' : 'Restricted View' }}
                                         </span>
-                                        <span class="soft-badge {{ $header->can_edit_owner_only ? 'soft-badge-secondary' : 'soft-badge-info' }}">
-                                            {{ $header->can_edit_owner_only ? 'Owner Edit Only' : 'Shared Edit' }}
-                                        </span>
+                                        @if($header->editorRoles->isEmpty())
+                                            <span class="soft-badge soft-badge-secondary">Owner Edit Only</span>
+                                        @else
+                                            <span class="soft-badge soft-badge-info">Also editable by {{ $header->editorRoles->map(fn ($r) => ucfirst(str_replace('_', ' ', $r->name)))->join(', ') }}</span>
+                                        @endif
                                         <span class="soft-badge {{ $header->merchant_can_upload ? 'soft-badge-success' : 'soft-badge-muted' }}">
                                             {{ $header->merchant_can_upload ? 'Merchant Upload' : 'No Merchant Upload' }}
                                         </span>

@@ -332,12 +332,55 @@ Rules for every step below:
 | R2 | **OCR export** per buyer / season in the familiar layout, with the summary sheets (O6) | People keep their Excel, the system is the source |
 | R3 | Order 360 page and management dashboard: on-time booking %, in-house %, liability exposure, payment due | Grows as the slices above ship |
 
+### 11.2a Owner decisions (2026-10-26)
+
+1. **Everything dynamic, nothing hard-coded.** Who edits a field, which
+   columns a buyer uses, which department a person heads, who approves: all
+   set on Admin screens and stored as data. Code never names a role, buyer
+   or person for a business rule.
+2. **Who may edit a column is set by Admin.** Excel Header Control keeps one
+   **owner role** per column (it counts for that department's progress and
+   reports) and now has **Also Editable By**: extra roles that may edit it
+   too (table `excel_header_editor_roles`). Example: shipment columns are
+   kept by both Merchandising and Commercial today; Admin ticks Commercial
+   on those columns instead of a code change. Every edit check goes through
+   `ExcelHeader::isEditableByRoleIds()`. The new department screens in
+   §11.2 must use the same rule, so a field shared on the workspace is
+   shared on the screen too.
+3. **One common format inside, buyer formats outside.** Buyers send
+   different layouts and the workspace has one common set of columns. That
+   is intended (`docs/16`): the system stores one standard format so every
+   department, report and dashboard reads the same fields. Buyer
+   differences are handled at the edges, by data:
+   - **In:** the per-buyer import profile maps the buyer's columns to the
+     common columns (built, Import Buyer Excel).
+   - **On screen (next):** a **per-buyer column view**: the workspace shows
+     a buyer only the common columns its import profile uses, plus the
+     department columns, so a buyer with 40 columns is not shown 133.
+     Derived from the saved profile, editable by Admin; nothing deleted.
+   - **Out:** the OCR export (R2) writes each buyer's file back in its own
+     layout from its profile.
+   A truly new field becomes a new common column on Excel Header Control,
+   never a buyer-only table.
+4. **Management sees everything; department heads see their part first.**
+   - Top management (Admin / Management roles): one **overall summary**
+     across Merchandising, Supply Chain, Commercial, Store and Accounts.
+   - A department head (set on Admin > Settings > Departments, not by role
+     name): the same dashboard with **their department's block first and
+     expanded** (Accounts head: payments due, PI vs paid, supplier
+     outstanding; Commercial head: shipments, clearance, L/C; and so on),
+     the other departments below.
+   - Blocks are defined once per department and ordered from the viewer's
+     department, so adding a department adds a block, not a new dashboard.
+   This is R3; it ships with R1 because R1's summaries are its data.
+
 ### 11.3 Recommended release order
 
 | Release | Slices | Why this order |
 |---|---|---|
-| 1 | **R1 + R2** OCR summaries and OCR export | Read-only, zero risk; management stops making pivots by hand at once |
+| 1 | **R1 + R2 + R3** OCR summaries, OCR export, management dashboard (overall for top management, own department first for heads) | Read-only, zero risk; management stops making pivots by hand at once |
 | 2 | **C1 + C2** Inbound shipment and clearance | Commercial has no screen at all; new tables only |
+| 2a | **Per-buyer column view** on the workspace (from the import profile) | Fixes "133 columns for a 40-column buyer"; no data change |
 | 3 | **S1 + S2** Booking from BOM lines, PI register | Removes the most typing from the workspace; builds on Booking PO |
 | 4 | **St1 + St2** GRN against booking, QC gate | Needs S1 / S2 |
 | 5 | **A1 + A2** Payment calendar, supplier ledger | Needs S2 |

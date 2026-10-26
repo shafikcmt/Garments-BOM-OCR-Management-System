@@ -45,7 +45,7 @@ class ExcelFileController extends Controller
         $minimumVisibleRows = ExcelRow::MINIMUM_VISIBLE_ROWS;
         $this->ensureMinimumRows($excelFile, $minimumVisibleRows);
 
-        $headers = ExcelHeader::with('ownerRole')
+        $headers = ExcelHeader::with(['ownerRole', 'editorRoles:id'])
             ->where('is_active', true)
             ->orderBy('position')
             ->get()
@@ -489,7 +489,7 @@ class ExcelFileController extends Controller
             }
         }
 
-        $editableHeaderIds = ExcelHeader::where('is_active', true)
+        $editableHeaderIds = ExcelHeader::with('editorRoles:id')->where('is_active', true)
             ->get()
             ->filter(fn ($header) => $this->canEditHeader($header, $roleIds))
             ->reject(fn ($header) => $this->isCalculatedHeader($header, $calculatedHeaderKeys))
@@ -1157,7 +1157,7 @@ class ExcelFileController extends Controller
         $roleIds = $this->getRoleIds();
         $calculatedHeaderKeys = $this->calculatedHeaderKeys();
 
-        return ExcelHeader::where('is_active', true)
+        return ExcelHeader::with('editorRoles:id')->where('is_active', true)
             ->get()
             ->filter(fn ($header) => $this->canEditHeader($header, $roleIds))
             ->reject(fn ($header) => $this->isCalculatedHeader($header, $calculatedHeaderKeys))
@@ -2822,7 +2822,8 @@ class ExcelFileController extends Controller
             return true;
         }
 
-        return $roleIds->contains($header->owner_role_id);
+        // The owner role, or a role Admin added as an extra editor.
+        return $header->isEditableByRoleIds($roleIds);
     }
 
     private function calculatedHeaderKeys(): array

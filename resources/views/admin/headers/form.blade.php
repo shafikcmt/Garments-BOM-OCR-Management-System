@@ -187,7 +187,7 @@
     <div class="col-lg-5">
         <div class="section-card h-100">
             <div class="section-title">Access & Flags</div>
-            <div class="section-subtitle">Required, active, view/edit permission ekhan theke manage korun.</div>
+            <div class="section-subtitle">Required, active, who can view and who can edit this column.</div>
 
             <div class="check-grid">
                 <div class="check-item">
@@ -232,19 +232,26 @@
                     </div>
                 </div>
 
-                <div class="check-item">
-                    <div class="form-check">
-                        <input
-                            type="checkbox"
-                            name="can_edit_owner_only"
-                            value="1"
-                            class="form-check-input"
-                            id="can_edit_owner_only"
-                            @checked(old('can_edit_owner_only', isset($header) ? $header->can_edit_owner_only : true))
-                        >
-                        <label class="form-check-label" for="can_edit_owner_only">Owner Edit Only</label>
-                    </div>
+            </div>
+
+            {{-- Who besides the owner role may type into this column, e.g.
+                 shipment columns kept by both Merchandising and Commercial. --}}
+            @php($editorIds = collect(old('editor_role_ids', isset($header) ? $header->editorRoles->pluck('id')->all() : []))->map(fn ($id) => (int) $id)->all())
+            <div class="mt-3">
+                <label class="form-label mb-1">Also Editable By</label>
+                <div class="small text-muted mb-2">The owner role can always edit. Tick other roles that may also edit this column. Leave all unticked for owner only.</div>
+                <div class="check-grid">
+                    @foreach($roles as $role)
+                        <div class="check-item">
+                            <div class="form-check">
+                                <input type="checkbox" name="editor_role_ids[]" value="{{ $role->id }}" class="form-check-input" id="editor_role_{{ $role->id }}" @checked(in_array($role->id, $editorIds, true))>
+                                <label class="form-check-label" for="editor_role_{{ $role->id }}">{{ ucfirst(str_replace('_', ' ', $role->name)) }}</label>
+                            </div>
+                        </div>
+                    @endforeach
                 </div>
+                @error('editor_role_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                @error('editor_role_ids.*')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
             </div>
         </div>
     </div>

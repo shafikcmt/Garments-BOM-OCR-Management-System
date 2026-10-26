@@ -87,7 +87,7 @@ class BomBuilder
 
             if (! $match) {
                 $missing[] = $label;
-            } elseif (! $user->hasRole('admin') && ! $roleIds->contains($match->owner_role_id)) {
+            } elseif (! $user->hasRole('admin') && ! $match->isEditableByRoleIds($roleIds)) {
                 $locked[] = $label;
             } else {
                 $ids[$field] = $match->id;
