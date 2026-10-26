@@ -37,6 +37,34 @@ You only see the screens your role needs.
 
 ## 2. Merchandising
 
+### 2.0 Merchandising dashboard
+
+**Open it:** left menu, **Dashboard** (the first screen after a merchant logs in).
+
+It answers "what needs my attention today" for the buyers you look after. A merchant who is given only some buyers sees only those buyers.
+
+**Top cards** (click a card to open the list behind it)
+
+| Card | What it counts |
+|---|---|
+| Total Orders | Order lines, with the number of customer POs and styles under it |
+| Order Quantity | Garment pieces of all those orders |
+| Booking Pending | Materials with no PO yet; the small text says how many are already late |
+| PI Pending | Materials with a PO but no PI from the supplier yet |
+| Payment Pending | Materials whose PI has come but is not paid yet |
+| PRA Pending | Payment requests still waiting for a check or an approval |
+
+**Action chips** under the cards: late bookings, bookings due in the next 14 days, BOMs waiting for approval, your follow-ups due today, and orders shipping in the next 30 days. Click a chip to go straight to that list.
+
+**Charts**
+- **Material Pipeline**: how many material lines are at each step: Not ordered, Ordered, PI received, Paid, Received, Issued.
+- **Order Quantity by Buyer**: each buyer's share of the pieces.
+- **Order Quantity by Ship Month**: pieces shipping this month and in the next five months.
+
+**Upcoming Shipments** lists the orders shipping in the next 30 days, with days left and how much of their material has been received. **Needs Attention** lists the styles with late bookings; press **View** to open the style.
+
+The numbers come from the same place as **Style Status** (section 2.4), so both screens always agree. If the dashboard says "No orders are linked yet", import the buyer's Excel or create a BOM first (sections 2.2 and 2.2a).
+
 ### 2.1 Style Library
 
 **What it is.** The list of a buyer's styles, kept the same way the buyer's folders are:
@@ -131,8 +159,10 @@ Use the Excel import (section 2.2) when the buyer sends a ready file; use this s
 
 **Open it:** **Style Library**, choose the season, press **View Status** on a style. (Or from **Style Status**, section 2.4.)
 
-**What you see**
-- Top row: order lines, order quantity, number of materials, and how many are **Ordered, PI received, Paid, Received, Issued** (with percentages).
+**What you see** (from top to bottom)
+- A red or yellow bar if materials are late or due to be ordered soon.
+- Cards: order lines, order quantity, number of materials, and how many are **Ordered, PI received, Paid, Received, Issued**. The percentage is shown next to the name, for example "Ordered · 61%".
+- **Pre-costing** and **BOM approval** side by side (sections 2.7 and 2.6), then **Follow-up** (section 6).
 - **Child style** buttons narrow everything to one child style.
 - **Orders:** one line per color and customer PO, with ship date, quantity and how many materials are ordered or received.
 - **Materials:** every material of the style with its PO, vendor, PI and payment status, received quantity, and its **Stage**. Use the search box or the stage list to find a material.
@@ -158,7 +188,7 @@ These figures come from the same Workspace columns the other departments fill in
 
 **Seasons list.** Choose a **buyer** (or leave "All buyers"). Each season shows how many styles, order lines and materials it has, bars for **Ordered** and **Received**, and the number that are **Late**. Press **View Season**.
 
-**Season page.** Every style of the season in one table, with bars for **Ordered, PI received, Paid, Received, Issued**. The styles that need attention (most **late**, then most **due soon**) are listed first. Press **View Status** on a style to see its materials one by one (section 2.3).
+**Season page.** Every style of the season in one table, with bars for **Ordered, PI received, Paid, Received, Issued**. Click the style number (or **View Status**) to open it. The product group is shown under the style number and the number of order lines under the order quantity. The styles that need attention (most **late**, then most **due soon**) are listed first. Press **View Status** on a style to see its materials one by one (section 2.3).
 
 The cards at the top are the totals of the whole season. The red or yellow bar warns about materials that are not ordered yet and are late or due soon (same rule as in 2.3).
 
@@ -231,7 +261,7 @@ Use the two buttons at the top to switch. When both exist, the page shows both m
 2. Choose the **Currency** and whether costs are **per piece or per dozen**. Type the **Quoted price**.
 3. Under each **cost head** (Fabric, Trims and accessories, Embroidery / print, Washing, Testing / other, CM, Overhead, Commission) fill the lines: **Description, Qty, Unit, Wastage %, Rate**. The **Amount** is worked out for you: `Qty x (1 + Wastage %) x Rate`. For CM or Commission use Qty 1 and type the amount in Rate.
 4. Press **Add Line** for more lines under a head, **Remove** to take one away. Empty rows are ignored.
-5. Press **Save Costing**. The cards at the top show **Total cost, Quoted price, Profit and Margin** (profit as a share of the quoted price).
+5. The bar at the bottom of the page stays in view while you scroll. It shows the **Total cost** as you type, with **Save Costing** and **Finalize Revision** next to it. Press **Save Costing**. The cards at the top show **Total cost, Quoted price, Profit and Margin** (profit as a share of the quoted price).
 
 **Finalize and revise**
 - When the costing is agreed, press **Finalize Revision 1** (save first). A final revision **cannot be edited**.
@@ -267,7 +297,52 @@ At the last step of a payment request there is a box **Payment reference no. (op
 
 ## 5. Store
 
-No change to how you receive and issue material. What you record now also shows in the **Style status** screen (Received, Issued).
+What you receive and issue also shows in the **Style status** screen (Received, Issued).
+
+Left menu order for Store: **Purchase Requisition, Receiving, Issues, Stock Report, Items, Setup**.
+
+### 5.1 Purchase requisition: from a section's sheet to the final approval
+
+There are two kinds of sheet.
+
+**1. The department / section sheet (3 steps)**
+
+```
+Prepared (section staff) -> Checked by Section / Department Head -> Received by Store
+```
+
+1. Section staff open **Purchase Requisition**, fill the items and press **Submit Requisition** (or **Save as Draft** to finish later).
+2. The Section Head (or the Department Head if there is no section) finds it under **My Approvals** and presses **Approve**, or **Return** with a note so the requester can correct it and submit again.
+3. Any Store user opens the **Requested** tab and presses **Received**.
+
+Store users do not raise sheets for a section. Each section raises its own.
+
+**2. The final sheet (one per month)**
+
+The same items come every month, so the Store joins one month's received sheets into one final sheet.
+
+1. In **Requested**, tick the received sheets of **one month** (marked **Ready to Merge**) and press **Merge into Final Requisition**.
+2. Check the list on **Review Before Merge** and press **Create Final Requisition**. The Store user who merges is shown as **Prepared by**.
+3. The final sheet then goes through the approvers set by Admin, normally:
+
+```
+Store Head -> HR Audit -> Finance & Commercial -> Operation Head (final approval)
+```
+
+Each approver finds it under **My Approvals** and presses **Approve** or **Return**. The final sheets are listed under the **Final Requisitions** tab.
+
+If a final sheet is deleted or cancelled, its department sheets become free to merge again.
+
+**Who sees stock figures.** Hand stock, safety stock and the other stock details on a requisition are shown only to Store, Admin and Management. Other departments see their items and quantities only.
+
+**Admin: who approves.** Admin sets the steps and the person for each step in **Admin > Requisition Signatures**. Nothing in the code needs to change when a person changes.
+
+### 5.2 Item Master: adding and approving items
+
+1. A Store user adds a new item in **Items**. It shows **Pending Approval** and cannot be used until it is approved.
+2. The **Store admin** gets a message (bell icon), opens **Items** and presses **Approve** (or rejects it).
+3. Items added by the Store admin or Admin are approved straight away.
+4. The Store admin and Admin can **Edit** an item. A change to the item name or unit shows everywhere the item is used (stock, receiving, issue, requisitions, reports), because every screen reads the same item.
 
 ---
 
@@ -309,13 +384,13 @@ The **Season page** of Style Status shows how many follow-ups are open for each 
 | Task | How |
 |---|---|
 | After pulling new code | `php artisan migrate`, then `php artisan view:clear` |
-| Fill the standard order tables for files that were uploaded before | `php artisan bom:sync-tables --dry-run` to see what would happen, then `php artisan bom:sync-tables` |
+| Fill the standard order tables for files that were uploaded before | Done once by itself on the deploy that added the Merchandising dashboard. To run it again by hand: `php artisan bom:sync-tables --dry-run` to see what would happen, then `php artisan bom:sync-tables` |
 | Turn the second (Management) BOM approval or the PO gate on or off | Screen: **BOM Approvals**, Settings box (Admin only). Both are off by default. |
 | Switch off automatic refresh of Workspace columns from PO / PRA | `.env`: `SUPPLY_CHAIN_SYNC_WORKSPACE=false` |
 | Switch off automatic filling of the standard order tables | `.env`: `BOM_SYNC_TABLES=false` |
 | Send the daily follow-up reminders by hand | `php artisan followups:remind` (the scheduler runs it every morning at 08:30, Dhaka time; the server's scheduler must be running) |
 
-On the live server, every push to `master` runs the migrations by itself. Only `bom:sync-tables` needs to be run once by hand for files that already exist.
+On the live server, every push to `master` runs the migrations by itself, and the one-time `bom:sync-tables` fill too. If the Merchandising dashboard stays empty after a deploy, look in the log for "Backfilling order_lines" and run `php artisan bom:sync-tables` by hand.
 
 ---
 

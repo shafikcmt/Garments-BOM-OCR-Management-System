@@ -44,8 +44,8 @@
             <div class="col-6 col-md-3 col-xl"><x-stat-card icon="tag" tone="primary" label="Styles" :value="$styles->count()" /></div>
             <div class="col-6 col-md-3 col-xl"><x-stat-card icon="box-seam" tone="primary" label="Order qty" :value="number_format($totals['order_qty'])" /></div>
             <div class="col-6 col-md-3 col-xl"><x-stat-card icon="list-ul" tone="primary" label="Materials" :value="$totals['materials']" /></div>
-            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="cart-check" tone="primary" label="Ordered" :value="$totals['ordered'] . ' (' . $pct($totals['ordered'], $totals['materials']) . '%)'" /></div>
-            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="truck" tone="success" label="Received" :value="$totals['received'] . ' (' . $pct($totals['received'], $totals['materials']) . '%)'" /></div>
+            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="cart-check" tone="primary" :label="'Ordered · ' . $pct($totals['ordered'], $totals['materials']) . '%'" :value="$totals['ordered']" /></div>
+            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="truck" tone="success" :label="'Received · ' . $pct($totals['received'], $totals['materials']) . '%'" :value="$totals['received']" /></div>
             <div class="col-6 col-md-3 col-xl"><x-stat-card icon="exclamation-triangle" tone="{{ $totals['late'] > 0 ? 'danger' : 'success' }}" label="Late" :value="$totals['late']" /></div>
         </div>
     @endif
@@ -54,10 +54,10 @@
         <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
                 <thead><tr>
-                    <th>Style</th><th>Group</th><th class="text-end">Order lines</th><th class="text-end">Order qty</th>
+                    <th>Style</th><th class="text-end">Order qty</th>
                     <th class="text-end">Materials</th>
-                    <th style="min-width:130px">Ordered</th><th style="min-width:130px">PI received</th><th style="min-width:130px">Paid</th>
-                    <th style="min-width:130px">Received</th><th style="min-width:130px">Issued</th><th>BOM</th><th class="text-end">Margin</th><th>Attention</th><th>Follow-up</th><th></th>
+                    <th style="min-width:92px">Ordered</th><th style="min-width:92px">PI received</th><th style="min-width:92px">Paid</th>
+                    <th style="min-width:92px">Received</th><th style="min-width:92px">Issued</th><th>BOM</th><th class="text-end">Margin</th><th>Attention</th><th>Follow-up</th><th></th>
                 </tr></thead>
                 <tbody>
                 @forelse($styles as $row)
@@ -65,12 +65,14 @@
                     @php($k = $row['kpis'])
                     @php($route = $isMerchant ? 'merchant.styles.mothers.show' : 'merchant.status.style')
                     <tr>
-                        <td class="fw-semibold">{{ $m->style_no }}
+                        <td class="text-nowrap">
+                            <a href="{{ route($route, $m) }}" class="fw-semibold text-decoration-none">{{ $m->style_no }}</a>
                             @foreach($m->children as $c)<span class="badge bg-light text-dark border ms-1">{{ $c->style_no }}</span>@endforeach
+                            @if($m->product_group)<div class="small text-muted">{{ $m->product_group }}</div>@endif
                         </td>
-                        <td>{{ $m->product_group ?: '—' }}</td>
-                        <td class="text-end">{{ $k['order_lines'] }}</td>
-                        <td class="text-end">{{ $k['order_qty'] ? number_format($k['order_qty']) : '—' }}</td>
+                        <td class="text-end text-nowrap">{{ $k['order_qty'] ? number_format($k['order_qty']) : '—' }}
+                            <div class="small text-muted">{{ $k['order_lines'] }} {{ \Illuminate\Support\Str::plural('line', $k['order_lines']) }}</div>
+                        </td>
                         <td class="text-end">{{ $k['materials'] }}</td>
                         @if($k['materials'] > 0)
                             <td>@include('merchant._progress', ['value' => $pct($k['ordered'], $k['materials'])])</td>
@@ -84,15 +86,17 @@
                         <td>@include('bom-approvals._badge', ['state' => $bomStates[$m->id]['state'], 'approval' => $bomStates[$m->id]['approval']])</td>
                         <td class="text-end">{{ isset($margins[$m->id]) && $margins[$m->id] !== null ? $margins[$m->id] . '%' : '—' }}</td>
                         <td class="text-nowrap">
+                            <div class="d-flex flex-column align-items-start gap-1">
                             @if($k['late'] > 0)<span class="badge bg-danger text-white">{{ $k['late'] }} late</span>@endif
                             @if($k['due_soon'] > 0)<span class="badge bg-warning text-dark">{{ $k['due_soon'] }} due soon</span>@endif
                             @if($k['late'] === 0 && $k['due_soon'] === 0)—@endif
+                            </div>
                         </td>
                         <td>@if(($openFollowUps[$m->id] ?? 0) > 0)<span class="badge bg-primary-subtle text-primary">{{ $openFollowUps[$m->id] }} open</span>@else — @endif</td>
                         <td class="text-end"><a href="{{ route($route, $m) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-eye me-1" aria-hidden="true"></i>View Status</a></td>
                     </tr>
                 @empty
-                    <tr><td colspan="15" class="text-center text-muted py-4">No styles in this season yet.</td></tr>
+                    <tr><td colspan="13" class="text-center text-muted py-4">No styles in this season yet.</td></tr>
                 @endforelse
                 </tbody>
             </table>

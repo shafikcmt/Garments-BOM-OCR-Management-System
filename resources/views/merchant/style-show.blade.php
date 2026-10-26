@@ -48,13 +48,39 @@
         </div>
     @endif
 
+    {{-- Where the style stands, first: what is late and how far materials have come. --}}
+    @if($kpis['order_lines'] > 0)
+    @if($kpis['late'] > 0 || $kpis['due_soon'] > 0)
+        <div class="alert {{ $kpis['late'] > 0 ? 'alert-danger' : 'alert-warning' }} d-flex align-items-center gap-2">
+            <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+            <div>
+                @if($kpis['late'] > 0)<strong>{{ $kpis['late'] }}</strong> material(s) not ordered and past the date they had to be ordered by.@endif
+                @if($kpis['due_soon'] > 0) <strong>{{ $kpis['due_soon'] }}</strong> due to be ordered within {{ \App\Services\StyleRollup::DUE_SOON_DAYS }} days.@endif
+            </div>
+        </div>
+    @endif
+
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><x-stat-card icon="receipt" tone="primary" label="Order lines" :value="$kpis['order_lines']" /></div>
+        <div class="col-6 col-md-3"><x-stat-card icon="box-seam" tone="primary" label="Order qty" :value="number_format($kpis['order_qty'])" /></div>
+        <div class="col-6 col-md-3"><x-stat-card icon="list-ul" tone="primary" label="Materials" :value="$kpis['materials']" /></div>
+        <div class="col-6 col-md-3"><x-stat-card icon="cart-check" tone="{{ $kpis['ordered'] === $kpis['materials'] ? 'success' : 'warning' }}" :label="'Ordered · ' . $pct($kpis['ordered']) . '%'" :value="$kpis['ordered']" /></div>
+        <div class="col-6 col-md-3"><x-stat-card icon="file-earmark-check" tone="primary" :label="'PI received · ' . $pct($kpis['pi_received']) . '%'" :value="$kpis['pi_received']" /></div>
+        <div class="col-6 col-md-3"><x-stat-card icon="cash-coin" tone="primary" :label="'Paid · ' . $pct($kpis['paid']) . '%'" :value="$kpis['paid']" /></div>
+        <div class="col-6 col-md-3"><x-stat-card icon="truck" tone="success" :label="'Received · ' . $pct($kpis['received']) . '%'" :value="$kpis['received']" /></div>
+        <div class="col-6 col-md-3"><x-stat-card icon="box-arrow-right" tone="success" :label="'Issued · ' . $pct($kpis['issued']) . '%'" :value="$kpis['issued']" /></div>
+    </div>
+    @endif
+
+    <div class="row g-3 mb-3">
+    <div class="col-xl-6">
     {{-- Pre-costing --}}
-    <x-card title="Pre-costing" class="mb-3" body-class="p-3">
+    <x-card title="Pre-costing" class="h-100" body-class="p-3">
         <x-slot:actions>
             <a href="{{ route('costing.show', $mother) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-calculator me-1" aria-hidden="true"></i>Open Pre-costing</a>
         </x-slot:actions>
         <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
+            <table class="table table-sm align-middle mb-0" style="min-width:0">
                 <thead><tr><th>Costing</th><th>Revision</th><th class="text-end">Total cost</th><th class="text-end">Quoted price</th><th class="text-end">Margin</th></tr></thead>
                 <tbody>
                 @foreach(\App\Models\Costing::MODES as $key => $label)
@@ -76,8 +102,10 @@
         </div>
     </x-card>
 
+    </div>
+    <div class="col-xl-6">
     {{-- BOM approval --}}
-    <x-card title="BOM approval" class="mb-3" body-class="p-3">
+    <x-card title="BOM approval" class="h-100" body-class="p-3">
         <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
             @include('bom-approvals._badge', ['state' => $bomState, 'approval' => $bomApproval])
             @if($bomApproval?->submitted_at)<span class="text-muted small">Submitted by {{ $bomApproval->submitter?->name }} on {{ $bomApproval->submitted_at->format('d M Y') }}</span>@endif
@@ -111,7 +139,7 @@
 
         @if($bomApproval && $bomApproval->steps->isNotEmpty())
             <div class="table-responsive">
-                <table class="table table-sm mb-0">
+                <table class="table table-sm mb-0" style="min-width:0">
                     <thead><tr><th>When</th><th>Step</th><th>By</th><th>Comment</th></tr></thead>
                     <tbody>
                     @foreach($bomApproval->steps->reverse() as $step)
@@ -127,6 +155,8 @@
             </div>
         @endif
     </x-card>
+    </div>
+    </div>
 
     @if($canFollowUp || $followUpTasks->isNotEmpty())
     <x-card title="Follow-up" class="mb-3" body-class="p-3">
@@ -199,27 +229,6 @@
             @endif
         </x-card>
     @else
-        @if($kpis['late'] > 0 || $kpis['due_soon'] > 0)
-            <div class="alert {{ $kpis['late'] > 0 ? 'alert-danger' : 'alert-warning' }} d-flex align-items-center gap-2">
-                <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
-                <div>
-                    @if($kpis['late'] > 0)<strong>{{ $kpis['late'] }}</strong> material(s) not ordered and past the date they had to be ordered by.@endif
-                    @if($kpis['due_soon'] > 0) <strong>{{ $kpis['due_soon'] }}</strong> due to be ordered within {{ \App\Services\StyleRollup::DUE_SOON_DAYS }} days.@endif
-                </div>
-            </div>
-        @endif
-
-        <div class="row g-3 mb-3">
-            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="receipt" tone="primary" label="Order lines" :value="$kpis['order_lines']" /></div>
-            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="box-seam" tone="primary" label="Order qty" :value="number_format($kpis['order_qty'])" /></div>
-            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="list-ul" tone="primary" label="Materials" :value="$kpis['materials']" /></div>
-            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="cart-check" tone="{{ $kpis['ordered'] === $kpis['materials'] ? 'success' : 'warning' }}" label="Ordered" :value="$kpis['ordered'] . ' (' . $pct($kpis['ordered']) . '%)'" /></div>
-            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="file-earmark-check" tone="primary" label="PI received" :value="$kpis['pi_received'] . ' (' . $pct($kpis['pi_received']) . '%)'" /></div>
-            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="cash-coin" tone="primary" label="Paid" :value="$kpis['paid'] . ' (' . $pct($kpis['paid']) . '%)'" /></div>
-            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="truck" tone="success" label="Received" :value="$kpis['received'] . ' (' . $pct($kpis['received']) . '%)'" /></div>
-            <div class="col-6 col-md-3 col-xl"><x-stat-card icon="box-arrow-right" tone="success" label="Issued" :value="$kpis['issued'] . ' (' . $pct($kpis['issued']) . '%)'" /></div>
-        </div>
-
         <x-card title="Orders" class="mb-3" body-class="p-3">
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">

@@ -872,8 +872,14 @@ a { text-decoration: none; }
     margin: 0;
 }
 .content .table:not(.booking-table):not(.bf-top-table):not(.bf-info-table):not(.bf-consignee-table):not(.bf-sign-table):not(.po-change-table):not(.booking-change-table):not(.gx-line-table):not(.gx-stock-table) td:last-child .btn-sm {
+    /* Icon + label stay on one line; a fixed height made long labels
+       ("View Status", "Remove") wrap under the icon and spill out. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
     min-width: 34px;
-    height: 34px;
+    min-height: 34px;
     border-radius: 12px !important;
     box-shadow: 0 10px 18px rgba(15, 23, 42, .08);
 }

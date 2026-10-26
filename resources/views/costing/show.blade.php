@@ -133,16 +133,20 @@
             @endforeach
 
             @if($editable)
-                <div class="d-flex gap-2 mb-4">
+                {{-- One action bar: running total, Save and Finalize side by side. --}}
+                <div class="costing-actions d-flex flex-wrap align-items-center gap-2 mb-4">
+                    <div class="me-auto">
+                        <span class="text-muted small d-block">Total cost per {{ \App\Models\Costing::BASES[$costing->basis] }}</span>
+                        <span class="fs-5 fw-bold">{{ $costing->currency }} <span data-grand-total>{{ $money($summary['total']) }}</span></span>
+                    </div>
                     <button class="btn btn-primary"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Save Costing</button>
+                    <button class="btn btn-success" form="finalizeForm"><i class="bi bi-lock me-1" aria-hidden="true"></i>Finalize Revision {{ $costing->revision }}</button>
                 </div>
             @endif
         </form>
 
         @if($editable)
-            <form method="POST" action="{{ route('costing.finalize', $costing) }}" class="mb-4" onsubmit="return confirm('Finalize revision {{ $costing->revision }}? It can no longer be edited; changes need a new revision. Save your changes first.')">@csrf
-                <button class="btn btn-success"><i class="bi bi-lock me-1" aria-hidden="true"></i>Finalize Revision {{ $costing->revision }}</button>
-            </form>
+            <form method="POST" action="{{ route('costing.finalize', $costing) }}" id="finalizeForm" class="d-none" onsubmit="return confirm('Finalize revision {{ $costing->revision }}? It can no longer be edited; changes need a new revision. Save your changes first.')">@csrf</form>
         @endif
 
         {{-- Sub-totals --}}
@@ -202,6 +206,8 @@
                         var badge = document.querySelector('[data-head-total="' + body.dataset.headBody + '"]');
                         if (badge) badge.textContent = sub.toFixed(2);
                     });
+                    var grand = document.querySelector('[data-grand-total]');
+                    if (grand) grand.textContent = total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 }
                 form.addEventListener('input', refresh);
                 form.addEventListener('click', function (e) {
@@ -218,4 +224,19 @@
         @endif
     @endif
 </div>
+@endsection
+
+@section('styles')
+<style>
+    .costing-actions {
+        position: sticky;
+        bottom: 12px;
+        z-index: 5;
+        padding: 12px 16px;
+        background: var(--bs-body-bg, #fff);
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, .10);
+    }
+</style>
 @endsection
