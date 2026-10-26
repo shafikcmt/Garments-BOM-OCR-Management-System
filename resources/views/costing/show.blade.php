@@ -76,6 +76,46 @@
             @endif
         </div>
 
+        {{-- Approval of a finalized revision. --}}
+        @php($appr = $costing->approval_status)
+        @if(! $costing->isDraft() || $appr === \App\Models\Costing::APPROVAL_RETURNED)
+            <div class="alert {{ $appr === 'approved' ? 'alert-success' : ($appr === 'returned' ? 'alert-danger' : ($appr === 'pending' ? 'alert-warning' : 'alert-light border')) }} d-flex flex-wrap align-items-center gap-2 py-2">
+                <i class="bi {{ $appr === 'approved' ? 'bi-patch-check' : ($appr === 'returned' ? 'bi-arrow-return-left' : 'bi-hourglass-split') }}" aria-hidden="true"></i>
+                <div class="me-auto">
+                    @if($appr === 'approved')
+                        <strong>Approved</strong> by {{ $costing->approver?->name }} on {{ $costing->approved_at?->format('d M Y') }}.@if($costing->approval_comment) <span class="text-muted">"{{ $costing->approval_comment }}"</span>@endif
+                    @elseif($appr === 'returned')
+                        <strong>Returned</strong> by {{ $costing->approver?->name }} on {{ $costing->approved_at?->format('d M Y') }}: {{ $costing->approval_comment }}@if($costing->isDraft()) <span class="text-muted">Correct it, then finalize again.</span>@endif
+                    @elseif($appr === 'pending')
+                        <strong>Waiting for approval</strong> by the Merchandising Head, Management or Admin.
+                    @else
+                        <strong>Not sent for approval.</strong> This revision was finalized before costing approval existed.
+                    @endif
+                </div>
+                @if($appr === null && ! $costing->isDraft() && $canEdit)
+                    <form method="POST" action="{{ route('costing.send', $costing) }}">@csrf
+                        <button class="btn btn-sm btn-outline-primary"><i class="bi bi-send me-1" aria-hidden="true"></i>Send for Approval</button>
+                    </form>
+                @endif
+            </div>
+            @if($canApprove)
+                <x-card class="mb-3" body-class="p-3">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md">
+                            <label class="form-label mb-1" for="apprComment">Comment <span class="text-muted fw-normal">(required to return)</span></label>
+                            <input type="text" name="comment" id="apprComment" form="approveForm" class="form-control form-control-sm" maxlength="1000" placeholder="What should change, or a note for the approval">
+                        </div>
+                        <div class="col-auto d-flex gap-2">
+                            <button class="btn btn-sm btn-success" form="approveForm"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Approve Costing</button>
+                            <button class="btn btn-sm btn-outline-danger" form="returnForm" onclick="document.getElementById('returnComment').value = document.getElementById('apprComment').value"><i class="bi bi-arrow-return-left me-1" aria-hidden="true"></i>Return to Merchant</button>
+                        </div>
+                    </div>
+                    <form method="POST" action="{{ route('costing.approve', $costing) }}" id="approveForm" class="d-none">@csrf</form>
+                    <form method="POST" action="{{ route('costing.return', $costing) }}" id="returnForm" class="d-none">@csrf<input type="hidden" name="comment" id="returnComment"></form>
+                </x-card>
+            @endif
+        @endif
+
         <div class="row g-3 mb-3" id="costSummary">
             <div class="col-6 col-xl-3"><x-stat-card icon="cash-stack" tone="primary" label="Total cost per {{ \App\Models\Costing::BASES[$costing->basis] }}" :value="$costing->currency . ' ' . $money($summary['total'])" /></div>
             <div class="col-6 col-xl-3"><x-stat-card icon="tag" tone="primary" label="Quoted price" :value="$summary['quoted'] !== null ? $costing->currency . ' ' . $money($summary['quoted']) : '—'" /></div>
@@ -160,6 +200,46 @@
                 </tbody>
             </table>
         </x-card>
+
+        {{-- Estimate against the actual BOM. --}}
+        @if($comparison && $comparison['has_bom'])
+            @php($m2 = fn ($n) => $n === null ? '—' : number_format((float) $n, 2))
+            @php($m4 = fn ($n) => $n === null ? '—' : rtrim(rtrim(number_format((float) $n, 4), '0'), '.'))
+            <x-card class="mb-3" body-class="p-3">
+                <x-slot:title>Pre-costing vs BOM <span class="text-muted fw-normal fs-6">per {{ \App\Models\Costing::BASES[$costing->basis] }}</span></x-slot:title>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr>
+                            <th>Costing line</th><th class="text-end">Costed Qty</th><th class="text-end">Costed Rate</th><th class="text-end">Costed Amount</th>
+                            <th>BOM material</th><th class="text-end">BOM Cons.</th><th class="text-end">PI Rate</th><th class="text-end">BOM Amount</th><th class="text-end">Difference</th>
+                        </tr></thead>
+                        <tbody>
+                        @foreach($comparison['rows'] as $r)
+                            <tr>
+                                <td class="fw-semibold">{{ $r['description'] }}<div class="small text-muted">{{ $r['head'] }}</div></td>
+                                <td class="text-end">{{ $m4($r['cost_qty']) }}</td><td class="text-end">{{ $m4($r['cost_rate']) }}</td><td class="text-end">{{ $m2($r['cost_amount']) }}</td>
+                                <td>{{ $r['bom']['description'] ?? '—' }}@if(! $r['bom'])<div class="small text-warning">Not in the BOM</div>@endif</td>
+                                <td class="text-end {{ $r['bom'] && $r['bom']['cons'] > $r['cost_qty'] + 0.0001 ? 'text-danger fw-semibold' : '' }}">{{ $r['bom'] ? $m4($r['bom']['cons']) . ' ' . ($r['bom']['uom'] ?? '') : '—' }}</td>
+                                <td class="text-end">{{ $r['bom'] ? $m4($r['bom']['rate']) : '—' }}</td>
+                                <td class="text-end">{{ $m2($r['bom_amount']) }}</td>
+                                <td class="text-end fw-semibold {{ ($r['difference'] ?? 0) > 0 ? 'text-danger' : (($r['difference'] ?? 0) < 0 ? 'text-success' : '') }}">{{ $r['difference'] === null ? '—' : ($r['difference'] > 0 ? '+' : '') . $m2($r['difference']) }}</td>
+                            </tr>
+                        @endforeach
+                        @foreach($comparison['uncosted'] as $u)
+                            <tr>
+                                <td class="text-warning">Not costed</td><td></td><td></td><td></td>
+                                <td>{{ $u['description'] }}</td>
+                                <td class="text-end">{{ $m4($u['cons']) }} {{ $u['uom'] }}</td><td class="text-end">{{ $m4($u['rate']) }}</td>
+                                <td class="text-end">{{ $u['rate'] !== null ? $m2($u['cons'] * $u['rate']) : '—' }}</td><td></td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                        <tfoot><tr class="fw-semibold"><td colspan="3">Material total</td><td class="text-end">{{ $m2($comparison['costing_total']) }}</td><td colspan="3" class="text-muted small fw-normal">{{ $comparison['priced'] }} of {{ $comparison['rows']->count() }} costed lines have a PI rate</td><td class="text-end">{{ $m2($comparison['bom_total']) }}</td><td></td></tr></tfoot>
+                    </table>
+                </div>
+                <p class="small text-muted mt-2 mb-0">BOM consumption is the average per garment including wastage{{ $costing->basis === 'dz' ? ', times 12 for a dozen' : '' }}. PI rate is what Supply Chain recorded. Red difference = the BOM costs more than the costing.</p>
+            </x-card>
+        @endif
 
         @if($revisions->count() > 1)
             <x-card title="Revision history" body-class="p-3">

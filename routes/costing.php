@@ -14,4 +14,7 @@ Route::prefix('costing')
         Route::post('/styles/{mother}/revise', [CostingController::class, 'revise'])->name('revise');
         Route::put('/{costing}', [CostingController::class, 'update'])->name('update');
         Route::post('/{costing}/finalize', [CostingController::class, 'finalize'])->name('finalize');
+        Route::post('/{costing}/send-for-approval', [CostingController::class, 'sendForApproval'])->name('send');
+        Route::post('/{costing}/approve', [CostingController::class, 'approve'])->name('approve');
+        Route::post('/{costing}/return', [CostingController::class, 'returnForChanges'])->name('return');
     });

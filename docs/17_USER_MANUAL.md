@@ -298,6 +298,15 @@ Use the two buttons at the top to switch. When both exist, the page shows both m
 - To change it, press **New Revision**. Revision 2 starts as a copy and is a draft until you finalize it. Old revisions stay as they were; the **Revision history** table at the bottom compares total cost and margin of every revision.
 - Only one draft can exist at a time.
 
+**Approval**
+- Pressing **Finalize Revision** sends the costing for approval. The Merchandising Head (department admin), Management and Admin get a message.
+- The approver opens the costing, writes a **Comment** if needed and presses **Approve Costing**, or **Return to Merchant** (a comment is required). The person who finalized cannot approve it themselves while someone else can.
+- **Returned** puts the revision back to draft with the reason shown at the top; correct it and finalize again. The merchant is told either way.
+- A revision finalized before approval existed shows **Not sent for approval** with a **Send for Approval** button.
+
+**Pre-costing vs BOM**
+Once the style has a BOM, the costing page shows each costed material next to the BOM material with the same name: the BOM consumption per garment (with wastage, times 12 for a dozen), the **PI rate** Supply Chain recorded, the BOM amount and the **Difference** (red = the BOM costs more than the costing). Costed lines with no BOM material say "Not in the BOM"; BOM materials nobody costed are listed as "Not costed".
+
 **Who can do what.** Merchandising and Admin make and change costings. Management can open and read them. Other roles cannot.
 
 The **Season page** of Style Status shows the **Margin** of each style's latest *final* buyer costing.

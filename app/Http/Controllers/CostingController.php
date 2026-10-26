@@ -22,7 +22,7 @@ class CostingController extends Controller
 
         $mode = array_key_exists($request->query('mode'), Costing::MODES) ? $request->query('mode') : 'buyer';
 
-        $revisions = $mother->costings()->where('mode', $mode)->orderByDesc('revision')->with('finalizer:id,name')->get();
+        $revisions = $mother->costings()->where('mode', $mode)->orderByDesc('revision')->with(['finalizer:id,name', 'approver:id,name'])->get();
         $costing = $revisions->firstWhere('revision', $request->integer('rev')) ?? $revisions->first();
         $costing?->load('lines');
 
@@ -42,6 +42,8 @@ class CostingController extends Controller
             'latestRevision' => $revisions->first()?->revision,
             'both' => $both,
             'canEdit' => $user->hasAnyRole(['merchant', 'admin']),
+            'canApprove' => $costing ? $costings->canApprove($user, $costing) : false,
+            'comparison' => $costing ? app(\App\Services\CostingVsBom::class)->compare($costing) : null,
         ]);
     }
 
@@ -116,6 +118,47 @@ class CostingController extends Controller
 
         return redirect()->route('costing.show', [$mother, 'mode' => $mode, 'rev' => $new->revision])
             ->with('success', 'Revision ' . $new->revision . ' started from the previous one.');
+    }
+
+    public function sendForApproval(Request $request, Costing $costing, Costings $costings)
+    {
+        $this->authorizeEdit($request, $costing->motherStyle);
+
+        try {
+            $costings->sendForApproval($costing, $request->user());
+        } catch (\DomainException $e) {
+            return back()->with('warning', $e->getMessage());
+        }
+
+        return back()->with('success', 'Revision ' . $costing->revision . ' sent for approval.');
+    }
+
+    public function approve(Request $request, Costing $costing, Costings $costings)
+    {
+        abort_unless($request->user()->hasBuyerAccess((int) $costing->motherStyle->buyer_id), 403);
+        $comment = $request->validate(['comment' => ['nullable', 'string', 'max:1000']])['comment'] ?? null;
+
+        try {
+            $costings->approve($costing, $request->user(), $comment);
+        } catch (\DomainException $e) {
+            return back()->with('warning', $e->getMessage());
+        }
+
+        return back()->with('success', 'Costing approved.');
+    }
+
+    public function returnForChanges(Request $request, Costing $costing, Costings $costings)
+    {
+        abort_unless($request->user()->hasBuyerAccess((int) $costing->motherStyle->buyer_id), 403);
+        $comment = $request->validate(['comment' => ['required', 'string', 'max:1000']], ['comment.required' => 'Write why the costing is returned.'])['comment'];
+
+        try {
+            $costings->returnForChanges($costing, $request->user(), $comment);
+        } catch (\DomainException $e) {
+            return back()->with('warning', $e->getMessage());
+        }
+
+        return back()->with('success', 'Costing returned to the merchant.');
     }
 
     private function authorizeEdit(Request $request, MotherStyle $mother): void

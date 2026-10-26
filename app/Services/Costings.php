@@ -141,9 +141,118 @@ class Costings
             throw new \DomainException('Enter at least one cost before finalizing.');
         }
 
-        $costing->update(['status' => Costing::FINAL, 'finalized_by' => $by->id, 'finalized_at' => now()]);
+        $costing->update([
+            'status' => Costing::FINAL, 'finalized_by' => $by->id, 'finalized_at' => now(),
+            'approval_status' => Costing::APPROVAL_PENDING, 'approved_by' => null, 'approved_at' => null,
+        ]);
+        $this->notifyApprovers($costing->refresh(), $by);
 
-        return $costing->refresh();
+        return $costing;
+    }
+
+    // ------------------------------------------------------------ approval
+
+    /**
+     * Who may approve a costing: Admin, Management, and Merchandising
+     * department admins (Merchandising Head) who may see the buyer. Set on
+     * Admin > Users, never coded per person.
+     *
+     * @return Collection<int, User>
+     */
+    public function approversFor(Costing $costing): Collection
+    {
+        $buyerId = (int) $costing->motherStyle?->buyer_id;
+        $roles = \Spatie\Permission\Models\Role::whereIn('name', ['admin', 'management', 'merchant'])->pluck('name')->all();
+        if ($roles === []) {
+            return collect();
+        }
+
+        return User::role($roles)->where('status', 1)->get()->filter(function (User $u) use ($buyerId) {
+            if ($u->hasRole('admin')) {
+                return true;
+            }
+
+            return ($u->hasRole('management') || ($u->hasRole('merchant') && $u->is_department_admin)) && $u->hasBuyerAccess($buyerId);
+        })->values();
+    }
+
+    /** Not the person who finalized it — unless nobody else could. */
+    public function canApprove(User $user, Costing $costing): bool
+    {
+        if ($costing->approval_status !== Costing::APPROVAL_PENDING) {
+            return false;
+        }
+        $approvers = $this->approversFor($costing);
+        if (! $approvers->contains('id', $user->id)) {
+            return false;
+        }
+
+        return $user->id !== (int) $costing->finalized_by || $approvers->where('id', '!=', $user->id)->isEmpty();
+    }
+
+    /** A final costing made before approval existed, sent now. @throws \DomainException */
+    public function sendForApproval(Costing $costing, User $by): Costing
+    {
+        if ($costing->isDraft() || $costing->approval_status === Costing::APPROVAL_PENDING || $costing->approval_status === Costing::APPROVAL_APPROVED) {
+            throw new \DomainException('This revision cannot be sent for approval.');
+        }
+        $costing->update(['approval_status' => Costing::APPROVAL_PENDING, 'approval_comment' => null]);
+        $this->notifyApprovers($costing, $by);
+
+        return $costing;
+    }
+
+    /** @throws \DomainException */
+    public function approve(Costing $costing, User $by, ?string $comment): Costing
+    {
+        if (! $this->canApprove($by, $costing)) {
+            throw new \DomainException('You cannot approve this costing.');
+        }
+        $costing->update(['approval_status' => Costing::APPROVAL_APPROVED, 'approved_by' => $by->id, 'approved_at' => now(), 'approval_comment' => $comment]);
+        $this->notifyFinalizer($costing, $by, 'Costing approved', (int) ($costing->finalized_by ?: $costing->created_by), $by->name . ' approved the ' . mb_strtolower(Costing::MODES[$costing->mode]) . ' costing of style ' . $costing->motherStyle->style_no . ' (revision ' . $costing->revision . ').');
+
+        return $costing;
+    }
+
+    /** Back to draft with a reason, so the merchant can correct it. @throws \DomainException */
+    public function returnForChanges(Costing $costing, User $by, string $comment): Costing
+    {
+        if (! $this->canApprove($by, $costing)) {
+            throw new \DomainException('You cannot return this costing.');
+        }
+        $finalizer = (int) ($costing->finalized_by ?: $costing->created_by);
+        // Only the latest revision of a mode may become a draft again.
+        $latest = (int) $costing->motherStyle->costings()->where('mode', $costing->mode)->max('revision');
+        $costing->update([
+            'status' => $costing->revision === $latest ? Costing::DRAFT : $costing->status,
+            'finalized_by' => $costing->revision === $latest ? null : $costing->finalized_by,
+            'finalized_at' => $costing->revision === $latest ? null : $costing->finalized_at,
+            'approval_status' => Costing::APPROVAL_RETURNED, 'approved_by' => $by->id, 'approved_at' => now(), 'approval_comment' => $comment,
+        ]);
+        $this->notifyFinalizer($costing, $by, 'Costing returned', $finalizer, $by->name . ' returned the costing of style ' . $costing->motherStyle->style_no . ': ' . $comment);
+
+        return $costing;
+    }
+
+    private function notifyApprovers(Costing $costing, User $by): void
+    {
+        $costing->loadMissing('motherStyle');
+        $this->approversFor($costing)->reject(fn (User $u) => $u->id === $by->id)->each(fn (User $u) => \App\Models\AppNotification::create([
+            'user_id' => $u->id, 'actor_id' => $by->id, 'type' => 'costing_approval', 'title' => 'Costing to approve',
+            'message' => $by->name . ' finalized the ' . mb_strtolower(Costing::MODES[$costing->mode]) . ' costing of style ' . $costing->motherStyle->style_no . ' (revision ' . $costing->revision . ').',
+            'url' => route('costing.show', [$costing->mother_style_id, 'mode' => $costing->mode, 'rev' => $costing->revision]),
+        ]));
+    }
+
+    private function notifyFinalizer(Costing $costing, User $by, string $title, int $to, string $message): void
+    {
+        if (! $to || $to === $by->id) {
+            return;
+        }
+        \App\Models\AppNotification::create([
+            'user_id' => $to, 'actor_id' => $by->id, 'type' => 'costing_approval', 'title' => $title, 'message' => $message,
+            'url' => route('costing.show', [$costing->mother_style_id, 'mode' => $costing->mode, 'rev' => $costing->revision]),
+        ]);
     }
 
     /**

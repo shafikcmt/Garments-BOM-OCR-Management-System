@@ -12,6 +12,12 @@ class Costing extends Model
 
     public const MODES = ['buyer' => 'Buyer', 'inhouse' => 'In-house'];
 
+    public const APPROVAL_PENDING = 'pending';
+
+    public const APPROVAL_APPROVED = 'approved';
+
+    public const APPROVAL_RETURNED = 'returned';
+
     public const CURRENCIES = ['USD', 'EUR', 'GBP', 'BDT'];
 
     public const BASES = ['pc' => 'piece', 'dz' => 'dozen'];
@@ -27,12 +33,14 @@ class Costing extends Model
     protected $fillable = [
         'mother_style_id', 'mode', 'revision', 'status', 'currency', 'basis', 'quoted_price',
         'total_cost', 'note', 'created_by', 'finalized_by', 'finalized_at',
+        'approval_status', 'approved_by', 'approved_at', 'approval_comment',
     ];
 
     protected $casts = [
         'quoted_price' => 'decimal:4',
         'total_cost' => 'decimal:4',
         'finalized_at' => 'datetime',
+        'approved_at' => 'datetime',
     ];
 
     public function motherStyle()
@@ -53,6 +61,11 @@ class Costing extends Model
     public function finalizer()
     {
         return $this->belongsTo(User::class, 'finalized_by');
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     public function isDraft(): bool
