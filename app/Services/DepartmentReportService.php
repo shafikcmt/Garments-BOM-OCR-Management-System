@@ -229,9 +229,16 @@ abstract class DepartmentReportService
     {
         $headerKey = $this->exactFilters()[$filterKey] ?? null;
 
-        return $headerKey
-            ? (string) ($this->columns()->firstWhere('header_key', $headerKey)?->header_name ?? $headerKey)
-            : $filterKey;
+        if (! $headerKey) {
+            return \Illuminate\Support\Str::headline($filterKey);
+        }
+
+        // A filter can sit on a column another department owns (e.g. Garments
+        // PO), which is not in columns(); read its name from the header list
+        // rather than showing the raw key ("garments_po") on screen.
+        return (string) ($this->columns()->firstWhere('header_key', $headerKey)?->header_name
+            ?? ExcelHeader::where('header_key', $headerKey)->value('header_name')
+            ?? \Illuminate\Support\Str::headline($headerKey));
     }
 
     /** Label of the column the date range filters on. */
