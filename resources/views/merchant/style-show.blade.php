@@ -230,6 +230,9 @@
         </x-card>
     @else
         <x-card title="Orders" class="mb-3" body-class="p-3">
+            <x-slot:actions>
+                <a href="{{ route('merchant.sizes.show', $mother) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-grid-3x3 me-1" aria-hidden="true"></i>Size Breakdown</a>
+            </x-slot:actions>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead><tr>

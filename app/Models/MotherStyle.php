@@ -8,7 +8,7 @@ class MotherStyle extends Model
 {
     protected $fillable = [
         'buyer_id', 'buyer_season_id', 'style_no', 'product_group',
-        'description', 'status', 'created_by',
+        'description', 'status', 'created_by', 'size_set_id',
     ];
 
     public function buyer()
@@ -29,6 +29,16 @@ class MotherStyle extends Model
     public function bomApproval()
     {
         return $this->hasOne(BomApproval::class);
+    }
+
+    public function sizeSet()
+    {
+        return $this->belongsTo(SizeSet::class);
+    }
+
+    public function sizeQuantities()
+    {
+        return $this->hasMany(OrderSizeQuantity::class);
     }
 
     public function orderLines()

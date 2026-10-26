@@ -182,6 +182,17 @@ Use the Excel import (section 2.2) when the buyer sends a ready file; use this s
 
 These figures come from the same Workspace columns the other departments fill in. If a number looks wrong, check the Workspace row for that material.
 
+### 2.3a Size breakdown (colour x size)
+
+**Open it:** open the style, then **Size Breakdown** on the **Orders** box.
+
+1. **Choose a size set** (the sizes this style comes in) and press **Use Size Set**. If the buyer's sizes are not there yet, type a **New size set name** and the **Sizes** separated by commas (for example `XS, S, M, L, XL` or `0, 2, 4, 6, 8`) and press **Add Size Set**. A size set belongs to the buyer and can be used for all its styles.
+2. The table has one row for each colour and customer PO of the style and one column for each size. Type the pieces per size.
+3. **Size Total** adds the row up; **Difference** compares it with the order quantity (green "Matches", red when it differs).
+4. Press **Save Size Breakdown**. If a row's total differs from its order quantity you get a yellow message naming the row; the figures are still saved.
+
+The figures are kept by style, colour and PO, so they stay even when the Workspace file is re-imported. Management can open this page but cannot change it.
+
 ### 2.4 Style Status: a whole season at a glance
 
 **Open it:** left menu, **Style Status**. Merchandising, Admin and Management can all open it. It is for watching progress; nothing can be edited here.

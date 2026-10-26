@@ -10,6 +10,7 @@ use App\Http\Controllers\Merchant\ImportWizardController;
 use App\Http\Controllers\Merchant\StatusController;
 use App\Http\Controllers\Merchant\BomBuilderController;
 use App\Http\Controllers\Merchant\OcrSummaryController;
+use App\Http\Controllers\Merchant\SizeBreakdownController;
 
 // Merchandising reports — read-only summaries of the BOM columns this
 // department owns. Kept in their own group because they are shared with Admin /
@@ -44,6 +45,18 @@ Route::prefix('merchant/ocr')
     ->group(function () {
         Route::get('/', [OcrSummaryController::class, 'index'])->name('index');
         Route::get('/excel', [OcrSummaryController::class, 'excel'])->name('excel');
+    });
+
+// Colour x size breakdown of a style's order. Merchandising and Admin edit,
+// Management reads; the controller checks the buyer.
+Route::prefix('merchant/sizes')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.sizes.')
+    ->group(function () {
+        Route::get('/styles/{mother}', [SizeBreakdownController::class, 'show'])->name('show');
+        Route::put('/styles/{mother}', [SizeBreakdownController::class, 'update'])->name('update');
+        Route::put('/styles/{mother}/set', [SizeBreakdownController::class, 'chooseSet'])->name('set');
+        Route::post('/styles/{mother}/sets', [SizeBreakdownController::class, 'storeSet'])->name('sets.store');
     });
 
 // BOM builder: make a style's BOM on a screen. Merchandising and Admin; the
