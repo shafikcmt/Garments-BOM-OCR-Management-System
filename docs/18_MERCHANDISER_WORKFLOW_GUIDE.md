@@ -86,3 +86,5 @@ Ask them to show you a real order, not describe it.
 7. Shipment, then production follow-up.
 
 Re-order this list after the merchandiser interview.
+
+The plan for all departments together (Supply Chain, Commercial, Store, Accounts, Management) and the release order across them is in `docs/12_ERP_IMPLEMENTATION_GUIDE.md` §11.

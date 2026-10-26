@@ -8,7 +8,8 @@
 > questions, and push back when a request would build on the wrong base.
 >
 > Written 2026-10-07 from a gap analysis of the codebase against the spec;
-> §10 (Merchandising & OCR plan) added 2026-10-25.
+> §10 (Merchandising & OCR plan) added 2026-10-25; §2 refreshed and §11
+> (department-wise Order / OCR plan) added 2026-10-26.
 > Update it when a phase ships or a decision is taken.
 
 ## 1. Owner's intent
@@ -18,14 +19,14 @@ The owner wants this software to become the full garments ERP in
 workflow. Small controlled releases; every push to `master` is a live deploy
 (see CLAUDE.md › Deployment).
 
-## 2. Where the system stands (gap analysis, 2026-10-07)
+## 2. Where the system stands (gap analysis 2026-10-07, refreshed 2026-10-26)
 
 | # | Spec module | Status | What exists today |
 |---|---|---|---|
-| 1 | Merchandising | Partial | Excel/BOM upload, Merchant workspace, buyer-wise scope, Style Budget. Orders, styles and BOM are **Excel rows/cells, not structured tables** |
+| 1 | Merchandising | Good part | Buyer → Season → Mother/Child Style library; Import Buyer Excel wizard with per-buyer profiles; Create BOM on screen, copy BOM, material library; BOM approval; Style Status (buyer / season / style); Merchandising dashboard. `order_lines` / `bom_items` exist but are **filled from the workspace** (one-way sync); the workspace is still the source of truth. No size breakdown |
 | 2 | Sample | None | — |
-| 3 | Costing | Minimal | Style Budget only |
-| 4 | TnA | None | — |
+| 3 | Costing | Partial | Style Budget; Pre-costing (cost heads, Buyer / In-house, revisions, margin). No costing approval, no BOM-vs-costing, no post-costing |
+| 4 | TnA | Minimal | Follow-up tasks, to-do list, daily reminders, late / due-soon material lights. No templates or automatic tasks |
 | 5 | Procurement | Good part | Booking PO, PO generate control, Payment Request (PRA) multi-approval, General Stock Purchase Requisition (stage engine + month-wise merge) |
 | 6 | Store & Inventory | Strongest | General Stock (Item Master, SKU, Receiving, Issue, Ledger, reports) and Buyer/Style stock (Receiving, Bulk Issue, Closing, Liability/Dead). Missing: lot/shade/roll, rack/bin, QC gate, FIFO/avg costing |
 | 7–10 | Planning, IE, QA/QC, Subcontract | None | — |
@@ -35,7 +36,7 @@ workflow. Small controlled releases; every push to `master` is a live deploy
 | 14 | HR & Payroll | None | Thin `employees` table (Employee ID login) — seed of PIMS, extend it, never duplicate it |
 | 15–16 | Fixed Assets, Maintenance | None | — |
 | 17 | CRM / Buyer | Partial | Buyer master, buyer assignment |
-| 18 | Reporting / BI | Partial | Role-wise dashboards, store/merchant/commercial reports |
+| 18 | Reporting / BI | Partial | Role-wise dashboards, Merchandising dashboard (Chart.js), Style Status, store/merchant/commercial reports. OCR summary sheets (Contract / Material / Payment / Clearance) not generated yet |
 | 19 | System Admin | Strong | Users, roles, permissions, departments, approval settings, email templates, alerts, activity log |
 
 ## 3. The foundation problem — read this first
@@ -223,15 +224,15 @@ on screen. `BookingPo` and the material stock ledger read from those rows.
 
 ### Steps (replace the generic phases in `08_MERCHANDISING_MODULE_IMPLEMENTATION.md`)
 
-| Step | Work | Why |
-|---|---|---|
-| **O1** | Season + Style + Order masters, created from existing workspace data; **Style 360° page** (rows, Booking POs, budget, receipt/issue status) | Low risk, new tables only; immediate management value |
-| **O2** | **Smart OCR import**: mapping profiles, synonyms, header detection, preview + validation before saving | Ends the format-change confusion |
-| **O3** | **Structured BOM line**, system-calculated to-be-ordered, short/excess, requirement; workspace rows link to BOM lines (nullable) | Formula errors stop |
-| **O4** | Department screens (Merchandiser / Supply Chain / Commercial / Store) over the same line | Replaces one giant sheet |
-| **O5** | **Auto reports**: Contract, Material, Payment, Style Status, Clearance Summary | No hand-made pivots |
-| **O6** | **OCR export** per buyer/season in the familiar layout | Excel stays available; the system is the source |
-| Later | Inbound Shipment module; Order Closing / post-costing (HB "OCR" sheet); pre-costing with revisions | Towards the full ERP |
+| Step | Work | Why | Status (2026-10-26) |
+|---|---|---|---|
+| **O1** | Season + Style + Order masters, created from existing workspace data; **Style 360° page** (rows, Booking POs, budget, receipt/issue status) | Low risk, new tables only; immediate management value | **Done** (Style Library, `order_lines`, Style Status, dashboard) |
+| **O2** | **Smart OCR import**: mapping profiles, synonyms, header detection, preview + validation before saving | Ends the format-change confusion | **Done** (3-step wizard, `BuyerImportProfile`, header detection) |
+| **O3** | **Structured BOM line**, system-calculated to-be-ordered, short/excess, requirement; workspace rows link to BOM lines (nullable) | Formula errors stop | **Partly**: `bom_items` linked by `excel_row_id`, but filled one-way from the workspace |
+| **O4** | Department screens (Merchandiser / Supply Chain / Commercial / Store) over the same line | Replaces one giant sheet | **Partly**: Booking PO, PRA, Payments, Receiving exist; Commercial has none. See §11 |
+| **O5** | **Auto reports**: Contract, Material, Payment, Style Status, Clearance Summary | No hand-made pivots | Style Status done; the other four not built |
+| **O6** | **OCR export** per buyer/season in the familiar layout | Excel stays available; the system is the source | Not built |
+| Later | Inbound Shipment module; Order Closing / post-costing (HB "OCR" sheet); pre-costing with revisions | Towards the full ERP | Pre-costing done; rest in §11 |
 
 Principle: data is entered in the system; Excel is for import (at first)
 and export (reports). Each step ships, is tested and goes live before the
@@ -240,3 +241,125 @@ flows working unchanged.
 
 Recommended start: **O1 then O2** — O1 touches no existing flow, O2 solves
 the most painful problem. Ask the §8 questions 5–8 before designing O2/O3.
+
+## 11. Department-wise Order / OCR plan (2026-10-26)
+
+The owner's goal (2026-10-26): after Merchandising brings in the order and
+BOM, **each department updates its own part of the OCR in the software** —
+Merchandising, Supply Chain, Commercial, Store, Accounts — and management
+reads one picture. Today departments still type into workspace columns; the
+target is one screen per department, each writing to its own record, with the
+OCR row (and the OCR Excel) produced from those records.
+
+### 11.1 The spine every department hangs on
+
+```
+Buyer -> Season -> Mother / Child Style -> Order line (colour x contract / PO [x size])
+   -> BOM line (material, consumption, to be ordered)
+        -> Booking PO line -> PI -> Payment (PRA)        Supply Chain / Accounts
+        -> Inbound shipment (BL / AWB, ETA, in-house)    Commercial
+        -> Receive (GRN, lot, QC) -> Issue -> Liability  Store
+```
+
+Rules for every step below:
+
+- **One owner per field.** A field is entered on one department's screen and
+  only shown on the others (same as the OCR column ownership today).
+- **Keep the workspace working.** Every new screen also writes the matching
+  workspace cells, the way Booking PO and PRA already do
+  (`SUPPLY_CHAIN_SYNC_WORKSPACE`). The workspace stops being typed into only
+  when every department has its screen; it is never dropped in one release.
+- Records link to `bom_items` / `excel_row_id` with **nullable** columns, so
+  older files keep working.
+- Status words come from one list (`docs/16_STANDARD_DYNAMIC_ORDER_FORMAT.md`).
+- Each slice ships alone, with tests, a manual section and no change to the
+  existing BookingPo / PRA / material stock flows.
+
+### 11.2 What each department gets
+
+**Merchandising** (most built; see §10 and `docs/18`)
+
+| # | Slice | Notes |
+|---|---|---|
+| M1 | Order / buyer PO screen with **colour x size** breakdown | Needed before size-wise BOM, size-wise booking and the export packing list. Ask §8 Q6 |
+| M2 | **Order change log**: quantity / ship-date changes with who and when, pushed to Supply Chain and Store | "Source changed" on Booking PO already exists; extend to the order line |
+| M3 | **TnA templates**: tasks created from ship date / PCD by lead time (booking, PI, in-house, PP, cut) with traffic light | Reuse `FollowUpTask` and reminders |
+| M4 | Costing approval and **pre-costing vs BOM** comparison | After M1 |
+| M5 | Sample tracking | Only if the merchandiser interview says it matters |
+
+**Supply Chain**
+
+| # | Slice | Notes |
+|---|---|---|
+| S1 | **Booking from BOM lines**: list of "to be ordered" lines (not booked, short), grouped by supplier, pick lines → Booking PO; booked vs required and short / excess shown by the system | Replaces typing "Materials Ordered" in the workspace |
+| S2 | **PI register**: PI no / date / rate / amount / HS code per Booking PO, PI vs PO mismatch flag, "PI pending" list | Today PI Status is a workspace column |
+| S3 | Supplier **delivery commitment** (committed ex-mill) and a late-supplier list | Feeds the dashboard and TnA |
+| S4 | One supplier master (`Supplier` and `GeneralStockSupplier` are separate today) | Decide with the owner; additive, no merge of old rows by force |
+
+**Commercial** (nothing structured yet; biggest gap)
+
+| # | Slice | Notes |
+|---|---|---|
+| C1 | **Inbound shipment** record per Booking PO / PI: ship mode, forwarder, BL / AWB, container, COO, port, ETD / ATD / ETA / ATA, arrival status, committed / actual in-house | Fills the ~15 OCR shipment columns from one screen; adds "In transit" to the material stage |
+| C2 | **Clearance summary** (by ETA week, port, status) | The OCR "Clearance Summary" sheet |
+| C3 | **Master L/C** (export, per buyer contract) and **BTB L/C** (against PIs), limit used % | Ask: which L/C data is tracked today and in which file |
+| C4 | Export documents: commercial invoice, packing list (colour x size) | After M1 |
+
+**Store** (General Stock strong; buyer material needs the order link)
+
+| # | Slice | Notes |
+|---|---|---|
+| St1 | **Receive against Booking PO / PI** (GRN): pick the booking, receive qty, invoice no, lot / shade / roll | Today receiving picks the workspace row; keep that path |
+| St2 | **QC gate** on receive: accepted / rejected qty, reason | Rejected qty never enters stock |
+| St3 | Issue against order line / cut qty, **return to store** | Bulk issue exists; add the order link and returns |
+| St4 | **Liability and dead stock** calculated from requirement vs received vs issued, by style and season | Part exists (`MaterialLiabilityMovement`); make it automatic |
+| St5 | Rack / bin location | Later |
+
+**Accounts**
+
+| # | Slice | Notes |
+|---|---|---|
+| A1 | **Payment due calendar** from PRA "payment required date", overdue list | Payments screen exists |
+| A2 | **Supplier ledger (AP lite)**: PI amount, paid, outstanding per supplier and per style | Read from PI register (S2) and payments |
+| A3 | Export realization against Master L/C | After C3 |
+| A4 | Export to the accounting software in use | Ask §8 Q3; integrate, do not build a GL |
+
+**Management**
+
+| # | Slice | Notes |
+|---|---|---|
+| R1 | **OCR summaries** generated: Contract, Material, Payment, Clearance (O5) | Read-only; no flow touched |
+| R2 | **OCR export** per buyer / season in the familiar layout, with the summary sheets (O6) | People keep their Excel, the system is the source |
+| R3 | Order 360 page and management dashboard: on-time booking %, in-house %, liability exposure, payment due | Grows as the slices above ship |
+
+### 11.3 Recommended release order
+
+| Release | Slices | Why this order |
+|---|---|---|
+| 1 | **R1 + R2** OCR summaries and OCR export | Read-only, zero risk; management stops making pivots by hand at once |
+| 2 | **C1 + C2** Inbound shipment and clearance | Commercial has no screen at all; new tables only |
+| 3 | **S1 + S2** Booking from BOM lines, PI register | Removes the most typing from the workspace; builds on Booking PO |
+| 4 | **St1 + St2** GRN against booking, QC gate | Needs S1 / S2 |
+| 5 | **A1 + A2** Payment calendar, supplier ledger | Needs S2 |
+| 6 | **M1 + M2** Colour x size order screen, change log | Opens size-wise BOM, packing list |
+| 7 | **M3** TnA templates | Uses dates from all the slices above |
+| 8 | **C3 + A3**, **C4**, **St3–St4**, **M4**, **S3–S4** | Deeper control |
+| Then | Material Item Master (§6), automatic BOM, post-costing (HB "OCR" sheet), production | Phase 1 item 2 and Phase 2–3 |
+
+After release 5, every OCR column group has a department screen; then the
+workspace can become read-only for those columns (owner's decision, one
+group at a time).
+
+### 11.4 Questions to ask before each release
+
+- **Release 1:** Which summary sheets does management actually read, and is
+  the layout of the ANN TAYLOR file the one to copy for the export? (§8 Q7)
+- **Release 2:** Who fills shipment columns today — Commercial or Supply
+  Chain? Is one shipment per PI, or can one BL carry several PIs?
+- **Release 3:** Does Supply Chain book per style or club several styles
+  into one PO per supplier? Can one PI cover several POs?
+- **Release 4:** Is lot / shade / roll recorded for fabric today? Who does
+  incoming QC, and is a rejection returned to the supplier or kept?
+- **Release 5:** Which accounting software is used (§8 Q3)? Does Accounts
+  need supplier-wise or style-wise outstanding, or both?
+- **Release 6:** Does every buyer's PO carry a size breakdown (§8 Q6)?
