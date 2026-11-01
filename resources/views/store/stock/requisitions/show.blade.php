@@ -151,51 +151,43 @@
     {{-- Header block, mirroring rows 3-8 of the reference sheet. --}}
     <div class="card gx-stock-card mb-4">
         <div class="gx-stock-card-body">
-            <div class="row g-4">
-                <div class="col-12 col-lg-6">
-                    <dl class="row gx-stock-dl">
-                        <dt class="col-5">Requisition No</dt><dd class="col-7">{{ $requisition->requisition_no }}</dd>
-                        <dt class="col-5">Requisition Date</dt><dd class="col-7">{{ optional($requisition->requisition_date)->format('d F Y') ?? '—' }}</dd>
-                        {{-- The snapshot from the last submit; an older sheet
-                             reads its own saved columns, as before. --}}
-                        @php($header = app(\App\Services\RequisitionHeaderResolver::class)->forDocument($requisition, $departmentHeadName ?? null))
-                        <dt class="col-5">Name of Unit</dt><dd class="col-7">{{ $header['unit_name'] ?: '—' }}</dd>
-                        <dt class="col-5">Section</dt><dd class="col-7">{{ $header['section'] ?: 'All' }}</dd>
-                        <dt class="col-5">Name of User</dt><dd class="col-7">{{ $header['user_name'] ?: '—' }}</dd>
-                        <dt class="col-5">Contact No. / Email</dt><dd class="col-7">{{ $header['contact'] ?: '—' }}</dd>
-                    </dl>
+            @php($header = app(\App\Services\RequisitionHeaderResolver::class)->forDocument($requisition, $departmentHeadName ?? null))
+            {{-- Key facts as tiles; the approval chain as steps below. --}}
+            <div class="gx-facts">
+                <div class="gx-fact"><span>Requisition Date</span><b>{{ optional($requisition->requisition_date)->format('d M Y') ?? '—' }}</b></div>
+                <div class="gx-fact"><span>Type</span><b>{{ \App\Models\PurchaseRequisition::modeLabels()[$requisition->mode] ?? $requisition->mode }}</b></div>
+                <div class="gx-fact">
+                    <span>Level</span>
+                    <b>{{ \App\Models\PurchaseRequisition::levelLabels()[$requisition->level] ?? 'Final Purchase Requisition' }}@if($requisition->isDepartmentLevel() && $requisition->department_role) <em>· {{ $requisition->departmentLabel() }}</em>@endif</b>
                 </div>
-                <div class="col-12 col-lg-6">
-                    <dl class="row gx-stock-dl">
-                        <dt class="col-5">Type</dt><dd class="col-7">{{ \App\Models\PurchaseRequisition::modeLabels()[$requisition->mode] ?? $requisition->mode }}</dd>
-                        <dt class="col-5">Requisition Level</dt>
-                        <dd class="col-7">
-                            {{ \App\Models\PurchaseRequisition::levelLabels()[$requisition->level] ?? 'Final Purchase Requisition' }}
-                            @if($requisition->isDepartmentLevel() && $requisition->department_role)
-                                <span class="text-muted">· {{ $requisition->departmentLabel() }}</span>
-                            @endif
-                        </dd>
-                        <dt class="col-5">Submitted</dt><dd class="col-7">{{ $requisition->submitted_at?->local()->format('d-M-Y H:i') ?: '—' }}</dd>
-                        {{-- One line per configured signature box — the same
-                             boxes the PDF and Excel print, from Admin >
-                             Settings. A step the system records reads
-                             name · date or Pending; a box signed on paper
-                             reads the configured name. --}}
-                        @foreach($signatures as $box)
-                            <dt class="col-5">{{ $box['label'] }}@if($box['title'] !== '') <span class="text-muted fw-normal">({{ $box['title'] }})</span>@endif</dt>
-                            <dd class="col-7">
-                                @if($box['signed_at'])
+                <div class="gx-fact"><span>Submitted</span><b>{{ $requisition->submitted_at?->local()->format('d-M-Y H:i') ?: 'Not yet' }}</b></div>
+                <div class="gx-fact"><span>Unit</span><b>{{ $header['unit_name'] ?: '—' }}</b></div>
+                <div class="gx-fact"><span>Section</span><b>{{ $header['section'] ?: 'All' }}</b></div>
+                <div class="gx-fact"><span>Requested by</span><b>{{ $header['user_name'] ?: '—' }}</b></div>
+                <div class="gx-fact"><span>Contact</span><b>{{ $header['contact'] ?: '—' }}</b></div>
+            </div>
+
+            {{-- One step per configured signature box, the same boxes the PDF and
+                 Excel print (Admin > Settings). --}}
+            <div class="gx-sign-steps" aria-label="Approval steps">
+                @foreach($signatures as $box)
+                    @php($done = (bool) $box['signed_at'])
+                    <div class="gx-sign-step {{ $done ? 'is-done' : '' }}">
+                        <span class="gx-sign-dot" aria-hidden="true">@if($done)<i class="bi bi-check-lg"></i>@else{{ $loop->iteration }}@endif</span>
+                        <div>
+                            <div class="gx-sign-label">{{ $box['label'] }}@if($box['title'] !== '') <span>({{ $box['title'] }})</span>@endif</div>
+                            <div class="gx-sign-value">
+                                @if($done)
                                     {{ $box['name'] }} · {{ $box['signed_at']->format('d-M-Y') }}
                                 @elseif($box['stamped'])
-                                    {{-- A stage-engine box names who it waits for. --}}
-                                    <span class="text-muted">Pending</span>@if($requisition->usesStageEngine() && $box['name'] !== '') <span class="text-muted">· {{ $box['name'] }}</span>@endif
+                                    Pending @if($requisition->usesStageEngine() && $box['name'] !== '')· {{ $box['name'] }}@endif
                                 @else
                                     {{ $box['name'] !== '' ? $box['name'] : '—' }}
                                 @endif
-                            </dd>
-                        @endforeach
-                    </dl>
-                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
             </div>
 
             @if($requisition->isCancelled())
@@ -249,15 +241,23 @@
                 </div>
             @endif
             @if($requisition->mergedSources->isNotEmpty())
-                <div class="alert alert-info border-0 mt-3 mb-0 small">
-                    <i class="bi bi-intersect me-1" aria-hidden="true"></i><strong>Merged from {{ $requisition->mergedSources->count() }} department requisition{{ $requisition->mergedSources->count() === 1 ? '' : 's' }}:</strong>
-                    @foreach($requisition->mergedSources as $source)
-                        @if($source->isVisibleTo(auth()->user()))<a href="{{ route('store.stock.requisitions.show', $source) }}">{{ $source->requisition_no }}</a>@else{{ $source->requisition_no }}@endif{{ $source->indentSection ? ' ('.$source->indentSection->name.')' : '' }}{{ $loop->last ? '' : ', ' }}
-                    @endforeach
+                <div class="gx-merged mt-3">
+                    <div class="gx-merged-head"><i class="bi bi-intersect me-1" aria-hidden="true"></i>Merged from {{ $requisition->mergedSources->count() }} department requisition{{ $requisition->mergedSources->count() === 1 ? '' : 's' }}</div>
+                    <div class="gx-merged-chips">
+                        @foreach($requisition->mergedSources as $source)
+                            @php($label = $source->indentSection?->name ?: ($source->departmentLabel() ?: ucfirst(strtolower(explode('/', $source->requisition_no)[1] ?? $source->requisition_no))))
+                            @if($source->isVisibleTo(auth()->user()))
+                                <a href="{{ route('store.stock.requisitions.show', $source) }}" class="gx-mchip" title="{{ $source->requisition_no }}"><b>{{ $label }}</b><span>{{ \Illuminate\Support\Str::afterLast($source->requisition_no, '/') ? '#'.\Illuminate\Support\Str::afterLast($source->requisition_no, '/') : '' }}</span></a>
+                            @else
+                                <span class="gx-mchip" title="{{ $source->requisition_no }}"><b>{{ $label }}</b></span>
+                            @endif
+                        @endforeach
+                    </div>
                 </div>
             @endif
 
-            @if($requisition->remarks)
+            {{-- A merge writes its source numbers into Remarks; the chips above already show them. --}}
+            @if($requisition->remarks && ! ($requisition->mergedSources->isNotEmpty() && \Illuminate\Support\Str::startsWith($requisition->remarks, 'Merged from')))
                 <div class="alert alert-light border mt-3 mb-0 small"><strong>Remarks:</strong> {{ $requisition->remarks }}</div>
             @endif
         </div>

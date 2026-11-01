@@ -1009,6 +1009,32 @@
     .gx-stock-dl > dt:nth-last-of-type(1),
     .gx-stock-dl > dd:nth-last-of-type(1) { border-bottom: 0; }
 
+    /* --- Requisition facts, approval steps, merged-from chips ------------ */
+    .gx-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }
+    .gx-fact { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 12px; padding: .65rem .85rem; min-width: 0; }
+    .gx-fact > span { display: block; font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; margin-bottom: .15rem; }
+    .gx-fact > b { display: block; font-size: .86rem; font-weight: 600; color: #0f172a; overflow-wrap: anywhere; }
+    .gx-fact > b em { font-style: normal; font-weight: 500; color: #64748b; }
+    @media (max-width: 991px) { .gx-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 340px) { .gx-facts { grid-template-columns: 1fr; } }
+
+    .gx-sign-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eef2f7; }
+    .gx-sign-step { display: flex; align-items: flex-start; gap: .6rem; }
+    .gx-sign-dot { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; background: #e2e8f0; color: #64748b; }
+    .gx-sign-step.is-done .gx-sign-dot { background: #16a34a; color: #fff; }
+    .gx-sign-label { font-size: .74rem; font-weight: 600; color: #475569; line-height: 1.25; }
+    .gx-sign-label span { font-weight: 500; color: #94a3b8; }
+    .gx-sign-value { font-size: .82rem; font-weight: 600; color: #94a3b8; }
+    .gx-sign-step.is-done .gx-sign-value { color: #0f172a; }
+
+    .gx-merged { background: #f0f9ff; border: 1px solid #d6ecfa; border-radius: 12px; padding: .75rem .9rem; }
+    .gx-merged-head { font-size: .8rem; font-weight: 700; color: #0c4a6e; margin-bottom: .5rem; }
+    .gx-merged-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .gx-mchip { display: inline-flex; align-items: center; gap: .4rem; background: #fff; border: 1px solid #cfe5f5; border-radius: 999px; padding: .2rem .65rem; font-size: .76rem; color: #0f172a; text-decoration: none; }
+    .gx-mchip b { font-weight: 600; letter-spacing: 0; text-transform: none; }
+    .gx-mchip span { color: #64748b; }
+    a.gx-mchip:hover { border-color: #60a5fa; background: #eff6ff; }
+
     /* --- Correction modals -----------------------------------------------
      * The Edit dialogs on Issue History and Purchase History. Both mix fields
      * that can be changed with fields that identify the record and cannot, and
