@@ -44,7 +44,7 @@ trait FormatsStoreSheet
     /** Column width bounds, in Excel character units. */
     private const WIDTH_MIN = 7;
 
-    private const WIDTH_MAX = 42;
+    private const WIDTH_MAX = 30;
 
     /**
      * Floor and slack for a figures column.
@@ -54,12 +54,12 @@ trait FormatsStoreSheet
      * prints it back at 12pt bold over the body's 9pt — the widest thing in the
      * column is usually the total, set in the largest type on the sheet.
      */
-    private const WIDTH_NUMERIC_MIN = 10;
+    private const WIDTH_NUMERIC_MIN = 9;
 
-    private const NUMERIC_PADDING = 3;
+    private const NUMERIC_PADDING = 2;
 
     /** Above this many characters a text column wraps instead of running on. */
-    private const WRAP_OVER = 26;
+    private const WRAP_OVER = 22;
 
     /**
      * Headings whose column holds money — two decimals and a thousands
@@ -148,7 +148,7 @@ trait FormatsStoreSheet
 
         $this->applyPrintSetup($sheet, $headerStart, $headerEnd, $lastColumn, $lastRow);
 
-        $sheet->getSheetView()->setZoomScale(85);
+        $sheet->getSheetView()->setZoomScale(90);
 
         // LAST, after the column widths: those were measured from the text, and
         // a date's serial number is a different length from what it displays.
@@ -449,34 +449,34 @@ trait FormatsStoreSheet
             : Alignment::HORIZONTAL_LEFT;
 
         $sheet->getStyle('A1:'.$lastColumn.'1')->applyFromArray([
-            'font' => ['bold' => true, 'size' => 28],
+            'font' => ['bold' => true, 'size' => 20],
             'alignment' => ['horizontal' => $align, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
-        $sheet->getRowDimension(1)->setRowHeight(34);
+        $sheet->getRowDimension(1)->setRowHeight(28);
 
         if ($headerStart > 2) {
             $sheet->getStyle('A2:'.$lastColumn.'2')->applyFromArray([
-                'font' => ['bold' => true, 'size' => 14],
+                'font' => ['bold' => true, 'size' => 12],
                 'alignment' => ['horizontal' => $align, 'vertical' => Alignment::VERTICAL_CENTER],
             ]);
-            $sheet->getRowDimension(2)->setRowHeight(20);
+            $sheet->getRowDimension(2)->setRowHeight(18);
         }
 
         // The information block: label on the left of each pair, value beside
         // it, and the personnel block on the right — all merged by the Blade.
         for ($row = 3; $row < $headerStart; $row++) {
             $sheet->getStyle('A'.$row.':'.$lastColumn.$row)->applyFromArray([
-                'font' => ['size' => 11],
+                'font' => ['size' => 10],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
             ]);
 
             // The label reads as a label, not as more prose.
             $sheet->getStyle('A'.$row)->getFont()->setBold(true);
-            $sheet->getRowDimension($row)->setRowHeight(16);
+            $sheet->getRowDimension($row)->setRowHeight(15);
         }
 
         // A little air between the letterhead and the table.
-        $sheet->getRowDimension($headerStart - 1)->setRowHeight(10);
+        $sheet->getRowDimension($headerStart - 1)->setRowHeight(6);
     }
 
     private function styleHeader(Worksheet $sheet, int $start, int $end, string $lastColumn): void
@@ -664,7 +664,7 @@ trait FormatsStoreSheet
                     $sheet,
                     $col,
                     $headerStart + 1,
-                    $lastRow,
+                    min($lastRow, $lastDataRow + 1), // data rows and the total row, not the signature captions
                     $this->numberFormatFor($heading)
                 );
 
@@ -672,9 +672,16 @@ trait FormatsStoreSheet
             } else {
                 // Headings are excluded from the measurement: they wrap, so a
                 // long one must not widen a column of short values.
-                $longest = $this->longestIn($sheet, $col, $headerStart + 1, $lastRow);
+                // Measured over the data rows only: the signature block's
+                // captions sit in the first columns and would widen SL / Item.
+                $longest = $this->longestIn($sheet, $col, $headerStart + 1, max($headerStart + 1, $lastDataRow));
 
-                $width = max(self::WIDTH_MIN, min(self::WIDTH_MAX, $longest + 2));
+                // But never narrower than the longest single word of its own
+                // heading, so "Specification" is not broken mid-word.
+                $heading = $this->headingFor($sheet, $col, $headerStart, $headerEnd);
+                $word = collect(preg_split('/\s+/', trim($heading)) ?: [])->map(fn ($w) => mb_strlen($w))->max() ?? 0;
+
+                $width = max(self::WIDTH_MIN, $word + 3, min(self::WIDTH_MAX, $longest + 2));
             }
 
             $sheet->getColumnDimension($letter)->setAutoSize(false);

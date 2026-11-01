@@ -76,6 +76,12 @@ class PurchaseRequisitionService
 
         $lastPurchases = $this->lastPurchases($ids, $on);
 
+        // An item with no purchase on record here (carried over from the old
+        // Excel sheets) falls back to the standard price and the reference
+        // date kept on the Item Master, so Rate and Date are not left blank.
+        // A real purchase always wins.
+        $masters = StockItem::whereIn('id', $ids)->get(['id', 'unit_price', 'last_addition_reference'])->keyBy('id');
+
         $out = [];
 
         foreach ($ids as $id) {
@@ -88,8 +94,10 @@ class PurchaseRequisitionService
                 'safety_stock' => $row && $row['safety'] !== null ? (float) $row['safety'] : null,
                 'consumption_last_month' => $prev ? (float) $prev['consumption'] : null,
                 'last_purchase_qty' => $purchase ? (float) $purchase->qty : null,
-                'last_purchase_rate' => $purchase && $purchase->unit_price !== null ? (float) $purchase->unit_price : null,
-                'last_purchase_date' => $purchase?->purchase_date,
+                'last_purchase_rate' => $purchase && $purchase->unit_price !== null
+                    ? (float) $purchase->unit_price
+                    : ($masters->get($id)?->unit_price !== null ? (float) $masters->get($id)->unit_price : null),
+                'last_purchase_date' => $purchase?->purchase_date ?? $masters->get($id)?->last_addition_reference,
             ];
         }
 

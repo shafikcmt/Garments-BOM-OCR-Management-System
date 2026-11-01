@@ -120,3 +120,19 @@ it('shows 3 on a requisition and its PDF source, and leaves the stored snapshot 
 
     expect((float) $line->fresh()->safety_stock_snapshot)->toBe(2.6923);
 });
+
+it('falls back to the Item Master price and reference date when an item has no purchase', function () {
+    $bare = StockItem::create(['name' => 'Stamp Pad', 'uom' => 'Piece', 'category' => 'Stationery', 'is_active' => true, 'opening_qty' => 5,
+        'opening_as_on' => '2026-08-01', 'unit_price' => 120, 'last_addition_reference' => '2026-10-10']);
+    $bought = StockItem::create(['name' => 'Pen', 'uom' => 'Piece', 'category' => 'Stationery', 'is_active' => true, 'opening_qty' => 5,
+        'opening_as_on' => '2026-08-01', 'unit_price' => 10, 'last_addition_reference' => '2026-01-01']);
+    \App\Models\StockPurchase::create(['stock_item_id' => $bought->id, 'purchase_date' => '2026-09-14', 'qty' => 20, 'unit_price' => 7]);
+
+    $snap = app(\App\Services\PurchaseRequisitionService::class)->snapshots([$bare->id, $bought->id], \Illuminate\Support\Carbon::parse('2026-10-31'));
+
+    expect($snap[$bare->id]['last_purchase_rate'])->toBe(120.0)
+        ->and(\Illuminate\Support\Carbon::parse($snap[$bare->id]['last_purchase_date'])->toDateString())->toBe('2026-10-10')
+        // A real purchase always wins over the master.
+        ->and($snap[$bought->id]['last_purchase_rate'])->toBe(7.0)
+        ->and(\Illuminate\Support\Carbon::parse($snap[$bought->id]['last_purchase_date'])->toDateString())->toBe('2026-09-14');
+});
