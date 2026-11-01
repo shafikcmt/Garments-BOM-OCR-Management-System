@@ -65,7 +65,7 @@ class CategorySummaryExport implements FromArray, WithEvents, WithTitle
             ['Requisitions', (int) $totals['requisitions'], '#,##0'],
             ['Distinct Items', (int) $totals['items'], '#,##0'],
             ['To Be Procured', (float) $totals['to_be_procured'], '#,##0'],
-            ['Total Amount', (float) $totals['amount'], '#,##0.00'],
+            ['Total Amount', (float) $totals['amount'], \App\Support\Quantity::EXCEL_MONEY],
         ];
         foreach ($kpis as $i => [$label, $value, $format]) {
             $from = chr(ord('A') + $i * 2);
@@ -146,7 +146,7 @@ class CategorySummaryExport implements FromArray, WithEvents, WithTitle
         $sheet->getStyle('A'.$firstBody.':'.$last.$row)->getFont()->setSize(10);
         $sheet->getStyle('C'.$firstBody.':C'.$row)->getNumberFormat()->setFormatCode('#,##0');
         $sheet->getStyle('D'.$firstBody.':E'.$row)->getNumberFormat()->setFormatCode('#,##0');
-        $sheet->getStyle('F'.$firstBody.':F'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
+        $sheet->getStyle('F'.$firstBody.':F'.$row)->getNumberFormat()->setFormatCode(\App\Support\Quantity::EXCEL_MONEY);
         $sheet->getStyle('G'.$firstBody.':H'.$row)->getNumberFormat()->setFormatCode('0.0%');
         $sheet->getStyle('A'.$firstBody.':A'.$row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle('C'.$firstBody.':H'.$row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);

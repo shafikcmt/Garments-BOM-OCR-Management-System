@@ -78,7 +78,7 @@
 
 @unless($compact)
     {{-- Same filters as Requirement vs Issue, kept under sum[...] in the URL. --}}
-    <form method="GET" class="row g-2 gx-stock-filter mb-3">
+    <form method="GET" class="row g-2 gx-stock-filter mb-3" id="sumFilters">
         @foreach(request()->except(['sum', 'sum_page']) as $name => $value)
             @if(is_scalar($value))
                 <input type="hidden" name="{{ $name }}" value="{{ $value }}">
@@ -141,10 +141,34 @@
             <input type="search" name="sum[search]" id="sumSearch" class="form-control form-control-sm" value="{{ $f['search'] }}" placeholder="SKU, item or specification" maxlength="100">
         </div>
         <div class="col-12 d-flex gap-2">
-            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
+            {{-- Filters apply as you change them (script below); the button is for scripts-off browsers. --}}
+            <noscript><button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button></noscript>
             <a href="{{ $here([]) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset</a>
         </div>
     </form>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var form = document.getElementById('sumFilters');
+            if (!form) { return; }
+            var timer = null;
+            function later(ms) { clearTimeout(timer); timer = setTimeout(function () {
+                try { sessionStorage.setItem('sumFocus', document.activeElement && document.activeElement.id === 'sumSearch' ? '1' : ''); } catch (e) {}
+                form.submit();
+            }, ms); }
+            form.addEventListener('change', function (e) { if (e.target.id !== 'sumSearch') { later(500); } });
+            var search = document.getElementById('sumSearch');
+            if (search) {
+                search.addEventListener('input', function () { later(700); });
+                search.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); later(0); } });
+                try {
+                    if (sessionStorage.getItem('sumFocus') === '1') {
+                        sessionStorage.removeItem('sumFocus');
+                        search.focus(); search.setSelectionRange(search.value.length, search.value.length);
+                    }
+                } catch (e) {}
+            }
+        });
+    </script>
 @endunless
 
 {{-- Cards: the active view's own totals, so they always equal its totals

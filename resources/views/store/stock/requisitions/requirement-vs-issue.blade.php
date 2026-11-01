@@ -153,10 +153,12 @@
                         <label class="form-label small fw-semibold mb-1" for="rviSearch">Search</label>
                         <input type="search" name="search" id="rviSearch" class="form-control form-control-sm" value="{{ $filters['search'] }}" placeholder="SKU, item or specification" maxlength="100">
                     </div>
-                    <div class="col-12 col-xl-2 gx-stock-filter-actions d-flex gap-2">
-                        <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button>
-                        <a href="{{ route('store.stock.requisitions.requirement-vs-issue') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset</a>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#rviMore" aria-expanded="{{ $moreOpen ? 'true' : 'false' }}" aria-controls="rviMore">
+                    <div class="col-12 col-xl-auto gx-stock-filter-actions d-flex align-items-end gap-2">
+                        {{-- Filters apply as you change them (script below); the button
+                             is only for a browser with scripts off. --}}
+                        <noscript><button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply</button></noscript>
+                        <a href="{{ route('store.stock.requisitions.requirement-vs-issue') }}" class="btn btn-sm btn-outline-secondary text-nowrap"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reset</a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" data-bs-toggle="collapse" data-bs-target="#rviMore" aria-expanded="{{ $moreOpen ? 'true' : 'false' }}" aria-controls="rviMore">
                             <i class="bi bi-sliders me-1" aria-hidden="true"></i>More filters
                         </button>
                     </div>
@@ -388,6 +390,31 @@
     </style>
 
     <script>
+        // Filters apply as they change: no Apply button. A pick submits after a
+        // short pause (so several quick picks in a dropdown make one request),
+        // typing in Search after a longer one, and the Search box keeps focus.
+        document.addEventListener('DOMContentLoaded', function () {
+            var form = document.getElementById('rviFilters');
+            if (!form) { return; }
+            var timer = null;
+            function later(ms) { clearTimeout(timer); timer = setTimeout(function () {
+                try { sessionStorage.setItem('rviFocus', document.activeElement && document.activeElement.id === 'rviSearch' ? '1' : ''); } catch (e) {}
+                form.submit();
+            }, ms); }
+            form.addEventListener('change', function (e) { if (e.target.id !== 'rviSearch') { later(500); } });
+            var search = document.getElementById('rviSearch');
+            if (search) {
+                search.addEventListener('input', function () { later(700); });
+                search.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); later(0); } });
+                try {
+                    if (sessionStorage.getItem('rviFocus') === '1') {
+                        sessionStorage.removeItem('rviFocus');
+                        search.focus(); search.setSelectionRange(search.value.length, search.value.length);
+                    }
+                } catch (e) {}
+            }
+        });
+
         // Dependent Section list: only sections of the checked departments;
         // all sections when none is checked. The server applies the same rule.
         document.addEventListener('DOMContentLoaded', function () {
