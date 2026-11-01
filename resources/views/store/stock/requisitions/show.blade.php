@@ -107,6 +107,15 @@
                 <a href="{{ route('store.stock.requisitions.excel', $requisition) }}" class="btn btn-outline-secondary">
                     <i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i>Excel
                 </a>
+                @unless($requisition->isDepartmentLevel())
+                    {{-- Like the Monthly Report: the whole sheet, then one per category. --}}
+                    <a href="{{ route('store.stock.requisitions.pdf', [$requisition, 'view' => 'category']) }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF by Category
+                    </a>
+                    <a href="{{ route('store.stock.requisitions.excel', [$requisition, 'view' => 'category']) }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i>Excel by Category
+                    </a>
+                @endunless
                 <a href="{{ route('store.stock.requisitions.index') }}" class="btn btn-outline-secondary">
                     <i class="bi bi-list-ul me-1" aria-hidden="true"></i>{{ \App\Models\PurchaseRequisition::listLabelFor(auth()->user()) }}
                 </a>
@@ -155,7 +164,7 @@
             {{-- Key facts as tiles; the approval chain as steps below. --}}
             <div class="gx-facts">
                 <div class="gx-fact"><span>Requisition Date</span><b>{{ optional($requisition->requisition_date)->format('d M Y') ?? '—' }}</b></div>
-                <div class="gx-fact"><span>Kind</span><b>{{ \App\Models\PurchaseRequisition::typeLabels()[$requisition->requisition_type] ?? 'Monthly' }}@if($requisition->isIndividual()) <em>· not merged</em>@endif</b></div>
+@if($requisition->isDepartmentLevel())                <div class="gx-fact"><span>Kind</span><b>{{ \App\Models\PurchaseRequisition::typeLabels()[$requisition->requisition_type] ?? 'Monthly' }}@if($requisition->isIndividual()) <em>· not merged</em>@endif</b></div>@endif
                 <div class="gx-fact"><span>Type</span><b>{{ \App\Models\PurchaseRequisition::modeLabels()[$requisition->mode] ?? $requisition->mode }}</b></div>
                 <div class="gx-fact">
                     <span>Level</span>
@@ -282,9 +291,9 @@
                             <th rowspan="2" class="text-nowrap">SKU</th>
                             <th rowspan="2" style="min-width:200px;">Name of Item</th>
                             <th rowspan="2">Uom</th>
-                            <th rowspan="2">Category</th>
                             <th rowspan="2" style="min-width:140px;">Specification / Brand</th>
                             <th rowspan="2">Type</th>
+                            <th rowspan="2">Category</th>
                             <th rowspan="2" style="min-width:130px;">User Dept. / Section</th>
                             {{-- Stock in Hand and Safety Stock figures are shown to Store (and Admin / Management) only. --}}
                             @php($showStockFigures = $showStockFigures ?? false)
@@ -307,11 +316,29 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($requisition->items as $i => $line)
+                        {{-- The Final Requisition reads by category — largest spend first,
+                             the Category Summary's order — each closed by its own sum.
+                             A department's sheet keeps the order it was written in. --}}
+                        @php($entries = $requisition->printEntries())
+                        @php($serial = 0)
+                        @foreach($entries as $entry)
+                            @if(isset($entry['sum']))
+                                <tr class="gx-cat-sum">
+                                    <td colspan="8" class="text-end">Category Sum: {{ $entry['sum'] }}</td>
+                                    <td class="text-end">{{ $qty($entry['qty']) }}</td>
+                                    <td colspan="6"></td>
+                                    <td class="text-end">{{ $qty($entry['tbp']) }}</td>
+                                    <td></td>
+                                    <td class="text-end">{{ $money($entry['amount']) }}</td>
+                                    <td></td>
+                                </tr>
+                                @continue
+                            @endif
+                            @php($line = $entry['line'])
                             @php($original = ($originalQty ?? [])[$line->id] ?? null)
                             @php($notApproved = (float) $line->qty_requested <= 0)
                             <tr @class(['gx-line-not-approved' => $notApproved])>
-                                <td class="text-center gx-line-no">{{ $i + 1 }}</td>
+                                <td class="text-center gx-line-no">{{ ++$serial }}</td>
                                 {{-- One row per item: the entry form's per-department
                                      lines were merged on save, so nothing here can
                                      repeat an item or its stock figure. --}}
@@ -329,9 +356,9 @@
                                     @endif
                                 </td>
                                 <td class="small">{{ $line->uom_snapshot ?: '—' }}</td>
-                                <td class="small text-muted">{{ optional($line->itemCategory)->name ?: '—' }}</td>
                                 <td class="small">{{ $line->specification ?: '—' }}</td>
                                 <td class="small">{{ $line->type ? ($typeLabels[$line->type] ?? $line->type) : '—' }}</td>
+                                <td class="small text-muted">{{ optional($line->itemCategory)->name ?: '—' }}</td>
                                 <td class="small gx-line-dept">{{ $line->user_dept ?: '—' }}</td>
 
                                 <td class="text-end fw-bold">

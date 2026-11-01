@@ -66,25 +66,37 @@
         ['Status', $requisition->isDepartmentLevel() ? $requisition->progressLabel() : $requisition->statusLabel()],
     ];
 
-    $rightRows = [
-        ['Type', \App\Models\PurchaseRequisition::modeLabels()[$requisition->mode] ?? $requisition->mode],
-    ];
-    foreach ($signatures as $box) {
-        $rightRows[] = [
-            $box['label'].($box['title'] !== '' ? ' ('.$box['title'].')' : ''),
-            $box['signed_at']
-                ? $box['name'].' · '.$box['signed_at']->format('d-M-Y')
-                : ($box['stamped'] ? 'Pending' : ($box['name'] !== '' ? $box['name'] : '-')),
-        ];
-    }
-    $rightRows[] = ['Total Amount', $money($rows->sum('amount'))];
+    $withCategory = $withCategory ?? false;
 
-    // Pad the shorter column so the two sides stay paired row for row.
-    $lines = max(count($leftRows), count($rightRows));
-    $infoRows = [];
-    for ($i = 0; $i < $lines; $i++) {
-        $infoRows[] = array_merge($leftRows[$i] ?? ['', ''], $rightRows[$i] ?? ['', '']);
-    }
+    // The right-hand column and the two sides paired row for row, for the rows
+    // of one sheet (a category sheet shows its own Total Amount).
+    $infoFor = function ($sheetRows) use ($requisition, $signatures, $money, $leftRows) {
+        $rightRows = [
+            ['Type', \App\Models\PurchaseRequisition::modeLabels()[$requisition->mode] ?? $requisition->mode],
+        ];
+        foreach ($signatures as $box) {
+            $rightRows[] = [
+                $box['label'].($box['title'] !== '' ? ' ('.$box['title'].')' : ''),
+                $box['signed_at']
+                    ? $box['name'].' · '.$box['signed_at']->format('d-M-Y')
+                    : ($box['stamped'] ? 'Pending' : ($box['name'] !== '' ? $box['name'] : '-')),
+            ];
+        }
+        $rightRows[] = ['Total Amount', $money($sheetRows->sum('amount'))];
+
+        $lines = max(count($leftRows), count($rightRows));
+        $infoRows = [];
+        for ($i = 0; $i < $lines; $i++) {
+            $infoRows[] = array_merge($leftRows[$i] ?? ['', ''], $rightRows[$i] ?? ['', '']);
+        }
+
+        return $infoRows;
+    };
+
+    // One page per entry: the sheet itself, then — By Category — one per
+    // category. A plain download is the one page.
+    $pages = $pages ?? [['title' => $title, 'rows' => $rows, 'withCategory' => $withCategory]];
+    $infoRows = $infoFor($rows);
 @endphp
 <!doctype html>
 <html>
@@ -93,14 +105,21 @@
     @include('store.stock.requisitions._report-styles')
 </head>
 <body>
-
+@foreach($pages as $pageIndex => $page)
+@php
+    $rows = $page['rows'];
+    $withCategory = $page['withCategory'];
+    $pageTitle = $page['title'];
+    $infoRows = $infoFor($rows);
+@endphp
+@unless($forExcel)<div @if($pageIndex > 0) style="page-break-before: always;" @endif>@endunless
 @unless($forExcel)
     <table class="top">
         <tr>
             <td style="width:25%;">&nbsp;</td>
             <td style="width:50%;">
                 <div class="company">{{ $letterhead }}</div>
-                <div class="title">{{ $title }}</div>
+                <div class="title">{{ $pageTitle }}</div>
             </td>
             <td style="width:25%;" class="date-area">
                 <div>Printed On</div>
@@ -124,7 +143,7 @@
          information pair. Type sizes and alignment come from FormatsStoreSheet;
          HTML cannot carry them into a spreadsheet. --}}
     @php
-        $columns = 21;
+        $columns = $withCategory ? 22 : 21;
         $labelSpan = 4;
         $valueSpan = 6;
         $rightLabelSpan = 4;
@@ -132,7 +151,7 @@
     @endphp
     <table>
         <tr><td colspan="{{ $columns }}">{{ $letterhead }}</td></tr>
-        <tr><td colspan="{{ $columns }}">{{ $title }}</td></tr>
+        <tr><td colspan="{{ $columns }}">{{ $pageTitle }}</td></tr>
         @foreach($infoRows as [$label, $value, $rightLabel, $rightValue])
             <tr>
                 <td colspan="{{ $labelSpan }}">{{ $label }}</td>
@@ -147,6 +166,7 @@
 
 @include('store.stock.requisitions._report-rows', [
     'rows' => $rows,
+    'withCategory' => $withCategory,
     'emptyMessage' => 'No items on this requisition.',
 ])
 
@@ -168,12 +188,13 @@
     @include('store.stock.requisitions._signature-block', ['signatures' => $signatures, 'forExcel' => false])
 
     <div class="footer">
-        {{ $letterhead }} &mdash; {{ $title }} &mdash; {{ $requisition->requisition_no }}
+        {{ $letterhead }} &mdash; {{ $pageTitle }} &mdash; {{ $requisition->requisition_no }}
         <span class="right">Generated {{ \App\Support\LocalTime::now()->format('d M Y') }}</span>
     </div>
 @else
-    @include('store.stock.requisitions._signature-block', ['signatures' => $signatures, 'forExcel' => true, 'columns' => 21])
+    @include('store.stock.requisitions._signature-block', ['signatures' => $signatures, 'forExcel' => true, 'columns' => $withCategory ? 22 : 21])
 @endunless
-
+@unless($forExcel)</div>@endunless
+@endforeach
 </body>
 </html>

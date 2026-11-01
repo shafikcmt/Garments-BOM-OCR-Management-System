@@ -404,6 +404,10 @@ Each approver finds it under **My Approvals** and presses **Approve** or **Retur
 
 If a final sheet is deleted or cancelled, its department sheets become free to merge again.
 
+**The Final Requisition by category.** The final sheet lists its items by category, the largest spend first (the same order as the **Category Summary**), with a **Category** column after **Type**. After each category a highlighted **Category Sum** row shows that category's quantity, quantity to buy and amount. **PDF** and **Excel** download the sheet as it reads. **PDF by Category** and **Excel by Category** add one page or sheet per category after it, as the Monthly Report does. Excel is set for A4 landscape, one page wide, with the table heading repeated on every page.
+
+The **Category Summary** is built from the same lines, so its category amounts and total are the Final Requisition's figures. The **Monthly Report** recalculates stock across sheets, so its totals can differ slightly.
+
 **3. An Individual requisition**
 
 ```

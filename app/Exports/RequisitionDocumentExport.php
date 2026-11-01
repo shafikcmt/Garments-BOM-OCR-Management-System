@@ -38,6 +38,10 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
         private readonly string $title,
         private readonly array $signatures,
         private readonly ?string $departmentHeadName = null,
+        // The Final Requisition: a Category column and a Category Sum row per category.
+        private readonly bool $withCategory = false,
+        // A category's own sheet in the By Category workbook.
+        private readonly ?string $sheetName = null,
     ) {
     }
 
@@ -49,6 +53,7 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
             'title' => $this->title,
             'signatures' => $this->signatures,
             'departmentHeadName' => $this->departmentHeadName,
+            'withCategory' => $this->withCategory,
             'forExcel' => true,
         ]);
     }
@@ -60,7 +65,7 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
      */
     public function title(): string
     {
-        $clean = str_replace([':', '\\', '/', '?', '*', '[', ']'], '-', $this->requisition->requisition_no ?: 'Requisition');
+        $clean = str_replace([':', '\\', '/', '?', '*', '[', ']'], '-', $this->sheetName ?? ($this->requisition->requisition_no ?: 'Requisition'));
 
         return Str::limit(trim($clean) ?: 'Requisition', 31, '');
     }

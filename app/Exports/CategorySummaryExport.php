@@ -163,7 +163,7 @@ class CategorySummaryExport implements FromArray, WithEvents, WithTitle
 
         // Footnote.
         $note = $row + 2;
-        $sheet->setCellValue('A'.$note, 'Counted requisitions only (drafts and sheets still with a head are not included). To Be Procured = Qty − Stock in Hand + Safety Stock, stock counted once per item. Red = more spend than '.$d['previousLabel'].', green = less.');
+        $sheet->setCellValue('A'.$note, 'Counted requisitions as raised: the same figures as the Final Requisition\'s category sums. Categories run largest spend first. Drafts and sheets still with a head are not included. Red = more spend than '.$d['previousLabel'].', green = less.');
         $sheet->mergeCells('A'.$note.':H'.($note + 1));
         $sheet->getStyle('A'.$note)->applyFromArray(['font' => ['italic' => true, 'size' => 9, 'color' => ['argb' => 'FF64748B']], 'alignment' => ['wrapText' => true, 'vertical' => Alignment::VERTICAL_TOP]]);
 

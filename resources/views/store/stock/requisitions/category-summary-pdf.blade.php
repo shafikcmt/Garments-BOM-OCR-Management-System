@@ -64,6 +64,6 @@
     </tr></tfoot>
     @endif
 </table>
-<p style="color:#64748b;font-size:8px;margin-top:8px;">Counted requisitions only (drafts and sheets still with a head are not included). To Be Procured = Qty - Stock in Hand + Safety Stock, stock counted once per item.</p>
+<p style="color:#64748b;font-size:8px;margin-top:8px;">Counted requisitions as raised: the same figures as the Final Requisition's category sums. Categories run largest spend first. Drafts and sheets still with a head are not included.</p>
 </body>
 </html>

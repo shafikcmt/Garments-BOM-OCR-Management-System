@@ -172,7 +172,7 @@
                         </tr></tfoot>
                     </table>
                 </div>
-                <p class="small text-muted mt-3 mb-0">Counted requisitions only. A red arrow means more spend than {{ $previousLabel }}; green means less.</p>
+                <p class="small text-muted mt-3 mb-0">Counted requisitions as raised: the same figures as the Final Requisition's category sums (the Monthly Report recalculates stock across sheets, so its totals can differ). Categories run largest spend first, as on the Final Requisition. A red arrow means more spend than {{ $previousLabel }}; green means less.</p>
             @endif
         </div>
     </div>

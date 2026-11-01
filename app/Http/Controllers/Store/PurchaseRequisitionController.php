@@ -1255,29 +1255,46 @@ class PurchaseRequisitionController extends Controller
      * the monthly report, so a requisition printed on its own carries exactly
      * the figures it will carry in the month it belongs to.
      */
-    public function pdf(PurchaseRequisition $requisition, MonthlyRequisitionReportService $report)
+    public function pdf(Request $request, PurchaseRequisition $requisition, MonthlyRequisitionReportService $report)
     {
         $this->authorizeVisible($requisition);
 
         $data = $this->documentData($requisition, $report);
+        $grouped = ! $requisition->isDepartmentLevel();
+
+        // The Final Requisition is grouped by category; "By Category" adds one
+        // page per category after it, as the Monthly Report's download does.
+        $pages = [['title' => $data['title'], 'rows' => $data['rows'], 'withCategory' => $grouped]];
+
+        if ($grouped && $request->query('view') === 'category') {
+            foreach (\App\Support\CategoryGroups::ofRows($data['rows']) as $category => $rows) {
+                $pages[] = ['title' => $data['title'].' — '.$category, 'rows' => $rows->values(), 'withCategory' => false];
+            }
+        }
 
         // Landscape A4: the sheet is 21 columns wide and will not fit portrait.
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView('store.stock.requisitions.document-pdf', $data)
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('store.stock.requisitions.document-pdf', $data + ['pages' => $pages, 'withCategory' => $grouped])
             ->setPaper('a4', 'landscape')
             ->download($this->documentFilename($requisition).'.pdf');
     }
 
-    /** The same document as a single-sheet workbook. */
-    public function excel(PurchaseRequisition $requisition, MonthlyRequisitionReportService $report)
+    /** The same document as a workbook; By Category adds a sheet per category. */
+    public function excel(Request $request, PurchaseRequisition $requisition, MonthlyRequisitionReportService $report)
     {
         $this->authorizeVisible($requisition);
 
         $data = $this->documentData($requisition, $report);
+        $grouped = ! $requisition->isDepartmentLevel();
+        $suffix = '';
 
-        return Excel::download(
-            new RequisitionDocumentExport($requisition, $data['rows'], $data['title'], $data['signatures'], $data['departmentHeadName']),
-            $this->documentFilename($requisition).'.xlsx',
-        );
+        if ($grouped && $request->query('view') === 'category') {
+            $export = new \App\Exports\RequisitionCategoryExport($requisition, $data['rows'], $data['title'], $data['signatures'], $data['departmentHeadName']);
+            $suffix = '-by-category';
+        } else {
+            $export = new RequisitionDocumentExport($requisition, $data['rows'], $data['title'], $data['signatures'], $data['departmentHeadName'], $grouped);
+        }
+
+        return Excel::download($export, $this->documentFilename($requisition).$suffix.'.xlsx');
     }
 
     /**
@@ -1603,7 +1620,7 @@ class PurchaseRequisitionController extends Controller
         // else they are blanked, not dropped, so the printed sheet keeps its
         // exact 21-column layout.
         $user = auth()->user();
-        if (! ($user && PurchaseRequisition::seesEveryRequisition($user))) {
+        if (! $requisition->isIndividual() && ! ($user && PurchaseRequisition::seesEveryRequisition($user))) {
             $rows = $rows->map(fn ($row) => array_merge($row, ['stock_in_hand' => null, 'safety_stock' => null]));
         }
 

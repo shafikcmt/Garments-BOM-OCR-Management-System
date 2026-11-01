@@ -3,15 +3,22 @@
 namespace App\Services;
 
 use App\Models\PurchaseRequisition;
+use App\Support\CategoryGroups;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
  * At-a-glance, category-wise summary of a month's purchase requisitions, for
- * management. It reads the same monthly rows the Monthly Report does
- * (MonthlyRequisitionReportService), so its totals always agree with that
- * report; it only adds each category's share of the month and its change
- * against the month before.
+ * management.
+ *
+ * It is built from the counted requisition sheets AS RAISED — the same stored
+ * lines the Final Requisition prints — so a Final Requisition's category
+ * subtotals and this summary are the same figures. (The Monthly Report
+ * recalculates a month by merging items across sheets against the latest
+ * stock, so its totals can differ; that is its own, labelled, view.)
+ *
+ * Categories come in CategoryGroups order — largest spend first — the order
+ * the Final Requisition and its Excel use, too.
  */
 class CategorySummary
 {
@@ -20,38 +27,13 @@ class CategorySummary
     }
 
     /**
-     * Monthly against Individual requisitions of the month, as raised: how many
-     * counted sheets and their stored line amounts. "Monthly" is the department
-     * monthly sheets and the Store's Final Requisitions; "Individual" the
-     * one-off sheets that are never merged.
-     *
-     * @return array<string, array{label: string, requisitions: int, amount: float}>
-     */
-    private function kinds(Carbon $monthStart): array
-    {
-        $counted = fn () => PurchaseRequisition::query()->countedInTotals()->forMonth($monthStart->format('Y-m'));
-        $individual = fn ($q) => $q->where('level', PurchaseRequisition::LEVEL_DEPARTMENT)->where('requisition_type', PurchaseRequisition::TYPE_INDIVIDUAL);
-
-        $of = function ($query) {
-            return [
-                'requisitions' => (clone $query)->count(),
-                'amount' => (float) \App\Models\PurchaseRequisitionItem::whereIn('purchase_requisition_id', (clone $query)->select('purchase_requisitions.id'))->sum('amount'),
-            ];
-        };
-
-        return [
-            PurchaseRequisition::TYPE_MONTHLY => ['label' => 'Monthly'] + $of($counted()->whereNot(fn ($q) => $individual($q))),
-            PurchaseRequisition::TYPE_INDIVIDUAL => ['label' => 'Individual'] + $of($individual($counted())),
-        ];
-    }
-
-    /**
-     * @return array{totals: array<string, mixed>, previous: array<string, mixed>, categories: Collection<int, array<string, mixed>>, top: ?array<string, mixed>}
+     * @return array{kinds: array, totals: array<string, mixed>, previous: array<string, mixed>, categories: Collection<int, array<string, mixed>>, top: ?array<string, mixed>}
      */
     public function build(Carbon $monthStart): array
     {
-        $current = $this->report->summary($this->report->rows($monthStart));
-        $previous = $this->report->summary($this->report->rows($monthStart->copy()->subMonthNoOverflow()));
+        $sheets = $this->sheets($monthStart);
+        $current = $this->summarise($sheets);
+        $previous = $this->summarise($this->sheets($monthStart->copy()->subMonthNoOverflow()));
 
         $total = (float) $current['amount'];
 
@@ -67,15 +49,74 @@ class CategorySummary
                     'change' => $before !== null && $before > 0 ? round(($row['amount'] - $before) / $before * 100, 1) : null,
                 ];
             })
-            ->sortByDesc('amount')
             ->values();
 
         return [
-            'kinds' => $this->kinds($monthStart),
+            'kinds' => $this->kinds($sheets),
             'totals' => $current,
             'previous' => $previous,
             'categories' => $categories,
             'top' => $categories->first(),
+        ];
+    }
+
+    /** The sheets that count as the month's demand, with what a row needs. */
+    private function sheets(Carbon $monthStart): Collection
+    {
+        return PurchaseRequisition::query()
+            ->countedInTotals()
+            ->forMonth($monthStart->format('Y-m'))
+            ->with(['items.stockItem', 'items.itemCategory', 'indentSection', 'indentPerson'])
+            ->get();
+    }
+
+    /**
+     * Monthly against Individual, as raised. "Monthly" is the department
+     * monthly sheets and the Store's Final Requisitions; "Individual" the
+     * one-off sheets that are never merged.
+     *
+     * @return array<string, array{label: string, requisitions: int, amount: float}>
+     */
+    private function kinds(Collection $sheets): array
+    {
+        $individual = $sheets->filter(fn (PurchaseRequisition $s) => $s->isDepartmentLevel() && $s->isIndividual());
+        $monthly = $sheets->reject(fn (PurchaseRequisition $s) => $s->isDepartmentLevel() && $s->isIndividual());
+        $of = fn (Collection $group) => [
+            'requisitions' => $group->count(),
+            'amount' => (float) $group->sum(fn (PurchaseRequisition $s) => $s->items->sum('amount')),
+        ];
+
+        return [
+            PurchaseRequisition::TYPE_MONTHLY => ['label' => 'Monthly'] + $of($monthly),
+            PurchaseRequisition::TYPE_INDIVIDUAL => ['label' => 'Individual'] + $of($individual),
+        ];
+    }
+
+    /**
+     * Headline figures and the same per category, in CategoryGroups order.
+     *
+     * @return array<string, mixed>
+     */
+    private function summarise(Collection $sheets): array
+    {
+        $rows = $sheets->flatMap(fn (PurchaseRequisition $s) => $this->report->requisitionRows($s))->values();
+
+        $perCategory = CategoryGroups::ofRows($rows)->map(fn (Collection $group) => [
+            'lines' => $group->count(),
+            'items' => $group->pluck('stock_item_id')->unique()->count(),
+            'qty_requested' => (float) $group->sum('qty_requested'),
+            'to_be_procured' => (float) $group->sum('to_be_procured'),
+            'amount' => (float) $group->sum('amount'),
+        ]);
+
+        return [
+            'requisitions' => $sheets->count(),
+            'lines' => $rows->count(),
+            'items' => $rows->pluck('stock_item_id')->unique()->count(),
+            'qty_requested' => (float) $rows->sum('qty_requested'),
+            'to_be_procured' => (float) $rows->sum('to_be_procured'),
+            'amount' => (float) $rows->sum('amount'),
+            'per_category' => $perCategory,
         ];
     }
 }

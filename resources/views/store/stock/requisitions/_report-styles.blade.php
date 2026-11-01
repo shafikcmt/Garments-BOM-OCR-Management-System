@@ -52,7 +52,10 @@
     .w-uom { width: 3%; }
     .w-spec { width: 7%; }
     .w-type { width: 4%; }
+    .w-cat { width: 6%; }
     .w-dept { width: 8%; }
+    .report-table tr.cat-sum td { background: #fff4d6; font-weight: 800; border-color: #d97706; }
+    .report-table tr { page-break-inside: avoid; }
     .w-remarks { width: 6%; }
 
     .sign { margin-top: 22px; }

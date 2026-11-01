@@ -7,10 +7,37 @@
     disagree with the printed page.
 
     Expects: $rows, and the $qty / $money / $date formatters.
+
+    $withCategory (the Final Requisition) adds a Category column after Type
+    and groups the rows by category — largest spend first, the order of the
+    Category Summary — each group closed by a highlighted "Category Sum" row.
 --}}
 @php
     $forExcel = $forExcel ?? false;
+    $withCategory = $withCategory ?? false;
     $sectionTotal = $rows->sum('amount');
+    $columns = $withCategory ? 22 : 21;
+
+    // The lines in print order, with a sum row after each category.
+    $entries = [];
+    if ($withCategory) {
+        foreach (\App\Support\CategoryGroups::ofRows($rows) as $category => $group) {
+            foreach ($group as $line) {
+                $entries[] = ['row' => $line];
+            }
+            $entries[] = [
+                'sum' => $category,
+                'qty' => $group->sum('qty_requested'),
+                'tbp' => $group->sum('to_be_procured'),
+                'amount' => $group->sum('amount'),
+            ];
+        }
+    } else {
+        foreach ($rows as $line) {
+            $entries[] = ['row' => $line];
+        }
+    }
+    $serial = 0;
 @endphp
 
 <table class="report-table">
@@ -21,6 +48,7 @@
             <th rowspan="2" class="w-uom">Uom</th>
             <th rowspan="2" class="w-spec">Specification / Brand &amp; Model</th>
             <th rowspan="2" class="w-type">Type (Replace/ New)</th>
+            @if($withCategory)<th rowspan="2" class="w-cat">Category</th>@endif
             <th rowspan="2" class="w-dept">User Dept./ Section</th>
             <th colspan="4">Stock Details</th>
             <th colspan="3">Last Purchase Details</th>
@@ -49,9 +77,23 @@
         </tr>
     </thead>
     <tbody>
-        @forelse($rows as $i => $row)
+        @forelse($entries as $entry)
+            @if(isset($entry['sum']))
+                {{-- Category Sum: the category's own figures, highlighted. --}}
+                <tr class="cat-sum">
+                    <td colspan="7" class="total-label">Category Sum: {{ $entry['sum'] }}</td>
+                    <td class="num">{{ $qty($entry['qty']) }}</td>
+                    <td colspan="6"></td>
+                    <td class="num">{{ $qty($entry['tbp']) }}</td>
+                    <td></td>
+                    <td class="num">{{ $money($entry['amount']) }}</td>
+                    <td colspan="5"></td>
+                </tr>
+                @continue
+            @endif
+            @php($row = $entry['row'])
             <tr>
-                <td class="num">{{ $i + 1 }}</td>
+                <td class="num">{{ ++$serial }}</td>
                 {{-- The item name only; the sheets a row came from are listed
                      in the header's Requisition No. A line naming something
                      not in the Item Master says so next to the name, on paper
@@ -64,6 +106,7 @@
                 <td>{{ $row['uom'] ?: '—' }}</td>
                 <td>{{ $row['specification'] ?: '-' }}</td>
                 <td>{{ $row['type'] ? ($typeLabels[$row['type']] ?? $row['type']) : '-' }}</td>
+                @if($withCategory)<td>{{ $row['category'] ?: '-' }}</td>@endif
                 <td>{{ $row['user_dept'] ?: '-' }}</td>
 
                 <td class="num">{{ $qty($row['qty_requested']) }}</td>
@@ -88,7 +131,7 @@
                 <td>{{ $row['remarks'] ?: '-' }}</td>
             </tr>
         @empty
-            <tr><td colspan="21" class="empty">{{ $emptyMessage ?? 'No requisitions raised in this month.' }}</td></tr>
+            <tr><td colspan="{{ $columns }}" class="empty">{{ $emptyMessage ?? 'No requisitions raised in this month.' }}</td></tr>
         @endforelse
     </tbody>
     @if($rows->isNotEmpty())
@@ -96,7 +139,7 @@
             {{-- "Total-" with the Amount sum, exactly where the reference
                  workbook puts it (column P). --}}
             <tr class="total">
-                <td colspan="15" class="total-label">Total-</td>
+                <td colspan="{{ $columns - 6 }}" class="total-label">Total-</td>
                 <td class="num">{{ $money($sectionTotal) }}</td>
                 <td colspan="5"></td>
             </tr>

@@ -124,6 +124,7 @@ trait FormatsStoreSheet
         $this->styleTitleBlock($sheet, $headerStart, $lastColumn);
         $this->styleHeader($sheet, $headerStart, $headerEnd, $lastColumn);
         $this->styleBody($sheet, $headerStart, $firstDataRow, $lastDataRow, $lastColumnIndex);
+        $this->styleCategorySums($sheet, $firstDataRow, $lastDataRow, $lastColumn);
 
         if ($totalRow !== null) {
             $this->styleTotalRow($sheet, $totalRow, $lastColumn, $lastColumnIndex);
@@ -252,6 +253,9 @@ trait FormatsStoreSheet
         // losing the first column; this clears it and still wastes no width.
         $sheet->getPageMargins()->setTop(0.4)->setBottom(0.4)->setLeft(0.3)->setRight(0.3);
         $sheet->getPageMargins()->setHeader(0.2)->setFooter(0.2);
+
+        // Page x of y and the sheet's name at the foot of every printed page.
+        $sheet->getHeaderFooter()->setOddFooter('&L&8&A&R&8Page &P of &N');
     }
 
     /**
@@ -565,6 +569,31 @@ trait FormatsStoreSheet
     }
 
     /**
+     * A Final Requisition's "Category Sum: …" rows: the category's own figures,
+     * set apart from the item rows by an amber band and a rule above.
+     */
+    private function styleCategorySums(Worksheet $sheet, int $firstDataRow, int $lastDataRow, string $lastColumn): void
+    {
+        for ($row = $firstDataRow; $row <= $lastDataRow; $row++) {
+            if (! str_starts_with(trim((string) $sheet->getCell('A'.$row)->getValue()), 'Category Sum')) {
+                continue;
+            }
+
+            $sheet->getStyle('A'.$row.':'.$lastColumn.$row)->applyFromArray([
+                'font' => ['bold' => true, 'size' => 10],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFFFF4D6']],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => false],
+                'borders' => [
+                    'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FFD97706']],
+                    'bottom' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FFD97706']],
+                ],
+            ]);
+            $sheet->getStyle('A'.$row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getRowDimension($row)->setRowHeight(18);
+        }
+    }
+
+    /**
      * The "Total-" row: heavier type, a medium rule across the top separating
      * it from the last item, and the figure right-aligned under the Amount
      * column it belongs to.
@@ -704,6 +733,10 @@ trait FormatsStoreSheet
         $longest = 0;
 
         for ($row = $from; $row <= $to; $row++) {
+            if ($this->isCategorySumRow($sheet, $row)) {
+                continue;
+            }
+
             $raw = trim((string) $sheet->getCellByColumnAndRow($col, $row)->getValue());
 
             if ($raw === '') {
@@ -736,6 +769,10 @@ trait FormatsStoreSheet
         $seen = 0;
 
         for ($row = $from; $row <= $to; $row++) {
+            if ($this->isCategorySumRow($sheet, $row)) {
+                continue;
+            }
+
             $value = trim((string) $sheet->getCellByColumnAndRow($col, $row)->getValue());
 
             if ($value === '' || $value === '-' || $value === '—') {
@@ -818,11 +855,21 @@ trait FormatsStoreSheet
         $longest = 0;
 
         for ($row = $from; $row <= $to; $row++) {
+            // A "Category Sum" label runs across merged cells; it must not size column A.
+            if ($this->isCategorySumRow($sheet, $row)) {
+                continue;
+            }
+
             $value = (string) $sheet->getCellByColumnAndRow($col, $row)->getValue();
             $longest = max($longest, mb_strlen(trim($value)));
         }
 
         return $longest;
+    }
+
+    private function isCategorySumRow(Worksheet $sheet, int $row): bool
+    {
+        return str_starts_with(trim((string) $sheet->getCell('A'.$row)->getValue()), 'Category Sum');
     }
 
     /** Tolerates the thousands separators a rendered view may have left behind. */

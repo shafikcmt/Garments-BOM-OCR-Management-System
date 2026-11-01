@@ -1009,6 +1009,8 @@
     .gx-stock-dl > dt:nth-last-of-type(1),
     .gx-stock-dl > dd:nth-last-of-type(1) { border-bottom: 0; }
 
+    .gx-line-table tr.gx-cat-sum > td { background: #fff4d6; font-weight: 700; border-top: 1px solid #f3c36b; border-bottom: 1px solid #f3c36b; }
+
     /* --- Requisition facts, approval steps, merged-from chips ------------ */
     .gx-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }
     .gx-fact { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 12px; padding: .65rem .85rem; min-width: 0; }

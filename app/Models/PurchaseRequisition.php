@@ -208,6 +208,47 @@ class PurchaseRequisition extends Model
         ];
     }
 
+    /**
+     * The item lines in the order a Final Requisition reads on screen: by
+     * category (largest spend first, as the Category Summary), each category
+     * closed by a "sum" entry. A department's sheet keeps its written order.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function printEntries(): array
+    {
+        $entries = [];
+
+        if ($this->isDepartmentLevel()) {
+            foreach ($this->items as $line) {
+                $entries[] = ['line' => $line];
+            }
+
+            return $entries;
+        }
+
+        $groups = \App\Support\CategoryGroups::of(
+            $this->items,
+            fn ($l) => optional($l->itemCategory)->name,
+            fn ($l) => $l->amount,
+            fn ($l) => $l->displayName(),
+        );
+
+        foreach ($groups as $category => $group) {
+            foreach ($group as $line) {
+                $entries[] = ['line' => $line];
+            }
+            $entries[] = [
+                'sum' => $category,
+                'qty' => $group->sum('qty_requested'),
+                'tbp' => $group->sum('to_be_procured_qty'),
+                'amount' => $group->sum('amount'),
+            ];
+        }
+
+        return $entries;
+    }
+
     /** A one-off sheet the Store receives but does not merge. */
     public function isIndividual(): bool
     {
