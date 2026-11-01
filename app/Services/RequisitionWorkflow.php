@@ -186,6 +186,12 @@ class RequisitionWorkflow
                     $stage['user'] = User::find(Department::where('key', 'store')->value('head_user_id'));
                     $stage['problem'] = $stage['user'] ? null
                         : $name.' approver is not set. Ask Admin to set the Store department head.';
+                    // The Store Head preparing the Store's own Final Requisition: nobody
+                    // sits between them and themselves, so this step reads as approved
+                    // by them at submit — as a head's own sheet does — and the sheet goes on.
+                    if ($level === RequisitionSignatureBlock::LEVEL_FINAL && $raiser && $stage['user']?->id === $raiser->id) {
+                        $stage['self_approved'] = true;
+                    }
                     break;
 
                 case RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM:

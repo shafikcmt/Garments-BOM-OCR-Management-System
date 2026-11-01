@@ -158,7 +158,7 @@ it('merges one month of received sheets into a final draft, one line per item', 
     $this->actingAs($clerk)->get(route('store.stock.requisitions.show', $final))
         ->assertOk()->assertSee('Merged from 2 department requisitions');
     $this->actingAs($clerk)->get(route('store.stock.requisitions.edit', $final))
-        ->assertOk()->assertSee('Final requisition merged from');
+        ->assertOk()->assertSee('Merged from 2 department requisitions');
 
     // Merged once only.
     mgMerge($clerk, [$cutting])->assertSessionHasErrors('ids');

@@ -408,6 +408,8 @@ If a final sheet is deleted or cancelled, its department sheets become free to m
 
 The **Category Summary** is built from the same lines, so its category amounts and total are the Final Requisition's figures. The **Monthly Report** recalculates stock across sheets, so its totals can differ slightly.
 
+**Large requisitions.** A Final Requisition can have well over a hundred lines. The form sends the lines as one package, so every line, the quantities and the Submit button always reach the server. The Store Head can prepare a Final Requisition; their own Store Head step is then approved when they submit, and Finance & Commercial Head and Operation Head approve it as usual.
+
 **3. An Individual requisition**
 
 ```

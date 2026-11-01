@@ -1771,6 +1771,7 @@ class PurchaseRequisitionController extends Controller
     {
         $unique = 'unique:purchase_requisitions,requisition_no'.($existing ? ','.$existing->id : '');
 
+        $this->readCompactLines($request);
         $this->dropBlankLines($request);
 
         $data = $request->validate([
@@ -1825,6 +1826,29 @@ class PurchaseRequisitionController extends Controller
      * line is kept and validated as ever; if every line was blank, nothing is
      * left and 'items' fails with "Add at least one item".
      */
+    /**
+     * The entry form posts its lines as ONE JSON field (items_json), not as
+     * items[n][field] inputs: a Final Requisition has over a hundred lines, and
+     * PHP drops every posted variable past max_input_vars (1000 by default) —
+     * the last lines and the Submit button's own value among them. The form
+     * script packs the lines on submit; this unpacks them. A plain items[]
+     * post (a script, an old page) still works.
+     */
+    private function readCompactLines(Request $request): void
+    {
+        $json = $request->input('items_json');
+
+        if (! is_string($json) || $json === '') {
+            return;
+        }
+
+        $items = json_decode($json, true);
+
+        if (is_array($items)) {
+            $request->merge(['items' => array_values($items)]);
+        }
+    }
+
     private function dropBlankLines(Request $request): void
     {
         $items = $request->input('items');

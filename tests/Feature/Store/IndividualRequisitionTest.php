@@ -186,3 +186,39 @@ it('splits the Category Summary into monthly and individual sheets', function ()
     $this->actingAs($admin)->get(route('store.stock.requisitions.category-summary.excel', ['month' => '2026-10']))->assertOk();
     $this->actingAs($admin)->get(route('store.stock.requisitions.category-summary.pdf', ['month' => '2026-10']))->assertOk();
 });
+
+it('takes a requisition of over a hundred lines posted as one JSON field', function () {
+    // PHP drops variables past max_input_vars (1000); the form packs the lines
+    // so a Final-sized requisition (and the Submit button's value) always arrives.
+    [, $raiser] = indRaiser();
+    $lines = [];
+    foreach (range(1, 150) as $n) {
+        $item = StockItem::create(['name' => 'Item '.$n, 'uom' => 'Pcs', 'is_active' => true]);
+        $lines[] = ['stock_item_id' => $item->id, 'qty_requested' => $n, 'remarks' => 'r'.$n];
+    }
+
+    $this->actingAs($raiser)->post(route('store.stock.requisitions.store'), [
+        'action' => 'submit', 'mode' => PurchaseRequisition::MODE_MULTI, 'requisition_date' => '2026-10-05',
+        'items_json' => json_encode($lines),
+    ])->assertSessionHasNoErrors()->assertRedirect();
+
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+    expect($sheet->status)->toBe(PurchaseRequisition::STATUS_SUBMITTED)
+        ->and($sheet->items()->count())->toBe(150)
+        ->and((float) $sheet->items()->sum('qty_requested'))->toBe(11325.0);
+});
+
+it('lets the Store Head prepare a Final Requisition: their own Store Head step is approved at submit', function () {
+    $plan = collect(app(\App\Services\RequisitionWorkflow::class)->plan('final', $this->approvers['store_head'], null, null));
+    $storeHeadStage = $plan->first(fn ($s) => $s['assignee_type'] === 'store_head');
+
+    expect($storeHeadStage['self_approved'])->toBeTrue()
+        ->and($storeHeadStage['problem'])->toBeNull()
+        // Finance and Operation still need someone else.
+        ->and($plan->pluck('problem')->filter()->all())->toBe([]);
+
+    // A different Store user preparing it: the Store Head still approves.
+    $other = collect(app(\App\Services\RequisitionWorkflow::class)->plan('final', indUser('store'), null, null))
+        ->first(fn ($s) => $s['assignee_type'] === 'store_head');
+    expect($other['self_approved'])->toBeFalse();
+});

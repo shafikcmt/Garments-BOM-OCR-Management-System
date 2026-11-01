@@ -107,10 +107,16 @@
     @endif
 
     @if($editing && $requisition->mergedSources()->exists())
-        <div class="alert alert-info border-0 shadow-sm rounded-3 small">
-            <i class="bi bi-intersect me-1" aria-hidden="true"></i><strong>Final requisition merged from:</strong>
-            {{ $requisition->mergedSources()->pluck('requisition_no')->implode(', ') }}.
-            Check the quantities, add any Store items, then submit it for approval.
+        {{-- What this final sheet was made from, as chips (as on the requisition page). --}}
+        @php($mergedSources = $requisition->mergedSources()->with('indentSection')->get())
+        <div class="gx-merged mb-3">
+            <div class="gx-merged-head"><i class="bi bi-intersect me-1" aria-hidden="true"></i>Merged from {{ $mergedSources->count() }} department requisition{{ $mergedSources->count() === 1 ? '' : 's' }}</div>
+            <div class="gx-merged-chips">
+                @foreach($mergedSources as $source)
+                    <span class="gx-mchip" title="{{ $source->requisition_no }}"><b>{{ $source->indentSection?->name ?: ucfirst(strtolower(explode('/', $source->requisition_no)[1] ?? $source->requisition_no)) }}</b><span>#{{ \Illuminate\Support\Str::afterLast($source->requisition_no, '/') }}</span></span>
+                @endforeach
+            </div>
+            <div class="small text-muted mt-2">Check the quantities, add any Store items, then submit it for approval.</div>
         </div>
     @endif
 
@@ -1321,6 +1327,26 @@
                 });
 
                 showBlocker('Please complete the form before submitting the requisition.', problems.map(function (p) { return p.message; }));
+            });
+
+            /* The lines travel as one JSON field. A Final Requisition has 100+
+               lines of 9 inputs each, and PHP drops every variable past
+               max_input_vars (1000) — the last lines, and the Submit button's own
+               "action", were lost. Done on `formdata`, the moment the data is
+               built, so the visible inputs are never touched. */
+            form.addEventListener('formdata', function (event) {
+                var lines = {};
+                var packed = [];
+
+                event.formData.forEach(function (value, key) {
+                    var m = /^items\[(\d+)\]\[([^\]]+)\]$/.exec(key);
+                    if (m) { (lines[m[1]] = lines[m[1]] || {})[m[2]] = value; packed.push(key); }
+                });
+
+                if (!packed.length) { return; }
+
+                packed.forEach(function (key) { event.formData.delete(key); });
+                event.formData.set('items_json', JSON.stringify(Object.keys(lines).sort(function (a, b) { return a - b; }).map(function (i) { return lines[i]; })));
             });
 
             // Cleared as soon as the user starts fixing the form, so a stale
