@@ -139,13 +139,50 @@ it('offers a department user both new-requisition buttons and opens the individu
         ->assertOk()->assertSee('New Monthly Requisition')->assertSee('New Individual Requisition');
 
     $this->actingAs($raiser)->get(route('store.stock.requisitions.create', ['type' => 'individual']))
-        ->assertOk()->assertSee('Individual requisition.')->assertSee('value="individual"', false);
+        ->assertOk()->assertSee('New Individual Requisition')->assertSee('value="individual"', false);
 });
 
 it('never makes a Store user\'s own Final Requisition individual', function () {
     $clerk = indUser('store', ['store.requisition.create']);
     $this->actingAs($clerk)->get(route('store.stock.requisitions.create', ['type' => 'individual']))
-        ->assertOk()->assertDontSee('Individual requisition.');
+        ->assertOk()->assertDontSee('New Individual Requisition')->assertSee('New Purchase Requisition');
 
     $this->actingAs($clerk)->get(route('store.stock.requisitions.index'))->assertDontSee('New Individual Requisition');
+});
+
+it('shows the kind on every department sheet and filters the list by it', function () {
+    [, $raiser] = indRaiser();
+    $monthly = indRaise($raiser, PurchaseRequisition::TYPE_MONTHLY);
+    $individual = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+
+    expect($monthly->requisition_type)->toBe('monthly')->and($individual->requisition_type)->toBe('individual');
+
+    $this->actingAs($raiser)->get(route('store.stock.requisitions.index'))
+        ->assertOk()->assertSee($monthly->requisition_no)->assertSee($individual->requisition_no)
+        ->assertSee('Monthly')->assertSee('Individual');
+
+    $this->actingAs($raiser)->get(route('store.stock.requisitions.index', ['type' => 'individual']))
+        ->assertOk()->assertSee($individual->requisition_no)->assertDontSee($monthly->requisition_no);
+});
+
+it('splits the Category Summary into monthly and individual sheets', function () {
+    $this->travelTo('2026-10-20');
+    [$head, $raiser] = indRaiser();
+    $monthly = indRaise($raiser, PurchaseRequisition::TYPE_MONTHLY);
+    $individual = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+    // Both are counted once their head has checked them.
+    indApprove($head, $monthly);
+    indApprove($head, $individual);
+    $monthly->items()->update(['amount' => 100]);
+    $individual->items()->update(['amount' => 40]);
+
+    $kinds = app(\App\Services\CategorySummary::class)->build(\Illuminate\Support\Carbon::parse('2026-10-01'))['kinds'];
+    expect($kinds['monthly']['requisitions'])->toBe(1)->and($kinds['monthly']['amount'])->toBe(100.0)
+        ->and($kinds['individual']['requisitions'])->toBe(1)->and($kinds['individual']['amount'])->toBe(40.0);
+
+    $admin = indUser('admin');
+    $this->actingAs($admin)->get(route('store.stock.requisitions.category-summary', ['month' => '2026-10']))
+        ->assertOk()->assertSee('Individual requisitions')->assertSee('Monthly requisitions');
+    $this->actingAs($admin)->get(route('store.stock.requisitions.category-summary.excel', ['month' => '2026-10']))->assertOk();
+    $this->actingAs($admin)->get(route('store.stock.requisitions.category-summary.pdf', ['month' => '2026-10']))->assertOk();
 });

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PurchaseRequisition;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -16,6 +17,32 @@ class CategorySummary
 {
     public function __construct(private readonly MonthlyRequisitionReportService $report)
     {
+    }
+
+    /**
+     * Monthly against Individual requisitions of the month, as raised: how many
+     * counted sheets and their stored line amounts. "Monthly" is the department
+     * monthly sheets and the Store's Final Requisitions; "Individual" the
+     * one-off sheets that are never merged.
+     *
+     * @return array<string, array{label: string, requisitions: int, amount: float}>
+     */
+    private function kinds(Carbon $monthStart): array
+    {
+        $counted = fn () => PurchaseRequisition::query()->countedInTotals()->forMonth($monthStart->format('Y-m'));
+        $individual = fn ($q) => $q->where('level', PurchaseRequisition::LEVEL_DEPARTMENT)->where('requisition_type', PurchaseRequisition::TYPE_INDIVIDUAL);
+
+        $of = function ($query) {
+            return [
+                'requisitions' => (clone $query)->count(),
+                'amount' => (float) \App\Models\PurchaseRequisitionItem::whereIn('purchase_requisition_id', (clone $query)->select('purchase_requisitions.id'))->sum('amount'),
+            ];
+        };
+
+        return [
+            PurchaseRequisition::TYPE_MONTHLY => ['label' => 'Monthly'] + $of($counted()->whereNot(fn ($q) => $individual($q))),
+            PurchaseRequisition::TYPE_INDIVIDUAL => ['label' => 'Individual'] + $of($individual($counted())),
+        ];
     }
 
     /**
@@ -44,6 +71,7 @@ class CategorySummary
             ->values();
 
         return [
+            'kinds' => $this->kinds($monthStart),
             'totals' => $current,
             'previous' => $previous,
             'categories' => $categories,

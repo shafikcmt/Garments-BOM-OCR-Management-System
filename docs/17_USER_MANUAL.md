@@ -372,7 +372,7 @@ A department or section raises one of two kinds of requisition. On the Purchase 
 | After the head checks it | The Store receives it and **merges** it with the month's other sheets | The Store receives it. It is **not merged** |
 | Then | Final Requisition: Store Head, Finance & Commercial Head, Operation Head | Finance & Commercial Head, then Operation Head approve this same sheet |
 
-Stock figures (Stock in Hand, Safety Stock) are shown to everyone who can open an **Individual** requisition. The Store can still correct quantities as before. An Individual requisition shows an **Individual** badge in the lists.
+Stock figures (Stock in Hand, Safety Stock) are shown to everyone who can open an **Individual** requisition. The Store can still correct quantities as before. Every department requisition shows a **Monthly** or **Individual** badge in the lists, and the list has a **Kind** filter. The kind is saved with the requisition, so the Category Summary shows Monthly and Individual sheets separately.
 
 There are two kinds of sheet.
 

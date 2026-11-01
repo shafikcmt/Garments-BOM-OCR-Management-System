@@ -33,6 +33,12 @@
     <td><span>Total Amount</span><b>{{ $money($totals['amount']) }}</b></td>
 </tr></table>
 
+<table class="kpi" style="margin-bottom:12px;"><tr>
+@foreach($kinds as $kind)
+    <td><span>{{ $kind['label'] }} requisitions</span><b>{{ number_format($kind['requisitions']) }} sheets · {{ $money($kind['amount']) }}</b></td>
+@endforeach
+</tr></table>
+
 <table>
     <thead><tr>
         <th>#</th><th>Category</th><th class="num">Items</th><th class="num">Qty Requested</th><th class="num">To Be Procured</th>

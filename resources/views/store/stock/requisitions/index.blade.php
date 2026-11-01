@@ -119,6 +119,15 @@
                     </select>
                 </div>
                 <div class="col-6 col-md-3 col-xl-2">
+                    <label class="form-label" for="typeFilter">Kind</label>
+                    <select name="type" id="typeFilter" class="form-select">
+                        <option value="">All</option>
+                        @foreach(\App\Models\PurchaseRequisition::typeLabels() as $value => $label)
+                            <option value="{{ $value }}" @selected(($filters['type'] ?? '') === $value)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
                     <label class="form-label" for="sectionFilter">Section</label>
                     <select name="section" id="sectionFilter" class="form-select js-searchable">
                         <option value="">All</option>
@@ -127,7 +136,7 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-12 col-md-6 col-xl-4">
+                <div class="col-12 col-md-6 col-xl-3">
                     <label class="form-label" for="search">Search</label>
                     <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Requisition no, requester, SKU or item">
                 </div>
@@ -162,7 +171,7 @@
                         @forelse($requisitions as $r)
                             <tr>
                                 <td>
-                                    <div class="fw-bold text-slate-900">{{ $r->requisition_no }} @if($r->isIndividual())<span class="badge bg-primary-subtle text-primary ms-1">Individual</span>@endif</div>
+                                    <div class="fw-bold text-slate-900">{{ $r->requisition_no }} @include('store.stock.requisitions._type-badge', ['r' => $r])</div>
                                     <div class="gx-stock-spec">raised by {{ optional($r->createdBy)->name ?: '—' }}</div>
                                 </td>
                                 <td class="small">{{ optional($r->requisition_date)->format('d-M-Y') ?? '—' }}</td>

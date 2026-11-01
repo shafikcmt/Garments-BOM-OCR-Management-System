@@ -81,6 +81,26 @@
         @endforeach
     </div>
 
+    {{-- Monthly against Individual requisitions, as raised. --}}
+    <div class="row g-3 mb-4">
+        @foreach($kinds as $kind)
+            <div class="col-12 col-md-6">
+                <div class="card gx-stock-card h-100">
+                    <div class="gx-stock-tile-body justify-content-between">
+                        <div>
+                            <div class="gx-stock-tile-label">{{ $kind['label'] }} requisitions</div>
+                            <div class="gx-stock-tile-value">{{ number_format($kind['requisitions']) }} <span class="small text-muted fw-normal">sheets</span></div>
+                        </div>
+                        <div class="text-end">
+                            <div class="gx-stock-tile-label">Amount</div>
+                            <div class="gx-stock-tile-value">{{ $money($kind['amount']) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    </div>
+
     <div class="card gx-stock-card">
         <div class="gx-stock-card-body">
             <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">

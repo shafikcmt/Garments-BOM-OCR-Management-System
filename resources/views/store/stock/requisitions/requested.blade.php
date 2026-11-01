@@ -154,7 +154,7 @@
                                     </td>
                                 @endif
                                 <td>
-                                    <div class="fw-bold text-slate-900">{{ $r->requisition_no }} @if($r->isIndividual())<span class="badge bg-primary-subtle text-primary ms-1">Individual</span>@endif</div>
+                                    <div class="fw-bold text-slate-900">{{ $r->requisition_no }} @include('store.stock.requisitions._type-badge', ['r' => $r])</div>
                                     @if($r->store_ack_at)
                                         <div class="gx-stock-spec">received {{ $r->store_ack_at->local()->format('d-M-Y') }}</div>
                                     @endif

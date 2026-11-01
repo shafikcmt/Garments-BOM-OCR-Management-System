@@ -84,8 +84,15 @@ class CategorySummaryExport implements FromArray, WithEvents, WithTitle
         $sheet->getRowDimension(4)->setRowHeight(18);
         $sheet->getRowDimension(5)->setRowHeight(26);
 
+        // Monthly against Individual requisitions, as raised.
+        $kindText = collect($d['kinds'])->map(fn ($k) => $k['label'].': '.number_format($k['requisitions']).' sheets, '.number_format($k['amount'], 2))->implode('     |     ');
+        $sheet->setCellValue('A6', $kindText);
+        $sheet->mergeCells('A6:H6');
+        $sheet->getStyle('A6')->applyFromArray(['font' => ['size' => 10, 'color' => ['argb' => 'FF475569']], 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER]]);
+        $sheet->getRowDimension(6)->setRowHeight(20);
+
         // Table header.
-        $head = 7;
+        $head = 8;
         foreach (['#', 'Category', 'Items', 'Qty Requested', 'To Be Procured', 'Amount', 'Share of Spend', 'vs '.$d['previousLabel']] as $i => $text) {
             $sheet->setCellValue(chr(ord('A') + $i).$head, $text);
         }

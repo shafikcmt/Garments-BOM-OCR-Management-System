@@ -80,6 +80,7 @@ class PurchaseRequisitionController extends Controller
             'section' => ['nullable', 'integer', 'exists:indent_sections,id'],
             'search' => ['nullable', 'string', 'max:100'],
             'level' => ['nullable', 'in:'.PurchaseRequisition::LEVEL_FINAL],
+            'type' => ['nullable', 'in:'.PurchaseRequisition::TYPE_MONTHLY.','.PurchaseRequisition::TYPE_INDIVIDUAL],
         ]);
 
         $requisitions = PurchaseRequisition::query()
@@ -94,6 +95,8 @@ class PurchaseRequisitionController extends Controller
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($filters['section'] ?? null, fn ($q, $id) => $q->where('indent_section_id', $id))
             ->when($filters['level'] ?? null, fn ($q, $level) => $q->where('level', $level))
+            // Monthly / Individual: a department sheet's kind (the Final sheet has none).
+            ->when($filters['type'] ?? null, fn ($q, $type) => $q->where('level', PurchaseRequisition::LEVEL_DEPARTMENT)->where('requisition_type', $type))
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $like = '%'.$search.'%';
                 // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE
