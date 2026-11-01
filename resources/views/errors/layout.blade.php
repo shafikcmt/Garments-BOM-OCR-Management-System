@@ -23,8 +23,12 @@
 </head>
 <body class="gx-error-body">
     <main class="gx-error">
-        <div class="gx-error-card">
-            <div class="gx-error-code @yield('tone', 'is-neutral')">@yield('code')</div>
+        <div class="gx-error-card @yield('tone', 'is-neutral')">
+            <div class="gx-error-brand">HAPL Threadloop</div>
+
+            <div class="gx-error-icon" aria-hidden="true">@yield('icon')</div>
+
+            <div class="gx-error-code">@yield('code')</div>
 
             <h1 class="gx-error-title">@yield('title')</h1>
 
@@ -34,11 +38,18 @@
                 <div class="gx-error-detail">@yield('detail')</div>
             @endif
 
+            @hasSection('status')
+                <div class="gx-error-status"><span class="gx-error-pulse"></span>@yield('status')</div>
+            @endif
+
             <div class="gx-error-actions">
+                @hasSection('reload')
+                    <button type="button" class="btn btn-primary" onclick="location.reload()">Try again</button>
+                @endif
                 @auth
-                    <a href="{{ url('/dashboard') }}" class="btn btn-primary">Back to dashboard</a>
+                    <a href="{{ url('/dashboard') }}" class="btn {{ View::hasSection('reload') ? 'btn-outline-secondary' : 'btn-primary' }}">Back to dashboard</a>
                 @else
-                    <a href="{{ route('login') }}" class="btn btn-primary">Sign in</a>
+                    <a href="{{ route('login') }}" class="btn {{ View::hasSection('reload') ? 'btn-outline-secondary' : 'btn-primary' }}">Sign in</a>
                 @endauth
 
                 <button type="button" class="btn btn-outline-secondary" onclick="history.back()">Go back</button>
@@ -54,5 +65,8 @@
             @endauth
         </div>
     </main>
+    @hasSection('reload')
+        <script>setTimeout(function () { location.reload(); }, 30000);</script>
+    @endif
 </body>
 </html>
