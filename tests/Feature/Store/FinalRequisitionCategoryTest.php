@@ -116,3 +116,25 @@ it('matches the Category Summary to the Final Requisition, in the same category 
 
     Carbon::setTestNow();
 });
+
+it('counts a draft Final Requisition once, not the department sheets merged into it', function () {
+    Carbon::setTestNow('2026-11-02');
+    [$admin, $final] = fcFinal();
+    $final->update(['status' => PurchaseRequisition::STATUS_DRAFT]);
+
+    // A department sheet already merged into that draft: it must not be counted as well.
+    $dept = PurchaseRequisition::create([
+        'requisition_no' => 'HAPL/CUT/2026/October/01', 'requisition_date' => '2026-10-10', 'mode' => PurchaseRequisition::MODE_MULTI,
+        'level' => PurchaseRequisition::LEVEL_DEPARTMENT, 'status' => PurchaseRequisition::STATUS_STORE_REVIEWED,
+        'submitted_at' => now(), 'created_by' => $admin->id,
+    ]);
+    $dept->forceFill(['merged_into_id' => $final->id])->save();
+    PurchaseRequisitionItem::create(['purchase_requisition_id' => $dept->id, 'custom_item_name' => 'Pen', 'sort_order' => 1,
+        'qty_requested' => 99, 'to_be_procured_qty' => 99, 'rate_appx' => 10, 'amount' => 990]);
+
+    $summary = app(CategorySummary::class)->build(Carbon::parse('2026-10-01'));
+    expect($summary['totals']['amount'])->toBe((float) $final->items()->sum('amount'))
+        ->and($summary['totals']['requisitions'])->toBe(1);
+
+    Carbon::setTestNow();
+});

@@ -11,7 +11,8 @@ use Illuminate\Support\Collection;
  * At-a-glance, category-wise summary of a month's purchase requisitions, for
  * management.
  *
- * It is built from the counted requisition sheets AS RAISED — the same stored
+ * It is built from the month's Final Requisitions (draft ones included) and
+ * the unmerged department / individual sheets, AS RAISED — the same stored
  * lines the Final Requisition prints — so a Final Requisition's category
  * subtotals and this summary are the same figures. (The Monthly Report
  * recalculates a month by merging items across sheets against the latest
@@ -60,14 +61,31 @@ class CategorySummary
         ];
     }
 
-    /** The sheets that count as the month's demand, with what a row needs. */
+    /**
+     * The sheets that make up the month's demand, each counted once:
+     *
+     *   - every Final Requisition of the month that is not cancelled — a DRAFT
+     *     one too, since that is what the Store is working from; and
+     *   - the department / individual sheets that are counted and NOT merged
+     *     into a final (a sheet merged into one is already in that final's
+     *     lines, so counting both would double the demand).
+     */
     private function sheets(Carbon $monthStart): Collection
     {
-        return PurchaseRequisition::query()
-            ->countedInTotals()
-            ->forMonth($monthStart->format('Y-m'))
-            ->with(['items.stockItem', 'items.itemCategory', 'indentSection', 'indentPerson'])
+        $month = $monthStart->format('Y-m');
+        $with = ['items.stockItem', 'items.itemCategory', 'indentSection', 'indentPerson'];
+
+        $finals = PurchaseRequisition::query()->forMonth($month)->with($with)
+            ->where('level', PurchaseRequisition::LEVEL_FINAL)
+            ->where('status', '<>', PurchaseRequisition::STATUS_CANCELLED)
             ->get();
+
+        $others = PurchaseRequisition::query()->countedInTotals()->forMonth($month)->with($with)
+            ->where('level', '<>', PurchaseRequisition::LEVEL_FINAL)
+            ->whereNull('merged_into_id')
+            ->get();
+
+        return $finals->concat($others)->values();
     }
 
     /**
