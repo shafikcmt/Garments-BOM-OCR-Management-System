@@ -13,6 +13,7 @@ use App\Http\Controllers\Store\IssueSetupController;
 use App\Http\Controllers\Store\PurchaseSetupController;
 use App\Http\Controllers\Store\StockSetupController;
 use App\Http\Controllers\Store\PurchaseRequisitionController;
+use App\Http\Controllers\Store\CategorySummaryController;
 use App\Http\Controllers\Store\MonthlyRequisitionReportController;
 use App\Http\Controllers\Store\RequirementVsIssueController;
 use App\Http\Controllers\Store\StockSummaryController;
@@ -385,6 +386,12 @@ Route::prefix('store')
                 ->name('requisitions.report.pdf');
             Route::get('/requisitions/report/excel', [MonthlyRequisitionReportController::class, 'excel'])
                 ->name('requisitions.report.excel');
+
+            // Category Summary — management's at-a-glance spend by item
+            // category, with PDF / Excel. Fixed paths, above /{requisition}.
+            Route::get('/requisitions/category-summary', [CategorySummaryController::class, 'index'])->name('requisitions.category-summary');
+            Route::get('/requisitions/category-summary/pdf', [CategorySummaryController::class, 'pdf'])->name('requisitions.category-summary.pdf');
+            Route::get('/requisitions/category-summary/excel', [CategorySummaryController::class, 'excel'])->name('requisitions.category-summary.excel');
 
             // Requirement vs Issue — requested against issued, per section
             // and item. The controller checks store.requirement_issue.view

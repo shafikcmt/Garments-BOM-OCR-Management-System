@@ -29,12 +29,14 @@
         </a>
     </li>
     @if($seesQueue)
-        {{-- The Final requisitions made by merging the departments' sheets. --}}
-        <li class="nav-item">
-            <a class="nav-link {{ $active === 'index' && request('level') === 'final' ? 'active' : '' }}" href="{{ route('store.stock.requisitions.index', ['level' => 'final']) }}">
-                Final Requisitions
-            </a>
-        </li>
+        {{-- Final requisitions are a view of the list, so they have a button in
+             the page header rather than a tab of their own. The tab shows only
+             while that view is open, so it is clear where you are. --}}
+        @if($active === 'index' && request('level') === 'final')
+            <li class="nav-item">
+                <a class="nav-link active" href="{{ route('store.stock.requisitions.index', ['level' => 'final']) }}">Final Requisitions</a>
+            </li>
+        @endif
         <li class="nav-item">
             <a class="nav-link {{ $active === 'requested' ? 'active' : '' }}" href="{{ route('store.stock.requisitions.requested') }}">
                 Requested
@@ -53,7 +55,8 @@
             </a>
         </li>
     @endif
-    @if(($departmentReviewCount ?? null) !== null)
+    {{-- Shown only when something is waiting for this department head. --}}
+    @if(($departmentReviewCount ?? null) !== null && ($departmentReviewCount > 0 || $active === 'department'))
         <li class="nav-item">
             <a class="nav-link {{ $active === 'department' ? 'active' : '' }}" href="{{ route('store.stock.requisitions.department-review') }}">
                 Department Review
