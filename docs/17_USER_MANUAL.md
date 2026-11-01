@@ -364,6 +364,16 @@ Left menu order for Store: **Purchase Requisition, Receiving, Issues, Stock Repo
 
 ### 5.1 Purchase requisition: from a section's sheet to the final approval
 
+A department or section raises one of two kinds of requisition. On the Purchase Requisition page press **New Monthly Requisition** or **New Individual Requisition**.
+
+| | Monthly | Individual |
+|---|---|---|
+| Use it for | The regular monthly needs | A one-off, urgent or special purchase |
+| After the head checks it | The Store receives it and **merges** it with the month's other sheets | The Store receives it. It is **not merged** |
+| Then | Final Requisition: Store Head, Finance & Commercial Head, Operation Head | Finance & Commercial Head, then Operation Head approve this same sheet |
+
+Stock figures (Stock in Hand, Safety Stock) are shown to everyone who can open an **Individual** requisition. The Store can still correct quantities as before. An Individual requisition shows an **Individual** badge in the lists.
+
 There are two kinds of sheet.
 
 **1. The department / section sheet (3 steps)**
@@ -387,12 +397,20 @@ The same items come every month, so the Store joins one month's received sheets 
 3. The final sheet then goes through the approvers set by Admin, normally:
 
 ```
-Store Head -> HR Audit -> Finance & Commercial -> Operation Head (final approval)
+Store Head -> Finance & Commercial -> Operation Head (final approval)
 ```
 
 Each approver finds it under **My Approvals** and presses **Approve** or **Return**. The final sheets are listed under the **Final Requisitions** tab.
 
 If a final sheet is deleted or cancelled, its department sheets become free to merge again.
+
+**3. An Individual requisition**
+
+```
+Prepared (section staff) -> Section / Department Head -> Received by Store -> Finance & Commercial Head -> Operation Head (final approval)
+```
+
+It is never merged. The approvers are set by Admin in **Admin > Requisition Signatures**, under **Individual Requisition**. HR Audit is not part of the Monthly (final) or the Individual steps. An Admin can still add it back in Requisition Signatures. Sheets already on their way keep the steps they started with.
 
 **To Be Procured.** The system works out the quantity to buy for each item: **Qty Requested − Stock in Hand + Safety Stock**, as a round figure. Example: Qty 420, Stock 180, Safety Stock 42.54 (shown as 43) → 420 − 180 + 43 = **283**. If the stock already covers the request and the safety level, To Be Procured is 0. Amount = To Be Procured × Rate. All quantities on a requisition (screen, PDF and Excel) are shown as round figures; rates and amounts keep 2 decimals.
 

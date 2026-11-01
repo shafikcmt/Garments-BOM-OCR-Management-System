@@ -49,9 +49,20 @@
             {{-- One entry form covers both cases: a one-item requisition is
                  simply this form with a single line, so there is nothing for
                  a separate "Single Item" button to open. --}}
-            <a href="{{ route('store.stock.requisitions.create') }}" class="btn btn-primary">
-                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>New Requisition
-            </a>
+            @if(\App\Models\PurchaseRequisition::levelFor(auth()->user()) === \App\Models\PurchaseRequisition::LEVEL_DEPARTMENT)
+                {{-- A department raises either kind: Monthly is merged by the Store
+                     with the month's others; Individual is a one-off that is not merged. --}}
+                <a href="{{ route('store.stock.requisitions.create', ['type' => 'individual']) }}" class="btn btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>New Individual Requisition
+                </a>
+                <a href="{{ route('store.stock.requisitions.create', ['type' => 'monthly']) }}" class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>New Monthly Requisition
+                </a>
+            @else
+                <a href="{{ route('store.stock.requisitions.create') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>New Requisition
+                </a>
+            @endif
         </x-slot:actions>
     </x-page-header>
 
@@ -151,7 +162,7 @@
                         @forelse($requisitions as $r)
                             <tr>
                                 <td>
-                                    <div class="fw-bold text-slate-900">{{ $r->requisition_no }}</div>
+                                    <div class="fw-bold text-slate-900">{{ $r->requisition_no }} @if($r->isIndividual())<span class="badge bg-primary-subtle text-primary ms-1">Individual</span>@endif</div>
                                     <div class="gx-stock-spec">raised by {{ optional($r->createdBy)->name ?: '—' }}</div>
                                 </td>
                                 <td class="small">{{ optional($r->requisition_date)->format('d-M-Y') ?? '—' }}</td>

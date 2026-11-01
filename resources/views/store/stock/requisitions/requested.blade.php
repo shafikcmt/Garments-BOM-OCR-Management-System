@@ -104,7 +104,7 @@
 
             {{-- Step 4: tick received sheets of ONE month and merge them into
                  the final requisition (a draft the Store checks, then
-                 submits for Store Head → HR Audit → Finance → Operation Head).
+                 submits for Store Head → Finance → Operation Head).
                  The checkboxes sit in the table and post this form through
                  their form="" attribute — the rows already hold forms of
                  their own, and forms cannot nest. --}}
@@ -154,7 +154,7 @@
                                     </td>
                                 @endif
                                 <td>
-                                    <div class="fw-bold text-slate-900">{{ $r->requisition_no }}</div>
+                                    <div class="fw-bold text-slate-900">{{ $r->requisition_no }} @if($r->isIndividual())<span class="badge bg-primary-subtle text-primary ms-1">Individual</span>@endif</div>
                                     @if($r->store_ack_at)
                                         <div class="gx-stock-spec">received {{ $r->store_ack_at->local()->format('d-M-Y') }}</div>
                                     @endif

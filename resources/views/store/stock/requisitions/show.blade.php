@@ -155,6 +155,7 @@
             {{-- Key facts as tiles; the approval chain as steps below. --}}
             <div class="gx-facts">
                 <div class="gx-fact"><span>Requisition Date</span><b>{{ optional($requisition->requisition_date)->format('d M Y') ?? '—' }}</b></div>
+                <div class="gx-fact"><span>Kind</span><b>{{ \App\Models\PurchaseRequisition::typeLabels()[$requisition->requisition_type] ?? 'Monthly' }}@if($requisition->isIndividual()) <em>· not merged</em>@endif</b></div>
                 <div class="gx-fact"><span>Type</span><b>{{ \App\Models\PurchaseRequisition::modeLabels()[$requisition->mode] ?? $requisition->mode }}</b></div>
                 <div class="gx-fact">
                     <span>Level</span>
@@ -233,7 +234,7 @@
                         {{ $requisition->mergedInto->requisition_no }}
                     @endif
                     ({{ $requisition->mergedInto->progressLabel() }})@if($requisition->merged_at) on {{ $requisition->merged_at->local()->format('d-M-Y') }}@endif.
-                    <span class="d-block mt-1">The final requisition carries these items through Store Head, HR Audit, Finance &amp; Commercial and Operation Head approval.</span>
+                    <span class="d-block mt-1">The final requisition carries these items through Store Head, Finance &amp; Commercial and Operation Head approval.</span>
                 </div>
             @elseif($requisition->isReadyToMerge())
                 <div class="alert alert-light border mt-3 mb-0 small">

@@ -123,12 +123,17 @@ Spare Part. Production Material waits for the Phase 1 Material Item Master.
 - **Purchase Requisition (General Stock):** department sheet = Prepared →
   Section/Department Head → Received by Store (any Store user). The Store
   merges ONE month's received sheets into a final sheet; the merging Store
-  user is "Prepared by"; final = Store Head → HR Audit → Finance & Commercial
-  → Operation Head (final approval). Approvers are maintained in Admin >
-  Requisition Signatures. The same items repeat monthly, so reports are
+  user is "Prepared by"; final = Store Head → Finance & Commercial
+  → Operation Head (final approval). HR Audit is in no chain (owner,
+  2026-11-02). Approvers are maintained in Admin > Requisition Signatures.
+  **Two kinds** (`requisition_type`): *monthly* (merged as above) and
+  *individual* (a one-off: head → Received by Store → Finance & Commercial →
+  Operation Head, never merged; its own "Individual Requisition" boxes; stock
+  figures visible to all who open it). The same items repeat monthly, so reports are
   month-based and merged demand counts once in its own month.
 - Stock figures (in hand, safety, consumption, last purchase) are visible to
-  Store, Admin and Management only.
+  Store, Admin and Management only — except on an Individual requisition,
+  where everyone who can open it sees them.
 - Store users do not raise department sheets on a section's behalf (owner
   declined this, 2026-10-07).
 - Reusable primitives to build on: Department / Section / Head hierarchy,

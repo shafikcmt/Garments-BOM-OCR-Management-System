@@ -17,6 +17,8 @@ class RequisitionSignatureBlock extends Model
 {
     public const LEVEL_DEPARTMENT = 'department';
     public const LEVEL_FINAL = 'final';
+    /** An individual (unmerged) requisition: its own approval boxes. */
+    public const LEVEL_INDIVIDUAL = 'individual';
 
     public const ASSIGNEE_REQUESTER = 'requester';
     public const ASSIGNEE_DEPARTMENT_HEAD = 'department_head';
@@ -53,6 +55,7 @@ class RequisitionSignatureBlock extends Model
         return [
             self::LEVEL_DEPARTMENT => 'Department Requisition',
             self::LEVEL_FINAL => 'Final Purchase Requisition',
+            self::LEVEL_INDIVIDUAL => 'Individual Requisition',
         ];
     }
 

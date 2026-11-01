@@ -27,8 +27,11 @@ use Illuminate\Validation\ValidationException;
  *
  *   Department sheet: Prepared → Section/Department Head → Received by Store
  *                     (any Store user). It then waits to be merged.
- *   Final sheet:      Prepared (the merge) → Store Head → HR Audit →
+ *   Final sheet:      Prepared (the merge) → Store Head →
  *                     Finance & Commercial → Operation Head
+ *   Individual sheet: Prepared → Section/Department Head → Received by Store
+ *                     → Finance & Commercial → Operation Head. A one-off: it
+ *                     is not merged (requisition_type = individual).
  *
  * WHO APPROVES A STAGE is fixed at submit and saved on the plan:
  *   - Requester's Department Head: the review chain (nearest head; a head's
@@ -246,10 +249,18 @@ class RequisitionWorkflow
      */
     public function isStoreStep(PurchaseRequisition $requisition, ?PurchaseRequisitionStage $stage): bool
     {
-        return $stage !== null
-            && $requisition->isDepartmentLevel()
-            && ! PurchaseRequisitionStage::where('purchase_requisition_id', $stage->purchase_requisition_id)
-                ->where('cycle', $stage->cycle)->where('sequence', '>', $stage->sequence)->exists();
+        if ($stage === null || ! $requisition->isDepartmentLevel()) {
+            return false;
+        }
+
+        // An individual sheet goes on to Finance and Operation after the
+        // Store, so its Store step is the one the Store Head box fills.
+        if ($requisition->isIndividual()) {
+            return $stage->stamp_source === RequisitionSignatureBlock::STAMP_STORE_HEAD;
+        }
+
+        return ! PurchaseRequisitionStage::where('purchase_requisition_id', $stage->purchase_requisition_id)
+            ->where('cycle', $stage->cycle)->where('sequence', '>', $stage->sequence)->exists();
     }
 
     /** The Store step, still waiting: the sender may name the Store user who gets it. */
@@ -308,7 +319,7 @@ class RequisitionWorkflow
     {
         $raiser = $requisition->createdBy()->first();
         $section = $requisition->indentSection()->first() ?: $raiser?->requisitionSection;
-        $plan = $this->plan($requisition->level, $raiser, $section, $requisition->department_role);
+        $plan = $this->plan($requisition->signatureLevel(), $raiser, $section, $requisition->department_role);
 
         $problems = collect($plan)->pluck('problem')->filter()->unique()->values()->all();
 
@@ -323,7 +334,7 @@ class RequisitionWorkflow
             'purchase_requisition_id' => $requisition->id,
             'cycle' => $cycle,
             'sequence' => 1,
-            'label' => RequisitionSignatureBlock::query()->forLevel($requisition->level)->value('label') ?: 'Prepared by',
+            'label' => RequisitionSignatureBlock::query()->forLevel($requisition->signatureLevel())->value('label') ?: 'Prepared by',
             'assignee_type' => RequisitionSignatureBlock::ASSIGNEE_REQUESTER,
             'assignee_user_id' => $raiser?->id,
             'assignee_name' => $raiser?->name,
@@ -933,7 +944,8 @@ class RequisitionWorkflow
      */
     private function complete(PurchaseRequisition $requisition, User $user): void
     {
-        if ($requisition->isDepartmentLevel()) {
+        // An individual sheet is approved by its own chain; it never waits to be merged.
+        if ($requisition->isDepartmentLevel() && ! $requisition->isIndividual()) {
             if ($requisition->status === PurchaseRequisition::STATUS_SUBMITTED) {
                 $requisition->forceFill([
                     'status' => PurchaseRequisition::STATUS_STORE_REVIEWED,
@@ -969,7 +981,7 @@ class RequisitionWorkflow
             return PurchaseRequisitionAction::HEAD_APPROVED;
         }
 
-        if ($last && ! $requisition->isDepartmentLevel()) {
+        if ($last && (! $requisition->isDepartmentLevel() || $requisition->isIndividual())) {
             return PurchaseRequisitionAction::APPROVED;
         }
 

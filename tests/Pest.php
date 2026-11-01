@@ -70,10 +70,28 @@ function requisitionApprovers(): array
         ['label' => 'Store', 'head_user_id' => $approvers['store_head']->id, 'is_active' => true]
     );
 
+    // The shipped Final chain has no HR Audit box (owner, 2026-11-02), but Admin
+    // may still add one. These tests exercise that longer chain, so put the
+    // box back as Admin would: Prepared, Store Head, HR Audit, Finance, Operation.
+    if (! \App\Models\RequisitionSignatureBlock::query()->where('level', 'final')->where('title', 'HR Head')->exists()) {
+        \App\Models\RequisitionSignatureBlock::query()->forLevel('final')->where('sequence', '>=', 3)->orderByDesc('sequence')->get()
+            ->each(fn ($b) => $b->update(['sequence' => $b->sequence + 1]));
+        \App\Models\RequisitionSignatureBlock::create([
+            'level' => 'final', 'sequence' => 3, 'label' => 'Audit by', 'title' => 'HR Head',
+            'assignee_type' => 'user', 'user_id' => $approvers['hr']->id, 'stamp_source' => null,
+        ]);
+    }
+
     // Final sheet boxes 3, 4 and 5 are the specific-user stages.
     $final = \App\Models\RequisitionSignatureBlock::query()->forLevel('final')->get()->values();
     foreach (['hr', 'finance', 'operation'] as $i => $key) {
         $final->get($i + 2)?->update(['assignee_type' => 'user', 'user_id' => $approvers[$key]->id]);
+    }
+
+    // Individual sheet: boxes 4 and 5 are Finance and Operation.
+    $individual = \App\Models\RequisitionSignatureBlock::query()->forLevel('individual')->get()->values();
+    foreach (['finance', 'operation'] as $i => $key) {
+        $individual->get($i + 3)?->update(['assignee_type' => 'user', 'user_id' => $approvers[$key]->id]);
     }
 
     // As saving Requisition Signatures does: whoever holds a stage can open

@@ -140,7 +140,7 @@ it('prints the final sheet boxes on ALL and category tabs, the department boxes 
 
     $final = RequisitionSignatureBlock::query()->forLevel(RequisitionSignatureBlock::LEVEL_FINAL)->count();
     $department = RequisitionSignatureBlock::query()->forLevel(RequisitionSignatureBlock::LEVEL_DEPARTMENT)->count();
-    expect($final)->toBe(5)->and($department)->toBe(3);
+    expect($final)->toBe(4)->and($department)->toBe(3);
 
     $book = mhWorkbook(['view' => Report::VIEW_CATEGORY]);
     expect($book['ALL']['boxes'])->toBe($final)
@@ -280,7 +280,7 @@ it('starts the section-wise export with an ALL tab that the section tabs add up 
     // tabs keep theirs.
     expect($all['text'])->toContain('HAPL/Dept./ALL/2026/September/01')->toContain('Stock in Hand')
         ->not->toContain('Stock Allocated')->not->toContain(Report::SECTION_STOCK_NOTE)
-        ->and(substr_count($all['text'], 'Signature & Date'))->toBe(5)
+        ->and(substr_count($all['text'], 'Signature & Date'))->toBe(4)
         ->and($cut['text'])->toContain('HAPL/Dept./CUTTING/2026/September/01')->toContain('Stock Allocated')
         ->and(substr_count($cut['text'], 'Signature & Date'))->toBe(3);
 });

@@ -36,6 +36,14 @@ class PurchaseRequisition extends Model
     /** The full form with dynamic item rows. */
     public const MODE_MULTI = 'multi';
 
+    /**
+     * Monthly: received by the Store and merged with the month's other sheets
+     * into one Final Requisition. Individual: a one-off, received by the Store
+     * and NOT merged — Finance & Commercial Head and Operation Head approve it.
+     */
+    public const TYPE_MONTHLY = 'monthly';
+    public const TYPE_INDIVIDUAL = 'individual';
+
     public const STATUS_DRAFT = 'draft';
     public const STATUS_SUBMITTED = 'submitted';
     public const STATUS_STORE_REVIEWED = 'store_reviewed';
@@ -76,6 +84,7 @@ class PurchaseRequisition extends Model
         'requisition_date',
         'mode',
         'level',
+        'requisition_type',
         'department_role',
         'unit_name',
         'indent_section_id',
@@ -188,6 +197,40 @@ class PurchaseRequisition extends Model
     public function isDepartmentLevel(): bool
     {
         return $this->level === self::LEVEL_DEPARTMENT;
+    }
+
+    /** @return array<string, string> type => label */
+    public static function typeLabels(): array
+    {
+        return [
+            self::TYPE_MONTHLY => 'Monthly',
+            self::TYPE_INDIVIDUAL => 'Individual',
+        ];
+    }
+
+    /** A one-off sheet the Store receives but does not merge. */
+    public function isIndividual(): bool
+    {
+        return $this->requisition_type === self::TYPE_INDIVIDUAL;
+    }
+
+    /**
+     * Which set of approval boxes this sheet follows (Admin > Requisition
+     * Signatures): its level, or "individual" for an individual sheet.
+     */
+    public function signatureLevel(): string
+    {
+        return $this->isIndividual()
+            ? RequisitionSignatureBlock::LEVEL_INDIVIDUAL
+            : ($this->level ?: self::LEVEL_FINAL);
+    }
+
+    /** The boxes a sheet of this level and type follows, before it exists. */
+    public static function signatureLevelFor(string $level, ?string $type): string
+    {
+        return $level === self::LEVEL_DEPARTMENT && $type === self::TYPE_INDIVIDUAL
+            ? RequisitionSignatureBlock::LEVEL_INDIVIDUAL
+            : $level;
     }
 
     /**
@@ -466,7 +509,7 @@ class PurchaseRequisition extends Model
     |
     | A department sheet ends at "Received by Store". The Store then merges
     | received sheets into its own final Purchase Requisition, which is the
-    | one that goes through Store Head, HR Audit, Finance & Commercial and
+    | one that goes through Store Head, Finance & Commercial and
     | Operation Head. merged_into_id links the two.
     */
 
@@ -496,6 +539,7 @@ class PurchaseRequisition extends Model
     public function isReadyToMerge(): bool
     {
         return $this->isDepartmentLevel()
+            && ! $this->isIndividual()
             && $this->status === self::STATUS_STORE_REVIEWED
             && $this->merged_into_id === null;
     }
@@ -503,6 +547,7 @@ class PurchaseRequisition extends Model
     public function scopeReadyToMerge(Builder $query): Builder
     {
         return $query->where('level', self::LEVEL_DEPARTMENT)
+            ->where('requisition_type', '<>', self::TYPE_INDIVIDUAL)
             ->where('status', self::STATUS_STORE_REVIEWED)
             ->whereNull('merged_into_id');
     }
@@ -735,11 +780,17 @@ class PurchaseRequisition extends Model
         // A final sheet on its way through the approvals names the stage it
         // waits at — "With HR Head" — not the status its Store Head stage
         // happened to write ("Received by Store").
-        if (! $this->isDepartmentLevel() && $this->usesStageEngine() && (int) $this->current_stage > 1
+        if ((! $this->isDepartmentLevel() || $this->isIndividual()) && $this->usesStageEngine() && (int) $this->current_stage > 1
             && in_array($this->status, [self::STATUS_SUBMITTED, self::STATUS_STORE_REVIEWED], true)) {
             $stage = $this->relationLoaded('stages')
                 ? $this->stages->where('sequence', $this->current_stage)->sortByDesc('cycle')->first()
                 : $this->stages()->where('sequence', $this->current_stage)->reorder()->orderByDesc('cycle')->first();
+
+            // An individual sheet's head and Store steps read as they do on any
+            // department sheet ("With Production Head", "Sent to Store").
+            if ($stage && $this->isIndividual() && in_array($stage->stamp_source, [RequisitionSignatureBlock::STAMP_DEPARTMENT_HEAD, RequisitionSignatureBlock::STAMP_STORE_HEAD], true)) {
+                $stage = null;
+            }
 
             if ($stage) {
                 return 'With '.(trim((string) $stage->title) ?: $stage->label);

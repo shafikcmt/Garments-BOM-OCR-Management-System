@@ -67,7 +67,7 @@
                                     [$sinceText, $sinceClass] = $waitingSince($d['days']);
                                 @endphp
                                 <tr>
-                                    <td class="fw-semibold">{{ $r->requisition_no }}</td>
+                                    <td class="fw-semibold">{{ $r->requisition_no }} @if($r->isIndividual())<span class="badge bg-primary-subtle text-primary ms-1">Individual</span>@endif</td>
                                     <td>{{ \App\Models\PurchaseRequisition::levelLabels()[$r->level] ?? $r->level }}</td>
                                     <td>{{ $r->isDepartmentLevel() ? ($r->indentSection?->name ?: $r->departmentLabel()) : 'Store' }}</td>
                                     <td>
@@ -118,7 +118,7 @@
                                         [$sinceText, $sinceClass] = $waitingSince($details[$r->id]['days'] ?? null);
                                     @endphp
                                     <tr>
-                                        <td class="fw-semibold">{{ $r->requisition_no }}</td>
+                                        <td class="fw-semibold">{{ $r->requisition_no }} @if($r->isIndividual())<span class="badge bg-primary-subtle text-primary ms-1">Individual</span>@endif</td>
                                         <td>{{ $note?->actorName() ?: '—' }}@if($note?->stageLabel()) <span class="text-muted">· {{ $note->stageLabel() }}</span>@endif</td>
                                         <td class="small">{{ $note?->comment ?: '—' }}</td>
                                         <td><span class="{{ $sinceClass }}">{{ $sinceText }}</span></td>
@@ -159,7 +159,7 @@
                                     [$sinceText, $sinceClass] = $waitingSince($details[$r->id]['days'] ?? null);
                                 @endphp
                                 <tr>
-                                    <td class="fw-semibold">{{ $r->requisition_no }}</td>
+                                    <td class="fw-semibold">{{ $r->requisition_no }} @if($r->isIndividual())<span class="badge bg-primary-subtle text-primary ms-1">Individual</span>@endif</td>
                                     <td>{{ \App\Models\PurchaseRequisition::levelLabels()[$r->level] ?? $r->level }}</td>
                                     <td>{{ $r->isDepartmentLevel() ? ($r->indentSection?->name ?: $r->departmentLabel()) : 'Store' }}</td>
                                     <td>{{ $r->createdBy?->name ?: '—' }}</td>

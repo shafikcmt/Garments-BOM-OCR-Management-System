@@ -66,6 +66,11 @@ class RequisitionSignatureSettingController extends Controller
         $levels = array_keys(RequisitionSignatureBlock::levelLabels());
         $roles = array_keys(RequisitionSignatureResolver::roleLabels());
 
+        // The Individual boxes are a later addition: a form posted without that
+        // level (an older page, a script) leaves it as it is instead of failing.
+        $posted = array_keys((array) $request->input('blocks', []));
+        $levels = array_values(array_filter($levels, fn ($level) => $level !== RequisitionSignatureBlock::LEVEL_INDIVIDUAL || in_array($level, $posted, true)));
+
         $data = $request->validate([
             'blocks' => ['required', 'array'],
             'blocks.*' => ['nullable', 'array'],

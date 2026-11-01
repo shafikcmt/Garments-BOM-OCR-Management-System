@@ -129,6 +129,20 @@
              requisition to its first line, so leaving the old value here would
              silently drop lines added on this screen. --}}
         <input type="hidden" name="mode" id="requisitionMode" value="multi">
+        @php($requisitionType = $requisitionType ?? 'monthly')
+        <input type="hidden" name="requisition_type" value="{{ $requisitionType }}">
+        @if($requisitionType === 'individual')
+            <div class="alert alert-primary border-0 shadow-sm rounded-3 small">
+                <i class="bi bi-person-check me-1" aria-hidden="true"></i><strong>Individual requisition.</strong>
+                After your head checks it, the Store receives it. It is not merged with the month's other requisitions;
+                Finance &amp; Commercial Head and then Operation Head approve it.
+            </div>
+        @elseif(\App\Models\PurchaseRequisition::levelFor(auth()->user()) === \App\Models\PurchaseRequisition::LEVEL_DEPARTMENT)
+            <div class="alert alert-light border small">
+                <i class="bi bi-calendar3 me-1" aria-hidden="true"></i><strong>Monthly requisition.</strong>
+                The Store receives it and merges it with the month's other requisitions into one Final Requisition.
+            </div>
+        @endif
 
         <div class="card gx-stock-card mb-4">
             <div class="gx-stock-card-body">

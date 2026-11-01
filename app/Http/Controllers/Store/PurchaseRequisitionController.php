@@ -164,9 +164,11 @@ class PurchaseRequisitionController extends Controller
         // What a department user's form has fixed for them — section, head,
         // contact, User Dept. — and nothing at all for the Store's own form.
         $defaults = DepartmentRequisitionDefaults::for($request->user());
+        $type = $this->typeFor($defaults, $request->query('type'));
 
-        return view('store.stock.requisitions.create', $this->formData($defaults) + [
+        return view('store.stock.requisitions.create', $this->formData($defaults, null, $type) + [
             'mode' => $mode,
+            'requisitionType' => $type,
             // A preview, not a reservation: whoever saves first takes it, and
             // it changes with the section, so the form recomputes it there too.
             // A department sheet previews under ITS section from the start.
@@ -495,7 +497,7 @@ class PurchaseRequisitionController extends Controller
 
     /**
      * Approve the stage a stage-engine sheet waits at — the head check, the
-     * Store Head, HR Audit, Finance & Commercial, Operation Head alike. Only
+     * Store Head, Finance & Commercial, Operation Head alike. Only
      * the person named on the sheet's plan; the raiser never.
      */
     public function stageApprove(Request $request, PurchaseRequisition $requisition)
@@ -660,7 +662,7 @@ class PurchaseRequisitionController extends Controller
     | Requisition: a draft, one line per item (quantities added, the User
     | Dept. cell listing every department that asked). The Store checks it,
     | adds its own items if any, and submits — the final sheet then goes
-    | Store Head → HR Audit → Finance & Commercial → Operation Head.
+    | Store Head → Finance & Commercial → Operation Head.
     |
     | One month per final sheet: the same items are requested every month,
     | and the monthly report must count each month's demand in that month.
@@ -1112,6 +1114,7 @@ class PurchaseRequisitionController extends Controller
                 'requisition_date' => $data['requisition_date'],
                 'mode' => $data['mode'],
                 'level' => $level,
+                'requisition_type' => $this->typeFor($defaults, $data['requisition_type'] ?? null),
                 'department_role' => $department,
                 'unit_name' => $data['unit_name'] ?? config('stock.company_name'),
                 'indent_section_id' => $data['indent_section_id'] ?? null,
@@ -1225,7 +1228,8 @@ class PurchaseRequisitionController extends Controller
             // Stock in Hand and Safety Stock are the Store's figures: shown
             // only to whoever works the Store's side, the same rule the entry
             // form uses to hide its stock chips from a department user.
-            'showStockFigures' => $user && PurchaseRequisition::seesEveryRequisition($user),
+            // An individual sheet shows its stock figures to everyone who can open it.
+            'showStockFigures' => $requisition->isIndividual() || ($user && PurchaseRequisition::seesEveryRequisition($user)),
             // Step 3d: what each changed line was first requested at this
             // round, and whether this viewer may change quantities now (the
             // person the sheet waits for, at their stage).
@@ -1330,6 +1334,7 @@ class PurchaseRequisitionController extends Controller
         $requisition->load('items.stockItem', 'createdBy.requisitionSection');
 
         return view('store.stock.requisitions.create', $this->formData(DepartmentRequisitionDefaults::for(auth()->user(), $requisition), $requisition) + [
+            'requisitionType' => $requisition->requisition_type,
             'mode' => $requisition->mode,
             'requisition' => $requisition,
             'nextNo' => $requisition->requisition_no,
@@ -1622,9 +1627,22 @@ class PurchaseRequisitionController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function formData(DepartmentRequisitionDefaults $defaults, ?PurchaseRequisition $requisition = null): array
+    /**
+     * Monthly or individual. Only a department's sheet can be individual: a
+     * Store-side user raises the Final Requisition itself, which has no type.
+     */
+    private function typeFor(DepartmentRequisitionDefaults $defaults, ?string $asked): string
+    {
+        return $defaults->level === PurchaseRequisition::LEVEL_DEPARTMENT && $asked === PurchaseRequisition::TYPE_INDIVIDUAL
+            ? PurchaseRequisition::TYPE_INDIVIDUAL
+            : PurchaseRequisition::TYPE_MONTHLY;
+    }
+
+    private function formData(DepartmentRequisitionDefaults $defaults, ?PurchaseRequisition $requisition = null, ?string $type = null): array
     {
         $user = auth()->user();
+        $type = $requisition?->requisition_type ?? $type ?? PurchaseRequisition::TYPE_MONTHLY;
+        $chain = PurchaseRequisition::signatureLevelFor($defaults->level, $type);
 
         // Anything that would stop this sheet being submitted — an approver
         // Admin has not set, or the raiser holding a stage — said BEFORE the
@@ -1632,7 +1650,7 @@ class PurchaseRequisitionController extends Controller
         // stage engine does not apply to it.
         $onEngine = ! $requisition || $requisition->status === PurchaseRequisition::STATUS_DRAFT || $requisition->usesStageEngine();
         $workflowProblems = $onEngine
-            ? $this->workflow->problems($defaults->level, $requisition?->createdBy ?? $user, $defaults->section, $defaults->department)
+            ? $this->workflow->problems($chain, $requisition?->createdBy ?? $user, $defaults->section, $defaults->department)
             : [];
 
         // Who the sheet goes to when it is submitted, said in the Submit popup:
@@ -1642,13 +1660,13 @@ class PurchaseRequisitionController extends Controller
 
         if ($onEngine && ! $workflowProblems) {
             $raiser = $requisition?->createdBy ?? $user;
-            $plan = collect($this->workflow->plan($defaults->level, $raiser, $defaults->section, $defaults->department));
+            $plan = collect($this->workflow->plan($chain, $raiser, $defaults->section, $defaults->department));
             // The first step that really waits on someone else: not skipped,
             // not one the raiser already clears as head of their own sheet.
             $first = $plan->first(fn ($st) => ! $st['skipped'] && ! $st['self_approved']
                 && ! ($st['user'] && $st['user']->id === $raiser->id));
             $toStore = $first && $defaults->level === PurchaseRequisition::LEVEL_DEPARTMENT
-                && $first['sequence'] === $plan->last()['sequence'];
+                && ($first['sequence'] === $plan->last()['sequence'] || $first['stamp_source'] === \App\Models\RequisitionSignatureBlock::STAMP_STORE_HEAD);
 
             if ($toStore) {
                 $options = $this->workflow->sendToOptions($raiser);
@@ -1738,6 +1756,7 @@ class PurchaseRequisitionController extends Controller
         $data = $request->validate([
             'action' => ['required', 'in:draft,submit'],
             'mode' => ['required', 'in:'.PurchaseRequisition::MODE_SINGLE.','.PurchaseRequisition::MODE_MULTI],
+            'requisition_type' => ['nullable', 'in:'.PurchaseRequisition::TYPE_MONTHLY.','.PurchaseRequisition::TYPE_INDIVIDUAL],
             'requisition_no' => ['nullable', 'string', 'max:100', $unique],
             'requisition_date' => ['required', 'date'],
             'unit_name' => ['nullable', 'string', 'max:255'],
