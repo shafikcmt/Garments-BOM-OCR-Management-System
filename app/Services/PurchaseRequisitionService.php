@@ -97,19 +97,27 @@ class PurchaseRequisitionService
     }
 
     /**
-     * Qty − Stock in Hand, floored at zero.
+     * Qty − Stock in Hand + Safety Stock, rounded to a whole figure and
+     * floored at zero.
      *
-     * Excel column N. Floored because a negative "to be procured" is not a
-     * refund: if there is already more on the shelf than was asked for, the
-     * quantity to buy is nothing.
+     * Excel column N. Safety Stock is added (owner, 2026-11-01) so that after
+     * the requested quantity is issued the shelf still holds the safety level:
+     * Qty 420, Stock 180, Safety 42.54 → 420 − 180 + 43 = 283. Safety is
+     * rounded first, then the result, so the figure to buy is always whole.
+     *
+     * Floored because a negative "to be procured" is not a refund: if the
+     * stock already covers the request plus the safety level, the quantity to
+     * buy is nothing (Qty 10, Stock 15, Safety 4 → 0).
      *
      * Safe to apply per stored line, because mergeLines() has already collapsed
      * a repeated item into ONE line carrying the combined quantity — so no two
      * stored lines ever subtract the same stock figure.
      */
-    public function toBeProcured(float $qtyRequested, ?float $stockInHand): float
+    public function toBeProcured(float $qtyRequested, ?float $stockInHand, ?float $safetyStock = null): float
     {
-        return max(0.0, $qtyRequested - (float) ($stockInHand ?? 0));
+        $needed = $qtyRequested - (float) ($stockInHand ?? 0) + round((float) ($safetyStock ?? 0));
+
+        return max(0.0, round($needed));
     }
 
     /**

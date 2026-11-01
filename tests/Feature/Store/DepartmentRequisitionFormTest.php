@@ -364,7 +364,7 @@ it('shows Stock in Hand and Safety Stock figures on a requisition to the Store o
 
     $this->actingAs($user)->post(route('store.stock.requisitions.store'), requisitionPost($item));
     $requisition = PurchaseRequisition::latest('id')->firstOrFail();
-    $requisition->items()->update(['stock_in_hand_snapshot' => 987, 'safety_stock_snapshot' => 12.34]);
+    $requisition->items()->update(['stock_in_hand_snapshot' => 987, 'safety_stock_snapshot' => 345.6]);
 
     // The department that raised it: the columns are there, the figures are not.
     $this->actingAs($user)
@@ -373,12 +373,12 @@ it('shows Stock in Hand and Safety Stock figures on a requisition to the Store o
         ->assertSee('Stock in Hand')
         ->assertSee('Safety Stock')
         ->assertDontSee('987')
-        ->assertDontSee('12.34');
+        ->assertDontSee('346');
 
     // The Store reads the figures as before.
     $this->actingAs(formStoreUser())
         ->get(route('store.stock.requisitions.show', $requisition))
         ->assertOk()
         ->assertSee('987')
-        ->assertSee('12.34');
+        ->assertSee('346');
 });

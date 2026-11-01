@@ -20,7 +20,7 @@
         'merged' => 'bg-info-subtle text-info-emphasis',
         'merge_released' => 'bg-warning-subtle text-warning-emphasis',
     ];
-    $qty = fn ($v) => \App\Support\Quantity::format($v);
+    $qty = fn ($v) => \App\Support\Quantity::whole($v);
     $recordedFrom = \Illuminate\Support\Carbon::parse(\App\Models\PurchaseRequisitionAction::RECORDED_FROM);
     $predates = $requisition->created_at && $requisition->created_at->lt($recordedFrom);
 @endphp

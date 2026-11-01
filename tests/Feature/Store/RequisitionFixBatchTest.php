@@ -212,8 +212,9 @@ it('writes real numbers to the monthly Excel, with no trailing dot on whole quan
         ->and($qty('MS Tee-2/1')->getValue())->toBe(200)
         ->and($qty('MS Tee-2/1')->getStyle()->getNumberFormat()->getFormatCode())->toBe('#,##0')
         ->and($qty('MS Tee-2/1')->getFormattedValue())->toBe('200')
-        ->and($qty('Thread Oil')->getValue())->toBe(12.5)
-        ->and($qty('Thread Oil')->getStyle()->getNumberFormat()->getFormatCode())->toBe('#,##0.00##');
+        // Requisition quantities are round figures (owner, 2026-11-01).
+        ->and($qty('Thread Oil')->getValue())->toBe(13)
+        ->and($qty('Thread Oil')->getStyle()->getNumberFormat()->getFormatCode())->toBe('#,##0');
 
     // "Safety Stock" spelled right, no "Listing" row, and the sheet's number
     // nowhere in the file — the header prints the report's own number.

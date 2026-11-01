@@ -18,8 +18,8 @@
     // cells so a column stays numeric, the PDF keeps separators and dashes
     // because it is only ink. See report-pdf.blade.php.
     $qty = $forExcel
-        ? fn ($v) => \App\Support\Quantity::plain($v)
-        : fn ($v) => \App\Support\Quantity::format($v, '-');
+        ? fn ($v) => \App\Support\Quantity::wholePlain($v)
+        : fn ($v) => \App\Support\Quantity::whole($v, '-');
 
     $money = $forExcel
         ? fn ($v) => $v === null ? '' : number_format((float) $v, 2, '.', '')

@@ -34,8 +34,8 @@
     // text. The separators and dashes are Excel's job, applied by
     // FormatsStoreSheet. The PDF, which is just ink, keeps them here.
     $qty = $forExcel
-        ? fn ($v) => \App\Support\Quantity::plain($v)
-        : fn ($v) => \App\Support\Quantity::format($v, '-');
+        ? fn ($v) => \App\Support\Quantity::wholePlain($v)
+        : fn ($v) => \App\Support\Quantity::whole($v, '-');
 
     $money = $forExcel
         ? fn ($v) => $v === null ? '' : number_format((float) $v, 2, '.', '')

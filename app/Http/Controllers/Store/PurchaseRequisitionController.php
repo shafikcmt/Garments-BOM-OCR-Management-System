@@ -882,7 +882,8 @@ class PurchaseRequisitionController extends Controller
             $item = $line['stock_item_id'] ? $items->get($line['stock_item_id']) : null;
             $stock = $line['stock_item_id'] ? ($snapshots[$line['stock_item_id']]['stock_in_hand'] ?? null) : null;
             $requested = (float) $line['qty_requested'];
-            $needed = $stock === null ? $requested : $this->requisitions->toBeProcured($requested, $stock);
+            $safety = $line['stock_item_id'] ? ($snapshots[$line['stock_item_id']]['safety_stock'] ?? null) : null;
+            $needed = $stock === null ? $requested : $this->requisitions->toBeProcured($requested, $stock, $safety);
 
             return [
                 'key' => $this->requisitions->lineKey($line),
@@ -1879,7 +1880,7 @@ class PurchaseRequisitionController extends Controller
             $snapshot = $itemId ? ($snapshots[$itemId] ?? []) : [];
 
             $qty = (float) $line['qty_requested'];
-            $toBeProcured = $this->requisitions->toBeProcured($qty, $snapshot['stock_in_hand'] ?? null);
+            $toBeProcured = $this->requisitions->toBeProcured($qty, $snapshot['stock_in_hand'] ?? null, $snapshot['safety_stock'] ?? null);
 
             // Rate defaults to the last purchase rate but is editable, so an
             // expected price rise can be planned for.

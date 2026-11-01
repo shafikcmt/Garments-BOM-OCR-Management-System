@@ -394,6 +394,8 @@ Each approver finds it under **My Approvals** and presses **Approve** or **Retur
 
 If a final sheet is deleted or cancelled, its department sheets become free to merge again.
 
+**To Be Procured.** The system works out the quantity to buy for each item: **Qty Requested − Stock in Hand + Safety Stock**, as a round figure. Example: Qty 420, Stock 180, Safety Stock 42.54 (shown as 43) → 420 − 180 + 43 = **283**. If the stock already covers the request and the safety level, To Be Procured is 0. Amount = To Be Procured × Rate. All quantities on a requisition (screen, PDF and Excel) are shown as round figures; rates and amounts keep 2 decimals.
+
 **Who sees stock figures.** Hand stock, safety stock and the other stock details on a requisition are shown only to Store, Admin and Management. Other departments see their items and quantities only.
 
 **Admin: who approves.** Admin sets the steps and the person for each step in **Admin > Requisition Signatures**. Nothing in the code needs to change when a person changes.

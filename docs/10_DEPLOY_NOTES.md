@@ -125,7 +125,7 @@ Applies to the Monthly Requisition report now and to the Step 4 merge.
 - **Sum first, subtract once.** Sum the quantity per item (per item and
   section in the Section-wise view, across sections for ALL), then compare
   with stock ONCE per item:
-  `To Be Procured = max(0, total qty − stock in hand)`.
+  `To Be Procured = max(0, round(total qty − stock in hand + round(safety stock)))` (safety stock added 2026-11-01).
   Never subtract stock per line. Stock, safety stock and consumption are
   per item, never summed.
 - `Amount = To Be Procured × the item's latest known rate`.

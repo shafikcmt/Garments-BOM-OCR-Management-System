@@ -512,7 +512,7 @@ class MonthlyRequisitionReportService
         $item = $this->mergeGroup($group);
         $remaining = (float) ($item['stock_in_hand'] ?? 0);
 
-        return $group
+        $rows = $group
             ->groupBy('section')
             ->map(fn (Collection $rows) => $this->mergeGroup($rows))
             ->sortBy([
@@ -522,7 +522,7 @@ class MonthlyRequisitionReportService
             ->map(function (array $row) use ($item, &$remaining) {
                 // The part of the item's stock given to this section.
                 $allocated = $item['stock_in_hand'] === null ? null : min($remaining, $row['qty_requested']);
-                $toBeProcured = max(0.0, $row['qty_requested'] - (float) $allocated);
+                $toBeProcured = max(0.0, round($row['qty_requested'] - (float) $allocated));
                 $remaining = max(0.0, $remaining - $row['qty_requested']);
 
                 return array_merge($row, [
@@ -541,6 +541,20 @@ class MonthlyRequisitionReportService
                 ]);
             })
             ->values();
+
+        // The item's safety top-up is bought once, not per section: whatever
+        // the item total (mergeGroup(), safety included) holds above the
+        // section shortfalls goes on the last section, so the sections still
+        // add up to the item.
+        $extra = $item['to_be_procured'] - (float) $rows->sum('to_be_procured');
+        if ($rows->isNotEmpty() && abs($extra) > 0.00001) {
+            $last = $rows->pop();
+            $last['to_be_procured'] = max(0.0, $last['to_be_procured'] + $extra);
+            $last['amount'] = $last['rate_appx'] !== null ? $last['to_be_procured'] * $last['rate_appx'] : 0.0;
+            $rows->push($last);
+        }
+
+        return $rows;
     }
 
     /**
@@ -597,7 +611,7 @@ class MonthlyRequisitionReportService
         // Recomputed from the combined quantity against ONE stock
         // figure — not the sum of the per-requisition shortfalls, which
         // would each have subtracted that same stock again.
-        $toBeProcured = $this->requisitions->toBeProcured($qty, $stock);
+        $toBeProcured = $this->requisitions->toBeProcured($qty, $stock, $latest['safety_stock'] ?? null);
 
         $rate = $newestFirst->pluck('rate_appx')->first(fn ($value) => $value !== null)
             ?? $newestFirst->pluck('last_purchase_rate')->first(fn ($value) => $value !== null);

@@ -795,7 +795,11 @@ class RequisitionWorkflow
         foreach ($changed as $line) {
             $old = (float) $line->qty_requested;
             $qty = $new($line);
-            $toBeProcured = $this->requisitions->toBeProcured($qty, $line->stock_in_hand_snapshot === null ? null : (float) $line->stock_in_hand_snapshot);
+            $toBeProcured = $this->requisitions->toBeProcured(
+                $qty,
+                $line->stock_in_hand_snapshot === null ? null : (float) $line->stock_in_hand_snapshot,
+                $line->safety_stock_snapshot === null ? null : (float) $line->safety_stock_snapshot,
+            );
 
             $line->update([
                 'qty_requested' => $qty,

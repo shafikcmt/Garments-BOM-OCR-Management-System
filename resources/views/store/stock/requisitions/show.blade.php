@@ -3,7 +3,7 @@
 @section('title', 'General Stock — '.$requisition->requisition_no)
 
 @php
-    $qty = fn ($v) => \App\Support\Quantity::format($v);
+    $qty = fn ($v) => \App\Support\Quantity::whole($v);
     $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
     $date = fn ($v) => $v ? $v->format('d-M-y') : '—';
 
