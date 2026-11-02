@@ -112,11 +112,10 @@
              each unit is counted on its own — three here, the rest under View all.
              Refreshed by the live filter with the other figures. --}}
         <div class="col-12 col-lg-4 col-xl-2">
-            <div class="card gx-stock-card h-100">
+            <div class="card gx-stock-card h-100 gx-unit-card">
                 <div class="gx-stock-tile-body align-items-start">
-                    <span class="gx-stock-tile-icon bg-primary-subtle text-primary"><i class="bi bi-boxes" aria-hidden="true"></i></span>
+                    {{-- No icon here: the units need the card's whole width. --}}
                     <div class="gx-ledger-figure w-100">
-                        <div class="gx-stock-tile-label">Stock by Unit</div>
                         <div class="gx-unit-list" data-ledger-units>@include('store.stock._ledger-units', ['summary' => $summary, 'part' => 'top'])</div>
                     </div>
                 </div>

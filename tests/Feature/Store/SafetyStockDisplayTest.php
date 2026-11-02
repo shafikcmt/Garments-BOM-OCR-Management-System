@@ -164,7 +164,7 @@ it('shows Stock by Unit instead of one mixed quantity total', function () {
     }
 
     $page = $this->actingAs($user)->get(route('store.stock.ledger', ['month' => '2026-09']))->assertOk();
-    $page->assertSee('Stock by Unit')->assertDontSee('data-ledger-tile="stock_qty"', false)->assertSee('View all 5 units');
+    $page->assertSee('Stock by Unit')->assertDontSee('data-ledger-tile="stock_qty"', false)->assertSee('View all 5');
 
     $by = collect(app(\App\Services\GeneralStockReportService::class)->summary(
         app(\App\Services\GeneralStockReportService::class)->rows(\Illuminate\Support\Carbon::parse('2026-09-01'))

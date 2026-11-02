@@ -12,6 +12,12 @@
 @endphp
 @if($part === 'top')
     @php($palette = ['#2563eb', '#16a34a', '#d97706'])
+    <div class="gx-unit-head">
+        <span class="gx-stock-tile-label">Stock by Unit</span>
+        @if($units->count() > 3)
+            <button type="button" class="gx-unit-all" data-bs-toggle="modal" data-bs-target="#stockUnitsModal">View all {{ $units->count() }} <i class="bi bi-arrow-right" aria-hidden="true"></i></button>
+        @endif
+    </div>
     @forelse($units->take(3) as $u)
         <div class="gx-unit-line" title="{{ number_format($u['items']) }} items">
             <span class="gx-unit-name"><i style="background:{{ $palette[$loop->index % 3] }}"></i>{{ $u['unit'] }}</span>
@@ -20,9 +26,6 @@
     @empty
         <div class="gx-unit-line"><span class="text-muted">No counted items</span></div>
     @endforelse
-    @if($units->count() > 3)
-        <button type="button" class="gx-unit-all" data-bs-toggle="modal" data-bs-target="#stockUnitsModal">View all {{ $units->count() }} units <i class="bi bi-arrow-right" aria-hidden="true"></i></button>
-    @endif
 @else
     @php($totalItems = max(1, $units->sum('items')))
     <div class="gx-unit-table">
