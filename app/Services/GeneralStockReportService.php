@@ -202,6 +202,9 @@ class GeneralStockReportService
         // built from items nobody had measured.
         $counted = $rows->where('not_counted', false);
 
+        // One name per unit, so Pcs and Pieces are counted as one.
+        $unit = \App\Support\UomOptions::resolver();
+
         return [
             'items' => $rows->count(),
             // How many of those rows actually carry figures, so the screen and
@@ -226,7 +229,16 @@ class GeneralStockReportService
             // one: 5,000 PCS plus 200 KG is 5,200 of nothing. The report says
             // so on screen when this is above 1. Counted rows only, for the
             // same reason as the totals it qualifies.
-            'uom_count' => $counted->map(fn ($r) => $r['item']->uom)->filter()->unique()->count(),
+            'uom_count' => $counted->map(fn ($r) => $unit($r['item']->uom))->filter()->unique()->count(),
+
+            // Stock as on Date per unit of measure — the only way a quantity
+            // total means anything. Most items first.
+            'by_unit' => $counted
+                ->groupBy(fn ($r) => $unit($r['item']->uom) ?: 'No unit')
+                ->map(fn ($group, $unit) => ['unit' => $unit, 'items' => $group->count(), 'stock' => (float) $group->sum('stock_as_on')])
+                ->sort(fn ($a, $b) => [$b['items'], $a['unit']] <=> [$a['items'], $b['unit']])
+                ->values()
+                ->all(),
         ];
     }
 

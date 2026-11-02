@@ -53,7 +53,9 @@
         // Already formatted: the cards show them as text, so the server does the
         // number formatting once rather than the JS re-deriving it.
         'closing_value' => $money($summary['closing_value']),
-        'stock_qty' => $qty($summary['stock_as_on']),
+        // Stock by Unit: the card and its View all list, rendered once here.
+        'units_html' => view('store.stock._ledger-units', ['summary' => $summary, 'part' => 'top'])->render(),
+        'units_all_html' => view('store.stock._ledger-units', ['summary' => $summary, 'part' => 'all'])->render(),
         'month_label' => $monthLabel,
         // Anything not "ok" — the same set the purchase-action banner counts.
         // Not-counted rows are already out of these three counts, so they

@@ -143,6 +143,12 @@ export function initStockLedgerTable() {
                 : meta[key];
         });
 
+        // Stock by Unit: the card and its View all list, rendered by the server.
+        const unitsEl = document.querySelector('[data-ledger-units]');
+        const unitsAllEl = document.querySelector('[data-ledger-units-all]');
+        if (unitsEl && meta.units_html !== undefined) unitsEl.innerHTML = meta.units_html;
+        if (unitsAllEl && meta.units_all_html !== undefined) unitsAllEl.innerHTML = meta.units_all_html;
+
         if (actionAlert) {
             actionAlert.classList.toggle('d-none', !meta.attention);
             if (actionCount) actionCount.textContent = Number(meta.attention).toLocaleString();

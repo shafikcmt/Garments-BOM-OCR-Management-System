@@ -257,3 +257,17 @@
         margin-top: .15rem;
     }
 </style>
+<style>
+    .gx-unit-list { display: flex; flex-direction: column; gap: .3rem; margin-top: .25rem; }
+    .gx-unit-line { display: flex; align-items: center; justify-content: space-between; gap: .5rem; white-space: nowrap; padding: .12rem .45rem; background: #f8fafc; border: 1px solid #eef2f7; border-radius: 8px; }
+    .gx-unit-name { display: inline-flex; align-items: center; gap: .4rem; font-size: .74rem; font-weight: 600; color: #475569; }
+    .gx-unit-name i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+    .gx-unit-line b { font-size: .86rem; font-weight: 700; color: #0f172a; }
+    .gx-unit-all { align-self: flex-start; background: none; border: 0; padding: 0; margin-top: .1rem; font-size: .72rem; font-weight: 600; color: #2563eb; white-space: nowrap; }
+    .gx-unit-all:hover { text-decoration: underline; }
+    .gx-unit-table { display: flex; flex-direction: column; gap: .75rem; }
+    .gx-unit-row-head { display: flex; align-items: baseline; gap: .6rem; }
+    .gx-unit-row-head b { margin-left: auto; font-size: 1rem; color: #0f172a; }
+    .gx-unit-bar { height: 6px; border-radius: 999px; background: #eef2f7; overflow: hidden; margin-top: .3rem; }
+    .gx-unit-bar > i { display: block; height: 100%; border-radius: 999px; background: #2563eb; }
+</style>

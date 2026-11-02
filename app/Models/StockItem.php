@@ -55,6 +55,13 @@ class StockItem extends Model
 
     protected static function booted(): void
     {
+        // One name per unit of measure: "Pcs" and "Pieces" are saved as "Piece".
+        static::saving(function (StockItem $item) {
+            if ($item->isDirty('uom')) {
+                $item->uom = \App\Support\UomOptions::canonical($item->uom);
+            }
+        });
+
         // Auto-generated on create, race-safe (see StockItemSku).
         static::creating(function (StockItem $item) {
             if (blank($item->sku)) {

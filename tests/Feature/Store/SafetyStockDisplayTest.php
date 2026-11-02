@@ -136,3 +136,41 @@ it('falls back to the Item Master price and reference date when an item has no p
         ->and($snap[$bought->id]['last_purchase_rate'])->toBe(7.0)
         ->and(\Illuminate\Support\Carbon::parse($snap[$bought->id]['last_purchase_date'])->toDateString())->toBe('2026-09-14');
 });
+
+it('gives every unit of measure one name — the one the Item Master uses most', function () {
+    // Nothing recorded yet: what is typed stays.
+    expect(\App\Support\UomOptions::canonical('Pkt'))->toBe('Pkt')
+        ->and(\App\Support\UomOptions::canonical('  Drum '))->toBe('Drum')
+        ->and(\App\Support\UomOptions::canonical('  '))->toBeNull();
+
+    foreach (['Pieces', 'Pieces', 'Pcs', 'Piece'] as $i => $uom) {
+        StockItem::create(['name' => 'Tape '.$i, 'uom' => $uom, 'category' => 'Stationery', 'is_active' => true]);
+    }
+
+    // Pieces is on most items: Pcs, pcs. and Piece are all that unit, so all become Pieces.
+    foreach (['Pcs', 'pcs.', ' PIECE ', 'nos', 'Pieces'] as $spelling) {
+        expect(\App\Support\UomOptions::canonical($spelling))->toBe('Pieces');
+    }
+    // A later item typed another way is saved with the one name.
+    expect(StockItem::create(['name' => 'Glue', 'uom' => 'Pc', 'category' => 'Stationery', 'is_active' => true])->fresh()->uom)->toBe('Pieces');
+    // Other units are untouched.
+    expect(\App\Support\UomOptions::canonical('Kg'))->toBe('Kg')->and(\App\Support\UomOptions::canonical('KGS'))->toBe('KGS');
+});
+
+it('shows Stock by Unit instead of one mixed quantity total', function () {
+    $user = ssUser();
+    foreach ([['Pen', 'Pcs', 10], ['Pad', 'Pieces', 5], ['Glue', 'Kg', 3], ['Tape', 'Box', 2], ['Ink', 'Litre', 4], ['Wire', 'Meter', 6]] as [$name, $uom, $qty]) {
+        StockItem::create(['name' => $name, 'uom' => $uom, 'category' => 'Stationery', 'is_active' => true, 'opening_qty' => $qty, 'opening_as_on' => '2026-08-01']);
+    }
+
+    $page = $this->actingAs($user)->get(route('store.stock.ledger', ['month' => '2026-09']))->assertOk();
+    $page->assertSee('Stock by Unit')->assertDontSee('data-ledger-tile="stock_qty"', false)->assertSee('View all 5 units');
+
+    $by = collect(app(\App\Services\GeneralStockReportService::class)->summary(
+        app(\App\Services\GeneralStockReportService::class)->rows(\Illuminate\Support\Carbon::parse('2026-09-01'))
+    )['by_unit'])->keyBy('unit');
+    // Pcs and Pieces are one unit (saved as one name), 2 items, 15.
+    expect(collect($by)->filter(fn ($u) => $u['items'] === 2)->count())->toBe(1)
+        ->and(collect($by)->firstWhere('items', 2)['stock'])->toBe(15.0)
+        ->and($by)->toHaveCount(5);
+});

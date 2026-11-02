@@ -108,9 +108,22 @@
              beside them, but not links: there is no "filter by total". Both
              cover the whole filtered month, exactly like the report's Total
              row, not the page on screen. --}}
+        {{-- Stock by Unit: Piece, Kg, Carton and Box cannot be added together, so
+             each unit is counted on its own — three here, the rest under View all.
+             Refreshed by the live filter with the other figures. --}}
+        <div class="col-12 col-lg-4 col-xl-2">
+            <div class="card gx-stock-card h-100">
+                <div class="gx-stock-tile-body align-items-start">
+                    <span class="gx-stock-tile-icon bg-primary-subtle text-primary"><i class="bi bi-boxes" aria-hidden="true"></i></span>
+                    <div class="gx-ledger-figure w-100">
+                        <div class="gx-stock-tile-label">Stock by Unit</div>
+                        <div class="gx-unit-list" data-ledger-units>@include('store.stock._ledger-units', ['summary' => $summary, 'part' => 'top'])</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         @foreach ([
-            ['label' => 'Total Stock Qty', 'key' => 'stock_qty', 'tone' => 'primary', 'icon' => 'bi-boxes',
-             'value' => $qty($summary['stock_as_on']), 'hint' => 'Sum of Stock as on Date'],
             ['label' => 'Closing Stock Value', 'key' => 'closing_value', 'tone' => 'success', 'icon' => 'bi-cash-stack',
              'value' => $money($summary['closing_value']), 'hint' => 'Stock as on Date x unit price'],
         ] as $tile)
@@ -129,6 +142,20 @@
                 </div>
             </div>
         @endforeach
+
+        {{-- All units, in a popup. --}}
+        <div class="modal fade" id="stockUnitsModal" tabindex="-1" aria-labelledby="stockUnitsTitle" aria-hidden="true" data-body-modal>
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="stockUnitsTitle">Stock by Unit</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" data-ledger-units-all>@include('store.stock._ledger-units', ['summary' => $summary, 'part' => 'all'])</div>
+                    <div class="modal-footer small text-muted justify-content-start">Counted items only. Units cannot be added together, so each is shown on its own.</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     {{-- Rendered whenever no status filter is set, but hidden while the count is
