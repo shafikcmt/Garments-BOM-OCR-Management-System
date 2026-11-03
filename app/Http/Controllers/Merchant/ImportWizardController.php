@@ -243,6 +243,7 @@ class ImportWizardController extends ExcelUploadController
 
         @set_time_limit(300);
         DB::disableQueryLog();
+        $this->allowLargeImport();
 
         $headers = $this->merchantInputHeaders()->keyBy('id');
         $mapping = $this->cleanMapping($state['mapping'], $headers);
@@ -360,6 +361,32 @@ class ImportWizardController extends ExcelUploadController
         }
 
         return is_scalar($value) ? (string) $value : '';
+    }
+
+    /**
+     * A big buyer file (thousands of rows x about a hundred columns) needs more
+     * than the 128 MB PHP gives a web request by default; the import has run out
+     * of it before. Raised for this request only, and only when it is lower.
+     */
+    private function allowLargeImport(int $megabytes = 512): void
+    {
+        $current = trim((string) ini_get('memory_limit'));
+
+        if ($current === '-1') {
+            return;
+        }
+
+        $bytes = (int) $current;
+        $bytes *= match (strtolower(substr($current, -1))) {
+            'g' => 1024 ** 3,
+            'm' => 1024 ** 2,
+            'k' => 1024,
+            default => 1,
+        };
+
+        if ($bytes < $megabytes * 1024 ** 2) {
+            @ini_set('memory_limit', $megabytes . 'M');
+        }
     }
 
     private function authorizeImport(Request $request): void
