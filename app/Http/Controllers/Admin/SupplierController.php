@@ -53,7 +53,7 @@ class SupplierController extends Controller
             ->with('success', 'Supplier deleted successfully.');
     }
 
-    private function validatedData(Request $request, ?Supplier $supplier = null): array
+    public function validatedData(Request $request, ?Supplier $supplier = null): array
     {
         $data = $request->validate([
             'supplier_code' => [
@@ -77,6 +77,13 @@ class SupplierController extends Controller
             'incoterm' => ['nullable', 'string', 'max:50'],
             'ship_mode' => ['nullable', 'string', 'max:50'],
             'tolerance_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+
+            'bank_name' => ['nullable', 'string', 'max:255'],
+            'bank_branch' => ['nullable', 'string', 'max:255'],
+            'bank_account_name' => ['nullable', 'string', 'max:255'],
+            'bank_account_number' => ['nullable', 'string', 'max:100'],
+            'bank_routing_number' => ['nullable', 'string', 'max:100'],
+            'bank_swift_code' => ['nullable', 'string', 'max:50'],
 
             'is_active' => ['nullable', 'boolean'],
         ]);

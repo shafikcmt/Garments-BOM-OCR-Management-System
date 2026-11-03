@@ -158,7 +158,7 @@ class BomTableSync
             $line->order_qty = $orderQty;
         }
 
-        $this->linkStyleLibrary($line, $file, $this->source->sourceValueForRow($row, 'season'), $style);
+        $this->linkStyleLibrary($line, $file, $this->source->sourceValueForRow($row, 'season'), $style, $text('mother_style'));
         $line->save();
 
         $item = BomItem::firstOrNew(['excel_row_id' => $row->id]);
@@ -185,8 +185,14 @@ class BomTableSync
      * Link the line to Buyer -> Season -> Mother -> Child in the Style Library,
      * creating what is missing. Needs a buyer on the file and a season in the
      * row; without either the line simply stays unlinked.
+     *
+     * The mother comes from, in this order: the sheet's own Mother Style column,
+     * the style code before its bracket ("720193(PETITE)" -> 720193), the style
+     * itself. A sheet with a Mother Style column keeps the whole style code as
+     * the child ("788457(PETITE)" under mother 813132), because the child's
+     * number then differs from the mother's.
      */
-    private function linkStyleLibrary(OrderLine $line, ExcelFile $file, ?string $season, string $styleCode): void
+    private function linkStyleLibrary(OrderLine $line, ExcelFile $file, ?string $season, string $styleCode, ?string $motherCode = null): void
     {
         $season = trim((string) $season);
 
@@ -214,14 +220,27 @@ class BomTableSync
             ['buyer_id' => $file->buyer_id, 'code' => mb_strtoupper(mb_substr($season, 0, 50))]
         );
 
+        // Excel often turns a typed number into "813132.0".
+        $motherNo = preg_replace('/^(\d+)\.0+$/', '$1', trim((string) $motherCode));
+        $childNo = $parsed['child'];
+        $childKind = $parsed['kind'];
+
+        if ($motherNo !== '') {
+            $code = trim($styleCode);
+            $childNo = $code === $motherNo ? null : $code;
+            $childKind = $parsed['kind'] ?? 'linked';
+        } else {
+            $motherNo = $parsed['style_no'];
+        }
+
         $mother = MotherStyle::firstOrCreate(
-            ['buyer_season_id' => $seasonModel->id, 'style_no' => $parsed['style_no']],
+            ['buyer_season_id' => $seasonModel->id, 'style_no' => $motherNo],
             ['buyer_id' => $file->buyer_id]
         );
 
-        $child = $parsed['child'] === null ? null : ChildStyle::firstOrCreate(
-            ['mother_style_id' => $mother->id, 'style_no' => $parsed['child']],
-            ['kind' => $parsed['kind'] ?? 'variant']
+        $child = $childNo === null ? null : ChildStyle::firstOrCreate(
+            ['mother_style_id' => $mother->id, 'style_no' => $childNo],
+            ['kind' => $childKind ?? 'variant']
         );
 
         $line->buyer_season_id = $seasonModel->id;

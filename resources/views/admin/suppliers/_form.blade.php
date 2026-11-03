@@ -184,6 +184,8 @@
         @enderror
     </div>
 
+    @include('partials.vendor-bank-fields', ['bank' => $supplier ?? null])
+
     <div class="col-md-4 d-flex align-items-end">
         <div class="form-check form-switch mb-2">
             <input type="hidden" name="is_active" value="0">

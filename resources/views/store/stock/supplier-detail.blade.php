@@ -78,6 +78,11 @@
                             <label class="form-label" for="address">Address</label>
                             <textarea id="address" name="address" rows="3" class="form-control mb-3" maxlength="1000">{{ old('address', $supplier->address) }}</textarea>
 
+                            <div class="row g-2 mb-3">
+                                <div class="col-12 fw-semibold"><i class="bi bi-bank me-1" aria-hidden="true"></i>Bank Details</div>
+                                @include('partials.vendor-bank-fields', ['bank' => $supplier, 'colClass' => 'col-12'])
+                            </div>
+
                             <div class="form-check mb-3">
                                 <input type="hidden" name="is_active" value="0">
                                 <input class="form-check-input" type="checkbox" name="is_active" value="1"
@@ -101,6 +106,12 @@
                             <dd class="col-7">{{ $supplier->email ?: '—' }}</dd>
                             <dt class="col-5 text-muted fw-normal">Address</dt>
                             <dd class="col-7">{{ $supplier->address ?: '—' }}</dd>
+                            <dt class="col-5 text-muted fw-normal">Bank</dt>
+                            <dd class="col-7">{{ $supplier->bank_name ?: '—' }}{{ $supplier->bank_branch ? ', '.$supplier->bank_branch : '' }}</dd>
+                            <dt class="col-5 text-muted fw-normal">Account Name</dt>
+                            <dd class="col-7">{{ $supplier->bank_account_name ?: '—' }}</dd>
+                            <dt class="col-5 text-muted fw-normal">Account Number</dt>
+                            <dd class="col-7">{{ $supplier->bank_account_number ?: '—' }}</dd>
                         </dl>
                     @endif
                 </div>

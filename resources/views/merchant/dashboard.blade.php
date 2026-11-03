@@ -38,6 +38,9 @@
             <a href="{{ route('merchant.status.index') }}" class="btn btn-outline-primary d-inline-flex align-items-center gap-2">
                 <i class="bi bi-bar-chart-steps" aria-hidden="true"></i>Style Status
             </a>
+            <a href="{{ route('merchant.vendors.create') }}" class="btn btn-outline-primary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-buildings" aria-hidden="true"></i>Add Vendor
+            </a>
             <a href="{{ route('merchant.workspace') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
                 <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>Open Workspace
             </a>

@@ -27,7 +27,7 @@ function bomFixture(array $rows, bool $withBuyer = true): array
     $keys = [
         'season_name' => 'Season Name', 'style_name' => 'Style', 'gmts_color_name' => 'GMTS Color Name',
         'contract_number' => 'Contract Number', 'material_description' => 'Material Description',
-        'sap_code' => 'SAP Code', 'bom_quantity' => 'BOM Quantity',
+        'sap_code' => 'SAP Code', 'bom_quantity' => 'BOM Quantity', 'mother_style' => 'Mother Style',
     ];
     $headers = [];
     $position = 1;
@@ -135,4 +135,34 @@ it('does nothing on a save when the switch is off', function () {
     app(BomTableSync::class)->syncRows($file, [$rows[0]->id]);
 
     expect(OrderLine::count())->toBe(0);
+});
+
+
+it('takes the mother from the Mother Style column and keeps the whole style code as the child', function () {
+    bomFixture([
+        ['season_name' => 'SU27', 'style_name' => '813132(MISSY)', 'mother_style' => '813132', 'gmts_color_name' => 'WASH', 'contract_number' => 'C1', 'material_description' => 'Thread'],
+        ['season_name' => 'SU27', 'style_name' => '788457(PETITE)', 'mother_style' => '813132.0', 'gmts_color_name' => 'WASH', 'contract_number' => 'C1', 'material_description' => 'Thread'],
+        ['season_name' => 'SU27', 'style_name' => '868536(CURVY)', 'mother_style' => '813132', 'gmts_color_name' => 'WASH', 'contract_number' => 'C1', 'material_description' => 'Thread'],
+        ['season_name' => 'SU27', 'style_name' => '742744', 'mother_style' => '742744', 'gmts_color_name' => 'WASH', 'contract_number' => 'C1', 'material_description' => 'Thread'],
+    ]);
+
+    app(BomTableSync::class)->syncFile(\App\Models\ExcelFile::first());
+
+    expect(MotherStyle::orderBy('style_no')->pluck('style_no')->all())->toBe(['742744', '813132']);
+    $mother = MotherStyle::where('style_no', '813132')->first();
+    expect($mother->children()->orderBy('style_no')->pluck('style_no')->all())
+        ->toBe(['788457(PETITE)', '813132(MISSY)', '868536(CURVY)']);
+    expect(OrderLine::where('style_no', '742744')->first()->childStyle)->toBeNull();
+});
+
+it('works out the mother from the style code when the sheet has no Mother Style value', function () {
+    bomFixture([
+        ['season_name' => 'SU27', 'style_name' => '720193(PETITE)', 'gmts_color_name' => 'WASH', 'contract_number' => 'C1', 'material_description' => 'Thread'],
+        ['season_name' => 'SU27', 'style_name' => '882635', 'gmts_color_name' => 'WASH', 'contract_number' => 'C1', 'material_description' => 'Thread'],
+    ]);
+
+    app(BomTableSync::class)->syncFile(\App\Models\ExcelFile::first());
+
+    expect(MotherStyle::orderBy('style_no')->pluck('style_no')->all())->toBe(['720193', '882635']);
+    expect(OrderLine::where('style_no', '720193(PETITE)')->first()->childStyle->style_no)->toBe('PETITE');
 });

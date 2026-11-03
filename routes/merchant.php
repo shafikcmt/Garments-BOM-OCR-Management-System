@@ -11,6 +11,7 @@ use App\Http\Controllers\Merchant\StatusController;
 use App\Http\Controllers\Merchant\BomBuilderController;
 use App\Http\Controllers\Merchant\OcrSummaryController;
 use App\Http\Controllers\Merchant\SizeBreakdownController;
+use App\Http\Controllers\Merchant\VendorEntryController;
 
 // Merchandising reports — read-only summaries of the BOM columns this
 // department owns. Kept in their own group because they are shared with Admin /
@@ -95,6 +96,10 @@ Route::prefix('merchant')
     ->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace');
+
+        // Add a vendor (with bank details) without going through Admin.
+        Route::get('/vendors/create', [VendorEntryController::class, 'create'])->name('vendors.create');
+        Route::post('/vendors', [VendorEntryController::class, 'store'])->name('vendors.store');
 
         // Buyer -> Season -> Mother Style -> Child Style.
         Route::get('/styles', [StyleLibraryController::class, 'index'])->name('styles.index');

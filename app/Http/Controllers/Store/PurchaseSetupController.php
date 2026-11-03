@@ -212,6 +212,12 @@ class PurchaseSetupController extends Controller
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
             'address' => ['nullable', 'string', 'max:1000'],
+            'bank_name' => ['nullable', 'string', 'max:255'],
+            'bank_branch' => ['nullable', 'string', 'max:255'],
+            'bank_account_name' => ['nullable', 'string', 'max:255'],
+            'bank_account_number' => ['nullable', 'string', 'max:100'],
+            'bank_routing_number' => ['nullable', 'string', 'max:100'],
+            'bank_swift_code' => ['nullable', 'string', 'max:50'],
             // is_active is an edit-time toggle only — it decides whether the
             // supplier still appears in the Record Purchase dropdown.
             'is_active' => ['nullable', 'boolean'],

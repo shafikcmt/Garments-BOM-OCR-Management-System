@@ -1318,6 +1318,7 @@ class BookingPoSourceService
         return match ($group) {
             'buyer' => str_contains($header, 'buyer') && ! str_contains($header, 'liability') && ! str_contains($header, 'value'),
             'season' => str_contains($header, 'season'),
+            'mother_style' => str_contains($header, 'mother_style') || str_contains($header, 'parent_style'),
             'vendor' => str_contains($header, 'vendor') || str_contains($header, 'supplier'),
             'style' => str_contains($header, 'style') || str_contains($header, 'contract_number') || str_contains($header, 'sales_contract'),
             'shipment_month' => str_contains($header, 'shipment_month') || str_contains($header, 'ship_month'),
@@ -1381,6 +1382,9 @@ class BookingPoSourceService
             'contract_po' => ['gmnts_po_number', 'gmts_po_number', 'gmt_po_number', 'initial_contract_number', 'contract_number', 'po_number', 'GMNTS PO Number', 'Initial Contract Number', 'PO Number'],
             'buyer' => ['buyer_name', 'buyer', 'Buyer Name'],
             'season' => ['season_name', 'season', 'Season Name'],
+            // The style family a style belongs to, when the buyer's sheet states it
+            // in its own column. Optional: BomTableSync falls back to the style code.
+            'mother_style' => ['mother_style', 'mother_style_no', 'mother_style_name', 'parent_style', 'main_style', 'Mother Style'],
             'vendor' => ['vendor_name', 'supplier_name', 'supplier', 'vendor', 'Vendor Name'],
             'style' => ['style_name', 'style_no', 'style_order', 'order_style_no', 'order_style', 'initial_contract_number', 'contract_number', 'sales_contract', 'Style Name'],
             // The style's own name/number, without the contract-number columns

@@ -31,6 +31,12 @@ class GeneralStockSupplier extends Model
         'phone',
         'email',
         'address',
+        'bank_name',
+        'bank_branch',
+        'bank_account_name',
+        'bank_account_number',
+        'bank_routing_number',
+        'bank_swift_code',
         'is_active',
         'created_by',
     ];

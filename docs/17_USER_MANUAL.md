@@ -86,6 +86,13 @@ Ann Taylor   SP27       748268            866317 (linked style no.)
 
 You rarely need to type styles by hand: when you import the buyer's Excel (next section) the styles are added for you.
 
+**How the mother style is found when you import.** The system uses the first one that applies:
+1. **The Mother Style column** of the buyer's file, if it has one and the cell is filled. The whole style code becomes the child, for example `788457(PETITE)` under mother `813132`.
+2. **The style code.** The number before the bracket is the mother: `720193(PETITE)` goes under `720193`.
+3. **The style itself.** A plain style such as `882635` is its own mother and has no child.
+
+So a buyer whose file has no Mother Style column still imports normally. If your buyer's file has the column, keep it: no manual linking is needed afterwards.
+
 ### 2.2 Import Buyer Excel (any buyer, any layout)
 
 Use this when the buyer's Excel does not look like the standard sample. It does not matter which sheet the data is on, which row the titles are on, or what the columns are called.
@@ -99,7 +106,7 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 
 **Step 2: Match columns.**
 - The system finds the sheet with the data and the row with the column titles by itself. If it picks wrongly, change **Sheet** or **Title row** and press **Reload**.
-- Each column of the buyer's file is shown with an example value and the system column it will go into.
+- Each column of the buyer's file is shown with an example value and the system column it will go into. Match the buyer's mother style column (if any) to **Mother Style**, and the season column to **Season Name**.
 - Columns the system recognised are filled in. **Yellow rows are not matched.** Choose the right system column from the list, or leave **Skip this column** (for example vendor or payment columns, which belong to other departments).
 - A system column can be used only once.
 - Tick **Save this matching for [buyer]**. Next time this buyer sends a file with the same layout, the system matches it for you and tells you so.
@@ -114,6 +121,16 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 - Formulas in the buyer's file are not recalculated. The value saved in Excel is used.
 - Large files take 10 to 20 seconds to import. Please wait for the page to finish.
 - If you stop half way, press **Cancel Import**.
+
+### 2.2b Add a Vendor (with bank details)
+
+**Open it:** **Merchandising Dashboard**, then **Add Vendor** (top right).
+
+1. Type the vendor name (required) and any contact details.
+2. Under **Bank Details** fill what you know: bank name, branch, account name, account number, routing number, SWIFT code. All are optional.
+3. Press **Save Vendor**. You return to the dashboard with a confirmation.
+
+The vendor is added to the same list Admin manages (**Admin, Vendors**), so it can be used for bookings and payment requests. Only Admin can edit or delete a vendor later. The Store's own supplier list (**Store, Purchase Setup**, then open a supplier) has the same Bank Details fields.
 
 ### 2.2a Create a BOM on screen (no Excel needed)
 
