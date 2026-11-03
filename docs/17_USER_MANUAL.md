@@ -109,6 +109,7 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 - Each column of the buyer's file is shown with an example value and the system column it will go into. Match the buyer's mother style column (if any) to **Mother Style**, and the season column to **Season Name**.
 - Columns the system recognised are filled in. **Yellow rows are not matched.** Choose the right system column from the list, or leave **Skip this column** (for example vendor or payment columns, which belong to other departments).
 - A system column can be used only once.
+- A buyer calls a column by a new name every time? Ask Admin to open **Admin, Excel Headers**, edit that header and type the name under **Other Names**. From then on that name is matched automatically in every buyer's file.
 - Tick **Save this matching for [buyer]**. Next time this buyer sends a file with the same layout, the system matches it for you and tells you so.
 
 **Step 3: Preview and import.**

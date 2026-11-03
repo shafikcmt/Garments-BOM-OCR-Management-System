@@ -145,6 +145,7 @@ class HeaderController extends Controller
                 'max:255',
                 Rule::unique('excel_headers', 'header_key')->ignore($header?->id),
             ],
+            'aliases' => ['nullable', 'string', 'max:1000'],
             'owner_role_id' => ['required', 'exists:roles,id'],
             'position' => ['required', 'integer', 'min:1'],
             'field_type' => ['required', 'in:text,number,date'],

@@ -112,6 +112,15 @@
                     <small class="text-muted">Auto generate hobe, chaile manually edit korte parben.</small>
                 </div>
 
+                <div class="col-12">
+                    <label class="form-label" for="aliases">Other Names (optional)</label>
+                    <textarea name="aliases" id="aliases" rows="2" maxlength="1000"
+                              class="form-control @error('aliases') is-invalid @enderror"
+                              placeholder="Example: Parent Style, Main Style">{{ old('aliases', $header->aliases ?? '') }}</textarea>
+                    <div class="form-text">Other names buyers use for this column. Import Buyer Excel matches them automatically. One per line or separated by commas.</div>
+                    @error('aliases')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+
                 <div class="col-md-4">
                     <label class="form-label">Owner Role</label>
                     <select name="owner_role_id" class="form-select @error('owner_role_id') is-invalid @enderror" required>

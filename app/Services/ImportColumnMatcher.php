@@ -39,7 +39,7 @@ class ImportColumnMatcher
      */
     public function headerKeys(ExcelHeader $header): array
     {
-        $keys = collect([$header->header_name, $header->header_key, $header->formula_key])
+        $keys = collect([$header->header_name, $header->header_key, $header->formula_key, ...$header->aliasList()])
             ->map(fn ($v) => $this->key($v))
             ->filter()
             ->unique();

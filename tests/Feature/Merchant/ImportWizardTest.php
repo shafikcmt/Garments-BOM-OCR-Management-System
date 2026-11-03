@@ -178,3 +178,18 @@ it('reads the value Excel saved for a formula instead of calculating it', functi
 
     expect((float) BomItem::first()->bom_qty)->toBe(6.0);
 });
+
+it('matches a buyer column by the other names Admin typed on a header', function () {
+    $matcher = app(ImportColumnMatcher::class);
+    $mother = ExcelHeader::create([
+        'header_name' => 'Mother Style', 'header_key' => 'mother_style', 'owner_role_id' => Role::findOrCreate('merchant', 'web')->id,
+        'position' => 20, 'aliases' => "Parent Style\nMain Style, Base Style",
+    ]);
+
+    expect($mother->aliasList())->toBe(['Parent Style', 'Main Style', 'Base Style']);
+
+    $result = $matcher->suggest([0 => 'Style', 1 => 'Base Style', 2 => 'Unknown'], \App\Models\ExcelHeader::all());
+
+    expect($result[1]['header_id'])->toBe($mother->id)->and($result[1]['reason'])->toBe('name')
+        ->and($result[2]['header_id'])->toBeNull();
+});

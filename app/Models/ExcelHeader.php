@@ -13,6 +13,7 @@ class ExcelHeader extends Model
     protected $fillable = [
         'header_name',
         'header_key',
+        'aliases',
         'owner_role_id',
         'position',
         'field_type',
@@ -36,6 +37,22 @@ class ExcelHeader extends Model
         'merchant_can_upload' => 'boolean',
         'track_order_changes' => 'boolean',
     ];
+
+    /**
+     * Other names a buyer's file may use for this column (Admin types them,
+     * one per line or separated by commas).
+     *
+     * @return list<string>
+     */
+    public function aliasList(): array
+    {
+        return collect(preg_split('/[\r\n,;]+/', (string) $this->aliases) ?: [])
+            ->map(fn ($name) => trim($name))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
 
     public function ownerRole()
     {
