@@ -143,7 +143,7 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 - Large files take 10 to 20 seconds to import. Please wait for the page to finish.
 - If you stop half way, press **Cancel Import**.
 
-### 2.2b Vendors: see the list, add and edit a vendor (with bank details)
+### 2.2b Vendors: list, add, edit, Excel import and export (with bank details)
 
 **Open it:** left menu, **Vendors**. (You can also press **Add Vendor** on the Merchandising Dashboard.)
 
@@ -156,6 +156,14 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 4. Press **Save Vendor**. You return to the list with a confirmation.
 
 **Edit a vendor.** On the list press **Edit** at the end of the vendor's row. The form opens with the current details, bank details included (the full account number is shown here so you can correct it). Change what you need and press **Save Changes**. The vendor's code must stay different from every other vendor's. Vendors you switch to inactive stay on the list, marked **Inactive**.
+
+**Export to Excel.** Press **Export Excel** above the list. You get an Excel file of the vendors (only the ones your search shows, if you typed one) in the same columns as the upload template, plus **Status**. The account number is shown as its last four digits only (for example `****7890`), because the file leaves the system.
+
+**Import from Excel.**
+1. Press **Import Excel**, then **Download Template**. Fill one row per vendor; only **Vendor Name** is required. Delete the grey example row.
+2. Choose the file and press **Import**.
+3. The file is checked as a whole. If any row has a problem (a missing name, an invalid email, a Tolerance % outside 0 to 100, a Vendor Code already used by another vendor) **nothing is imported** and the rows to correct are listed. Fix them and upload again.
+4. A vendor already on the list (same name, in any capital or small letters) is **skipped** and never overwritten; use **Edit** to change it. Skipped rows are listed after the import.
 
 The vendor goes into the same list Admin manages (**Admin, Vendors**), so it can be used for bookings and payment requests, and your changes show there too. Only Admin can delete a vendor. The Store's own supplier list (**Store, Purchase Setup**, then open a supplier) has the same Bank Details fields.
 

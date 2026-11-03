@@ -7,6 +7,12 @@
     <x-page-header icon="buildings" eyebrow="Merchandising" title="Vendors"
                    copy="The vendor list used for bookings and payment requests. Add a new vendor or edit one here; Admin removes one.">
         <x-slot:actions>
+            <a href="{{ route('merchant.vendors.export', array_filter(['q' => $term])) }}" class="btn btn-outline-primary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-file-earmark-excel" aria-hidden="true"></i>Export Excel
+            </a>
+            <button type="button" class="btn btn-outline-primary d-inline-flex align-items-center gap-2" data-bs-toggle="collapse" data-bs-target="#vendorImport" aria-expanded="{{ session('import_errors') || session('import_skipped') || $errors->has('file') ? 'true' : 'false' }}" aria-controls="vendorImport">
+                <i class="bi bi-upload" aria-hidden="true"></i>Import Excel
+            </button>
             <a href="{{ route('merchant.vendors.create') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
                 <i class="bi bi-plus-lg" aria-hidden="true"></i>Add Vendor
             </a>
@@ -14,6 +20,46 @@
     </x-page-header>
 
     <x-flash />
+
+    @foreach ([
+        ['key' => 'import_errors', 'tone' => 'danger', 'icon' => 'x-circle-fill', 'heading' => 'These rows need correcting before the file can be imported:'],
+        ['key' => 'import_skipped', 'tone' => 'warning', 'icon' => 'exclamation-triangle-fill', 'heading' => 'These rows were skipped:'],
+    ] as $report)
+        @if(session($report['key']))
+            <div class="alert alert-{{ $report['tone'] }} d-flex align-items-start gap-2" role="alert">
+                <i class="bi bi-{{ $report['icon'] }}" aria-hidden="true"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-semibold mb-1">{{ $report['heading'] }}</div>
+                    <ul class="mb-0 ps-3 small" style="max-height:220px; overflow-y:auto;">
+                        @foreach(session($report['key']) as $line)
+                            <li>{{ $line }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        @endif
+    @endforeach
+
+    <div class="collapse {{ session('import_errors') || session('import_skipped') || $errors->has('file') ? 'show' : '' }}" id="vendorImport">
+        <x-card class="mb-3" title="Import vendors from Excel">
+            <p class="text-muted small mb-3">
+                Fill the upload template and upload it. The file is checked as a whole: if any row has a problem nothing is imported.
+                A vendor already on the list is skipped, never overwritten; edit it with <strong>Edit</strong> instead.
+            </p>
+            <form method="POST" action="{{ route('merchant.vendors.import') }}" enctype="multipart/form-data" class="row g-2 align-items-end">
+                @csrf
+                <div class="col-12 col-md-6 col-xl-5">
+                    <label class="form-label" for="vendorFile">Excel or CSV file <span class="text-danger">*</span></label>
+                    <input id="vendorFile" type="file" name="file" accept=".xlsx,.xls,.csv" class="form-control @error('file') is-invalid @enderror" required>
+                    @error('file')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-auto d-flex gap-2">
+                    <button class="btn btn-primary"><i class="bi bi-upload me-1" aria-hidden="true"></i>Import</button>
+                    <a href="{{ route('merchant.vendors.template') }}" class="btn btn-outline-secondary"><i class="bi bi-download me-1" aria-hidden="true"></i>Download Template</a>
+                </div>
+            </form>
+        </x-card>
+    </div>
 
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-4"><x-stat-card icon="buildings" tone="primary" label="Vendors" :value="$totals['all']" /></div>

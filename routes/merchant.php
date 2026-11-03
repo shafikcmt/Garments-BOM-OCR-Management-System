@@ -97,8 +97,11 @@ Route::prefix('merchant')
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace');
 
-        // See, add and edit vendors (bank details included) without going through Admin.
+        // See, add, edit, import and export vendors (bank details included) without going through Admin.
         Route::get('/vendors', [VendorEntryController::class, 'index'])->name('vendors.index');
+        Route::get('/vendors/export', [VendorEntryController::class, 'export'])->name('vendors.export');
+        Route::get('/vendors/template', [VendorEntryController::class, 'template'])->name('vendors.template');
+        Route::post('/vendors/import', [VendorEntryController::class, 'import'])->name('vendors.import');
         Route::get('/vendors/create', [VendorEntryController::class, 'create'])->name('vendors.create');
         Route::post('/vendors', [VendorEntryController::class, 'store'])->name('vendors.store');
         Route::get('/vendors/{supplier}/edit', [VendorEntryController::class, 'edit'])->name('vendors.edit');
