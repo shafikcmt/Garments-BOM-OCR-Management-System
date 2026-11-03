@@ -112,6 +112,7 @@ Route::prefix('merchant')
 
         // Import any buyer's Excel: choose -> match columns -> preview.
         Route::get('/import', [ImportWizardController::class, 'index'])->name('import.index');
+        Route::get('/import/template', [ImportWizardController::class, 'template'])->name('import.template');
         Route::post('/import', [ImportWizardController::class, 'upload'])->name('import.upload');
         Route::get('/import/map', [ImportWizardController::class, 'map'])->name('import.map');
         Route::post('/import/preview', [ImportWizardController::class, 'preview'])->name('import.preview');

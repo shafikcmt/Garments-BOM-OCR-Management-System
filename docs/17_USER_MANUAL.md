@@ -99,6 +99,8 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 
 **Open it:** **Workspace**, then **Import Buyer Excel**. There are three steps.
 
+**No Excel from the buyer?** On the first step press **Download Standard Template**. It is an empty Excel with the Merchandising columns, in the order Admin set. Fill one row per material line, save it, and upload it like any other file. The second sheet, **How to fill**, explains each column. When Admin adds a column on Excel Headers, it appears in the next template you download.
+
 **Step 1: Choose file.**
 1. Choose the **buyer**.
 2. Type the **season**, for example `SP27`.

@@ -321,3 +321,21 @@ it('saves the style rule on the profile and the imported file, and the sync foll
     expect(MotherStyle::orderBy('style_no')->pluck('style_no')->all())->toBe(['607594', '608468']);
     expect(\App\Models\ChildStyle::orderBy('style_no')->pluck('style_no')->all())->toBe(['PETITE', 'TALL']);
 });
+
+
+it('downloads a blank standard template built from the Merchandising input columns', function () {
+    ExcelHeader::create(['header_name' => 'Mother Style', 'header_key' => 'mother_style', 'owner_role_id' => Role::findOrCreate('merchant', 'web')->id, 'position' => 40]);
+
+    $response = $this->actingAs($this->merchant)->get(route('merchant.import.template'))->assertOk();
+
+    $path = tempnam(sys_get_temp_dir(), 'tpl') . '.xlsx';
+    file_put_contents($path, $response->streamedContent());
+    $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+    $titles = collect($book->getSheetByName('Database')->rangeToArray('A1:Z1')[0])->filter()->values()->all();
+
+    // Merchandising columns only (not the Supply Chain Vendor Name), in Admin's order.
+    expect($titles)->toBe(['Style', 'GMTS Color Name', 'Material Description', 'BOM Quantity', 'Season Name', 'Mother Style']);
+    expect($book->getSheetByName('How to fill'))->not->toBeNull();
+    // A header row only: nothing for the import to read as data.
+    expect($book->getSheetByName('Database')->getHighestRow())->toBe(1);
+});

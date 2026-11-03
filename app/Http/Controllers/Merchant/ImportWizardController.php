@@ -44,11 +44,59 @@ class ImportWizardController extends ExcelUploadController
     /** Title rows are searched among the first rows of a sheet. */
     private const TOP_ROWS = 30;
 
-    /** Blank rows in a row (nothing in the matched columns) in the matched columns after which reading stops. */
+    /** Reading stops after this many blank rows in a row (nothing in the matched columns). */
     private const MAX_BLANK_ROWS = 200;
 
     public function __construct(private ImportColumnMatcher $matcher)
     {
+    }
+
+    // ---------------------------------------------------------------- template
+
+    /**
+     * A blank Excel in the standard format: one column per Merchandising input
+     * column, in the order Admin set on Excel Header Control, so a buyer with no
+     * Excel of its own starts here. Built from the live headers, so a column Admin
+     * adds or switches off shows up here without a code change.
+     */
+    public function template(Request $request)
+    {
+        $this->authorizeImport($request);
+
+        $headers = $this->merchantInputHeaders();
+
+        $book = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $book->getActiveSheet()->setTitle('Database');
+
+        foreach ($headers->values() as $i => $header) {
+            $sheet->setCellValue([$i + 1, 1], $header->header_name);
+            $sheet->getColumnDimensionByColumn($i + 1)->setAutoSize(true);
+        }
+
+        if ($headers->isNotEmpty()) {
+            $range = 'A1:' . Coordinate::stringFromColumnIndex($headers->count()) . '1';
+            $sheet->getStyle($range)->getFont()->setBold(true);
+            $sheet->freezePane('A2');
+        }
+
+        $help = $book->createSheet()->setTitle('How to fill');
+        $notes = [
+            'Fill one row per material line. Keep the column titles in row 1 of the Database sheet.',
+            'Style: the buyer\'s style number. A style that applies to every style (poly bag, carton) can be written as ALL.',
+            'Mother Style: the main style number. Leave empty if the style code already shows it, for example 720193(PETITE).',
+            'Order Qty: garment pieces for the style and colour. BOM Quantity: the quantity of this material.',
+            'Do not fill vendor, PO, PI, payment, shipment, receipt or issue columns here. Other departments fill them in the system.',
+            'Then: Merchandising, Import Buyer Excel, choose the buyer and season, and upload this file.',
+        ];
+        foreach ($notes as $i => $note) {
+            $help->setCellValue([1, $i + 1], $note);
+        }
+        $help->getColumnDimension('A')->setWidth(120);
+        $book->setActiveSheetIndex(0);
+
+        return response()->streamDownload(function () use ($book) {
+            (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($book))->save('php://output');
+        }, 'standard-order-template.xlsx', ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 
     // ---------------------------------------------------------------- step 1
