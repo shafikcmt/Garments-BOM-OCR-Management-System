@@ -14,8 +14,8 @@
                    title="Import Buyer Excel"
                    copy="Any layout. Match the columns once and the system remembers them for this buyer.">
         <x-slot:actions>
-            <a href="{{ route('merchant.import.template') }}" class="btn btn-outline-primary d-inline-flex align-items-center gap-2">
-                <i class="bi bi-download" aria-hidden="true"></i>Download Standard Template
+            <a href="{{ route('merchant.excel.sample') }}" class="btn btn-outline-primary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-download" aria-hidden="true"></i>Download Sample
             </a>
         </x-slot:actions>
     </x-page-header>

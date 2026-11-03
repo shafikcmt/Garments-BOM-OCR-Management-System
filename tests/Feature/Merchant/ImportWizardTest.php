@@ -323,19 +323,15 @@ it('saves the style rule on the profile and the imported file, and the sync foll
 });
 
 
-it('downloads a blank standard template built from the Merchandising input columns', function () {
+it('offers the Merchandising columns, including the new ones, in the existing sample download', function () {
     ExcelHeader::create(['header_name' => 'Mother Style', 'header_key' => 'mother_style', 'owner_role_id' => Role::findOrCreate('merchant', 'web')->id, 'position' => 40]);
 
-    $response = $this->actingAs($this->merchant)->get(route('merchant.import.template'))->assertOk();
+    $response = $this->actingAs($this->merchant)->get(route('merchant.excel.sample'))->assertOk();
 
-    $path = tempnam(sys_get_temp_dir(), 'tpl') . '.xlsx';
+    $path = tempnam(sys_get_temp_dir(), 'smp') . '.xlsx';
     file_put_contents($path, $response->streamedContent());
-    $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
-    $titles = collect($book->getSheetByName('Database')->rangeToArray('A1:Z1')[0])->filter()->values()->all();
+    $titles = collect(\PhpOffice\PhpSpreadsheet\IOFactory::load($path)->getActiveSheet()->rangeToArray('A1:Z1')[0])->filter()->values()->all();
 
     // Merchandising columns only (not the Supply Chain Vendor Name), in Admin's order.
     expect($titles)->toBe(['Style', 'GMTS Color Name', 'Material Description', 'BOM Quantity', 'Season Name', 'Mother Style']);
-    expect($book->getSheetByName('How to fill'))->not->toBeNull();
-    // A header row only: nothing for the import to read as data.
-    expect($book->getSheetByName('Database')->getHighestRow())->toBe(1);
 });
