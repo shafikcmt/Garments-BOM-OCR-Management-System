@@ -439,15 +439,15 @@ Route::prefix('store')
             // Step 4: received department sheets merged into the Store's final
             // sheet. A fixed path, so declared above /{requisition}.
             Route::post('/requisitions/merge', [PurchaseRequisitionController::class, 'merge'])
-                ->middleware($act('store.requisition.create'))->name('requisitions.merge');
+                ->middleware($act('store.requisition.create|store.requisition.final'))->name('requisitions.merge');
             // The review before it: every merged item with its stock, for the
             // Store to keep, reduce or hide before the Final sheet is made.
             Route::get('/requisitions/merge/review', [PurchaseRequisitionController::class, 'mergeReview'])
-                ->middleware($act('store.requisition.create'))->name('requisitions.merge-review');
+                ->middleware($act('store.requisition.create|store.requisition.final'))->name('requisitions.merge-review');
 
             Route::get('/requisitions', [PurchaseRequisitionController::class, 'index'])->name('requisitions.index');
-            Route::get('/requisitions/create', [PurchaseRequisitionController::class, 'create'])->middleware($act('store.requisition.create'))->name('requisitions.create');
-            Route::post('/requisitions', [PurchaseRequisitionController::class, 'store'])->middleware($act('store.requisition.create'))->name('requisitions.store');
+            Route::get('/requisitions/create', [PurchaseRequisitionController::class, 'create'])->middleware($act('store.requisition.create|store.requisition.final'))->name('requisitions.create');
+            Route::post('/requisitions', [PurchaseRequisitionController::class, 'store'])->middleware($act('store.requisition.create|store.requisition.final'))->name('requisitions.store');
             Route::get('/requisitions/{requisition}', [PurchaseRequisitionController::class, 'show'])->name('requisitions.show');
 
             // One requisition as its own printable document — the same layout

@@ -525,6 +525,16 @@ It is never merged. The approvers are set by Admin in **Admin > Requisition Sign
 
 **Admin: who approves.** Admin sets the steps and the person for each step in **Admin > Requisition Signatures**. Nothing in the code needs to change when a person changes.
 
+### 5.1a Giving someone the Final Requisition or the Category Summary
+
+Admin can give a person these two Store requisition tasks without changing their role.
+
+**Open it:** **Admin, Users**, open the person, in the permission list find **General Stock**.
+- **Purchase Requisition, Prepare Final Requisition**: the person can raise the Final Requisition, see the **Requested** queue and every requisition, and merge the departments' sheets, like the Store team. They also see the stock figures on the lines.
+- **Category Summary (view + export)**: the person can open **Category Summary** and download its PDF and Excel. Nothing else of the Store's desk opens with it.
+
+Both start with **Purchase Requisition, View** (they need it to reach the screen). Untick a box to take the task away again. The Store, Admin and Management roles already have them.
+
 ### 5.2 Item Master: adding and approving items
 
 1. A Store user adds a new item in **Items**. It shows **Pending Approval** and cannot be used until it is approved.

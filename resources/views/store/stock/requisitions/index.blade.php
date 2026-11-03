@@ -37,9 +37,13 @@
             <a href="{{ route('store.stock.requisitions.report') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-calendar3 me-1" aria-hidden="true"></i>Monthly Report
             </a>
+            @endif
+            @if(\App\Models\PurchaseRequisition::canViewCategorySummary(auth()->user()))
             <a href="{{ route('store.stock.requisitions.category-summary') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-pie-chart me-1" aria-hidden="true"></i>Category Summary
             </a>
+            @endif
+            @if(\App\Models\PurchaseRequisition::worksStoreDesk(auth()->user()))
             @if(request('level') !== 'final')
             <a href="{{ route('store.stock.requisitions.index', ['level' => 'final']) }}" class="btn btn-outline-secondary">
                 <i class="bi bi-files me-1" aria-hidden="true"></i>Final Requisitions

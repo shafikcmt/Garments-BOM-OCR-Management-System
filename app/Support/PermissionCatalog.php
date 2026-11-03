@@ -68,6 +68,7 @@ class PermissionCatalog
         'issues' => 'Issues',
         'requisition' => 'Purchase Requisition',
         'requirement_issue' => 'Requisition Summary & Requirement vs Issue (view + export)',
+        'category_summary' => 'Category Summary (view + export)',
         'setup' => 'Setup',
 
         // Buyer / Style Stock
@@ -82,7 +83,7 @@ class PermissionCatalog
 
     /** Per-module sub-section order. Sections not listed follow, alphabetically. */
     private const SECTION_ORDER = [
-        'store' => ['stock_report', 'items', 'receiving', 'issues', 'requisition', 'requirement_issue', 'setup'],
+        'store' => ['stock_report', 'items', 'receiving', 'issues', 'requisition', 'requirement_issue', 'category_summary', 'setup'],
         'material' => ['closing_stock', 'receiving', 'bulk_issue', 'requisitions'],
     ];
 
@@ -112,13 +113,14 @@ class PermissionCatalog
         'adjust' => 'Adjust',
         'review' => 'Review',
         'accounts' => 'Accounts Stage',
+        'final' => 'Prepare Final Requisition',
     ];
 
     /**
      * Column order for the matrix. Modules are drawn as rows, these as columns,
      * and a module simply has no checkbox where the permission does not exist.
      */
-    public const ACTION_ORDER = ['view', 'create', 'edit', 'delete', 'export', 'approve', 'manage', 'issue', 'return', 'adjust', 'review', 'accounts'];
+    public const ACTION_ORDER = ['view', 'create', 'edit', 'delete', 'export', 'approve', 'manage', 'issue', 'return', 'adjust', 'review', 'accounts', 'final'];
 
     /** Permissions that are one-off switches rather than a module action. */
     private const SPECIAL_MODULE = 'Special Approvals';

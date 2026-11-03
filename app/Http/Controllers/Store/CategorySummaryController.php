@@ -48,9 +48,9 @@ class CategorySummaryController extends Controller
     private function data(Request $request): array
     {
         abort_unless(
-            PurchaseRequisition::worksStoreDesk($request->user()),
+            PurchaseRequisition::canViewCategorySummary($request->user()),
             403,
-            'The category summary is available to the Store team and management only.'
+            'The category summary is available to the Store team, management and anyone given the Category Summary permission.'
         );
 
         $monthStart = $this->report->resolveMonth($request->validate(['month' => ['nullable', 'string']])['month'] ?? null);

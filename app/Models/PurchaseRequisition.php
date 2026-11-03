@@ -602,7 +602,7 @@ class PurchaseRequisition extends Model
     {
         return $user !== null
             && self::levelFor($user) === self::LEVEL_FINAL
-            && $user->can('store.requisition.create');
+            && ($user->can('store.requisition.create') || $user->can('store.requisition.final'));
     }
 
     /** Every cycle's approval plan. */
@@ -988,7 +988,24 @@ class PurchaseRequisition extends Model
      */
     public static function seesEveryRequisition(User $user): bool
     {
-        return $user->hasAnyRole(['store', 'admin', 'management']);
+        // store.requisition.final: Admin ticks it per user on Admin > Users, so a
+        // person on another role (a General Stock clerk, say) can prepare the Final
+        // Requisition. It makes them Store side for requisitions: they raise the final
+        // sheet, see the Requested queue and every requisition, and merge.
+        return $user->hasAnyRole(['store', 'admin', 'management'])
+            || $user->can('store.requisition.final');
+    }
+
+    /**
+     * Who may open the Category Summary and its PDF / Excel: the Store's side of
+     * requisitions, or anyone Admin ticked store.category_summary.view for (who can
+     * open Purchase Requisition at all). That permission opens the summary and nothing
+     * else of the Store's desk.
+     */
+    public static function canViewCategorySummary(?User $user): bool
+    {
+        return $user !== null
+            && (self::worksStoreDesk($user) || $user->can('store.category_summary.view'));
     }
 
     /**
