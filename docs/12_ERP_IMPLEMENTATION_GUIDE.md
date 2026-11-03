@@ -474,9 +474,12 @@ Style-814144, OCR-607294, Macy's SP27, Ann Taylor SU27) share one Database
 sheet of about 81 columns; their differences are column names, a few extra
 columns, and how style codes are written.
 
-Still open: the standard-template download button (rule 7), a list of file
-columns the system has no header for, and master-data import (vendors from a
-"Dropdown" sheet).
+The merchant sample download (rule 7) already existed on the Upload Excel page
+and is built from the live Merchandising columns, so it carries the new headers
+automatically; the Import Buyer Excel page links to it.
+
+Still open: a list of file columns the system has no header for, and
+master-data import (vendors from a "Dropdown" sheet).
 
 ### 12.4 Reference products
 
