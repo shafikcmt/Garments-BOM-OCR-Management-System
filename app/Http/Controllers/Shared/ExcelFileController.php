@@ -2216,18 +2216,13 @@ class ExcelFileController extends Controller
         DB::disableQueryLog();
         @set_time_limit(300);
 
-        $rows = $excelFile->rows()
-            ->with(['cells'])
-            ->orderBy('row_number')
-            ->get();
-
         // Rows that have a Material Stock Ledger entry yield their overlapping
         // Store cells to the ledger (single source of truth): recalc stops
         // writing its Excel-formula value for those cells so the auto-synced
         // ledger figure survives. Disabled -> legacy Excel-formula behaviour.
         $ledgerSyncEnabled = (bool) config('stock.sync_workspace_cells', true);
         $ledgerRowIds = $ledgerSyncEnabled
-            ? MaterialStockLedger::whereIn('excel_row_id', $rows->pluck('id')->all())
+            ? MaterialStockLedger::whereIn('excel_row_id', $excelFile->rows()->pluck('id')->all())
                 ->pluck('excel_row_id')
                 ->map(fn ($id) => (int) $id)
                 ->flip()
@@ -2236,7 +2231,7 @@ class ExcelFileController extends Controller
         $praByPi = $this->praDatesByPiNumber($excelFile);
         $previousFormulaKey = null;
 
-        foreach ($rows as $row) {
+        foreach ($this->rowsWithCells($excelFile) as $row) {
             if ($exceptRowIds->has((int) $row->id)) {
                 continue;
             }
@@ -2519,6 +2514,43 @@ class ExcelFileController extends Controller
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['short_excess_value', 'short_and_excess_value'], $this->fmtNum($shortExcessValue), $userId);
 
             $previousFormulaKey = $formulaKey;
+        }
+    }
+
+    /**
+     * The file's rows in sheet order, each with its cells, read a block at a time
+     * so a large file (thousands of rows x a hundred columns) never sits in
+     * memory all at once. Order is row number then id, so a block boundary can
+     * never skip or repeat a row.
+     */
+    private function rowsWithCells(ExcelFile $excelFile, int $size = 200): \Generator
+    {
+        $lastNumber = null;
+        $lastId = 0;
+
+        while (true) {
+            $block = $excelFile->rows()
+                ->with('cells')
+                ->when($lastNumber !== null, fn ($q) => $q->where(fn ($w) => $w
+                    ->where('row_number', '>', $lastNumber)
+                    ->orWhere(fn ($same) => $same->where('row_number', $lastNumber)->where('id', '>', $lastId))))
+                ->orderBy('row_number')
+                ->orderBy('id')
+                ->limit($size)
+                ->get();
+
+            if ($block->isEmpty()) {
+                return;
+            }
+
+            foreach ($block as $row) {
+                yield $row;
+            }
+
+            $last = $block->last();
+            $lastNumber = $last->row_number;
+            $lastId = $last->id;
+            unset($block);
         }
     }
 
