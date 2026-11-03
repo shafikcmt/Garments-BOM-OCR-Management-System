@@ -97,10 +97,12 @@ Route::prefix('merchant')
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace');
 
-        // Add a vendor (with bank details) without going through Admin.
+        // See, add and edit vendors (bank details included) without going through Admin.
         Route::get('/vendors', [VendorEntryController::class, 'index'])->name('vendors.index');
         Route::get('/vendors/create', [VendorEntryController::class, 'create'])->name('vendors.create');
         Route::post('/vendors', [VendorEntryController::class, 'store'])->name('vendors.store');
+        Route::get('/vendors/{supplier}/edit', [VendorEntryController::class, 'edit'])->name('vendors.edit');
+        Route::put('/vendors/{supplier}', [VendorEntryController::class, 'update'])->name('vendors.update');
 
         // Buyer -> Season -> Mother Style -> Child Style.
         Route::get('/styles', [StyleLibraryController::class, 'index'])->name('styles.index');

@@ -5,7 +5,7 @@
 @section('content')
 <div class="container-fluid">
     <x-page-header icon="buildings" eyebrow="Merchandising" title="Vendors"
-                   copy="The vendor list used for bookings and payment requests. Add a new vendor here; Admin edits or removes one.">
+                   copy="The vendor list used for bookings and payment requests. Add a new vendor or edit one here; Admin removes one.">
         <x-slot:actions>
             <a href="{{ route('merchant.vendors.create') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
                 <i class="bi bi-plus-lg" aria-hidden="true"></i>Add Vendor
@@ -54,6 +54,7 @@
                             <th>Location</th>
                             <th>Bank</th>
                             <th>Status</th>
+                            <th class="text-end">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -83,6 +84,11 @@
                                 </td>
                                 <td>
                                     <span class="badge {{ $vendor->is_active ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' }}">{{ $vendor->is_active ? 'Active' : 'Inactive' }}</span>
+                                </td>
+                                <td class="text-end">
+                                    <a href="{{ route('merchant.vendors.edit', $vendor) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit
+                                    </a>
                                 </td>
                             </tr>
                         @endforeach

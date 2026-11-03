@@ -8,13 +8,14 @@ use App\Models\Supplier;
 use Illuminate\Http\Request;
 
 /**
- * Merchant > Vendors. Lets Merchandising see the vendor list and add a vendor,
- * bank details included. It reads and writes the same `suppliers` list Admin >
- * Vendors manages and applies the same rules (SupplierController::validatedData);
- * editing and deleting a vendor stays with Admin.
+ * Merchant > Vendors. Lets Merchandising see the vendor list, add a vendor and
+ * edit one, bank details included. It reads and writes the same `suppliers` list
+ * Admin > Vendors manages and applies the same rules
+ * (SupplierController::validatedData); deleting a vendor stays with Admin.
  *
  * The list shows whether bank details are on file and the bank name, never the
- * account number: that stays on the Admin screen.
+ * account number; the edit form shows it, because the person editing needs to
+ * correct it.
  */
 class VendorEntryController extends Controller
 {
@@ -60,5 +61,19 @@ class VendorEntryController extends Controller
         return redirect()
             ->route('merchant.vendors.index')
             ->with('success', 'Vendor "' . e($supplier->supplier_name) . '" added.');
+    }
+
+    public function edit(Supplier $supplier)
+    {
+        return view('merchant.vendors.edit', compact('supplier'));
+    }
+
+    public function update(Request $request, Supplier $supplier)
+    {
+        $supplier->update(app(SupplierController::class)->validatedData($request, $supplier));
+
+        return redirect()
+            ->route('merchant.vendors.index')
+            ->with('success', 'Vendor "' . e($supplier->supplier_name) . '" updated.');
     }
 }
