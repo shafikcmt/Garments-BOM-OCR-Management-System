@@ -196,13 +196,13 @@ it('matches a buyer column by the other names Admin typed on a header', function
 
 it('works out mother and child the same way for the preview and the import', function () {
     expect(\App\Support\StyleHierarchy::resolve('788457(PETITE)', '813132.0'))
-        ->toBe(['mother' => '813132', 'child' => '788457(PETITE)', 'kind' => 'variant', 'source' => 'column']);
+        ->toBe(['mother' => '813132', 'child' => '788457(PETITE)', 'kind' => 'variant', 'source' => 'column', 'missing' => false]);
     expect(\App\Support\StyleHierarchy::resolve('813132', '813132'))
-        ->toBe(['mother' => '813132', 'child' => null, 'kind' => null, 'source' => 'column']);
+        ->toBe(['mother' => '813132', 'child' => null, 'kind' => null, 'source' => 'column', 'missing' => false]);
     expect(\App\Support\StyleHierarchy::resolve('720193(PETITE)', ''))
-        ->toBe(['mother' => '720193', 'child' => 'PETITE', 'kind' => 'variant', 'source' => 'code']);
+        ->toBe(['mother' => '720193', 'child' => 'PETITE', 'kind' => 'variant', 'source' => 'code', 'missing' => false]);
     expect(\App\Support\StyleHierarchy::resolve('882635'))
-        ->toBe(['mother' => '882635', 'child' => null, 'kind' => null, 'source' => 'style']);
+        ->toBe(['mother' => '882635', 'child' => null, 'kind' => null, 'source' => 'style', 'missing' => false]);
 });
 
 it('previews mothers, children, colors and rows to check, using the Mother Style column', function () {
@@ -231,4 +231,93 @@ it('previews mothers, children, colors and rows to check, using the Mother Style
         ->and($summary['mother_fallback_rows'])->toBe(1)
         ->and($summary['mother_column'])->toBeTrue();
     $response->assertSee('have no style')->assertSee('empty Mother Style');
+});
+
+
+it('treats an ALL style row as a common item, not a mother style', function () {
+    expect(\App\Support\StyleHierarchy::isCommon(' All '))->toBeTrue()
+        ->and(\App\Support\StyleHierarchy::isCommon('ALL'))->toBeTrue()
+        ->and(\App\Support\StyleHierarchy::isCommon('ALLEN-1'))->toBeFalse();
+
+    $file = lotWorkbook([
+        ['882635', 'RED', 'Thread', '10', ''],
+        ['ALL', 'ALL', 'Poly Bag', '10', ''],
+    ]);
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), ['buyer_id' => $this->buyer->id, 'season_code' => 'SU27', 'file' => $file]);
+
+    $map = [1 => $this->headers['style_name']->id, 2 => $this->headers['gmts_color_name']->id, 3 => $this->headers['material_description']->id, 4 => $this->headers['bom_quantity']->id];
+    $response = $this->withoutVite()->actingAs($this->merchant)->post(route('merchant.import.preview'), ['sheet' => 'Database', 'header_row' => 3, 'map' => $map])->assertOk();
+
+    expect($response->viewData('summary')['mothers'])->toBe(1)->and($response->viewData('summary')['common_rows'])->toBe(1);
+
+    $this->actingAs($this->merchant)->post(route('merchant.import.confirm'))->assertRedirect();
+
+    expect(MotherStyle::pluck('style_no')->all())->toBe(['882635']);
+    expect(BomItem::count())->toBe(2);
+    expect(OrderLine::where('style_no', 'ALL')->first()->mother_style_id)->toBeNull();
+});
+
+it('stops reading after a long run of blank rows', function () {
+    $rows = [['882635', 'RED', 'Thread', '10', '']];
+    $book = new Spreadsheet();
+    $sheet = $book->getActiveSheet()->setTitle('Database');
+    foreach (['Style', 'GMTS Color Name', 'Material Description', 'BOM Qty'] as $i => $t) {
+        $sheet->setCellValue([$i + 1, 1], $t);
+    }
+    $sheet->fromArray(['882635', 'RED', 'Thread', '10'], null, 'A2');
+    // Far below the data: a stray formatted/typed cell, like a sheet that reports a million rows.
+    $sheet->setCellValue('A5000', 'stray');
+    $path = tempnam(sys_get_temp_dir(), 'blank') . '.xlsx';
+    (new Xlsx($book))->save($path);
+
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), ['buyer_id' => $this->buyer->id, 'season_code' => 'SU27', 'file' => new UploadedFile($path, 'blank.xlsx', null, null, true)]);
+    $map = [1 => $this->headers['style_name']->id, 2 => $this->headers['gmts_color_name']->id, 3 => $this->headers['material_description']->id, 4 => $this->headers['bom_quantity']->id];
+
+    $response = $this->withoutVite()->actingAs($this->merchant)->post(route('merchant.import.preview'), ['sheet' => 'Database', 'header_row' => 1, 'map' => $map])->assertOk();
+
+    expect($response->viewData('rowCount'))->toBe(1);
+});
+
+
+it('follows the buyer-wise rule: fit words, style-only and column-only', function () {
+    $r = fn (...$a) => \App\Support\StyleHierarchy::resolve(...$a);
+
+    // Fit word without a bracket, longest first.
+    expect($r('608471 CURVY PETITE', '', 'code', 'PETITE, CURVY PETITE'))->toMatchArray(['mother' => '608471', 'child' => 'CURVY PETITE', 'source' => 'code']);
+    expect($r('608468 PETITE', '', null, 'PETITE'))->toMatchArray(['mother' => '608468', 'child' => 'PETITE']);
+    expect($r('607294(MISSY)', '', null, 'PETITE'))->toMatchArray(['mother' => '607294', 'child' => 'MISSY']);
+    // No fit words listed: the whole text stays the mother, as before.
+    expect($r('608468 PETITE'))->toMatchArray(['mother' => '608468 PETITE', 'child' => null]);
+
+    // Every style its own mother, even with a bracket or a Mother Style value.
+    expect($r('720193(PETITE)', '999', 'style'))->toMatchArray(['mother' => '720193(PETITE)', 'child' => null, 'source' => 'style']);
+
+    // Column only: a blank cell is flagged and not guessed from the code.
+    expect($r('788457(PETITE)', '', 'column'))->toMatchArray(['mother' => '788457(PETITE)', 'child' => null, 'missing' => true]);
+    expect($r('788457(PETITE)', '813132', 'column'))->toMatchArray(['mother' => '813132', 'child' => '788457(PETITE)', 'missing' => false]);
+
+    // Code only: the Mother Style column is ignored.
+    expect($r('720193(PETITE)', '999', 'code'))->toMatchArray(['mother' => '720193', 'child' => 'PETITE']);
+});
+
+it('saves the style rule on the profile and the imported file, and the sync follows it', function () {
+    $file = lotWorkbook([
+        ['608468 PETITE', 'RED', 'Thread', '10', ''],
+        ['607594 TALL', 'RED', 'Thread', '10', ''],
+    ]);
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), ['buyer_id' => $this->buyer->id, 'season_code' => 'SU27', 'file' => $file]);
+    $map = [1 => $this->headers['style_name']->id, 2 => $this->headers['gmts_color_name']->id, 3 => $this->headers['material_description']->id, 4 => $this->headers['bom_quantity']->id];
+
+    $this->withoutVite()->actingAs($this->merchant)->post(route('merchant.import.preview'), [
+        'sheet' => 'Database', 'header_row' => 3, 'map' => $map, 'save_profile' => 1, 'profile_name' => 'Ann Taylor SU27',
+        'mother_source' => 'code', 'fit_words' => 'PETITE, TALL',
+    ])->assertOk()->assertSee('Mother style rule');
+
+    $this->actingAs($this->merchant)->post(route('merchant.import.confirm'))->assertRedirect();
+
+    $profile = BuyerImportProfile::firstOrFail();
+    expect($profile->mother_source)->toBe('code')->and($profile->fit_words)->toBe('PETITE, TALL');
+    expect(ExcelFile::firstOrFail()->mother_source)->toBe('code');
+    expect(MotherStyle::orderBy('style_no')->pluck('style_no')->all())->toBe(['607594', '608468']);
+    expect(\App\Models\ChildStyle::orderBy('style_no')->pluck('style_no')->all())->toBe(['PETITE', 'TALL']);
 });

@@ -44,6 +44,9 @@ class ImportWizardController extends ExcelUploadController
     /** Title rows are searched among the first rows of a sheet. */
     private const TOP_ROWS = 30;
 
+    /** Blank rows in a row (nothing in the matched columns) in the matched columns after which reading stops. */
+    private const MAX_BLANK_ROWS = 200;
+
     public function __construct(private ImportColumnMatcher $matcher)
     {
     }
@@ -144,6 +147,7 @@ class ImportWizardController extends ExcelUploadController
             'profiles' => $profiles,
             'profile' => $profile,
             'autoPicked' => $autoPicked,
+            'motherRule' => (string) old('mother_source', $profile?->mother_source ?? ''),
             'samples' => $this->samples($top, $headerRow, array_keys($columns)),
         ]);
     }
@@ -166,6 +170,8 @@ class ImportWizardController extends ExcelUploadController
             'map.*' => ['nullable', 'integer'],
             'save_profile' => ['nullable', 'boolean'],
             'profile_name' => ['nullable', 'string', 'max:100'],
+            'mother_source' => ['nullable', 'in:auto,' . implode(',', StyleHierarchy::RULES)],
+            'fit_words' => ['nullable', 'string', 'max:500'],
         ]);
 
         $headers = $this->merchantInputHeaders()->keyBy('id');
@@ -193,6 +199,8 @@ class ImportWizardController extends ExcelUploadController
             'source_titles' => $read['titles'],
             'save_profile' => (bool) ($data['save_profile'] ?? false),
             'profile_name' => trim((string) ($data['profile_name'] ?? '')),
+            'mother_source' => in_array($data['mother_source'] ?? null, StyleHierarchy::RULES, true) ? $data['mother_source'] : null,
+            'fit_words' => trim((string) ($data['fit_words'] ?? '')) ?: null,
         ]);
         $request->session()->put(self::SESSION, $state);
 
@@ -200,7 +208,7 @@ class ImportWizardController extends ExcelUploadController
         $keyOf = fn ($h) => $this->matcher->key($h->header_key ?: $h->header_name);
         $motherHeaderId = $headers->first(fn ($h) => $keyOf($h) === 'mother_style')?->id;
         $colorHeaderId = $headers->first(fn ($h) => $keyOf($h) === 'gmts_color_name')?->id;
-        $summary = $this->summariseStyles($read['rows'], $styleHeaderId, $motherHeaderId, $colorHeaderId, $mapping);
+        $summary = $this->summariseStyles($read['rows'], $styleHeaderId, $motherHeaderId, $colorHeaderId, $mapping, $state['mother_source'], $state['fit_words']);
         $styles = $summary['styles'];
 
         $mappedIds = array_values($mapping);
@@ -266,6 +274,8 @@ class ImportWizardController extends ExcelUploadController
                 'uploaded_by' => $userId,
                 'buyer_id' => $state['buyer_id'],
                 'buyer_season_id' => $season->id,
+                'mother_source' => $state['mother_source'] ?? null,
+                'fit_words' => $state['fit_words'] ?? null,
                 'upload_batch_no' => 'BATCH-' . now()->format('YmdHis'),
                 'total_rows' => 0,
                 'status' => 'pending',
@@ -562,8 +572,11 @@ class ImportWizardController extends ExcelUploadController
 
         $rows = [];
         $n = 0;
+        $blankRun = 0;
 
-        for ($r = $headerRow + 1, $last = $ws->getHighestRow(); $r <= $last; $r++) {
+        // Some workbooks report a million rows because of formatting alone; stop
+        // once the data has clearly ended instead of walking all of them.
+        for ($r = $headerRow + 1, $last = $ws->getHighestRow(); $r <= $last && $blankRun < self::MAX_BLANK_ROWS; $r++) {
             $values = [];
             $any = false;
 
@@ -575,6 +588,9 @@ class ImportWizardController extends ExcelUploadController
 
             if ($any) {
                 $rows[++$n] = $values;
+                $blankRun = 0;
+            } else {
+                $blankRun++;
             }
         }
 
@@ -588,9 +604,9 @@ class ImportWizardController extends ExcelUploadController
      *
      * @param  array<int, array<int, mixed>>  $rows  row => (header id => value)
      * @param  array<int, int>  $mapping  file column => header id
-     * @return array{styles: Collection, mothers: int, children: int, colors: int, no_style_rows: int, mother_fallback_rows: int, mother_column: bool}
+     * @return array{styles: Collection, mothers: int, children: int, colors: int, no_style_rows: int, common_rows: int, mother_fallback_rows: int, mother_column: bool}
      */
-    private function summariseStyles(array $rows, ?int $styleId, ?int $motherId, ?int $colorId, array $mapping): array
+    private function summariseStyles(array $rows, ?int $styleId, ?int $motherId, ?int $colorId, array $mapping, ?string $rule = null, ?string $fitWords = null): array
     {
         $mapped = fn (?int $id) => $id !== null && in_array($id, $mapping, true);
         $text = fn (array $row, ?int $id) => $id === null ? '' : trim((string) ($row[$id] ?? ''));
@@ -600,6 +616,7 @@ class ImportWizardController extends ExcelUploadController
         $colors = [];
         $noStyle = 0;
         $fallback = 0;
+        $common = 0;
 
         if ($mapped($styleId)) {
             foreach ($rows as $row) {
@@ -611,12 +628,19 @@ class ImportWizardController extends ExcelUploadController
                     continue;
                 }
 
-                $motherCell = $motherColumn ? $text($row, $motherId) : '';
-                if ($motherColumn && $motherCell === '') {
-                    $fallback++;
+                if (StyleHierarchy::isCommon($code)) {
+                    $common++;
+
+                    continue;
                 }
 
-                $place = StyleHierarchy::resolve($code, $motherCell);
+                $motherCell = $motherColumn ? $text($row, $motherId) : '';
+                $place = StyleHierarchy::resolve($code, $motherCell, $rule, $fitWords);
+
+                // A blank Mother Style cell: counted so the preview can warn.
+                if ($motherColumn && $motherCell === '' && $rule !== StyleHierarchy::FROM_CODE && $rule !== StyleHierarchy::FROM_STYLE) {
+                    $fallback++;
+                }
                 $key = $place['mother'] . "\0" . ($place['child'] ?? '');
                 $groups[$key] ??= $place + ['rows' => 0];
                 $groups[$key]['rows']++;
@@ -638,6 +662,7 @@ class ImportWizardController extends ExcelUploadController
             'children' => $styles->pluck('child')->filter()->unique()->count(),
             'colors' => count($colors),
             'no_style_rows' => $noStyle,
+            'common_rows' => $common,
             'mother_fallback_rows' => $fallback,
             'mother_column' => $motherColumn,
         ];
@@ -647,7 +672,8 @@ class ImportWizardController extends ExcelUploadController
     {
         $profile = BuyerImportProfile::updateOrCreate(
             ['buyer_id' => $state['buyer_id'], 'name' => $state['profile_name'] !== '' ? $state['profile_name'] : 'Default'],
-            ['sheet_name' => $state['sheet'], 'header_row' => $state['header_row'], 'created_by' => $userId]
+            ['sheet_name' => $state['sheet'], 'header_row' => $state['header_row'], 'created_by' => $userId,
+             'mother_source' => $state['mother_source'] ?? null, 'fit_words' => $state['fit_words'] ?? null]
         );
 
         $profile->columns()->delete();

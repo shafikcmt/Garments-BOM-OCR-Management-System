@@ -75,6 +75,28 @@
             </div>
             <div class="form-text mb-3">Columns left on "Skip" belong to other departments or are not needed. Only Merchandising columns can be filled here.</div>
 
+            <div class="border rounded p-3 mb-3">
+                <div class="fw-semibold mb-2"><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>Mother and child styles</div>
+                <div class="row g-3">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label" for="mother_source">Where does the mother style come from?</label>
+                        <select id="mother_source" name="mother_source" class="form-select">
+                            <option value="auto" {{ ($motherRule === '' || $motherRule === 'auto') ? 'selected' : '' }}>Automatic (Mother Style column, then style code)</option>
+                            <option value="column" {{ $motherRule === 'column' ? 'selected' : '' }}>Mother Style column only</option>
+                            <option value="code" {{ $motherRule === 'code' ? 'selected' : '' }}>Style code (number before the bracket or fit word)</option>
+                            <option value="style" {{ $motherRule === 'style' ? 'selected' : '' }}>Every style is its own mother</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-7">
+                        <label class="form-label" for="fit_words">Fit words (optional)</label>
+                        <input id="fit_words" type="text" name="fit_words" maxlength="500" class="form-control"
+                               placeholder="PETITE, TALL, CURVY, CURVY PETITE"
+                               value="{{ old('fit_words', optional($profile)->fit_words) }}">
+                        <div class="form-text">Used with the style code: "608468 PETITE" becomes mother 608468 with child PETITE.</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-2 align-items-center mb-3">
                 <div class="col-auto form-check ms-2">
                     <input type="checkbox" class="form-check-input" id="saveProfile" name="save_profile" value="1" {{ ($profile || $autoPicked) ? 'checked' : '' }}>

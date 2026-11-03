@@ -16,6 +16,8 @@ class ExcelFile extends Model
         'uploaded_by',
         'buyer_id',
         'buyer_season_id',
+        'mother_source',
+        'fit_words',
         'upload_batch_no',
         'total_rows',
         'status',

@@ -8,6 +8,11 @@ class BuyerImportProfileColumn extends Model
 {
     protected $fillable = ['profile_id', 'source_header', 'source_key', 'excel_header_id'];
 
+    public function header()
+    {
+        return $this->belongsTo(ExcelHeader::class, 'excel_header_id');
+    }
+
     public function profile()
     {
         return $this->belongsTo(BuyerImportProfile::class, 'profile_id');

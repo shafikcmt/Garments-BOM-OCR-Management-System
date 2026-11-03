@@ -1319,6 +1319,7 @@ class BookingPoSourceService
             'buyer' => str_contains($header, 'buyer') && ! str_contains($header, 'liability') && ! str_contains($header, 'value'),
             'season' => str_contains($header, 'season'),
             'mother_style' => str_contains($header, 'mother_style') || str_contains($header, 'parent_style'),
+            'division' => $header === 'division' || $header === 'product_group',
             'vendor' => str_contains($header, 'vendor') || str_contains($header, 'supplier'),
             'style' => str_contains($header, 'style') || str_contains($header, 'contract_number') || str_contains($header, 'sales_contract'),
             'shipment_month' => str_contains($header, 'shipment_month') || str_contains($header, 'ship_month'),
@@ -1385,6 +1386,8 @@ class BookingPoSourceService
             // The style family a style belongs to, when the buyer's sheet states it
             // in its own column. Optional: BomTableSync falls back to the style code.
             'mother_style' => ['mother_style', 'mother_style_no', 'mother_style_name', 'parent_style', 'main_style', 'Mother Style'],
+            // Product group / division of the style (Denim, Outerwear...), kept on the mother style.
+            'division' => ['division', 'product_group', 'product_division', 'Division', 'Product Group'],
             'vendor' => ['vendor_name', 'supplier_name', 'supplier', 'vendor', 'Vendor Name'],
             'style' => ['style_name', 'style_no', 'style_order', 'order_style_no', 'order_style', 'initial_contract_number', 'contract_number', 'sales_contract', 'Style Name'],
             // The style's own name/number, without the contract-number columns

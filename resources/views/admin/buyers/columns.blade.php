@@ -15,6 +15,7 @@
     <x-page-header icon="layout-three-columns" :eyebrow="$buyer->buyer_name" title="Workspace Columns"
                    copy="Tick the columns this buyer uses. Unticked columns are hidden on this buyer's workspace files. Nothing is deleted; users can still press Show All Columns.">
         <x-slot:actions>
+            <a href="{{ route('admin.buyers.profiles.index', $buyer) }}" class="btn btn-outline-primary"><i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i>Import Profiles</a>
             <a href="{{ route('admin.buyers.edit', $buyer) }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Buyer</a>
         </x-slot:actions>
     </x-page-header>

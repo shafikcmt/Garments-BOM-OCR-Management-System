@@ -411,3 +411,80 @@ group at a time).
 - **Release 5:** Which accounting software is used (§8 Q3)? Does Accounts
   need supplier-wise or style-wise outstanding, or both?
 - **Release 6:** Does every buyer's PO carry a size breakdown (§8 Q6)?
+
+---
+
+## 12. HAPL Threadloop development plan v1.0 (29 Oct 2026) and easy management
+
+Source: "HAPL Threadloop — Full Garments ERP, Module-wise Development Plan &
+Deadlines", Nov 2026 – Dec 2027 (19 modules). The Word file is kept by the
+owner; this section is the working summary, so a session can tell which month
+a request belongs to. Where this guide and the plan differ, ask the owner.
+
+### 12.1 Month map (from the plan)
+
+| Month | Module | Notes for the build |
+|---|---|---|
+| Nov 2026 | Order Management (final) + management dashboard | Phase 2 of the dynamic order format belongs here (see 12.3) |
+| Dec 2026 | Procurement / PO & Booking | Booking from BOM "to be ordered" lines, PI register, MOQ, budget control |
+| Jan 2027 | Store & Inventory upgrade | GRN against PO / PI, lot / shade / roll, QC gate, FIFO / weighted average |
+| Feb–Mar 2027 | Commercial (L/C, inbound, export documents) | |
+| Apr 2027 | Shipping & Logistics + CRM | |
+| May 2027 | Financial Accounting A (AP / AR, auto journal) | SAP FICO-style, see §4 build vs integrate |
+| Jun 2027 | Production Planning | |
+| Jul–Aug 2027 | QR production tracking, IE, QA / QC | |
+| Sep 2027 | Subcontract, post-costing, Accounting B | |
+| Oct 2027 | Maintenance, Fixed Assets | |
+| Nov 2027 | HR & Payroll (build or integrate) | |
+| Dec 2027 | BI, mobile, hardening, final manual | |
+
+### 12.2 "Easy to manage" rules (from the plan's principle "everything set on screen")
+
+These apply to every module in the table above. A feature is not finished until
+a non-developer can run it from a screen.
+
+1. **No buyer-specific or person-specific code.** Buyers, seasons, product
+   groups, sample types, TnA templates, approvers, column rights and column
+   names are data on Admin or Merchant screens.
+2. **A new buyer takes minutes:** add buyer, upload a file, confirm the
+   matching once, set the style rule once, save as a profile.
+3. **One common format, many buyer layouts.** Columns carry the standard name;
+   a buyer's own wording lives in the header's **Other Names** and in the
+   buyer's profile. Per-buyer visibility is done with Workspace Columns, never
+   with a second format.
+4. **Each department updates only its part.** The merchant uploads the
+   merchandising input columns; formula columns are calculated by the system;
+   every other column appears empty for its department to fill.
+5. **Preview before save, plain-English warnings, nothing half-saved.**
+6. **Every setting is visible and reversible:** list, rename, copy, delete.
+   Deleting a profile never changes data already imported.
+7. **A pre-built "standard template"** per module (Excel) so a department that
+   has no layout of its own starts from the common format.
+8. **Each month ends with a user-manual section and a department sign-off.**
+
+### 12.3 Phase 2 of the dynamic order format: shipped 2026-11-03
+
+Mother Style column and header; buyer-wise style rule and fit words on the
+import profile (also kept on the imported file); `ALL` rows kept as common
+items; sheet reading stops at the end of the data; Division feeds the mother
+style's product group; Order Qty as the merchant's quantity column; Other Names
+on headers; Admin > Buyers > Import Profiles; import preview with mother /
+child / colour counts. Buyer files studied (MOP SS27, HB FA27 outerwear,
+Style-814144, OCR-607294, Macy's SP27, Ann Taylor SU27) share one Database
+sheet of about 81 columns; their differences are column names, a few extra
+columns, and how style codes are written.
+
+Still open: the standard-template download button (rule 7), a list of file
+columns the system has no header for, and master-data import (vendors from a
+"Dropdown" sheet).
+
+### 12.4 Reference products
+
+- **Kandaree Apparel ERP**: order / BOM / procurement flow (owner's reference).
+- **SAP FICO**: Accounts side, later.
+- **FastReact (FastReactPlan / FastReactFabric)**: seen only through
+  third-party listings (order management, TnA calendar, purchasing,
+  inventory, supplier management). No official feature sheet was found, so
+  treat every FastReact point as unconfirmed until the owner has seen a demo
+  or the vendor's documentation.
+

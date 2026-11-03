@@ -166,3 +166,19 @@ it('works out the mother from the style code when the sheet has no Mother Style 
     expect(MotherStyle::orderBy('style_no')->pluck('style_no')->all())->toBe(['720193', '882635']);
     expect(OrderLine::where('style_no', '720193(PETITE)')->first()->childStyle->style_no)->toBe('PETITE');
 });
+
+it('fills the mother style product group from a Division column and reads Order Qty', function () {
+    [$file, $rows, $headers] = bomFixture([
+        ['season_name' => 'SS27', 'style_name' => '5000018835', 'gmts_color_name' => 'WASH', 'contract_number' => 'C1', 'material_description' => 'Thread', 'bom_quantity' => '900'],
+    ]);
+    $division = ExcelHeader::create(['header_name' => 'Division', 'header_key' => 'division', 'owner_role_id' => 1, 'position' => 50]);
+    $orderQty = ExcelHeader::create(['header_name' => 'Order Qty', 'header_key' => 'order_qty', 'owner_role_id' => 1, 'position' => 51, 'field_type' => 'number']);
+    ExcelCell::create(['row_id' => $rows[0]->id, 'header_id' => $division->id, 'value' => 'CMWO']);
+    ExcelCell::create(['row_id' => $rows[0]->id, 'header_id' => $orderQty->id, 'value' => '1,250']);
+
+    app(BomTableSync::class)->syncFile($file);
+
+    expect(MotherStyle::firstOrFail()->product_group)->toBe('CMWO');
+    // Order Qty (1,250), not the BOM quantity fallback (900).
+    expect((float) OrderLine::firstOrFail()->order_qty)->toBe(1250.0);
+});

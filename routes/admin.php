@@ -60,6 +60,12 @@ Route::prefix('admin')
         Route::get('buyers/{buyer}/columns', [\App\Http\Controllers\Admin\BuyerColumnController::class, 'edit'])->name('buyers.columns.edit');
         Route::put('buyers/{buyer}/columns', [\App\Http\Controllers\Admin\BuyerColumnController::class, 'update'])->name('buyers.columns.update');
         Route::post('buyers/{buyer}/columns/from-profile', [\App\Http\Controllers\Admin\BuyerColumnController::class, 'fromProfile'])->name('buyers.columns.from_profile');
+
+        // Saved import profiles per buyer (column matching + style rule).
+        Route::get('buyers/{buyer}/profiles', [\App\Http\Controllers\Admin\BuyerImportProfileController::class, 'index'])->name('buyers.profiles.index');
+        Route::put('buyers/{buyer}/profiles/{profile}', [\App\Http\Controllers\Admin\BuyerImportProfileController::class, 'update'])->name('buyers.profiles.update');
+        Route::post('buyers/{buyer}/profiles/{profile}/copy', [\App\Http\Controllers\Admin\BuyerImportProfileController::class, 'copy'])->name('buyers.profiles.copy');
+        Route::delete('buyers/{buyer}/profiles/{profile}', [\App\Http\Controllers\Admin\BuyerImportProfileController::class, 'destroy'])->name('buyers.profiles.destroy');
         Route::resource('booking-delivery-destinations', BookingDeliveryDestinationController::class)->except(['show']);
 
         Route::get('/po-generate-control', [PoGenerateControlController::class, 'index'])->name('po-generate-control.index');

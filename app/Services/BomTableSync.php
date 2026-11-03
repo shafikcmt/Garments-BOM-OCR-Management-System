@@ -159,7 +159,7 @@ class BomTableSync
             $line->order_qty = $orderQty;
         }
 
-        $this->linkStyleLibrary($line, $file, $this->source->sourceValueForRow($row, 'season'), $style, $text('mother_style'));
+        $this->linkStyleLibrary($line, $file, $this->source->sourceValueForRow($row, 'season'), $style, $text('mother_style'), $text('division'));
         $line->save();
 
         $item = BomItem::firstOrNew(['excel_row_id' => $row->id]);
@@ -193,7 +193,7 @@ class BomTableSync
      * the child ("788457(PETITE)" under mother 813132), because the child's
      * number then differs from the mother's.
      */
-    private function linkStyleLibrary(OrderLine $line, ExcelFile $file, ?string $season, string $styleCode, ?string $motherCode = null): void
+    private function linkStyleLibrary(OrderLine $line, ExcelFile $file, ?string $season, string $styleCode, ?string $motherCode = null, ?string $division = null): void
     {
         $season = trim((string) $season);
 
@@ -213,7 +213,7 @@ class BomTableSync
 
         $parsed = StyleCodeParser::parse($styleCode);
 
-        if ($parsed['style_no'] === '') {
+        if ($parsed['style_no'] === '' || StyleHierarchy::isCommon($styleCode)) {
             return;
         }
 
@@ -221,7 +221,7 @@ class BomTableSync
             ['buyer_id' => $file->buyer_id, 'code' => mb_strtoupper(mb_substr($season, 0, 50))]
         );
 
-        $place = StyleHierarchy::resolve($styleCode, $motherCode);
+        $place = StyleHierarchy::resolve($styleCode, $motherCode, $file->mother_source, $file->fit_words);
         $motherNo = $place['mother'];
         $childNo = $place['child'];
         $childKind = $place['kind'];
@@ -230,6 +230,11 @@ class BomTableSync
             ['buyer_season_id' => $seasonModel->id, 'style_no' => $motherNo],
             ['buyer_id' => $file->buyer_id]
         );
+
+        // Division fills the group once; a group a user already set is not overwritten.
+        if ($division !== null && trim($division) !== '' && $mother->product_group === null) {
+            $mother->update(['product_group' => mb_substr(trim($division), 0, 255)]);
+        }
 
         $child = $childNo === null ? null : ChildStyle::firstOrCreate(
             ['mother_style_id' => $mother->id, 'style_no' => $childNo],

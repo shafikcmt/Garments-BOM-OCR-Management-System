@@ -110,6 +110,13 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 - Columns the system recognised are filled in. **Yellow rows are not matched.** Choose the right system column from the list, or leave **Skip this column** (for example vendor or payment columns, which belong to other departments).
 - A system column can be used only once.
 - A buyer calls a column by a new name every time? Ask Admin to open **Admin, Excel Headers**, edit that header and type the name under **Other Names**. From then on that name is matched automatically in every buyer's file.
+- Under the columns, **Mother and child styles** tells the system how this buyer writes styles. Choose once; it is saved with the matching:
+  - **Automatic**: the Mother Style column if the file has one, otherwise the style code.
+  - **Mother Style column only**: only that column. A blank cell is not guessed; it shows under **Rows to check**.
+  - **Style code**: the number before the bracket, or before a fit word. `720193(PETITE)` goes under 720193.
+  - **Every style is its own mother**: no child styles are made.
+  - **Fit words** (optional): words such as `PETITE, TALL, CURVY, CURVY PETITE`. With them, `608468 PETITE` becomes mother 608468 with child PETITE even without a bracket.
+  - Fit words are used only when the mother comes from the style code (Automatic without a Mother Style value, or Style code).
 - Tick **Save this matching for [buyer]**. Next time this buyer sends a file with the same layout, the system matches it for you and tells you so.
 
 **Step 3: Preview and import.**
@@ -118,6 +125,10 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 - **Rows to check** counts rows with no style (imported but not linked to the Style Library) and rows with an empty Mother Style (their mother is taken from the style code). A message above the table explains each case.
 - A yellow message appears if no Style column is matched, or a required column is empty. You can still import; fill those later in the Workspace.
 - Press **Import**. The file appears under **Workspace**, **Existing Files**. Formula columns are calculated by the system.
+- Columns that belong to other departments (vendor, PO, PI, payment, shipment, receipt, issue) are not filled from your file. They appear in the workspace empty, so each department can update its own part after you upload. Formula columns are calculated by the system, not read from the file.
+- A row whose style is `ALL` (for example poly bag or carton for every style) is imported as a **common item**. It stays in the BOM but is not added to the Style Library.
+- **Order Qty** is a column you fill (the buyer's formula column "Customer Contract Quantity" is not read). If your file has the order quantity, match it to **Order Qty**. **Division** goes to the style's product group.
+- Very long sheets are read until the data ends; a sheet that only looks long because of formatting is not a problem.
 
 **Good to know**
 - Only Merchandising columns can be filled here.
@@ -510,6 +521,8 @@ A TnA template is a ready list of tasks for an order, for example "Fabric bookin
 | After pulling new code | `php artisan migrate`, then `php artisan view:clear` |
 | Fill the standard order tables for files that were uploaded before | Done once by itself on the deploy that added the Merchandising dashboard. To run it again by hand: `php artisan bom:sync-tables --dry-run` to see what would happen, then `php artisan bom:sync-tables` |
 | Show each buyer only the columns it uses on the workspace | **Admin > Buyers**, **Edit** the buyer, **Choose Columns**. Press **Use Saved Matching** to tick the Merchandising columns from the buyer's saved import matching, or tick by hand, then **Save Columns**. On that buyer's files the workspace says "Showing the N columns … uses"; anyone can press **Show All Columns**. Nothing is deleted. |
+| See, rename, copy or delete a buyer's saved import matching, and set how its mother and child styles are worked out | **Admin > Buyers**, **Edit** the buyer, **Choose Columns**, then **Import Profiles**. Change a profile's name, **Mother style comes from** and **Fit words**, press **Save**; **Copy** and **Delete** are on each profile. Files already imported are not changed. To change a matching itself, import a file with the new layout and save it again. |
+| Teach the import another name for a column (a buyer calls "Wastage" something new) | **Admin > Excel Headers**, **Edit** the column, type the buyer's name under **Other Names**, **Update Header**. It is matched automatically in every buyer's file from then on. |
 | Choose which columns appear in a style's **Order Changes** box | **Admin > Excel Headers**, **Edit** the column, tick **Show in Order Changes**, **Update Header**. Order qty, ship date, contract, colour, BOM qty and consumption start ticked. |
 | Let another department edit a column (for example shipment columns for both Merchandising and Commercial) | **Admin > Excel Headers**, press **Edit** on the column, tick the roles under **Also Editable By**, press **Update Header**. The owner role can always edit; untick all for owner only. The list shows "Also editable by …" or "Owner Edit Only". |
 | Turn the second (Management) BOM approval or the PO gate on or off | Screen: **BOM Approvals**, Settings box (Admin only). Both are off by default. |

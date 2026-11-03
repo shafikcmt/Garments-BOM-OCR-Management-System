@@ -37,6 +37,12 @@
     @if($styleMapped && $summary['no_style_rows'] > 0)
         <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ $summary['no_style_rows'] }} row(s) have no style. They will be imported but not linked to the Style Library.</div>
     @endif
+    @if($styleMapped && ($state['mother_source'] ?? null))
+        <div class="alert alert-info"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Mother style rule: {{ ['column' => 'Mother Style column only', 'code' => 'style code', 'style' => 'every style is its own mother'][$state['mother_source']] }}@if($state['fit_words'] ?? null). Fit words: {{ $state['fit_words'] }}@endif.</div>
+    @endif
+    @if($styleMapped && $summary['common_rows'] > 0)
+        <div class="alert alert-info"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>{{ $summary['common_rows'] }} row(s) are for ALL styles (such as poly bag or carton). They are imported as common items and are not added to the Style Library.</div>
+    @endif
     @if($styleMapped && $summary['mother_column'] && $summary['mother_fallback_rows'] > 0)
         <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ $summary['mother_fallback_rows'] }} row(s) have an empty Mother Style. Their mother is taken from the style code instead.</div>
     @endif
