@@ -335,3 +335,19 @@ it('offers the Merchandising columns, including the new ones, in the existing sa
     // Merchandising columns only (not the Supply Chain Vendor Name), in Admin's order.
     expect($titles)->toBe(['Style', 'GMTS Color Name', 'Material Description', 'BOM Quantity', 'Season Name', 'Mother Style']);
 });
+
+
+it('does not warn that the Style column is missing when it is matched, whatever its column number', function () {
+    // Style is the 3rd column of the file; its system header has a different id.
+    $file = lotWorkbook([
+        ['x', 'y', '882635', 'RED', 'Thread'],
+    ], ['Junk 1', 'Junk 2', 'Style', 'GMTS Color Name', 'Material Description']);
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), ['buyer_id' => $this->buyer->id, 'season_code' => 'SU27', 'file' => $file]);
+
+    $map = [3 => $this->headers['style_name']->id, 4 => $this->headers['gmts_color_name']->id, 5 => $this->headers['material_description']->id];
+
+    $this->withoutVite()->actingAs($this->merchant)->post(route('merchant.import.preview'), ['sheet' => 'Database', 'header_row' => 3, 'map' => $map, 'mother_source' => 'style'])
+        ->assertOk()->assertViewHas('styleMapped', true)
+        ->assertDontSee('No Style column is matched')
+        ->assertSee('Mother style rule');
+});

@@ -222,7 +222,8 @@ class ImportWizardController extends ExcelUploadController
             'skippedCount' => count($read['titles']) - count($mapping),
             'styles' => $styles,
             'summary' => $summary,
-            'styleMapped' => $styleHeaderId !== null && isset($mapping[$styleHeaderId]),
+            // $mapping is file column => header id, so test the header id among the values.
+            'styleMapped' => $styleHeaderId !== null && in_array($styleHeaderId, $mapping, true),
             'missingRequired' => $missingRequired,
             'sampleHeaders' => collect($mappedIds)->take(8)->map(fn ($id) => $headers[$id]),
             'sampleRows' => collect($read['rows'])->take(5),
