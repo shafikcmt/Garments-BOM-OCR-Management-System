@@ -313,6 +313,11 @@
                         </a>
                     </li>
                     <li class="sidebar-item">
+                        <a href="{{ route('merchant.vendors.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.vendors.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-buildings" aria-hidden="true"></i></span><span class="sidebar-link-text">Vendors</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="{{ route('merchant.status.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.status.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-bar-chart-steps" aria-hidden="true"></i></span><span class="sidebar-link-text">Style Status</span></span>
                         </a>

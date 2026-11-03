@@ -1,0 +1,102 @@
+@extends('layouts.app')
+
+@section('title', 'Vendors')
+
+@section('content')
+<div class="container-fluid">
+    <x-page-header icon="buildings" eyebrow="Merchandising" title="Vendors"
+                   copy="The vendor list used for bookings and payment requests. Add a new vendor here; Admin edits or removes one.">
+        <x-slot:actions>
+            <a href="{{ route('merchant.vendors.create') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i>Add Vendor
+            </a>
+        </x-slot:actions>
+    </x-page-header>
+
+    <x-flash />
+
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-4"><x-stat-card icon="buildings" tone="primary" label="Vendors" :value="$totals['all']" /></div>
+        <div class="col-6 col-md-4"><x-stat-card icon="check2-circle" tone="success" label="Active" :value="$totals['active']" /></div>
+        <div class="col-12 col-md-4"><x-stat-card icon="bank" tone="info" label="With bank details" :value="$totals['with_bank']" /></div>
+    </div>
+
+    <x-card body-class="p-0">
+        <div class="p-3 border-bottom">
+            <form method="GET" action="{{ route('merchant.vendors.index') }}" class="row g-2 align-items-center">
+                <div class="col-12 col-md-6 col-xl-4">
+                    <label class="visually-hidden" for="vendorSearch">Search vendors</label>
+                    <input id="vendorSearch" type="search" name="q" value="{{ $term }}" class="form-control"
+                           placeholder="Search name, code, contact, city or item type">
+                </div>
+                <div class="col-auto d-flex gap-2">
+                    <button class="btn btn-primary"><i class="bi bi-search me-1" aria-hidden="true"></i>Search</button>
+                    @if($term !== '')
+                        <a href="{{ route('merchant.vendors.index') }}" class="btn btn-outline-secondary"><i class="bi bi-x-circle me-1" aria-hidden="true"></i>Clear</a>
+                    @endif
+                </div>
+            </form>
+        </div>
+
+        @if($vendors->isEmpty())
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-buildings fs-2 d-block mb-2" aria-hidden="true"></i>
+                {{ $term !== '' ? 'No vendor matches your search.' : 'No vendor yet. Press Add Vendor to create the first one.' }}
+            </div>
+        @else
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Vendor</th>
+                            <th>Contact</th>
+                            <th>Item Type</th>
+                            <th>Location</th>
+                            <th>Bank</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($vendors as $vendor)
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold text-body">{{ $vendor->supplier_name }}</div>
+                                    <div class="small text-muted">{{ $vendor->supplier_code ?: 'No code' }}@if($vendor->legal_name) · {{ $vendor->legal_name }}@endif</div>
+                                </td>
+                                <td>
+                                    <div>{{ $vendor->contact_person ?: '—' }}</div>
+                                    <div class="small text-muted">{{ collect([$vendor->phone, $vendor->email])->filter()->implode(' · ') ?: '—' }}</div>
+                                </td>
+                                <td>{{ $vendor->item_type ?: '—' }}</td>
+                                <td>{{ collect([$vendor->city, $vendor->country])->filter()->implode(', ') ?: '—' }}</td>
+                                <td>
+                                    @if($vendor->bank_name || $vendor->bank_account_number)
+                                        <div>{{ $vendor->bank_name ?: 'Bank not named' }}@if($vendor->bank_branch), {{ $vendor->bank_branch }}@endif</div>
+                                        @if($vendor->bank_account_number)
+                                            <div class="small text-muted">Account ending {{ substr(preg_replace('/\s+/', '', $vendor->bank_account_number), -4) }}</div>
+                                        @else
+                                            <div class="small text-warning-emphasis">No account number</div>
+                                        @endif
+                                    @else
+                                        <span class="badge bg-warning-subtle text-warning-emphasis">No bank details</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    <span class="badge {{ $vendor->is_active ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' }}">{{ $vendor->is_active ? 'Active' : 'Inactive' }}</span>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            @if($vendors->hasPages())
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-3 border-top">
+                    <div class="small text-muted">Showing {{ $vendors->firstItem() }} to {{ $vendors->lastItem() }} of {{ $vendors->total() }} vendors</div>
+                    {{ $vendors->links() }}
+                </div>
+            @endif
+        @endif
+    </x-card>
+</div>
+@endsection

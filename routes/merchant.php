@@ -98,6 +98,7 @@ Route::prefix('merchant')
         Route::get('/workspace', [WorkspaceController::class, 'index'])->name('workspace');
 
         // Add a vendor (with bank details) without going through Admin.
+        Route::get('/vendors', [VendorEntryController::class, 'index'])->name('vendors.index');
         Route::get('/vendors/create', [VendorEntryController::class, 'create'])->name('vendors.create');
         Route::post('/vendors', [VendorEntryController::class, 'store'])->name('vendors.store');
 

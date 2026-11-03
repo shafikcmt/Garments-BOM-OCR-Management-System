@@ -143,15 +143,19 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 - Large files take 10 to 20 seconds to import. Please wait for the page to finish.
 - If you stop half way, press **Cancel Import**.
 
-### 2.2b Add a Vendor (with bank details)
+### 2.2b Vendors: see the list and add a vendor (with bank details)
 
-**Open it:** **Merchandising Dashboard**, then **Add Vendor** (top right).
+**Open it:** left menu, **Vendors**. (You can also press **Add Vendor** on the Merchandising Dashboard.)
 
-1. Type the vendor name (required) and any contact details.
-2. Under **Bank Details** fill what you know: bank name, branch, account name, account number, routing number, SWIFT code. All are optional.
-3. Press **Save Vendor**. You return to the dashboard with a confirmation.
+**The list.** Every vendor with its contact, item type, location, bank and status. Use the search box (name, code, contact, city or item type). The **Bank** column says which bank is on file and the last four digits of the account, or **No bank details** if none was entered. The full account number is not shown here; Admin sees it.
 
-The vendor is added to the same list Admin manages (**Admin, Vendors**), so it can be used for bookings and payment requests. Only Admin can edit or delete a vendor later. The Store's own supplier list (**Store, Purchase Setup**, then open a supplier) has the same Bank Details fields.
+**Add a vendor.**
+1. Press **Add Vendor**.
+2. Type the vendor name (required) and any contact details.
+3. Under **Bank Details** fill what you know: bank name, branch, account name, account number, routing number, SWIFT code. All are optional.
+4. Press **Save Vendor**. You return to the list with a confirmation.
+
+The vendor goes into the same list Admin manages (**Admin, Vendors**), so it can be used for bookings and payment requests. Only Admin can edit or delete a vendor later. The Store's own supplier list (**Store, Purchase Setup**, then open a supplier) has the same Bank Details fields.
 
 ### 2.2a Create a BOM on screen (no Excel needed)
 

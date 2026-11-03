@@ -21,7 +21,7 @@ it('lets a merchant add a vendor with bank details', function () {
         'bank_account_number' => '1234567890',
         'bank_swift_code' => 'DBBLBDDH',
         'is_active' => '1',
-    ])->assertRedirect(route('merchant.dashboard'));
+    ])->assertRedirect(route('merchant.vendors.index'));
 
     $vendor = Supplier::firstOrFail();
     expect($vendor->supplier_code)->toBeNull()
@@ -51,4 +51,31 @@ it('shows the vendor form with the bank fields and a dashboard button', function
 
     $this->withoutVite()->actingAs($user)->get(route('merchant.vendors.create'))
         ->assertOk()->assertSee('Bank Details')->assertSee('Account Number')->assertSee('SWIFT Code');
+});
+
+
+it('lists the vendors, with a search, and never shows an account number', function () {
+    Supplier::create(['supplier_name' => 'IDEAL FASTENER', 'supplier_code' => 'SUP-1', 'city' => 'Dhaka', 'bank_name' => 'Dutch-Bangla Bank', 'bank_branch' => 'Motijheel', 'bank_account_number' => '1234567890', 'is_active' => true]);
+    Supplier::create(['supplier_name' => 'LOCAL TRIMS', 'is_active' => true]);
+    Supplier::create(['supplier_name' => 'OLD SUPPLIER', 'is_active' => false]);
+    $user = vendorMerchant();
+
+    $page = $this->withoutVite()->actingAs($user)->get(route('merchant.vendors.index'))->assertOk();
+
+    $page->assertSee('IDEAL FASTENER')->assertSee('LOCAL TRIMS')->assertSee('OLD SUPPLIER')
+        ->assertSee('Dutch-Bangla Bank')->assertSee('Account ending 7890')->assertSee('No bank details')
+        ->assertDontSee('1234567890')                 // the number itself stays on the Admin screen
+        ->assertViewHas('totals', fn ($t) => $t === ['all' => 3, 'active' => 2, 'with_bank' => 1]);
+    // The sidebar carries the entry.
+    $page->assertSee(route('merchant.vendors.index'), false)->assertSee('Vendors');
+
+    // Search is case-insensitive on every database.
+    $this->withoutVite()->actingAs($user)->get(route('merchant.vendors.index', ['q' => 'ideal']))
+        ->assertSee('IDEAL FASTENER')->assertDontSee('LOCAL TRIMS');
+    $this->withoutVite()->actingAs($user)->get(route('merchant.vendors.index', ['q' => 'zzz']))
+        ->assertSee('No vendor matches your search');
+});
+
+it('keeps the vendor list to merchants', function () {
+    $this->actingAs(User::factory()->create())->get(route('merchant.vendors.index'))->assertForbidden();
 });
