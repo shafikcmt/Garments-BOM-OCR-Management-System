@@ -1463,15 +1463,22 @@ class BookingController extends Controller
 
     /**
      * Totals for each group on the page: how many source rows it holds, its items
-     * and its quantity. Read from the item and quantity cells alone, a block at a
-     * time; the quantity is the stored Materials to be Ordered figure, which the
-     * workspace keeps up to date.
+     * and its quantity.
+     *
+     * The quantity is bookingQtyValueFor() of every member, the same figure the
+     * booking preview and the PO use: the stored Materials to be Ordered when it
+     * holds a real number, otherwise BOM quantity x consumption x wastage worked
+     * out live (the stored cell can still say 0 while the workspace shows the live
+     * figure). Only the cells those readings need are loaded, a block of rows at a
+     * time, so a group of thousands of rows stays light.
      */
     protected function applyGroupFigures($pendingRows): void
     {
-        $itemHeaders = $this->headerIdsForGroup('item');
-        $qtyHeaders = $this->headerIdsForGroup('qty');
-        $wanted = array_values(array_unique(array_merge($itemHeaders, $qtyHeaders)));
+        $wanted = array_values(array_unique(array_merge(
+            $this->headerIdsForGroup('item'),
+            $this->headerIdsForGroup('qty'),
+            $this->quantityCalculationHeaderIds(),
+        )));
 
         foreach ($pendingRows->getCollection() as $row) {
             $members = $row->booking_member_ids ?? [$row->id];
@@ -1493,7 +1500,7 @@ class BookingController extends Controller
                         if ($item !== null && trim($item) !== '') {
                             $items[$this->normalize($item)] = trim($item);
                         }
-                        $qty += (float) ($this->numericValue($this->valueFor($member, 'qty')) ?? 0);
+                        $qty += (float) ($this->numericValue($this->bookingQtyValueFor($member)) ?? 0);
                     });
             }
 
@@ -1501,6 +1508,35 @@ class BookingController extends Controller
             $row->booking_group_items = array_values($items);
             $row->booking_group_qty_total = $qty;
         }
+    }
+
+    /**
+     * Ids of the workspace columns calculateMaterialsToBeOrderedQty() reads (BOM
+     * and order quantity, consumption, wastage), matched the way
+     * formulaValueForKey() matches them: by header key, name or formula key.
+     *
+     * @return list<int>
+     */
+    protected function quantityCalculationHeaderIds(): array
+    {
+        $keys = [
+            'bom_quantity', 'customer_contract_quantity', 'customer_po_quantity', 'order_qty', 'gmts_order_qty', 'gmts_order_quantity',
+            'consumption_based_on_which_materials_order_including_yy', 'consumption_incl_yy', 'consumption_including_yy', 'yy_waste',
+            'booking_consumption_from_cad', 'initial_consumption', 'booking_yy', 'consumption', 'costing_yy_in_sms', 'costing_yy',
+            'wastage_for_ordering_percent',
+        ];
+
+        $names = collect($keys)
+            ->flatMap(fn ($key) => array_merge([$key], $this->formulaAliases($key)))
+            ->map(fn ($name) => $this->normalize($name))
+            ->filter()->unique()->flip();
+
+        return ExcelHeader::query()
+            ->get(['id', 'header_key', 'header_name', 'formula_key'])
+            ->filter(fn (ExcelHeader $h) => $names->has($this->normalize($h->header_key))
+                || $names->has($this->normalize($h->header_name))
+                || $names->has($this->normalize($h->formula_key ?? '')))
+            ->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
     }
 
     protected function buildPendingRowsQuery(Request $request)

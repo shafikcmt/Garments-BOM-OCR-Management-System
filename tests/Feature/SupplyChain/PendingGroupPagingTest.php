@@ -99,3 +99,28 @@ it('keeps the rows-per-page choice in the page links', function () {
 
     expect($page->nextPageUrl())->toContain('per_page=25')->toContain('buyer=Ann%20Taylor');
 });
+
+
+it('works a group\'s quantity out live when the stored Materials to be Ordered still says 0', function () {
+    // The stored cell can hold 0 while the workspace shows the live figure; the list,
+    // the preview and the PO must all use the live one.
+    foreach (['bom_quantity' => 'BOM Quantity', 'booking_consumption_from_cad' => 'Booking Consumption from CAD', 'wastage_for_ordering_percent' => '% Wastage for ordering'] as $key => $name) {
+        $this->headers[$key] = ExcelHeader::create([
+            'header_name' => $name, 'header_key' => $key, 'owner_role_id' => Role::findOrCreate('merchant', 'web')->id,
+            'position' => 30, 'field_type' => 'text', 'is_active' => true,
+        ]);
+    }
+
+    foreach ([1, 2] as $part) {
+        ($this->line)([
+            'material_description' => "Live item $part", 'vendor_name' => 'Live Vendor', 'sap_code' => 'LIVE-1',
+            'materials_ordered' => '0', 'bom_quantity' => '1000', 'booking_consumption_from_cad' => '0.5', 'wastage_for_ordering_percent' => '0.1',
+        ]);
+    }
+
+    $page = $this->withoutVite()->actingAs($this->user)->get(route('supply_chain.bookings.index', ['per_page' => 100]))->viewData('pendingRows');
+    $group = $page->first(fn ($row) => in_array('Live item 1', (array) $row->booking_group_items, true));
+
+    // 0.5 x (1 + 0.1) x 1000 = 550 for each of the two rows.
+    expect($group->booking_group_count)->toBe(2)->and($group->booking_group_qty_total)->toBe(1100.0);
+});
