@@ -8,7 +8,7 @@ use App\Models\BuyerSeason;
 use App\Models\ExcelFile;
 use App\Services\BomTableSync;
 use App\Services\ImportColumnMatcher;
-use App\Support\StyleCodeParser;
+use App\Support\StyleHierarchy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -197,7 +197,11 @@ class ImportWizardController extends ExcelUploadController
         $request->session()->put(self::SESSION, $state);
 
         $styleHeaderId = $headers->first(fn ($h) => in_array($this->matcher->key($h->header_key ?: $h->header_name), ['style', 'style_name', 'style_no'], true))?->id;
-        $styles = $styleHeaderId && isset($mapping[$styleHeaderId]) ? $this->detectStyles($read['rows'], $styleHeaderId) : collect();
+        $keyOf = fn ($h) => $this->matcher->key($h->header_key ?: $h->header_name);
+        $motherHeaderId = $headers->first(fn ($h) => $keyOf($h) === 'mother_style')?->id;
+        $colorHeaderId = $headers->first(fn ($h) => $keyOf($h) === 'gmts_color_name')?->id;
+        $summary = $this->summariseStyles($read['rows'], $styleHeaderId, $motherHeaderId, $colorHeaderId, $mapping);
+        $styles = $summary['styles'];
 
         $mappedIds = array_values($mapping);
         $missingRequired = $headers->filter(fn ($h) => $h->is_required && ! in_array($h->id, $mappedIds, true))->pluck('header_name')->values();
@@ -209,6 +213,7 @@ class ImportWizardController extends ExcelUploadController
             'mappedCount' => count($mapping),
             'skippedCount' => count($read['titles']) - count($mapping),
             'styles' => $styles,
+            'summary' => $summary,
             'styleMapped' => $styleHeaderId !== null && isset($mapping[$styleHeaderId]),
             'missingRequired' => $missingRequired,
             'sampleHeaders' => collect($mappedIds)->take(8)->map(fn ($id) => $headers[$id]),
@@ -576,20 +581,66 @@ class ImportWizardController extends ExcelUploadController
         return ['rows' => $rows, 'titles' => $titles];
     }
 
-    /** @return Collection<int, array{style_no: string, child: ?string, rows: int}> */
-    private function detectStyles(array $rows, int $styleHeaderId): Collection
+    /**
+     * What the Style Library will look like after this file: mothers, children,
+     * colours, and the rows that need a look. Uses StyleHierarchy, the same rule
+     * the import itself applies, so the preview never promises something else.
+     *
+     * @param  array<int, array<int, mixed>>  $rows  row => (header id => value)
+     * @param  array<int, int>  $mapping  file column => header id
+     * @return array{styles: Collection, mothers: int, children: int, colors: int, no_style_rows: int, mother_fallback_rows: int, mother_column: bool}
+     */
+    private function summariseStyles(array $rows, ?int $styleId, ?int $motherId, ?int $colorId, array $mapping): array
     {
-        return collect($rows)
-            ->pluck($styleHeaderId)
-            ->map(fn ($v) => trim((string) $v))
-            ->filter()
-            ->countBy()
-            ->map(function ($count, $code) {
-                $parsed = StyleCodeParser::parse($code);
+        $mapped = fn (?int $id) => $id !== null && in_array($id, $mapping, true);
+        $text = fn (array $row, ?int $id) => $id === null ? '' : trim((string) ($row[$id] ?? ''));
 
-                return ['style_no' => $parsed['style_no'], 'child' => $parsed['child'], 'rows' => $count];
-            })
+        $motherColumn = $mapped($motherId);
+        $groups = [];
+        $colors = [];
+        $noStyle = 0;
+        $fallback = 0;
+
+        if ($mapped($styleId)) {
+            foreach ($rows as $row) {
+                $code = $text($row, $styleId);
+
+                if ($code === '') {
+                    $noStyle++;
+
+                    continue;
+                }
+
+                $motherCell = $motherColumn ? $text($row, $motherId) : '';
+                if ($motherColumn && $motherCell === '') {
+                    $fallback++;
+                }
+
+                $place = StyleHierarchy::resolve($code, $motherCell);
+                $key = $place['mother'] . "\0" . ($place['child'] ?? '');
+                $groups[$key] ??= $place + ['rows' => 0];
+                $groups[$key]['rows']++;
+
+                if ($mapped($colorId) && ($color = $text($row, $colorId)) !== '') {
+                    $colors[mb_strtolower($color)] = true;
+                }
+            }
+        }
+
+        $styles = collect($groups)
+            ->map(fn ($g) => ['style_no' => $g['mother'], 'child' => $g['child'], 'rows' => $g['rows'], 'source' => $g['source']])
+            ->sortBy([['style_no', 'asc'], ['child', 'asc']])
             ->values();
+
+        return [
+            'styles' => $styles,
+            'mothers' => $styles->pluck('style_no')->unique()->count(),
+            'children' => $styles->pluck('child')->filter()->unique()->count(),
+            'colors' => count($colors),
+            'no_style_rows' => $noStyle,
+            'mother_fallback_rows' => $fallback,
+            'mother_column' => $motherColumn,
+        ];
     }
 
     private function saveProfile(array $state, array $titles, array $mapping, int $userId): void

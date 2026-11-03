@@ -24,8 +24,24 @@
         <div class="col-6 col-xl-3"><x-stat-card icon="tags" tone="primary" label="Styles found" :value="$styles->count()" /></div>
     </div>
 
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-xl-3"><x-stat-card icon="diagram-3" tone="primary" label="Mother styles" :value="$summary['mothers']" /></div>
+        <div class="col-6 col-xl-3"><x-stat-card icon="diagram-2" tone="primary" label="Child styles" :value="$summary['children']" /></div>
+        <div class="col-6 col-xl-3"><x-stat-card icon="palette" tone="primary" label="Colors" :value="$summary['colors']" /></div>
+        <div class="col-6 col-xl-3"><x-stat-card icon="exclamation-triangle" :tone="$summary['no_style_rows'] + $summary['mother_fallback_rows'] > 0 ? 'warning' : 'success'" label="Rows to check" :value="$summary['no_style_rows'] + $summary['mother_fallback_rows']" /></div>
+    </div>
+
     @if(! $styleMapped)
         <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>No Style column is matched, so styles will not be linked to the Style Library.</div>
+    @endif
+    @if($styleMapped && $summary['no_style_rows'] > 0)
+        <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ $summary['no_style_rows'] }} row(s) have no style. They will be imported but not linked to the Style Library.</div>
+    @endif
+    @if($styleMapped && $summary['mother_column'] && $summary['mother_fallback_rows'] > 0)
+        <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ $summary['mother_fallback_rows'] }} row(s) have an empty Mother Style. Their mother is taken from the style code instead.</div>
+    @endif
+    @if($styleMapped && ! $summary['mother_column'] && $styles->isNotEmpty())
+        <div class="alert alert-info"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>No Mother Style column is matched. The mother is taken from the style code, and a plain style is its own mother.</div>
     @endif
     @if($missingRequired->isNotEmpty())
         <div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Required columns not matched: {{ $missingRequired->implode(', ') }}. They stay empty until filled in the workspace.</div>
@@ -37,12 +53,12 @@
                 @if($styles->isEmpty())
                     <p class="text-muted mb-0">None.</p>
                 @else
-                    <div class="table-responsive" style="max-height:320px">
+                    <div class="table-responsive" style="max-height:420px">
                         <table class="table table-sm mb-0">
-                            <thead><tr><th>Mother style</th><th>Child</th><th class="text-end">Rows</th></tr></thead>
+                            <thead><tr><th>Mother style</th><th>Child</th><th>Mother from</th><th class="text-end">Rows</th></tr></thead>
                             <tbody>
                             @foreach($styles as $s)
-                                <tr><td class="fw-semibold">{{ $s['style_no'] }}</td><td>{{ $s['child'] ?: '—' }}</td><td class="text-end">{{ $s['rows'] }}</td></tr>
+                                <tr><td class="fw-semibold">{{ $s['style_no'] }}</td><td>{{ $s['child'] ?: '—' }}</td><td class="text-muted small">{{ ['column' => 'Mother Style column', 'code' => 'Style code', 'style' => 'Style itself'][$s['source']] ?? '' }}</td><td class="text-end">{{ $s['rows'] }}</td></tr>
                             @endforeach
                             </tbody>
                         </table>

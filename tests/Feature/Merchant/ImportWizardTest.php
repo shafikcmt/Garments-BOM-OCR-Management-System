@@ -193,3 +193,42 @@ it('matches a buyer column by the other names Admin typed on a header', function
     expect($result[1]['header_id'])->toBe($mother->id)->and($result[1]['reason'])->toBe('name')
         ->and($result[2]['header_id'])->toBeNull();
 });
+
+it('works out mother and child the same way for the preview and the import', function () {
+    expect(\App\Support\StyleHierarchy::resolve('788457(PETITE)', '813132.0'))
+        ->toBe(['mother' => '813132', 'child' => '788457(PETITE)', 'kind' => 'variant', 'source' => 'column']);
+    expect(\App\Support\StyleHierarchy::resolve('813132', '813132'))
+        ->toBe(['mother' => '813132', 'child' => null, 'kind' => null, 'source' => 'column']);
+    expect(\App\Support\StyleHierarchy::resolve('720193(PETITE)', ''))
+        ->toBe(['mother' => '720193', 'child' => 'PETITE', 'kind' => 'variant', 'source' => 'code']);
+    expect(\App\Support\StyleHierarchy::resolve('882635'))
+        ->toBe(['mother' => '882635', 'child' => null, 'kind' => null, 'source' => 'style']);
+});
+
+it('previews mothers, children, colors and rows to check, using the Mother Style column', function () {
+    $role = Role::findOrCreate('merchant', 'web');
+    $mother = ExcelHeader::create(['header_name' => 'Mother Style', 'header_key' => 'mother_style', 'owner_role_id' => $role->id, 'position' => 30]);
+
+    $file = lotWorkbook([
+        ['813132(MISSY)', 'WASH', 'Thread', '10', '813132'],
+        ['788457(PETITE)', 'WASH', 'Thread', '10', '813132'],
+        ['868536(CURVY)', 'DARK', 'Thread', '10', ''],
+        ['', 'DARK', 'Thread', '10', '813132'],
+    ], ['Style', 'GMTS Color Name', 'Material Description', 'BOM Qty', 'Parent Style']);
+    $mother->update(['aliases' => 'Parent Style']);
+
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), ['buyer_id' => $this->buyer->id, 'season_code' => 'SU27', 'file' => $file]);
+
+    $map = [1 => $this->headers['style_name']->id, 2 => $this->headers['gmts_color_name']->id, 3 => $this->headers['material_description']->id, 4 => $this->headers['bom_quantity']->id, 5 => $mother->id];
+
+    $response = $this->withoutVite()->actingAs($this->merchant)->post(route('merchant.import.preview'), ['sheet' => 'Database', 'header_row' => 3, 'map' => $map])->assertOk();
+
+    $summary = $response->viewData('summary');
+    expect($summary['mothers'])->toBe(2)           // 813132 and 868536 (fell back to its own code)
+        ->and($summary['children'])->toBe(3)
+        ->and($summary['colors'])->toBe(2)
+        ->and($summary['no_style_rows'])->toBe(1)
+        ->and($summary['mother_fallback_rows'])->toBe(1)
+        ->and($summary['mother_column'])->toBeTrue();
+    $response->assertSee('have no style')->assertSee('empty Mother Style');
+});

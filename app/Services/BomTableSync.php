@@ -10,6 +10,7 @@ use App\Models\ExcelRow;
 use App\Models\MotherStyle;
 use App\Models\OrderLine;
 use App\Support\StyleCodeParser;
+use App\Support\StyleHierarchy;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -220,18 +221,10 @@ class BomTableSync
             ['buyer_id' => $file->buyer_id, 'code' => mb_strtoupper(mb_substr($season, 0, 50))]
         );
 
-        // Excel often turns a typed number into "813132.0".
-        $motherNo = preg_replace('/^(\d+)\.0+$/', '$1', trim((string) $motherCode));
-        $childNo = $parsed['child'];
-        $childKind = $parsed['kind'];
-
-        if ($motherNo !== '') {
-            $code = trim($styleCode);
-            $childNo = $code === $motherNo ? null : $code;
-            $childKind = $parsed['kind'] ?? 'linked';
-        } else {
-            $motherNo = $parsed['style_no'];
-        }
+        $place = StyleHierarchy::resolve($styleCode, $motherCode);
+        $motherNo = $place['mother'];
+        $childNo = $place['child'];
+        $childKind = $place['kind'];
 
         $mother = MotherStyle::firstOrCreate(
             ['buyer_season_id' => $seasonModel->id, 'style_no' => $motherNo],

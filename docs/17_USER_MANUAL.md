@@ -114,6 +114,8 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 
 **Step 3: Preview and import.**
 - You see how many rows will come in, how many columns were matched or skipped, and which styles were found.
+- Below that you see how many **mother styles**, **child styles** and **colors** the file contains, and a table showing each style, its mother, and where the mother came from (the Mother Style column, the style code, or the style itself). Check it against the buyer's file before importing: for example 14 mothers and 23 styles.
+- **Rows to check** counts rows with no style (imported but not linked to the Style Library) and rows with an empty Mother Style (their mother is taken from the style code). A message above the table explains each case.
 - A yellow message appears if no Style column is matched, or a required column is empty. You can still import; fill those later in the Workspace.
 - Press **Import**. The file appears under **Workspace**, **Existing Files**. Formula columns are calculated by the system.
 
