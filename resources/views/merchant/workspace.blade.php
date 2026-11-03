@@ -49,16 +49,11 @@
             <x-card class="mb-3">
                 <x-slot:title>
                     Upload Excel File
-                    <span class="d-block fw-normal text-muted small mt-1">Upload only merchant input headers. Formula fields are calculated automatically.</span>
+                    <span class="d-block fw-normal text-muted small mt-1">Any buyer's Excel. Match the columns once, check the preview, import. Formula fields are calculated automatically.</span>
                 </x-slot:title>
                 <x-slot:actions>
-                    @if($canUpload)
-                        <a href="{{ route('merchant.import.index') }}" class="btn btn-primary btn-sm">
-                            <i class="bi bi-magic me-1" aria-hidden="true"></i>Import Buyer Excel
-                        </a>
-                    @endif
                     <a href="{{ route('merchant.excel.sample') }}" class="btn btn-outline-primary btn-sm">
-                        Download Sample
+                        <i class="bi bi-download me-1" aria-hidden="true"></i>Download Sample
                     </a>
                 </x-slot:actions>
 
@@ -81,6 +76,19 @@
                 @endunless
 
                 @if($canUpload)
+                {{-- The one way to upload: Import Buyer Excel (choose file, match
+                     columns, preview). The older sample-format upload below is kept,
+                     folded away, until the new path has been used for a while. --}}
+                <div class="gx-upload-cta text-center py-4 px-3 mb-3 border rounded-3 bg-body-tertiary">
+                    <div class="fs-5 fw-semibold mb-1">Upload a buyer's Excel</div>
+                    <div class="text-muted small mb-3">Choose the buyer and season, upload the file, match its columns once (the system remembers them for next time), then check the preview and import.</div>
+                    <a href="{{ route('merchant.import.index') }}" class="btn btn-primary">
+                        <i class="bi bi-magic me-1" aria-hidden="true"></i>Import Buyer Excel
+                    </a>
+                </div>
+
+                <details class="gx-quick-upload" {{ $errors->has('file') || $errors->has('buyer_id') ? 'open' : '' }}>
+                    <summary class="small text-muted mb-2" style="cursor:pointer;">Quick upload (sample format only)</summary>
                 {{-- The limit shown is the real PHP ceiling, so the number
                      cannot drift away from what the server will accept. --}}
                 <x-file-upload
@@ -163,6 +171,7 @@
                         </div>
                     </div>
                 </x-file-upload>
+                </details>
                 @endif
             </x-card>
         </div>

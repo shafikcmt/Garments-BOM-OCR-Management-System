@@ -351,3 +351,33 @@ it('does not warn that the Style column is missing when it is matched, whatever 
         ->assertDontSee('No Style column is matched')
         ->assertSee('Mother style rule');
 });
+
+it('goes straight to the preview when every column of the file matched by name', function () {
+    $file = lotWorkbook([['882635', 'RED', 'Thread', '10', 'SU27']], ['Style', 'GMTS Color Name', 'Material Description', 'BOM Quantity', 'Season Name']);
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), ['buyer_id' => $this->buyer->id, 'season_code' => 'SU27', 'file' => $file]);
+
+    // First arrival: nothing to decide.
+    $this->actingAs($this->merchant)->get(route('merchant.import.map'))
+        ->assertOk()->assertViewHas('autoContinue', true)->assertSee('All columns matched by name');
+
+    // Reload / Back to matching carry the sheet: the user is reviewing, so stay.
+    $this->actingAs($this->merchant)->get(route('merchant.import.map', ['sheet' => 'Database', 'header_row' => 3]))
+        ->assertOk()->assertViewHas('autoContinue', false);
+});
+
+it('stays on the matching page when a column of the file is not matched', function () {
+    $file = lotWorkbook([['882635', 'RED', 'Thread', '10', 'Acme']], ['Style', 'GMTS Color Name', 'Material Description', 'BOM Quantity', 'Mystery Column']);
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), ['buyer_id' => $this->buyer->id, 'season_code' => 'SU27', 'file' => $file]);
+
+    $this->actingAs($this->merchant)->get(route('merchant.import.map'))
+        ->assertOk()->assertViewHas('autoContinue', false);
+});
+
+it('does not loop back into the preview after the preview sent the user back with a message', function () {
+    $file = lotWorkbook([['882635', 'RED', 'Thread', '10', 'SU27']], ['Style', 'GMTS Color Name', 'Material Description', 'BOM Quantity', 'Season Name']);
+    $this->actingAs($this->merchant)->post(route('merchant.import.upload'), ['buyer_id' => $this->buyer->id, 'season_code' => 'SU27', 'file' => $file]);
+
+    $this->actingAs($this->merchant)->withSession(['warning' => 'Match at least one column before continuing.'])
+        ->get(route('merchant.import.map'))
+        ->assertOk()->assertViewHas('autoContinue', false);
+});

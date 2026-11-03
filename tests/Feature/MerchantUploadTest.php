@@ -63,3 +63,14 @@ it('requires a file', function () {
         ->post(route('merchant.excel.store'), [])
         ->assertSessionHasErrors('file');
 });
+
+it('offers one main way to upload, with the older sample-format form folded away', function () {
+    $user = merchantUser();
+
+    $this->actingAs($user)->get(route('merchant.workspace'))
+        ->assertOk()
+        ->assertSee('Import Buyer Excel')
+        ->assertSee('gx-upload-cta', false)
+        ->assertSee('Quick upload (sample format only)')
+        ->assertSee('data-upload-form', false);   // still there, inside the folded section
+});

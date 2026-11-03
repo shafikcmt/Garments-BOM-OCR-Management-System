@@ -95,6 +95,11 @@ So a buyer whose file has no Mother Style column still imports normally. If your
 
 ### 2.2 Import Buyer Excel (any buyer, any layout)
 
+**This is the one way to upload.** On **Workspace**, the **New Excel File Upload** tab has one main button, **Import Buyer Excel**. An older **Quick upload (sample format only)** form is folded under it; use it only for a file made from **Download Sample**, and prefer **Import Buyer Excel** for everything else.
+
+**Skipping the matching step.** When there is nothing to decide, the system goes straight from the file to the preview: when the buyer's saved matching was applied, or when every column of your file has the same name as a system column (a file made from **Download Sample**). Press **Back to matching** on the preview if you want to look at the matching.
+
+
 Use this when the buyer's Excel does not look like the standard sample. It does not matter which sheet the data is on, which row the titles are on, or what the columns are called.
 
 **Open it:** **Workspace**, then **Import Buyer Excel**. There are three steps.

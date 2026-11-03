@@ -47,7 +47,13 @@
 
     @php($matched = collect($suggestions)->whereNotNull('header_id')->count())
     <x-card :title="$matched . ' of ' . count($suggestions) . ' columns matched'">
-        <form method="POST" action="{{ route('merchant.import.preview') }}">
+        @if($autoContinue)
+            <div class="alert alert-success d-flex align-items-center gap-2 py-2" id="autoContinueNote">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                <span>{{ $autoPicked ? 'Matched with the saved matching' : 'All columns matched by name' }}. Opening the preview...</span>
+            </div>
+        @endif
+        <form method="POST" action="{{ route('merchant.import.preview') }}" id="matchForm">
             @csrf
             <input type="hidden" name="sheet" value="{{ $sheet }}">
             <input type="hidden" name="header_row" value="{{ $headerRow }}">
@@ -112,4 +118,11 @@
         </form>
     </x-card>
 </div>
+
+@if($autoContinue)
+    <script>
+        // Nothing to decide, so go straight to the preview. Press Back to matching there to review.
+        document.getElementById('matchForm')?.submit();
+    </script>
+@endif
 @endsection

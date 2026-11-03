@@ -136,6 +136,16 @@ class ImportWizardController extends ExcelUploadController
         $columns = collect($top[$headerRow] ?? [])->filter(fn ($t) => trim((string) $t) !== '')->all();
         $suggestions = $this->matcher->suggest($columns, $headers, $profile);
 
+        // Straight on to the preview when there is nothing to decide: the buyer's
+        // saved matching was applied, or every column of the file matched a system
+        // column by name (the sample format). Only on first arrival: not after
+        // Reload / Back to matching (they carry the sheet), and not after the
+        // preview sent the user back with a message.
+        $allMatched = $columns !== [] && collect($suggestions)->every(fn ($s) => $s['header_id'] !== null);
+        $firstArrival = ! $request->query('sheet') && ! $request->integer('header_row')
+            && ! $request->filled('profile') && ! session('warning') && $request->old() === [];
+        $autoContinue = $firstArrival && ($autoPicked || $allMatched);
+
         return view('merchant.import.map', [
             'state' => $state,
             'buyer' => Buyer::find($state['buyer_id']),
@@ -147,6 +157,7 @@ class ImportWizardController extends ExcelUploadController
             'profiles' => $profiles,
             'profile' => $profile,
             'autoPicked' => $autoPicked,
+            'autoContinue' => $autoContinue,
             'motherRule' => (string) old('mother_source', $profile?->mother_source ?? ''),
             'samples' => $this->samples($top, $headerRow, array_keys($columns)),
         ]);
