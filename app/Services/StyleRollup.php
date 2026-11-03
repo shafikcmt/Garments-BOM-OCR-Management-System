@@ -125,16 +125,22 @@ class StyleRollup
      * (canonical keys, resolved by header name like the status columns) to
      * carry on each material row under 'extra', e.g. pi_amount or eta.
      *
+     * $includeUntagged keeps order lines with no buyer in a buyer-confined view,
+     * the same rule the other department screens use (a file nobody tagged with
+     * a buyer stays visible).
+     *
      * @param  list<int>|null  $buyerIds
      * @param  list<string>  $extra
      * @return array{kpis: array<string, int|float>, lines: Collection, materials: Collection, orderLines: Collection}
      */
-    public function forScope(?array $buyerIds, ?int $seasonId = null, array $extra = [], ?Carbon $today = null): array
+    public function forScope(?array $buyerIds, ?int $seasonId = null, array $extra = [], ?Carbon $today = null, bool $includeUntagged = false): array
     {
         $today ??= Carbon::today();
 
         $lines = OrderLine::query()
-            ->when($buyerIds !== null, fn ($q) => $q->whereIn('buyer_id', $buyerIds))
+            ->when($buyerIds !== null, fn ($q) => $q->where(fn ($w) => $w
+                ->whereIn('buyer_id', $buyerIds)
+                ->when($includeUntagged, fn ($x) => $x->orWhereNull('buyer_id'))))
             ->when($seasonId, fn ($q) => $q->where('buyer_season_id', $seasonId))
             ->with(['bomItems', 'childStyle', 'motherStyle:id,style_no,buyer_id', 'buyer:id,buyer_name', 'season:id,code'])
             ->orderBy('style_no')->orderBy('customer_po_no')->orderBy('gmts_color')

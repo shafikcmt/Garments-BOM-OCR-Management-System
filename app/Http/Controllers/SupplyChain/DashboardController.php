@@ -8,6 +8,7 @@ use App\Models\EmailLog;
 use App\Models\PaymentRequest;
 use App\Services\DashboardMetricsService;
 use App\Services\DepartmentActivityService;
+use App\Services\SupplyChainDashboard;
 use App\Support\Concerns\ScopesToAssignedBuyers;
 
 class DashboardController extends Controller
@@ -16,7 +17,7 @@ class DashboardController extends Controller
 
     use ScopesToAssignedBuyers;
 
-    public function index(DashboardMetricsService $metrics)
+    public function index(DashboardMetricsService $metrics, SupplyChainDashboard $board)
     {
         // Required-column progress for this department only, from the same
         // service the Admin Dashboard reads — so a department and admin
@@ -44,7 +45,13 @@ class DashboardController extends Controller
             'emails' => $this->scopedEmailLogs()->count(),
         ];
 
-        return view('supply-chain.dashboard', compact('stats', 'workspace', 'trend', 'delta') + $this->requisitionSummary(auth()->user()));
+        // Material lines from booking to arrival, for the buyers this user may
+        // see. A confined viewer keeps untagged files, as on every other screen.
+        $user = auth()->user();
+        $confined = (bool) $user?->isBuyerConfined();
+        $data = $board->build($confined ? $user->scopedBuyerIds() : null, $confined);
+
+        return view('supply-chain.dashboard', $data + compact('stats', 'workspace', 'trend', 'delta') + $this->requisitionSummary($user));
     }
 
     /** POs this viewer may see, through their BOM file's buyer. */

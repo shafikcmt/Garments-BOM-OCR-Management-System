@@ -370,6 +370,37 @@ The **Season page** of Style Status shows the **Margin** of each style's latest 
 
 ## 3. Supply Chain
 
+### 3.0 Supply Chain dashboard
+
+**Open it:** log in as Supply Chain; the dashboard is the first page.
+
+It shows every material line of your buyers' orders, from booking to arrival. The numbers come from the BOM workspace columns Supply Chain fills in, and from the same reading as **Style Status**, so both pages agree.
+
+**Tiles (top row)**
+- **Booking Pending**: material with no PO yet. The red line says how many are past their *Order to be placed by* date.
+- **PI Pending**: a PO is placed but the PI is not received.
+- **Payment Pending**: the PI is received but the payment is not done. The red line counts those past *Payment Req'd Date*.
+- **In Transit**: shipped (an *ATD* is filled) but not yet arrived (no *ATA*).
+- **Arrival Overdue**: not arrived and *Committed ETA* has passed.
+- **PRA Pending**: payment requests waiting for check or approval.
+
+**Chips (second row)**: late bookings, bookings due in 14 days, arrivals due in 7 days, order lines, booking POs generated, emails sent.
+
+**Charts**
+- **Material Pipeline**: how many material lines are at each stage, with the share booked, PI received, paid and received.
+- **Open Work by Buyer**: booking, PI and payment pending lines for each buyer.
+- **Arrivals by Committed ETA**: lines still to arrive, by month. The red bar is overdue.
+- **Waiting on Vendors**: the eight vendors with most lines ordered but not received.
+
+**Lists**: **Late Bookings**, **PI Pending** (oldest PO first) and **Arrival Overdue** show the eight worst lines. Fill the missing columns in the **Workspace** and the line leaves the list.
+
+**Good to know**
+- A line counts as arrived when an *ATA* is filled or the store has received it.
+- If a column is empty the line is simply not counted in that step: for example no *Committed ETA* means it never shows as overdue.
+- If you are assigned to some buyers only, you see those buyers' orders and files with no buyer.
+- "No order lines are linked yet" means Merchandising has not imported a BOM yet.
+
+
 - **Merchant changed an order:** you get a message (bell icon) and the PO shows **Source changed**. Open the PO and use **Regenerate** before sending it to the supplier.
 - **BOM not approved:** if Admin has switched the gate on, you cannot generate a PO for a style whose BOM is not approved. You are told which style. Ask Merchandising to get it approved (section 2.6). You are told when it is approved.
 - **You raise a PO or a payment request (PRA):** the Workspace columns PI Status, PI Amount, Payment Required Date, Payment Status and order status update **by themselves**. Nobody has to press Save in the Workspace.
