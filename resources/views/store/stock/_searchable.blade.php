@@ -403,17 +403,25 @@
             if (!window.TomSelect) { return; }
 
             root = root || document;
-            root.querySelectorAll('select.js-searchable').forEach(function (el) { build(el, false); });
-            root.querySelectorAll('select.js-creatable').forEach(function (el) { build(el, true); });
+            // data-lazy-items: the screen builds this select itself, on first use
+            // (the requisition form, whose lines would otherwise each build a widget
+            // over the whole item list up front).
+            root.querySelectorAll('select.js-searchable:not([data-lazy-items])').forEach(function (el) { build(el, false); });
+            root.querySelectorAll('select.js-creatable:not([data-lazy-items])').forEach(function (el) { build(el, true); });
         }
 
         // Exposed so a screen that adds rows after load (the multi-item Record
         // Issue form) can wire up the selects it just created.
         window.gxInitSearchable = init;
 
+        // Build one select now: for a data-lazy-items select, once its options are in.
+        window.gxBuildSearchable = function (el) {
+            if (window.TomSelect) { build(el, el.classList.contains('js-creatable')); }
+        };
+
         function start() {
             // Fields outside a modal, built once up front.
-            document.querySelectorAll('select.js-searchable, select.js-creatable').forEach(function (el) {
+            document.querySelectorAll('select.js-searchable:not([data-lazy-items]), select.js-creatable:not([data-lazy-items])').forEach(function (el) {
                 if (!el.closest('.modal')) { build(el, el.classList.contains('js-creatable')); }
             });
 

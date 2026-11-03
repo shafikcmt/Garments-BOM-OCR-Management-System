@@ -1548,35 +1548,70 @@ class PurchaseRequisitionController extends Controller
             ? Carbon::parse($request->query('on'))
             : LocalTime::now();
 
-        $snapshot = $this->requisitions->snapshot($stockItem->id, $on);
+        return response()->json($this->snapshotPayload(
+            $stockItem,
+            $this->requisitions->snapshot($stockItem->id, $on),
+            $request->user()
+        ));
+    }
 
-        // array_merge, not "+": the union operator keeps the LEFT side's value
-        // for a duplicate key, which would send the raw timestamp instead of
-        // the display date the form puts straight into a read-only box.
+    /**
+     * The same figures for many items in one request, for a form opened with a
+     * long requisition (a Final one has over a hundred lines). One pass of the
+     * stock report covers every item, where a request per line ran it per item.
+     * Same payload, same rule about what a department user may see, keyed by
+     * item id.
+     */
+    public function itemSnapshots(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'max:500'],
+            'ids.*' => ['integer'],
+            'on' => ['nullable', 'date'],
+        ]);
+
+        $on = ! empty($data['on']) ? Carbon::parse($data['on']) : LocalTime::now();
+        $items = StockItem::whereIn('id', $data['ids'])->get()->keyBy('id');
+        $snapshots = $this->requisitions->snapshots($items->keys()->all(), $on);
+
+        return response()->json($items->map(fn (StockItem $item) => $this->snapshotPayload($item, $snapshots[$item->id] ?? [], $request->user()))->all());
+    }
+
+    /**
+     * One item's snapshot as the requisition form reads it.
+     *
+     * array_merge, not "+": the union operator keeps the LEFT side's value for a
+     * duplicate key, which would send the raw timestamp instead of the display
+     * date the form puts straight into a read-only box.
+     *
+     * A department user gets the item master's descriptive fields (SKU, Uom,
+     * Specification, Category) and none of the Store's figures. Hiding the chips
+     * on their form is not enough when the numbers still travel in the response,
+     * so they are stripped here. The server re-reads the full snapshot when the
+     * line is saved, so the frozen figures the Store later sees are unaffected.
+     *
+     * @param  array<string, mixed>  $snapshot
+     * @return array<string, mixed>
+     */
+    private function snapshotPayload(StockItem $stockItem, array $snapshot, ?User $user): array
+    {
         $payload = array_merge($snapshot, [
             'sku' => $stockItem->sku,
             'uom' => $stockItem->uom,
             // The item master's merged Brand/Specification field. The line's
-            // own Specification stays editable — this only pre-fills it.
+            // own Specification stays editable: this only pre-fills it.
             'specification' => $stockItem->brand,
             'item_category_id' => $stockItem->item_category_id,
-            'last_purchase_date' => $snapshot['last_purchase_date']
+            'last_purchase_date' => ($snapshot['last_purchase_date'] ?? null)
                 ? Carbon::parse($snapshot['last_purchase_date'])->format('d-M-y')
                 : null,
         ]);
 
-        // A department user gets the item master's descriptive fields — SKU, Uom,
-        // Specification, Category — and none of the Store's figures. Hiding
-        // the chips on their form is not enough when the numbers still travel
-        // in the response; they are stripped here. The server re-reads the
-        // full snapshot when the line is saved, so the frozen figures the
-        // Store later sees are unaffected.
-        $user = $request->user();
         if (! ($user && PurchaseRequisition::seesEveryRequisition($user))) {
             $payload = array_intersect_key($payload, array_flip(['sku', 'uom', 'specification', 'item_category_id']));
         }
 
-        return response()->json($payload);
+        return $payload;
     }
 
     /** The next Requisition No for a section, so the form can update it live. */
@@ -1699,9 +1734,21 @@ class PurchaseRequisitionController extends Controller
             }
         }
 
+        $items = $this->requisitions->selectableItems();
+
         return [
             'submitRoute' => $submitRoute,
-            'items' => $this->requisitions->selectableItems(),
+            'items' => $items,
+            // Every selectable item once, as [id, label, uom, brand, category id]: the form
+            // puts an item into a line's select when the line is first used, instead of
+            // repeating the whole list in every line.
+            'itemList' => $items->map(fn ($it) => [
+                $it->id,
+                ($it->sku ? $it->sku.' — ' : '').$it->name.($it->brand ? ' ('.$it->brand.')' : ''),
+                $it->uom,
+                $it->brand,
+                $it->item_category_id,
+            ])->values()->all(),
             'categories' => ItemCategory::selectable()->get(['id', 'name']),
             'sections' => IndentSection::selectable()->get(['id', 'name']),
             'persons' => IndentPerson::selectable()->get(['id', 'name']),

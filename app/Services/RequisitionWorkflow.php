@@ -202,6 +202,18 @@ class RequisitionWorkflow
                     $stage['user'] = $block->user;
                     $stage['problem'] = $stage['user'] ? null
                         : $name.' approver is not set. Ask Admin.';
+                    // The Store Head box can be set to a named person instead of "Store
+                    // Department Head". When that person IS the Store department head and
+                    // prepares the Store's own Final Requisition, it is the same case as
+                    // above: nobody sits between them and themselves, so the step reads as
+                    // approved by them at submit. Any other named person approving their
+                    // own sheet is still refused.
+                    if ($level === RequisitionSignatureBlock::LEVEL_FINAL
+                        && $block->stamp_source === RequisitionSignatureBlock::STAMP_STORE_HEAD
+                        && $raiser && $stage['user']?->id === $raiser->id
+                        && PurchaseRequisition::isStoreHead($raiser)) {
+                        $stage['self_approved'] = true;
+                    }
                     break;
 
                 default:

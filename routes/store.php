@@ -372,6 +372,8 @@ Route::prefix('store')
             // requisition id by the model-bound routes below.
             Route::get('/requisitions/item-snapshot/{stockItem}', [PurchaseRequisitionController::class, 'itemSnapshot'])
                 ->name('requisitions.item-snapshot');
+            Route::get('/requisitions/item-snapshots', [PurchaseRequisitionController::class, 'itemSnapshots'])
+                ->name('requisitions.item-snapshots');
             Route::get('/requisitions/next-number', [PurchaseRequisitionController::class, 'nextNumber'])
                 ->name('requisitions.next-number');
 

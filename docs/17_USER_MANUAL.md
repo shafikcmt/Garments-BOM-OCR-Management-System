@@ -525,6 +525,15 @@ It is never merged. The approvers are set by Admin in **Admin > Requisition Sign
 
 **Admin: who approves.** Admin sets the steps and the person for each step in **Admin > Requisition Signatures**. Nothing in the code needs to change when a person changes.
 
+### 5.1b Editing a long requisition (a Final Requisition with hundreds of lines)
+
+- The page opens in a couple of seconds, however many lines it has. The item list of a line is filled in when you first click that line's **Item Name** box; until then the box simply shows the chosen item.
+- Stock, safety stock and last purchase of every line come in one go when the page opens (and again if you change the **Requisition Date**).
+- **To Be Procured** = Qty requested − Stock in Hand + Safety Stock (rounded), never below 0, and **Amount** = To Be Procured × Rate. The **Total Amount** under the lines uses exactly this rule, so it is the same figure the saved requisition and its View page show. (It used to leave Safety Stock out, which made the total on the edit page smaller than the saved one.)
+- If you change a line's **Category** after choosing its item and the item is not in that category, the item is cleared and you must choose it again.
+
+**"You are the Store Head approver for this sheet" when submitting.** The person who prepares a sheet cannot approve it. The Store Head preparing the Final Requisition is allowed (the Store Head step then counts as approved by them). If Admin set the Store Head box on **Requisition Signatures** to a named person, that person is allowed the same way as long as they are the Store department head. Any other approver preparing their own sheet is refused: ask another person to prepare it. Admin can give someone that job without changing their role (section 5.1a).
+
 ### 5.1a Giving someone the Final Requisition or the Category Summary
 
 Admin can give a person these two Store requisition tasks without changing their role.

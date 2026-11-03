@@ -361,14 +361,12 @@
                     {{-- aria-required, never `required`: TomSelect hides this
                          select, and a hidden required field blocks the submit
                          without a message. --}}
-                    <select class="form-select form-select-sm js-line-item js-searchable" data-sku-labels name="items[__INDEX__][stock_item_id]" aria-required="true">
+                    {{-- The item list is NOT repeated in every line: it is in the page once
+                         (ITEM_LIST below) and put into a line's select when that line is
+                         first used, so a requisition of a few hundred lines is not a page
+                         of hundreds of thousands of <option> elements. --}}
+                    <select class="form-select form-select-sm js-line-item js-searchable" data-lazy-items data-sku-labels name="items[__INDEX__][stock_item_id]" aria-required="true">
                         <option value="">Select item…</option>
-                        @foreach($items as $it)
-                            <option value="{{ $it->id }}"
-                                    data-uom="{{ $it->uom }}"
-                                    data-brand="{{ $it->brand }}"
-                                    data-category-id="{{ $it->item_category_id }}">@if($it->sku){{ $it->sku }} — @endif{{ $it->name }}@if($it->brand) ({{ $it->brand }})@endif</option>
-                        @endforeach
                     </select>
 
                     {{-- "Not in Item Master" is retired: every line must be a master
@@ -697,6 +695,13 @@
 
             var SNAPSHOT_URL = @json(route('store.stock.requisitions.item-snapshot', ['stockItem' => '__ID__']));
             var NEXT_NO_URL = @json(route('store.stock.requisitions.next-number'));
+            var SNAPSHOTS_URL = @json(route('store.stock.requisitions.item-snapshots'));
+
+            /* Every selectable item once: [id, label, uom, brand, category id]. Lines take what
+               they need from here (see ensureItemSelect). */
+            var ITEM_LIST = @json($itemList);
+            var ITEM_BY_ID = {};
+            ITEM_LIST.forEach(function (it) { ITEM_BY_ID[it[0]] = it; });
 
             var nextIndex = 0;
 
@@ -731,7 +736,8 @@
                 });
             }
 
-            /* To Be Procured and Amount, previewed exactly as they will be SAVED.
+            /* To Be Procured and Amount, previewed exactly as they will be SAVED
+             * (Safety Stock included, as the saved figure includes it).
              *
              * The form lets a requester add a line per department, but on save
              * those lines collapse into one line per item
@@ -755,7 +761,7 @@
                     var key = itemId === '' ? 'blank-' + index : 'item-' + itemId;
 
                     if (!byItem[key]) {
-                        byItem[key] = { qty: 0, stock: num(row.dataset.stockInHand), rate: 0, rows: [] };
+                        byItem[key] = { qty: 0, stock: num(row.dataset.stockInHand), safety: num(row.dataset.safetyStock), rate: 0, rows: [] };
                         groups.push(byItem[key]);
                     }
 
@@ -770,7 +776,9 @@
                 var sum = 0;
 
                 groups.forEach(function (group) {
-                    var tbp = Math.max(0, group.qty - group.stock);
+                    // The server's rule (PurchaseRequisitionService::toBeProcured): Qty - Stock in Hand
+                    // + Safety Stock (rounded), as a whole figure, never below 0.
+                    var tbp = Math.max(0, Math.round(group.qty - group.stock + Math.round(group.safety)));
                     var amount = tbp * group.rate;
 
                     group.rows.forEach(function (row) {
@@ -810,6 +818,7 @@
                     row.querySelector('.js-line-sku').value = '';
                     row.querySelector('.js-line-uom').value = '';
                     row.dataset.stockInHand = '';
+                    row.dataset.safetyStock = '';
                     recalc(row);
                     return;
                 }
@@ -822,35 +831,76 @@
                     .then(function (data) {
                         if (!data) { return; }
 
-                        row.querySelector('.js-line-sku').value = data.sku || '';
-                        row.querySelector('.js-line-uom').value = data.uom || '';
-                        row.querySelector('.js-line-stock').textContent = qtyText(data.stock_in_hand);
-                        // Safety Stock as a round figure, as everywhere else.
-                        row.querySelector('.js-line-safety').textContent = (data.safety_stock === null || data.safety_stock === undefined || data.safety_stock === '')
-                            ? '—' : String(Math.round(parseFloat(data.safety_stock)));
-                        row.querySelector('.js-line-consumption').textContent = qtyText(data.consumption_last_month);
-                        row.querySelector('.js-line-lpqty').textContent = qtyText(data.last_purchase_qty);
-                        row.querySelector('.js-line-lprate').textContent = data.last_purchase_rate == null ? '—' : money(data.last_purchase_rate);
-                        row.querySelector('.js-line-lpdate').textContent = data.last_purchase_date || '—';
-
-                        row.dataset.stockInHand = data.stock_in_hand === null ? '' : data.stock_in_hand;
-
-                        // Rate defaults to the last purchase rate but stays
-                        // editable, so an expected price rise can be planned in.
-                        // `!= null` on purpose: a department user's payload
-                        // carries no figures at all (undefined, not null), and
-                        // their rate box must stay blank for the server to
-                        // fill from the last purchase.
-                        var rateField = row.querySelector('.js-line-rate');
-                        if (!rateField.value && data.last_purchase_rate != null) {
-                            rateField.value = data.last_purchase_rate;
-                        }
-
-                        applyItemMasterDefaults(row, data);
-
+                        applySnapshot(row, data, false);
                         recalc(row);
                     })
                     .catch(function () { /* Leave the chips blank; the server fills them on save. */ });
+            }
+
+            /* Put one item's figures on its line. The same for a single pick and for the
+               bulk load of a long requisition; `initial` is the bulk load, which leaves
+               the item list alone (see applyItemMasterDefaults). */
+            function applySnapshot(row, data, initial) {
+                row.querySelector('.js-line-sku').value = data.sku || '';
+                row.querySelector('.js-line-uom').value = data.uom || '';
+                row.querySelector('.js-line-stock').textContent = qtyText(data.stock_in_hand);
+                // Safety Stock as a round figure, as everywhere else.
+                row.querySelector('.js-line-safety').textContent = (data.safety_stock === null || data.safety_stock === undefined || data.safety_stock === '')
+                    ? '—' : String(Math.round(parseFloat(data.safety_stock)));
+                row.querySelector('.js-line-consumption').textContent = qtyText(data.consumption_last_month);
+                row.querySelector('.js-line-lpqty').textContent = qtyText(data.last_purchase_qty);
+                row.querySelector('.js-line-lprate').textContent = data.last_purchase_rate == null ? '—' : money(data.last_purchase_rate);
+                row.querySelector('.js-line-lpdate').textContent = data.last_purchase_date || '—';
+
+                row.dataset.stockInHand = data.stock_in_hand == null ? '' : data.stock_in_hand;
+                row.dataset.safetyStock = data.safety_stock == null ? '' : data.safety_stock;
+
+                // Rate defaults to the last purchase rate but stays
+                // editable, so an expected price rise can be planned in.
+                // `!= null` on purpose: a department user's payload
+                // carries no figures at all (undefined, not null), and
+                // their rate box must stay blank for the server to
+                // fill from the last purchase.
+                var rateField = row.querySelector('.js-line-rate');
+                if (!rateField.value && data.last_purchase_rate != null) {
+                    rateField.value = data.last_purchase_rate;
+                }
+
+                applyItemMasterDefaults(row, data, initial);
+            }
+
+            /* The figures of every line's item in one request (two for over 200 items), for a
+               requisition opened with many lines: a Final one has over a hundred, and a request
+               per line, each running the stock report, made the page crawl. */
+            function loadSnapshots(list) {
+                var byId = {};
+
+                list.forEach(function (row) {
+                    var id = row.querySelector('.js-line-item').value;
+                    if (id) { (byId[id] = byId[id] || []).push(row); }
+                });
+
+                var ids = Object.keys(byId);
+                var chunks = [];
+
+                for (var i = 0; i < ids.length; i += 200) { chunks.push(ids.slice(i, i + 200)); }
+
+                if (!chunks.length) { recalcAll(); return Promise.resolve(); }
+
+                return Promise.all(chunks.map(function (chunk) {
+                    var query = chunk.map(function (id) { return 'ids[]=' + encodeURIComponent(id); }).join('&');
+                    if (dateField && dateField.value) { query += '&on=' + encodeURIComponent(dateField.value); }
+
+                    return fetch(SNAPSHOTS_URL + '?' + query, { headers: { 'Accept': 'application/json' } })
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .then(function (map) {
+                            if (!map) { return; }
+
+                            chunk.forEach(function (id) {
+                                if (map[id]) { byId[id].forEach(function (row) { applySnapshot(row, map[id], true); }); }
+                            });
+                        });
+                })).then(recalcAll).catch(function () { /* Chips stay blank; the server fills them on save. */ });
             }
 
             /* Copy across what the Item Master already knows, so nothing that
@@ -864,13 +914,14 @@
              *
              * Nothing already typed is overwritten: a requester who asked for a
              * specific brand on this line keeps what they wrote. */
-            function applyItemMasterDefaults(row, data) {
+            function applyItemMasterDefaults(row, data, initial) {
                 var select = row.querySelector('.js-line-item');
                 var option = select.querySelector('option[value="' + select.value + '"]');
+                var known = ITEM_BY_ID[select.value];
 
                 var spec = row.querySelector('.js-line-spec');
                 if (!spec.value) {
-                    var fromMaster = data.specification || (option ? option.dataset.brand : '') || '';
+                    var fromMaster = data.specification || (option ? option.dataset.brand : '') || (known ? known[3] : '') || '';
 
                     if (fromMaster) { spec.value = fromMaster; }
                 }
@@ -885,7 +936,11 @@
                 if (categoryId && category.value !== categoryId
                     && category.querySelector('option[value="' + categoryId + '"]')) {
                     category.value = categoryId;
-                    applyCategoryFilter(row);
+
+                    // Narrowing the item list rebuilds the item picker, which is costly
+                    // on every line of a long requisition; the bulk load only shows the
+                    // category and leaves the list whole until it is changed.
+                    if (!initial) { applyCategoryFilter(row); }
                 }
             }
 
@@ -934,6 +989,7 @@
                     ].forEach(function (sel) { row.querySelector(sel).textContent = '—'; });
 
                     row.dataset.stockInHand = '';
+                    row.dataset.safetyStock = '';
                     recalc(row);
                 } else {
                     nameBox.value = '';
@@ -943,7 +999,7 @@
             /* Category is a filter on the item list, exactly as on Record Issue. */
             function applyCategoryFilter(row) {
                 var categoryId = row.querySelector('.js-line-category').value;
-                var select = row.querySelector('.js-line-item');
+                var select = ensureItemSelect(row);
                 var ts = select.tomselect;
 
                 Array.prototype.forEach.call(select.options, function (option) {
@@ -975,7 +1031,54 @@
                 }
             }
 
-            function addLine(values) {
+            /* A line's item select starts with only its chosen item. The full list, and the
+               searchable widget over it, are built the first time the line is used (click,
+               focus, or a category change), or at once for a new empty line. */
+            function setChosenItem(row, id) {
+                var select = row.querySelector('.js-line-item');
+                var item = ITEM_BY_ID[id];
+
+                if (!item) { return; }
+
+                var option = document.createElement('option');
+                option.value = item[0];
+                option.textContent = item[1];
+                option.dataset.uom = item[2] || '';
+                option.dataset.brand = item[3] || '';
+                option.dataset.categoryId = item[4] || '';
+                select.appendChild(option);
+                select.value = String(id);
+            }
+
+            function ensureItemSelect(row) {
+                var select = row.querySelector('.js-line-item');
+
+                if (select.dataset.full === '1') { return select; }
+
+                var chosen = select.value;
+
+                Array.prototype.slice.call(select.options).forEach(function (o) { if (o.value) { o.remove(); } });
+
+                var fragment = document.createDocumentFragment();
+                ITEM_LIST.forEach(function (item) {
+                    var option = document.createElement('option');
+                    option.value = item[0];
+                    option.textContent = item[1];
+                    option.dataset.uom = item[2] || '';
+                    option.dataset.brand = item[3] || '';
+                    option.dataset.categoryId = item[4] || '';
+                    fragment.appendChild(option);
+                });
+                select.appendChild(fragment);
+                select.value = chosen;
+                select.dataset.full = '1';
+
+                if (window.gxBuildSearchable) { window.gxBuildSearchable(select); }
+
+                return select;
+            }
+
+            function addLine(values, deferred) {
                 var html = tpl.innerHTML.split('__INDEX__').join(nextIndex);
                 nextIndex++;
 
@@ -986,7 +1089,7 @@
 
                 if (values) {
                     if (values.id) { row.querySelector('.js-line-id').value = values.id; }
-                    if (values.stock_item_id) { row.querySelector('.js-line-item').value = values.stock_item_id; }
+                    if (values.stock_item_id) { setChosenItem(row, values.stock_item_id); }
                     if (values.specification) { row.querySelector('.js-line-spec').value = values.specification; }
                     // Assigned even when blank, unlike its neighbours. The
                     // template defaults Type to New; a saved line that is
@@ -1001,6 +1104,26 @@
                 }
 
                 if (window.gxInitSearchable) { window.gxInitSearchable(row); }
+
+                if (values && values.stock_item_id) {
+                    // Built on first use: the pointer or keyboard reaching the item box.
+                    var lazySelect = row.querySelector('.js-line-item');
+                    var wake = function (event) {
+                        if (lazySelect.dataset.full === '1') { return; }
+                        if (event && event.type === 'mousedown') { event.preventDefault(); }
+
+                        ensureItemSelect(row);
+
+                        if (lazySelect.tomselect) {
+                            lazySelect.tomselect.focus();
+                            if (event && event.type === 'mousedown') { lazySelect.tomselect.open(); }
+                        }
+                    };
+                    lazySelect.addEventListener('mousedown', wake);
+                    lazySelect.addEventListener('focus', wake);
+                } else {
+                    ensureItemSelect(row);
+                }
 
                 applyCustomItemMode(row);
 
@@ -1043,9 +1166,13 @@
                     total();
                 });
 
-                renumber();
+                // The first paint of a long requisition numbers the lines and loads their
+                // figures once, after the last line is in (see below), not once per line.
+                if (!deferred) {
+                    renumber();
 
-                if (values && values.stock_item_id) { loadSnapshot(row); }
+                    if (values && values.stock_item_id) { loadSnapshot(row); }
+                }
 
                 return row;
             }
@@ -1403,15 +1530,21 @@
             // the stock position is as at that date, not today.
             if (dateField) {
                 dateField.addEventListener('change', function () {
-                    rows().forEach(function (row) { loadSnapshot(row); });
+                    loadSnapshots(rows());
                 });
             }
 
             // First paint: whatever bounced back from validation or is being
             // edited, else one empty line.
+            var firstPaint = [];
             @foreach($existingLines as $line)
-                addLine(@json($line));
+                firstPaint.push(addLine(@json($line), true));
             @endforeach
+
+            if (firstPaint.length) {
+                renumber();
+                loadSnapshots(firstPaint);
+            }
 
             if (rows().length === 0) { addLine(); }
         })();
