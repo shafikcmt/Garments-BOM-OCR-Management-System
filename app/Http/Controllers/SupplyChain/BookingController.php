@@ -1334,16 +1334,18 @@ class BookingController extends Controller
         $this->applyCompletenessOrder($pendingRowsQuery);
 
         /*
-         * 25 rather than 50. With the most complete rows first, the pages a
-         * merchant actually works from are the early ones, so a shorter page
-         * is less to scan; and the rows with nothing on them are gathered at
-         * the back instead of appearing a few times on every page.
+         * One list row is one booking GROUP (see bookingGroupKey), so the list is
+         * paged by group. It used to page 25 source rows and then merge them, which
+         * showed a handful of rows per page next to a total that counted source
+         * rows, and split one group across several pages.
+         *
+         * 25 by default, 50 or 100 on request. With the most complete rows first,
+         * the pages a merchant works from are the early ones.
          */
-        $pendingRows = $pendingRowsQuery
-            ->paginate(25)
-            ->withQueryString();
+        $pendingRows = $this->paginatePendingGroups($pendingRowsQuery, $request);
 
         $this->decoratePendingRows($pendingRows);
+        $this->applyGroupFigures($pendingRows);
 
         $generatedPosQuery = BookingPo::query()
             ->with(['excelFile', 'excelRow.cells.header', 'generatedBy', 'completedBy']);
@@ -1374,6 +1376,131 @@ class BookingController extends Controller
         }
 
         return [$pendingRows, $generatedPos, $filterOptions];
+    }
+
+    /** Rows per page the pending list offers. */
+    public const PENDING_PAGE_SIZES = [25, 50, 100];
+
+    /**
+     * Page the pending list by booking group instead of by source row.
+     *
+     * Works in three light steps so a long list never loads every cell:
+     *   1. the ids of every pending row, in the list's order
+     *   2. each row's group key, read from only the five cells that make it
+     *      (buyer, season, IHOD, vendor, SAP Code), a block of rows at a time
+     *   3. the first row of each group stands for it; the page is a slice of those,
+     *      loaded in full
+     *
+     * A row that already has a PO is its own entry, never merged, as before.
+     *
+     * @return \Illuminate\Pagination\LengthAwarePaginator<ExcelRow>
+     */
+    protected function paginatePendingGroups($query, Request $request): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        $perPage = (int) $request->input('per_page');
+        $perPage = in_array($perPage, self::PENDING_PAGE_SIZES, true) ? $perPage : self::PENDING_PAGE_SIZES[0];
+        $page = max(1, (int) $request->input('page', 1));
+
+        $ids = (clone $query)->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $keyHeaderIds = collect(['buyer', 'season', 'ihod', 'vendor', 'sap_code'])
+            ->flatMap(fn ($group) => $this->headerIdsForGroup($group))->unique()->values()->all();
+
+        $hasPo = [];
+        $keyOf = [];
+
+        foreach (array_chunk($ids, 400) as $chunk) {
+            foreach (BookingPo::whereIn('excel_row_id', $chunk)->pluck('excel_row_id') as $rowId) {
+                $hasPo[(int) $rowId] = true;
+            }
+
+            ExcelRow::query()
+                ->whereIn('id', $chunk)
+                ->with(['cells' => fn ($cells) => $cells->whereIn('header_id', $keyHeaderIds ?: [0])->with('header')])
+                ->get(['id'])
+                ->each(function (ExcelRow $row) use (&$keyOf, $hasPo) {
+                    $key = isset($hasPo[$row->id]) ? '' : $this->bookingGroupKey([
+                        'buyer_name' => $this->valueFor($row, 'buyer'),
+                        'season_name' => $this->valueFor($row, 'season'),
+                        'ihod' => $this->valueFor($row, 'ihod'),
+                        'vendor_name' => $this->valueFor($row, 'vendor'),
+                        'sap_code' => $this->valueFor($row, 'sap_code'),
+                    ]);
+                    $keyOf[$row->id] = $key;
+                });
+        }
+
+        // Group members by key, in list order; the first member leads the group.
+        $groups = [];
+        foreach ($ids as $id) {
+            $key = ($keyOf[$id] ?? '') === '' ? 'row|' . $id : $keyOf[$id];
+            $groups[$key][] = $id;
+        }
+        $groups = array_values($groups);
+
+        $slice = array_slice($groups, ($page - 1) * $perPage, $perPage);
+        $leaderIds = array_map(fn (array $members) => $members[0], $slice);
+
+        $rows = ExcelRow::query()
+            ->with(['excelFile', 'cells.header', 'bookingPo'])
+            ->whereIn('id', $leaderIds ?: [0])
+            ->get()
+            ->keyBy('id');
+
+        $ordered = collect($slice)->map(function (array $members) use ($rows) {
+            $row = $rows->get($members[0]);
+            if ($row) {
+                $row->booking_member_ids = $members;
+            }
+
+            return $row;
+        })->filter()->values();
+
+        return (new \Illuminate\Pagination\LengthAwarePaginator($ordered, count($groups), $perPage, $page, [
+            'path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(),
+        ]))->withQueryString();
+    }
+
+    /**
+     * Totals for each group on the page: how many source rows it holds, its items
+     * and its quantity. Read from the item and quantity cells alone, a block at a
+     * time; the quantity is the stored Materials to be Ordered figure, which the
+     * workspace keeps up to date.
+     */
+    protected function applyGroupFigures($pendingRows): void
+    {
+        $itemHeaders = $this->headerIdsForGroup('item');
+        $qtyHeaders = $this->headerIdsForGroup('qty');
+        $wanted = array_values(array_unique(array_merge($itemHeaders, $qtyHeaders)));
+
+        foreach ($pendingRows->getCollection() as $row) {
+            $members = $row->booking_member_ids ?? [$row->id];
+
+            if ($row->bookingPo || count($members) < 2) {
+                continue;
+            }
+
+            $items = [];
+            $qty = 0.0;
+
+            foreach (array_chunk($members, 400) as $chunk) {
+                ExcelRow::query()
+                    ->whereIn('id', $chunk)
+                    ->with(['cells' => fn ($cells) => $cells->whereIn('header_id', $wanted ?: [0])->with('header')])
+                    ->get(['id'])
+                    ->each(function (ExcelRow $member) use (&$items, &$qty) {
+                        $item = $this->valueFor($member, 'item');
+                        if ($item !== null && trim($item) !== '') {
+                            $items[$this->normalize($item)] = trim($item);
+                        }
+                        $qty += (float) ($this->numericValue($this->valueFor($member, 'qty')) ?? 0);
+                    });
+            }
+
+            $row->booking_group_count = count($members);
+            $row->booking_group_items = array_values($items);
+            $row->booking_group_qty_total = $qty;
+        }
     }
 
     protected function buildPendingRowsQuery(Request $request)
@@ -1665,6 +1792,11 @@ class BookingController extends Controller
             ->whereHas('excelFile')
             ->whereDoesntHave('bookingPo');
 
+        // Rows of the same vendor and SAP Code are one booking even across buyers,
+        // but only the rows this user may see: a PO must not pull in lines of a
+        // buyer the user is not assigned to.
+        $this->applyBuyerScope($query);
+
         $this->applyPendingPoFilter($query);
         $this->applyHasBookingSourceData($query);
 
@@ -1728,10 +1860,20 @@ class BookingController extends Controller
             return collect();
         }
 
-        return ExcelCell::query()
+        $cells = ExcelCell::query()
             ->whereIn('header_id', $headerIds)
             ->whereNotNull('value')
-            ->whereRaw("TRIM(value) <> ''")
+            ->whereRaw("TRIM(value) <> ''");
+
+        // The filter lists (buyer, season, SAP code, vendor, ship date) offer only
+        // what this user may see in the list below them. Without this, a user
+        // assigned to one buyer was offered every other buyer's name here.
+        // Untagged files stay in, exactly as they do in the list itself.
+        if ($this->buyerScopeViewer()?->isBuyerConfined()) {
+            $cells->whereHas('row', fn ($row) => $this->applyBuyerScope($row));
+        }
+
+        return $cells
             ->distinct()
             ->orderBy('value')
             ->limit(800)

@@ -743,12 +743,21 @@
                             @endforeach
                         </select>
                     </div>
-                    {{-- 2 + 2 + 5 + 3 = 12. IHOD went from one column to two, so
-                         the keyword field gives up one to keep the row on one line. --}}
-                    <div class="col-md-5 booking-search-field">
+                    {{-- 2 + 2 + 4 + 1 + 3 = 12. IHOD went from one column to two, and rows per
+                         page took one more, so the keyword field gives up two to keep the
+                         row on one line. --}}
+                    <div class="col-md-4 booking-search-field">
                         <label class="form-label">Quick keyword search</label>
                         <i class="bi bi-search booking-search-icon" aria-hidden="true"></i>
                         <input type="text" name="keyword" value="{{ $selectedKeyword }}" class="form-control booking-auto-filter-text" placeholder="Search buyer / season / vendor / item / style / PO keyword...">
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label" for="perPage">Rows</label>
+                        <select id="perPage" name="per_page" class="form-select booking-auto-filter" autocomplete="off">
+                            @foreach([25, 50, 100] as $size)
+                                <option value="{{ $size }}" @selected((int) request('per_page', 25) === $size)>{{ $size }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="col-md-3 d-grid d-md-flex gap-2">
                         <button type="submit" class="btn booking-primary-btn flex-fill" title="Apply filter"><i class="bi bi-search me-1" aria-hidden="true"></i>Search</button>

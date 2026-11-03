@@ -405,6 +405,22 @@ It shows every material line of your buyers' orders, from booking to arrival. Th
 - **BOM not approved:** if Admin has switched the gate on, you cannot generate a PO for a style whose BOM is not approved. You are told which style. Ask Merchandising to get it approved (section 2.6). You are told when it is approved.
 - **You raise a PO or a payment request (PRA):** the Workspace columns PI Status, PI Amount, Payment Required Date, Payment Status and order status update **by themselves**. Nobody has to press Save in the Workspace.
 
+### 3.1 PO Generate: the pending list
+
+**Open it:** left menu, **PO Generate**, tab **Pending Preview**.
+
+**One row is one booking.** Source rows that will go on the same PO are shown as one row:
+- Rows with a **SAP Code**: the same vendor and the same SAP Code (styles and buyers may differ).
+- Rows without a SAP Code: the same buyer, season, IHOD (ship date) and vendor.
+
+The row shows how many source rows it holds, up to three of their items, and the total quantity (the stored **Materials to be Ordered** figures). A row that already has a PO is never merged.
+
+**Rows per page.** The list shows 25 bookings per page. Use **Rows** next to the search box to show 50 or 100. The total at the bottom counts bookings, not source rows, and a booking never appears on two pages.
+
+**Why a page can have few rows.** If many rows have no vendor and no SAP Code, they merge into one booking per ship date. Fill in **Vendor Name** and **SAP Code** in the Workspace and they split into separate bookings.
+
+**Who sees what.** The list and its filters (**Buyer**, **Season**, **SAP Code**, **Vendor**, **IHOD**) show only the buyers you are assigned to, plus files that have no buyer set. A booking never pulls in rows of a buyer you cannot see. If you still see a buyer you are not assigned to, that buyer's file has no buyer set: ask Admin to tag the file.
+
 ## 4. Accounts
 
 ### 4.1 Payments screen

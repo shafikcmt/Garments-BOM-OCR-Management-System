@@ -488,3 +488,57 @@ it('leaves the supply chain workspace list whole for an unconfined user', functi
     $response->assertSee($link($this->pendingB), false);
     $response->assertSee($link($this->pendingUntagged), false);
 });
+
+/*
+|--------------------------------------------------------------------------
+| PO Generate — the filter lists and the booking group
+|--------------------------------------------------------------------------
+*/
+
+it('offers a one-buyer user only the buyers, seasons and vendors they may see in the filters', function () {
+    $user = scScopeUser('supply_chain', [$this->buyerA->id], BuyerScope::MODE_SPECIFIC);
+
+    $this->withoutVite()->actingAs($user)->get(route('supply_chain.bookings.index'))
+        ->assertOk()
+        ->assertViewHas('filterOptions', function ($options) {
+            $buyers = $options['buyers']->all();
+            $vendors = $options['vendors']->all();
+
+            // Alpha is Buyer A's, Charlie sits in an untagged file (visible to everyone by design).
+            return in_array('Alpha', $buyers, true) && in_array('Charlie', $buyers, true)
+                && ! in_array('Bravo', $buyers, true)
+                && in_array('Vendor Alpha', $vendors, true) && ! in_array('Vendor Bravo', $vendors, true);
+        });
+});
+
+it('still offers an all-buyers user every buyer in the filters', function () {
+    $user = scScopeUser('supply_chain');
+
+    $this->withoutVite()->actingAs($user)->get(route('supply_chain.bookings.index'))
+        ->assertOk()
+        ->assertViewHas('filterOptions', fn ($options) => collect(['Alpha', 'Bravo', 'Charlie'])->every(fn ($b) => in_array($b, $options['buyers']->all(), true)));
+});
+
+it('groups rows of one vendor and SAP Code only among the rows the user may see', function () {
+    ExcelHeader::create([
+        'header_name' => 'SAP Code', 'header_key' => 'sap_code', 'owner_role_id' => Role::findOrCreate('merchant', 'web')->id,
+        'position' => 20, 'field_type' => 'text', 'is_active' => true,
+    ]);
+    $same = fn (string $buyer) => ['buyer_name' => $buyer, 'style_name' => 'S ' . $buyer, 'vendor_name' => 'YKK', 'sap_code' => 'ZIP-1'];
+    $rowA = scScopeFile($this->buyerA->id, $same('Alpha'));
+    scScopeFile($this->buyerB->id, $same('Bravo'));
+
+    $group = function (User $user) use ($rowA) {
+        $this->actingAs($user);
+        $controller = app(\App\Http\Controllers\SupplyChain\BookingController::class);
+        $extract = new ReflectionMethod($controller, 'extractRowData');
+        $extract->setAccessible(true);
+        $method = new ReflectionMethod($controller, 'pendingRowsForSameBookingGroup');
+        $method->setAccessible(true);
+
+        return $method->invoke($controller, $rowA, $extract->invoke($controller, $rowA))->pluck('id')->all();
+    };
+
+    expect($group(scScopeUser('supply_chain', [$this->buyerA->id], BuyerScope::MODE_SPECIFIC)))->toHaveCount(1);
+    expect($group(scScopeUser('supply_chain')))->toHaveCount(2);
+});
