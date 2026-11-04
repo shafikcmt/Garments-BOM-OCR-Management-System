@@ -553,6 +553,48 @@ Both start with **Purchase Requisition, View** (they need it to reach the screen
 3. Items added by the Store admin or Admin are approved straight away.
 4. The Store admin and Admin can **Edit** an item. A change to the item name or unit shows everywhere the item is used (stock, receiving, issue, requisitions, reports), because every screen reads the same item.
 
+### 5.3 General Stock purchasing: Comparative Statement, Internal PO and receiving
+
+This is for the **Supply Chain General** desk: the people who buy the factory's general stock (consumables) after a requisition is approved. It is separate from the buyer-order Supply Chain (BOM, booking, PI, payment request). A Supply Chain General user does not see those screens.
+
+**The flow**
+
+```text
+Final or Individual requisition approved
+  -> To Purchase (items waiting)
+  -> Comparative Statement (CS): compare suppliers, choose one per item
+  -> CS checked, then approved
+  -> Internal PO (booking with an internal PO number)
+  -> PO authorised
+  -> Store records the goods "Against PO"
+```
+
+**1. To Purchase.** Open **General Stock Purchasing, To Purchase**. It lists every item of an approved Final or Individual requisition that is not on a Comparative Statement yet, with the quantity left to buy and the last rate. Tick the items (or the whole requisition) and press **Make Comparative Statement**. An item you have not ticked stays in the list. If a requisition has no items here, everything on it is already on a statement.
+
+**2. Make the Comparative Statement.**
+1. **Suppliers compared.** Two supplier columns are open. Pick a saved supplier from **From supplier list** (name, phone and address fill in) or type one. Add terms such as "Excluding VAT. One month credit along with work order." Press **Add supplier** for a third or fourth (up to 4). Tick **Recommended supplier** on the one the committee prefers.
+2. **Items and rates.** For each item enter the quantity (never more than is left on the requisition), the specification or brand, and each supplier's **unit price**. The lowest price on an item turns green. The circle beside a price chooses that supplier for that item: it is ticked for you when you type the first price, and you can change it. **Choose lowest price for every item** and **Choose recommended supplier** do it for all items at once.
+3. Write the **Recommendation from committee members**, then press **Save Draft**, or **Save & Send for Checking**.
+
+Sending for checking needs at least 2 suppliers and a priced supplier chosen on every item. The statement number looks like **CS-26-27/0001** and restarts every financial year (July to June). You can split one requisition item over two statements, but never ask for more than it has left. **Print / PDF** gives the form on A4 landscape with the form code, the supplier columns, the chosen suppliers highlighted, the terms and the three signature boxes: **Jr. Executive - SCM**, **Manager - SCM**, **Approved By**.
+
+**3. Check and approve.** The statement moves **Draft, Waiting for Check, Waiting for Approval, Approved**.
+- **Mark as Checked** is the Manager - SCM step. **Approve** is the final step, with an optional approver note (for example "take approval from internal audit before purchasing").
+- **Send Back** returns it to the person who made it with a note saying what to fix; they correct it and send it again.
+- The person who made a statement can never check or approve it. One person may do both the check and the approval if Admin gave them both.
+- **Cancel Statement** (with a reason) puts its items back on **To Purchase**. A statement that already has a purchase order cannot be cancelled until the PO is cancelled.
+
+**4. Make the Internal PO.** On an approved statement press **Make Purchase Order**. One PO is made for each chosen supplier, as a draft, with the quantities and rates of the statement. The number looks like **PO-26-27/HS-0001**. Open the PO and press **Edit** to change the date, reference, BIN, consignee, terms, remarks and each line's **Due on**. Quantity and rate cannot be changed here: they are what was approved. **Print / PDF** gives the purchase order on A4 portrait with the amount in words and **Checked By** and **Authorised Signatory**. A draft prints with "DRAFT: not yet authorised".
+
+**5. Authorise the PO.** Someone with the authorising right, who did not make the PO, presses **Authorise PO**. It becomes **Issued**. When every item of a requisition is on an issued PO, the requisition shows **Purchase Action Taken**; cancelling a PO puts it back to **Approved**. A PO that Store has received goods against cannot be cancelled.
+
+**6. Store receives against the PO.** On **General Stock, Receiving, Record Receiving** choose **Against PO** (optional). The supplier and one line for every item still to come are filled in, with the quantity left and the PO rate. Change the quantity to what actually arrived and the rate to the invoice rate if it differs, then save as usual. The system refuses a PO from another supplier, an item that is not on the PO, and more than the PO still expects. The PO shows **Partly Received** then **Received**, and its page shows what is still to come. Goods with no PO can still be received as before: leave **Against PO** empty.
+
+**Who can do what (Admin).** Admin sets this in **Admin, Users, Portal Access** (or the permission list under **General Stock**):
+- The **Supply Chain General** role can see **To Purchase**, make and edit Comparative Statements, and make and edit Internal POs. It cannot check, approve or authorise.
+- **Comparative Statement: Check**, **Comparative Statement: Approve** and **Internal PO: Authorise** are given to the right people one by one.
+- Store needs no purchasing right to receive against a PO. The form code printed on the CS, the consignee and BIN printed on the PO, the PO number code (HS) and the minimum number of suppliers are in `config/purchasing.php`.
+
 ---
 
 ## 6. Follow-ups: asking someone to chase
@@ -617,6 +659,8 @@ A TnA template is a ready list of tasks for an order, for example "Fabric bookin
 | A big import or a PDF export stops with "Something went wrong" (500) | Look in `storage/logs/laravel.log` for "Allowed memory size". The default PHP limit is 128 MB. The import raises its own limit to 512 MB for that request; for PDF exports set `memory_limit = 512M` in the PHP container's `php.ini` and restart the container. |
 | Clean up styles left over from a deleted test file | Deleting a file does not delete its styles: the Style Library is shared by all files. Open **Style Library**, choose the buyer and season. A style with a green "N order line(s)" tag is in use, keep it. A style with no tag has no orders: press **Delete** on it. |
 | Turn the second (Management) BOM approval or the PO gate on or off | Screen: **BOM Approvals**, Settings box (Admin only). Both are off by default. |
+| Give a person the General Stock purchasing sign-offs (check a CS, approve a CS, authorise a PO) | **Admin > Users**, open the person, **Portal Access**, switch on **Comparative Statement: Check**, **Comparative Statement: Approve** or **Internal PO: Authorise**. The role **Supply Chain General** (created by the deploy; an existing role with that name is reused) has view and create only. |
+| Change the CS form code, the PO consignee / BIN, the PO number code or the minimum suppliers | `config/purchasing.php` (or the `PURCHASING_*` values in `.env`) |
 | Switch off automatic refresh of Workspace columns from PO / PRA | `.env`: `SUPPLY_CHAIN_SYNC_WORKSPACE=false` |
 | Switch off automatic filling of the standard order tables | `.env`: `BOM_SYNC_TABLES=false` |
 | Make TnA tasks from the auto-apply templates by hand | `php artisan tna:apply` (the scheduler runs it every morning at 08:15, Dhaka time) |
@@ -652,6 +696,8 @@ On the live server, every push to `master` runs the migrations by itself, and th
 | PO | Purchase Order sent to a supplier |
 | PI | Proforma Invoice from the supplier |
 | PRA | Payment Request Approval |
+| CS | Comparative Statement: supplier rates compared item by item before a purchase |
+| Internal PO | The purchase order for general stock, made from an approved CS; Store receives against its number |
 | Workspace | The shared sheet of order and material columns |
 | Pmt Doc No | Payment reference recorded against a line |
 | Follow-up | A task asking one person to chase a style by a date |

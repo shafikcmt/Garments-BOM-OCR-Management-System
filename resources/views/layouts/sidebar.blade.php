@@ -11,7 +11,8 @@
     // highlight itself when one of its pages is showing.
     $isAdminStore = request()->routeIs('store.material.bulk-issues.*')
         || request()->routeIs('store.reports.*')
-        || request()->routeIs('store.stock.*');
+        || request()->routeIs('store.stock.*')
+        || request()->routeIs('store.purchasing.*');
     $isSupplyBooking = request()->routeIs('supply_chain.bookings.*');
     $isSupplyPayment = request()->routeIs('supply_chain.payment_requests.*');
     $isSupplyEmails = request()->routeIs('supply_chain.sent_emails.*');
@@ -108,6 +109,13 @@
     $seeWorkspace = $storeUser?->can('store.workspace.view') ?? false;
 
     $seeStoreArea = $seeStoreArea || (! $hasOwnSidebarBlock && $seeWorkspace);
+
+    // General Stock purchasing (To Purchase, Comparative Statement, Internal PO).
+    // Permission-driven, so the live role name does not matter. Admin lists these
+    // inside its own Store group instead, hence the own-block exclusion.
+    $seePurchaseCs = $storeUser?->can('store.purchase_cs.view') ?? false;
+    $seePurchasePo = $storeUser?->can('store.purchase_po.view') ?? false;
+    $seePurchasing = ! $hasOwnSidebarBlock && ($seePurchaseCs || $seePurchasePo);
 @endphp
 
 <nav class="sidebar" id="appSidebar" aria-label="Main sidebar navigation">
@@ -207,6 +215,9 @@
                             {{-- Named in full to keep it distinct from the
                                  material Requisitions under Buyer/Style Stock. --}}
                             <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.requisitions.*') && ! request()->routeIs('store.stock.requisitions.my-approvals') ? 'is-active' : '' }}">Purchase Requisition</a>
+                            <a href="{{ route('store.purchasing.queue') }}" class="sidebar-sub-link {{ request()->routeIs('store.purchasing.queue') ? 'is-active' : '' }}">To Purchase</a>
+                            <a href="{{ route('store.purchasing.cs.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.purchasing.cs.*') ? 'is-active' : '' }}">Comparative Statement</a>
+                            <a href="{{ route('store.purchasing.po.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.purchasing.po.*') ? 'is-active' : '' }}">Internal PO</a>
                             <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">Receiving</a>
                             <a href="{{ route('store.stock.issues.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">Issues</a>
                             <a href="{{ route('store.stock.ledger') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">Stock Report</a>
@@ -527,6 +538,34 @@
                 </ul>
             </div>
             @endif
+            @endif
+
+            {{-- General Stock purchasing desk: its own short menu, in the order the work flows. --}}
+            @if($seePurchasing)
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">General Stock Purchasing</div>
+                <ul class="sidebar-list">
+                    @if($seePurchaseCs)
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.purchasing.queue') }}" class="sidebar-nav-link {{ request()->routeIs('store.purchasing.queue') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-cart-plus" aria-hidden="true"></i></span><span class="sidebar-link-text">To Purchase</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.purchasing.cs.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.purchasing.cs.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-columns-gap" aria-hidden="true"></i></span><span class="sidebar-link-text">Comparative Statement</span></span>
+                        </a>
+                    </li>
+                    @endif
+                    @if($seePurchasePo)
+                    <li class="sidebar-item">
+                        <a href="{{ route('store.purchasing.po.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.purchasing.po.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Internal PO</span></span>
+                        </a>
+                    </li>
+                    @endif
+                </ul>
+            </div>
             @endif
 
             @role('supply_chain')

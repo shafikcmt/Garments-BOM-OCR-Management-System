@@ -24,6 +24,9 @@ class StockPurchase extends Model
         'general_stock_supplier_id',
         'remarks',
         'created_by',
+        // The Internal PO (and its line) this receiving answers, when there is one.
+        'gs_purchase_order_id',
+        'gs_purchase_order_item_id',
     ];
 
     protected $casts = [
@@ -119,6 +122,11 @@ class StockPurchase extends Model
     public function generalStockSupplier()
     {
         return $this->belongsTo(GeneralStockSupplier::class, 'general_stock_supplier_id');
+    }
+
+    public function purchaseOrder()
+    {
+        return $this->belongsTo(GsPurchaseOrder::class, 'gs_purchase_order_id');
     }
 
     public function createdBy()

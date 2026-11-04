@@ -8,16 +8,19 @@ use App\Http\Controllers\Concerns\AuthorizesStoreCorrections;
 use App\Http\Controllers\Concerns\ManagesFormDrafts;
 use App\Imports\ReceivingImport;
 use App\Models\GeneralStockSupplier;
+use App\Models\GsPurchaseOrder;
 use App\Models\StockItem;
 use App\Models\StockPurchase;
 use App\Models\StoreFormDraft;
 use App\Services\GeneralStockReportService;
+use App\Services\PurchaseOrderService;
 use App\Services\RvNumberGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 
 /**
@@ -168,6 +171,10 @@ class StockPurchaseController extends Controller
             ->get(['id', 'sku', 'name', 'uom', 'category', 'brand']);
         $suppliers = GeneralStockSupplier::selectable()->get(['id', 'name']);
 
+        // Issued Internal POs with something still to come, for "Against PO".
+        $openPos = GsPurchaseOrder::receivable()->latest('id')->limit(200)
+            ->get(['id', 'po_no', 'supplier_name']);
+
         ['edit' => $canEdit, 'delete' => $canDelete] = $this->storeCorrectionAbilities();
 
         // The RV No the next save will take. A preview, not a reservation:
@@ -193,7 +200,7 @@ class StockPurchaseController extends Controller
         $drafts = $this->myDrafts();
 
         return view('store.stock.purchases', compact(
-            'groups', 'lines', 'items', 'suppliers', 'filters', 'canEdit', 'canDelete', 'nextRv', 'drafts'
+            'groups', 'lines', 'items', 'suppliers', 'filters', 'canEdit', 'canDelete', 'nextRv', 'drafts', 'openPos'
         ) + [
             // The Month filter's list ("All months" + recent months).
             'monthOptions' => \App\Support\MonthOptions::recent($filters['month'] ?? null),
@@ -230,6 +237,9 @@ class StockPurchaseController extends Controller
             // 0 is allowed (a free sample); the reports treat it as no price.
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.remarks' => ['nullable', 'string', 'max:1000'],
+            // Receiving against an Internal PO (optional).
+            'gs_purchase_order_id' => ['nullable', 'integer', 'exists:gs_purchase_orders,id'],
+            'items.*.gs_purchase_order_item_id' => ['nullable', 'integer'],
         ], self::requiredMessages() + [
             'rcv_date.after_or_equal' => 'The RCV date cannot be earlier than the challan date.',
             'items.required' => 'Add at least one item to receive.',
@@ -244,6 +254,9 @@ class StockPurchaseController extends Controller
         // The same item on one challan from one supplier only with a
         // different remark — within this form and against receipts recorded.
         $this->assertNoRepeatedLines($data['items'], $data['challan_no'], (int) $data['general_stock_supplier_id']);
+
+        // The Internal PO these goods are for, if any: checked before anything is written.
+        $purchaseOrder = $this->assertAgainstPurchaseOrder($data);
 
         // Header, resolved once rather than once per line.
         $header = [
@@ -265,7 +278,7 @@ class StockPurchaseController extends Controller
 
         $rvNo = null;
 
-        DB::transaction(function () use ($data, $header, $rv, &$rvNo) {
+        DB::transaction(function () use ($data, $header, $rv, &$rvNo, $purchaseOrder) {
             // Allocated inside the transaction: the counter row stays locked
             // until commit, so two people saving at once cannot take the same
             // number. Keyed to the RCV date's month, which is when the goods
@@ -281,9 +294,16 @@ class StockPurchaseController extends Controller
                     // Remarks follow the line, not the header — one delivery can
                     // carry a note about one item only.
                     'remarks' => $line['remarks'] ?? null,
+                    'gs_purchase_order_id' => $purchaseOrder?->id,
+                    'gs_purchase_order_item_id' => $purchaseOrder ? ($line['gs_purchase_order_item_id'] ?? null) : null,
                 ]);
             }
         });
+
+        // Move the PO to Partly Received / Received to match what Store has now recorded.
+        if ($purchaseOrder) {
+            app(PurchaseOrderService::class)->syncReceiving($purchaseOrder->fresh());
+        }
 
         // The real record is written, so the draft it came from has served its
         // purpose. After the transaction, never before — a rejected submission
@@ -292,9 +312,11 @@ class StockPurchaseController extends Controller
 
         $count = count($data['items']);
 
+        $against = $purchaseOrder ? ' against '.$purchaseOrder->po_no : '';
+
         return back()->with('success', $count === 1
-            ? 'Purchase recorded under GRN No '.$rvNo.'.'
-            : $count.' item(s) received under GRN No '.$rvNo.'.');
+            ? 'Purchase recorded under GRN No '.$rvNo.$against.'.'
+            : $count.' item(s) received under GRN No '.$rvNo.$against.'.');
     }
 
     /**
@@ -558,6 +580,8 @@ class StockPurchaseController extends Controller
             ]);
         });
 
+        $this->syncPurchaseOrderOf($stockPurchase);
+
         return back()->with('success', 'Receiving line updated.');
     }
 
@@ -769,7 +793,76 @@ class StockPurchaseController extends Controller
 
         $stockPurchase->delete();
 
+        $this->syncPurchaseOrderOf($stockPurchase);
+
         return back()->with('success', 'Purchase entry removed.');
+    }
+
+    /** A corrected or removed receiving line changes how much of its PO has arrived. */
+    private function syncPurchaseOrderOf(StockPurchase $stockPurchase): void
+    {
+        if ($stockPurchase->gs_purchase_order_id && ($po = GsPurchaseOrder::find($stockPurchase->gs_purchase_order_id))) {
+            app(PurchaseOrderService::class)->syncReceiving($po);
+        }
+    }
+
+    /**
+     * Record Receiving "Against PO": the PO must be open, from the same supplier,
+     * and every line must be one of its lines, for no more than it still expects.
+     * Returns the PO, or null when the goods are not against a PO.
+     *
+     * @param  array<string, mixed>  $data  validated request
+     */
+    private function assertAgainstPurchaseOrder(array $data): ?GsPurchaseOrder
+    {
+        $poId = $data['gs_purchase_order_id'] ?? null;
+
+        if (! $poId) {
+            return null;
+        }
+
+        $po = GsPurchaseOrder::with('items')->find($poId);
+        $errors = [];
+
+        if (! $po || ! $po->isReceivable()) {
+            throw ValidationException::withMessages(['gs_purchase_order_id' => 'This purchase order is not open for receiving.']);
+        }
+
+        if ($po->general_stock_supplier_id && (int) $po->general_stock_supplier_id !== (int) ($data['general_stock_supplier_id'] ?? 0)) {
+            $errors['general_stock_supplier_id'] = $po->po_no.' is for '.$po->supplier_name.'. Choose that supplier, or clear the PO.';
+        }
+
+        $received = app(PurchaseOrderService::class)->receivedByLine($po);
+        $asked = [];
+
+        foreach ($data['items'] as $i => $line) {
+            $poItem = $po->items->firstWhere('id', (int) ($line['gs_purchase_order_item_id'] ?? 0));
+
+            if (! $poItem) {
+                $errors["items.$i.stock_item_id"] = 'This item is not on '.$po->po_no.'.';
+
+                continue;
+            }
+
+            if ($poItem->stock_item_id && (int) $poItem->stock_item_id !== (int) $line['stock_item_id']) {
+                $errors["items.$i.stock_item_id"] = 'This line is for '.$poItem->item_name.' on '.$po->po_no.'.';
+
+                continue;
+            }
+
+            $asked[$poItem->id] = ($asked[$poItem->id] ?? 0.0) + (float) $line['qty'];
+            $remaining = (float) $poItem->qty - ($received[$poItem->id] ?? 0.0);
+
+            if ($asked[$poItem->id] > $remaining + 0.00005) {
+                $errors["items.$i.qty"] = $po->po_no.' still expects only '.$this->fmtQty(max(0, $remaining)).' of '.$poItem->item_name.'.';
+            }
+        }
+
+        if ($errors) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $po;
     }
 
     /** A quantity as the screens write it: trimmed of trailing zeros. */

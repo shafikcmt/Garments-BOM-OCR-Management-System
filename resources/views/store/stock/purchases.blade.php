@@ -18,6 +18,7 @@
             'qty' => $line['qty'] ?? '',
             'unit_price' => $line['unit_price'] ?? '',
             'remarks' => $line['remarks'] ?? '',
+            'gs_purchase_order_item_id' => $line['gs_purchase_order_item_id'] ?? '',
             // The server's message for each field of the line, shown under it.
             // Short tags under the fields; the full sentences are in the
             // summary at the top of the page.
@@ -152,6 +153,19 @@
                             @endif
                             @error('general_stock_supplier_id')<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($message) }}</div>@enderror
                         </div>
+                        {{-- Optional: the Internal PO these goods are for. Choosing one fills the
+                             supplier and the item lines with what is still to come. --}}
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <label class="form-label" for="poSelect">Against PO <span class="text-muted small">(optional)</span></label>
+                            <select name="gs_purchase_order_id" id="poSelect" class="form-select js-searchable @error('gs_purchase_order_id') is-invalid @enderror">
+                                <option value="">No PO (receive without one)</option>
+                                @foreach($openPos as $po)
+                                    <option value="{{ $po->id }}" @selected((string) old('gs_purchase_order_id') === (string) $po->id)>{{ $po->po_no }} — {{ $po->supplier_name }}</option>
+                                @endforeach
+                            </select>
+                            @error('gs_purchase_order_id')<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($message) }}</div>@enderror
+                            <div class="form-text d-none" id="poNote"></div>
+                        </div>
                     </div>
 
                     {{-- Already recorded under this challan number.
@@ -277,7 +291,7 @@
                          replaced by the line's array index. --}}
                     <template id="purchaseLineTemplate">
                         <tr class="purchase-line">
-                            <td class="text-center js-line-number gx-line-no"></td>
+                            <td class="text-center js-line-number gx-line-no"><input type="hidden" class="js-line-po-item" name="items[__INDEX__][gs_purchase_order_item_id]" value=""></td>
                             <td>
                                 {{-- No `required`: TomSelect hides this select, and a hidden
                                      required field blocks the submit with no message. --}}
@@ -665,6 +679,7 @@
                     set('.js-line-qty', values.qty);
                     set('.js-line-price', values.unit_price);
                     set('[name$="[remarks]"]', values.remarks);
+                    set('.js-line-po-item', values.gs_purchase_order_item_id);
                 }
 
                 body.appendChild(row);
@@ -686,6 +701,60 @@
             }
 
             addBtns.forEach(function (btn) { btn.addEventListener('click', function () { addRow(); }); });
+
+            // "Against PO" fills the lines through these two. Same addRow a resumed draft uses.
+            form.gxAddRow = addRow;
+            form.gxClearRows = function () { rows().forEach(function (row) { row.remove(); }); renumber(); total(); };
+
+            // Choosing an Internal PO fills the supplier and one line per item still to come.
+            var poSelect = document.getElementById('poSelect');
+            if (poSelect) {
+                var poNote = document.getElementById('poNote');
+                var poLinesUrl = @json(route('store.stock.purchases.po-lines', ['order' => '__ID__']));
+
+                function poMessage(text, bad) {
+                    poNote.textContent = text;
+                    poNote.classList.toggle('text-danger', !!bad);
+                    poNote.classList.remove('d-none');
+                }
+
+                poSelect.addEventListener('change', function () {
+                    poNote.classList.add('d-none');
+                    if (!poSelect.value) { return; }
+
+                    fetch(poLinesUrl.replace('__ID__', encodeURIComponent(poSelect.value)), {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                    }).then(function (r) {
+                        if (!r.ok) { throw new Error('po'); }
+                        return r.json();
+                    }).then(function (po) {
+                        var supplier = document.getElementById('supplierSelect');
+                        if (supplier && po.general_stock_supplier_id) {
+                            var id = String(po.general_stock_supplier_id);
+                            if (supplier.tomselect) { supplier.tomselect.setValue(id); }
+                            else { supplier.value = id; supplier.dispatchEvent(new Event('change', { bubbles: true })); }
+                        }
+
+                        form.gxClearRows();
+                        var open = po.lines.filter(function (l) { return l.remaining > 0; });
+                        open.forEach(function (l) {
+                            form.gxAddRow({
+                                stock_item_id: l.stock_item_id,
+                                qty: l.remaining,
+                                unit_price: l.rate,
+                                gs_purchase_order_item_id: l.po_item_id
+                            });
+                        });
+                        if (!open.length) { form.gxAddRow(); }
+
+                        poMessage(open.length
+                            ? po.po_no + ': ' + open.length + ' item(s) still to come. Qty is what is left; change it to what arrived.'
+                            : po.po_no + ' has nothing left to receive.', !open.length);
+                    }).catch(function () {
+                        poMessage('Could not load this purchase order. Choose it again.', true);
+                    });
+                });
+            }
 
             /*
              * Add several items in one go.

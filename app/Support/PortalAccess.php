@@ -28,6 +28,26 @@ final class PortalAccess
                 'icon' => 'bi-clipboard-check',
                 'permissions' => ['store.requisition.view', 'store.requisition.create'],
             ],
+            // General Stock purchasing sign-offs. Given per person, never by the
+            // Supply Chain General role itself, so nobody approves their own work.
+            'purchase_cs_check' => [
+                'label' => 'Comparative Statement: Check',
+                'description' => 'Check a Comparative Statement (the Manager - SCM box).',
+                'icon' => 'bi-check2-square',
+                'permissions' => ['store.purchase_cs.view', 'store.purchase_cs.review'],
+            ],
+            'purchase_cs_approve' => [
+                'label' => 'Comparative Statement: Approve',
+                'description' => 'Give the final approval on a Comparative Statement.',
+                'icon' => 'bi-check2-circle',
+                'permissions' => ['store.purchase_cs.view', 'store.purchase_cs.approve', 'store.purchase_po.view'],
+            ],
+            'purchase_po_authorise' => [
+                'label' => 'Internal PO: Authorise',
+                'description' => 'Authorise a purchase order so Store can receive against it.',
+                'icon' => 'bi-patch-check',
+                'permissions' => ['store.purchase_po.view', 'store.purchase_po.approve'],
+            ],
         ];
     }
 }

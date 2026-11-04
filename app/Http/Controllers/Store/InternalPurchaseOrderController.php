@@ -1,0 +1,132 @@
+<?php
+
+namespace App\Http\Controllers\Store;
+
+use App\Http\Controllers\Controller;
+use App\Models\GsComparativeStatement;
+use App\Models\GsPurchaseOrder;
+use App\Services\PurchaseOrderService;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+
+/**
+ * General Stock purchasing: the Internal PO ("booking" with an internal PO
+ * number). Made from an approved Comparative Statement; its number is what
+ * Store picks on Record Receiving.
+ */
+class InternalPurchaseOrderController extends Controller
+{
+    public function __construct(private readonly PurchaseOrderService $service)
+    {
+    }
+
+    public function index(Request $request)
+    {
+        $filters = $request->validate([
+            'status' => ['nullable', 'string', 'max:30'],
+            'search' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $orders = GsPurchaseOrder::query()
+            ->with(['statement:id,cs_no', 'creator:id,name'])
+            ->withCount('items')
+            ->when($filters['status'] ?? null, fn ($q, $s) => $q->where('status', $s))
+            ->when($filters['search'] ?? null, function ($q, $s) {
+                $q->where(fn ($w) => $w->whereLike('po_no', "%{$s}%")
+                    ->orWhereLike('supplier_name', "%{$s}%")
+                    ->orWhereHas('items', fn ($i) => $i->whereLike('item_name', "%{$s}%")));
+            })
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('store.purchasing.po-index', [
+            'orders' => $orders,
+            'filters' => $filters,
+            'statusLabels' => GsPurchaseOrder::statusLabels(),
+        ]);
+    }
+
+    /** One draft PO per supplier chosen on the approved CS. */
+    public function storeFromStatement(Request $request, GsComparativeStatement $cs)
+    {
+        abort_unless($request->user()->can('store.purchase_po.create'), 403);
+
+        $orders = $this->service->createFromStatement($cs, $request->user());
+
+        return $orders->count() === 1
+            ? redirect()->route('store.purchasing.po.show', $orders->first())->with('success', $orders->first()->po_no.' created as a draft. Check it, then have it authorised.')
+            : redirect()->route('store.purchasing.po.index', ['search' => $cs->cs_no])->with('success', $orders->count().' purchase orders created as drafts, one per supplier.');
+    }
+
+    public function show(Request $request, GsPurchaseOrder $order)
+    {
+        $order->load(['items', 'statement', 'creator:id,name', 'checkedBy:id,name', 'authorisedBy:id,name']);
+
+        return view('store.purchasing.po-show', [
+            'order' => $order,
+            'allowed' => $this->service->allowed($order, $request->user()),
+            'received' => $this->service->receivedByLine($order),
+        ]);
+    }
+
+    public function edit(Request $request, GsPurchaseOrder $order)
+    {
+        abort_unless(isset($this->service->allowed($order, $request->user())['edit']), 403, 'This purchase order can no longer be edited.');
+        $order->load('items');
+
+        return view('store.purchasing.po-edit', ['order' => $order]);
+    }
+
+    public function update(Request $request, GsPurchaseOrder $order)
+    {
+        abort_unless(isset($this->service->allowed($order, $request->user())['edit']), 403, 'This purchase order can no longer be edited.');
+
+        $data = $request->validate([
+            'po_date' => ['required', 'date'],
+            'reference_no' => ['nullable', 'string', 'max:100'],
+            'bin_number' => ['nullable', 'string', 'max:60'],
+            'invoice_to' => ['nullable', 'string', 'max:1000'],
+            'consignee' => ['nullable', 'string', 'max:1000'],
+            'dispatched_through' => ['nullable', 'string', 'max:150'],
+            'destination' => ['nullable', 'string', 'max:255'],
+            'payment_terms' => ['nullable', 'string', 'max:1000'],
+            'delivery_terms' => ['nullable', 'string', 'max:1000'],
+            'remarks' => ['nullable', 'string', 'max:1000'],
+            'lines' => ['nullable', 'array'],
+            'lines.*.due_on' => ['nullable', 'string', 'max:40'],
+            'lines.*.remarks' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $this->service->update($order, $data);
+
+        return redirect()->route('store.purchasing.po.show', $order)->with('success', $order->po_no.' saved.');
+    }
+
+    public function authorise(Request $request, GsPurchaseOrder $order)
+    {
+        abort_unless(isset($this->service->allowed($order, $request->user())['authorise']), 403, 'You cannot authorise this purchase order.');
+        $this->service->authorise($order, $request->user());
+
+        return back()->with('success', $order->po_no.' authorised. Store can now receive goods against it.');
+    }
+
+    public function cancel(Request $request, GsPurchaseOrder $order)
+    {
+        abort_unless(isset($this->service->allowed($order, $request->user())['cancel']), 403, 'This purchase order cannot be cancelled.');
+        $reason = $request->validate(['reason' => ['required', 'string', 'max:1000']], ['reason.required' => 'Write why it is being cancelled.'])['reason'];
+        $this->service->cancel($order, $reason);
+
+        return back()->with('success', $order->po_no.' cancelled.');
+    }
+
+    /** The printed PO: A4 portrait. Only an authorised PO prints as final; a draft is watermarked. */
+    public function pdf(GsPurchaseOrder $order)
+    {
+        $order->load(['items', 'creator:id,name', 'checkedBy:id,name', 'authorisedBy:id,name']);
+
+        return Pdf::loadView('store.purchasing.po-pdf', ['order' => $order])
+            ->setPaper('a4', 'portrait')
+            ->stream('PO-'.str_replace(['/', '\\'], '-', $order->po_no).'.pdf');
+    }
+}

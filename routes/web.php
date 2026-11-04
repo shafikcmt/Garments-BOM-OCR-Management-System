@@ -47,6 +47,15 @@ Route::middleware(['auth'])->group(function () {
             return redirect()->route('management.dashboard');
         }
 
+        // The General Stock purchasing desk (Supply Chain General). Asked as a
+        // permission so the live role name does not matter. Roles that have a
+        // dashboard of their own keep it: admin is excluded because Gate::before
+        // answers yes to every permission for them.
+        if (! $user->hasAnyRole(['admin', 'supply_chain', 'store', 'merchant', 'account', 'commercial'])
+            && $user->can('store.purchase_cs.view')) {
+            return redirect()->route('store.purchasing.queue');
+        }
+
         $department = \App\Support\DepartmentRoles::departmentOf($user->getRoleNames()->first());
 
         /*

@@ -24,6 +24,10 @@ use App\Http\Controllers\Store\MaterialBulkIssueController;
 use App\Http\Controllers\Store\MaterialRequisitionController;
 use App\Http\Controllers\Store\MaterialStockLedgerController;
 use App\Http\Controllers\Store\ReportController;
+use App\Http\Controllers\Store\PurchaseQueueController;
+use App\Http\Controllers\Store\ComparativeStatementController;
+use App\Http\Controllers\Store\InternalPurchaseOrderController;
+use App\Http\Controllers\Store\ReceivingPoLookupController;
 
 // Store reports — read-only summaries. Kept in their own group because they are
 // shared with Admin / Management (full access) and Merchant (preview only, the
@@ -302,6 +306,12 @@ Route::prefix('store')
             // the path is not read as a {stockPurchase}.
             Route::get('/purchases/challan-status', [StockPurchaseController::class, 'challanStatus'])->name('purchases.challan-status');
 
+            // Record Receiving "Against PO": find an issued Internal PO and load its
+            // lines. Read-only; behind this section's guard, so Store needs no
+            // purchasing permission to receive against a PO.
+            Route::get('/purchases/po-search', [ReceivingPoLookupController::class, 'search'])->name('purchases.po-search');
+            Route::get('/purchases/po/{order}/lines', [ReceivingPoLookupController::class, 'lines'])->name('purchases.po-lines');
+
             // Half-finished Record Receiving forms. Same guard as recording
             // one, and nothing on this path writes stock.
             Route::post('/purchases/drafts', [StockPurchaseController::class, 'saveDraft'])->middleware($act('store.receiving.create'))->name('purchases.drafts.save');
@@ -577,4 +587,47 @@ Route::prefix('store/material-stock')
         Route::get('/bulk-issues/{materialBulkIssue}', [MaterialBulkIssueController::class, 'show'])->name('bulk-issues.show');
         Route::put('/bulk-issues/{materialBulkIssue}', [MaterialBulkIssueController::class, 'update'])->name('bulk-issues.update');
         Route::delete('/bulk-issues/{materialBulkIssue}', [MaterialBulkIssueController::class, 'destroy'])->name('bulk-issues.destroy');
+    });
+
+/*
+ * General Stock purchasing — To Purchase queue, Comparative Statement (CS) and
+ * Internal PO. For the Supply Chain General desk.
+ *
+ * Permission-only guards (plus admin / management for oversight): the `store`
+ * role is deliberately NOT admitted here, because Store receives goods and does
+ * not choose suppliers. What a person may DO on a sheet (create, check, approve,
+ * authorise) is decided per record by the services' allowed() answers, which the
+ * buttons on the pages use too.
+ */
+Route::prefix('store/purchasing')
+    ->middleware(['auth'])
+    ->name('store.purchasing.')
+    ->group(function () {
+        Route::middleware('role_or_perm:admin|management|store.purchase_cs.view')->group(function () {
+            Route::get('/queue', [PurchaseQueueController::class, 'index'])->name('queue');
+
+            Route::get('/cs', [ComparativeStatementController::class, 'index'])->name('cs.index');
+            Route::get('/cs/create', [ComparativeStatementController::class, 'create'])->name('cs.create');
+            Route::post('/cs', [ComparativeStatementController::class, 'store'])->name('cs.store');
+            Route::get('/cs/{cs}', [ComparativeStatementController::class, 'show'])->name('cs.show');
+            Route::get('/cs/{cs}/edit', [ComparativeStatementController::class, 'edit'])->name('cs.edit');
+            Route::put('/cs/{cs}', [ComparativeStatementController::class, 'update'])->name('cs.update');
+            Route::post('/cs/{cs}/submit', [ComparativeStatementController::class, 'submit'])->name('cs.submit');
+            Route::post('/cs/{cs}/check', [ComparativeStatementController::class, 'check'])->name('cs.check');
+            Route::post('/cs/{cs}/approve', [ComparativeStatementController::class, 'approve'])->name('cs.approve');
+            Route::post('/cs/{cs}/send-back', [ComparativeStatementController::class, 'sendBack'])->name('cs.send-back');
+            Route::post('/cs/{cs}/cancel', [ComparativeStatementController::class, 'cancel'])->name('cs.cancel');
+            Route::get('/cs/{cs}/pdf', [ComparativeStatementController::class, 'pdf'])->name('cs.pdf');
+        });
+
+        Route::middleware('role_or_perm:admin|management|store.purchase_po.view')->group(function () {
+            Route::get('/po', [InternalPurchaseOrderController::class, 'index'])->name('po.index');
+            Route::post('/cs/{cs}/po', [InternalPurchaseOrderController::class, 'storeFromStatement'])->name('po.store');
+            Route::get('/po/{order}', [InternalPurchaseOrderController::class, 'show'])->name('po.show');
+            Route::get('/po/{order}/edit', [InternalPurchaseOrderController::class, 'edit'])->name('po.edit');
+            Route::put('/po/{order}', [InternalPurchaseOrderController::class, 'update'])->name('po.update');
+            Route::post('/po/{order}/authorise', [InternalPurchaseOrderController::class, 'authorise'])->name('po.authorise');
+            Route::post('/po/{order}/cancel', [InternalPurchaseOrderController::class, 'cancel'])->name('po.cancel');
+            Route::get('/po/{order}/pdf', [InternalPurchaseOrderController::class, 'pdf'])->name('po.pdf');
+        });
     });

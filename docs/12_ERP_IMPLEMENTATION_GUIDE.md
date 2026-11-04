@@ -491,3 +491,36 @@ master-data import (vendors from a "Dropdown" sheet).
   treat every FastReact point as unconfirmed until the owner has seen a demo
   or the vendor's documentation.
 
+
+## 13. General Stock purchasing: CS, Internal PO, receive against PO (built 2026-11-05)
+
+Closes the gap between an approved General Stock requisition and the Store's receiving. The **Supply Chain General** desk (consumables) works it; the buyer-order Supply Chain (BOM, booking, PI, PRA) is untouched.
+
+```text
+Approved Final / Individual requisition (to_be_procured_qty > 0)
+  -> To Purchase queue            PurchaseQueueService
+  -> Comparative Statement        ComparativeStatementService   draft -> submitted -> checked -> approved
+  -> Internal PO per supplier     PurchaseOrderService          draft -> issued -> partially_received -> received
+  -> Record Receiving "Against PO" StockPurchaseController      stock_purchases.gs_purchase_order_id / _item_id
+```
+
+**Decisions taken (owner can change):**
+- **Own tables** (`gs_comparative_statements`, `gs_cs_items`, `gs_cs_suppliers`, `gs_cs_quotes`, `gs_purchase_orders`, `gs_purchase_order_items`, `gs_purchase_sequences`), not `booking_pos`: that one is buyer / BOM / buyer-scope. Consumables belong to no buyer.
+- **Role** `supply_chain_general`: view + create only, found by normalised name so a role already made on live ("Supply chain general") is reused, never duplicated. Check, approve and authorise are permissions Admin gives per person (Portal Access), so nobody approves their own work. Permissions: `store.purchase_cs.{view,create,review,approve}`, `store.purchase_po.{view,create,approve}`. The `store` role is deliberately NOT admitted to these screens.
+- **Maker / checker:** the preparer of a CS cannot check or approve it; the maker of a PO cannot authorise it. The same person may hold check and approve.
+- **Numbers:** `CS-26-27/0001`, `PO-26-27/HS-0001`; counter per financial year starting July (`config/purchasing.php`).
+- **Quantity to buy** is the requisition line's `To Be Procured` (the approver's figure). A line already on a live CS is taken; cancelling the CS returns it. One line may be split over several CS, never above its quantity.
+- **PO rate and quantity are copied from the approved CS and locked.** The PO edit screen changes only header text and each line's due-on / remark.
+- **Receiving against a PO is strict:** same supplier, only PO lines, never more than still expected. Receiving without a PO still works as before.
+- **Requisition status:** when every purchasable line is on an issued PO the requisition becomes `purchase_action_taken` (the status already existed); cancelling a PO puts it back to `approved`.
+- Printed forms follow the factory's paper forms: CS `HAPL-03-0345` (A4 landscape), PO (A4 portrait, amount in words).
+
+**Open questions for the owner:**
+1. PO number: what does `HS` stand for, and does the series restart each financial year? The sample PO is `PO-25-26/HS-420` dated 24-Oct-26, while this build counts July to June (so Oct 2026 is `26-27`). Set `PURCHASING_FY_START_MONTH` if the factory counts differently.
+2. Is the CS chain Jr. Executive, Manager - SCM, Approved By the full chain? Does a small amount skip a step?
+3. The handwritten note on the sample CS ("take approval / advance from internal audit before purchasing"): is there a rule (an amount above X) that should become a gate?
+4. Is one supplier ever acceptable? Today a CS needs 2 (`PURCHASING_MIN_SUPPLIERS`).
+5. Should Management / Admin see the purchasing screens in their own menu (Admin does; Management has the URLs but no menu entry yet)?
+6. Receiving tolerance: any allowance above the PO quantity (for example 2%)?
+
+**Not built yet:** Excel export of a CS, e-mailing the PO to the supplier (booking e-mail), supplier invoice / payment from the PO, PO amendments after issue, tolerance on receiving, a purchasing report (requisition line -> CS -> PO -> received -> issued).

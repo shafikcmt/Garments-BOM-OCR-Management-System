@@ -67,6 +67,8 @@ class PermissionCatalog
         'receiving' => 'Receiving',
         'issues' => 'Issues',
         'requisition' => 'Purchase Requisition',
+        'purchase_cs' => 'Comparative Statement (Supply Chain General)',
+        'purchase_po' => 'Internal PO (Supply Chain General)',
         'requirement_issue' => 'Requisition Summary & Requirement vs Issue (view + export)',
         'category_summary' => 'Category Summary (view + export)',
         'setup' => 'Setup',
@@ -83,7 +85,7 @@ class PermissionCatalog
 
     /** Per-module sub-section order. Sections not listed follow, alphabetically. */
     private const SECTION_ORDER = [
-        'store' => ['stock_report', 'items', 'receiving', 'issues', 'requisition', 'requirement_issue', 'category_summary', 'setup'],
+        'store' => ['stock_report', 'items', 'receiving', 'issues', 'requisition', 'purchase_cs', 'purchase_po', 'requirement_issue', 'category_summary', 'setup'],
         'material' => ['closing_stock', 'receiving', 'bulk_issue', 'requisitions'],
     ];
 
