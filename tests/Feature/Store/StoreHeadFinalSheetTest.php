@@ -58,3 +58,9 @@ it('does not need an exemption when another person prepares and the Store Head a
     $stage = collect($this->workflow->plan('final', $preparer, null, null))->firstWhere('label', 'Checked by');
     expect($stage['self_approved'])->toBeFalse()->and($stage['user']->id)->toBe($this->head->id);
 });
+
+it('lets the Store Head prepare the final sheet when the box is a named user with approval only', function () {
+    $this->storeHeadBox->update(['assignee_type' => 'user', 'user_id' => $this->head->id, 'stamp_source' => null]);
+
+    expect(selfApprovalProblems($this->head))->toBe([]);
+});

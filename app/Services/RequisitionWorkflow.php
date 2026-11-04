@@ -208,8 +208,9 @@ class RequisitionWorkflow
                     // above: nobody sits between them and themselves, so the step reads as
                     // approved by them at submit. Any other named person approving their
                     // own sheet is still refused.
+                    // Whatever the box stamps ("Approval only" included): the Final sheet's
+                    // "Checked by — Store Head" box often is approval only.
                     if ($level === RequisitionSignatureBlock::LEVEL_FINAL
-                        && $block->stamp_source === RequisitionSignatureBlock::STAMP_STORE_HEAD
                         && $raiser && $stage['user']?->id === $raiser->id
                         && PurchaseRequisition::isStoreHead($raiser)) {
                         $stage['self_approved'] = true;
