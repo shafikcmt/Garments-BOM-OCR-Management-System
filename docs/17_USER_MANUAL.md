@@ -542,6 +542,8 @@ Admin can give a person these two Store requisition tasks without changing their
 - **Purchase Requisition, Prepare Final Requisition**: the person can raise the Final Requisition, see the **Requested** queue and every requisition, and merge the departments' sheets, like the Store team. They also see the stock figures on the lines.
 - **Category Summary (view + export)**: the person can open **Category Summary** and download its PDF and Excel. Nothing else of the Store's desk opens with it.
 
+In the permission list each section (Items, Receiving, Purchase Requisition and so on) is one line with a labelled box for every action it has, so nothing hides off to the right. **Select all** on a line, or at the top of a module, ticks every box you may change there; it turns into **Clear** when all are ticked. Boxes that come with the role stay locked.
+
 Both start with **Purchase Requisition, View** (they need it to reach the screen). Untick a box to take the task away again. The Store, Admin and Management roles already have them.
 
 ### 5.2 Item Master: adding and approving items

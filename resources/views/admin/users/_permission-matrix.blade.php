@@ -117,7 +117,10 @@
                     {{-- Coverage: how much of this module the user reaches, and
                          where it came from. The slate part is the role, the blue
                          part was granted here. --}}
-                    <span class="gx-perm-meter" aria-hidden="true">
+                    @if(! $readonly)
+                        <button type="button" class="gx-perm-bulk js-perm-bulk ms-auto" data-scope="card">Select all</button>
+                    @endif
+                    <span class="gx-perm-meter @if($readonly) ms-auto @endif" aria-hidden="true">
                         <span class="gx-perm-meter-bar"><span class="gx-perm-meter-role"></span><span class="gx-perm-meter-direct"></span></span>
                         <span class="gx-perm-meter-text js-perm-meter">0/0</span>
                     </span>
@@ -125,51 +128,38 @@
 
                 <div class="gx-perm-body js-perm-body">
                     @if($group['sectioned'])
-                        <table class="gx-perm-table">
-                            <thead>
-                                <tr>
-                                    <th class="gx-perm-th-section">Section</th>
-                                    @foreach($group['columns'] as $action)
-                                        <th>{{ $catalog->actionLabel($action) }}</th>
-                                    @endforeach
-                                    @if(collect($group['rows'])->contains(fn ($r) => ! empty($r['extra'])))
-                                        <th class="gx-perm-th-other">Other</th>
-                                    @endif
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($group['rows'] as $row)
-                                    <tr class="js-perm-row" data-text="{{ Str::lower($group['label'].' '.$row['section']) }}">
-                                        <th scope="row" class="{{ $row['key'] === null ? 'is-module-wide' : '' }}">{{ $row['section'] }}</th>
-
-                                        @foreach($group['columns'] as $action)
-                                            <td>
-                                                @php($entry = $row['actions'][$action] ?? null)
-                                                @if($entry)
-                                                    @include('admin.users._permission-check', [
-                                                        'entry' => $entry, 'roleGranted' => $roleGranted,
-                                                        'direct' => $direct, 'readonly' => $readonly, 'grantable' => $grantable, 'showLabel' => false,
-                                                    ])
-                                                @else
-                                                    <span class="gx-perm-na" aria-label="not applicable">·</span>
-                                                @endif
-                                            </td>
-                                        @endforeach
-
-                                        @if(collect($group['rows'])->contains(fn ($r) => ! empty($r['extra'])))
-                                            <td class="gx-perm-other">
-                                                @foreach($row['extra'] as $entry)
-                                                    @include('admin.users._permission-check', [
-                                                        'entry' => $entry, 'roleGranted' => $roleGranted,
-                                                        'direct' => $direct, 'readonly' => $readonly, 'grantable' => $grantable, 'showLabel' => true,
-                                                    ])
-                                                @endforeach
-                                            </td>
+                        {{-- One line per section: its name, then a labelled chip for each
+                             action it really has. No empty columns, no sideways scroll,
+                             and a long name such as "Prepare Final Requisition" reads in full. --}}
+                        <div class="gx-perm-lines">
+                            @foreach($group['rows'] as $row)
+                                <div class="gx-perm-line js-perm-row" data-text="{{ Str::lower($group['label'].' '.$row['section']) }}">
+                                    <div class="gx-perm-line-name {{ $row['key'] === null ? 'is-module-wide' : '' }}">
+                                        {{ $row['section'] }}
+                                        @if(! $readonly)
+                                            <button type="button" class="gx-perm-bulk js-perm-bulk" data-scope="row">Select all</button>
                                         @endif
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                                    </div>
+                                    <div class="gx-perm-line-chips">
+                                        @foreach($group['columns'] as $action)
+                                            @php($entry = $row['actions'][$action] ?? null)
+                                            @if($entry)
+                                                @include('admin.users._permission-check', [
+                                                    'entry' => $entry, 'roleGranted' => $roleGranted,
+                                                    'direct' => $direct, 'readonly' => $readonly, 'grantable' => $grantable, 'showLabel' => true,
+                                                ])
+                                            @endif
+                                        @endforeach
+                                        @foreach($row['extra'] as $entry)
+                                            @include('admin.users._permission-check', [
+                                                'entry' => $entry, 'roleGranted' => $roleGranted,
+                                                'direct' => $direct, 'readonly' => $readonly, 'grantable' => $grantable, 'showLabel' => true,
+                                            ])
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
                     @else
                         {{-- No sub-sections: the card heading is the row, so the
                              actions go straight underneath as named chips. --}}
@@ -283,7 +273,7 @@
     .gx-perm-caret { font-size: .7rem; color: #94a3b8; transition: transform .12s ease; }
     .is-collapsed .gx-perm-caret { transform: rotate(-90deg); }
 
-    .gx-perm-meter { margin-left: auto; display: flex; align-items: center; gap: .45rem; }
+    .gx-perm-meter { display: flex; align-items: center; gap: .45rem; }
     .gx-perm-meter-bar {
         display: flex; width: 54px; height: 5px;
         border-radius: 999px; overflow: hidden; background: #e2e8f0;
@@ -315,6 +305,24 @@
     .gx-perm-table td { text-align: center; }
     .gx-perm-other { text-align: left !important; }
     .gx-perm-na { color: #cbd5e1; }
+
+    .gx-perm-lines { display: flex; flex-direction: column; }
+    .gx-perm-line {
+        display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: .5rem .9rem;
+        align-items: start; padding: .5rem 0;
+    }
+    .gx-perm-line + .gx-perm-line { border-top: 1px solid #f1f5f9; }
+    .gx-perm-line-name { font-size: .82rem; font-weight: 600; color: var(--gx-text, #1E293B); display: flex; flex-direction: column; align-items: flex-start; gap: .25rem; }
+    .gx-perm-line-name.is-module-wide { color: var(--gx-text-muted, #64748B); font-style: italic; font-weight: 500; }
+    .gx-perm-line-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+    @media (max-width: 640px) { .gx-perm-line { grid-template-columns: 1fr; } }
+
+    .gx-perm-bulk {
+        background: none; border: 0; padding: 0; cursor: pointer;
+        font-size: .7rem; font-weight: 600; color: var(--gx-secondary, #3B82F6);
+    }
+    .gx-perm-bulk:hover { text-decoration: underline; }
+    .gx-perm-head .gx-perm-bulk { padding: .15rem .55rem; border: 1px solid var(--gx-secondary-border, #BFDBFE); border-radius: 999px; background: #fff; }
 
     .gx-perm-flat { display: flex; flex-wrap: wrap; gap: .35rem; }
 
@@ -501,7 +509,41 @@
             cards.forEach(meter);
             summary();
             apply();
+            if (typeof labelBulk === 'function') { labelBulk(); }
         }
+
+        /** Select all / Clear for a row or a whole card: only boxes the editor may change. */
+        function bulk(button) {
+            var scope = button.dataset.scope === 'row'
+                ? button.closest('.js-perm-row') : button.closest('.js-perm-card');
+            var free = boxes(scope).filter(function (b) { return ! b.disabled; });
+            if (! free.length) { return; }
+
+            var turnOn = free.some(function (b) { return ! b.checked; });
+            free.forEach(function (b) {
+                if (b.checked !== turnOn) {
+                    b.checked = turnOn;
+                    b.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+            refresh();
+        }
+
+        function labelBulk() {
+            matrix.querySelectorAll('.js-perm-bulk').forEach(function (button) {
+                var scope = button.dataset.scope === 'row'
+                    ? button.closest('.js-perm-row') : button.closest('.js-perm-card');
+                var free = boxes(scope).filter(function (b) { return ! b.disabled; });
+                button.classList.toggle('d-none', free.length === 0);
+                button.textContent = free.length && free.every(function (b) { return b.checked; }) ? 'Clear' : 'Select all';
+            });
+        }
+
+        matrix.addEventListener('click', function (e) {
+            var button = e.target.closest('.js-perm-bulk');
+            if (button) { bulk(button); }
+        });
+        matrix.addEventListener('change', labelBulk);
 
         search.addEventListener('input', apply);
         if (departmentSelect) { departmentSelect.addEventListener('change', apply); }
