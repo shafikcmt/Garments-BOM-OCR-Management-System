@@ -65,17 +65,27 @@ it('lets the Store Head prepare the final sheet when the box is a named user wit
     expect(selfApprovalProblems($this->head))->toBe([]);
 });
 
-it('makes the Store user who submits a Final draft its preparer, not the one who merged it', function () {
-    $this->storeHeadBox->update(['assignee_type' => 'user', 'user_id' => $this->head->id]);
-    $preparer = User::factory()->create();
-    $preparer->givePermissionTo('store.requisition.final');
+it('makes the Store user who submits a Final draft its preparer, through the real submit', function () {
+    $this->storeHeadBox->update(['assignee_type' => 'user', 'user_id' => $this->head->id, 'stamp_source' => null]);
+    $item = \App\Models\StockItem::create(['name' => 'Machine Oil', 'uom' => 'Ltr', 'is_active' => true]);
 
-    $draft = new \App\Models\PurchaseRequisition(['level' => 'final', 'status' => 'draft', 'created_by' => $this->head->id]);
+    $amirul = User::factory()->create(['name' => 'Amirul']);
+    foreach (['store.requisition.view', 'store.requisition.edit', 'store.requisition.create', 'store.requisition.final'] as $name) {
+        $amirul->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate($name, 'web'));
+    }
 
-    $controller = new \ReflectionMethod(\App\Http\Controllers\Store\PurchaseRequisitionController::class, 'preparerOf');
-    $controller->setAccessible(true);
-    $who = $controller->invoke(app(\App\Http\Controllers\Store\PurchaseRequisitionController::class), $draft, $preparer);
+    // The Store Head merged it earlier, so the draft carries their name.
+    $draft = \App\Models\PurchaseRequisition::create([
+        'requisition_no' => 'F/1', 'requisition_date' => '2026-10-31', 'mode' => 'multi', 'level' => 'final',
+        'requisition_type' => 'monthly', 'status' => 'draft', 'created_by' => $this->head->id,
+    ]);
 
-    expect($who->id)->toBe($preparer->id)
-        ->and(selfApprovalProblems($who))->toBe([]);
+    $this->actingAs($amirul)->put(route('store.stock.requisitions.update', $draft), [
+        'action' => 'submit', 'mode' => 'multi', 'requisition_date' => '2026-10-31',
+        'items' => [['stock_item_id' => $item->id, 'qty_requested' => 5]],
+    ])->assertSessionHasNoErrors();
+
+    $draft->refresh();
+    expect($draft->created_by)->toBe($amirul->id)
+        ->and($draft->stages()->orderBy('sequence')->first()->assignee_user_id)->toBe($amirul->id);
 });

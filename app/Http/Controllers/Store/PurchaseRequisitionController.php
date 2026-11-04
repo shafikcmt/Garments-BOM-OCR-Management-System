@@ -1390,6 +1390,11 @@ class PurchaseRequisitionController extends Controller
                 'This requisition has already moved on. Reload the page to see where it is now.');
 
             $fromStatus = $requisition->status;
+            // A Final draft goes to whoever submits it: Box 1 "Prepared by" is the Store
+            // user who checks and submits it, not whoever first merged it. Decided here,
+            // while the sheet is still a draft (the update below changes its status).
+            $takeOver = ! $isStoreCorrection && $data['action'] === 'submit'
+                && $this->preparerOf($requisition, auth()->user())?->id !== (int) $requisition->created_by;
             // Sent back by a head (old or new flow) or by any later stage.
             $wasReturned = $requisition->rejectedByDepartmentHead() || $requisition->returnedToRaiser();
             $linesBefore = $isStoreCorrection
@@ -1460,10 +1465,7 @@ class PurchaseRequisitionController extends Controller
                 // starts (again) on the stage engine — a new cycle. An old-flow
                 // sheet returned by its head finishes on the old flow.
                 if ($fromStatus === PurchaseRequisition::STATUS_DRAFT || $requisition->usesStageEngine()) {
-                    // A Final draft goes to whoever submits it: Box 1 "Prepared by" is the
-                    // Store user who checks and submits it, not whoever first merged it.
-                    if ($fromStatus === PurchaseRequisition::STATUS_DRAFT
-                        && $this->preparerOf($requisition, auth()->user())?->id !== (int) $requisition->created_by) {
+                    if ($takeOver) {
                         $requisition->forceFill(['created_by' => auth()->id()])->save();
                         $requisition->unsetRelation('createdBy');
                     }
