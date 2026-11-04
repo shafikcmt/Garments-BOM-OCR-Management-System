@@ -64,3 +64,18 @@ it('lets the Store Head prepare the final sheet when the box is a named user wit
 
     expect(selfApprovalProblems($this->head))->toBe([]);
 });
+
+it('makes the Store user who submits a Final draft its preparer, not the one who merged it', function () {
+    $this->storeHeadBox->update(['assignee_type' => 'user', 'user_id' => $this->head->id]);
+    $preparer = User::factory()->create();
+    $preparer->givePermissionTo('store.requisition.final');
+
+    $draft = new \App\Models\PurchaseRequisition(['level' => 'final', 'status' => 'draft', 'created_by' => $this->head->id]);
+
+    $controller = new \ReflectionMethod(\App\Http\Controllers\Store\PurchaseRequisitionController::class, 'preparerOf');
+    $controller->setAccessible(true);
+    $who = $controller->invoke(app(\App\Http\Controllers\Store\PurchaseRequisitionController::class), $draft, $preparer);
+
+    expect($who->id)->toBe($preparer->id)
+        ->and(selfApprovalProblems($who))->toBe([]);
+});

@@ -1460,6 +1460,13 @@ class PurchaseRequisitionController extends Controller
                 // starts (again) on the stage engine — a new cycle. An old-flow
                 // sheet returned by its head finishes on the old flow.
                 if ($fromStatus === PurchaseRequisition::STATUS_DRAFT || $requisition->usesStageEngine()) {
+                    // A Final draft goes to whoever submits it: Box 1 "Prepared by" is the
+                    // Store user who checks and submits it, not whoever first merged it.
+                    if ($fromStatus === PurchaseRequisition::STATUS_DRAFT
+                        && $this->preparerOf($requisition, auth()->user())?->id !== (int) $requisition->created_by) {
+                        $requisition->forceFill(['created_by' => auth()->id()])->save();
+                        $requisition->unsetRelation('createdBy');
+                    }
                     $this->workflow->start($requisition, (int) request()->input('send_to') ?: null);
                 }
 
@@ -1693,6 +1700,23 @@ class PurchaseRequisitionController extends Controller
             : PurchaseRequisition::TYPE_MONTHLY;
     }
 
+    /**
+     * Who prepares a sheet when it is submitted. A department sheet is its raiser's.
+     * A Final draft belongs to the Store user who submits it, so a colleague who
+     * merged it earlier (the Store Head, say) is not made to approve their own
+     * sheet just because the draft carries their name.
+     */
+    private function preparerOf(?PurchaseRequisition $requisition, ?\App\Models\User $user): ?\App\Models\User
+    {
+        if ($requisition && $requisition->level === PurchaseRequisition::LEVEL_FINAL
+            && $requisition->status === PurchaseRequisition::STATUS_DRAFT
+            && $user && PurchaseRequisition::seesEveryRequisition($user)) {
+            return $user;
+        }
+
+        return $requisition?->createdBy ?? $user;
+    }
+
     private function formData(DepartmentRequisitionDefaults $defaults, ?PurchaseRequisition $requisition = null, ?string $type = null): array
     {
         $user = auth()->user();
@@ -1705,7 +1729,7 @@ class PurchaseRequisitionController extends Controller
         // stage engine does not apply to it.
         $onEngine = ! $requisition || $requisition->status === PurchaseRequisition::STATUS_DRAFT || $requisition->usesStageEngine();
         $workflowProblems = $onEngine
-            ? $this->workflow->problems($chain, $requisition?->createdBy ?? $user, $defaults->section, $defaults->department)
+            ? $this->workflow->problems($chain, $this->preparerOf($requisition, $user), $defaults->section, $defaults->department)
             : [];
 
         // Who the sheet goes to when it is submitted, said in the Submit popup:
@@ -1714,7 +1738,7 @@ class PurchaseRequisitionController extends Controller
         $submitRoute = null;
 
         if ($onEngine && ! $workflowProblems) {
-            $raiser = $requisition?->createdBy ?? $user;
+            $raiser = $this->preparerOf($requisition, $user);
             $plan = collect($this->workflow->plan($chain, $raiser, $defaults->section, $defaults->department));
             // The first step that really waits on someone else: not skipped,
             // not one the raiser already clears as head of their own sheet.
