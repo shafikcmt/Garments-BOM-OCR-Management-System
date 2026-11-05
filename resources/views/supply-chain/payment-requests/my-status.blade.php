@@ -166,13 +166,18 @@
         <div class="modal fade" id="resubmitModal{{ $pr->id }}" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content" style="border-radius:var(--gx-radius);">
-                    <form method="POST" action="{{ route('supply_chain.payment_requests.resubmit', $pr) }}">
+                    <form method="POST" action="{{ route('supply_chain.payment_requests.resubmit', $pr) }}" enctype="multipart/form-data">
                         @csrf
                         <div class="modal-header">
                             <h5 class="modal-title"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Resubmit {{ $pr->request_no }}</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
+                            @if($pr->isDepartmentalFlow())
+                                <p class="small text-muted mb-3">This PRA goes back to the Merchant team for checking. The previous cycle stays in the history.</p>
+                                <label class="form-label fw-semibold">Remarks <span class="text-muted small">(optional)</span></label>
+                                <textarea name="remarks" rows="2" class="form-control" maxlength="2000">{{ $pr->remarks }}</textarea>
+                            @else
                             <p class="small text-muted mb-3">Select approver(s) for a fresh approval cycle. The previous cycle stays in the history.</p>
                             @if($approverPool->isEmpty())
                                 <div class="alert alert-warning small mb-0">No active approvers available. Ask the admin to add approvers.</div>
@@ -198,10 +203,23 @@
                                 <label class="form-label fw-semibold mt-3">Remarks <span class="text-muted small">(optional)</span></label>
                                 <textarea name="remarks" rows="2" class="form-control" maxlength="2000">{{ $pr->remarks }}</textarea>
                             @endif
+                            @endif
+
+                            <hr class="my-3">
+                            <label class="form-label fw-semibold mb-1">Supporting documents <span class="text-muted small fw-normal">(optional)</span></label>
+                            @foreach($pr->attachments() as $i => $doc)
+                                <label class="d-flex align-items-center gap-2 border rounded-3 px-3 py-2 mb-2" style="cursor:pointer;">
+                                    <input type="checkbox" class="form-check-input mt-0" name="remove_documents[]" value="{{ $i }}">
+                                    <span class="small text-truncate">{{ $doc['name'] }}</span>
+                                    <span class="small text-danger ms-auto text-nowrap">Tick to remove</span>
+                                </label>
+                            @endforeach
+                            <input type="file" name="documents[]" class="form-control" multiple accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.csv,.doc,.docx">
+                            <div class="form-text">Add updated PI copy or other files. PDF, image, Excel or Word, up to 10 files, 10 MB each.</div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary" {{ $approverPool->isEmpty() ? 'disabled' : '' }}>
+                            <button type="submit" class="btn btn-primary" {{ (! $pr->isDepartmentalFlow() && $approverPool->isEmpty()) ? 'disabled' : '' }}>
                                 <i class="bi bi-send me-1" aria-hidden="true"></i> Resubmit
                             </button>
                         </div>

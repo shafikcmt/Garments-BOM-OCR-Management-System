@@ -448,6 +448,8 @@ When you press **Create PRA** on the preview screen, the box has a **Supporting 
 2. Press **Create PRA**. The files are saved with the request.
 3. Everyone who reviews the request (Merchant, Accounts, Commercial, approvers) sees a **Supporting Documents** box on the request page with a **Download** button for each file.
 
+**Resubmitting a rejected PRA.** In **My PRA Status**, press **Resubmit**. The box lists the documents already attached: tick **Tick to remove** on any you want to drop, and use **Supporting documents** to add new or corrected files (for example an updated PI copy). Then press **Resubmit**.
+
 ## 4. Accounts
 
 ### 4.1 Payments screen
