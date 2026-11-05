@@ -3210,8 +3210,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const customerContractQtySource = num(valAny(rowData, ['bom_quantity', 'customer_contract_quantity', 'customer_po_quantity', 'order_qty', 'gmts_order_qty', 'gmts_order_quantity']));
             const initialConsumption = num(valAny(rowData, ['booking_consumption_from_cad', 'initial_consumption', 'booking_yy', 'consumption', 'costing_yy_in_sms', 'costing_yy']));
             const orderingWastage = percent(valAny(rowData, ['wastage_for_ordering_percent', 'waste_percent', 'wastage_percent', 'waste']));
-            const materialsOrderedRaw = valAny(rowData, ['materials_ordered', 'material_ordered']);
-            const materialsOrdered = num(materialsOrderedRaw);
+            const materialsOrderedTyped = valAny(rowData, ['materials_ordered', 'material_ordered']);
+            const materialPoNumber = valAny(rowData, ['po_no', 'material_po_number']);
             const materialPiNumber = valAny(rowData, ['material_pi_number', 'pi_number', 'vendor_pi_number']);
             const piRate = num(valAny(rowData, ['pi_rate', 'invoiced_rate_scm', 'invoiced_rate']));
             const pmtDocNo = valAny(rowData, ['pmt_doc_no', 'payment_doc_no', 'payment_reference_number', 'payment_ref_no']);
@@ -3237,10 +3237,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const consumptionInclYy = initialConsumption * (1 + orderingWastage);
             const materialsToBeOrdered = Math.round(consumptionInclYy * customerContractQtySource);
+            // Materials Ordered defaults to Materials To Be Ordered until Supply
+            // Chain types its own figure.
+            const materialsOrderedRaw = !blank(materialsOrderedTyped)
+                ? materialsOrderedTyped
+                : (materialsToBeOrdered > 0 ? String(materialsToBeOrdered) : null);
+            const materialsOrdered = num(materialsOrderedRaw);
             const shortExcessOrdered = Math.round(materialsOrdered - materialsToBeOrdered);
 
+            // Status stays "PO Pending" until a PO number exists (generated PO).
             let materialOrderStatus = 'PO Pending';
-            if (!blank(materialsOrderedRaw)) {
+            if (!blank(materialsOrderedRaw) && !blank(materialPoNumber)) {
                 if (shortExcessOrdered <= (materialsToBeOrdered * -1)) {
                     materialOrderStatus = 'PO Pending';
                 } else if (shortExcessOrdered < 0) {
@@ -3355,6 +3362,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     buildEditableGrid();
     updateLiveFormulas();
+
+    // One-time default: show Materials To Be Ordered inside a blank Materials
+    // Ordered box. Supply Chain can overwrite it; the server fills the same
+    // value on Save (see recalculateFile), so nothing else changes.
+    (function prefillMaterialsOrdered() {
+        const orderedKeys = ['materials_ordered', 'material_ordered'];
+        const toBeKeys = ['materials_to_be_ordered', 'material_to_be_ordered'];
+        const indexFor = keys => {
+            for (const key of keys) {
+                const i = headerIndexByKey[normalizeHeaderKey(key)];
+                if (i !== undefined) return i;
+            }
+            return undefined;
+        };
+        const orderedIndex = indexFor(orderedKeys);
+        const toBeIndex = indexFor(toBeKeys);
+        if (orderedIndex === undefined || toBeIndex === undefined) return;
+
+        rowElements().forEach(row => {
+            const input = row.querySelectorAll('td')[orderedIndex + 1]?.querySelector('input.excel-editable-cell');
+            if (!input || String(input.value ?? '').trim() !== '') return;
+            const target = num(readCellValue(row, toBeIndex));
+            if (target > 0) input.value = fmtNum(target);
+        });
+        updateLiveFormulas();
+    })();
 
     /* ---- Autofill guard, second layer ------------------------------------
      * autocomplete="off" on the form and on every cell is the fix; this is the

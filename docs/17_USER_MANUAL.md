@@ -440,6 +440,12 @@ The row shows how many source rows it holds, up to three of their items, and the
 
 **Who sees what.** The list and its filters (**Buyer**, **Season**, **SAP Code**, **Vendor**, **IHOD**) show only the buyers you are assigned to, plus files that have no buyer set. A booking never pulls in rows of a buyer you cannot see. If you still see a buyer you are not assigned to, that buyer's file has no buyer set: ask Admin to tag the file.
 
+### 3.1a Materials Ordered, Booking Qty and PO status
+
+- **Materials Ordered** (Workspace, Supply Chain column) fills itself with the **Materials To Be Ordered** figure. You can type a different quantity over it at any time. While you have not changed it, it follows Materials To Be Ordered if that figure changes.
+- The **Booking Qty** on the PO (booking format) is taken from **Materials Ordered**.
+- **Material Order Status** shows **PO Pending** until a PO number exists. When you press **Generate PO**, the **Material PO Number** and **PO Date** (today) are written to every line of that PO in the Workspace, and the status changes to Short PO Qty, PO Raised or Excess Qty PO by comparing Materials Ordered with Materials To Be Ordered.
+
 ### 3.x Attaching documents to a payment request (PRA)
 
 When you press **Create PRA** on the preview screen, the box has a **Supporting documents (optional)** field.

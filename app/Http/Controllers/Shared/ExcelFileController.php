@@ -2288,10 +2288,18 @@ class ExcelFileController extends Controller
                 'consumption_including_yy',
                 'yy_waste',
             ]));
-            $materialsOrderedRaw = $this->valAny($cellMap, $headerIdByKey, [
+            $materialsOrderedTyped = $this->valAny($cellMap, $headerIdByKey, [
                 'materials_ordered', 'material_ordered',
             ]);
-            $materialsOrdered = $this->num($materialsOrderedRaw);
+            // Value Materials To Be Ordered had before this recalculation. A
+            // Materials Ordered that still equals it was auto-filled (never
+            // changed by Supply Chain), so it keeps following the new figure.
+            $previousToBeOrdered = $this->valAny($cellMap, $headerIdByKey, [
+                'materials_to_be_ordered', 'material_to_be_ordered',
+            ]);
+            $materialPoNumber = $this->valAny($cellMap, $headerIdByKey, [
+                'po_no', 'material_po_number',
+            ]);
             $materialPiNumber = $this->valAny($cellMap, $headerIdByKey, [
                 'material_pi_number', 'pi_number', 'vendor_pi_number',
             ]);
@@ -2356,10 +2364,26 @@ class ExcelFileController extends Controller
             $calculatedConsumptionInclYy = $bookingConsumption * (1 + $orderingWastage);
             $consumptionInclYy = $existingConsumptionInclYy != 0 ? $existingConsumptionInclYy : $calculatedConsumptionInclYy;
             $materialsToBeOrdered = round($consumptionInclYy * $customerContractQtySource, 0);
+
+            // Materials Ordered defaults to Materials To Be Ordered and stays
+            // editable by Supply Chain.
+            $materialsOrderedRaw = $materialsOrderedTyped;
+            $materialsOrderedAutoFilled = false;
+            if ($materialsToBeOrdered > 0) {
+                $followsDefault = blank($materialsOrderedTyped)
+                    || (! blank($previousToBeOrdered)
+                        && abs($this->num($materialsOrderedTyped) - $this->num($previousToBeOrdered)) < 0.000001);
+                if ($followsDefault) {
+                    $materialsOrderedRaw = $this->fmtNum($materialsToBeOrdered);
+                    $materialsOrderedAutoFilled = true;
+                }
+            }
+            $materialsOrdered = $this->num($materialsOrderedRaw);
             $shortExcessOrdered = round($materialsOrdered - $materialsToBeOrdered, 0);
 
+            // Status stays "PO Pending" until a PO number exists (generated PO).
             $materialOrderStatus = 'PO Pending';
-            if (! blank($materialsOrderedRaw)) {
+            if (! blank($materialsOrderedRaw) && ! blank($materialPoNumber)) {
                 if ($shortExcessOrdered <= ($materialsToBeOrdered * -1)) {
                     $materialOrderStatus = 'PO Pending';
                 } elseif ($shortExcessOrdered < 0) {
@@ -2472,6 +2496,9 @@ class ExcelFileController extends Controller
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['order_to_be_placed_by', 'order_to_be_placed'], $this->fmtDate($orderToBePlacedBy), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['consumption_incl_yy', 'consumption_based_on_which_materials_order_including_yy', 'yy_waste'], $this->fmtNum($consumptionInclYy), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['materials_to_be_ordered', 'material_to_be_ordered'], $this->fmtNum($materialsToBeOrdered), $userId);
+            if ($materialsOrderedAutoFilled) {
+                $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['materials_ordered', 'material_ordered'], $materialsOrderedRaw, $userId);
+            }
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['short_excess_ordered', 'short_excess_ordered_qty'], $this->fmtNum($shortExcessOrdered), $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['material_order_status'], $materialOrderStatus, $userId);
             $this->setCalcAny($row->id, $cellMap, $headerIdByKey, ['pi_status'], $piStatus, $userId);
