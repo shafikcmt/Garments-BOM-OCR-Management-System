@@ -3384,7 +3384,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const input = row.querySelectorAll('td')[orderedIndex + 1]?.querySelector('input.excel-editable-cell');
             if (!input || String(input.value ?? '').trim() !== '') return;
             const target = num(readCellValue(row, toBeIndex));
-            if (target > 0) input.value = fmtNum(target);
+            if (target > 0) {
+                input.value = fmtNum(target);
+                // Count it as the rendered value, otherwise the browser-autofill
+                // guard below reverts it and the sheet is flagged as edited.
+                input.dataset.originalValue = input.value;
+            }
         });
         updateLiveFormulas();
     })();
