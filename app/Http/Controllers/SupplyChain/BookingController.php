@@ -542,6 +542,7 @@ class BookingController extends Controller
                 foreach ($lockedRows as $row) {
                     $this->syncPoToWorkspace($row, $poNo, $generatedAt);
                 }
+                $this->refreshWorkspaceStatus($lockedRows);
 
                 return $bookingPo;
             });
@@ -1810,6 +1811,7 @@ class BookingController extends Controller
             foreach ($groupRows as $row) {
                 $this->syncPoToWorkspace($row, $poNo, $generatedAt);
             }
+            $this->refreshWorkspaceStatus($groupRows);
 
             return $bookingPo;
         });
@@ -2238,6 +2240,34 @@ class BookingController extends Controller
         ], true);
     }
 
+    /**
+     * Once a PO number is written to the workspace, Material Order Status (and the
+     * PI/payment statuses that follow it) must move off "PO Pending". Recalculate
+     * the affected file(s) with the same routine the workspace Save uses. A failure
+     * here must never undo the PO that was just generated.
+     */
+    protected function refreshWorkspaceStatus($rows): void
+    {
+        $fileIds = collect($rows)->pluck('excel_file_id')->filter()->unique()->values()->all();
+        $userId = auth()->id();
+
+        // After commit: a failing recalculation inside the PO transaction would
+        // abort it on PostgreSQL.
+        DB::afterCommit(function () use ($fileIds, $userId) {
+            foreach ($fileIds as $fileId) {
+                try {
+                    $file = \App\Models\ExcelFile::find($fileId);
+                    if ($file) {
+                        app(\App\Http\Controllers\Shared\ExcelFileController::class)
+                            ->recalculateFile($file, $userId);
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Workspace status refresh after PO generation failed: ' . $e->getMessage());
+                }
+            }
+        });
+    }
+
     protected function syncPoToWorkspace(ExcelRow $row, string $poNo, $generatedAt): void
     {
         $batchId = (string) Str::uuid();
@@ -2367,6 +2397,15 @@ class BookingController extends Controller
 
     protected function bookingQtyValueFor(ExcelRow $row): ?string
     {
+        // Booking Qty = Materials Ordered (Supply Chain column). It is auto-filled
+        // from Materials To Be Ordered and editable, so a value is normally there;
+        // when it is empty or 0 the older Materials To Be Ordered logic applies.
+        $orderedQty = $this->valueFor($row, 'materials_ordered');
+        $orderedQtyNumber = $this->numericValue($orderedQty);
+        if ($orderedQty !== null && $orderedQtyNumber !== null && abs($orderedQtyNumber) > 0.000001) {
+            return $orderedQty;
+        }
+
         $storedQty = $this->valueFor($row, 'qty');
         $storedQtyNumber = $this->numericValue($storedQty);
 
@@ -2639,6 +2678,9 @@ class BookingController extends Controller
                     'booking_qty',
                     'booking_quantity',
                 ],
+            // Exact match only: Booking Qty follows the Supply Chain "Materials
+            // Ordered" column (never "Materials To Be Ordered").
+            'materials_ordered' => ['materials_ordered', 'material_ordered'],
             'pp_qty' => ['pp_qty', 'p_p_qty', 'pp_quantity', 'p_p_quantity', 'pp'],
             'uom' => ['uom', 'unit'],
             'item_type' => ['item_type', 'material_type'],
@@ -2672,6 +2714,7 @@ class BookingController extends Controller
             'ihod' => ['Contract Shipment Date'],
             'po_no' => ['Material PO Number', 'Material PO No', 'Material Purchase Order', 'Material Purchase Order Number'],
             'po_date' => ['PO Date', 'Material PO Date'],
+            'materials_ordered' => ['Materials Ordered', 'Material Ordered'],
             'qty' => [
                 'Materials to be Ordered',
                 'Material to be Ordered',
