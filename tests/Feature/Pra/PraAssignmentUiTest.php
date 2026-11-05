@@ -388,3 +388,43 @@ it('previews a legacy PRA with the same three fixed officers as before', functio
         ->not->toContain('Approved By (Merchant)')
         ->not->toContain('Pending approval');
 });
+
+// --- Supporting documents ----------------------------------------------------
+
+it('stores supporting documents uploaded with the PRA and serves them to authorised users only', function () {
+    \Illuminate\Support\Facades\Storage::fake('local');
+
+    $this->actingAs($this->creator)
+        ->post(route('supply_chain.payment_requests.store'), [
+            'booking_po_ids' => [$this->po->id],
+            'documents' => [\Illuminate\Http\UploadedFile::fake()->create('PI-1.pdf', 100, 'application/pdf')],
+        ])
+        ->assertRedirect();
+
+    $pra = PaymentRequest::sole();
+    expect($pra->attachments())->toHaveCount(1)
+        ->and($pra->attachments()[0]['name'])->toBe('PI-1.pdf');
+
+    \Illuminate\Support\Facades\Storage::disk('local')->assertExists($pra->attachments()[0]['path']);
+
+    $this->actingAs($this->creator)
+        ->get(route('pra_documents.download', [$pra, 0]))
+        ->assertOk();
+
+    $this->actingAs($this->accountsTeam)
+        ->get(route('pra_documents.download', [$pra, 0]))
+        ->assertForbidden();
+});
+
+it('rejects a document type that is not allowed', function () {
+    \Illuminate\Support\Facades\Storage::fake('local');
+
+    $this->actingAs($this->creator)
+        ->post(route('supply_chain.payment_requests.store'), [
+            'booking_po_ids' => [$this->po->id],
+            'documents' => [\Illuminate\Http\UploadedFile::fake()->create('run.exe', 10)],
+        ])
+        ->assertSessionHasErrors('documents.0');
+
+    expect(PaymentRequest::count())->toBe(0);
+});

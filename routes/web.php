@@ -165,6 +165,10 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('/emails/{emailLog}', [EmailLogController::class, 'destroy'])->name('emails.destroy');
 
+    // Supporting documents attached to a PRA. Authorised per record in the controller.
+    Route::get('/pra-documents/{paymentRequest}/{index}', [\App\Http\Controllers\PraDocumentController::class, 'download'])
+        ->whereNumber('index')->name('pra_documents.download');
+
     // PRA digital approval — approver-facing screens (any role, gated by the
     // approve-pra permission granted through the admin approver pool).
     Route::middleware('can:approve-pra')->group(function () {

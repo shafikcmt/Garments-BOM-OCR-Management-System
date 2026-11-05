@@ -440,6 +440,14 @@ The row shows how many source rows it holds, up to three of their items, and the
 
 **Who sees what.** The list and its filters (**Buyer**, **Season**, **SAP Code**, **Vendor**, **IHOD**) show only the buyers you are assigned to, plus files that have no buyer set. A booking never pulls in rows of a buyer you cannot see. If you still see a buyer you are not assigned to, that buyer's file has no buyer set: ask Admin to tag the file.
 
+### 3.x Attaching documents to a payment request (PRA)
+
+When you press **Create PRA** on the preview screen, the box has a **Supporting documents (optional)** field.
+
+1. Click **Choose files** and select the PI copy and any other related files. You can pick up to 10 files (PDF, image, Excel, CSV or Word), 10 MB each.
+2. Press **Create PRA**. The files are saved with the request.
+3. Everyone who reviews the request (Merchant, Accounts, Commercial, approvers) sees a **Supporting Documents** box on the request page with a **Download** button for each file.
+
 ## 4. Accounts
 
 ### 4.1 Payments screen

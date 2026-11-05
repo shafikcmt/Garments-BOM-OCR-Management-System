@@ -228,6 +228,8 @@
                 </div>
             </div>
 
+            @include('partials.pra-documents')
+
             {{-- THE BOOKING PO(S) THIS PRA PAYS FOR. Every viewer sees the summary
                  — it is built from the PRA's own lines and the PO's header, which
                  they are already looking at. The "Open Booking PO" button appears
