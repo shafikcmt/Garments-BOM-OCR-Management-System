@@ -298,6 +298,13 @@ class PaymentRequestController extends Controller
             // Departmental flow only: the optional primary assignee for step 2.
             // Ignored entirely on the legacy path — see below.
             'assignee_step2' => ['nullable', 'integer'],
+            // Supporting documents (PI copy, etc.) — optional.
+            'documents' => ['nullable', 'array', 'max:10'],
+            'documents.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,xls,xlsx,csv,doc,docx'],
+        ], [
+            'documents.max' => 'You can upload up to 10 documents at a time.',
+            'documents.*.max' => 'Each document must be 10 MB or smaller.',
+            'documents.*.mimes' => 'Documents must be PDF, image, Excel, CSV or Word files.',
         ]);
 
         // Only users that are currently in the active approver pool may be
@@ -517,6 +524,10 @@ class PaymentRequestController extends Controller
             return $paymentRequest->fresh(['items', 'createdBy', 'approvals']);
         });
 
+        // Save the uploaded supporting documents now that the PRA exists. Files
+        // go to the private disk and are served only through an authorised route.
+        $this->storeDocuments($paymentRequest, $request->file('documents', []));
+
         // Departmental PRAs route themselves: step 2's actors are resolved from
         // the department and the PRA's buyer, so there is no chosen recipient to
         // name and no separate scoping to apply here.
@@ -568,6 +579,38 @@ class PaymentRequestController extends Controller
         return redirect()
             ->route('supply_chain.payment_requests.show', $paymentRequest)
             ->with('success', 'Payment Request Approval created: ' . $paymentRequest->request_no);
+    }
+
+    /**
+     * Store uploaded supporting documents on the private disk and record them in
+     * the PRA's `data.attachments`.
+     *
+     * @param  array<int, \Illuminate\Http\UploadedFile>  $files
+     */
+    protected function storeDocuments(PaymentRequest $paymentRequest, array $files): void
+    {
+        $files = array_filter($files);
+
+        if (empty($files)) {
+            return;
+        }
+
+        $saved = [];
+
+        foreach ($files as $file) {
+            $saved[] = [
+                'name' => $file->getClientOriginalName(),
+                'path' => $file->store('pra-documents/' . $paymentRequest->id, 'local'),
+                'size' => (int) $file->getSize(),
+                'mime' => $file->getClientMimeType(),
+                'uploaded_by' => auth()->id(),
+                'uploaded_at' => now()->toDateTimeString(),
+            ];
+        }
+
+        $data = (array) $paymentRequest->data;
+        $data['attachments'] = array_merge((array) ($data['attachments'] ?? []), $saved);
+        $paymentRequest->update(['data' => $data]);
     }
 
     public function show(PaymentRequest $paymentRequest)

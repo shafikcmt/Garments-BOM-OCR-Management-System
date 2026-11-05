@@ -424,7 +424,7 @@
             <div class="modal fade" id="createPraModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content" style="border-radius:var(--gx-radius);">
-                        <form method="POST" action="{{ route('supply_chain.payment_requests.store') }}">
+                        <form method="POST" action="{{ route('supply_chain.payment_requests.store') }}" enctype="multipart/form-data">
                             @csrf
                             @foreach($bookingPoIds as $bookingPoId)
                                 <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
@@ -524,6 +524,16 @@
                                     <div class="form-text">All selected approvers must approve before the PRA is marked as Approved.</div>
                                 @endif
                                 @endif
+
+                                <hr class="my-3">
+                                <label for="praDocuments" class="form-label fw-semibold mb-1">
+                                    Supporting documents <span class="text-muted small fw-normal">(optional)</span>
+                                </label>
+                                <input type="file" name="documents[]" id="praDocuments" class="form-control @error('documents.*') is-invalid @enderror" multiple
+                                       accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.csv,.doc,.docx">
+                                <div class="form-text">PI copy and other related files. PDF, image, Excel or Word, up to 10 files, 10 MB each.</div>
+                                @error('documents') <div class="text-danger small">{{ $message }}</div> @enderror
+                                @error('documents.*') <div class="text-danger small">{{ $message }}</div> @enderror
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
@@ -666,6 +676,7 @@
             @endif
 
             <div class="mx-auto mt-3 pra-no-print" style="max-width:1120px;">
+                @include('partials.pra-documents')
                 @if($emailLogs->isEmpty())
                     <div class="card border-0 shadow-sm rounded-3">
                         <div class="card-body p-4">

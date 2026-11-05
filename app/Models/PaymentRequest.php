@@ -84,6 +84,17 @@ class PaymentRequest extends Model
      * describe flow 1 and would misreport a flow-2 PRA — not because they are
      * wrong, but because they answer a question flow 2 does not ask.
      */
+    /**
+     * Supporting documents (PI copy, etc.) uploaded when the PRA was created.
+     * Stored in the existing `data` JSON under `attachments`, so no schema change.
+     *
+     * @return array<int, array{name:string,path:string,size:int,mime:?string,uploaded_by:?int,uploaded_at:?string}>
+     */
+    public function attachments(): array
+    {
+        return array_values((array) data_get($this->data, 'attachments', []));
+    }
+
     public function isDepartmentalFlow(): bool
     {
         return (int) $this->flow_version === self::FLOW_DEPARTMENTAL;

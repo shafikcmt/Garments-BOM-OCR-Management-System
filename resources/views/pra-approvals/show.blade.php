@@ -75,6 +75,8 @@
             </div>
 
             {{-- Line items --}}
+            @include('partials.pra-documents')
+
             <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                 <div class="card-body p-4">
                     <h5 class="mb-3">Items ({{ $paymentRequest->items->count() }})</h5>
