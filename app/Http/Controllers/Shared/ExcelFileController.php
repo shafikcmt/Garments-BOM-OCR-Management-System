@@ -3139,37 +3139,25 @@ class ExcelFileController extends Controller
             return;
         }
 
-        $rows = $excelFile->rows()->with('cells')->get();
+        // Count in the database. Loading every row with every cell into PHP
+        // (rows x ~128 columns) ran the server out of memory on a 2,000+ row
+        // file, which surfaced as a 500 on Save and rolled the whole save back.
+        $rowCount = $excelFile->rows()->count();
 
-        if ($rows->isEmpty()) {
+        if ($rowCount === 0) {
             $excelFile->update(['status' => 'pending']);
             return;
         }
 
-        $filled = 0;
-        $total = 0;
-
-        // keyBy() rather than firstWhere() inside the loop. firstWhere() rescans
-        // the row's whole cell collection for every target header, which on a
-        // real file (499 rows x ~100 target headers x ~128 cells) is millions of
-        // PHP comparisons — it measured 23 seconds on one save, with only five
-        // queries. Hashing each row's cells once makes the lookup O(1). Same
-        // counts, same resulting status.
         $targetHeaderIds = $targetHeaderIds->all();
+        $total = $rowCount * count($targetHeaderIds);
 
-        foreach ($rows as $row) {
-            $cellsByHeader = $row->cells->keyBy('header_id');
-
-            foreach ($targetHeaderIds as $headerId) {
-                $total++;
-
-                $value = trim((string) ($cellsByHeader->get($headerId)?->value ?? ''));
-
-                if ($value !== '') {
-                    $filled++;
-                }
-            }
-        }
+        $filled = (int) ExcelCell::query()
+            ->whereIn('row_id', $excelFile->rows()->select('id'))
+            ->whereIn('header_id', $targetHeaderIds)
+            ->whereNotNull('value')
+            ->whereRaw("TRIM(value) <> ''")
+            ->count();
 
         if ($filled === 0) {
             $status = 'pending';
