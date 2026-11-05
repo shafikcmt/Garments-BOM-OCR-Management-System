@@ -613,6 +613,34 @@ class PaymentRequestController extends Controller
         $paymentRequest->update(['data' => $data]);
     }
 
+    /**
+     * On resubmit: drop the documents the creator ticked and add any new ones.
+     */
+    protected function syncDocuments(PaymentRequest $paymentRequest, Request $request): void
+    {
+        $remove = collect($request->input('remove_documents', []))->map(fn ($i) => (int) $i)->all();
+
+        if ($remove) {
+            $kept = [];
+
+            foreach ($paymentRequest->attachments() as $i => $doc) {
+                if (in_array($i, $remove, true)) {
+                    \Illuminate\Support\Facades\Storage::disk('local')->delete($doc['path']);
+
+                    continue;
+                }
+
+                $kept[] = $doc;
+            }
+
+            $data = (array) $paymentRequest->data;
+            $data['attachments'] = $kept;
+            $paymentRequest->update(['data' => $data]);
+        }
+
+        $this->storeDocuments($paymentRequest, $request->file('documents', []));
+    }
+
     public function show(PaymentRequest $paymentRequest)
     {
         $this->authorizePaymentRequest($paymentRequest);
@@ -702,6 +730,15 @@ class PaymentRequestController extends Controller
         // reject the submission outright for want of an approver_ids array that
         // this flow has no way to supply.
         if ($paymentRequest->isDepartmentalFlow()) {
+            $request->validate([
+                'remarks' => ['nullable', 'string', 'max:2000'],
+            'documents' => ['nullable', 'array', 'max:10'],
+            'documents.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,xls,xlsx,csv,doc,docx'],
+            'remove_documents' => ['nullable', 'array'],
+            'remove_documents.*' => ['integer'],
+            ]);
+            $this->syncDocuments($paymentRequest, $request);
+
             // Refresh the Prepared By snapshot exactly as the legacy path does below.
             $paymentRequest->update([
                 'remarks' => $request->input('remarks') ?: $paymentRequest->remarks,
@@ -726,6 +763,10 @@ class PaymentRequestController extends Controller
             'approver_ids' => ['required', 'array', 'min:1'],
             'approver_ids.*' => ['integer'],
             'remarks' => ['nullable', 'string', 'max:2000'],
+            'documents' => ['nullable', 'array', 'max:10'],
+            'documents.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,xls,xlsx,csv,doc,docx'],
+            'remove_documents' => ['nullable', 'array'],
+            'remove_documents.*' => ['integer'],
         ]);
 
         $approverUserIds = PraApprover::where('is_active', true)
@@ -743,6 +784,8 @@ class PaymentRequestController extends Controller
                 ->where('user_id', (int) $checkerUserId)
                 ->value('user_id');
         }
+
+        $this->syncDocuments($paymentRequest, $request);
 
         $paymentRequest->load('approvals');
         $nextCycle = $paymentRequest->currentCycle() + 1;
