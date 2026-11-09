@@ -92,17 +92,17 @@ class Inquiries
             return null;
         }
 
-        return ['price' => (float) $costing->quoted_price, 'currency' => $costing->currency, 'revision' => $costing->revision];
+        return ['price' => (float) $costing->quoted_price, 'currency' => $costing->currency, 'basis' => $costing->basis, 'revision' => $costing->revision];
     }
 
     /** @throws \DomainException */
-    public function markQuoted(Inquiry $inquiry, float $price, string $currency, ?string $date, User $by): Inquiry
+    public function markQuoted(Inquiry $inquiry, float $price, string $currency, ?string $date, User $by, string $basis = 'pc'): Inquiry
     {
         if (! in_array($inquiry->status, ['new', 'costing', 'quoted'], true)) {
             throw new \DomainException('This inquiry is already closed.');
         }
         $inquiry->update([
-            'status' => 'quoted', 'quoted_price' => $price, 'currency' => $currency,
+            'status' => 'quoted', 'quoted_price' => $price, 'price_basis' => array_key_exists($basis, Inquiry::BASES) ? $basis : 'pc', 'currency' => $currency,
             'quoted_date' => $date ?: Carbon::today()->toDateString(), 'updated_by' => $by->id,
         ]);
 

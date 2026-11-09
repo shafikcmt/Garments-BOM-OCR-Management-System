@@ -107,6 +107,13 @@ Use this when a buyer asks for a price on a style and there is no order yet.
 3. **Mark Won** when the buyer accepts. **Mark Lost** needs a reason, which stays on the inquiry. When the order comes, use **Import Buyer Excel** with the same season and style so it lands on the style made here.
 4. **Cancel Inquiry** closes one the buyer withdrew. **Reopen** brings a lost or cancelled inquiry back.
 
+**Print the quotation:** after the price is recorded, press **Download Quotation PDF** on the inquiry. It is an A4 page with the company heading, quotation number, date, **Valid until**, the buyer, the style, description, estimated quantity, **unit price and estimated value**, the **terms** and three signature lines (Prepared by, Authorised by, Accepted by buyer). Before you press it:
+- Choose **Price per** piece or dozen when you record the quotation. A dozen price is also shown per piece on the page.
+- Under **Details**, in **Printed on the quotation**, type the **Payment terms**, **Delivery terms**, **Valid for (days)** and **Remarks on the quotation**. Anything left empty prints the standard text (payment and delivery "To be agreed", valid for 30 days).
+- The company name, address and logo come from the system settings, not from this screen; ask the person who looks after the server to change them.
+
+This is the standard layout. Check it once with your own quotation before sending to a buyer, and tell the project owner what to change.
+
 Merchandising and Admin work inquiries for the buyers they hold. Management can read them. The system never creates an order from an inquiry.
 
 ### 2.2 Import Buyer Excel (any buyer, any layout)

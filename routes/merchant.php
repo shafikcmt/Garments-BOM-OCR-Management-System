@@ -127,6 +127,7 @@ Route::prefix('merchant/inquiries')
         Route::post('/', [$c, 'store'])->name('store');
         Route::get('/{inquiry}', [$c, 'show'])->name('show');
         Route::put('/{inquiry}', [$c, 'update'])->name('update');
+        Route::get('/{inquiry}/quotation.pdf', [$c, 'quotationPdf'])->name('quotation_pdf');
         Route::post('/{inquiry}/start-costing', [$c, 'startCosting'])->name('start_costing');
         Route::post('/{inquiry}/quote', [$c, 'quote'])->name('quote');
         Route::post('/{inquiry}/won', [$c, 'won'])->name('won');
