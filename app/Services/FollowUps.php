@@ -2,11 +2,15 @@
 
 namespace App\Services;
 
+use App\Mail\FollowUpDigestMail;
 use App\Models\AppNotification;
+use App\Models\AppSetting;
 use App\Models\FollowUpTask;
 use App\Models\MotherStyle;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Follow-up tasks: creating one for a style, finishing it, and the daily reminder.
@@ -17,6 +21,24 @@ class FollowUps
 {
     /** Roles a task can be given to. */
     public const ASSIGNEE_ROLES = ['merchant', 'supply_chain', 'account', 'commercial', 'admin'];
+
+    public const KEY_EMAIL = 'followup_email_enabled';
+
+    public const KEY_ESCALATE_DAYS = 'followup_escalate_after_days';
+
+    public const DEFAULT_ESCALATE_DAYS = 3;
+
+    /** Daily e-mail of overdue tasks. Off until Admin switches it on (mail may not be set up). */
+    public static function emailEnabled(): bool
+    {
+        return (bool) (int) AppSetting::get(self::KEY_EMAIL, 0);
+    }
+
+    /** Days overdue after which the supervisor is told; 0 switches escalation off. */
+    public static function escalateAfterDays(): int
+    {
+        return max(0, (int) AppSetting::get(self::KEY_ESCALATE_DAYS, self::DEFAULT_ESCALATE_DAYS));
+    }
 
     public function __construct(private StyleRollup $rollup)
     {
@@ -122,10 +144,90 @@ class FollowUps
 
                 $this->notify($user, null, 'followup_reminder', 'Follow-ups need attention',
                     'You have ' . implode(' and ', $parts) . ' follow-up(s).');
+                $this->email($user, 'Follow-ups need your attention', 'You have ' . implode(' and ', $parts) . ' follow-up(s).', $tasks, $today, false);
                 $reminded++;
             });
 
         return $reminded;
+    }
+
+    /**
+     * Tell the supervisor about tasks that stayed overdue for escalateAfterDays
+     * or more. Each task is escalated once (escalated_at); the supervisor gets one
+     * message per run. The supervisors are Admin, Management of the buyer and a
+     * Merchandising department head, never the person who owns the task.
+     *
+     * @return int number of tasks escalated
+     */
+    public function escalateOverdue(?Carbon $today = null): int
+    {
+        $days = self::escalateAfterDays();
+        if ($days < 1) {
+            return 0;
+        }
+        $today ??= Carbon::today();
+
+        $tasks = FollowUpTask::open()->whereNull('escalated_at')->whereDate('due_date', '<=', $today->copy()->subDays($days))
+            ->with(['assignee:id,name', 'motherStyle:id,style_no'])->get();
+        if ($tasks->isEmpty()) {
+            return 0;
+        }
+
+        $perSupervisor = [];
+        foreach ($tasks as $task) {
+            foreach ($this->supervisorsFor((int) $task->buyer_id)->reject(fn (User $u) => $u->id === (int) $task->assigned_to) as $sup) {
+                $perSupervisor[$sup->id]['user'] = $sup;
+                $perSupervisor[$sup->id]['tasks'][] = $task;
+            }
+        }
+
+        foreach ($perSupervisor as $row) {
+            $list = collect($row['tasks']);
+            $names = $list->map(fn ($t) => $t->assignee?->name)->filter()->unique()->take(3)->implode(', ');
+            $message = $list->count() . ' task(s) are ' . $days . '+ days overdue (' . $names . ').';
+            $this->notify($row['user'], null, 'followup_escalation', 'Overdue tasks escalated', $message);
+            $this->email($row['user'], 'Overdue tasks escalated', $message, $list, $today, true);
+        }
+
+        // Escalated once, even when nobody could be told, so it is not retried every morning.
+        FollowUpTask::whereIn('id', $tasks->pluck('id'))->update(['escalated_at' => now()]);
+
+        return $tasks->count();
+    }
+
+    /** @return \Illuminate\Support\Collection<int, User> */
+    public function supervisorsFor(int $buyerId)
+    {
+        $roles = array_values(array_intersect(['admin', 'management', 'merchant'], \Spatie\Permission\Models\Role::pluck('name')->all()));
+        if ($roles === []) {
+            return collect();
+        }
+
+        return User::role($roles)
+            ->where('status', 1)->get()
+            ->filter(fn (User $u) => $u->hasRole('admin') || (($u->hasRole('management') || ($u->hasRole('merchant') && $u->is_department_admin)) && $u->hasBuyerAccess($buyerId)))
+            ->values();
+    }
+
+    /** A failed e-mail must never stop the in-app message or the rest of the run. */
+    private function email(User $to, string $heading, string $intro, $tasks, Carbon $today, bool $withOwner): void
+    {
+        if (! self::emailEnabled() || ! filled($to->email)) {
+            return;
+        }
+        $tasks = collect($tasks);
+        $lines = $tasks->map(fn ($t) => [
+            'title' => $t->title,
+            'due' => $t->due_date->format('d M Y'),
+            'who' => $withOwner ? $t->assignee?->name : null,
+            'days_late' => max(0, (int) $t->due_date->diffInDays($today, false)),
+        ])->values()->all();
+
+        try {
+            Mail::to($to->email)->send(new FollowUpDigestMail($heading, $intro, $lines, route('follow_ups.index')));
+        } catch (\Throwable $e) {
+            Log::warning('Follow-up e-mail failed for user ' . $to->id . ': ' . $e->getMessage());
+        }
     }
 
     private function defaultTitle(MotherStyle $mother, array $kpis): string

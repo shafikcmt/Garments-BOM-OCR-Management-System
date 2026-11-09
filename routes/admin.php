@@ -46,6 +46,7 @@ Route::prefix('admin')
 
         Route::resource('roles', RoleController::class)->except(['show']);
         Route::resource('headers', HeaderController::class)->except(['show']);
+        Route::put('tna-settings', [\App\Http\Controllers\Admin\TnaTemplateController::class, 'settings'])->name('tna.settings');
         Route::resource('tna', \App\Http\Controllers\Admin\TnaTemplateController::class)->except(['show'])->parameters(['tna' => 'tna']);
 
         Route::resource('suppliers', SupplierController::class)->except(['show']);

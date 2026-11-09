@@ -50,9 +50,18 @@
             <p class="fw-semibold mb-1">No {{ \App\Models\Costing::MODES[$mode] }} costing for this style yet.</p>
             <p class="text-muted">{{ $mode === 'buyer' ? 'The buyer costing is the price build-up you quote to the buyer.' : 'The in-house costing is what the factory expects to spend.' }}</p>
             @if($canEdit)
-                <form method="POST" action="{{ route('costing.start', $mother) }}">@csrf
+                <form method="POST" action="{{ route('costing.start', $mother) }}" class="row g-2 align-items-end">@csrf
                     <input type="hidden" name="mode" value="{{ $mode }}">
-                    <button class="btn btn-primary"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Start {{ \App\Models\Costing::MODES[$mode] }} Costing</button>
+                    @if($templates->isNotEmpty())
+                        <div class="col-12 col-md-5">
+                            <label class="form-label mb-1" for="cTemplate">Start from a template</label>
+                            <select name="template_id" id="cTemplate" class="form-select form-select-sm">
+                                @foreach($templates as $t)<option value="{{ $t->id }}">{{ $t->name }} ({{ $t->lines_count }} lines){{ $t->buyer_id ? '' : ' · all buyers' }}</option>@endforeach
+                                <option value="">No template (standard rows)</option>
+                            </select>
+                        </div>
+                    @endif
+                    <div class="col-auto"><button class="btn btn-primary"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Start {{ \App\Models\Costing::MODES[$mode] }} Costing</button></div>
                 </form>
             @endif
         </x-card>
@@ -201,6 +210,38 @@
             </table>
         </x-card>
 
+        {{-- Cost of the garment by size, from the style's Size-wise BOM. --}}
+        @if($sizeCost)
+            @php($sc4 = fn ($n) => $n === null ? '—' : number_format((float) $n, 2))
+            <x-card class="mb-3" body-class="p-3">
+                <x-slot:title>Cost by size <span class="text-muted fw-normal fs-6">per {{ \App\Models\Costing::BASES[$costing->basis] }}, {{ $costing->currency }}</span></x-slot:title>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0" style="min-width:0">
+                        <thead><tr><th>Size</th><th class="text-end">Pieces</th><th class="text-end">Cost</th><th class="text-end">Against sheet</th><th class="text-end">Margin</th></tr></thead>
+                        <tbody>
+                        @foreach($sizeCost['sizes'] as $r)
+                            <tr>
+                                <td class="fw-semibold">{{ $r['size'] }}@if($r['changed'] === 0)<span class="small text-muted fw-normal"> · as costed</span>@endif</td>
+                                <td class="text-end">{{ $r['pieces'] > 0 ? number_format($r['pieces']) : '—' }}</td>
+                                <td class="text-end">{{ $sc4($r['cost']) }}</td>
+                                <td class="text-end {{ $r['difference'] > 0.00005 ? 'text-danger' : ($r['difference'] < -0.00005 ? 'text-success' : 'text-muted') }}">{{ $r['difference'] > 0 ? '+' : '' }}{{ $sc4($r['difference']) }}</td>
+                                <td class="text-end">{{ $r['margin'] === null ? '—' : $r['margin'] . '%' }}</td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-semibold"><td>Sheet (one figure)</td><td></td><td class="text-end">{{ $sc4($sizeCost['sheet_total']) }}</td><td></td><td class="text-end">{{ $costing->marginPct() === null ? '—' : $costing->marginPct() . '%' }}</td></tr>
+                            @if($sizeCost['average'] !== null)
+                                <tr class="fw-semibold"><td>Average by pieces</td><td class="text-end">{{ number_format($sizeCost['pieces']) }}</td><td class="text-end">{{ $sc4($sizeCost['average']) }}</td><td class="text-end {{ $sizeCost['average'] > $sizeCost['sheet_total'] + 0.00005 ? 'text-danger' : 'text-success' }}">{{ $sizeCost['average'] > $sizeCost['sheet_total'] ? '+' : '' }}{{ $sc4($sizeCost['average'] - $sizeCost['sheet_total']) }}</td><td class="text-end">{{ $sizeCost['average_margin'] === null ? '—' : $sizeCost['average_margin'] . '%' }}</td></tr>
+                            @endif
+                        </tfoot>
+                    </table>
+                </div>
+                <p class="small text-muted mt-2 mb-0">Only the material lines with a size-wise consumption change ({{ collect($sizeCost['lines'])->map(fn ($l) => $l['costing'])->implode(', ') ?: 'none matched' }}); the rate and wastage of the line are kept. Red = costs more than the sheet.</p>
+                @if($sizeCost['unmatched'])<p class="small text-warning mt-1 mb-0">No costing line matches: {{ implode(', ', $sizeCost['unmatched']) }}. Name the costing line like the BOM material so it is counted.</p>@endif
+            </x-card>
+        @endif
+
         {{-- Estimate against the actual BOM. --}}
         @if($comparison && $comparison['has_bom'])
             @php($m2 = fn ($n) => $n === null ? '—' : number_format((float) $n, 2))
@@ -238,6 +279,20 @@
                     </table>
                 </div>
                 <p class="small text-muted mt-2 mb-0">BOM consumption is the average per garment including wastage{{ $costing->basis === 'dz' ? ', times 12 for a dozen' : '' }}. PI rate is what Supply Chain recorded. Red difference = the BOM costs more than the costing.</p>
+            </x-card>
+        @endif
+
+        @if($canEdit)
+            <x-card class="mb-3" body-class="p-3">
+                <x-slot:title>Save as template</x-slot:title>
+                <form method="POST" action="{{ route('merchant.costing_templates.from_costing', $costing) }}" class="row g-2 align-items-end">
+                    @csrf
+                    <div class="col-12 col-md-4"><label class="form-label mb-1" for="tplName">Template name</label>
+                        <input type="text" name="name" id="tplName" class="form-control form-control-sm" maxlength="120" required placeholder="e.g. Jacket - standard"></div>
+                    <div class="col-auto"><div class="form-check mb-1"><input class="form-check-input" type="checkbox" name="for_this_buyer" id="tplBuyer" value="1" checked><label class="form-check-label" for="tplBuyer">Only for {{ $mother->buyer?->buyer_name }}</label></div></div>
+                    <div class="col-auto"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-bookmark-plus me-1" aria-hidden="true"></i>Save as Template</button></div>
+                    <div class="col-12 form-text">Copies the lines, rates, currency and basis of this revision (not the quoted price). The template is offered on styles of the same product group{{ $mother->product_group ? ' (' . $mother->product_group . ')' : '' }}. Saves the last saved version of the sheet.</div>
+                </form>
             </x-card>
         @endif
 

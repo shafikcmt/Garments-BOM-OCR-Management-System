@@ -158,8 +158,61 @@
     </div>
     </div>
 
-    {{-- Samples of this style. --}}
     @php($canSample = auth()->user()->hasAnyRole(['merchant', 'admin']))
+    {{-- Document bank: tech pack, lab dip, PP comments and the like. --}}
+    <x-card class="mb-3" body-class="p-3">
+        <x-slot:title>Documents <span class="badge bg-light text-muted border ms-1">{{ $documents->count() }}</span></x-slot:title>
+        @if($documents->isNotEmpty())
+            <div class="table-responsive mb-3">
+                <table class="table table-sm align-middle mb-0" style="min-width:0">
+                    <thead><tr><th>Category</th><th>Title</th><th>File</th><th>Added</th><th>By</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach($documents as $d)
+                        <tr>
+                            <td>{{ $d->category ?: '—' }}</td>
+                            <td class="fw-semibold">{{ $d->title }}</td>
+                            <td class="small text-muted">{{ $d->original_name }} · {{ $d->sizeLabel() }}</td>
+                            <td class="text-nowrap">{{ $d->created_at?->format('d M Y') }}</td>
+                            <td>{{ $d->uploader?->name ?? '—' }}</td>
+                            <td class="text-end text-nowrap">
+                                <a href="{{ route('merchant.documents.download', $d) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1" aria-hidden="true"></i>Download</a>
+                                @if($canSample)
+                                    <form method="POST" action="{{ route('merchant.documents.destroy', $d) }}" class="d-inline" onsubmit="return confirm('Delete this document?')">
+                                        @csrf @method('DELETE')
+                                        <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                    </form>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @elseif(! $canSample)
+            <p class="text-muted mb-0">No documents added for this style.</p>
+        @endif
+        @if($canSample)
+            <form method="POST" action="{{ route('merchant.documents.store', $mother) }}" enctype="multipart/form-data" class="row g-2 align-items-end">
+                @csrf
+                <div class="col-12 col-md-3">
+                    <label class="form-label mb-1" for="docFile">File (max 15 MB)</label>
+                    <input type="file" name="document" id="docFile" class="form-control form-control-sm" required>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label mb-1" for="docTitle">Title</label>
+                    <input type="text" name="title" id="docTitle" class="form-control form-control-sm" maxlength="160" placeholder="Defaults to the file name">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label mb-1" for="docCat">Category</label>
+                    <input type="text" name="category" id="docCat" list="docCatList" class="form-control form-control-sm" maxlength="60">
+                    <datalist id="docCatList">@foreach(\App\Models\StyleDocument::CATEGORY_HINTS as $h)<option value="{{ $h }}">@endforeach</datalist>
+                </div>
+                <div class="col-12 col-md-3"><button class="btn btn-primary btn-sm"><i class="bi bi-upload me-1" aria-hidden="true"></i>Add Document</button></div>
+            </form>
+        @endif
+    </x-card>
+
+    {{-- Samples of this style. --}}
     <x-card class="mb-3" body-class="p-3">
         <x-slot:title>Samples <span class="badge bg-light text-muted border ms-1">{{ $samples->count() }}</span></x-slot:title>
         <x-slot:actions><a href="{{ route('merchant.samples.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-list-ul me-1" aria-hidden="true"></i>All Samples</a></x-slot:actions>
@@ -223,6 +276,15 @@
     @if($canFollowUp && ($tnaTemplates->isNotEmpty() || $tnaTasks->isNotEmpty()))
     <x-card class="mb-3" body-class="p-3">
         <x-slot:title>TnA Plan @if($tnaTasks->isNotEmpty())<span class="badge bg-light text-muted border ms-1">{{ $tnaTasks->where('status', \App\Models\FollowUpTask::DONE)->count() }} / {{ $tnaTasks->count() }} done</span>@endif</x-slot:title>
+        @if($criticalPath)
+            @php($cp = $criticalPath)
+            <div class="alert py-2 mb-3 alert-{{ ['at_risk' => 'danger', 'watch' => 'warning', 'on_track' => 'success', 'complete' => 'success'][$cp['state']] }}">
+                <strong>Critical path:</strong>
+                {{ ['at_risk' => 'At risk', 'watch' => 'Watch', 'on_track' => 'On track', 'complete' => 'Complete'][$cp['state']] }}
+                — {{ $cp['done'] }} of {{ $cp['total'] }} critical step(s) done@if($cp['overdue'] > 0), {{ $cp['overdue'] }} overdue@endif.
+                @if($cp['next'])Next: {{ $cp['next']->title }}, due {{ $cp['next']->due_date->format('d M Y') }}.@endif
+            </div>
+        @endif
         @if($tnaTasks->isNotEmpty())
             <div class="table-responsive mb-3">
                 <table class="table table-sm align-middle mb-0" style="min-width:0">
@@ -231,12 +293,12 @@
                     @foreach($tnaTasks as $t)
                         @php($light = $t->light())
                         <tr>
-                            <td>{{ $t->title }}<div class="small text-muted">{{ $t->note }}</div></td>
+                            <td>{{ $t->title }}@if($t->isCritical())<span class="badge bg-danger-subtle text-danger ms-1">Critical</span>@endif<div class="small text-muted">{{ $t->note }}</div></td>
                             <td>{{ $t->assignee?->name }}</td>
                             <td class="text-nowrap">{{ $t->due_date->format('d M Y') }}</td>
                             <td>
                                 @if(! $t->isOpen())<span class="badge bg-success-subtle text-success">Done</span>
-                                @elseif($light === 'red')<span class="badge bg-danger text-white">Overdue</span>
+                                @elseif($light === 'red')<span class="badge bg-danger text-white">Overdue</span>@if($t->escalated_at)<span class="badge bg-light text-muted border ms-1">Escalated</span>@endif
                                 @elseif($light === 'amber')<span class="badge bg-warning text-dark">Due soon</span>
                                 @else<span class="badge bg-light text-muted border">Open</span>@endif
                             </td>
@@ -338,6 +400,8 @@
     @else
         <x-card title="Orders" class="mb-3" body-class="p-3">
             <x-slot:actions>
+                <a href="{{ route('merchant.sizebom.show', $mother) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-rulers me-1" aria-hidden="true"></i>Size-wise BOM</a>
+                <a href="{{ route('merchant.orders.show', $mother) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-check me-1" aria-hidden="true"></i>Buyer Orders</a>
                 <a href="{{ route('merchant.sizes.show', $mother) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-grid-3x3 me-1" aria-hidden="true"></i>Size Breakdown</a>
             </x-slot:actions>
             <div class="table-responsive">

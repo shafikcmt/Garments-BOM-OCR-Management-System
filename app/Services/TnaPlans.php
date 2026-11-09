@@ -33,6 +33,38 @@ class TnaPlans
     }
 
     /**
+     * Where the order's critical path stands: the critical TnA tasks of a style,
+     * whether one is overdue (the order is at risk) and the next one due.
+     *
+     * @param  \Illuminate\Support\Collection<int, FollowUpTask>  $tasks  the style's TnA tasks
+     * @return array{total: int, done: int, overdue: int, state: string, next: ?FollowUpTask}|null  null when no task is critical
+     */
+    public function criticalPath($tasks, ?Carbon $today = null): ?array
+    {
+        $today ??= Carbon::today();
+        $critical = $tasks->filter(fn (FollowUpTask $t) => $t->isCritical());
+        if ($critical->isEmpty()) {
+            return null;
+        }
+        $open = $critical->filter(fn (FollowUpTask $t) => $t->isOpen());
+        $overdue = $open->filter(fn (FollowUpTask $t) => $t->due_date->lt($today))->count();
+        $soon = $open->filter(fn (FollowUpTask $t) => $t->light($today) === 'amber')->count();
+
+        return [
+            'total' => $critical->count(),
+            'done' => $critical->count() - $open->count(),
+            'overdue' => $overdue,
+            'state' => match (true) {
+                $open->isEmpty() => 'complete',
+                $overdue > 0 => 'at_risk',
+                $soon > 0 => 'watch',
+                default => 'on_track',
+            },
+            'next' => $open->sortBy('due_date')->first(),
+        ];
+    }
+
+    /**
      * @return array{created: int, skipped: list<string>}
      */
     public function apply(MotherStyle $mother, TnaTemplate $template, ?User $by = null): array
@@ -71,7 +103,7 @@ class TnaPlans
                 'created_by' => $by?->id,
                 'due_date' => Carbon::parse($anchor)->addDays($task->offset_days)->toDateString(),
                 'source' => self::SOURCE,
-                'meta' => ['tna_template_id' => $template->id, 'tna_task_id' => $task->id],
+                'meta' => ['tna_template_id' => $template->id, 'tna_task_id' => $task->id, 'critical' => (bool) $task->is_critical],
             ]);
         }
 

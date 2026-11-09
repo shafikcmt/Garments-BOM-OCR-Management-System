@@ -292,9 +292,15 @@ class BomApprovals
     // -------------------------------------------------------------- PO gate
 
     /**
-     * Why PO generation must stop for this worksheet row, or null to let it go.
+     * Why PO generation must stop for this worksheet row (BOM not approved, or the buyer order not approved), or null to let it go.
      */
     public function blockReason(ExcelRow $row): ?string
+    {
+        // Two optional gates, both off by default: the style's BOM, then the customer PO's order.
+        return $this->bomBlockReason($row) ?? app(OrderApprovals::class)->blockReason($row);
+    }
+
+    private function bomBlockReason(ExcelRow $row): ?string
     {
         if (! self::requiredForPo()) {
             return null;

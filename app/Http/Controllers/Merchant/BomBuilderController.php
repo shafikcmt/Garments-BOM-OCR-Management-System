@@ -52,6 +52,13 @@ class BomBuilderController extends Controller
             }
         }
 
+        // Fill the materials from the Consumption Master (product group of this style).
+        $fromMaster = null;
+        $masterRows = \App\Models\ConsumptionMaster::rowsForStyle($mother);
+        if ($request->boolean('master') && ! $copied) {
+            $fromMaster = $masterRows === [] ? ['rows' => [], 'note' => 'The Consumption Master has no materials for this style yet.'] : ['rows' => $masterRows, 'note' => null];
+        }
+
         // Styles (and their order lines) of this buyer that have a BOM, to copy from.
         $sources = MotherStyle::where('buyer_id', $mother->buyer_id)
             ->whereHas('orderLines.bomItems')
@@ -66,7 +73,9 @@ class BomBuilderController extends Controller
             'copyFrom' => $request->integer('from') ?: null,
             'copyLine' => $request->integer('line') ?: null,
             'prefill' => old('lines', $lines ?: [['color' => '', 'po' => '', 'ship_date' => '', 'qty' => '', 'child' => '']]),
-            'materials' => $copied ? $copied['rows'] : old('materials', [['type' => '', 'description' => '', 'sap_code' => '', 'color' => '', 'uom' => '', 'consumption' => '', 'wastage' => '']]),
+            'masterCount' => count($masterRows),
+            'fromMaster' => $fromMaster,
+            'materials' => $copied ? $copied['rows'] : ($fromMaster && $fromMaster['rows'] ? $fromMaster['rows'] : old('materials', [['type' => '', 'description' => '', 'sap_code' => '', 'color' => '', 'uom' => '', 'consumption' => '', 'wastage' => '']])),
             'columns' => $builder->fieldColumns($request->user()),
             'limits' => ['lines' => BomBuilder::MAX_LINES, 'materials' => BomBuilder::MAX_MATERIALS],
         ]);

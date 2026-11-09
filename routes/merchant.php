@@ -79,6 +79,109 @@ Route::prefix('merchant/samples')
         Route::put('/types/{type}', [\App\Http\Controllers\Merchant\SampleController::class, 'toggleType'])->name('types.toggle');
     });
 
+// Order progress meetings: minutes and action items (follow-up tasks).
+// Merchandising and Admin record, Management reads; the controller checks the buyer.
+Route::prefix('merchant/meetings')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.meetings.')
+    ->group(function () {
+        $c = \App\Http\Controllers\Merchant\MeetingController::class;
+        Route::get('/', [$c, 'index'])->name('index');
+        Route::get('/create', [$c, 'create'])->name('create');
+        Route::post('/', [$c, 'store'])->name('store');
+        Route::get('/{meeting}', [$c, 'show'])->name('show');
+        Route::put('/{meeting}', [$c, 'update'])->name('update');
+        Route::post('/{meeting}/actions', [$c, 'addActions'])->name('actions');
+        Route::delete('/{meeting}', [$c, 'destroy'])->name('destroy');
+    });
+
+// Costing templates: ready cost sheets per product group. Merchandising and
+// Admin manage, Management reads; the controller checks the buyer.
+Route::prefix('merchant/costing-templates')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.costing_templates.')
+    ->group(function () {
+        $c = \App\Http\Controllers\Merchant\CostingTemplateController::class;
+        Route::get('/', [$c, 'index'])->name('index');
+        Route::get('/create', [$c, 'create'])->name('create');
+        Route::post('/', [$c, 'store'])->name('store');
+        Route::post('/from-costing/{costing}', [$c, 'fromCosting'])->name('from_costing');
+        Route::get('/{template}/edit', [$c, 'edit'])->name('edit');
+        Route::put('/{template}', [$c, 'update'])->name('update');
+        Route::delete('/{template}', [$c, 'destroy'])->name('destroy');
+    });
+
+// Merchandising analytics: order value, margin, win rate. Read-only; buyer-scoped.
+Route::get('merchant/analytics', [\App\Http\Controllers\Merchant\AnalyticsController::class, 'index'])
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.analytics.index');
+
+// Buyer inquiries and quotations. Merchandising and Admin work them,
+// Management reads; the controller checks the buyer and the role per action.
+Route::prefix('merchant/inquiries')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.inquiries.')
+    ->group(function () {
+        $c = \App\Http\Controllers\Merchant\InquiryController::class;
+        Route::get('/', [$c, 'index'])->name('index');
+        Route::post('/', [$c, 'store'])->name('store');
+        Route::get('/{inquiry}', [$c, 'show'])->name('show');
+        Route::put('/{inquiry}', [$c, 'update'])->name('update');
+        Route::post('/{inquiry}/start-costing', [$c, 'startCosting'])->name('start_costing');
+        Route::post('/{inquiry}/quote', [$c, 'quote'])->name('quote');
+        Route::post('/{inquiry}/won', [$c, 'won'])->name('won');
+        Route::post('/{inquiry}/lost', [$c, 'lost'])->name('lost');
+        Route::post('/{inquiry}/cancel', [$c, 'cancel'])->name('cancel');
+        Route::post('/{inquiry}/reopen', [$c, 'reopen'])->name('reopen');
+    });
+
+// Consumption master: standard materials per product group. Merchandising and
+// Admin manage, Management reads; the controller checks the buyer.
+Route::prefix('merchant/consumption-master')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.consumption.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\Merchant\ConsumptionMasterController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\Merchant\ConsumptionMasterController::class, 'store'])->name('store');
+        Route::post('/from-style', [\App\Http\Controllers\Merchant\ConsumptionMasterController::class, 'fromStyle'])->name('from_style');
+        Route::put('/{row}', [\App\Http\Controllers\Merchant\ConsumptionMasterController::class, 'update'])->name('update');
+        Route::delete('/{row}', [\App\Http\Controllers\Merchant\ConsumptionMasterController::class, 'destroy'])->name('destroy');
+    });
+
+// Size-wise BOM of a style. Merchandising and Admin edit, Management reads.
+Route::prefix('merchant/size-bom')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.sizebom.')
+    ->group(function () {
+        Route::get('/styles/{mother}', [\App\Http\Controllers\Merchant\SizeBomController::class, 'show'])->name('show');
+        Route::put('/styles/{mother}', [\App\Http\Controllers\Merchant\SizeBomController::class, 'update'])->name('update');
+    });
+
+// Buyer orders (customer POs) of a style: register fields and order approval.
+// Merchandising and Admin edit, Management reads and may approve; the
+// controller checks the buyer and the role per action.
+Route::prefix('merchant/orders')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.orders.')
+    ->group(function () {
+        Route::get('/styles/{mother}', [\App\Http\Controllers\Merchant\BuyerOrderController::class, 'show'])->name('show');
+        Route::put('/styles/{mother}', [\App\Http\Controllers\Merchant\BuyerOrderController::class, 'update'])->name('update');
+        Route::put('/styles/{mother}/submit', [\App\Http\Controllers\Merchant\BuyerOrderController::class, 'submit'])->name('submit');
+        Route::post('/{order}/approve', [\App\Http\Controllers\Merchant\BuyerOrderController::class, 'approve'])->name('approve');
+        Route::post('/{order}/return', [\App\Http\Controllers\Merchant\BuyerOrderController::class, 'returnOrder'])->name('return');
+    });
+
+// Document bank of a style. Merchandising and Admin upload / delete,
+// Management downloads; the controller checks the buyer.
+Route::prefix('merchant/documents')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.documents.')
+    ->group(function () {
+        Route::post('/styles/{mother}', [\App\Http\Controllers\Merchant\StyleDocumentController::class, 'store'])->name('store');
+        Route::get('/{document}', [\App\Http\Controllers\Merchant\StyleDocumentController::class, 'download'])->name('download');
+        Route::delete('/{document}', [\App\Http\Controllers\Merchant\StyleDocumentController::class, 'destroy'])->name('destroy');
+    });
+
 // BOM builder: make a style's BOM on a screen. Merchandising and Admin; the
 // controller checks the buyer.
 Route::prefix('merchant/bom')

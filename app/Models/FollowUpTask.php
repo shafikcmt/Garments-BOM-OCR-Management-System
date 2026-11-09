@@ -15,13 +15,14 @@ class FollowUpTask extends Model
     public const DUE_SOON_DAYS = 2;
 
     protected $fillable = [
-        'title', 'note', 'buyer_id', 'mother_style_id', 'assigned_to', 'created_by', 'due_date',
-        'status', 'completed_at', 'completed_by', 'source', 'meta',
+        'title', 'note', 'buyer_id', 'mother_style_id', 'meeting_id', 'assigned_to', 'created_by', 'due_date',
+        'status', 'completed_at', 'completed_by', 'escalated_at', 'source', 'meta',
     ];
 
     protected $casts = [
         'due_date' => 'date',
         'completed_at' => 'datetime',
+        'escalated_at' => 'datetime',
         'meta' => 'array',
     ];
 
@@ -40,9 +41,19 @@ class FollowUpTask extends Model
         return $this->belongsTo(MotherStyle::class);
     }
 
+    public function meeting()
+    {
+        return $this->belongsTo(Meeting::class);
+    }
+
     public function scopeOpen($query)
     {
         return $query->where('status', self::OPEN);
+    }
+
+    public function isCritical(): bool
+    {
+        return (bool) ($this->meta['critical'] ?? false);
     }
 
     public function isOpen(): bool

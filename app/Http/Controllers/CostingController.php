@@ -43,6 +43,8 @@ class CostingController extends Controller
             'both' => $both,
             'canEdit' => $user->hasAnyRole(['merchant', 'admin']),
             'canApprove' => $costing ? $costings->canApprove($user, $costing) : false,
+            'templates' => $costing ? collect() : app(\App\Services\CostingTemplates::class)->forStyle($mother),
+            'sizeCost' => $costing ? app(\App\Services\SizeWiseCosting::class)->forCosting($costing) : null,
             'comparison' => $costing ? app(\App\Services\CostingVsBom::class)->compare($costing) : null,
         ]);
     }
@@ -52,8 +54,15 @@ class CostingController extends Controller
         $this->authorizeEdit($request, $mother);
         $mode = $request->validate(['mode' => ['required', Rule::in(array_keys(Costing::MODES))]])['mode'];
 
+        // Optional: start from a costing template that fits this style.
+        $fitting = app(\App\Services\CostingTemplates::class)->forStyle($mother);
+        $template = $request->filled('template_id') ? $fitting->firstWhere('id', $request->integer('template_id')) : null;
+        if ($request->filled('template_id') && ! $template) {
+            return back()->with('warning', 'That template does not fit this style.');
+        }
+
         try {
-            $costings->start($mother, $mode, $request->user());
+            app(\App\Services\CostingTemplates::class)->start($mother, $mode, $template, $request->user());
         } catch (\DomainException $e) {
             return back()->with('warning', $e->getMessage());
         }

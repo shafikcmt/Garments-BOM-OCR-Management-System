@@ -93,6 +93,22 @@ You rarely need to type styles by hand: when you import the buyer's Excel (next 
 
 So a buyer whose file has no Mother Style column still imports normally. If your buyer's file has the column, keep it: no manual linking is needed afterwards.
 
+### 2.1a Inquiries and quotations (before the order)
+
+Use this when a buyer asks for a price on a style and there is no order yet.
+
+**Open it:** left menu, **Inquiries**. The tiles show open inquiries, those whose **Quote by** date has passed, quotations waiting for the buyer, and the percentage won.
+
+**Add an inquiry:** fill **Buyer**, **Style / design no.**, the **Received** date, and if you know them the description, product group, estimated quantity, the buyer's **Target price** and the **Quote by** date. Press **Add Inquiry**. The system gives it a reference such as INQ-26-0001.
+
+**Work it** (press **Open** on the list):
+1. **Start Costing:** choose the season (or type a new season code) and press the button. The style is made in the Style Library and the buyer pre-costing is started, ready to fill (section 2.7). If the style already has a pre-costing, it is reused and nothing is duplicated.
+2. **Record Quotation:** type the price you quote and press the button. The price of the style's latest buyer costing is filled in for you; change it if the quotation differs. You can update it if the price is revised.
+3. **Mark Won** when the buyer accepts. **Mark Lost** needs a reason, which stays on the inquiry. When the order comes, use **Import Buyer Excel** with the same season and style so it lands on the style made here.
+4. **Cancel Inquiry** closes one the buyer withdrew. **Reopen** brings a lost or cancelled inquiry back.
+
+Merchandising and Admin work inquiries for the buyers they hold. Management can read them. The system never creates an order from an inquiry.
+
 ### 2.2 Import Buyer Excel (any buyer, any layout)
 
 **This is the one way to upload.** On **Workspace**, the **New Excel File Upload** tab has one main button, **Import Buyer Excel**. An older **Quick upload (sample format only)** form is folded under it; use it only for a file made from **Download Sample**, and prefer **Import Buyer Excel** for everything else.
@@ -207,6 +223,22 @@ You can only copy from a style of the **same buyer**.
 
 Use the Excel import (section 2.2) when the buyer sends a ready file; use this screen when you build the BOM yourself.
 
+### 2.2b Consumption Master (standard materials, fill the BOM faster)
+
+The Consumption Master keeps the **standard materials, consumption and wastage of a product group** (for example Jacket), so you do not type the same materials for every style.
+
+**Open it:** left menu, **Consumption Master**.
+
+**Add a material:** choose the **Buyer** (Admin may choose **All buyers**), type the **Product group** (leave empty if it applies to every group), the **Description**, and the **Consumption**. Wastage % is optional. Press **Add Material**.
+
+**Change or remove:** edit the figures on the line and press **Save**, or press **Delete**. Lines for **All buyers** can be changed by Admin only.
+
+**Learn from an existing BOM:** under **Add a material**, choose a style that already has a BOM and press **Add Its Materials**. Its materials are copied for that buyer and the style's product group. Materials already there are not added twice. Set the style's product group first, otherwise they apply to every style of the buyer.
+
+**Use it:** in **Create BOM** press **Fill from Consumption Master**. The Materials table is filled with the master's lines for the style's product group (the buyer's own line wins over an All-buyers line). **Nothing is saved yet.** Check every consumption and wastage, remove or add materials, then press **Create BOM** as usual.
+
+The system **proposes, you decide**: it never makes a BOM without your pressing Create BOM. Management can read the master but not change it.
+
 ### 2.3 Style status (how far each style has come)
 
 **Open it:** **Style Library**, choose the season, press **View Status** on a style. (Or from **Style Status**, section 2.4.)
@@ -218,7 +250,7 @@ Use the Excel import (section 2.2) when the buyer sends a ready file; use this s
 - **Child style** buttons narrow everything to one child style.
 - **Orders:** one line per color and customer PO, with ship date, quantity and how many materials are ordered or received.
 - **Materials:** every material of the style with its PO, vendor, PI and payment status, received quantity, and its **Stage**. Use the search box or the stage list to find a material.
-- **Order Changes:** every change to the order columns (ship date, PO, colour, BOM quantity, consumption and the like) made in the Workspace: when, who, which colour / PO, the old and the new value. A change saved on several material lines at once shows once ("on 9 material lines"). Which columns count is set by Admin (**Show in Order Changes** on Excel Header Control).
+- **Order Changes:** every change to the order columns (ship date, PO, colour, BOM quantity, consumption and the like) made in the Workspace: when, who, which colour / PO, the old and the new value. A change saved on several material lines at once shows once ("on 9 material lines"). Which columns count is set by Admin (**Show in Order Changes** on Excel Header Control). **The Store is told:** when a merchant saves a change in one of these columns, every Store user gets a notification "Order changed" naming the style and the columns, once per style per save, so receiving and issue are not done against an old figure. The Store roles are the ones Admin put under the Store department.
 
 **Stage means the furthest step the material has reached:**
 
@@ -246,6 +278,33 @@ These figures come from the same Workspace columns the other departments fill in
 
 The figures are kept by style, colour and PO, so they stay even when the Workspace file is re-imported. Management can open this page but cannot change it.
 
+### 2.3b Size-wise BOM (consumption per size)
+
+Use this when a bigger size needs more of a material than a smaller one, so one consumption for the whole order is not right.
+
+**Open it:** open the style, then **Size-wise BOM** on the **Orders** box. You need the **Size Breakdown** filled first (section 2.3a).
+
+1. Each row is a material of the style. **BOM cons. (incl. waste)** is the figure from the BOM.
+2. Under a size, type the consumption for that size only if it differs. **Leave it empty to use the BOM figure.** Type the figure before wastage; the wastage of the BOM line is added by the system.
+3. Press **Save Size-wise Consumption**.
+4. **Size-wise need** is worked out size by size (pieces of the size x its consumption x wastage). **Workspace need** is the old figure (order quantity x BOM consumption). **Difference** is red when the size-wise need is higher, green when lower.
+
+**Cost by size:** once a material has a size-wise consumption, the style's **Pre-costing** page shows a **Cost by size** box (section 2.7). It recalculates the matching costing line for each size and shows the cost, the difference against the sheet and the margin, then the **average by pieces** weighted by the Size Breakdown. The costing line is matched to the BOM material by name, so name them alike; a material with no matching line is listed in yellow. The costing itself is not changed.
+
+A colour or PO that has no size breakdown is counted the old way, and the row says how many lines were counted so. This page does **not** change the Workspace, the PO or the BOM approval; use the Difference to decide what to book. Management can read but not change.
+
+### 2.4d Analytics (order value, margin, win rate)
+
+**Open it:** left menu, **Analytics**. Read-only; you see your own buyers (Admin and Management see all).
+
+- **Order value by buyer:** for each buyer and currency, the number of styles, pieces, **order value**, **cost**, **profit** and **margin**. Choose one buyer in the filter to see the same by **season**.
+- **Styles, lowest margin first:** the first place to look when a margin is thin (red when negative, yellow under 10%). Press the style number to open it.
+- **Quotations won:** per buyer, open, won and lost inquiries and the win rate (section 2.1a).
+
+**How the money is worked out:** pieces are the style's order lines (a colour and PO repeated in two files counts once). Price and cost are **per piece from the style's latest final buyer pre-costing** (a dozen sheet is divided by 12). They are **estimates** until the order is closed. Styles with no final costing and quoted price are not in the money columns; the yellow message says how many pieces they hold. Different currencies are never added together.
+
+Capacity (can the factory take the order) is not shown yet.
+
 ### 2.4 Style Status: a whole season at a glance
 
 **Open it:** left menu, **Style Status**. Merchandising, Admin and Management can all open it. It is for watching progress; nothing can be edited here.
@@ -257,6 +316,20 @@ The figures are kept by style, colour and PO, so they stay even when the Workspa
 The cards at the top are the totals of the whole season. The red or yellow bar warns about materials that are not ordered yet and are late or due soon (same rule as in 2.3).
 
 If a season shows "No orders linked", import the buyer's Excel with that season code first (section 2.2).
+
+### 2.4e Meetings (order progress meetings and their actions)
+
+Keep the minutes of buyer and internal order meetings in one place, and make every agreed action a task with an owner and a date.
+
+**Open it:** left menu, **Meetings**. Filter by buyer.
+
+**Record a meeting:** press **New Meeting**. Fill the **Title**, **Date**, **Buyer**, and if the meeting was about one style its **Style no.** (it must exist in the Style Library for that buyer). Write who **Attended**, the **Minutes**, and the **Next meeting** date. Under **Actions** type each action, choose **Given to** and the **Due** date, press **Add Action** for more rows, then **Save Meeting**. Rows with an empty action are ignored.
+
+**What happens to an action:** it is a normal **follow-up task** for that person: it is in their **Follow-ups** list, they get a message, the 08:30 reminder counts it, and a long-overdue one goes to the supervisor (section 6.4). The person presses **Mark Done** on their list, and the meeting page shows "done / total". The person must be able to see the buyer.
+
+**Later:** open the meeting to correct the minutes, or add more actions. **Delete Meeting** removes the minutes; the actions stay on people's lists.
+
+Merchandising and Admin record meetings for their buyers; Management can read them.
 
 ### 2.4a OCR Summary (no more hand-made pivots)
 
@@ -275,6 +348,23 @@ If a season shows "No orders linked", import the buyer's Excel with that season 
 3. Press **Download OCR Excel** for the workbook: a **Database** sheet (every material line, every column you may see) plus the four summary sheets. When one buyer is chosen and a column matching is saved for that buyer (Import Buyer Excel, Step 2), the Database sheet starts with the buyer's own columns in the buyer's order and titles.
 
 Good to know: a PI repeated on several lines is counted once in the Payment Summary. (Short) / excess counts only lines that have an ordered quantity. Columns are found by their name, so if a buyer's sheet has no ETA column, the ETA shows "—".
+
+### 2.4a1 Buyer Orders (customer PO register and approval)
+
+One card for each customer PO of a style. Quantity, colours and ship date are shown from the workspace (change them there, as before). The card keeps what the workspace does not hold, and the approval.
+
+**Open it:** open the style, then **Buyer Orders** on the **Orders** box.
+
+**On each card:**
+- **Colours, Order qty, Size total, Ship date** are read-only. **Differs** appears when the Size Breakdown total is not the order quantity.
+- Fill **Destination**, **Contract / L/C ref.**, **Quotation** (choose one of the style's final costings) and **Remark**, then press **Save**.
+- Press **Send for Approval** when the PO is ready. Admin, Management of the buyer and a Merchandising department head are told. The person who sent it does not approve it, unless nobody else could.
+- An approver presses **Approve**, or writes a comment and presses **Return**. A returned order shows the reason; correct it and send again.
+- If the quantity, a colour, a ship date or a size figure changes after approval, the card shows **Changed after approval**. Send it for approval again.
+
+Management can read and approve but not edit.
+
+**Stopping Supply Chain until the order is approved (Admin).** On **BOM Approvals**, the Settings box has a switch **Supply Chain cannot generate a PO until the buyer order (customer PO) is approved**. It is off by default. When it is on, Supply Chain cannot generate a PO for a customer PO that is not **Approved** on Buyer Orders, or that **changed after approval**, and sees the reason. This includes orders that were never sent for approval, so switch it on only after the open orders have been approved. Rows that are not linked to a style (older files) are never blocked. Buyer Orders shows a blue note while the switch is on.
 
 ### 2.4b Samples
 
@@ -297,6 +387,16 @@ Good to know: a PI repeated on several lines is counted once in the Payment Summ
 **Sample types:** at the bottom of the Samples page. Press a type to switch it off (not offered for new samples) or on; type a **New sample type** and press **Add Type**. Proto, Fit, Size Set, PP, Photo, TOP and Shipment are there to start with.
 
 Management can see samples but not change them.
+
+### 2.4c Documents (document bank)
+
+Keep the style's papers with the style: tech pack, approved lab dip, PP comments, test report, buyer e-mail.
+
+**Add a document:** open the style, go to the **Documents** box. Press **Choose file** (PDF, picture, Excel, Word, PowerPoint, text or zip; up to 15 MB). Type a **Title** if you want (otherwise the file name is used) and a **Category** (pick a suggestion or type your own). Press **Add Document**.
+
+**Open a document:** press **Download** on its line. **Delete** removes it for good; ask before you delete a paper others may need.
+
+Merchandising and Admin can add and delete. Management can download but not change. Only people who may see the buyer can open its documents.
 
 ### 2.5 When you change an order that already has a PO
 
@@ -388,6 +488,20 @@ The **Season page** of Style Status shows the **Margin** of each style's latest 
 ---
 
 ## 3. Supply Chain
+
+### 2.7a Costing templates (start a costing from a ready sheet)
+
+A costing template is a **ready cost sheet** for a product group, with the usual lines, quantities, wastage and rates, so you do not type them for every style.
+
+**Make one:** left menu, **Costing Templates**, **New Template**. Choose the **Buyer** (Admin may choose **All buyers**), type the **Product group** (empty = every group), the currency and whether costs are per piece or per dozen, then add the lines under their cost head and press **Save Template**. **Active** switches it on or off.
+
+**Or save one from a costing:** open a style's Pre-costing, go to **Save as template** at the bottom, type a name and press **Save as Template**. It copies the lines, rates, currency and basis of the saved sheet (not the quoted price). Press Save on the costing first if you changed it.
+
+**Use one:** on a style that has no costing yet, **Start a template** shows the templates that fit the style, best first (the buyer's own for the style's product group, then the group's for every buyer, then general ones). Choose one, or **No template (standard rows)**, and press **Start Buyer Costing**. The amounts and the total are worked out for you; change any line as usual.
+
+The lines are **copied**: changing or deleting a template later never changes a costing already made. Lines for **All buyers** can be changed by Admin only. Management can read the templates.
+
+Post-costing (what the order really cost after shipment) is not built yet.
 
 ### 3.0 Supply Chain dashboard
 
@@ -657,11 +771,22 @@ A TnA template is a ready list of tasks for an order, for example "Fabric bookin
 2. For each task type the **Task**, the **Days** (negative = before, positive = after), **From** (Ship date or Order received) and **Given to role**. **Add Task** adds a row.
 3. Tick **Apply automatically every morning** if every style of that buyer should get the plan by itself. Press **Save Template**.
 
+**Critical steps:** on each template task, tick **Critical** for the steps the shipment depends on (fabric in-house, PP approval, cutting start). Tasks made from the template keep the mark.
+
 **Apply it to a style:** open the style, in the **TnA Plan** box choose the template and press **Apply TnA Plan**.
 - One follow-up task is made per template task, due on the anchor date plus the days. It goes to someone with that role who can see the buyer: you, if you have the role, otherwise the person with the fewest open tasks.
 - Each person gets one message. The tasks appear in **Follow-ups** with the same red / yellow / green lights and the 8:30 reminder.
 - Applying again only adds tasks that are not there yet. A task that cannot be made (no ship date yet, nobody with the role) is named in a yellow message.
 - The **TnA Plan** box shows every TnA task of the style with its status and "done / total".
+
+**Critical path.** In the style's **TnA Plan** box a green, amber or red line shows where the critical steps stand: **On track**, **Watch** (one is due within 2 days), **At risk** (one is overdue) or **Complete**, with how many are done and the next one due. Critical tasks carry a **Critical** badge.
+
+**Overdue e-mail and escalation (Admin).** On **Admin > TnA Templates**, the **Alerts** box has two settings:
+- **E-mail the daily list of overdue tasks:** when ticked, the morning reminder is also sent by e-mail to people who have an e-mail address on their profile. It is off until you tick it, and it needs mail to be set up on the server. If the mail server fails, the in-app reminder still arrives.
+- **Tell the supervisor after (days overdue):** a task that stays overdue for this many days is reported **once** to the supervisors (Admin, Management of the buyer, and a Merchandising department head), never to the person who owns it. The task then shows **Escalated**. Type 0 to switch this off. The default is 3 days.
+
+Both run with the 08:30 morning reminder (Dhaka time). Press **Save Alert Settings** after a change.
+
 
 ---
 
@@ -692,7 +817,7 @@ On the live server, every push to `master` runs the migrations by itself, and th
 
 ## 8. Common questions
 
-**Who makes the BOM? Is it created by the system after I upload the Excel?** The **merchant** makes it: either on screen with **Create BOM** (section 2.2a) or in an Excel file that is uploaded or imported (section 2.2). The system does **not invent** materials or consumption; they come from the merchant (from the buyer's tech pack or the costing). Once the BOM is in, the system takes over: it arranges every line under the right style, season and colour, **calculates** the formula columns, and passes it on to BOM approval, PO, payment, receiving and issue. Making a BOM automatically from an order and a consumption master is **not built yet**.
+**Who makes the BOM? Is it created by the system after I upload the Excel?** The **merchant** makes it: either on screen with **Create BOM** (section 2.2a) or in an Excel file that is uploaded or imported (section 2.2). The system does **not invent** materials or consumption; they come from the merchant (from the buyer's tech pack or the costing). Once the BOM is in, the system takes over: it arranges every line under the right style, season and colour, **calculates** the formula columns, and passes it on to BOM approval, PO, payment, receiving and issue. Filling the materials from standard figures is built: see the Consumption Master (section 2.2b). Fully automatic BOM, without a merchant checking it, is not built and not planned.
 
 **The Style status page says "No orders are linked".** The style has no order yet. Import the buyer's Excel with the same season code, or run `bom:sync-tables` for older files.
 
@@ -732,4 +857,4 @@ On the live server, every push to `master` runs the migrations by itself, and th
 
 ## 10. Not built yet
 
-Automatic BOM from an order and consumption master, size-wise costing, buyer inquiry and quotation, the rest of TnA (critical path, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
+Fully automatic BOM (the Consumption Master only proposes), the rest of TnA (mobile app, tasks at PO level), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
