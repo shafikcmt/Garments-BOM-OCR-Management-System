@@ -39,6 +39,20 @@
         <div class="alert alert-warning py-2">{{ $copyNote }}</div>
     @endif
 
+    @if($fromMaster && $fromMaster['rows'])
+        <div class="alert alert-success py-2">Filled {{ count($fromMaster['rows']) }} material(s) from the Consumption Master. Check each consumption and wastage, then press Create BOM.</div>
+    @elseif($fromMaster)
+        <div class="alert alert-warning py-2">{{ $fromMaster['note'] }}</div>
+    @endif
+
+    {{-- Fill from the Consumption Master (standard materials of this product group) --}}
+    <x-card title="Start from the Consumption Master" class="mb-3" body-class="p-3">
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <a href="{{ route('merchant.bom.create', ['mother' => $mother, 'master' => 1]) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-list-check me-1" aria-hidden="true"></i>Fill from Consumption Master</a>
+            <span class="text-muted small">{{ $masterCount }} standard material(s) for {{ $mother->product_group ?: 'this style' }}. <a href="{{ route('merchant.consumption.index') }}">Open the Consumption Master</a></span>
+        </div>
+    </x-card>
+
     {{-- Copy the materials of an earlier BOM of this buyer --}}
     @if($sources->isNotEmpty())
         <x-card title="Start from an earlier BOM" class="mb-3" body-class="p-3">

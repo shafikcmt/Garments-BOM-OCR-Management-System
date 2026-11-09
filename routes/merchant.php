@@ -79,6 +79,19 @@ Route::prefix('merchant/samples')
         Route::put('/types/{type}', [\App\Http\Controllers\Merchant\SampleController::class, 'toggleType'])->name('types.toggle');
     });
 
+// Consumption master: standard materials per product group. Merchandising and
+// Admin manage, Management reads; the controller checks the buyer.
+Route::prefix('merchant/consumption-master')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.consumption.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\Merchant\ConsumptionMasterController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\Merchant\ConsumptionMasterController::class, 'store'])->name('store');
+        Route::post('/from-style', [\App\Http\Controllers\Merchant\ConsumptionMasterController::class, 'fromStyle'])->name('from_style');
+        Route::put('/{row}', [\App\Http\Controllers\Merchant\ConsumptionMasterController::class, 'update'])->name('update');
+        Route::delete('/{row}', [\App\Http\Controllers\Merchant\ConsumptionMasterController::class, 'destroy'])->name('destroy');
+    });
+
 // Size-wise BOM of a style. Merchandising and Admin edit, Management reads.
 Route::prefix('merchant/size-bom')
     ->middleware(['auth', 'role:merchant,admin,management'])

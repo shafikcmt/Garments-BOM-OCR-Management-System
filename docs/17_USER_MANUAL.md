@@ -207,6 +207,22 @@ You can only copy from a style of the **same buyer**.
 
 Use the Excel import (section 2.2) when the buyer sends a ready file; use this screen when you build the BOM yourself.
 
+### 2.2b Consumption Master (standard materials, fill the BOM faster)
+
+The Consumption Master keeps the **standard materials, consumption and wastage of a product group** (for example Jacket), so you do not type the same materials for every style.
+
+**Open it:** left menu, **Consumption Master**.
+
+**Add a material:** choose the **Buyer** (Admin may choose **All buyers**), type the **Product group** (leave empty if it applies to every group), the **Description**, and the **Consumption**. Wastage % is optional. Press **Add Material**.
+
+**Change or remove:** edit the figures on the line and press **Save**, or press **Delete**. Lines for **All buyers** can be changed by Admin only.
+
+**Learn from an existing BOM:** under **Add a material**, choose a style that already has a BOM and press **Add Its Materials**. Its materials are copied for that buyer and the style's product group. Materials already there are not added twice. Set the style's product group first, otherwise they apply to every style of the buyer.
+
+**Use it:** in **Create BOM** press **Fill from Consumption Master**. The Materials table is filled with the master's lines for the style's product group (the buyer's own line wins over an All-buyers line). **Nothing is saved yet.** Check every consumption and wastage, remove or add materials, then press **Create BOM** as usual.
+
+The system **proposes, you decide**: it never makes a BOM without your pressing Create BOM. Management can read the master but not change it.
+
 ### 2.3 Style status (how far each style has come)
 
 **Open it:** **Style Library**, choose the season, press **View Status** on a style. (Or from **Style Status**, section 2.4.)
@@ -726,7 +742,7 @@ On the live server, every push to `master` runs the migrations by itself, and th
 
 ## 8. Common questions
 
-**Who makes the BOM? Is it created by the system after I upload the Excel?** The **merchant** makes it: either on screen with **Create BOM** (section 2.2a) or in an Excel file that is uploaded or imported (section 2.2). The system does **not invent** materials or consumption; they come from the merchant (from the buyer's tech pack or the costing). Once the BOM is in, the system takes over: it arranges every line under the right style, season and colour, **calculates** the formula columns, and passes it on to BOM approval, PO, payment, receiving and issue. Making a BOM automatically from an order and a consumption master is **not built yet**.
+**Who makes the BOM? Is it created by the system after I upload the Excel?** The **merchant** makes it: either on screen with **Create BOM** (section 2.2a) or in an Excel file that is uploaded or imported (section 2.2). The system does **not invent** materials or consumption; they come from the merchant (from the buyer's tech pack or the costing). Once the BOM is in, the system takes over: it arranges every line under the right style, season and colour, **calculates** the formula columns, and passes it on to BOM approval, PO, payment, receiving and issue. Filling the materials from standard figures is built: see the Consumption Master (section 2.2b). Fully automatic BOM, without a merchant checking it, is not built and not planned.
 
 **The Style status page says "No orders are linked".** The style has no order yet. Import the buyer's Excel with the same season code, or run `bom:sync-tables` for older files.
 
@@ -766,4 +782,4 @@ On the live server, every push to `master` runs the migrations by itself, and th
 
 ## 10. Not built yet
 
-Automatic BOM from an order and consumption master, size-wise costing (size-wise BOM consumption is built, section 2.3b), buyer inquiry and quotation, the rest of TnA (critical path, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
+Fully automatic BOM (the Consumption Master only proposes), size-wise costing (size-wise BOM consumption is built, section 2.3b), buyer inquiry and quotation, the rest of TnA (critical path, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
