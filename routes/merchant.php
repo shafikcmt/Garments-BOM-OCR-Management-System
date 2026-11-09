@@ -79,6 +79,22 @@ Route::prefix('merchant/samples')
         Route::put('/types/{type}', [\App\Http\Controllers\Merchant\SampleController::class, 'toggleType'])->name('types.toggle');
     });
 
+// Costing templates: ready cost sheets per product group. Merchandising and
+// Admin manage, Management reads; the controller checks the buyer.
+Route::prefix('merchant/costing-templates')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.costing_templates.')
+    ->group(function () {
+        $c = \App\Http\Controllers\Merchant\CostingTemplateController::class;
+        Route::get('/', [$c, 'index'])->name('index');
+        Route::get('/create', [$c, 'create'])->name('create');
+        Route::post('/', [$c, 'store'])->name('store');
+        Route::post('/from-costing/{costing}', [$c, 'fromCosting'])->name('from_costing');
+        Route::get('/{template}/edit', [$c, 'edit'])->name('edit');
+        Route::put('/{template}', [$c, 'update'])->name('update');
+        Route::delete('/{template}', [$c, 'destroy'])->name('destroy');
+    });
+
 // Merchandising analytics: order value, margin, win rate. Read-only; buyer-scoped.
 Route::get('merchant/analytics', [\App\Http\Controllers\Merchant\AnalyticsController::class, 'index'])
     ->middleware(['auth', 'role:merchant,admin,management'])

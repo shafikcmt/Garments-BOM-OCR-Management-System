@@ -184,6 +184,11 @@
                         </a>
                     </li>
                     <li class="sidebar-item">
+                        <a href="{{ route('merchant.costing_templates.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.costing_templates.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-ruled" aria-hidden="true"></i></span><span class="sidebar-link-text">Costing Templates</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="{{ route('merchant.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.reports.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
@@ -371,6 +376,11 @@
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.consumption.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.consumption.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Consumption Master</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.costing_templates.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.costing_templates.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-ruled" aria-hidden="true"></i></span><span class="sidebar-link-text">Costing Templates</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
@@ -713,6 +723,11 @@
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.consumption.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.consumption.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Consumption Master</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.costing_templates.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.costing_templates.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-ruled" aria-hidden="true"></i></span><span class="sidebar-link-text">Costing Templates</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">

@@ -50,9 +50,18 @@
             <p class="fw-semibold mb-1">No {{ \App\Models\Costing::MODES[$mode] }} costing for this style yet.</p>
             <p class="text-muted">{{ $mode === 'buyer' ? 'The buyer costing is the price build-up you quote to the buyer.' : 'The in-house costing is what the factory expects to spend.' }}</p>
             @if($canEdit)
-                <form method="POST" action="{{ route('costing.start', $mother) }}">@csrf
+                <form method="POST" action="{{ route('costing.start', $mother) }}" class="row g-2 align-items-end">@csrf
                     <input type="hidden" name="mode" value="{{ $mode }}">
-                    <button class="btn btn-primary"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Start {{ \App\Models\Costing::MODES[$mode] }} Costing</button>
+                    @if($templates->isNotEmpty())
+                        <div class="col-12 col-md-5">
+                            <label class="form-label mb-1" for="cTemplate">Start from a template</label>
+                            <select name="template_id" id="cTemplate" class="form-select form-select-sm">
+                                @foreach($templates as $t)<option value="{{ $t->id }}">{{ $t->name }} ({{ $t->lines_count }} lines){{ $t->buyer_id ? '' : ' · all buyers' }}</option>@endforeach
+                                <option value="">No template (standard rows)</option>
+                            </select>
+                        </div>
+                    @endif
+                    <div class="col-auto"><button class="btn btn-primary"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Start {{ \App\Models\Costing::MODES[$mode] }} Costing</button></div>
                 </form>
             @endif
         </x-card>
@@ -270,6 +279,20 @@
                     </table>
                 </div>
                 <p class="small text-muted mt-2 mb-0">BOM consumption is the average per garment including wastage{{ $costing->basis === 'dz' ? ', times 12 for a dozen' : '' }}. PI rate is what Supply Chain recorded. Red difference = the BOM costs more than the costing.</p>
+            </x-card>
+        @endif
+
+        @if($canEdit)
+            <x-card class="mb-3" body-class="p-3">
+                <x-slot:title>Save as template</x-slot:title>
+                <form method="POST" action="{{ route('merchant.costing_templates.from_costing', $costing) }}" class="row g-2 align-items-end">
+                    @csrf
+                    <div class="col-12 col-md-4"><label class="form-label mb-1" for="tplName">Template name</label>
+                        <input type="text" name="name" id="tplName" class="form-control form-control-sm" maxlength="120" required placeholder="e.g. Jacket - standard"></div>
+                    <div class="col-auto"><div class="form-check mb-1"><input class="form-check-input" type="checkbox" name="for_this_buyer" id="tplBuyer" value="1" checked><label class="form-check-label" for="tplBuyer">Only for {{ $mother->buyer?->buyer_name }}</label></div></div>
+                    <div class="col-auto"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-bookmark-plus me-1" aria-hidden="true"></i>Save as Template</button></div>
+                    <div class="col-12 form-text">Copies the lines, rates, currency and basis of this revision (not the quoted price). The template is offered on styles of the same product group{{ $mother->product_group ? ' (' . $mother->product_group . ')' : '' }}. Saves the last saved version of the sheet.</div>
+                </form>
             </x-card>
         @endif
 

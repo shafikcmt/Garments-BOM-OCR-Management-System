@@ -473,6 +473,20 @@ The **Season page** of Style Status shows the **Margin** of each style's latest 
 
 ## 3. Supply Chain
 
+### 2.7a Costing templates (start a costing from a ready sheet)
+
+A costing template is a **ready cost sheet** for a product group, with the usual lines, quantities, wastage and rates, so you do not type them for every style.
+
+**Make one:** left menu, **Costing Templates**, **New Template**. Choose the **Buyer** (Admin may choose **All buyers**), type the **Product group** (empty = every group), the currency and whether costs are per piece or per dozen, then add the lines under their cost head and press **Save Template**. **Active** switches it on or off.
+
+**Or save one from a costing:** open a style's Pre-costing, go to **Save as template** at the bottom, type a name and press **Save as Template**. It copies the lines, rates, currency and basis of the saved sheet (not the quoted price). Press Save on the costing first if you changed it.
+
+**Use one:** on a style that has no costing yet, **Start a template** shows the templates that fit the style, best first (the buyer's own for the style's product group, then the group's for every buyer, then general ones). Choose one, or **No template (standard rows)**, and press **Start Buyer Costing**. The amounts and the total are worked out for you; change any line as usual.
+
+The lines are **copied**: changing or deleting a template later never changes a costing already made. Lines for **All buyers** can be changed by Admin only. Management can read the templates.
+
+Post-costing (what the order really cost after shipment) is not built yet.
+
 ### 3.0 Supply Chain dashboard
 
 **Open it:** log in as Supply Chain; the dashboard is the first page.
