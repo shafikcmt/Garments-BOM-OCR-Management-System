@@ -522,8 +522,24 @@ A costing template is a **ready cost sheet** for a product group, with the usual
 
 The lines are **copied**: changing or deleting a template later never changes a costing already made. Lines for **All buyers** can be changed by Admin only. Management can read the templates.
 
-Post-costing (what the order really cost after shipment) is not built yet.
+Post-costing of materials is built (section 2.7b); full post-costing (CM, overhead, shipped quantity) is not.
 
+
+### 2.7b Post-costing (what the materials really cost)
+
+Pre-costing is the estimate. Post-costing looks at what actually happened. **Material post-costing** compares the material cost of the style's **final buyer costing** with what Store has received and issued.
+
+**Open it:** on the style page press **Post-costing** (Orders box), or on the Pre-costing page.
+
+**The four figures at the top:**
+- **Material budget:** the material cost of the latest final buyer costing, per piece, times the order quantity (a dozen sheet is divided by 12).
+- **Received:** every goods receipt (GRN) of the style's materials: received quantity times the unit price Store booked. Shown with the share of the budget.
+- **Issued to production:** bulk issues, valued at the average price that material was received at.
+- **Bought, not issued (in stock):** received minus issued. Money tied up in material that has not been used.
+
+A green or red note says how far the material bought so far is below or above the budget. **Below is normal while the order is still being received.** Under it, **By material** lists each material with its received and issued quantity and value. Yellow badges warn about a material **received with no price** (its value counts as zero; add the price on Material Receiving) or **issued but never received** against this style.
+
+**What this page does not know yet:** CM, overhead, commission, claims and the quantity actually shipped are not recorded in the system, so the real **profit** of an order cannot be worked out. Prices on receipts have no currency; they are taken to be in the costing's currency. Management can read the page; it changes nothing.
 ### 3.0 Supply Chain dashboard
 
 **Open it:** log in as Supply Chain; the dashboard is the first page.
