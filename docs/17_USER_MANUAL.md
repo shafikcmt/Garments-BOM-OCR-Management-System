@@ -102,7 +102,7 @@ Use this when a buyer asks for a price on a style and there is no order yet.
 **Add an inquiry:** fill **Buyer**, **Style / design no.**, the **Received** date, and if you know them the description, product group, estimated quantity, the buyer's **Target price** and the **Quote by** date. Press **Add Inquiry**. The system gives it a reference such as INQ-26-0001.
 
 **Work it** (press **Open** on the list):
-1. **Start Costing:** choose the season (or type a new season code) and press the button. The style is made in the Style Library and the buyer pre-costing is started, ready to fill (section 6.2). If the style already has a pre-costing, it is reused and nothing is duplicated.
+1. **Start Costing:** choose the season (or type a new season code) and press the button. The style is made in the Style Library and the buyer pre-costing is started, ready to fill (section 2.7). If the style already has a pre-costing, it is reused and nothing is duplicated.
 2. **Record Quotation:** type the price you quote and press the button. The price of the style's latest buyer costing is filled in for you; change it if the quotation differs. You can update it if the price is revised.
 3. **Mark Won** when the buyer accepts. **Mark Lost** needs a reason, which stays on the inquiry. When the order comes, use **Import Buyer Excel** with the same season and style so it lands on the style made here.
 4. **Cancel Inquiry** closes one the buyer withdrew. **Reopen** brings a lost or cancelled inquiry back.
