@@ -79,6 +79,22 @@ Route::prefix('merchant/samples')
         Route::put('/types/{type}', [\App\Http\Controllers\Merchant\SampleController::class, 'toggleType'])->name('types.toggle');
     });
 
+// Order progress meetings: minutes and action items (follow-up tasks).
+// Merchandising and Admin record, Management reads; the controller checks the buyer.
+Route::prefix('merchant/meetings')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.meetings.')
+    ->group(function () {
+        $c = \App\Http\Controllers\Merchant\MeetingController::class;
+        Route::get('/', [$c, 'index'])->name('index');
+        Route::get('/create', [$c, 'create'])->name('create');
+        Route::post('/', [$c, 'store'])->name('store');
+        Route::get('/{meeting}', [$c, 'show'])->name('show');
+        Route::put('/{meeting}', [$c, 'update'])->name('update');
+        Route::post('/{meeting}/actions', [$c, 'addActions'])->name('actions');
+        Route::delete('/{meeting}', [$c, 'destroy'])->name('destroy');
+    });
+
 // Costing templates: ready cost sheets per product group. Merchandising and
 // Admin manage, Management reads; the controller checks the buyer.
 Route::prefix('merchant/costing-templates')

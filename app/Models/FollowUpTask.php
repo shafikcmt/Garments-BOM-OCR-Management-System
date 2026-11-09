@@ -15,7 +15,7 @@ class FollowUpTask extends Model
     public const DUE_SOON_DAYS = 2;
 
     protected $fillable = [
-        'title', 'note', 'buyer_id', 'mother_style_id', 'assigned_to', 'created_by', 'due_date',
+        'title', 'note', 'buyer_id', 'mother_style_id', 'meeting_id', 'assigned_to', 'created_by', 'due_date',
         'status', 'completed_at', 'completed_by', 'escalated_at', 'source', 'meta',
     ];
 
@@ -39,6 +39,11 @@ class FollowUpTask extends Model
     public function motherStyle()
     {
         return $this->belongsTo(MotherStyle::class);
+    }
+
+    public function meeting()
+    {
+        return $this->belongsTo(Meeting::class);
     }
 
     public function scopeOpen($query)

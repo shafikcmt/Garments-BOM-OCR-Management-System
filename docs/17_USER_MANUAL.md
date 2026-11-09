@@ -317,6 +317,20 @@ The cards at the top are the totals of the whole season. The red or yellow bar w
 
 If a season shows "No orders linked", import the buyer's Excel with that season code first (section 2.2).
 
+### 2.4e Meetings (order progress meetings and their actions)
+
+Keep the minutes of buyer and internal order meetings in one place, and make every agreed action a task with an owner and a date.
+
+**Open it:** left menu, **Meetings**. Filter by buyer.
+
+**Record a meeting:** press **New Meeting**. Fill the **Title**, **Date**, **Buyer**, and if the meeting was about one style its **Style no.** (it must exist in the Style Library for that buyer). Write who **Attended**, the **Minutes**, and the **Next meeting** date. Under **Actions** type each action, choose **Given to** and the **Due** date, press **Add Action** for more rows, then **Save Meeting**. Rows with an empty action are ignored.
+
+**What happens to an action:** it is a normal **follow-up task** for that person: it is in their **Follow-ups** list, they get a message, the 08:30 reminder counts it, and a long-overdue one goes to the supervisor (section 6.4). The person presses **Mark Done** on their list, and the meeting page shows "done / total". The person must be able to see the buyer.
+
+**Later:** open the meeting to correct the minutes, or add more actions. **Delete Meeting** removes the minutes; the actions stay on people's lists.
+
+Merchandising and Admin record meetings for their buyers; Management can read them.
+
 ### 2.4a OCR Summary (no more hand-made pivots)
 
 **Open it:** left menu, **OCR Summary**. Merchandising, Admin and Management can open it; you see only your buyers.
