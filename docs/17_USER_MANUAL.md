@@ -246,6 +246,19 @@ These figures come from the same Workspace columns the other departments fill in
 
 The figures are kept by style, colour and PO, so they stay even when the Workspace file is re-imported. Management can open this page but cannot change it.
 
+### 2.3b Size-wise BOM (consumption per size)
+
+Use this when a bigger size needs more of a material than a smaller one, so one consumption for the whole order is not right.
+
+**Open it:** open the style, then **Size-wise BOM** on the **Orders** box. You need the **Size Breakdown** filled first (section 2.3a).
+
+1. Each row is a material of the style. **BOM cons. (incl. waste)** is the figure from the BOM.
+2. Under a size, type the consumption for that size only if it differs. **Leave it empty to use the BOM figure.** Type the figure before wastage; the wastage of the BOM line is added by the system.
+3. Press **Save Size-wise Consumption**.
+4. **Size-wise need** is worked out size by size (pieces of the size x its consumption x wastage). **Workspace need** is the old figure (order quantity x BOM consumption). **Difference** is red when the size-wise need is higher, green when lower.
+
+A colour or PO that has no size breakdown is counted the old way, and the row says how many lines were counted so. This page does **not** change the Workspace, the PO or the BOM approval; use the Difference to decide what to book. Management can read but not change.
+
 ### 2.4 Style Status: a whole season at a glance
 
 **Open it:** left menu, **Style Status**. Merchandising, Admin and Management can all open it. It is for watching progress; nothing can be edited here.
@@ -753,4 +766,4 @@ On the live server, every push to `master` runs the migrations by itself, and th
 
 ## 10. Not built yet
 
-Automatic BOM from an order and consumption master, size-wise costing, buyer inquiry and quotation, the rest of TnA (critical path, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
+Automatic BOM from an order and consumption master, size-wise costing (size-wise BOM consumption is built, section 2.3b), buyer inquiry and quotation, the rest of TnA (critical path, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.

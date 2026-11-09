@@ -391,6 +391,7 @@
     @else
         <x-card title="Orders" class="mb-3" body-class="p-3">
             <x-slot:actions>
+                <a href="{{ route('merchant.sizebom.show', $mother) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-rulers me-1" aria-hidden="true"></i>Size-wise BOM</a>
                 <a href="{{ route('merchant.orders.show', $mother) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-check me-1" aria-hidden="true"></i>Buyer Orders</a>
                 <a href="{{ route('merchant.sizes.show', $mother) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-grid-3x3 me-1" aria-hidden="true"></i>Size Breakdown</a>
             </x-slot:actions>

@@ -79,6 +79,15 @@ Route::prefix('merchant/samples')
         Route::put('/types/{type}', [\App\Http\Controllers\Merchant\SampleController::class, 'toggleType'])->name('types.toggle');
     });
 
+// Size-wise BOM of a style. Merchandising and Admin edit, Management reads.
+Route::prefix('merchant/size-bom')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.sizebom.')
+    ->group(function () {
+        Route::get('/styles/{mother}', [\App\Http\Controllers\Merchant\SizeBomController::class, 'show'])->name('show');
+        Route::put('/styles/{mother}', [\App\Http\Controllers\Merchant\SizeBomController::class, 'update'])->name('update');
+    });
+
 // Buyer orders (customer POs) of a style: register fields and order approval.
 // Merchandising and Admin edit, Management reads and may approve; the
 // controller checks the buyer and the role per action.
