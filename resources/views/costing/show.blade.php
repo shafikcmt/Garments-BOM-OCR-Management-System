@@ -201,6 +201,38 @@
             </table>
         </x-card>
 
+        {{-- Cost of the garment by size, from the style's Size-wise BOM. --}}
+        @if($sizeCost)
+            @php($sc4 = fn ($n) => $n === null ? '—' : number_format((float) $n, 2))
+            <x-card class="mb-3" body-class="p-3">
+                <x-slot:title>Cost by size <span class="text-muted fw-normal fs-6">per {{ \App\Models\Costing::BASES[$costing->basis] }}, {{ $costing->currency }}</span></x-slot:title>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0" style="min-width:0">
+                        <thead><tr><th>Size</th><th class="text-end">Pieces</th><th class="text-end">Cost</th><th class="text-end">Against sheet</th><th class="text-end">Margin</th></tr></thead>
+                        <tbody>
+                        @foreach($sizeCost['sizes'] as $r)
+                            <tr>
+                                <td class="fw-semibold">{{ $r['size'] }}@if($r['changed'] === 0)<span class="small text-muted fw-normal"> · as costed</span>@endif</td>
+                                <td class="text-end">{{ $r['pieces'] > 0 ? number_format($r['pieces']) : '—' }}</td>
+                                <td class="text-end">{{ $sc4($r['cost']) }}</td>
+                                <td class="text-end {{ $r['difference'] > 0.00005 ? 'text-danger' : ($r['difference'] < -0.00005 ? 'text-success' : 'text-muted') }}">{{ $r['difference'] > 0 ? '+' : '' }}{{ $sc4($r['difference']) }}</td>
+                                <td class="text-end">{{ $r['margin'] === null ? '—' : $r['margin'] . '%' }}</td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-semibold"><td>Sheet (one figure)</td><td></td><td class="text-end">{{ $sc4($sizeCost['sheet_total']) }}</td><td></td><td class="text-end">{{ $costing->marginPct() === null ? '—' : $costing->marginPct() . '%' }}</td></tr>
+                            @if($sizeCost['average'] !== null)
+                                <tr class="fw-semibold"><td>Average by pieces</td><td class="text-end">{{ number_format($sizeCost['pieces']) }}</td><td class="text-end">{{ $sc4($sizeCost['average']) }}</td><td class="text-end {{ $sizeCost['average'] > $sizeCost['sheet_total'] + 0.00005 ? 'text-danger' : 'text-success' }}">{{ $sizeCost['average'] > $sizeCost['sheet_total'] ? '+' : '' }}{{ $sc4($sizeCost['average'] - $sizeCost['sheet_total']) }}</td><td class="text-end">{{ $sizeCost['average_margin'] === null ? '—' : $sizeCost['average_margin'] . '%' }}</td></tr>
+                            @endif
+                        </tfoot>
+                    </table>
+                </div>
+                <p class="small text-muted mt-2 mb-0">Only the material lines with a size-wise consumption change ({{ collect($sizeCost['lines'])->map(fn ($l) => $l['costing'])->implode(', ') ?: 'none matched' }}); the rate and wastage of the line are kept. Red = costs more than the sheet.</p>
+                @if($sizeCost['unmatched'])<p class="small text-warning mt-1 mb-0">No costing line matches: {{ implode(', ', $sizeCost['unmatched']) }}. Name the costing line like the BOM material so it is counted.</p>@endif
+            </x-card>
+        @endif
+
         {{-- Estimate against the actual BOM. --}}
         @if($comparison && $comparison['has_bom'])
             @php($m2 = fn ($n) => $n === null ? '—' : number_format((float) $n, 2))

@@ -289,6 +289,8 @@ Use this when a bigger size needs more of a material than a smaller one, so one 
 3. Press **Save Size-wise Consumption**.
 4. **Size-wise need** is worked out size by size (pieces of the size x its consumption x wastage). **Workspace need** is the old figure (order quantity x BOM consumption). **Difference** is red when the size-wise need is higher, green when lower.
 
+**Cost by size:** once a material has a size-wise consumption, the style's **Pre-costing** page shows a **Cost by size** box (section 2.7). It recalculates the matching costing line for each size and shows the cost, the difference against the sheet and the margin, then the **average by pieces** weighted by the Size Breakdown. The costing line is matched to the BOM material by name, so name them alike; a material with no matching line is listed in yellow. The costing itself is not changed.
+
 A colour or PO that has no size breakdown is counted the old way, and the row says how many lines were counted so. This page does **not** change the Workspace, the PO or the BOM approval; use the Difference to decide what to book. Management can read but not change.
 
 ### 2.4 Style Status: a whole season at a glance
@@ -809,4 +811,4 @@ On the live server, every push to `master` runs the migrations by itself, and th
 
 ## 10. Not built yet
 
-Fully automatic BOM (the Consumption Master only proposes), size-wise costing (size-wise BOM consumption is built, section 2.3b), the rest of TnA (mobile app, tasks at PO level), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
+Fully automatic BOM (the Consumption Master only proposes), the rest of TnA (mobile app, tasks at PO level), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.

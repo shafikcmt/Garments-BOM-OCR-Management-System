@@ -43,6 +43,7 @@ class CostingController extends Controller
             'both' => $both,
             'canEdit' => $user->hasAnyRole(['merchant', 'admin']),
             'canApprove' => $costing ? $costings->canApprove($user, $costing) : false,
+            'sizeCost' => $costing ? app(\App\Services\SizeWiseCosting::class)->forCosting($costing) : null,
             'comparison' => $costing ? app(\App\Services\CostingVsBom::class)->compare($costing) : null,
         ]);
     }
