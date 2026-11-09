@@ -174,6 +174,11 @@
                         </a>
                     </li>
                     <li class="sidebar-item">
+                        <a href="{{ route('merchant.analytics.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.analytics.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i></span><span class="sidebar-link-text">Analytics</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="{{ route('merchant.consumption.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.consumption.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Consumption Master</span></span>
                         </a>
@@ -356,6 +361,11 @@
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.inquiries.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.inquiries.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-chat-left-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Inquiries</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.analytics.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.analytics.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i></span><span class="sidebar-link-text">Analytics</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
@@ -693,6 +703,11 @@
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.inquiries.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.inquiries.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-chat-left-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Inquiries</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('merchant.analytics.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.analytics.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i></span><span class="sidebar-link-text">Analytics</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">

@@ -293,6 +293,18 @@ Use this when a bigger size needs more of a material than a smaller one, so one 
 
 A colour or PO that has no size breakdown is counted the old way, and the row says how many lines were counted so. This page does **not** change the Workspace, the PO or the BOM approval; use the Difference to decide what to book. Management can read but not change.
 
+### 2.4d Analytics (order value, margin, win rate)
+
+**Open it:** left menu, **Analytics**. Read-only; you see your own buyers (Admin and Management see all).
+
+- **Order value by buyer:** for each buyer and currency, the number of styles, pieces, **order value**, **cost**, **profit** and **margin**. Choose one buyer in the filter to see the same by **season**.
+- **Styles, lowest margin first:** the first place to look when a margin is thin (red when negative, yellow under 10%). Press the style number to open it.
+- **Quotations won:** per buyer, open, won and lost inquiries and the win rate (section 2.1a).
+
+**How the money is worked out:** pieces are the style's order lines (a colour and PO repeated in two files counts once). Price and cost are **per piece from the style's latest final buyer pre-costing** (a dozen sheet is divided by 12). They are **estimates** until the order is closed. Styles with no final costing and quoted price are not in the money columns; the yellow message says how many pieces they hold. Different currencies are never added together.
+
+Capacity (can the factory take the order) is not shown yet.
+
 ### 2.4 Style Status: a whole season at a glance
 
 **Open it:** left menu, **Style Status**. Merchandising, Admin and Management can all open it. It is for watching progress; nothing can be edited here.

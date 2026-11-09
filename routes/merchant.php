@@ -79,6 +79,11 @@ Route::prefix('merchant/samples')
         Route::put('/types/{type}', [\App\Http\Controllers\Merchant\SampleController::class, 'toggleType'])->name('types.toggle');
     });
 
+// Merchandising analytics: order value, margin, win rate. Read-only; buyer-scoped.
+Route::get('merchant/analytics', [\App\Http\Controllers\Merchant\AnalyticsController::class, 'index'])
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.analytics.index');
+
 // Buyer inquiries and quotations. Merchandising and Admin work them,
 // Management reads; the controller checks the buyer and the role per action.
 Route::prefix('merchant/inquiries')
