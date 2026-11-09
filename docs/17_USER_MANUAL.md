@@ -93,6 +93,22 @@ You rarely need to type styles by hand: when you import the buyer's Excel (next 
 
 So a buyer whose file has no Mother Style column still imports normally. If your buyer's file has the column, keep it: no manual linking is needed afterwards.
 
+### 2.1a Inquiries and quotations (before the order)
+
+Use this when a buyer asks for a price on a style and there is no order yet.
+
+**Open it:** left menu, **Inquiries**. The tiles show open inquiries, those whose **Quote by** date has passed, quotations waiting for the buyer, and the percentage won.
+
+**Add an inquiry:** fill **Buyer**, **Style / design no.**, the **Received** date, and if you know them the description, product group, estimated quantity, the buyer's **Target price** and the **Quote by** date. Press **Add Inquiry**. The system gives it a reference such as INQ-26-0001.
+
+**Work it** (press **Open** on the list):
+1. **Start Costing:** choose the season (or type a new season code) and press the button. The style is made in the Style Library and the buyer pre-costing is started, ready to fill (section 6.2). If the style already has a pre-costing, it is reused and nothing is duplicated.
+2. **Record Quotation:** type the price you quote and press the button. The price of the style's latest buyer costing is filled in for you; change it if the quotation differs. You can update it if the price is revised.
+3. **Mark Won** when the buyer accepts. **Mark Lost** needs a reason, which stays on the inquiry. When the order comes, use **Import Buyer Excel** with the same season and style so it lands on the style made here.
+4. **Cancel Inquiry** closes one the buyer withdrew. **Reopen** brings a lost or cancelled inquiry back.
+
+Merchandising and Admin work inquiries for the buyers they hold. Management can read them. The system never creates an order from an inquiry.
+
 ### 2.2 Import Buyer Excel (any buyer, any layout)
 
 **This is the one way to upload.** On **Workspace**, the **New Excel File Upload** tab has one main button, **Import Buyer Excel**. An older **Quick upload (sample format only)** form is folded under it; use it only for a file made from **Download Sample**, and prefer **Import Buyer Excel** for everything else.
@@ -793,4 +809,4 @@ On the live server, every push to `master` runs the migrations by itself, and th
 
 ## 10. Not built yet
 
-Fully automatic BOM (the Consumption Master only proposes), size-wise costing (size-wise BOM consumption is built, section 2.3b), buyer inquiry and quotation, the rest of TnA (mobile app, tasks at PO level), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
+Fully automatic BOM (the Consumption Master only proposes), size-wise costing (size-wise BOM consumption is built, section 2.3b), the rest of TnA (mobile app, tasks at PO level), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.

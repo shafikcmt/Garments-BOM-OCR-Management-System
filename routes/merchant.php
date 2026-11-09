@@ -79,6 +79,25 @@ Route::prefix('merchant/samples')
         Route::put('/types/{type}', [\App\Http\Controllers\Merchant\SampleController::class, 'toggleType'])->name('types.toggle');
     });
 
+// Buyer inquiries and quotations. Merchandising and Admin work them,
+// Management reads; the controller checks the buyer and the role per action.
+Route::prefix('merchant/inquiries')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.inquiries.')
+    ->group(function () {
+        $c = \App\Http\Controllers\Merchant\InquiryController::class;
+        Route::get('/', [$c, 'index'])->name('index');
+        Route::post('/', [$c, 'store'])->name('store');
+        Route::get('/{inquiry}', [$c, 'show'])->name('show');
+        Route::put('/{inquiry}', [$c, 'update'])->name('update');
+        Route::post('/{inquiry}/start-costing', [$c, 'startCosting'])->name('start_costing');
+        Route::post('/{inquiry}/quote', [$c, 'quote'])->name('quote');
+        Route::post('/{inquiry}/won', [$c, 'won'])->name('won');
+        Route::post('/{inquiry}/lost', [$c, 'lost'])->name('lost');
+        Route::post('/{inquiry}/cancel', [$c, 'cancel'])->name('cancel');
+        Route::post('/{inquiry}/reopen', [$c, 'reopen'])->name('reopen');
+    });
+
 // Consumption master: standard materials per product group. Merchandising and
 // Admin manage, Management reads; the controller checks the buyer.
 Route::prefix('merchant/consumption-master')
