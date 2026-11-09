@@ -523,7 +523,7 @@ Each approver finds it under **My Approvals** and presses **Approve** or **Retur
 
 If a final sheet is deleted or cancelled, its department sheets become free to merge again.
 
-**The Final Requisition by category.** The final sheet lists its items by category, the largest spend first (the same order as the **Category Summary**), with a **Category** column after **Type**. After each category a highlighted **Category Sum** row shows that category's quantity, quantity to buy and amount. **PDF** and **Excel** download the sheet as it reads. **PDF by Category** and **Excel by Category** add one page or sheet per category after it, as the Monthly Report does. Excel is set for A4 landscape, one page wide, with the table heading repeated on every page.
+**The Final Requisition by category.** The final sheet lists its items by category, the largest spend first (the same order as the **Category Summary**), with a **Category** column after **Type**. After each category a highlighted **Category Sum** row shows that category's quantity, quantity to buy and amount. **PDF** and **Excel** download the sheet as it reads. **PDF by Category** and **Excel by Category** add one page or sheet per category after it, as the Monthly Report does. Excel is set for A4 landscape, one page wide, with the table heading repeated on every page. The Excel is made for a black-and-white printer: black text on light grey headings, black borders on every cell, and no merged cells, so you can select and copy any cell. The signature boxes at the bottom run from the left edge to the right edge of the page.
 
 The **Category Summary** is built from the same lines, so its category amounts and total are the Final Requisition's figures. The **Monthly Report** recalculates stock across sheets, so its totals can differ slightly.
 
@@ -539,7 +539,7 @@ Prepared (section staff) -> Section / Department Head -> Received by Store -> Fi
 
 It is never merged. The approvers are set by Admin in **Admin > Requisition Signatures**, under **Individual Requisition**. HR Audit is not part of the Monthly (final) or the Individual steps. An Admin can still add it back in Requisition Signatures. Sheets already on their way keep the steps they started with.
 
-**To Be Procured.** The system works out the quantity to buy for each item: **Qty Requested − Stock in Hand + Safety Stock**, as a round figure. Example: Qty 420, Stock 180, Safety Stock 42.54 (shown as 43) → 420 − 180 + 43 = **283**. If the stock already covers the request and the safety level, To Be Procured is 0. Amount = To Be Procured × Rate. All quantities on a requisition (screen, PDF and Excel) are shown as round figures; rates and amounts keep 2 decimals.
+**To Be Procured.** The system works out the quantity to buy for each item: **Qty Requested − Stock in Hand + Safety Stock**, as a round figure. Example: Qty 420, Stock 180, Safety Stock 42.54 (shown as 43) → 420 − 180 + 43 = **283**. If the stock already covers the request and the safety level, To Be Procured is 0. **Individual requisitions do not add Safety Stock**: To Be Procured is Qty Requested − Stock in Hand (the Safety Stock is still shown for reference). Amount = To Be Procured × Rate. All quantities on a requisition (screen, PDF and Excel) are shown as round figures; rates and amounts keep 2 decimals.
 
 **Who sees stock figures.** Hand stock, safety stock and the other stock details on a requisition are shown only to Store, Admin and Management. Other departments see their items and quantities only.
 

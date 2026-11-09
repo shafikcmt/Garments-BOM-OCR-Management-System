@@ -2068,7 +2068,13 @@ class PurchaseRequisitionController extends Controller
             $snapshot = $itemId ? ($snapshots[$itemId] ?? []) : [];
 
             $qty = (float) $line['qty_requested'];
-            $toBeProcured = $this->requisitions->toBeProcured($qty, $snapshot['stock_in_hand'] ?? null, $snapshot['safety_stock'] ?? null);
+            // An Individual requisition is a one-off need: Safety Stock is shown
+            // for reference but is not added to what is bought.
+            $toBeProcured = $this->requisitions->toBeProcured(
+                $qty,
+                $snapshot['stock_in_hand'] ?? null,
+                $requisition->isIndividual() ? null : ($snapshot['safety_stock'] ?? null)
+            );
 
             // Rate defaults to the last purchase rate but is editable, so an
             // expected price rise can be planned for.

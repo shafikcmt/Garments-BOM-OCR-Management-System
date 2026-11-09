@@ -78,16 +78,19 @@ it('puts Category after Type in the Final Requisition Excel, with highlighted ca
     $headings = collect(range('A', 'G'))->map(fn ($c) => trim((string) $ws->getCell($c.$headerRow)->getValue()))->all();
     expect($headings[4])->toStartWith('Type')->and($headings[5])->toBe('Category');
 
+    // The label sits in the last cell before the figures (no merged cells).
     $sums = [];
     foreach ($ws->getRowIterator() as $row) {
-        $label = trim((string) $ws->getCell('A'.$row->getRowIndex())->getValue());
-        if (str_starts_with($label, 'Category Sum')) {
-            $sums[$label] = $row->getRowIndex();
+        foreach (range('A', 'G') as $c) {
+            $label = trim((string) $ws->getCell($c.$row->getRowIndex())->getValue());
+            if (str_starts_with($label, 'Category Sum')) {
+                $sums[$label] = $row->getRowIndex();
+            }
         }
     }
     expect(array_keys($sums))->toBe(['Category Sum: Chemical', 'Category Sum: Stationery']);
     $first = $sums['Category Sum: Chemical'];
-    expect($ws->getStyle('A'.$first)->getFill()->getStartColor()->getARGB())->toBe('FFFFF4D6')
+    expect($ws->getStyle('A'.$first)->getFill()->getStartColor()->getARGB())->toBe('FFEDEDED')
         ->and($ws->getStyle('A'.$first)->getFont()->getBold())->toBeTrue();
 });
 
