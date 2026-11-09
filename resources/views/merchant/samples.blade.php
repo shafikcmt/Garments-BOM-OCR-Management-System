@@ -8,6 +8,7 @@
 
     <x-page-header icon="scissors" eyebrow="Merchandising" title="Samples"
                    copy="Every sample of your buyers: what, when the buyer needs it, when it was sent and what the buyer said. Add a sample from the style page.">
+        <x-slot:actions><a href="{{ route('merchant.samples.lessons') }}" class="btn btn-outline-secondary"><i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Buyer Comments (Lessons)</a></x-slot:actions>
     </x-page-header>
 
     <x-flash />
