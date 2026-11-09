@@ -299,7 +299,7 @@ Rules for every step below:
 |---|---|---|
 | S1 | **Booking from BOM lines**: list of "to be ordered" lines (not booked, short), grouped by supplier, pick lines → Booking PO; booked vs required and short / excess shown by the system | Replaces typing "Materials Ordered" in the workspace |
 | S2 | **PI register**: PI no / date / rate / amount / HS code per Booking PO, PI vs PO mismatch flag, "PI pending" list | Today PI Status is a workspace column |
-| S3 | Supplier **delivery commitment** (committed ex-mill) and a late-supplier list | Feeds the dashboard and TnA |
+| S3 | (**read-only slice done 2026-11-10**: Supply Chain > Supplier Delivery, `SupplierDelivery`, promised date vs receipts per PO and per supplier; entering the committed date on a screen is still open) Supplier **delivery commitment** (committed ex-mill) and a late-supplier list | Feeds the dashboard and TnA |
 | S4 | One supplier master (`Supplier` and `GeneralStockSupplier` are separate today) | Decide with the owner; additive, no merge of old rows by force |
 
 **Commercial** (nothing structured yet; biggest gap)

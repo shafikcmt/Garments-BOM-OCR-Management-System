@@ -608,6 +608,22 @@ When you press **Create PRA** on the preview screen, the box has a **Supporting 
 
 **Resubmitting a rejected PRA.** In **My PRA Status**, press **Resubmit**. The box lists the documents already attached: tick **Tick to remove** on any you want to drop, and use **Supporting documents** to add new or corrected files (for example an updated PI copy). Then press **Resubmit**.
 
+### 3.x Supplier Delivery (who is late)
+
+**Open it:** left menu, **Supplier Delivery**. It is read-only and changes nothing; use it each morning to decide whom to call.
+
+**Where the dates come from.** For every generated PO the system takes the **promised date** from the PO's workspace row: **Committed In-house**, else **Committed ETA**, else **Committed Ex-mill** (the first one that is filled). A PO counts as **delivered** when **Actual In-house** is filled, or when Store has received **98% or more** of the PO quantity (the delivery date is Actual In-house, else the date of the last receipt).
+
+**Each PO line is one of:**
+- **Overdue:** not delivered and the promised date has passed. It shows how many days late.
+- **No date given:** not delivered and nobody entered a promised date. Ask the supplier and fill it in.
+- **Open, not due yet.** A line that has had part of the quantity shows "partial".
+- **Delivered on time** or **Delivered late** (and how many days).
+
+**The tiles** count overdue lines, lines with no date, open lines and the percentage delivered on time. **Suppliers** lists each supplier with PO lines, delivered, overdue, no date, open, the on-time percentage and the average days late; the ones with most overdue lines come first. Press a supplier to see its lines, or choose what to **Show** and search a supplier, PO number, style or item. **View PO** opens the booking PO.
+
+You see only the POs of the buyers you hold. Management and Admin can read it too. To fix a date, change it in the workspace or on **Inbound Shipments** (the shipment writes Committed ETA and in-house dates to the PO).
+
 ## 3a. Commercial
 
 ### 3a.1 Inbound Shipments (imported material by BL / AWB)

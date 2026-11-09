@@ -12,6 +12,13 @@ use App\Http\Controllers\SupplyChain\ReportController;
 // Kept in their own group because they are shared with Admin / Management,
 // while the main supply chain group below stays supply_chain-only. The download
 // routes re-check the role in ReportController.
+// Supplier delivery follow-up: promised date against what arrived, per PO and
+// supplier. Read-only, shared with Admin and Management; buyer-scoped in the
+// controller.
+Route::get('supply-chain/supplier-delivery', [\App\Http\Controllers\SupplyChain\SupplierDeliveryController::class, 'index'])
+    ->middleware(['auth', 'role:supply_chain,admin,management'])
+    ->name('supply_chain.supplier_delivery');
+
 Route::prefix('supply-chain/reports')
     ->middleware(['auth', 'role:supply_chain,admin,management'])
     ->name('supply_chain.reports.')
