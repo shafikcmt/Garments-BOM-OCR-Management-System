@@ -4,7 +4,7 @@
 
 @section('content')
 @php
-    $rows = old('tasks', $tasks->map(fn ($t) => ['id' => $t->id, 'title' => $t->title, 'anchor' => $t->anchor, 'offset_days' => $t->offset_days, 'assignee_role' => $t->assignee_role])->all());
+    $rows = old('tasks', $tasks->map(fn ($t) => ['id' => $t->id, 'title' => $t->title, 'anchor' => $t->anchor, 'offset_days' => $t->offset_days, 'assignee_role' => $t->assignee_role, 'is_critical' => $t->is_critical])->all());
     if ($rows === []) {
         $rows = [['id' => null, 'title' => '', 'anchor' => 'ship_date', 'offset_days' => -30, 'assignee_role' => 'merchant']];
     }
@@ -62,7 +62,7 @@
             </x-slot:actions>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0" style="min-width:0">
-                    <thead><tr><th>Task</th><th style="width:150px">Days</th><th style="width:190px">From</th><th style="width:200px">Given to role</th><th style="width:110px"></th></tr></thead>
+                    <thead><tr><th>Task</th><th style="width:150px">Days</th><th style="width:190px">From</th><th style="width:200px">Given to role</th><th style="width:90px">Critical</th><th style="width:110px"></th></tr></thead>
                     <tbody data-tasks>
                     @foreach($rows as $i => $r)
                         <tr>
@@ -71,13 +71,14 @@
                             <td><input type="number" name="tasks[{{ $i }}][offset_days]" class="form-control form-control-sm" min="-365" max="365" required value="{{ $r['offset_days'] }}"></td>
                             <td><select name="tasks[{{ $i }}][anchor]" class="form-select form-select-sm">@foreach($anchors as $k => $label)<option value="{{ $k }}" @selected($r['anchor'] === $k)>{{ $label }}</option>@endforeach</select></td>
                             <td><select name="tasks[{{ $i }}][assignee_role]" class="form-select form-select-sm">@foreach($roles as $role)<option value="{{ $role }}" @selected($r['assignee_role'] === $role)>{{ $roleLabel($role) }}</option>@endforeach</select></td>
+                            <td><input type="hidden" name="tasks[{{ $i }}][is_critical]" value="0"><input type="checkbox" class="form-check-input" name="tasks[{{ $i }}][is_critical]" value="1" aria-label="Critical" @checked(! empty($r['is_critical']))></td>
                             <td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-remove-task><i class="bi bi-trash me-1" aria-hidden="true"></i>Remove</button></td>
                         </tr>
                     @endforeach
                     </tbody>
                 </table>
             </div>
-            <p class="small text-muted mt-2 mb-0">Each task goes to someone with that role who can see the buyer (the person applying, if they have the role).</p>
+            <p class="small text-muted mt-2 mb-0">Each task goes to someone with that role who can see the buyer (the person applying, if they have the role). Tick Critical for the steps the shipment depends on; the style page shows the order at risk when one of them is late.</p>
         </x-card>
 
         <div class="mt-3"><button class="btn btn-primary"><i class="bi bi-save me-1" aria-hidden="true"></i>Save Template</button></div>
@@ -90,6 +91,7 @@
         <td><input type="number" name="tasks[__I__][offset_days]" class="form-control form-control-sm" min="-365" max="365" required value="0"></td>
         <td><select name="tasks[__I__][anchor]" class="form-select form-select-sm">@foreach($anchors as $k => $label)<option value="{{ $k }}">{{ $label }}</option>@endforeach</select></td>
         <td><select name="tasks[__I__][assignee_role]" class="form-select form-select-sm">@foreach($roles as $role)<option value="{{ $role }}">{{ $roleLabel($role) }}</option>@endforeach</select></td>
+        <td><input type="hidden" name="tasks[__I__][is_critical]" value="0"><input type="checkbox" class="form-check-input" name="tasks[__I__][is_critical]" value="1" aria-label="Critical"></td>
         <td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-remove-task><i class="bi bi-trash me-1" aria-hidden="true"></i>Remove</button></td>
     </tr>
 </template>

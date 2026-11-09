@@ -707,11 +707,22 @@ A TnA template is a ready list of tasks for an order, for example "Fabric bookin
 2. For each task type the **Task**, the **Days** (negative = before, positive = after), **From** (Ship date or Order received) and **Given to role**. **Add Task** adds a row.
 3. Tick **Apply automatically every morning** if every style of that buyer should get the plan by itself. Press **Save Template**.
 
+**Critical steps:** on each template task, tick **Critical** for the steps the shipment depends on (fabric in-house, PP approval, cutting start). Tasks made from the template keep the mark.
+
 **Apply it to a style:** open the style, in the **TnA Plan** box choose the template and press **Apply TnA Plan**.
 - One follow-up task is made per template task, due on the anchor date plus the days. It goes to someone with that role who can see the buyer: you, if you have the role, otherwise the person with the fewest open tasks.
 - Each person gets one message. The tasks appear in **Follow-ups** with the same red / yellow / green lights and the 8:30 reminder.
 - Applying again only adds tasks that are not there yet. A task that cannot be made (no ship date yet, nobody with the role) is named in a yellow message.
 - The **TnA Plan** box shows every TnA task of the style with its status and "done / total".
+
+**Critical path.** In the style's **TnA Plan** box a green, amber or red line shows where the critical steps stand: **On track**, **Watch** (one is due within 2 days), **At risk** (one is overdue) or **Complete**, with how many are done and the next one due. Critical tasks carry a **Critical** badge.
+
+**Overdue e-mail and escalation (Admin).** On **Admin > TnA Templates**, the **Alerts** box has two settings:
+- **E-mail the daily list of overdue tasks:** when ticked, the morning reminder is also sent by e-mail to people who have an e-mail address on their profile. It is off until you tick it, and it needs mail to be set up on the server. If the mail server fails, the in-app reminder still arrives.
+- **Tell the supervisor after (days overdue):** a task that stays overdue for this many days is reported **once** to the supervisors (Admin, Management of the buyer, and a Merchandising department head), never to the person who owns it. The task then shows **Escalated**. Type 0 to switch this off. The default is 3 days.
+
+Both run with the 08:30 morning reminder (Dhaka time). Press **Save Alert Settings** after a change.
+
 
 ---
 
@@ -782,4 +793,4 @@ On the live server, every push to `master` runs the migrations by itself, and th
 
 ## 10. Not built yet
 
-Fully automatic BOM (the Consumption Master only proposes), size-wise costing (size-wise BOM consumption is built, section 2.3b), buyer inquiry and quotation, the rest of TnA (critical path, mobile app), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.
+Fully automatic BOM (the Consumption Master only proposes), size-wise costing (size-wise BOM consumption is built, section 2.3b), buyer inquiry and quotation, the rest of TnA (mobile app, tasks at PO level), planning, commercial (LC / export documents) extensions, shipment documents, SAP FICO-style accounting, HR. These will be added to this manual as they are delivered.

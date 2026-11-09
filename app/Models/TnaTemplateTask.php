@@ -12,9 +12,9 @@ class TnaTemplateTask extends Model
         'order_received' => 'Order received',
     ];
 
-    protected $fillable = ['tna_template_id', 'title', 'anchor', 'offset_days', 'assignee_role', 'position'];
+    protected $fillable = ['tna_template_id', 'title', 'anchor', 'offset_days', 'assignee_role', 'is_critical', 'position'];
 
-    protected $casts = ['offset_days' => 'integer'];
+    protected $casts = ['offset_days' => 'integer', 'is_critical' => 'boolean'];
 
     public function template()
     {

@@ -18,7 +18,24 @@ class TnaTemplateController extends Controller
     {
         $templates = TnaTemplate::with('buyer')->withCount('tasks')->orderBy('name')->get();
 
-        return view('admin.tna.index', compact('templates'));
+        return view('admin.tna.index', [
+            'templates' => $templates,
+            'emailEnabled' => \App\Services\FollowUps::emailEnabled(),
+            'escalateDays' => \App\Services\FollowUps::escalateAfterDays(),
+        ]);
+    }
+
+    /** Alert settings: daily e-mail and escalation to the supervisor. */
+    public function settings(Request $request)
+    {
+        $data = $request->validate([
+            'escalate_after_days' => ['required', 'integer', 'between:0,60'],
+        ], ['escalate_after_days.required' => 'Type the number of days (0 switches escalation off).']);
+
+        \App\Models\AppSetting::put(\App\Services\FollowUps::KEY_EMAIL, $request->boolean('email_enabled') ? 1 : 0);
+        \App\Models\AppSetting::put(\App\Services\FollowUps::KEY_ESCALATE_DAYS, (int) $data['escalate_after_days']);
+
+        return back()->with('success', 'TnA alert settings saved.');
     }
 
     public function create()
@@ -81,6 +98,7 @@ class TnaTemplateController extends Controller
             'tasks.*.anchor' => ['required', Rule::in(array_keys(TnaTemplateTask::ANCHORS))],
             'tasks.*.offset_days' => ['required', 'integer', 'between:-365,365'],
             'tasks.*.assignee_role' => ['required', 'exists:roles,name'],
+            'tasks.*.is_critical' => ['nullable', 'boolean'],
         ], [
             'tasks.required' => 'Add at least one task.',
             'tasks.*.title.required' => 'Every task needs a name.',
@@ -104,7 +122,7 @@ class TnaTemplateController extends Controller
     {
         $keep = [];
         foreach ($tasks as $position => $row) {
-            $attrs = ['title' => $row['title'], 'anchor' => $row['anchor'], 'offset_days' => (int) $row['offset_days'], 'assignee_role' => $row['assignee_role'], 'position' => $position];
+            $attrs = ['title' => $row['title'], 'anchor' => $row['anchor'], 'offset_days' => (int) $row['offset_days'], 'assignee_role' => $row['assignee_role'], 'is_critical' => ! empty($row['is_critical']), 'position' => $position];
             $task = ! empty($row['id']) ? $template->tasks()->whereKey($row['id'])->first() : null;
             if ($task) {
                 $task->update($attrs);

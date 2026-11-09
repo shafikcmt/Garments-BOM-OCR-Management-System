@@ -15,6 +15,25 @@
 
     <x-flash />
 
+    <x-card title="Alerts" class="mb-3" body-class="p-3">
+        <form method="POST" action="{{ route('admin.tna.settings') }}" class="row g-3 align-items-end">
+            @csrf @method('PUT')
+            <div class="col-12 col-md-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="email_enabled" id="tnaEmail" value="1" @checked($emailEnabled)>
+                    <label class="form-check-label" for="tnaEmail">E-mail the daily list of overdue tasks</label>
+                </div>
+                <div class="form-text">Sent with the morning reminder to people who have an e-mail address. Needs mail to be set up on the server.</div>
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label mb-1" for="tnaEsc">Tell the supervisor after (days overdue)</label>
+                <input type="number" min="0" max="60" name="escalate_after_days" id="tnaEsc" class="form-control form-control-sm" value="{{ old('escalate_after_days', $escalateDays) }}" required>
+                <div class="form-text">0 switches it off. Admin, Management of the buyer and a Merchandising department head are told, once per task.</div>
+            </div>
+            <div class="col-auto"><button class="btn btn-primary btn-sm"><i class="bi bi-save me-1" aria-hidden="true"></i>Save Alert Settings</button></div>
+        </form>
+    </x-card>
+
     <x-card body-class="p-3">
         <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">

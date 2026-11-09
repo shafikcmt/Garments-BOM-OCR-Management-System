@@ -16,12 +16,13 @@ class FollowUpTask extends Model
 
     protected $fillable = [
         'title', 'note', 'buyer_id', 'mother_style_id', 'assigned_to', 'created_by', 'due_date',
-        'status', 'completed_at', 'completed_by', 'source', 'meta',
+        'status', 'completed_at', 'completed_by', 'escalated_at', 'source', 'meta',
     ];
 
     protected $casts = [
         'due_date' => 'date',
         'completed_at' => 'datetime',
+        'escalated_at' => 'datetime',
         'meta' => 'array',
     ];
 
@@ -43,6 +44,11 @@ class FollowUpTask extends Model
     public function scopeOpen($query)
     {
         return $query->where('status', self::OPEN);
+    }
+
+    public function isCritical(): bool
+    {
+        return (bool) ($this->meta['critical'] ?? false);
     }
 
     public function isOpen(): bool

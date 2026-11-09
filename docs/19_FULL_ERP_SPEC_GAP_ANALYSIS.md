@@ -124,7 +124,7 @@ Status, Merchandising dashboard, OCR Summary, OCR Excel.
 | M-3 | **Document bank** per style / order (tech pack, lab dip, PP comment) | Merch: document bank | Small-Medium | — |
 | M-4 | **Size-wise BOM and costing** | Merch + Costing | Medium | M-2 |
 | M-5 | **Consumption master + auto BOM** | Merch: auto BOM | Medium-Large | M-2, M-4 |
-| M-6 | **TnA depth**: critical path, supervisor escalation, overdue e-mail, PO-level tasks | TnA | Medium | — |
+| M-6 | **TnA depth**: **Slice 1 done 2026-11-09** (Critical mark on template tasks + critical-path state on the style page; overdue e-mail digest, Admin on/off; escalation to the supervisor after N days, once per task; `followups:remind` runs it). Still open: tasks at PO / PR level (cost-centre), dependencies between steps and a true critical-path calculation, per-user escalation chains, mobile updates, WhatsApp / SMS | TnA | Medium | — |
 | M-7 | **Sample depth**: sample requisition with materials, Tag ID, rework, sample costing / SAM, lessons bank | Sample | Medium | Interview Q4 |
 | M-8 | **Inquiry and quotation**: buyer inquiry > pre-costing > quotation sent / won / lost | Merch: inquiry | Medium | — |
 | M-9 | **Merchandiser analytics**: revenue, margin, order win rate by buyer / style; capacity check | Merch analytics | Medium | M-2, post-costing |
@@ -132,7 +132,7 @@ Status, Merchandising dashboard, OCR Summary, OCR Excel.
 | M-11 | **Order progress meeting tracker** (minutes, action items assigned) | Merch | Small | — |
 | M-12 | Open item from doc 12 §12.3: list of file columns with no header; master-data import (vendors from "Dropdown" sheet) | Import | Small | — |
 
-M-1 and M-3 shipped together on 2026-11-09. M-2 slice 1 shipped the same day. M-4 slice 1 (size-wise BOM) and M-5 slice 1 (consumption master) shipped the same day. Next: M-4 slice 2 (size-wise costing), M-6 (TnA e-mail / escalation), or M-8 (inquiry and quotation).
+M-1 and M-3 shipped together on 2026-11-09. M-2 slice 1 shipped the same day. M-4 slice 1 (size-wise BOM) and M-5 slice 1 (consumption master) shipped the same day. M-6 slice 1 (TnA alerts and critical path) shipped the same day. Next: M-4 slice 2 (size-wise costing) or M-8 (inquiry and quotation).
 
 ### 7.3 Ask the merchandiser before M-2 to M-8
 
