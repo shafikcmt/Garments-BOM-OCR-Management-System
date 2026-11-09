@@ -202,6 +202,11 @@
                         </a>
                     </li>
                     <li class="sidebar-item">
+                        <a href="{{ route('supply_chain.supplier_delivery') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.supplier_delivery') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span><span class="sidebar-link-text">Supplier Delivery</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="{{ route('supply_chain.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.reports.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
@@ -690,6 +695,11 @@
                         </a>
                     </li>
                     <li class="sidebar-item">
+                        <a href="{{ route('supply_chain.supplier_delivery') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.supplier_delivery') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span><span class="sidebar-link-text">Supplier Delivery</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="{{ route('supply_chain.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.reports.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
@@ -763,6 +773,11 @@
                                 <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Merchandising Reports</span>
                             </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('supply_chain.supplier_delivery') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.supplier_delivery') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span><span class="sidebar-link-text">Supplier Delivery</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
