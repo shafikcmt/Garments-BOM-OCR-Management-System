@@ -151,6 +151,11 @@ Route::prefix('merchant/consumption-master')
         Route::delete('/{row}', [\App\Http\Controllers\Merchant\ConsumptionMasterController::class, 'destroy'])->name('destroy');
     });
 
+// Material post-costing of a style: final costing vs what Store received and issued. Read-only.
+Route::get('merchant/post-costing/styles/{mother}', [\App\Http\Controllers\Merchant\PostCostingController::class, 'show'])
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.postcosting.show');
+
 // Size-wise BOM of a style. Merchandising and Admin edit, Management reads.
 Route::prefix('merchant/size-bom')
     ->middleware(['auth', 'role:merchant,admin,management'])

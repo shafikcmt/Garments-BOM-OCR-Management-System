@@ -21,6 +21,7 @@
                    :title="'Pre-costing — style ' . $mother->style_no"
                    copy="What the style costs, by cost head, and what is left of the price.">
         <x-slot:actions>
+            <a href="{{ route('merchant.postcosting.show', $mother) }}" class="btn btn-outline-primary"><i class="bi bi-clipboard-data me-1" aria-hidden="true"></i>Post-costing</a>
             <a href="{{ $backUrl }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Style</a>
         </x-slot:actions>
     </x-page-header>
