@@ -3,7 +3,7 @@
 @section('title', 'General Stock — Requested Requisitions')
 
 @php
-    $hasFilters = collect($filters)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
+    $hasFilters = collect($filters)->except('type')->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
 
     // Same badge set as the main list, so one status never reads two ways.
     $badges = [
@@ -59,6 +59,8 @@
                 @endif
             </div>
 
+            @include('store.stock.requisitions._type-tabs', ['route' => 'store.stock.requisitions.requested', 'current' => $filters['type'] ?? '', 'counts' => $typeCounts])
+
             <form method="GET" class="row g-3 gx-stock-filter mb-4">
                 <div class="col-6 col-md-3 col-xl-2">
                     <label class="form-label" for="month">Month</label>
@@ -94,6 +96,9 @@
                 <div class="col-12 col-xl-2 gx-stock-filter-actions">
                     @if($filters['ready'] ?? false)
                         <input type="hidden" name="ready" value="1">
+                    @endif
+                    @if($filters['type'] ?? false)
+                        <input type="hidden" name="type" value="{{ $filters['type'] }}">
                     @endif
                     <button class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
                     @if($hasFilters)
