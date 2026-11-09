@@ -95,10 +95,36 @@ class InquiryController extends Controller
             'currency' => ['required', Rule::in(Costing::CURRENCIES)],
             'quote_due_date' => ['nullable', 'date'],
             'note' => ['nullable', 'string', 'max:2000'],
+            'payment_terms' => ['nullable', 'string', 'max:255'],
+            'delivery_terms' => ['nullable', 'string', 'max:255'],
+            'validity_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'quote_remark' => ['nullable', 'string', 'max:2000'],
         ]);
         $inquiry->update($data + ['updated_by' => $request->user()->id]);
 
         return back()->with('success', 'Inquiry updated.');
+    }
+
+    /** The printed quotation: A4 portrait, the same page for preview and download. */
+    public function quotationPdf(Request $request, Inquiry $inquiry)
+    {
+        $this->authorizeView($request, $inquiry);
+        if ($inquiry->quoted_price === null) {
+            return back()->with('warning', 'Record the quotation (price) first, then download the PDF.');
+        }
+        $inquiry->load(['buyer', 'creator:id,name']);
+        $date = $inquiry->quoted_date ?? Carbon::today();
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('merchant.quotation-pdf', [
+            'inquiry' => $inquiry,
+            'date' => $date,
+            'validDays' => $inquiry->validity_days ?: (int) config('quotation.validity_days', 30),
+            'company' => config('quotation.company_name'),
+            'address' => config('quotation.address', []),
+            'logo' => ($logo = config('quotation.logo')) && is_file(public_path($logo)) ? public_path($logo) : null,
+            'paymentTerms' => $inquiry->payment_terms ?: config('quotation.payment_terms'),
+            'deliveryTerms' => $inquiry->delivery_terms ?: config('quotation.delivery_terms'),
+        ])->setPaper('a4', 'portrait')->stream('Quotation-' . str_replace(['/', '\\'], '-', (string) $inquiry->reference) . '.pdf');
     }
 
     public function startCosting(Request $request, Inquiry $inquiry, Inquiries $inquiries)
@@ -122,9 +148,10 @@ class InquiryController extends Controller
             'quoted_price' => ['required', 'numeric', 'min:0', 'max:99999999'],
             'currency' => ['required', Rule::in(Costing::CURRENCIES)],
             'quoted_date' => ['nullable', 'date'],
+            'price_basis' => ['nullable', Rule::in(array_keys(Inquiry::BASES))],
         ], ['quoted_price.required' => 'Type the price quoted to the buyer.']);
 
-        return $this->run(fn () => $inquiries->markQuoted($inquiry, (float) $data['quoted_price'], $data['currency'], $data['quoted_date'] ?? null, $request->user()), 'Quotation recorded.');
+        return $this->run(fn () => $inquiries->markQuoted($inquiry, (float) $data['quoted_price'], $data['currency'], $data['quoted_date'] ?? null, $request->user(), $data['price_basis'] ?? 'pc'), 'Quotation recorded.');
     }
 
     public function won(Request $request, Inquiry $inquiry, Inquiries $inquiries)

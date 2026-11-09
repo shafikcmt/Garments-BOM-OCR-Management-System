@@ -106,3 +106,43 @@ it('keeps other buyers, management and other roles in their place', function () 
     $store = User::factory()->create(['status' => 1])->assignRole(Role::findOrCreate('store', 'web'));
     $this->actingAs($store)->get(route('merchant.inquiries.index'))->assertForbidden();
 });
+
+/** Quotation PDF: the standard printed format of a recorded quotation. */
+it('prints the quotation PDF only once a price is recorded, with the terms and the dozen price shown per piece', function () {
+    $i = newInquiry($this, ['description' => 'Padded jacket', 'est_qty' => 1200]);
+    $this->get(route('merchant.inquiries.quotation_pdf', $i))->assertSessionHas('warning');
+
+    $this->post(route('merchant.inquiries.quote', $i), ['quoted_price' => 96, 'currency' => 'USD', 'price_basis' => 'dz', 'quoted_date' => '2026-11-09'])->assertSessionHas('success');
+    expect($i->fresh())->price_basis->toBe('dz');
+    expect($i->fresh()->pricePerPiece())->toBe(8.0);
+
+    $this->put(route('merchant.inquiries.update', $i), [
+        'style_ref' => '748268(PETITE)', 'currency' => 'USD', 'payment_terms' => 'LC at sight', 'delivery_terms' => 'FOB Chattogram', 'validity_days' => 45, 'quote_remark' => 'Fabric as approved sample',
+    ])->assertSessionHas('success');
+    expect($i->fresh()->validity_days)->toBe(45);
+
+    $res = $this->get(route('merchant.inquiries.quotation_pdf', $i))->assertOk();
+    expect($res->headers->get('content-type'))->toContain('application/pdf');
+
+    // The page itself (what the PDF draws): figures, terms, validity date, signature boxes.
+    $html = view('merchant.quotation-pdf', [
+        'inquiry' => $i->fresh()->load(['buyer', 'creator']), 'date' => Carbon::parse('2026-11-09'), 'validDays' => 45, 'company' => 'Test Co', 'address' => ['Dhaka'],
+        'logo' => null, 'paymentTerms' => 'LC at sight', 'deliveryTerms' => 'FOB Chattogram',
+    ])->render();
+    expect($html)->toContain('QUOTATION')->toContain($i->reference)->toContain('748268(PETITE)')->toContain('Padded jacket')
+        ->toContain('9,600.00')                       // 1200 pcs x 8.00 per piece
+        ->toContain('Price per dozen')->toContain('24 Dec 2026')   // 9 Nov + 45 days
+        ->toContain('LC at sight')->toContain('FOB Chattogram')->toContain('Fabric as approved sample')->toContain('Accepted by buyer');
+});
+
+it('limits the quotation PDF to people who may see the buyer', function () {
+    $i = newInquiry($this);
+    $this->post(route('merchant.inquiries.quote', $i), ['quoted_price' => 8, 'currency' => 'USD']);
+
+    $mgmt = User::factory()->create(['status' => 1])->assignRole(Role::findOrCreate('management', 'web'));
+    $this->actingAs($mgmt)->get(route('merchant.inquiries.quotation_pdf', $i))->assertOk();
+    $store = User::factory()->create(['status' => 1])->assignRole(Role::findOrCreate('store', 'web'));
+    $this->actingAs($store)->get(route('merchant.inquiries.quotation_pdf', $i))->assertForbidden();
+
+    $this->actingAs($this->merchant)->post(route('merchant.inquiries.quote', $i), ['quoted_price' => 8, 'currency' => 'USD', 'price_basis' => 'xx'])->assertSessionHasErrors('price_basis');
+});

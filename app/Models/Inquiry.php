@@ -22,7 +22,8 @@ class Inquiry extends Model
 
     protected $fillable = [
         'reference', 'buyer_id', 'buyer_season_id', 'mother_style_id', 'style_ref', 'description', 'product_group',
-        'est_qty', 'target_price', 'currency', 'received_date', 'quote_due_date', 'status', 'quoted_price', 'quoted_date',
+        'est_qty', 'target_price', 'currency', 'received_date', 'quote_due_date', 'status', 'quoted_price', 'price_basis', 'quoted_date',
+        'payment_terms', 'delivery_terms', 'validity_days', 'quote_remark',
         'decision_date', 'lost_reason', 'note', 'created_by', 'updated_by',
     ];
 
@@ -31,7 +32,15 @@ class Inquiry extends Model
         'target_price' => 'decimal:4', 'quoted_price' => 'decimal:4',
     ];
 
-    protected $attributes = ['status' => 'new', 'currency' => 'USD'];
+    protected $attributes = ['status' => 'new', 'currency' => 'USD', 'price_basis' => 'pc'];
+
+    public const BASES = ['pc' => 'piece', 'dz' => 'dozen'];
+
+    /** The quoted price per piece (a dozen price is divided by 12), or null before a price is recorded. */
+    public function pricePerPiece(): ?float
+    {
+        return $this->quoted_price === null ? null : (float) $this->quoted_price / ($this->price_basis === 'dz' ? 12 : 1);
+    }
 
     public function buyer()
     {

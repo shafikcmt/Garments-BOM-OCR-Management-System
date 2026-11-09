@@ -29,10 +29,14 @@
         <div class="row g-3 mb-2">
             <div class="col-6 col-md-3"><div class="small text-muted">Received</div><div>{{ $inquiry->received_date?->format('d M Y') }}</div></div>
             <div class="col-6 col-md-3"><div class="small text-muted">Quote by</div><div>{{ $inquiry->quote_due_date?->format('d M Y') ?? '—' }}</div></div>
-            <div class="col-6 col-md-3"><div class="small text-muted">Quoted</div><div>@if($inquiry->quoted_price !== null)<strong>{{ $inquiry->currency }} {{ rtrim(rtrim(number_format((float) $inquiry->quoted_price, 4), '0'), '.') }}</strong> on {{ $inquiry->quoted_date?->format('d M Y') }}@else — @endif</div></div>
+            <div class="col-6 col-md-3"><div class="small text-muted">Quoted</div><div>@if($inquiry->quoted_price !== null)<strong>{{ $inquiry->currency }} {{ rtrim(rtrim(number_format((float) $inquiry->quoted_price, 4), '0'), '.') }}</strong> per {{ \App\Models\Inquiry::BASES[$inquiry->price_basis] ?? 'piece' }} on {{ $inquiry->quoted_date?->format('d M Y') }}@else — @endif</div></div>
             <div class="col-6 col-md-3"><div class="small text-muted">Style in Style Library</div>
                 <div>@if($inquiry->motherStyle)<a href="{{ route($styleRoute, $inquiry->motherStyle) }}">{{ $inquiry->motherStyle->style_no }}</a> · <a href="{{ route('costing.show', [$inquiry->motherStyle, 'mode' => 'buyer']) }}">Pre-costing</a>@else — @endif</div></div>
         </div>
+        @if($inquiry->quoted_price !== null)
+            <p class="mb-2"><a href="{{ route('merchant.inquiries.quotation_pdf', $inquiry) }}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Download Quotation PDF</a>
+                <span class="small text-muted ms-2">Uses the price, terms and validity below.</span></p>
+        @endif
         @if($st === 'lost' && $inquiry->lost_reason)<p class="mb-2"><strong>Lost because:</strong> {{ $inquiry->lost_reason }}</p>@endif
 
         @if($canEdit)
@@ -55,6 +59,8 @@
                             <input type="number" step="any" min="0" name="quoted_price" class="form-control form-control-sm text-end" style="width:120px" required value="{{ old('quoted_price', $inquiry->quoted_price ?? $suggested['price'] ?? '') }}"></div>
                         <div class="col-auto"><label class="form-label mb-1">Currency</label>
                             <select name="currency" class="form-select form-select-sm">@foreach(\App\Models\Costing::CURRENCIES as $c)<option @selected(($suggested['currency'] ?? $inquiry->currency) === $c)>{{ $c }}</option>@endforeach</select></div>
+                        <div class="col-auto"><label class="form-label mb-1">Price per</label>
+                            <select name="price_basis" class="form-select form-select-sm">@foreach(\App\Models\Inquiry::BASES as $k => $label)<option value="{{ $k }}" @selected(($inquiry->quoted_price !== null ? $inquiry->price_basis : ($suggested['basis'] ?? 'pc')) === $k)>{{ ucfirst($label) }}</option>@endforeach</select></div>
                         <div class="col-auto"><label class="form-label mb-1">Date sent</label><input type="date" name="quoted_date" class="form-control form-control-sm" value="{{ $inquiry->quoted_date?->toDateString() ?? $today->toDateString() }}"></div>
                         <div class="col-auto"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-send me-1" aria-hidden="true"></i>{{ $st === 'quoted' ? 'Update Quotation' : 'Record Quotation' }}</button></div>
                         @if($suggested)<div class="col-12 form-text">Prefilled from pre-costing revision {{ $suggested['revision'] }} ({{ $suggested['currency'] }} {{ rtrim(rtrim(number_format($suggested['price'], 4), '0'), '.') }}).</div>@endif
@@ -94,6 +100,11 @@
             <div class="col-2 col-md-1"><label class="form-label mb-1">Curr.</label><select name="currency" class="form-select form-select-sm" @disabled(! $canEdit)>@foreach(\App\Models\Costing::CURRENCIES as $c)<option @selected(old('currency', $inquiry->currency) === $c)>{{ $c }}</option>@endforeach</select></div>
             <div class="col-6 col-md-2"><label class="form-label mb-1">Quote by</label><input type="date" name="quote_due_date" class="form-control form-control-sm" value="{{ old('quote_due_date', $inquiry->quote_due_date?->toDateString()) }}" @disabled(! $canEdit)></div>
             <div class="col-12 col-md-6"><label class="form-label mb-1">Note</label><input type="text" name="note" class="form-control form-control-sm" maxlength="2000" value="{{ old('note', $inquiry->note) }}" @disabled(! $canEdit)></div>
+            <div class="col-12"><hr class="my-2"><div class="small text-muted mb-1">Printed on the quotation (empty = the standard text)</div></div>
+            <div class="col-12 col-md-4"><label class="form-label mb-1">Payment terms</label><input type="text" name="payment_terms" class="form-control form-control-sm" maxlength="255" value="{{ old('payment_terms', $inquiry->payment_terms) }}" placeholder="{{ config('quotation.payment_terms') }}" @disabled(! $canEdit)></div>
+            <div class="col-12 col-md-4"><label class="form-label mb-1">Delivery terms</label><input type="text" name="delivery_terms" class="form-control form-control-sm" maxlength="255" value="{{ old('delivery_terms', $inquiry->delivery_terms) }}" placeholder="{{ config('quotation.delivery_terms') }}" @disabled(! $canEdit)></div>
+            <div class="col-6 col-md-2"><label class="form-label mb-1">Valid for (days)</label><input type="number" min="1" max="365" name="validity_days" class="form-control form-control-sm text-end" value="{{ old('validity_days', $inquiry->validity_days) }}" placeholder="{{ config('quotation.validity_days') }}" @disabled(! $canEdit)></div>
+            <div class="col-12 col-md-8"><label class="form-label mb-1">Remarks on the quotation</label><input type="text" name="quote_remark" class="form-control form-control-sm" maxlength="2000" value="{{ old('quote_remark', $inquiry->quote_remark) }}" @disabled(! $canEdit)></div>
             @if($canEdit)<div class="col-auto"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-check2 me-1" aria-hidden="true"></i>Save Details</button></div>@endif
         </form>
         <p class="small text-muted mt-3 mb-0">Added by {{ $inquiry->creator?->name ?? '—' }} on {{ $inquiry->created_at?->format('d M Y') }}.</p>
