@@ -479,8 +479,8 @@ The merchant sample download (rule 7) already existed on the Upload Excel page
 and is built from the live Merchandising columns, so it carries the new headers
 automatically; the Import Buyer Excel page links to it.
 
-Still open: a list of file columns the system has no header for, and
-master-data import (vendors from a "Dropdown" sheet).
+The list of file columns the system has no header for is built (2026-11-10: Admin > Unmapped Columns,
+`import_unmapped_columns`, filled when a file is imported). Still open: master-data import (vendors from a "Dropdown" sheet).
 
 ### 12.4 Reference products
 

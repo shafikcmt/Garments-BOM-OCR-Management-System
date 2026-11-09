@@ -87,7 +87,7 @@
                         name="header_name"
                         id="header_name"
                         class="form-control @error('header_name') is-invalid @enderror"
-                        value="{{ old('header_name', $header->header_name ?? '') }}"
+                        value="{{ old('header_name', $header->header_name ?? request('name', '')) }}"
                         placeholder="Example: Delivery Date"
                         maxlength="255"
                         required

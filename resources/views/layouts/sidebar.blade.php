@@ -1,6 +1,6 @@
 @php
     $isAdminDashboard = request()->routeIs('admin.dashboard');
-    $isAdminWorkspace = request()->routeIs('admin.workspace') || request()->routeIs('uploaded-files.*') || request()->routeIs('admin.headers.*');
+    $isAdminWorkspace = request()->routeIs('admin.workspace') || request()->routeIs('uploaded-files.*') || request()->routeIs('admin.headers.*') || request()->routeIs('admin.unmapped.*');
     $isAdminUserRole = request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*');
     $isAdminBookingSettings = request()->routeIs('admin.suppliers.*') || request()->routeIs('admin.buyers.*') || request()->routeIs('admin.booking-delivery-destinations.*') || request()->routeIs('admin.booking-instructions.*') || request()->routeIs('admin.po-generate-control.*');
     $isAdminSettings = request()->routeIs('admin.alert-settings.*') || request()->routeIs('admin.payment-settings.*') || request()->routeIs('admin.email-templates.*') || request()->routeIs('admin.requisition-signatures.*') || request()->routeIs('admin.departments.*') || request()->routeIs('admin.item-sku.*');
@@ -266,6 +266,7 @@
                             <span class="sidebar-submenu-rail"></span>
                             <a href="{{ route('admin.workspace') }}" class="sidebar-sub-link {{ request()->routeIs('admin.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">Workspace</a>
                             <a href="{{ route('admin.headers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.headers.*') ? 'is-active' : '' }}">Excel Headers</a>
+                            <a href="{{ route('admin.unmapped.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.unmapped.*') ? 'is-active' : '' }}">Unmapped Columns</a>
                             <a href="{{ route('admin.tna.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.tna.*') ? 'is-active' : '' }}">TnA Templates</a>
                         </div>
                     </li>

@@ -46,6 +46,10 @@ Route::prefix('admin')
 
         Route::resource('roles', RoleController::class)->except(['show']);
         Route::resource('headers', HeaderController::class)->except(['show']);
+        Route::get('unmapped-columns', [\App\Http\Controllers\Admin\UnmappedColumnController::class, 'index'])->name('unmapped.index');
+        Route::post('unmapped-columns/teach', [\App\Http\Controllers\Admin\UnmappedColumnController::class, 'teach'])->name('unmapped.teach');
+        Route::post('unmapped-columns/ignore', [\App\Http\Controllers\Admin\UnmappedColumnController::class, 'ignore'])->name('unmapped.ignore');
+        Route::post('unmapped-columns/reopen', [\App\Http\Controllers\Admin\UnmappedColumnController::class, 'reopen'])->name('unmapped.reopen');
         Route::put('tna-settings', [\App\Http\Controllers\Admin\TnaTemplateController::class, 'settings'])->name('tna.settings');
         Route::resource('tna', \App\Http\Controllers\Admin\TnaTemplateController::class)->except(['show'])->parameters(['tna' => 'tna']);
 

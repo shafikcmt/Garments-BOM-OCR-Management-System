@@ -166,6 +166,12 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 - Large files take 10 to 20 seconds to import. Please wait for the page to finish.
 - If you stop half way, press **Cancel Import**.
 
+
+**Unmapped Columns (Admin).** Every time a file is imported, the system remembers the column titles of that file that it did **not** import and that match **no header** (by name, formula key or Other Name). Open them at **Admin > Excel Headers area > Unmapped Columns**. The list is grouped by title with the buyers that sent it, how many files carried it, and the last date.
+- **Add as Other Name:** choose the header the title belongs to and press the button. The title becomes an Other Name of that header (the same as typing it under Other Names on Excel Headers), so the next file with this title is matched automatically. It applies to every buyer.
+- **New Header:** opens the new-header form with the title already typed in, when the system truly needs a new column.
+- **Ignore:** for columns nobody needs. They move to the **Ignored** tab and can be reopened.
+A column that was skipped on purpose but matches another department's header (for example the buyer's Vendor column) is not listed.
 ### 2.2b Vendors: list, add, edit, Excel import and export (with bank details)
 
 **Open it:** left menu, **Vendors**. (You can also press **Add Vendor** on the Merchandising Dashboard.)
