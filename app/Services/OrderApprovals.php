@@ -24,6 +24,43 @@ use Illuminate\Support\Collection;
  */
 class OrderApprovals
 {
+    public const KEY_REQUIRED_FOR_PO = 'order_approval_required_for_po';
+
+    /** Admin switch (off by default): no PO / booking for a customer PO until its order is approved. */
+    public static function requiredForPo(): bool
+    {
+        return (bool) (int) \App\Models\AppSetting::get(self::KEY_REQUIRED_FOR_PO, 0);
+    }
+
+    /**
+     * Why PO generation must stop for this worksheet row because its buyer order
+     * is not approved, or null to let it go. A row that is not linked to a style
+     * (an older file) is never blocked.
+     */
+    public function blockReason(\App\Models\ExcelRow $row): ?string
+    {
+        if (! self::requiredForPo()) {
+            return null;
+        }
+
+        $line = \App\Models\OrderLine::whereHas('bomItems', fn ($q) => $q->where('excel_row_id', $row->id))->first();
+        if (! $line || ! $line->mother_style_id || ! ($mother = MotherStyle::find($line->mother_style_id))) {
+            return null;
+        }
+
+        $order = $this->rows($mother)->firstWhere('key', $this->norm($line->customer_po_no));
+        if (! $order) {
+            return null;
+        }
+        $label = 'PO ' . ($order['po'] !== '' ? $order['po'] : '(no PO number)') . ' of style ' . $mother->style_no;
+
+        return match (true) {
+            $order['status'] === BuyerOrder::APPROVED && $order['changed_after_approval'] => 'The order ' . $label . ' changed after it was approved. Ask Merchandising to send it for approval again before ordering.',
+            $order['status'] === BuyerOrder::APPROVED => null,
+            default => 'The order ' . $label . ' is not approved. Ask Merchandising to send it for approval before ordering.',
+        };
+    }
+
     /**
      * One row per customer PO of the style: figures read from the workspace
      * order lines, plus the saved register record (if any).

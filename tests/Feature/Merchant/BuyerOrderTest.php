@@ -74,3 +74,55 @@ it('refuses submit for a PO that is not in the workspace and blocks other buyers
     $store = User::factory()->create(['status' => 1])->assignRole(Role::findOrCreate('store', 'web'));
     $this->actingAs($store)->get(route('merchant.orders.show', $this->mother))->assertForbidden();
 });
+
+/** The optional gate: Supply Chain cannot generate a PO for a customer PO whose order is not approved. */
+function gateRow($test): \App\Models\ExcelRow
+{
+    $line = \App\Models\OrderLine::where('customer_po_no', 'PO-1')->first();
+    $row = \App\Models\ExcelRow::create(['excel_file_id' => $line->excel_file_id, 'row_number' => 1]);
+    \App\Models\BomItem::create(['order_line_id' => $line->id, 'excel_row_id' => $row->id, 'material_description' => 'Zipper']);
+
+    return $row;
+}
+
+it('does not block anything while the Admin gate is off', function () {
+    $row = gateRow($this);
+    expect(app(\App\Services\OrderApprovals::class)->blockReason($row))->toBeNull()
+        ->and(app(\App\Services\BomApprovals::class)->blockReason($row))->toBeNull();
+});
+
+it('blocks a PO until the order is approved, again when it changes, and never an unlinked row', function () {
+    $row = gateRow($this);
+    $service = app(\App\Services\OrderApprovals::class);
+    \App\Models\AppSetting::put(\App\Services\OrderApprovals::KEY_REQUIRED_FOR_PO, 1);
+
+    // Never registered, then submitted: both mean "not approved".
+    expect($service->blockReason($row))->toContain('PO PO-1')->toContain('748268')->toContain('not approved');
+    $this->actingAs($this->merchant)->put(route('merchant.orders.submit', $this->mother), ['po' => 'PO-1']);
+    expect(app(\App\Services\BomApprovals::class)->blockReason($row))->toContain('not approved');
+
+    // Supply Chain is refused with the same reason (the existing generate action).
+    $sc = User::factory()->create(['status' => 1])->assignRole(Role::findOrCreate('supply_chain', 'web'));
+    $this->actingAs($sc)->postJson(route('supply_chain.bookings.generate', $row))->assertStatus(422)->assertJsonPath('success', false)
+        ->assertJsonPath('message', $service->blockReason($row));
+
+    $this->actingAs($this->admin)->post(route('merchant.orders.approve', BuyerOrder::firstOrFail()), ['comment' => 'OK']);
+    expect($service->blockReason($row))->toBeNull();
+
+    OrderLine::where('gmts_color', 'WHITE')->update(['order_qty' => 700]);
+    expect($service->blockReason($row))->toContain('changed after it was approved');
+
+    $loose = \App\Models\ExcelRow::create(['excel_file_id' => $row->excel_file_id, 'row_number' => 99]);
+    expect($service->blockReason($loose))->toBeNull();
+});
+
+it('lets only Admin switch the gate, from the approval settings, and says so on Buyer Orders', function () {
+    $this->actingAs($this->admin)->post(route('bom_approvals.settings'), ['order_required_for_po' => 1])->assertSessionHas('success');
+    expect(\App\Services\OrderApprovals::requiredForPo())->toBeTrue();
+    $this->get(route('bom_approvals.index'))->assertOk()->assertSee('buyer order (customer PO) is approved');
+    $this->get(route('merchant.orders.show', $this->mother))->assertSee('cannot generate a PO');
+
+    $this->actingAs($this->merchant)->post(route('bom_approvals.settings'), ['order_required_for_po' => 0])->assertForbidden();
+    $this->actingAs($this->admin)->post(route('bom_approvals.settings'), [])->assertSessionHas('success');
+    expect(\App\Services\OrderApprovals::requiredForPo())->toBeFalse();
+});

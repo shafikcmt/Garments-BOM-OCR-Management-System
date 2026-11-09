@@ -42,6 +42,7 @@ class BomApprovalController extends Controller
             'isAdmin' => $user->hasRole('admin'),
             'managementStage' => BomApprovals::managementStage(),
             'requiredForPo' => BomApprovals::requiredForPo(),
+            'orderRequiredForPo' => \App\Services\OrderApprovals::requiredForPo(),
             'service' => $approvals,
         ]);
     }
@@ -98,6 +99,7 @@ class BomApprovalController extends Controller
 
         AppSetting::put(BomApprovals::KEY_MANAGEMENT_STAGE, $request->boolean('management_stage') ? 1 : 0);
         AppSetting::put(BomApprovals::KEY_REQUIRED_FOR_PO, $request->boolean('required_for_po') ? 1 : 0);
+        AppSetting::put(\App\Services\OrderApprovals::KEY_REQUIRED_FOR_PO, $request->boolean('order_required_for_po') ? 1 : 0);
 
         return back()->with('success', 'BOM approval settings saved.');
     }

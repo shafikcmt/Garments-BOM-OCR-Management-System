@@ -28,6 +28,10 @@
         <div class="alert alert-danger py-2">@foreach($errors->all() as $e)<div>{{ $e }}</div>@endforeach</div>
     @endif
 
+    @if($gateOn)
+        <div class="alert alert-info py-2">Supply Chain cannot generate a PO for a customer PO below until it is <strong>Approved</strong>. Send each one for approval.</div>
+    @endif
+
     @forelse($rows as $r)
         @php($o = $r['order'])
         @php($label = $r['po'] !== '' ? $r['po'] : 'No PO number')

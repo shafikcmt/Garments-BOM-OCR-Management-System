@@ -22,9 +22,13 @@
                     <input type="checkbox" class="form-check-input" id="setPo" name="required_for_po" value="1" {{ $requiredForPo ? 'checked' : '' }}>
                     <label class="form-check-label" for="setPo">Supply Chain cannot generate a PO until the BOM is approved</label>
                 </div>
+                <div class="col-12 col-md-6 form-check ms-2">
+                    <input type="checkbox" class="form-check-input" id="setOrderPo" name="order_required_for_po" value="1" {{ $orderRequiredForPo ? 'checked' : '' }}>
+                    <label class="form-check-label" for="setOrderPo">Supply Chain cannot generate a PO until the buyer order (customer PO) is approved</label>
+                </div>
                 <div class="col-auto"><button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Save Settings</button></div>
             </form>
-            <div class="form-text mt-2">Styles that are not linked to an imported BOM (older files) are never blocked.</div>
+            <div class="form-text mt-2">Styles that are not linked to an imported BOM (older files) are never blocked. The buyer order is approved on the style's Buyer Orders page; switching this on blocks every customer PO that is not approved yet, including orders that were never registered there.</div>
         </x-card>
     @endif
 

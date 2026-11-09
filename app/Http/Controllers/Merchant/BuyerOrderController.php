@@ -33,6 +33,7 @@ class BuyerOrderController extends Controller
             'mother' => $mother,
             'rows' => $rows,
             'costings' => $mother->costings()->where('status', 'final')->orderByDesc('id')->get(),
+            'gateOn' => OrderApprovals::requiredForPo(),
             'canEdit' => $user->hasAnyRole(['merchant', 'admin']),
             'backUrl' => $user->hasRole('merchant') ? route('merchant.styles.mothers.show', $mother) : route('merchant.status.style', $mother),
         ]);

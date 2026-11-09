@@ -364,6 +364,8 @@ One card for each customer PO of a style. Quantity, colours and ship date are sh
 
 Management can read and approve but not edit.
 
+**Stopping Supply Chain until the order is approved (Admin).** On **BOM Approvals**, the Settings box has a switch **Supply Chain cannot generate a PO until the buyer order (customer PO) is approved**. It is off by default. When it is on, Supply Chain cannot generate a PO for a customer PO that is not **Approved** on Buyer Orders, or that **changed after approval**, and sees the reason. This includes orders that were never sent for approval, so switch it on only after the open orders have been approved. Rows that are not linked to a style (older files) are never blocked. Buyer Orders shows a blue note while the switch is on.
+
 ### 2.4b Samples
 
 **Add a sample:** open the style, in the **Samples** box choose the **Sample type**, and if you want the child style, **Colour**, **Size**, **Qty** and **Needed by** (the buyer's date). Press **Add Sample**.
