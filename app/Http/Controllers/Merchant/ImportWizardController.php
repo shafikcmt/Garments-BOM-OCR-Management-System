@@ -306,6 +306,9 @@ class ImportWizardController extends ExcelUploadController
             $this->saveProfile($state, $read['titles'], $mapping, $userId);
         }
 
+        // Remember the columns of this file that the system has no header for (never raises).
+        app(\App\Services\UnmappedImportColumns::class)->record((int) $state['buyer_id'], $read['titles'], $mapping, $excelFile->id);
+
         app(\App\Http\Controllers\Shared\ExcelFileController::class)->recalculateFile($excelFile, $userId);
 
         try {
