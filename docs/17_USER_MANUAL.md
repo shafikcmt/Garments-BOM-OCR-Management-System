@@ -27,6 +27,7 @@ Who does what:
 |---|---|
 | Merchandising | Brings in the buyer's order and BOM, keeps styles in order |
 | Supply Chain | Raises POs, collects PIs, raises payment requests (PRA) |
+| Commercial | Records imported shipments (BL / AWB, dates, ports) and follows clearance |
 | Accounts | Pays approved requests and records the payment reference |
 | Store | Receives and issues material |
 | Management / Admin | Watches progress (Style Status), gives follow-ups, controls who can do what |
@@ -606,6 +607,34 @@ When you press **Create PRA** on the preview screen, the box has a **Supporting 
 3. Everyone who reviews the request (Merchant, Accounts, Commercial, approvers) sees a **Supporting Documents** box on the request page with a **Download** button for each file.
 
 **Resubmitting a rejected PRA.** In **My PRA Status**, press **Resubmit**. The box lists the documents already attached: tick **Tick to remove** on any you want to drop, and use **Supporting documents** to add new or corrected files (for example an updated PI copy). Then press **Resubmit**.
+
+## 3a. Commercial
+
+### 3a.1 Inbound Shipments (imported material by BL / AWB)
+
+Record each import shipment once, with its route and dates and the POs it carries, instead of typing the same shipment details in many workspace lines.
+
+**Open it:** left menu, **Inbound Shipments**. The tiles show how many are planned, in transit, arrived, cleared and past their ETA (press a tile to filter). Filter by status, mode or search a shipment number, BL / AWB, container, forwarder, vessel or port.
+
+**Add a shipment:** press **New Shipment**, choose the **Buyer**, then fill what you know: **Mode** (sea, air, road, courier), **BL / AWB no.**, BL status, **Forwarder**, vessel or flight, container numbers, **port of loading**, **port of discharge**, country of origin, and the dates. Press **Save Shipment**. It gets a number such as SHP-26-0012.
+
+**The status is not typed; it follows the dates:**
+- no departure date yet: **Planned**
+- **ATD** (left) entered: **In transit**
+- **ATA** (arrived) entered: **Arrived**
+- **Customs cleared** date entered: **Customs cleared**
+- **Actual in-house** date entered: **In-house**
+A shipment whose **ETA** has passed and that has not arrived shows **Late**. A later date cannot be before an earlier one (for example, cleared before arrived).
+
+**Add the POs it carries:** open the shipment, type part of a PO number, vendor, style or item of that buyer under **Find a PO to add** and press **Add** (the PO quantity is filled in; change it if only part of the PO is on this shipment). One shipment can carry many POs and a PO can come in several shipments. **Remove** takes a PO off the shipment; the PO itself is not changed.
+
+**The workspace follows:** when you save, the **BL / AWB no**, **Committed ETD**, **Committed ETA**, **Committed in-house** and **Actual in-house** columns of the PO's workspace row are filled, for the columns the workspace has (Admin names them on Excel Headers). A value that is already there is left alone; every change is logged like a manual edit.
+
+### 3a.2 Clearance Summary
+
+On Inbound Shipments press **Clearance Summary**. It shows what is not yet in-house **by port**, what is **arriving by expected week (ETA)**, the count by status, and three lists to chase: shipments whose **ETA has passed**, shipments that **arrived 3 or more days ago and are not customs cleared**, and shipments **cleared but not yet in-house**.
+
+Commercial and Admin record shipments for the buyers they hold; Management can read them.
 
 ## 4. Accounts
 
