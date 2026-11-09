@@ -210,6 +210,11 @@
                         </a>
                     </li>
                     <li class="sidebar-item">
+                        <a href="{{ route('commercial.shipments.index') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.shipments.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span class="sidebar-link-text">Inbound Shipments</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="{{ route('commercial.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.reports.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
@@ -450,6 +455,11 @@
                     <li class="sidebar-item">
                         <a href="{{ route('commercial.workspace') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.workspace') || request()->routeIs('uploaded-files.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-layout-text-window-reverse" aria-hidden="true"></i></span><span class="sidebar-link-text">Workspace</span></span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('commercial.shipments.index') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.shipments.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span class="sidebar-link-text">Inbound Shipments</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
@@ -761,6 +771,11 @@
                                 <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
                                 <span class="sidebar-link-text">Supply Chain Reports</span>
                             </span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="{{ route('commercial.shipments.index') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.shipments.*') ? 'is-active' : '' }}">
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span class="sidebar-link-text">Inbound Shipments</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">

@@ -306,8 +306,8 @@ Rules for every step below:
 
 | # | Slice | Notes |
 |---|---|---|
-| C1 | **Inbound shipment** record per Booking PO / PI: ship mode, forwarder, BL / AWB, container, COO, port, ETD / ATD / ETA / ATA, arrival status, committed / actual in-house | Fills the ~15 OCR shipment columns from one screen; adds "In transit" to the material stage |
-| C2 | **Clearance summary** (by ETA week, port, status) | The OCR "Clearance Summary" sheet |
+| C1 | **Inbound shipment** (slice 1 done 2026-11-10: `inbound_shipments`, Commercial > Inbound Shipments; shipment <-> Booking PO links; status from dates; BL / AWB and dates written to the workspace) record per Booking PO / PI: ship mode, forwarder, BL / AWB, container, COO, port, ETD / ATD / ETA / ATA, arrival status, committed / actual in-house | Fills the ~15 OCR shipment columns from one screen; adds "In transit" to the material stage |
+| C2 | **Clearance summary** (done 2026-11-10: Clearance Summary page) (by ETA week, port, status) | The OCR "Clearance Summary" sheet |
 | C3 | **Master L/C** (export, per buyer contract) and **BTB L/C** (against PIs), limit used % | Ask: which L/C data is tracked today and in which file |
 | C4 | Export documents: commercial invoice, packing list (colour x size) | After M1 |
 
