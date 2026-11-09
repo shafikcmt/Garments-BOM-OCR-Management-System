@@ -393,6 +393,11 @@ Route::prefix('store')
             Route::get('/requisitions/category-summary/pdf', [CategorySummaryController::class, 'pdf'])->name('requisitions.category-summary.pdf');
             Route::get('/requisitions/category-summary/excel', [CategorySummaryController::class, 'excel'])->name('requisitions.category-summary.excel');
 
+            // Monthly Requisition Window — when a Monthly sheet may be
+            // submitted. Admin and Store only (checked in the controller).
+            Route::get('/requisitions/monthly-window', [\App\Http\Controllers\Store\RequisitionWindowController::class, 'edit'])->name('requisitions.window.edit');
+            Route::post('/requisitions/monthly-window', [\App\Http\Controllers\Store\RequisitionWindowController::class, 'update'])->name('requisitions.window.update');
+
             // Requirement vs Issue — requested against issued, per section
             // and item. The controller checks store.requirement_issue.view
             // (Admin passes it too).

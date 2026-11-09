@@ -374,6 +374,10 @@ A department or section raises one of two kinds of requisition. On the Purchase 
 
 Stock figures (Stock in Hand, Safety Stock) are shown to everyone who can open an **Individual** requisition. The Store can still correct quantities as before. Every department requisition shows a **Monthly** or **Individual** badge in the lists, and the list has a **Kind** filter. The kind is saved with the requisition, so the Category Summary shows Monthly and Individual sheets separately.
 
+**When can a Monthly requisition be submitted?** A Monthly requisition can be submitted only from the **20th to the end of each month**. A department may raise more than one Monthly requisition for the same month, but each must be submitted in this period. The Store then receives and merges them into that month's Final Requisition. If you press **Submit** outside this period, a message tells you to raise an **Individual** requisition instead. You can still **Save as Draft** on any day. An Individual requisition can be submitted on any day of the month.
+
+Admin and the Store Head can change this period. Open **Purchase Requisition > Monthly Window** (or **Admin > Settings > Monthly Requisition Window**). There you can switch Monthly requisitions on or off, set the opening and closing day (enter 0 to close on the last day of the month) and, if you wish, type your own message.
+
 There are two kinds of sheet.
 
 **1. The department / section sheet (3 steps)**
