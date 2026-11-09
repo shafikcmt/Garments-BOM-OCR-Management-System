@@ -644,6 +644,15 @@ class ExcelFileController extends Controller
             }
         }
 
+        // Tell the Store when the order itself (qty, ship date, PO ...) changed.
+        if (count($changedCells) > 0 && $user->hasRole('merchant')) {
+            try {
+                app(\App\Services\OrderChangeNotifier::class)->notify($excelFile, $changedCells, $user);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Order change notification failed: ' . $e->getMessage());
+            }
+        }
+
         $queryParams = array_filter([
             'page' => $request->query('page'),
             'per_page' => $request->query('per_page'),

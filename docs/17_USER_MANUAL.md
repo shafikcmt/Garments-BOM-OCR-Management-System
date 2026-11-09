@@ -218,7 +218,7 @@ Use the Excel import (section 2.2) when the buyer sends a ready file; use this s
 - **Child style** buttons narrow everything to one child style.
 - **Orders:** one line per color and customer PO, with ship date, quantity and how many materials are ordered or received.
 - **Materials:** every material of the style with its PO, vendor, PI and payment status, received quantity, and its **Stage**. Use the search box or the stage list to find a material.
-- **Order Changes:** every change to the order columns (ship date, PO, colour, BOM quantity, consumption and the like) made in the Workspace: when, who, which colour / PO, the old and the new value. A change saved on several material lines at once shows once ("on 9 material lines"). Which columns count is set by Admin (**Show in Order Changes** on Excel Header Control).
+- **Order Changes:** every change to the order columns (ship date, PO, colour, BOM quantity, consumption and the like) made in the Workspace: when, who, which colour / PO, the old and the new value. A change saved on several material lines at once shows once ("on 9 material lines"). Which columns count is set by Admin (**Show in Order Changes** on Excel Header Control). **The Store is told:** when a merchant saves a change in one of these columns, every Store user gets a notification "Order changed" naming the style and the columns, once per style per save, so receiving and issue are not done against an old figure. The Store roles are the ones Admin put under the Store department.
 
 **Stage means the furthest step the material has reached:**
 
@@ -297,6 +297,16 @@ Good to know: a PI repeated on several lines is counted once in the Payment Summ
 **Sample types:** at the bottom of the Samples page. Press a type to switch it off (not offered for new samples) or on; type a **New sample type** and press **Add Type**. Proto, Fit, Size Set, PP, Photo, TOP and Shipment are there to start with.
 
 Management can see samples but not change them.
+
+### 2.4c Documents (document bank)
+
+Keep the style's papers with the style: tech pack, approved lab dip, PP comments, test report, buyer e-mail.
+
+**Add a document:** open the style, go to the **Documents** box. Press **Choose file** (PDF, picture, Excel, Word, PowerPoint, text or zip; up to 15 MB). Type a **Title** if you want (otherwise the file name is used) and a **Category** (pick a suggestion or type your own). Press **Add Document**.
+
+**Open a document:** press **Download** on its line. **Delete** removes it for good; ask before you delete a paper others may need.
+
+Merchandising and Admin can add and delete. Management can download but not change. Only people who may see the buyer can open its documents.
 
 ### 2.5 When you change an order that already has a PO
 

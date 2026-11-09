@@ -158,8 +158,61 @@
     </div>
     </div>
 
-    {{-- Samples of this style. --}}
     @php($canSample = auth()->user()->hasAnyRole(['merchant', 'admin']))
+    {{-- Document bank: tech pack, lab dip, PP comments and the like. --}}
+    <x-card class="mb-3" body-class="p-3">
+        <x-slot:title>Documents <span class="badge bg-light text-muted border ms-1">{{ $documents->count() }}</span></x-slot:title>
+        @if($documents->isNotEmpty())
+            <div class="table-responsive mb-3">
+                <table class="table table-sm align-middle mb-0" style="min-width:0">
+                    <thead><tr><th>Category</th><th>Title</th><th>File</th><th>Added</th><th>By</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach($documents as $d)
+                        <tr>
+                            <td>{{ $d->category ?: '—' }}</td>
+                            <td class="fw-semibold">{{ $d->title }}</td>
+                            <td class="small text-muted">{{ $d->original_name }} · {{ $d->sizeLabel() }}</td>
+                            <td class="text-nowrap">{{ $d->created_at?->format('d M Y') }}</td>
+                            <td>{{ $d->uploader?->name ?? '—' }}</td>
+                            <td class="text-end text-nowrap">
+                                <a href="{{ route('merchant.documents.download', $d) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1" aria-hidden="true"></i>Download</a>
+                                @if($canSample)
+                                    <form method="POST" action="{{ route('merchant.documents.destroy', $d) }}" class="d-inline" onsubmit="return confirm('Delete this document?')">
+                                        @csrf @method('DELETE')
+                                        <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                    </form>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @elseif(! $canSample)
+            <p class="text-muted mb-0">No documents added for this style.</p>
+        @endif
+        @if($canSample)
+            <form method="POST" action="{{ route('merchant.documents.store', $mother) }}" enctype="multipart/form-data" class="row g-2 align-items-end">
+                @csrf
+                <div class="col-12 col-md-3">
+                    <label class="form-label mb-1" for="docFile">File (max 15 MB)</label>
+                    <input type="file" name="document" id="docFile" class="form-control form-control-sm" required>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label mb-1" for="docTitle">Title</label>
+                    <input type="text" name="title" id="docTitle" class="form-control form-control-sm" maxlength="160" placeholder="Defaults to the file name">
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label mb-1" for="docCat">Category</label>
+                    <input type="text" name="category" id="docCat" list="docCatList" class="form-control form-control-sm" maxlength="60">
+                    <datalist id="docCatList">@foreach(\App\Models\StyleDocument::CATEGORY_HINTS as $h)<option value="{{ $h }}">@endforeach</datalist>
+                </div>
+                <div class="col-12 col-md-3"><button class="btn btn-primary btn-sm"><i class="bi bi-upload me-1" aria-hidden="true"></i>Add Document</button></div>
+            </form>
+        @endif
+    </x-card>
+
+    {{-- Samples of this style. --}}
     <x-card class="mb-3" body-class="p-3">
         <x-slot:title>Samples <span class="badge bg-light text-muted border ms-1">{{ $samples->count() }}</span></x-slot:title>
         <x-slot:actions><a href="{{ route('merchant.samples.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-list-ul me-1" aria-hidden="true"></i>All Samples</a></x-slot:actions>

@@ -99,6 +99,7 @@ class StyleLibraryController extends Controller
             // Who changed the order (qty, ship date, PO ...) and when.
             'orderChanges' => app(\App\Services\OrderChanges::class)->forMother($mother, 50),
             // TnA: templates that may be applied, and the tasks already made from them.
+            'documents' => $mother->documents()->with('uploader:id,name')->get(),
             'samples' => $mother->samples()->with(['type', 'childStyle'])->orderByRaw('case when required_date is null then 1 else 0 end')->orderBy('required_date')->get(),
             'sampleTypes' => \App\Models\SampleType::active()->get(),
             'tnaTemplates' => \App\Models\TnaTemplate::forBuyer($mother->buyer_id)->orderBy('name')->get(),

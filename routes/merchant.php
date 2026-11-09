@@ -79,6 +79,17 @@ Route::prefix('merchant/samples')
         Route::put('/types/{type}', [\App\Http\Controllers\Merchant\SampleController::class, 'toggleType'])->name('types.toggle');
     });
 
+// Document bank of a style. Merchandising and Admin upload / delete,
+// Management downloads; the controller checks the buyer.
+Route::prefix('merchant/documents')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.documents.')
+    ->group(function () {
+        Route::post('/styles/{mother}', [\App\Http\Controllers\Merchant\StyleDocumentController::class, 'store'])->name('store');
+        Route::get('/{document}', [\App\Http\Controllers\Merchant\StyleDocumentController::class, 'download'])->name('download');
+        Route::delete('/{document}', [\App\Http\Controllers\Merchant\StyleDocumentController::class, 'destroy'])->name('destroy');
+    });
+
 // BOM builder: make a style's BOM on a screen. Merchandising and Admin; the
 // controller checks the buyer.
 Route::prefix('merchant/bom')
