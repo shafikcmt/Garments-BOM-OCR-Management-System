@@ -120,6 +120,23 @@ Management Review & Reporting
 
 ---
 
+## Development Roadmap (Full Garments ERP)
+
+The system is growing module by module into a full garments ERP (19 modules in the owner's specification). The front half of the order cycle is built; the factory-floor and shipment half is pending.
+
+| Area | Status |
+|---|---|
+| Merchandising (style library, Excel import, BOM, size breakdown, costing, samples, TnA templates) | Mostly built |
+| Procurement / Supply Chain (Booking PO, PRA, General Stock CS and Internal PO) | Partly built |
+| Store and Inventory | Partly built (QC gate, lot/shade/roll pending) |
+| Commercial, Accounts | Minimal |
+| Production Planning, IE, QA/QC, Subcontract, Shipping, Maintenance, Fixed Assets, HR | Not started |
+| Reporting, System Admin | Partly built / strong |
+
+Detailed module-by-module comparison, pending list, merchant-side next steps and feature advice: [`docs/19_FULL_ERP_SPEC_GAP_ANALYSIS.md`](docs/19_FULL_ERP_SPEC_GAP_ANALYSIS.md). Phase order and owner decisions: [`docs/12_ERP_IMPLEMENTATION_GUIDE.md`](docs/12_ERP_IMPLEMENTATION_GUIDE.md). Merchandiser workflow: [`docs/18_MERCHANDISER_WORKFLOW_GUIDE.md`](docs/18_MERCHANDISER_WORKFLOW_GUIDE.md).
+
+---
+
 ## Why This System Is Valuable
 
 This platform helps garment businesses move from manual Excel dependency to a structured digital process.

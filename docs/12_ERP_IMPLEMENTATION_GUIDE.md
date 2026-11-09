@@ -11,6 +11,7 @@
 > §10 (Merchandising & OCR plan) added 2026-10-25; §2 refreshed and §11
 > (department-wise Order / OCR plan) added 2026-10-26.
 > Update it when a phase ships or a decision is taken.
+> The 19-module spec comparison (2026-11-09) is in `19_FULL_ERP_SPEC_GAP_ANALYSIS.md`.
 
 ## 1. Owner's intent
 

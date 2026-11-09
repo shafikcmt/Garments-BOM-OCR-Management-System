@@ -88,3 +88,5 @@ Ask them to show you a real order, not describe it.
 Re-order this list after the merchandiser interview.
 
 The plan for all departments together (Supply Chain, Commercial, Store, Accounts, Management) and the release order across them is in `docs/12_ERP_IMPLEMENTATION_GUIDE.md` §11.
+
+Full-spec comparison and the pending merchant list: `docs/19_FULL_ERP_SPEC_GAP_ANALYSIS.md` §7.
