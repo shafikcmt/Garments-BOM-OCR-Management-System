@@ -15,6 +15,13 @@ pest()->extend(Tests\TestCase::class)
     ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->in('Feature');
 
+// Monthly requisitions are accepted only 20th–month end in real life. Tests
+// raise them on any day, so the window is opened for the whole month here;
+// MonthlyRequisitionWindowTest sets its own days.
+pest()->beforeEach(function () {
+    \App\Models\AppSetting::put(\App\Support\MonthlyRequisitionWindow::KEY_START_DAY, '1');
+})->in('Feature');
+
 /*
 |--------------------------------------------------------------------------
 | Expectations

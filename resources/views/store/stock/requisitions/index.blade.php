@@ -4,7 +4,7 @@
 
 @php
     // Drives the Clear button only — the filtering itself is the controller's.
-    $hasFilters = collect($filters)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
+    $hasFilters = collect($filters)->except('type')->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
 
     // One badge style per status, worst-to-best left to right in the flow.
     $badges = [
@@ -44,6 +44,11 @@
             </a>
             @endif
             @if(\App\Models\PurchaseRequisition::worksStoreDesk(auth()->user()))
+            @if(\App\Http\Controllers\Store\RequisitionWindowController::canManage(auth()->user()))
+            <a href="{{ route('store.stock.requisitions.window.edit') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-calendar-check me-1" aria-hidden="true"></i>Monthly Window
+            </a>
+            @endif
             @if(request('level') !== 'final')
             <a href="{{ route('store.stock.requisitions.index', ['level' => 'final']) }}" class="btn btn-outline-secondary">
                 <i class="bi bi-files me-1" aria-hidden="true"></i>Final Requisitions
@@ -103,6 +108,10 @@
                 <h5 class="mb-0">Requisitions <span class="badge bg-primary-subtle text-primary ms-1">{{ $requisitions->total() }}</span></h5>
             </div>
 
+            @if(request('level') !== 'final')
+                @include('store.stock.requisitions._type-tabs', ['route' => 'store.stock.requisitions.index', 'current' => $filters['type'] ?? '', 'counts' => $typeCounts])
+            @endif
+
             <form method="GET" class="row g-3 gx-stock-filter mb-4">
                 <div class="col-6 col-md-3 col-xl-2">
                     <label class="form-label" for="month">Month</label>
@@ -123,15 +132,6 @@
                     </select>
                 </div>
                 <div class="col-6 col-md-3 col-xl-2">
-                    <label class="form-label" for="typeFilter">Kind</label>
-                    <select name="type" id="typeFilter" class="form-select">
-                        <option value="">All</option>
-                        @foreach(\App\Models\PurchaseRequisition::typeLabels() as $value => $label)
-                            <option value="{{ $value }}" @selected(($filters['type'] ?? '') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-6 col-md-3 col-xl-2">
                     <label class="form-label" for="sectionFilter">Section</label>
                     <select name="section" id="sectionFilter" class="form-select js-searchable">
                         <option value="">All</option>
@@ -145,6 +145,9 @@
                     <input type="text" name="search" id="search" value="{{ $filters['search'] ?? '' }}" class="form-control" placeholder="Requisition no, requester, SKU or item">
                 </div>
                 <div class="col-12 col-xl-2 gx-stock-filter-actions">
+                    @if($filters['type'] ?? false)
+                        <input type="hidden" name="type" value="{{ $filters['type'] }}">
+                    @endif
                     <button class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
                     @if($hasFilters)
                         <a href="{{ route('store.stock.requisitions.index') }}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear</a>

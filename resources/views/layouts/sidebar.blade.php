@@ -317,6 +317,7 @@
                             <a href="{{ route('admin.payment-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.payment-settings.*') ? 'is-active' : '' }}">PI / PRA Settings</a>
                             <a href="{{ route('admin.departments.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.departments.*') ? 'is-active' : '' }}">Departments</a>
                             <a href="{{ route('admin.requisition-signatures.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.requisition-signatures.*') ? 'is-active' : '' }}">Requisition Signatures</a>
+                            <a href="{{ route('store.stock.requisitions.window.edit') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.requisitions.window.*') ? 'is-active' : '' }}">Monthly Requisition Window</a>
                             <a href="{{ route('admin.item-sku.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.item-sku.*') ? 'is-active' : '' }}">Item SKU</a>
                             <a href="{{ route('admin.email-templates.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.email-templates.*') ? 'is-active' : '' }}">Email Templates</a>
                             <a href="{{ route('admin.pra-approvers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-approvers.*') || request()->routeIs('admin.pra-approvals.*') ? 'is-active' : '' }}">PRA Approvers</a>

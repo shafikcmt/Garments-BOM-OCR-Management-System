@@ -83,6 +83,17 @@ class PurchaseRequisitionController extends Controller
             'type' => ['nullable', 'in:'.PurchaseRequisition::TYPE_MONTHLY.','.PurchaseRequisition::TYPE_INDIVIDUAL],
         ]);
 
+        // Counts for the Monthly / Individual tabs: what this user may see, under
+        // the other filters, by kind.
+        $typeCounts = PurchaseRequisition::query()
+            ->visibleTo($request->user())
+            ->where('level', PurchaseRequisition::LEVEL_DEPARTMENT)
+            ->when($filters['month'] ?? null, fn ($q, $month) => $q->forMonth($month))
+            ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
+            ->when($filters['section'] ?? null, fn ($q, $id) => $q->where('indent_section_id', $id))
+            ->toBase()->selectRaw('requisition_type, count(*) as total')
+            ->groupBy('requisition_type')->pluck('total', 'requisition_type');
+
         $requisitions = PurchaseRequisition::query()
             // Store, Admin and Management still see the whole company. A user
             // from another department, here on store.requisition.view, sees the
@@ -136,6 +147,7 @@ class PurchaseRequisitionController extends Controller
         return view('store.stock.requisitions.index', [
             'requisitions' => $requisitions,
             'filters' => $filters,
+            'typeCounts' => $typeCounts,
             'monthOptions' => $this->monthOptions($filters['month'] ?? null),
             'sections' => IndentSection::selectable()->get(['id', 'name']),
             'statusLabels' => PurchaseRequisition::statusLabels(),
@@ -202,15 +214,14 @@ class PurchaseRequisitionController extends Controller
             'section' => ['nullable', 'integer', 'exists:indent_sections,id'],
             'search' => ['nullable', 'string', 'max:100'],
             'ready' => ['nullable', 'boolean'],
+            'type' => ['nullable', 'in:'.PurchaseRequisition::TYPE_MONTHLY.','.PurchaseRequisition::TYPE_INDIVIDUAL],
         ]);
 
-        $requisitions = PurchaseRequisition::query()
+        // Every filter except Monthly / Individual: the type tabs count against
+        // this, so each tab shows how many of ITS kind match the rest.
+        $base = PurchaseRequisition::query()
             ->fromDepartments()
-            ->with('mergedInto')
             ->when($filters['ready'] ?? false, fn ($q) => $q->readyToMerge())
-            ->with(['indentSection', 'indentPerson', 'createdBy'])
-            ->withCount('items')
-            ->withSum('items', 'amount')
             ->when($filters['month'] ?? null, fn ($q, $month) => $q->forMonth($month))
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($filters['section'] ?? null, fn ($q, $id) => $q->where('indent_section_id', $id))
@@ -221,7 +232,17 @@ class PurchaseRequisitionController extends Controller
                     ->orWhereHas('createdBy', fn ($u) => $u->whereLike('name', $like))
                     ->orWhereHas('items.stockItem', fn ($i) => $i->where(fn ($n) => $n->whereLike('name', $like)->orWhereLike('sku', $like)))
                     ->orWhereHas('items', fn ($i) => $i->whereLike('custom_item_name', $like)));
-            })
+            });
+
+        $typeCounts = (clone $base)->toBase()->selectRaw('requisition_type, count(*) as total')
+            ->groupBy('requisition_type')->pluck('total', 'requisition_type');
+
+        $requisitions = (clone $base)
+            ->with('mergedInto')
+            ->with(['indentSection', 'indentPerson', 'createdBy'])
+            ->withCount('items')
+            ->withSum('items', 'amount')
+            ->when($filters['type'] ?? null, fn ($q, $type) => $q->where('requisition_type', $type))
             // Oldest first: a queue is worked from the end that has waited
             // longest, unlike the main list which reads newest first.
             ->orderByRaw("CASE WHEN status = ? THEN 0 ELSE 1 END", [PurchaseRequisition::STATUS_SUBMITTED])
@@ -233,6 +254,7 @@ class PurchaseRequisitionController extends Controller
         return view('store.stock.requisitions.requested', [
             'requisitions' => $requisitions,
             'filters' => $filters,
+            'typeCounts' => $typeCounts,
             'monthOptions' => $this->monthOptions($filters['month'] ?? null),
             'sections' => IndentSection::selectable()->get(['id', 'name']),
             'statusLabels' => PurchaseRequisition::statusLabels(),
@@ -1889,7 +1911,37 @@ class PurchaseRequisitionController extends Controller
             $data['items'] = array_slice(array_values($data['items']), 0, 1);
         }
 
+        $this->guardMonthlyWindow($data, $existing);
+
         return $data;
+    }
+
+    /**
+     * A department's MONTHLY sheet may be submitted only inside the Monthly
+     * Requisition Window (20th to month end by default; Admin/Store set it).
+     * Checked on Submit only — a draft can be saved any day — against the day
+     * of submitting, and for everyone alike. An Individual sheet and the
+     * Store's own Final Requisition are never held back.
+     */
+    private function guardMonthlyWindow(array $data, ?PurchaseRequisition $existing): void
+    {
+        if (($data['action'] ?? null) !== 'submit') {
+            return;
+        }
+
+        $defaults = DepartmentRequisitionDefaults::for(auth()->user());
+        $level = $existing?->level ?? $defaults->level;
+        $type = $existing?->requisition_type ?? $this->typeFor($defaults, $data['requisition_type'] ?? null);
+
+        if ($level !== PurchaseRequisition::LEVEL_DEPARTMENT || $type === PurchaseRequisition::TYPE_INDIVIDUAL) {
+            return;
+        }
+
+        if (! \App\Support\MonthlyRequisitionWindow::isOpen()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'requisition_type' => \App\Support\MonthlyRequisitionWindow::message(),
+            ]);
+        }
     }
 
     /**

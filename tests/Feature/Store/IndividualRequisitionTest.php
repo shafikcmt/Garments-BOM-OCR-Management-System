@@ -222,3 +222,24 @@ it('lets the Store Head prepare a Final Requisition: their own Store Head step i
         ->first(fn ($s) => $s['assignee_type'] === 'store_head');
     expect($other['self_approved'])->toBeFalse();
 });
+
+it('splits the Requested queue and the main list into Monthly and Individual tabs', function () {
+    [$head, $raiser] = indRaiser();
+    $monthly = indRaise($raiser, PurchaseRequisition::TYPE_MONTHLY);
+    $individual = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+    // The Requested queue holds only what the head has sent on to the Store.
+    indApprove($head, $monthly);
+    indApprove($head, $individual);
+    $clerk = indUser('store', ['store.requisition.create']);
+
+    foreach (['store.stock.requisitions.requested', 'store.stock.requisitions.index'] as $route) {
+        $this->actingAs($clerk)->get(route($route))
+            ->assertOk()->assertSee($monthly->requisition_no)->assertSee($individual->requisition_no)->assertSee('Individual');
+
+        $this->actingAs($clerk)->get(route($route, ['type' => 'individual']))
+            ->assertOk()->assertSee($individual->requisition_no)->assertDontSee($monthly->requisition_no);
+
+        $this->actingAs($clerk)->get(route($route, ['type' => 'monthly']))
+            ->assertOk()->assertSee($monthly->requisition_no)->assertDontSee($individual->requisition_no);
+    }
+});
