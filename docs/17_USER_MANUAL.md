@@ -401,6 +401,14 @@ Management can read and approve but not edit.
 
 Management can see samples but not change them.
 
+
+**Tag ID.** Every sample gets a Tag ID when it is added, for example **SMP-26-0012**. Write it on the physical tag so the sample and the system can always be matched. It is shown under the sample type everywhere and never changes. Samples that already existed received one too.
+
+**History and rework.** Press **History** on a sample to see every step: each change of status and each new buyer comment, with the date and who recorded it. A sample the buyer **rejected** or **approved with comments** counts as **sent back**; the list shows "Sent back 2x" under the status. When you press **Save** on an update, the system adds a history line only if the status or the buyer comment is new, so saving the same thing twice adds nothing.
+
+**Buyer Comments (Lessons).** On the Samples page press **Buyer Comments (Lessons)**. It lists what buyers said when samples were sent back, newest first. Filter by buyer and search a word of the comment, a style number or a product group (capital letters do not matter). Look here before making the next sample for the same buyer. You see only your own buyers.
+
+Not built yet for samples: ordering the sample materials, sample costing and SAM.
 ### 2.4c Documents (document bank)
 
 Keep the style's papers with the style: tech pack, approved lab dip, PP comments, test report, buyer e-mail.

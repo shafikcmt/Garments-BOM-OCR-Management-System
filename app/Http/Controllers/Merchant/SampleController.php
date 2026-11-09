@@ -30,7 +30,7 @@ class SampleController extends Controller
         $typeId = (int) $request->query('type') ?: null;
 
         $samples = Sample::query()
-            ->with(['type', 'motherStyle.buyer', 'motherStyle.season', 'childStyle'])
+            ->with(['type', 'motherStyle.buyer', 'motherStyle.season', 'childStyle', 'logs'])
             ->whereHas('motherStyle', fn ($q) => $q->whereIn('buyer_id', $buyer ? [$buyer->id] : $buyers->pluck('id')))
             ->when($status === 'open', fn ($q) => $q->whereNotIn('status', Sample::CLOSED))
             ->when($status !== 'open', fn ($q) => $q->where('status', $status))
@@ -54,14 +54,43 @@ class SampleController extends Controller
         ]);
     }
 
+    /** One sample's history: every status change and buyer comment, with the rework count. */
+    public function show(Request $request, Sample $sample)
+    {
+        $sample->load(['motherStyle.buyer', 'motherStyle.season', 'childStyle', 'type', 'logs.user:id,name']);
+        abort_unless($request->user()->hasBuyerAccess((int) $sample->motherStyle->buyer_id), 403);
+
+        return view('merchant.sample', ['sample' => $sample]);
+    }
+
+    /** The buyers' comments on samples that were sent back, searchable: what to remember for the next sample. */
+    public function lessons(Request $request)
+    {
+        $user = $request->user();
+        $buyers = Buyer::active()->when($user->isBuyerConfined(), fn ($q) => $q->whereIn('id', $user->merchantBuyerIds()))->orderBy('buyer_name')->get();
+        $buyer = $buyers->firstWhere('id', (int) $request->query('buyer'));
+        $term = trim((string) $request->query('q', ''));
+
+        $logs = \App\Models\SampleLog::with(['sample.type', 'sample.motherStyle.buyer', 'sample.motherStyle.season'])
+            ->whereIn('status', Sample::REWORK)->whereNotNull('note')->where('note', '!=', '')
+            ->whereHas('sample.motherStyle', fn ($q) => $q->whereIn('buyer_id', $buyer ? [$buyer->id] : $buyers->pluck('id')))
+            ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w->whereLike('note', '%' . $term . '%')
+                ->orWhereHas('sample.motherStyle', fn ($s) => $s->whereLike('style_no', '%' . $term . '%')->orWhereLike('product_group', '%' . $term . '%'))))
+            ->orderByDesc('event_date')->orderByDesc('id')->limit(300)->get();
+
+        return view('merchant.sample-lessons', ['logs' => $logs, 'buyers' => $buyers, 'buyer' => $buyer, 'term' => $term]);
+    }
+
     public function store(Request $request, MotherStyle $mother)
     {
         $this->authorizeEdit($request, $mother);
         $data = $this->validated($request, $mother);
 
-        $mother->samples()->create($data + ['status' => 'requested', 'created_by' => $request->user()->id, 'updated_by' => $request->user()->id]);
+        $sample = $mother->samples()->create($data + ['status' => 'requested', 'created_by' => $request->user()->id, 'updated_by' => $request->user()->id]);
+        $sample->assignTag();
+        $sample->logs()->create(['status' => 'requested', 'event_date' => Carbon::today()->toDateString(), 'user_id' => $request->user()->id, 'created_at' => now()]);
 
-        return back()->with('success', 'Sample added.');
+        return back()->with('success', 'Sample added. Tag ID ' . $sample->tag_id . '.');
     }
 
     public function update(Request $request, Sample $sample)
@@ -83,7 +112,19 @@ class SampleController extends Controller
             $data['comment_date'] = Carbon::today()->toDateString();
         }
 
+        $statusChanged = $data['status'] !== $sample->status;
+        $commentChanged = ! empty($data['buyer_comment']) && $data['buyer_comment'] !== $sample->buyer_comment;
+
         $sample->update($data + ['updated_by' => $request->user()->id]);
+
+        // Remember what happened: a new status, or a new buyer comment, is one line of history.
+        if ($statusChanged || $commentChanged) {
+            $sample->logs()->create([
+                'status' => $sample->status, 'note' => $commentChanged ? $data['buyer_comment'] : null,
+                'event_date' => ($commentChanged ? ($data['comment_date'] ?? null) : null) ?: Carbon::today()->toDateString(),
+                'user_id' => $request->user()->id, 'created_at' => now(),
+            ]);
+        }
 
         return back()->with('success', 'Sample updated.');
     }

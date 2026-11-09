@@ -7,14 +7,17 @@
             <div class="small text-muted">{{ $s->motherStyle->buyer?->buyer_name }} · {{ $s->motherStyle->season?->code }}</div>
         </td>
     @endif
-    <td class="fw-semibold">{{ $s->type?->name }}@if($s->childStyle)<span class="badge bg-light text-dark border ms-1">{{ $s->childStyle->style_no }}</span>@endif</td>
+    <td class="fw-semibold">{{ $s->type?->name }}@if($s->childStyle)<span class="badge bg-light text-dark border ms-1">{{ $s->childStyle->style_no }}</span>@endif
+        @if($s->tag_id)<div class="small text-muted fw-normal">{{ $s->tag_id }}</div>@endif</td>
     <td>{{ $s->gmts_color ?: '—' }}{{ $s->size ? ' · ' . $s->size : '' }}</td>
     <td class="text-end">{{ $s->qty }}</td>
     <td class="text-nowrap {{ $late ? 'text-danger fw-semibold' : '' }}">{{ $s->required_date?->format('d M Y') ?? '—' }}@if($late)<div class="small">Late</div>@endif</td>
     <td class="text-nowrap">{{ $s->sent_date?->format('d M Y') ?? '—' }}@if($s->courier_awb)<div class="small text-muted">{{ $s->courier_awb }}</div>@endif</td>
-    <td><span class="badge {{ $s->badgeClass() }}">{{ \App\Models\Sample::STATUSES[$s->status] ?? $s->status }}</span></td>
+    <td><span class="badge {{ $s->badgeClass() }}">{{ \App\Models\Sample::STATUSES[$s->status] ?? $s->status }}</span>
+        @if(($rw = $s->reworkCount()) > 0)<div class="small text-warning-emphasis">Sent back {{ $rw }}x</div>@endif</td>
     <td class="small">{{ $s->buyer_comment ?: '—' }}@if($s->comment_date)<div class="text-muted">{{ $s->comment_date->format('d M Y') }}</div>@endif</td>
     <td class="text-end text-nowrap">
+        <a href="{{ route('merchant.samples.show', $s) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>History</a>
         @if($canEdit)
             <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#sampleEdit{{ $s->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Update</button>
         @endif

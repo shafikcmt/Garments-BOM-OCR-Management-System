@@ -72,6 +72,8 @@ Route::prefix('merchant/samples')
     ->name('merchant.samples.')
     ->group(function () {
         Route::get('/', [\App\Http\Controllers\Merchant\SampleController::class, 'index'])->name('index');
+        Route::get('/lessons', [\App\Http\Controllers\Merchant\SampleController::class, 'lessons'])->name('lessons');
+        Route::get('/{sample}', [\App\Http\Controllers\Merchant\SampleController::class, 'show'])->whereNumber('sample')->name('show');
         Route::post('/styles/{mother}', [\App\Http\Controllers\Merchant\SampleController::class, 'store'])->name('store');
         Route::put('/{sample}', [\App\Http\Controllers\Merchant\SampleController::class, 'update'])->name('update');
         Route::delete('/{sample}', [\App\Http\Controllers\Merchant\SampleController::class, 'destroy'])->name('destroy');

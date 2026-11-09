@@ -20,12 +20,36 @@ class Sample extends Model
     /** Statuses after which nothing more is waited for. */
     public const CLOSED = ['approved', 'approved_with_comments', 'rejected'];
 
+    /** A buyer verdict that sends the sample back for work. */
+    public const REWORK = ['rejected', 'approved_with_comments'];
+
     protected $fillable = [
-        'mother_style_id', 'child_style_id', 'sample_type_id', 'gmts_color', 'size', 'qty', 'required_date', 'sent_date',
+        'tag_id', 'mother_style_id', 'child_style_id', 'sample_type_id', 'gmts_color', 'size', 'qty', 'required_date', 'sent_date',
         'courier_awb', 'status', 'buyer_comment', 'comment_date', 'created_by', 'updated_by',
     ];
 
     protected $casts = ['required_date' => 'date', 'sent_date' => 'date', 'comment_date' => 'date', 'qty' => 'integer'];
+
+    public function logs()
+    {
+        return $this->hasMany(SampleLog::class)->orderBy('event_date')->orderBy('id');
+    }
+
+    /** SMP-26-0012: the number on the physical tag. Set once, never changed. */
+    public function assignTag(): void
+    {
+        if (! $this->tag_id) {
+            $this->forceFill(['tag_id' => 'SMP-' . ($this->created_at ?? now())->format('y') . '-' . str_pad((string) $this->id, 4, '0', STR_PAD_LEFT)])->save();
+        }
+    }
+
+    /** How many times the buyer sent this sample back (rejected, or approved with comments). */
+    public function reworkCount(): int
+    {
+        return $this->relationLoaded('logs')
+            ? $this->logs->whereIn('status', self::REWORK)->count()
+            : $this->logs()->whereIn('status', self::REWORK)->count();
+    }
 
     public function motherStyle()
     {
