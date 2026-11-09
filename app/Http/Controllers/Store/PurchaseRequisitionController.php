@@ -1889,7 +1889,37 @@ class PurchaseRequisitionController extends Controller
             $data['items'] = array_slice(array_values($data['items']), 0, 1);
         }
 
+        $this->guardMonthlyWindow($data, $existing);
+
         return $data;
+    }
+
+    /**
+     * A department's MONTHLY sheet may be submitted only inside the Monthly
+     * Requisition Window (20th to month end by default; Admin/Store set it).
+     * Checked on Submit only — a draft can be saved any day — against the day
+     * of submitting, and for everyone alike. An Individual sheet and the
+     * Store's own Final Requisition are never held back.
+     */
+    private function guardMonthlyWindow(array $data, ?PurchaseRequisition $existing): void
+    {
+        if (($data['action'] ?? null) !== 'submit') {
+            return;
+        }
+
+        $defaults = DepartmentRequisitionDefaults::for(auth()->user());
+        $level = $existing?->level ?? $defaults->level;
+        $type = $existing?->requisition_type ?? $this->typeFor($defaults, $data['requisition_type'] ?? null);
+
+        if ($level !== PurchaseRequisition::LEVEL_DEPARTMENT || $type === PurchaseRequisition::TYPE_INDIVIDUAL) {
+            return;
+        }
+
+        if (! \App\Support\MonthlyRequisitionWindow::isOpen()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'requisition_type' => \App\Support\MonthlyRequisitionWindow::message(),
+            ]);
+        }
     }
 
     /**
