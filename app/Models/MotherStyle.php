@@ -31,6 +31,11 @@ class MotherStyle extends Model
         return $this->hasOne(BomApproval::class);
     }
 
+    public function buyerOrders()
+    {
+        return $this->hasMany(BuyerOrder::class);
+    }
+
     public function documents()
     {
         return $this->hasMany(StyleDocument::class)->latest('id');

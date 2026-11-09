@@ -276,6 +276,21 @@ If a season shows "No orders linked", import the buyer's Excel with that season 
 
 Good to know: a PI repeated on several lines is counted once in the Payment Summary. (Short) / excess counts only lines that have an ordered quantity. Columns are found by their name, so if a buyer's sheet has no ETA column, the ETA shows "—".
 
+### 2.4a1 Buyer Orders (customer PO register and approval)
+
+One card for each customer PO of a style. Quantity, colours and ship date are shown from the workspace (change them there, as before). The card keeps what the workspace does not hold, and the approval.
+
+**Open it:** open the style, then **Buyer Orders** on the **Orders** box.
+
+**On each card:**
+- **Colours, Order qty, Size total, Ship date** are read-only. **Differs** appears when the Size Breakdown total is not the order quantity.
+- Fill **Destination**, **Contract / L/C ref.**, **Quotation** (choose one of the style's final costings) and **Remark**, then press **Save**.
+- Press **Send for Approval** when the PO is ready. Admin, Management of the buyer and a Merchandising department head are told. The person who sent it does not approve it, unless nobody else could.
+- An approver presses **Approve**, or writes a comment and presses **Return**. A returned order shows the reason; correct it and send again.
+- If the quantity, a colour, a ship date or a size figure changes after approval, the card shows **Changed after approval**. Send it for approval again.
+
+Management can read and approve but not edit.
+
 ### 2.4b Samples
 
 **Add a sample:** open the style, in the **Samples** box choose the **Sample type**, and if you want the child style, **Colour**, **Size**, **Qty** and **Needed by** (the buyer's date). Press **Add Sample**.

@@ -79,6 +79,20 @@ Route::prefix('merchant/samples')
         Route::put('/types/{type}', [\App\Http\Controllers\Merchant\SampleController::class, 'toggleType'])->name('types.toggle');
     });
 
+// Buyer orders (customer POs) of a style: register fields and order approval.
+// Merchandising and Admin edit, Management reads and may approve; the
+// controller checks the buyer and the role per action.
+Route::prefix('merchant/orders')
+    ->middleware(['auth', 'role:merchant,admin,management'])
+    ->name('merchant.orders.')
+    ->group(function () {
+        Route::get('/styles/{mother}', [\App\Http\Controllers\Merchant\BuyerOrderController::class, 'show'])->name('show');
+        Route::put('/styles/{mother}', [\App\Http\Controllers\Merchant\BuyerOrderController::class, 'update'])->name('update');
+        Route::put('/styles/{mother}/submit', [\App\Http\Controllers\Merchant\BuyerOrderController::class, 'submit'])->name('submit');
+        Route::post('/{order}/approve', [\App\Http\Controllers\Merchant\BuyerOrderController::class, 'approve'])->name('approve');
+        Route::post('/{order}/return', [\App\Http\Controllers\Merchant\BuyerOrderController::class, 'returnOrder'])->name('return');
+    });
+
 // Document bank of a style. Merchandising and Admin upload / delete,
 // Management downloads; the controller checks the buyer.
 Route::prefix('merchant/documents')

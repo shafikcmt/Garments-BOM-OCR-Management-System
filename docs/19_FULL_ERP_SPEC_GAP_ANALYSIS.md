@@ -132,7 +132,7 @@ Status, Merchandising dashboard, OCR Summary, OCR Excel.
 | M-11 | **Order progress meeting tracker** (minutes, action items assigned) | Merch | Small | — |
 | M-12 | Open item from doc 12 §12.3: list of file columns with no header; master-data import (vendors from "Dropdown" sheet) | Import | Small | — |
 
-M-1 and M-3 shipped together on 2026-11-09. Next sensible slice: **M-2** (Order / buyer PO screen) after the merchant interview, or **M-6** (TnA e-mail / escalation).
+M-1 and M-3 shipped together on 2026-11-09. M-2 slice 1 shipped the same day. Next: M-4 (size-wise BOM and costing, now possible), or M-6 (TnA e-mail / escalation).
 
 ### 7.3 Ask the merchandiser before M-2 to M-8
 
