@@ -243,6 +243,10 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
         if ($headerEnd > $headerStart) {
             $sheet->getRowDimension($headerEnd)->setRowHeight(26);
         }
+        // Opens zoomed out so the whole width fits an ordinary monitor without
+        // a sideways scroll bar; the zoom slider at the bottom still changes it.
+        $sheet->getSheetView()->setZoomScale(70);
+
         for ($row = $letterheadEnd + 1; $row < $headerStart; $row++) {
             $sheet->getRowDimension($row)->setRowHeight($row === $letterheadEnd + 1 ? 5 : 2);
         }
