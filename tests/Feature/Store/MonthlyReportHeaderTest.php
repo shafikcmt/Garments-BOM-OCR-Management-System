@@ -248,7 +248,8 @@ it('starts the section-wise export with an ALL tab that the section tabs add up 
         $total = null;
         // Calculated, so the ALL tab's To Be Procured / Amount formulas read as numbers.
         foreach ($sheet->toArray(null, true, false) as $row) {
-            if (($row[0] ?? '') === 'Total-') {
+            // The "Total-" label sits in the last cell before the amount (no merged cells).
+            if (in_array('Total-', array_slice($row, 0, 15), true)) {
                 $total = (float) $row[15];
             } elseif (is_numeric($row[0] ?? null) && ! empty($row[1])) {
                 $rows[$row[1]] = [(float) $row[6], (float) $row[7], (float) $row[13], (float) $row[15], $row[5]];
