@@ -8,6 +8,7 @@ use App\Models\ExcelFile;
 use App\Models\ExcelHeader;
 use App\Models\PaymentRequest;
 use App\Services\HeaderAliasResolver;
+use App\Services\PaymentPosition;
 use App\Services\PraPaymentReferenceWriter;
 use App\Support\Concerns\ScopesToAssignedBuyers;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ class PaymentController extends Controller
     use ScopesToAssignedBuyers;
 
     /** Statuses a PRA can be in once it is approved and heading for payment. */
-    private const PAYABLE = [
+    public const PAYABLE = [
         PaymentRequest::STATUS_APPROVED,
         PaymentRequest::STATUS_PENDING_COMPLETION,
         PaymentRequest::STATUS_COMPLETED,
@@ -49,17 +50,7 @@ class PaymentController extends Controller
             ->latest('id');
 
         $all = $query->limit(500)->get();
-        $paidLines = $this->paidLineCounts($all);
-
-        $all->each(function (PaymentRequest $pra) use ($paidLines) {
-            $paid = $paidLines[$pra->id] ?? 0;
-            $pra->setAttribute('paid_lines', $paid);
-            $pra->setAttribute('payment_state', match (true) {
-                filled($pra->data['payment_reference'] ?? null) || ($pra->items_count > 0 && $paid >= $pra->items_count) => 'paid',
-                $paid > 0 => 'partial',
-                default => 'due',
-            });
-        });
+        app(PaymentPosition::class)->annotate($all);
 
         $due = $all->where('payment_state', '!=', 'paid');
         $paid = $all->where('payment_state', 'paid');
@@ -118,35 +109,5 @@ class PaymentController extends Controller
 
         return back()->with('success', 'Payment reference saved for ' . $paymentRequest->request_no
             . ($lines > 0 ? ' on ' . $lines . ' line(s).' : '.'));
-    }
-
-    /**
-     * Lines with a Pmt Doc No filled in, per PRA.
-     *
-     * @return array<int, int>
-     */
-    private function paidLineCounts($requests): array
-    {
-        $headerId = app(HeaderAliasResolver::class)->resolveHeaderId('pmt_doc_no');
-
-        if (! $headerId || $requests->isEmpty()) {
-            return [];
-        }
-
-        $rowsByPra = \App\Models\PaymentRequestItem::whereIn('payment_request_id', $requests->pluck('id'))
-            ->whereNotNull('excel_row_id')
-            ->get(['payment_request_id', 'excel_row_id'])
-            ->groupBy('payment_request_id');
-
-        $filled = ExcelCell::where('header_id', $headerId)
-            ->whereIn('row_id', $rowsByPra->flatten(1)->pluck('excel_row_id')->unique())
-            ->whereNotNull('value')
-            ->where('value', '!=', '')
-            ->pluck('row_id')
-            ->flip();
-
-        return $rowsByPra->map(
-            fn ($items) => $items->pluck('excel_row_id')->unique()->filter(fn ($id) => $filled->has($id))->count()
-        )->all();
     }
 }

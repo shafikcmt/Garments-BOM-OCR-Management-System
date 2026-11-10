@@ -654,6 +654,28 @@ Commercial and Admin record shipments for the buyers they hold; Management can r
 
 ## 4. Accounts
 
+### 4.0 Accounts dashboard
+
+**Open it:** left menu, **Dashboard**. It answers three questions: what must be paid, what is late, and where every payment request stands. It reads the same requests, and counts "paid" the same way, as the **Payments** screen (4.1), so the two always agree. Amounts are the PI amounts as entered; the system does not hold a currency on them.
+
+**Top row (money):**
+- **Awaiting payment:** the amount of approved requests not yet paid, and how many requests.
+- **Overdue:** the part of that whose required date has passed.
+- **Due in 7 days:** the part needed in the next week.
+- **Paid:** requests whose payment reference is saved or whose lines all have a Pmt Doc No.
+Press a tile to open Payments.
+
+**Second row (requests):** payment requests raised, pending approval, approved, and the workspace columns you own.
+
+**Charts and lists:**
+- **Amount to pay, by when it is needed:** bars for Overdue, This week, Next week, In 2 weeks, In 3 weeks, Later and No date. A request with no required date goes under **No date**; fill the required date on its lines so it is planned.
+- **Where the requests stand:** a ring of pending approval, awaiting payment, part paid and paid.
+- **Owed to suppliers:** the five suppliers with the most unpaid amount, with a red bar and an "overdue" tag when some of it is late.
+- **Pay these first:** the five oldest overdue requests, with how many days late. **Open Payments** goes to the screen where you record the payment.
+- **Payment requests raised, last 6 months** and **Your share of the BOM**, as before.
+
+You see only the requests of the buyers you hold.
+
 ### 4.1 Payments screen
 
 **Open it:** left menu, **Payments**.
