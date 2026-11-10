@@ -809,6 +809,8 @@ Sending for checking needs at least 2 suppliers and a priced supplier chosen on 
 
 **6. Store receives against the PO.** On **General Stock, Receiving, Record Receiving** choose **Against PO** (optional). The supplier and one line for every item still to come are filled in, with the quantity left and the PO rate. Change the quantity to what actually arrived and the rate to the invoice rate if it differs, then save as usual. The system refuses a PO from another supplier, an item that is not on the PO, and more than the PO still expects. The PO shows **Partly Received** then **Received**, and its page shows what is still to come. Goods with no PO can still be received as before: leave **Against PO** empty.
 
+**Dashboard.** On **General Stock, Dashboard** anyone who can open Comparative Statements or Internal POs sees a **Purchasing** panel above the stock figures: items waiting to be purchased, statements waiting for check or approval, POs waiting for check or authorising, POs open for receiving, a chart of statements and of POs by stage, the ordered value per month, the waiting items by category (click a category to open it on To Purchase) and the latest POs. Each tile opens the list it counts.
+
 **Who can do what (Admin).** Admin sets this in **Admin, Users, Portal Access** (or the permission list under **General Stock**):
 - The **Supply Chain General** role can see **To Purchase**, make and edit Comparative Statements, and make and edit Internal POs. It cannot check, approve or authorise.
 - **Comparative Statement: Check**, **Comparative Statement: Approve** **Internal PO: Check** and **Internal PO: Authorise** are given to the right people one by one.

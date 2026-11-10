@@ -678,3 +678,28 @@ it('saves a 600-item statement sent as one JSON field, with the categories', fun
     $this->actingAs($maker)->get(route('store.purchasing.cs.show', $cs))->assertOk()->assertSee('Electrical');
     $this->actingAs($maker)->get(route('store.purchasing.cs.pdf', $cs))->assertOk();
 });
+
+// ------------------------------------------------------------------- dashboard
+
+it('shows the purchasing panel on the General Stock dashboard, with real figures, only to purchasing users', function () {
+    $sheet = gpApprovedWithCategories([['Bin Liner', 40, 'Cleaning'], ['Ball Pen', 60, 'Stationery']]);
+    $desk = gpUser(['store.requisition.view'], 'Desk');
+
+    $this->actingAs($desk)->get(route('store.dashboard'))->assertOk()
+        ->assertSee('Items waiting to be purchased')->assertSee('Waiting to purchase, by category')
+        ->assertSee('Cleaning')->assertSee('Ordered value per month');
+
+    $summary = app(\App\Services\PurchasingDashboardService::class)->summary();
+    expect($summary['waiting_items'])->toBe(2)->and($summary['trend'])->toHaveCount(6);
+
+    // A plain stock user without purchasing rights does not get the panel.
+    $store = gpStoreUser();
+    $this->actingAs($store)->get(route('store.dashboard'))->assertOk()->assertDontSee('Items waiting to be purchased');
+});
+
+it('counts an authorised PO in this month on the dashboard trend', function () {
+    [$po] = gpIssuedPo();
+    $summary = app(\App\Services\PurchasingDashboardService::class)->summary();
+
+    expect($summary['po']['issued'])->toBe(1)->and($summary['recent_orders'])->toHaveCount(1);
+});

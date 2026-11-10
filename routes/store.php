@@ -70,6 +70,7 @@ Route::prefix('store/reports')
 $storeEntry = 'role_or_perm:store|admin|management'
     .'|store.stock_report.view|store.items.view|store.receiving.view'
     .'|store.issues.view|store.requisition.view|store.setup.view'
+    .'|store.purchase_cs.view|store.purchase_po.view'
     .'|material.closing_stock.view|material.receiving.view'
     .'|material.bulk_issue.view|material.requisitions.view';
 
@@ -89,7 +90,7 @@ $generalStock = 'role_or_perm:store|admin|management'
 // dashboard on any other right still can.
 $generalStockDashboard = 'role_or_perm:store|admin|management'
     .'|store.stock_report.view|store.items.view|store.receiving.view'
-    .'|store.issues.view|store.setup.view';
+    .'|store.issues.view|store.setup.view|store.purchase_cs.view|store.purchase_po.view';
 
 /*
  * Section guards inside General Stock.
