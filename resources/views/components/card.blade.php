@@ -25,10 +25,15 @@
 
 {{-- border-0 / shadow-sm are gone on purpose: .gx-card now owns both, so the
      card matches the stat tiles instead of carrying Bootstrap's defaults. --}}
+@php
+    // A flush card (p-0, for a table) has no body padding to indent its heading,
+    // so the heading row carries its own.
+    $flush = str_contains($bodyClass, 'p-0');
+@endphp
 <div {{ $attributes->merge(['class' => 'card gx-card']) }}>
     <div class="card-body {{ $bodyClass }}">
         @if($title || isset($actions))
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 {{ $flush ? 'p-3 pb-2' : 'mb-3' }}">
                 @if($title)
                     <h5 class="mb-0">{{ $title }}</h5>
                 @endif

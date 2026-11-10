@@ -7,6 +7,7 @@ use App\Models\ExcelRow;
 use App\Models\PaymentRequest;
 use App\Services\DashboardMetricsService;
 use App\Services\DepartmentActivityService;
+use App\Services\PaymentPosition;
 use App\Support\Concerns\ScopesToAssignedBuyers;
 
 /**
@@ -50,6 +51,23 @@ class DashboardController extends Controller
             'pra_approved' => $pras()->where('status', PaymentRequest::STATUS_APPROVED)->count(),
         ];
 
-        return view('account.dashboard', compact('stats', 'workspace', 'trend', 'delta') + $this->requisitionSummary(auth()->user()));
+        // Money side: the approved requests heading for payment, read the same way
+        // the Payments screen reads them (PaymentPosition), so the two always agree.
+        $payable = $pras()->whereIn('status', PaymentController::PAYABLE)
+            ->withCount('items')
+            ->withSum('items as lines_amount', 'pi_amount')
+            ->withMin('items as required_date', 'payment_required_date')
+            ->latest('id')->limit(2000)->get();
+        $pay = app(PaymentPosition::class)->dashboard($payable);
+
+        // Where every request stands, as one picture.
+        $statusSegments = [
+            ['label' => 'Pending approval', 'value' => $stats['pra_pending'], 'tone' => 'warning'],
+            ['label' => 'Awaiting payment', 'value' => $pay['due_only_count'], 'tone' => 'danger'],
+            ['label' => 'Part paid', 'value' => $pay['partial_count'], 'tone' => 'primary'],
+            ['label' => 'Paid', 'value' => $pay['paid_count'], 'tone' => 'success'],
+        ];
+
+        return view('account.dashboard', compact('stats', 'workspace', 'trend', 'delta', 'pay', 'statusSegments') + $this->requisitionSummary(auth()->user()));
     }
 }
