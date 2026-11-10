@@ -101,6 +101,10 @@
                         The requisition and all its item lines will be removed. Its history is kept.
                     </x-action-modal>
                 @endif
+                {{-- Prints the same document as the PDF, without saving a file first. --}}
+                <button type="button" class="btn btn-outline-secondary" data-print-pdf="{{ route('store.stock.requisitions.pdf', [$requisition, 'inline' => 1]) }}">
+                    <i class="bi bi-printer me-1" aria-hidden="true"></i>Print
+                </button>
                 <a href="{{ route('store.stock.requisitions.pdf', $requisition) }}" class="btn btn-outline-secondary">
                     <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF
                 </a>
@@ -526,4 +530,34 @@
         .gx-line-table tbody td.text-center { text-align: center !important; }
     </style>
 </div>
+
+@endsection
+
+@section('scripts')
+<script>
+    document.querySelectorAll('[data-print-pdf]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var url = button.getAttribute('data-print-pdf');
+            var label = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Preparing';
+
+            var frame = document.createElement('iframe');
+            frame.setAttribute('aria-hidden', 'true');
+            frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+            frame.onload = function () {
+                button.disabled = false;
+                button.innerHTML = label;
+                try {
+                    frame.contentWindow.focus();
+                    frame.contentWindow.print();
+                } catch (e) {
+                    window.open(url, '_blank'); // the browser's own PDF viewer has a Print button
+                }
+            };
+            frame.src = url;
+            document.body.appendChild(frame);
+        });
+    });
+</script>
 @endsection

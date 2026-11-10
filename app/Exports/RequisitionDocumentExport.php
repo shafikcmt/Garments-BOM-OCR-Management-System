@@ -254,6 +254,30 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
             ]);
         }
 
+        // Item rows: roomier than a bare text line, so a printed row can be read
+        // and written on. A row grows with its longest wrapped text (the
+        // remarks) at about one line per column-width of characters.
+        for ($row = $firstData; $row <= $tableEnd; $row++) {
+            if ($row === $totalRow || $sheet->getStyle('A'.$row)->getFill()->getFillType() === Fill::FILL_SOLID) {
+                $sheet->getRowDimension($row)->setRowHeight(22);
+
+                continue;
+            }
+
+            $lines = 1;
+            for ($col = 1; $col <= $lastIndex; $col++) {
+                $value = $sheet->getCell(Coordinate::stringFromColumnIndex($col).$row)->getValue();
+                $width = $sheet->getColumnDimensionByColumn($col)->getWidth();
+
+                if (is_string($value) && $width > 0 && $sheet->getStyle(Coordinate::stringFromColumnIndex($col).$row)->getAlignment()->getWrapText()) {
+                    $lines = max($lines, (int) ceil(mb_strlen($value) * 1.1 / max(1, $width - 1)));
+                }
+            }
+
+            $sheet->getRowDimension($row)->setRowHeight(max(26, 13 * $lines + 6));
+            $sheet->getStyle('A'.$row.':'.$lastColumn.$row)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        }
+
         // 7. The Signature and Pending Qty columns of the two acknowledgement
         // blocks are wide enough to sign in, and to carry the long heading
         // above them on one line.

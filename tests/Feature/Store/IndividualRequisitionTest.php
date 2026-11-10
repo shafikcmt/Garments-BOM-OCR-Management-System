@@ -256,3 +256,14 @@ it('does not add Safety Stock to To Be Procured on an Individual requisition', f
         ->and((float) $individual->safety_stock_snapshot)->toBe(5.0)  // still shown
         ->and((float) $individual->to_be_procured_qty)->toBe(5.0);    // but not added
 });
+
+it('offers a Print button that loads the same PDF inline', function () {
+    [$head, $raiser] = indRaiser();
+    $sheet = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+
+    $this->actingAs($raiser)->get(route('store.stock.requisitions.show', $sheet))
+        ->assertOk()->assertSee('data-print-pdf', false)->assertSee('inline=1', false);
+
+    $response = $this->actingAs($raiser)->get(route('store.stock.requisitions.pdf', [$sheet, 'inline' => 1]))->assertOk();
+    expect($response->headers->get('content-disposition'))->toContain('inline');
+});
