@@ -57,6 +57,14 @@ function mhSheet(string $no, ?IndentSection $section, string $item, string $cate
 }
 
 /** Download the workbook for a switch and read every sheet's header block: sheet => [label => value]. */
+/** The signature boxes: the captions on the first of the sheet's last three rows. */
+function mhBoxCount($sheet): int
+{
+    $rows = $sheet->toArray(null, false, false);
+
+    return count(array_filter($rows[count($rows) - 3] ?? [], fn ($v) => trim((string) $v) !== ''));
+}
+
 function mhWorkbook(array $query): array
 {
     $file = test()->actingAs(test()->store)
@@ -73,7 +81,7 @@ function mhWorkbook(array $query): array
             }
         }
         $text = collect($sheet->toArray(null, false, false))->flatten()->filter()->implode("\n");
-        $out[$sheet->getTitle()] = ['header' => $header, 'text' => $text, 'boxes' => substr_count($text, 'Signature & Date')];
+        $out[$sheet->getTitle()] = ['header' => $header, 'text' => $text, 'boxes' => mhBoxCount($sheet)];
     }
 
     return $out;
@@ -256,7 +264,7 @@ it('starts the section-wise export with an ALL tab that the section tabs add up 
             }
         }
 
-        return ['rows' => $rows, 'total' => $total, 'text' => collect($sheet->toArray(null, false, false))->flatten()->filter()->implode("\n")];
+        return ['rows' => $rows, 'total' => $total, 'boxes' => mhBoxCount($sheet), 'text' => collect($sheet->toArray(null, false, false))->flatten()->filter()->implode("\n")];
     };
 
     $all = $read('ALL');
@@ -281,9 +289,9 @@ it('starts the section-wise export with an ALL tab that the section tabs add up 
     // tabs keep theirs.
     expect($all['text'])->toContain('HAPL/Dept./ALL/2026/September/01')->toContain('Stock in Hand')
         ->not->toContain('Stock Allocated')->not->toContain(Report::SECTION_STOCK_NOTE)
-        ->and(substr_count($all['text'], 'Signature & Date'))->toBe(4)
+        ->and($all['boxes'])->toBe(4)
         ->and($cut['text'])->toContain('HAPL/Dept./CUTTING/2026/September/01')->toContain('Stock Allocated')
-        ->and(substr_count($cut['text'], 'Signature & Date'))->toBe(3);
+        ->and($cut['boxes'])->toBe(3);
 });
 
 it('makes the downloads follow the switch', function () {

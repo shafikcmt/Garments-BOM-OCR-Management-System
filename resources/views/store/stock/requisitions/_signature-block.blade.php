@@ -39,9 +39,11 @@
         </tr>
     </table>
 @else
-    {{-- The blank rows above the labels are the signing space; bold, borders
-         and heights come from FormatsStoreSheet, which finds this block by
-         the "Signature & Date" line below the labels. Every box gets the same
+    {{-- The blank rows above the labels are the signing space. Three lines per
+         box: the caption, the name, the designation (the signing date is on the
+         PDF, and beside "Prepared by" etc. in the letterhead). Bold, borders
+         and heights come from the export, which finds this block as the last
+         three rows of the sheet. Every box gets the same
          share of the columns; the last takes the remainder. --}}
     @php
         $columns = $columns ?? 21;
@@ -59,12 +61,12 @@
         </tr>
         <tr>
             @foreach($boxes as $i => $box)
-                <td colspan="{{ $span($i) }}">{{ trim($box['name'].($box['title'] !== '' ? ($box['name'] !== '' ? ', ' : '').$box['title'] : '')) }}</td>
+                <td colspan="{{ $span($i) }}">{{ $box['name'] }}</td>
             @endforeach
         </tr>
         <tr>
             @foreach($boxes as $i => $box)
-                <td colspan="{{ $span($i) }}">{{ $signDate($box['signed_at']) }}</td>
+                <td colspan="{{ $span($i) }}">{{ $box['title'] }}</td>
             @endforeach
         </tr>
     </table>

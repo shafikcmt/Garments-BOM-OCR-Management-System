@@ -228,6 +228,16 @@ trait PlainPrintLook
         }
 
         if ($signatureRow !== null) {
+            // Caption bold; the name bold italic; the designation plain.
+            $sheet->getStyle('A'.$signatureRow.':'.$lastColumn.$signatureRow)->getFont()->setBold(true)->setItalic(false)->setSize(10);
+            $sheet->getStyle('A'.($signatureRow + 1).':'.$lastColumn.($signatureRow + 1))->getFont()->setBold(true)->setItalic(true)->setSize(10);
+            $sheet->getStyle('A'.($signatureRow + 2).':'.$lastColumn.($signatureRow + 2))->getFont()->setBold(false)->setItalic(false)->setSize(10);
+            foreach ([1, 2] as $offset) {
+                $sheet->getRowDimension($signatureRow + $offset)->setRowHeight(16);
+            }
+        }
+
+        if ($signatureRow !== null) {
             $this->spreadSignatureBoxes($sheet, $signatureRow, $lastIndex);
         }
     }

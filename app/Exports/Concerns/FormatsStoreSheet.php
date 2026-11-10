@@ -426,7 +426,24 @@ trait FormatsStoreSheet
 
         $dateLine = $this->locateLabelRow($sheet, $from, $to, 'signature &');
 
-        return $dateLine !== null && $dateLine - 2 >= $from ? $dateLine - 2 : null;
+        if ($dateLine !== null) {
+            return $dateLine - 2 >= $from ? $dateLine - 2 : null;
+        }
+
+        // The requisition documents end with a three-line block — caption,
+        // name, designation — and nothing after it.
+        if (in_array(PlainPrintLook::class, class_uses($this), true) && $to - 2 > $from) {
+            $filled = 0;
+            for ($col = 1; $col <= Coordinate::columnIndexFromString($sheet->getHighestDataColumn()); $col++) {
+                if (trim((string) $sheet->getCell(Coordinate::stringFromColumnIndex($col).($to - 2))->getValue()) !== '') {
+                    $filled++;
+                }
+            }
+
+            return $filled > 0 ? $to - 2 : null;
+        }
+
+        return null;
     }
 
     /**
