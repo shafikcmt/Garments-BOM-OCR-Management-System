@@ -29,6 +29,7 @@ use Maatwebsite\Excel\Events\AfterSheet;
 class MonthlyRequisitionReportSheet implements FromView, WithEvents, WithTitle
 {
     use FormatsStoreSheet;
+    use Concerns\PlainPrintLook;
 
     /**
      * @param  array<string, mixed>  $data  payload from MonthlyRequisitionReportController
@@ -70,6 +71,7 @@ class MonthlyRequisitionReportSheet implements FromView, WithEvents, WithTitle
                 $sheet = $event->sheet->getDelegate();
                 $this->formatStoreSheet($sheet);
                 $this->writeFormulas($sheet);
+                $this->plainPrintLook($sheet);
             },
         ];
     }

@@ -319,7 +319,9 @@ it('writes To Be Procured and Amount as formulas on the ALL and category tabs, n
         ->and($all->getCell('P14')->getValue())->toBe('=N14*O14');
 
     // The Total row sums the Amount formulas.
-    $total = collect(range(15, 24))->first(fn ($r) => str_starts_with(trim((string) $all->getCell('A'.$r)->getValue()), 'Total'));
+    // (The "Total-" label sits in the last cell before the amount — no merged cells.)
+    $total = collect(range(15, 24))->first(fn ($r) => collect(range('A', 'O'))
+        ->contains(fn ($c) => str_starts_with(trim((string) $all->getCell($c.$r)->getValue()), 'Total')));
     expect($all->getCell('P'.$total)->getValue())->toBe('=SUM(P13:P14)');
 
     // Category tabs carry them too.
