@@ -83,6 +83,9 @@
         </thead>
         <tbody>
             @foreach($cs->items as $i => $item)
+                @if(filled($item->category) && ($i === 0 || $cs->items[$i - 1]->category !== $item->category))
+                    <tr><td colspan="{{ $cols }}" style="background:#f3f5f8;font-weight:bold;">{{ $item->category }}</td></tr>
+                @endif
                 <tr>
                     <td class="c">{{ $i + 1 }}</td>
                     <td>{{ $item->item_name }}</td>

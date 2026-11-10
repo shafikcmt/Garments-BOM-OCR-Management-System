@@ -23,12 +23,18 @@ class PurchaseQueueController extends Controller
             'type' => ['nullable', 'in:final,individual'],
             'q' => ['nullable', 'string', 'max:100'],
             'requisition' => ['nullable', 'integer'],
+            'category' => ['nullable', 'string', 'max:120'],
         ]);
+
+        // Categories are listed from everything waiting, so picking one never hides the others from the list.
+        $categories = $this->queue->lines(array_diff_key($filters, ['category' => 1]))
+            ->groupBy('category_name')->map->count()->sortKeys();
 
         $lines = $this->queue->lines($filters);
 
         return view('store.purchasing.queue', [
-            'lines' => $lines->groupBy('purchase_requisition_id'),
+            'groups' => $lines->sortBy(fn ($l) => $l->category_name.'|'.$l->purchase_requisition_id.'|'.$l->sort_order)->groupBy('category_name'),
+            'categories' => $categories,
             'total' => $lines->count(),
             'filters' => $filters,
             'canCreate' => $request->user()->can('store.purchase_cs.create'),

@@ -93,6 +93,7 @@ class ComparativeStatementService
                     'purchase_requisition_item_id' => $source?->id,
                     'stock_item_id' => $source?->stock_item_id,
                     'item_name' => $source ? $source->displayName() : trim((string) ($line['item_name'] ?? '')),
+                    'category' => filled($line['category'] ?? null) ? trim((string) $line['category']) : null,
                     'uom' => $source ? ($source->uom_snapshot ?: $source->stockItem?->uom) : ($line['uom'] ?? null),
                     'qty' => $line['qty'],
                     'specification' => $line['specification'] ?? ($source?->specification),

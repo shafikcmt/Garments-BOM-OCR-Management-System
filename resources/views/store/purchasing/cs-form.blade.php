@@ -10,6 +10,8 @@
     $active = $suppliersByKey->isEmpty() ? range(0, max(1, $minSuppliers) - 1) : $suppliersByKey->keys()->map(fn ($k) => (int) $k)->all();
 
     $lines = array_values($state['lines']);
+    $categoryNames = collect($lines)->pluck('category')->filter()->unique()->values();
+    $totalCols = 5 + ($max * 3) + 1;
     $fmt = fn ($n) => $n === null || $n === '' ? '' : rtrim(rtrim(number_format((float) $n, 4, '.', ''), '0'), '.');
 @endphp
 
@@ -46,6 +48,8 @@
           action="{{ $cs ? route('store.purchasing.cs.update', $cs) : route('store.purchasing.cs.store') }}">
         @csrf
         @if($cs) @method('PUT') @endif
+        {{-- The item grid is sent as this one field (see ComparativeStatementController::unpackLines). --}}
+        <input type="hidden" name="lines_json" id="linesJson" value="">
 
         <div class="card gx-stock-card mb-3">
             <div class="gx-stock-card-body">
@@ -134,6 +138,39 @@
                 </div>
                 @error('lines')<div class="alert alert-danger py-2 small">{{ $message }}</div>@enderror
 
+                <div class="row g-2 align-items-end mb-2" id="gridTools">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label small mb-1" for="rowSearch">Find an item</label>
+                        <input type="search" id="rowSearch" class="form-control form-control-sm" placeholder="Type part of an item name">
+                    </div>
+                    @if($categoryNames->count() > 1)
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small mb-1" for="catFilter">Category</label>
+                            <select id="catFilter" class="form-select form-select-sm">
+                                <option value="">All categories</option>
+                                @foreach($categoryNames as $c)<option value="{{ $c }}">{{ $c }}</option>@endforeach
+                            </select>
+                        </div>
+                    @endif
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-1" for="viewFilter">Show</label>
+                        <select id="viewFilter" class="form-select form-select-sm">
+                            <option value="">All items</option>
+                            <option value="unpriced">Items still missing a price</option>
+                            <option value="nochoice">Items with no supplier chosen</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="copyList">
+                            <i class="bi bi-clipboard me-1" aria-hidden="true"></i>Copy item list
+                        </button>
+                    </div>
+                    <div class="col-12 small text-muted" id="progress" aria-live="polite"></div>
+                </div>
+                <div class="form-text mb-2">
+                    <i class="bi bi-clipboard-data me-1" aria-hidden="true"></i>
+                    Many prices? Press <strong>Copy item list</strong> and paste it into Excel to send suppliers the items in this order. When their quotation comes back in the same order, copy the price column from the supplier's Excel quotation (same item order), click the first price box under that supplier and paste (Ctrl+V). Copy two columns to fill two suppliers at once. Press Enter to move down to the next item.
+                </div>
                 <div class="table-responsive">
                     <table class="table align-middle gx-stock-table" id="csTable">
                         <thead>
@@ -158,11 +195,17 @@
                         </thead>
                         <tbody>
                             @foreach($lines as $i => $line)
-                                <tr data-line="{{ $i }}">
+                                @if(filled($line['category'] ?? null) && ($i === 0 || ($lines[$i - 1]['category'] ?? null) !== $line['category']))
+                                    <tr class="table-light" data-cat-row="{{ $line['category'] }}">
+                                        <td colspan="{{ $totalCols }}" class="fw-semibold"><i class="bi bi-tags text-primary me-1" aria-hidden="true"></i>{{ $line['category'] }}</td>
+                                    </tr>
+                                @endif
+                                <tr data-line="{{ $i }}" data-name="{{ mb_strtolower($line['item_name'] ?? '') }}" data-cat="{{ $line['category'] ?? '' }}">
                                     <td>{{ $i + 1 }}
                                         <input type="hidden" name="lines[{{ $i }}][purchase_requisition_item_id]" value="{{ $line['purchase_requisition_item_id'] ?? '' }}">
                                         <input type="hidden" name="lines[{{ $i }}][item_name]" value="{{ $line['item_name'] ?? '' }}">
                                         <input type="hidden" name="lines[{{ $i }}][uom]" value="{{ $line['uom'] ?? '' }}">
+                                        <input type="hidden" name="lines[{{ $i }}][category]" value="{{ $line['category'] ?? '' }}">
                                         <input type="hidden" name="lines[{{ $i }}][requisition_no]" value="{{ $line['requisition_no'] ?? '' }}">
                                         <input type="hidden" name="lines[{{ $i }}][last_rate]" value="{{ $line['last_rate'] ?? '' }}">
                                         <input type="hidden" name="lines[{{ $i }}][max_qty]" value="{{ $line['max_qty'] ?? '' }}">
@@ -370,7 +413,123 @@
         });
     });
 
-    recalc();
+    // ---------------------------------------------------------------- long lists
+    var rows = Array.prototype.slice.call(form.querySelectorAll('tr[data-line]'));
+    var search = document.getElementById('rowSearch');
+    var catSel = document.getElementById('catFilter');
+    var viewSel = document.getElementById('viewFilter');
+
+    function priced(row, k) { return num(row.querySelector('[data-price="' + k + '"]').value) !== null; }
+
+    function applyFilter() {
+        var needle = (search.value || '').trim().toLowerCase();
+        var cat = catSel ? catSel.value : '';
+        var view = viewSel.value;
+        var keys = activeKeys();
+        var shownCats = {};
+        rows.forEach(function (row) {
+            var show = true;
+            if (needle && row.dataset.name.indexOf(needle) === -1) show = false;
+            if (cat && row.dataset.cat !== cat) show = false;
+            if (view === 'unpriced' && !keys.some(function (k) { return !priced(row, k); })) show = false;
+            if (view === 'nochoice' && row.querySelector('[data-choose]:checked')) show = false;
+            row.hidden = !show;
+            if (show) shownCats[row.dataset.cat] = true;
+        });
+        form.querySelectorAll('tr[data-cat-row]').forEach(function (h) { h.hidden = !shownCats[h.dataset.catRow]; });
+    }
+
+    function progress() {
+        var keys = activeKeys(), n = rows.length, parts = [];
+        keys.forEach(function (k) {
+            var c = rows.filter(function (r) { return priced(r, k); }).length;
+            parts.push('Supplier ' + (k + 1) + ': ' + c + '/' + n + ' priced');
+        });
+        var chosen = rows.filter(function (r) { return r.querySelector('[data-choose]:checked'); }).length;
+        parts.push('Chosen: ' + chosen + '/' + n);
+        document.getElementById('progress').innerHTML = parts.join('<br>');
+    }
+
+    [search, catSel, viewSel].forEach(function (el) { if (el) el.addEventListener('input', applyFilter); });
+    form.addEventListener('input', function (e) { if (e.target.matches('[data-price]')) progress(); });
+    form.addEventListener('change', progress);
+
+    function visibleRows() { return rows.filter(function (r) { return !r.hidden; }); }
+
+    // Enter moves down to the same supplier's price on the next item.
+    form.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' || !e.target.matches('[data-price],[data-qty]')) return;
+        e.preventDefault();
+        var sel = e.target.matches('[data-price]') ? '[data-price="' + e.target.dataset.price + '"]' : '[data-qty]';
+        var vis = visibleRows(), at = vis.indexOf(e.target.closest('tr[data-line]'));
+        var next = vis[at + 1];
+        if (next) { var f = next.querySelector(sel); f.focus(); f.select(); }
+    });
+
+    // Item, UoM and quantity of the items shown, tab-separated: pastes into Excel as three columns.
+    document.getElementById('copyList').addEventListener('click', function () {
+        var lines = visibleRows().map(function (r) {
+            var cells = r.querySelectorAll('td');
+            return [r.querySelector('.fw-semibold').textContent.trim(), r.querySelector('[name$="[uom]"]').value, r.querySelector('[data-qty]').value].join('\t');
+        });
+        var text = lines.join('\n'), btn = this;
+        function done() { btn.innerHTML = '<i class="bi bi-check2 me-1" aria-hidden="true"></i>Copied ' + lines.length + ' item(s)'; }
+        if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done); }
+        else { var t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); done(); }
+    });
+
+    // Paste a column (or several) straight from Excel.
+    form.addEventListener('paste', function (e) {
+        if (!e.target.matches('[data-price]')) return;
+        var text = (e.clipboardData || window.clipboardData).getData('text');
+        if (text.indexOf('\n') === -1 && text.indexOf('\t') === -1) return; // one value: normal paste
+        e.preventDefault();
+        var grid = text.replace(/\r/g, '').replace(/\n+$/, '').split('\n').map(function (r) { return r.split('\t'); });
+        var keys = activeKeys(), k0 = keys.indexOf(parseInt(e.target.dataset.price, 10));
+        var vis = visibleRows(), r0 = vis.indexOf(e.target.closest('tr[data-line]'));
+        var filled = 0;
+        grid.forEach(function (cells, ri) {
+            var row = vis[r0 + ri];
+            if (!row) return;
+            cells.forEach(function (cell, ci) {
+                var k = keys[k0 + ci];
+                if (k === undefined) return;
+                var v = cell.replace(/[^0-9.\-]/g, '');
+                if (v === '' || isNaN(parseFloat(v))) return;
+                row.querySelector('[data-price="' + k + '"]').value = v;
+                filled++;
+            });
+            if (!row.querySelector('[data-choose]:checked')) { var lk = lowestKey(row); if (lk !== null) choose(row, lk); }
+        });
+        recalc(); progress(); applyFilter();
+        var note = document.getElementById('progress');
+        note.insertAdjacentHTML('beforeend', '<br><span class="text-success">Pasted ' + filled + ' price(s).</span>');
+    });
+
+    // Send the grid as one field: 500+ items would overrun PHP's input-variable limit as ordinary fields.
+    form.addEventListener('submit', function () {
+        var out = [];
+        rows.forEach(function (row) {
+            var o = {};
+            row.querySelectorAll('input').forEach(function (inp) {
+                if (!inp.name || inp.name.indexOf('lines[') !== 0 || inp.disabled) return;
+                if (inp.type === 'radio' && !inp.checked) return;
+                if (inp.value === '') return;
+                var path = inp.name.match(/\[([^\]]*)\]/g).map(function (x) { return x.slice(1, -1); });
+                path.shift();
+                var t = o;
+                path.forEach(function (key, idx) {
+                    if (idx === path.length - 1) { t[key] = inp.value; }
+                    else { t[key] = t[key] || {}; t = t[key]; }
+                });
+            });
+            out.push(o);
+        });
+        document.getElementById('linesJson').value = JSON.stringify(out);
+        form.querySelectorAll('tbody input').forEach(function (inp) { inp.disabled = true; });
+    });
+
+    recalc(); progress();
 })();
 </script>
 @endsection

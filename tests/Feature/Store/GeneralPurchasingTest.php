@@ -608,3 +608,73 @@ it('puts Against PO on the Record Receiving form', function () {
 
     expect($html)->toContain('id="poSelect"')->toContain($po->po_no)->toContain('gs_purchase_order_item_id');
 });
+
+// ------------------------------------------------- long monthly lists: categories, bulk entry
+
+/** An approved sheet whose items sit in the given categories: [name, qty, category]. */
+function gpApprovedWithCategories(array $lines): PurchaseRequisition
+{
+    $sheet = gpApproved(array_map(fn ($l) => [$l[0], $l[1]], $lines));
+
+    foreach ($lines as [$name, , $category]) {
+        StockItem::where('name', $name)->update(['category' => $category]);
+    }
+
+    return $sheet;
+}
+
+it('groups the To Purchase queue by category, filters by one, and counts the categories', function () {
+    gpApprovedWithCategories([['Bin Liner', 40, 'Cleaning'], ['Floor Wiper', 5, 'Cleaning'], ['Ball Pen', 60, 'Stationery'], ['Mystery', 1, '']]);
+    $user = gpUser();
+
+    $this->actingAs($user)->get(route('store.purchasing.queue'))->assertOk()
+        ->assertSee('Cleaning')->assertSee('Stationery')->assertSee('Uncategorised')
+        ->assertSee('Make CS for Cleaning only');
+
+    $this->actingAs($user)->get(route('store.purchasing.queue', ['category' => 'Stationery']))->assertOk()
+        ->assertSee('Ball Pen')->assertDontSee('Bin Liner')
+        // The category list still offers the others, so the user can switch.
+        ->assertSee('Cleaning (2)', false);
+});
+
+it('starts a CS from many ticked items by POST, in category order, with the category kept', function () {
+    $sheet = gpApprovedWithCategories([['Ball Pen', 60, 'Stationery'], ['Bin Liner', 40, 'Cleaning']]);
+    $user = gpUser();
+
+    $this->actingAs($user)->post(route('store.purchasing.cs.start'), ['lines' => $sheet->items->pluck('id')->all()])
+        ->assertRedirect(route('store.purchasing.cs.create'));
+
+    $html = $this->actingAs($user)->get(route('store.purchasing.cs.create'))->assertOk()->getContent();
+    expect(strpos($html, 'Bin Liner'))->toBeLessThan(strpos($html, 'Ball Pen')) // Cleaning before Stationery
+        ->and($html)->toContain('id="rowSearch"')->toContain('name="lines_json"');
+
+    $this->actingAs($user)->post(route('store.purchasing.cs.start'), [])->assertSessionHasErrors('lines');
+});
+
+it('saves a 600-item statement sent as one JSON field, with the categories', function () {
+    $names = [];
+    for ($n = 1; $n <= 600; $n++) {
+        $names[] = ['Item '.str_pad((string) $n, 3, '0', STR_PAD_LEFT), 2, $n % 2 ? 'Electrical' : 'Hardware'];
+    }
+    $sheet = gpApprovedWithCategories($names);
+    $maker = gpUser();
+
+    $payload = gpPayload($sheet->items, array_fill(0, 600, [10, 9]));
+    $lines = $payload['lines'];
+    foreach ($lines as $i => &$l) { $l['category'] = $names[$i][2]; }
+    unset($l);
+    $payload['lines_json'] = json_encode(array_values($lines));
+    unset($payload['lines']);
+
+    $this->actingAs($maker)->post(route('store.purchasing.cs.store'), $payload + ['action' => 'draft'])->assertSessionHasNoErrors();
+
+    $cs = GsComparativeStatement::with('items.quotes')->firstOrFail();
+    expect($cs->items)->toHaveCount(600)
+        ->and($cs->items->first()->category)->toBe('Electrical')
+        ->and($cs->items->first()->quotes)->toHaveCount(2)
+        ->and($cs->chosenTotal())->toBe(600 * 2 * 9.0);
+
+    // Shown on the screen and the PDF, grouped under its category heading.
+    $this->actingAs($maker)->get(route('store.purchasing.cs.show', $cs))->assertOk()->assertSee('Electrical');
+    $this->actingAs($maker)->get(route('store.purchasing.cs.pdf', $cs))->assertOk();
+});

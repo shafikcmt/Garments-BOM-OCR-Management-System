@@ -612,6 +612,7 @@ Route::prefix('store/purchasing')
             Route::get('/queue', [PurchaseQueueController::class, 'index'])->name('queue');
 
             Route::get('/cs', [ComparativeStatementController::class, 'index'])->name('cs.index');
+            Route::post('/cs/start', [ComparativeStatementController::class, 'start'])->name('cs.start');
             Route::get('/cs/create', [ComparativeStatementController::class, 'create'])->name('cs.create');
             Route::post('/cs', [ComparativeStatementController::class, 'store'])->name('cs.store');
             Route::get('/cs/{cs}', [ComparativeStatementController::class, 'show'])->name('cs.show');
