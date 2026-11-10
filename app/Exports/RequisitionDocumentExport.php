@@ -236,7 +236,10 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
         // 6. Less air: a taller first heading row for the tall headings and a
         // shorter second one, a thin gap below the letterhead, and a smaller
         // signing space. The gap rows are the blank ones above the signature labels.
-        $sheet->getRowDimension($headerStart)->setRowHeight(36);
+        // Tall enough for a three-line heading ("Type (Replace/ New)") in a
+        // narrow column; the heading text is 9pt so nothing is clipped.
+        $sheet->getStyle('A'.$headerStart.':'.$lastColumn.$headerStart)->getFont()->setSize(9);
+        $sheet->getRowDimension($headerStart)->setRowHeight(48);
         if ($headerEnd > $headerStart) {
             $sheet->getRowDimension($headerEnd)->setRowHeight(26);
         }
