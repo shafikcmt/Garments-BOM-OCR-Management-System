@@ -703,3 +703,27 @@ it('counts an authorised PO in this month on the dashboard trend', function () {
 
     expect($summary['po']['issued'])->toBe(1)->and($summary['recent_orders'])->toHaveCount(1);
 });
+
+// ------------------------------------------------- view-only Receiving (checkers)
+
+it('shows a view-only Receiving user the history but not the entry form, import or drafts', function () {
+    StockItem::create(['name' => 'Bin Liner', 'uom' => 'Pkt', 'is_active' => true]);
+
+    $viewer = User::factory()->create();
+    $viewer->givePermissionTo(Permission::findOrCreate('store.receiving.view', 'web'));
+
+    $this->actingAs($viewer)->get(route('store.stock.purchases.index'))->assertOk()
+        ->assertSee('Purchase History')->assertSee('Receiving summary')
+        ->assertDontSee('>Record Receiving</h5>', false)->assertDontSee('id="purchaseForm"', false)
+        ->assertDontSee('importReceivingModal', false)->assertDontSee('purchases.drafts', false);
+
+    // They cannot post one either.
+    $this->actingAs($viewer)->post(route('store.stock.purchases.store'), [])->assertForbidden();
+
+    // Whoever may enter receiving still gets the form.
+    $entry = User::factory()->create();
+    $entry->givePermissionTo(Permission::findOrCreate('store.receiving.view', 'web'), Permission::findOrCreate('store.receiving.create', 'web'));
+    $this->actingAs($entry)->get(route('store.stock.purchases.index'))->assertOk()
+        ->assertSee('>Record Receiving</h5>', false)->assertSee('id="purchaseForm"', false)->assertSee('importReceivingModal', false)
+        ->assertDontSee('Receiving summary');
+});

@@ -56,6 +56,34 @@ class StockPurchaseController extends Controller
         return route('store.stock.purchases.index');
     }
 
+    /**
+     * This month's receiving at a glance, for people who check it but do not enter it.
+     *
+     * @return array<string, mixed>
+     */
+    private function receivingSummary(): array
+    {
+        $month = StockPurchase::query()
+            ->whereYear('purchase_date', now()->year)->whereMonth('purchase_date', now()->month);
+
+        $rows = (clone $month)->get(['rv_no', 'challan_no', 'stock_item_id', 'supplier_name', 'qty', 'unit_price', 'purchase_date']);
+
+        $bySupplier = $rows->groupBy(fn ($r) => trim((string) $r->supplier_name) ?: 'Not named')
+            ->map(fn ($g) => round((float) $g->sum(fn ($r) => (float) $r->qty * (float) $r->unit_price), 2))
+            ->sortDesc()->take(5);
+
+        return [
+            'month' => now()->format('F Y'),
+            'deliveries' => $rows->map(fn ($r) => $r->rv_no ?: $r->challan_no)->filter()->unique()->count(),
+            'items' => $rows->pluck('stock_item_id')->unique()->count(),
+            'suppliers' => $rows->pluck('supplier_name')->map(fn ($s) => trim((string) $s))->filter()->unique()->count(),
+            'value' => round((float) $rows->sum(fn ($r) => (float) $r->qty * (float) $r->unit_price), 2),
+            'last_date' => StockPurchase::query()->max('purchase_date'),
+            'top_suppliers' => $bySupplier,
+            'open_pos' => \App\Models\GsPurchaseOrder::query()->receivable()->count(),
+        ];
+    }
+
     /** A draft is recording a receiving, half-done, so it carries that right. */
     protected function authorizeDraftAction(): void
     {
@@ -199,9 +227,16 @@ class StockPurchaseController extends Controller
         // see the store_form_drafts migration.
         $drafts = $this->myDrafts();
 
+        $user = auth()->user();
+        // Same rule as the route guard ($act in routes/store.php): the Store, Admin and
+        // Management roles, or the create permission.
+        $canCreate = ($user?->hasAnyRole(['store', 'admin', 'management']) ?? false) || ($user?->can('store.receiving.create') ?? false);
+
         return view('store.stock.purchases', compact(
-            'groups', 'lines', 'items', 'suppliers', 'filters', 'canEdit', 'canDelete', 'nextRv', 'drafts', 'openPos'
+            'groups', 'lines', 'items', 'suppliers', 'filters', 'canEdit', 'canDelete', 'nextRv', 'drafts', 'openPos', 'canCreate'
         ) + [
+            // A user who only checks Receiving gets a summary where the entry form would be.
+            'summary' => $canCreate ? null : $this->receivingSummary(),
             // The Month filter's list ("All months" + recent months).
             'monthOptions' => \App\Support\MonthOptions::recent($filters['month'] ?? null),
         ]);

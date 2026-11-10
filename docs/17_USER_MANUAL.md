@@ -811,6 +811,8 @@ Sending for checking needs at least 2 suppliers and a priced supplier chosen on 
 
 **Dashboard.** On **General Stock, Dashboard** anyone who can open Comparative Statements or Internal POs sees a **Purchasing** panel above the stock figures: items waiting to be purchased, statements waiting for check or approval, POs waiting for check or authorising, POs open for receiving, a chart of statements and of POs by stage, the ordered value per month, the waiting items by category (click a category to open it on To Purchase) and the latest POs. Each tile opens the list it counts.
 
+**Checking Receiving without entering it.** A person who has only the **Receiving: View** right opens **General Stock, Receiving** and sees a **Receiving summary** (deliveries, items, value, suppliers and POs awaiting delivery this month) and the full **Purchase History** to check. The **Record Receiving** form, **Import** and drafts are hidden; they appear for people with the **Create / Entry** right (and for the Store, Admin and Management roles).
+
 **Who can do what (Admin).** Admin sets this in **Admin, Users, Portal Access** (or the permission list under **General Stock**):
 - The **Supply Chain General** role can see **To Purchase**, make and edit Comparative Statements, and make and edit Internal POs. It cannot check, approve or authorise.
 - **Comparative Statement: Check**, **Comparative Statement: Approve** **Internal PO: Check** and **Internal PO: Authorise** are given to the right people one by one.
