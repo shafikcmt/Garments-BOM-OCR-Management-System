@@ -7,12 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * General Stock purchasing: the Internal PO. The number printed on it
- * (PO-26-27/HS-0001) is what Store picks on Record Receiving, so what arrives
+ * (PO-26-27/T-080) is what Store picks on Record Receiving, so what arrives
  * is checked against what was ordered.
  */
 class GsPurchaseOrder extends Model
 {
     public const STATUS_DRAFT = 'draft';
+    public const STATUS_CHECKED = 'checked';
     public const STATUS_ISSUED = 'issued';
     public const STATUS_PARTIAL = 'partially_received';
     public const STATUS_RECEIVED = 'received';
@@ -40,6 +41,7 @@ class GsPurchaseOrder extends Model
     {
         return [
             self::STATUS_DRAFT => 'Draft',
+            self::STATUS_CHECKED => 'Checked',
             self::STATUS_ISSUED => 'Issued',
             self::STATUS_PARTIAL => 'Partly Received',
             self::STATUS_RECEIVED => 'Received',
@@ -55,6 +57,12 @@ class GsPurchaseOrder extends Model
     public function isDraft(): bool
     {
         return $this->status === self::STATUS_DRAFT;
+    }
+
+    /** Draft or Checked: made, but not yet authorised, so Store cannot receive against it. */
+    public function isPending(): bool
+    {
+        return in_array($this->status, [self::STATUS_DRAFT, self::STATUS_CHECKED], true);
     }
 
     /** Store may receive against a PO that is issued and not yet fully received. */

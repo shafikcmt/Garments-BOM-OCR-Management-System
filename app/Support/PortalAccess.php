@@ -42,9 +42,15 @@ final class PortalAccess
                 'icon' => 'bi-check2-circle',
                 'permissions' => ['store.purchase_cs.view', 'store.purchase_cs.approve', 'store.purchase_po.view'],
             ],
+            'purchase_po_check' => [
+                'label' => 'Internal PO: Check',
+                'description' => 'Check a purchase order (the Checked By box), the first of its two approvals.',
+                'icon' => 'bi-check2-square',
+                'permissions' => ['store.purchase_po.view', 'store.purchase_po.review'],
+            ],
             'purchase_po_authorise' => [
                 'label' => 'Internal PO: Authorise',
-                'description' => 'Authorise a purchase order so Store can receive against it.',
+                'description' => 'Authorise a checked purchase order (the Authorised Signatory box), the second approval, so Store can receive against it.',
                 'icon' => 'bi-patch-check',
                 'permissions' => ['store.purchase_po.view', 'store.purchase_po.approve'],
             ],

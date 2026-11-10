@@ -55,7 +55,7 @@ class InternalPurchaseOrderController extends Controller
         $orders = $this->service->createFromStatement($cs, $request->user());
 
         return $orders->count() === 1
-            ? redirect()->route('store.purchasing.po.show', $orders->first())->with('success', $orders->first()->po_no.' created as a draft. Check it, then have it authorised.')
+            ? redirect()->route('store.purchasing.po.show', $orders->first())->with('success', $orders->first()->po_no.' created as a draft. It needs to be checked, then authorised.')
             : redirect()->route('store.purchasing.po.index', ['search' => $cs->cs_no])->with('success', $orders->count().' purchase orders created as drafts, one per supplier.');
     }
 
@@ -103,6 +103,22 @@ class InternalPurchaseOrderController extends Controller
         return redirect()->route('store.purchasing.po.show', $order)->with('success', $order->po_no.' saved.');
     }
 
+    public function check(Request $request, GsPurchaseOrder $order)
+    {
+        abort_unless(isset($this->service->allowed($order, $request->user())['check']), 403, 'You cannot check this purchase order.');
+        $this->service->check($order, $request->user());
+
+        return back()->with('success', $order->po_no.' checked. It now waits for the Authorised Signatory.');
+    }
+
+    public function sendBack(Request $request, GsPurchaseOrder $order)
+    {
+        abort_unless(isset($this->service->allowed($order, $request->user())['send_back']), 403, 'You cannot send this purchase order back.');
+        $this->service->sendBack($order);
+
+        return back()->with('success', $order->po_no.' sent back to draft.');
+    }
+
     public function authorise(Request $request, GsPurchaseOrder $order)
     {
         abort_unless(isset($this->service->allowed($order, $request->user())['authorise']), 403, 'You cannot authorise this purchase order.');
@@ -120,7 +136,7 @@ class InternalPurchaseOrderController extends Controller
         return back()->with('success', $order->po_no.' cancelled.');
     }
 
-    /** The printed PO: A4 portrait. Only an authorised PO prints as final; a draft is watermarked. */
+    /** The printed PO: A4 portrait. Only an authorised PO prints as final; a draft or checked one is marked. */
     public function pdf(GsPurchaseOrder $order)
     {
         $order->load(['items', 'creator:id,name', 'checkedBy:id,name', 'authorisedBy:id,name']);

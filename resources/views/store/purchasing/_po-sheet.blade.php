@@ -28,8 +28,8 @@
     .po-sheet .draft { color: #b00020; font-weight: bold; text-align: center; font-size: 11px; margin-bottom: 4px; }
 </style>
 <div class="po-sheet">
-    @if($order->status === \App\Models\GsPurchaseOrder::STATUS_DRAFT)
-        <div class="draft">DRAFT: not yet authorised</div>
+    @if($order->isPending())
+        <div class="draft">{{ $order->status === \App\Models\GsPurchaseOrder::STATUS_CHECKED ? 'CHECKED: not yet authorised' : 'DRAFT: not yet checked or authorised' }}</div>
     @elseif($order->status === \App\Models\GsPurchaseOrder::STATUS_CANCELLED)
         <div class="draft">CANCELLED</div>
     @endif
@@ -46,7 +46,7 @@
         </tr>
         <tr>
             <td><span class="k">Reference No. &amp; Date</span><span class="v">{{ $order->reference_no ?: 'Ref. No. #' }}</span></td>
-            <td rowspan="2"><div class="logo">HUMANA<small>APPARELS PVT. LTD.</small></div></td>
+            <td rowspan="2">@include('store.purchasing._logo', ['width' => 110])</td>
         </tr>
         <tr>
             <td rowspan="2"><span class="k">Consignee (ship to)</span>{!! nl2br(e($order->consignee)) !!}</td>

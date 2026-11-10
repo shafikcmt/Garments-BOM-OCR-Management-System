@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
  * Allocates the CS and Internal PO numbers for General Stock purchasing:
  *
  *   CS-26-27/0001           comparative statement
- *   PO-26-27/HS-0001        internal PO (HS = unit code, config/purchasing.php)
+ *   PO-26-27/T-080         internal PO (T = unit code, config/purchasing.php)
  *
  * The sequence restarts every financial year. Same locking idea as
  * RvNumberGenerator: the period's counter row is locked for the length of the
@@ -36,14 +36,14 @@ class GsDocumentNumberGenerator
     {
         $on ??= Carbon::now();
 
-        return $this->format(self::CS, $on, $this->last(self::CS, $on) + 1);
+        return $this->format(self::CS, $on, max($this->last(self::CS, $on) + 1, max(1, (int) config('purchasing.cs_first_no', 1))));
     }
 
     public function previewPo(?Carbon $on = null): string
     {
         $on ??= Carbon::now();
 
-        return $this->format(self::PO, $on, $this->last(self::PO, $on) + 1);
+        return $this->format(self::PO, $on, max($this->last(self::PO, $on) + 1, max(1, (int) config('purchasing.po_first_no', 1))));
     }
 
     /** "26-27" for 1 Oct 2026 when the financial year starts in July. */
@@ -84,7 +84,8 @@ class GsDocumentNumberGenerator
         }
 
         $row = DB::table('gs_purchase_sequences')->where('period_key', $key)->lockForUpdate()->first();
-        $next = (int) ($row->last_no ?? 0) + 1;
+        $first = max(1, (int) config($type === self::CS ? 'purchasing.cs_first_no' : 'purchasing.po_first_no', 1));
+        $next = max((int) ($row->last_no ?? 0) + 1, $first);
 
         DB::table('gs_purchase_sequences')->where('period_key', $key)->update(['last_no' => $next, 'updated_at' => now()]);
 
@@ -94,10 +95,10 @@ class GsDocumentNumberGenerator
     private function format(string $type, Carbon $on, int $no): string
     {
         $fy = $this->financialYear($on);
-        $seq = str_pad((string) $no, (int) config('purchasing.seq_width', 4), '0', STR_PAD_LEFT);
+        $seq = str_pad((string) $no, (int) config($type === self::CS ? 'purchasing.cs_seq_width' : 'purchasing.po_seq_width', $type === self::CS ? 4 : 3), '0', STR_PAD_LEFT);
 
         return $type === self::CS
             ? config('purchasing.cs_prefix', 'CS').'-'.$fy.'/'.$seq
-            : config('purchasing.po_prefix', 'PO').'-'.$fy.'/'.config('purchasing.po_code', 'HS').'-'.$seq;
+            : config('purchasing.po_prefix', 'PO').'-'.$fy.'/'.config('purchasing.po_code', 'T').'-'.$seq;
     }
 }
