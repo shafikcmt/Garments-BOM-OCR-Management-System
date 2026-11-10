@@ -20,7 +20,11 @@ use Illuminate\Validation\ValidationException;
  * the Store's receiving.
  *
  *   one approved CS --> one PO per chosen supplier --> Draft
- *   Draft --(Authorised Signatory)--> Issued --(Store receives)--> Partly Received --> Received
+ *   Draft --(Checked By)--> Checked --(Authorised Signatory)--> Issued --(Store receives)--> Partly Received --> Received
+ *
+ * Two approval points after the maker: Checked By, then Authorised Signatory.
+ * Three different people: whoever made the PO cannot check or authorise it, and
+ * whoever checked it cannot authorise it.
  *
  * Rate and quantity are copied from the approved CS and locked: a PO cannot
  * quietly differ from what was approved. Only the header and each line's
@@ -66,7 +70,9 @@ class PurchaseOrderService
                 $supplier = $cs->suppliers->firstWhere('id', (int) $supplierId);
 
                 $po = GsPurchaseOrder::create([
-                    'po_no' => $this->numbers->nextPo(now()),
+                    'po_no' => $poNo = $this->numbers->nextPo(now()),
+                    // PO-26-27/T-080 carries its own reference: T-080.
+                    'reference_no' => str_contains($poNo, '/') ? substr($poNo, strrpos($poNo, '/') + 1) : null,
                     'po_date' => now()->toDateString(),
                     'status' => GsPurchaseOrder::STATUS_DRAFT,
                     'gs_comparative_statement_id' => $cs->id,
@@ -83,9 +89,6 @@ class PurchaseOrderService
                     'payment_terms' => filled($supplier?->terms) ? $supplier->terms : ($defaults['payment_terms'] ?? null),
                     'delivery_terms' => $defaults['delivery_terms'] ?? null,
                     'remarks' => $defaults['remarks'] ?? null,
-                    // Prepared and checked against the CS by whoever makes it.
-                    'checked_by' => $user->id,
-                    'checked_at' => now(),
                     'created_by' => $user->id,
                 ]);
 
@@ -148,15 +151,47 @@ class PurchaseOrderService
         return $po->fresh('items');
     }
 
-    /** Draft -> Issued: the Authorised Signatory box. */
-    public function authorise(GsPurchaseOrder $po, User $user): GsPurchaseOrder
+    /** Draft -> Checked: the Checked By box (approval point 1 of 2). */
+    public function check(GsPurchaseOrder $po, User $user): GsPurchaseOrder
     {
         if (! $po->isDraft()) {
-            throw ValidationException::withMessages(['po' => 'Only a draft purchase order can be authorised.']);
+            throw ValidationException::withMessages(['po' => 'Only a draft purchase order can be checked.']);
         }
 
         if ((int) $po->created_by === (int) $user->id) {
-            throw ValidationException::withMessages(['po' => 'You made this purchase order, so someone else has to authorise it.']);
+            throw ValidationException::withMessages(['po' => 'You made this purchase order, so someone else has to check it.']);
+        }
+
+        $po->forceFill([
+            'status' => GsPurchaseOrder::STATUS_CHECKED,
+            'checked_by' => $user->id,
+            'checked_at' => now(),
+        ])->save();
+
+        return $po;
+    }
+
+    /** Checked -> Draft: the checker sends it back to its maker to be corrected. */
+    public function sendBack(GsPurchaseOrder $po): GsPurchaseOrder
+    {
+        if ($po->status !== GsPurchaseOrder::STATUS_CHECKED) {
+            throw ValidationException::withMessages(['po' => 'Only a checked purchase order can be sent back.']);
+        }
+
+        $po->forceFill(['status' => GsPurchaseOrder::STATUS_DRAFT, 'checked_by' => null, 'checked_at' => null])->save();
+
+        return $po;
+    }
+
+    /** Checked -> Issued: the Authorised Signatory box (approval point 2 of 2). */
+    public function authorise(GsPurchaseOrder $po, User $user): GsPurchaseOrder
+    {
+        if ($po->status !== GsPurchaseOrder::STATUS_CHECKED) {
+            throw ValidationException::withMessages(['po' => 'A purchase order has to be checked before it is authorised.']);
+        }
+
+        if ((int) $po->created_by === (int) $user->id || (int) $po->checked_by === (int) $user->id) {
+            throw ValidationException::withMessages(['po' => 'You made or checked this purchase order, so someone else has to authorise it.']);
         }
 
         $po->forceFill([
@@ -201,8 +236,12 @@ class PurchaseOrderService
 
         return array_filter([
             'edit' => $po->isDraft() && $user->can('store.purchase_po.create'),
-            'authorise' => $po->isDraft() && $user->can('store.purchase_po.approve') && (int) $po->created_by !== (int) $user->id,
-            'cancel' => in_array($po->status, [GsPurchaseOrder::STATUS_DRAFT, GsPurchaseOrder::STATUS_ISSUED], true)
+            'check' => $po->isDraft() && $user->can('store.purchase_po.review') && (int) $po->created_by !== (int) $user->id,
+            'send_back' => $po->status === GsPurchaseOrder::STATUS_CHECKED
+                && ($user->can('store.purchase_po.review') || $user->can('store.purchase_po.approve')),
+            'authorise' => $po->status === GsPurchaseOrder::STATUS_CHECKED && $user->can('store.purchase_po.approve')
+                && (int) $po->created_by !== (int) $user->id && (int) $po->checked_by !== (int) $user->id,
+            'cancel' => in_array($po->status, [GsPurchaseOrder::STATUS_DRAFT, GsPurchaseOrder::STATUS_CHECKED, GsPurchaseOrder::STATUS_ISSUED], true)
                 && $user->can('store.purchase_po.create') && ! $po->receivings()->exists(),
         ]);
     }
@@ -266,7 +305,7 @@ class PurchaseOrderService
 
             $ordered = GsPurchaseOrderItem::query()
                 ->whereIn('purchase_requisition_item_id', $lines->pluck('id'))
-                ->whereHas('order', fn ($q) => $q->whereNotIn('status', [GsPurchaseOrder::STATUS_DRAFT, GsPurchaseOrder::STATUS_CANCELLED]))
+                ->whereHas('order', fn ($q) => $q->whereNotIn('status', [GsPurchaseOrder::STATUS_DRAFT, GsPurchaseOrder::STATUS_CHECKED, GsPurchaseOrder::STATUS_CANCELLED]))
                 ->selectRaw('purchase_requisition_item_id, SUM(qty) as ordered')
                 ->groupBy('purchase_requisition_item_id')
                 ->pluck('ordered', 'purchase_requisition_item_id');

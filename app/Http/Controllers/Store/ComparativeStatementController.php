@@ -54,12 +54,29 @@ class ComparativeStatementController extends Controller
         ]);
     }
 
+    /**
+     * The queue posts its ticked lines here (hundreds of ids would not fit in a URL),
+     * then we hand over to the create screen.
+     */
+    public function start(Request $request)
+    {
+        abort_unless($request->user()->can('store.purchase_cs.create'), 403);
+
+        $ids = $request->validate(['lines' => ['required', 'array', 'min:1'], 'lines.*' => ['integer']], [
+            'lines.required' => 'Tick at least one item on the To Purchase list first.',
+        ])['lines'];
+
+        $request->session()->put('cs_start_lines', array_values($ids));
+
+        return redirect()->route('store.purchasing.cs.create');
+    }
+
     /** Start a CS from lines ticked on the To Purchase queue. */
     public function create(Request $request)
     {
         abort_unless($request->user()->can('store.purchase_cs.create'), 403);
 
-        $ids = collect((array) $request->query('lines'))->map(fn ($v) => (int) $v)->filter()->unique()->all();
+        $ids = collect((array) ($request->query('lines') ?: $request->session()->get('cs_start_lines', [])))->map(fn ($v) => (int) $v)->filter()->unique()->all();
         $lines = $this->queue->lines()->whereIn('id', $ids)->values();
 
         if ($lines->isEmpty()) {
@@ -67,15 +84,19 @@ class ComparativeStatementController extends Controller
                 ->with('warning', 'Tick at least one item on the To Purchase list first.');
         }
 
-        return view('store.purchasing.cs-form', $this->formData(null, $lines->map(fn ($l) => $this->lineFromRequisition($l))->all()));
+        return view('store.purchasing.cs-form', $this->formData(null, $lines
+            ->sortBy(fn ($l) => $l->category_name.'|'.$l->purchase_requisition_id.'|'.$l->sort_order)->values()
+            ->map(fn ($l) => $this->lineFromRequisition($l))->all()));
     }
 
     public function store(Request $request)
     {
         abort_unless($request->user()->can('store.purchase_cs.create'), 403);
 
+        $this->unpackLines($request);
         $data = $request->validate($this->payloadRules(), $this->messages());
         $cs = $this->service->save(null, $request->user(), $data);
+        $request->session()->forget('cs_start_lines');
 
         if ($request->input('action') === 'submit') {
             $this->service->submit($cs, $request->user());
@@ -111,6 +132,7 @@ class ComparativeStatementController extends Controller
     {
         $this->authoriseAction($cs, $request, 'edit');
 
+        $this->unpackLines($request);
         $data = $request->validate($this->payloadRules(), $this->messages());
         $cs = $this->service->save($cs, $request->user(), $data);
 
@@ -176,6 +198,23 @@ class ComparativeStatementController extends Controller
             ->stream('CS-'.str_replace(['/', '\\'], '-', $cs->cs_no).'.pdf');
     }
 
+    /**
+     * A monthly statement can carry 500+ items with several fields each, more than
+     * PHP's max_input_vars would let through a normal form post. The form therefore
+     * sends the item grid as one JSON field; it is turned back into `lines` here.
+     */
+    private function unpackLines(Request $request): void
+    {
+        $json = $request->input('lines_json');
+
+        if (is_string($json) && $json !== '') {
+            $lines = json_decode($json, true);
+            abort_unless(is_array($lines), 422, 'The item list could not be read. Reload the page and try again.');
+            $request->merge(['lines' => $lines]);
+            $request->request->remove('lines_json');
+        }
+    }
+
     private function authoriseAction(GsComparativeStatement $cs, Request $request, string $action): void
     {
         abort_unless(in_array($action, $this->service->allowed($cs, $request->user()), true), 403, 'You cannot do this on this Comparative Statement right now.');
@@ -201,6 +240,7 @@ class ComparativeStatementController extends Controller
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.purchase_requisition_item_id' => ['required', 'integer', 'exists:purchase_requisition_items,id'],
             'lines.*.qty' => ['required', 'numeric', 'min:0.0001'],
+            'lines.*.category' => ['nullable', 'string', 'max:120'],
             'lines.*.specification' => ['nullable', 'string', 'max:255'],
             'lines.*.current_supplier' => ['nullable', 'string', 'max:255'],
             'lines.*.remarks' => ['nullable', 'string', 'max:500'],
@@ -279,6 +319,7 @@ class ComparativeStatementController extends Controller
         return [
             'purchase_requisition_item_id' => $l->id,
             'item_name' => $l->displayName(),
+            'category' => $l->category_name ?? PurchaseQueueService::categoryOf($l),
             'uom' => $l->uom_snapshot ?: $l->stockItem?->uom,
             'requisition_no' => $l->requisition?->requisition_no,
             'qty' => rtrim(rtrim(number_format((float) $l->outstanding_qty, 4, '.', ''), '0'), '.'),
@@ -298,6 +339,7 @@ class ComparativeStatementController extends Controller
         return [
             'purchase_requisition_item_id' => $i->purchase_requisition_item_id,
             'item_name' => $i->item_name,
+            'category' => $i->category,
             'uom' => $i->uom,
             'requisition_no' => $i->requisitionItem?->requisition?->requisition_no,
             'qty' => rtrim(rtrim(number_format((float) $i->qty, 4, '.', ''), '0'), '.'),

@@ -36,6 +36,10 @@
 
     @include('store._flash')
 
+    @if($purchasing)
+        @include('store.purchasing._dashboard')
+    @endif
+
     <div class="row g-3 mb-4">
         @if($seeItems || $seeStockReport)
             <div class="col-12 col-sm-6 col-xl-3">

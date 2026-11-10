@@ -243,3 +243,27 @@ it('splits the Requested queue and the main list into Monthly and Individual tab
             ->assertOk()->assertSee($monthly->requisition_no)->assertDontSee($individual->requisition_no);
     }
 });
+
+it('does not add Safety Stock to To Be Procured on an Individual requisition', function () {
+    [$head, $raiser] = indRaiser();
+    StockItem::create(['name' => 'Machine Oil', 'uom' => 'Ltr', 'is_active' => true, 'safety_stock_qty' => 5]);
+
+    $monthly = indRaise($raiser, PurchaseRequisition::TYPE_MONTHLY)->items()->firstOrFail();
+    $individual = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL)->items()->firstOrFail();
+
+    expect((float) $monthly->safety_stock_snapshot)->toBe(5.0)
+        ->and((float) $monthly->to_be_procured_qty)->toBe(10.0)       // 5 requested + 5 safety
+        ->and((float) $individual->safety_stock_snapshot)->toBe(5.0)  // still shown
+        ->and((float) $individual->to_be_procured_qty)->toBe(5.0);    // but not added
+});
+
+it('offers a Print button that loads the same PDF inline', function () {
+    [$head, $raiser] = indRaiser();
+    $sheet = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+
+    $this->actingAs($raiser)->get(route('store.stock.requisitions.show', $sheet))
+        ->assertOk()->assertSee('data-print-pdf', false)->assertSee('inline=1', false);
+
+    $response = $this->actingAs($raiser)->get(route('store.stock.requisitions.pdf', [$sheet, 'inline' => 1]))->assertOk();
+    expect($response->headers->get('content-disposition'))->toContain('inline');
+});

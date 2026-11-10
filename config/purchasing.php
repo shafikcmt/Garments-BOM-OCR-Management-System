@@ -22,15 +22,23 @@ return [
     ],
 
     /*
-     * Number formats. CS: CS-26-27/0001. PO: PO-26-27/HS-0001, where HS is the
-     * unit code. The counter restarts every financial year, which begins in
+     * Number formats. CS: CS-26-27/0001. PO: PO-26-27/T-080, where T is the
+     * unit code (the same T-080 is the PO's Reference No.). The counter restarts every financial year, which begins in
      * `fy_start_month` (7 = July, the Bangladesh financial year).
      */
     'fy_start_month' => (int) env('PURCHASING_FY_START_MONTH', 7),
-    'po_code' => env('PURCHASING_PO_CODE', 'HS'),
+    'po_code' => env('PURCHASING_PO_CODE', 'T'),
     'cs_prefix' => 'CS',
     'po_prefix' => 'PO',
-    'seq_width' => 4,
+    'cs_seq_width' => 4,
+    'po_seq_width' => 3,
+    /*
+     * The first number the system gives in a financial year. The factory already
+     * books POs by hand (PO-26-27/T-080 in October), so the system starts after
+     * the last manual one. Only used when the year has no counter yet.
+     */
+    'po_first_no' => (int) env('PURCHASING_PO_FIRST_NO', 1),
+    'cs_first_no' => (int) env('PURCHASING_CS_FIRST_NO', 1),
 
     /*
      * Printed on every new Internal PO unless the user types something else.

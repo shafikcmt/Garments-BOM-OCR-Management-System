@@ -1295,9 +1295,14 @@ class PurchaseRequisitionController extends Controller
         }
 
         // Landscape A4: the sheet is 21 columns wide and will not fit portrait.
-        return \Barryvdh\DomPDF\Facade\Pdf::loadView('store.stock.requisitions.document-pdf', $data + ['pages' => $pages, 'withCategory' => $grouped])
-            ->setPaper('a4', 'landscape')
-            ->download($this->documentFilename($requisition).'.pdf');
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('store.stock.requisitions.document-pdf', $data + ['pages' => $pages, 'withCategory' => $grouped])
+            ->setPaper('a4', 'landscape');
+
+        // The Print button loads the same PDF inline, in a hidden frame, and
+        // prints it; the PDF button downloads it.
+        return $request->boolean('inline')
+            ? $pdf->stream($this->documentFilename($requisition).'.pdf')
+            : $pdf->download($this->documentFilename($requisition).'.pdf');
     }
 
     /** The same document as a workbook; By Category adds a sheet per category. */
@@ -2068,7 +2073,13 @@ class PurchaseRequisitionController extends Controller
             $snapshot = $itemId ? ($snapshots[$itemId] ?? []) : [];
 
             $qty = (float) $line['qty_requested'];
-            $toBeProcured = $this->requisitions->toBeProcured($qty, $snapshot['stock_in_hand'] ?? null, $snapshot['safety_stock'] ?? null);
+            // An Individual requisition is a one-off need: Safety Stock is shown
+            // for reference but is not added to what is bought.
+            $toBeProcured = $this->requisitions->toBeProcured(
+                $qty,
+                $snapshot['stock_in_hand'] ?? null,
+                $requisition->isIndividual() ? null : ($snapshot['safety_stock'] ?? null)
+            );
 
             // Rate defaults to the last purchase rate but is editable, so an
             // expected price rise can be planned for.

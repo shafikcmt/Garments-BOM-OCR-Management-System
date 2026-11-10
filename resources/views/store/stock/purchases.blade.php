@@ -7,6 +7,9 @@
     $money = fn ($v) => $v === null ? '—' : number_format((float) $v, 2);
 
     // Drives the Clear button only — the filtering itself is the controller's.
+    // Receiving is checked by some users (view only); only people with the create right see the entry form.
+    // ($canCreate comes from the controller: Store / Admin / Management role, or the create permission.)
+
     $hasFilters = collect($filters)->filter(fn ($v) => $v !== null && $v !== '')->isNotEmpty();
 
     // Item lines as they were last submitted, so a rejected receiving comes
@@ -48,9 +51,11 @@
             <a href="{{ route('store.stock.purchases.report') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-file-earmark-bar-graph me-1" aria-hidden="true"></i>Report
             </a>
-            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importReceivingModal">
-                <i class="bi bi-upload me-1" aria-hidden="true"></i>Import
-            </button>
+            @if($canCreate)
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importReceivingModal">
+                    <i class="bi bi-upload me-1" aria-hidden="true"></i>Import
+                </button>
+            @endif
             <a href="{{ route('store.stock.ledger') }}" class="btn btn-outline-secondary"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>Stock Report</a>
             <a href="{{ route('store.stock.items.index') }}" class="btn btn-outline-secondary"><i class="bi bi-box-seam me-1" aria-hidden="true"></i>Items</a>
         </x-slot:actions>
@@ -87,6 +92,40 @@
          Each line is still saved as its own purchase row carrying a copy of
          the header, so the Stock Report is untouched by grouping.
          ------------------------------------------------------------------ --}}
+    @unless($canCreate)
+        @php
+            $money0 = fn ($v) => number_format((float) $v, 0);
+        @endphp
+        <div class="gx-stock-card card mb-4">
+            <div class="gx-stock-card-body">
+                <div class="d-flex flex-wrap align-items-baseline gap-2 mb-3">
+                    <h5 class="mb-0">Receiving summary</h5>
+                    <span class="text-muted small">{{ $summary['month'] }}@if($summary['last_date']) &middot; last receiving {{ \Illuminate\Support\Carbon::parse($summary['last_date'])->format('d-M-Y') }}@endif</span>
+                </div>
+                <div class="row g-3">
+                    <div class="col-6 col-lg-3"><x-stat-card class="h-100" icon="truck" tone="primary" label="Deliveries this month" :value="$summary['deliveries']" /></div>
+                    <div class="col-6 col-lg-3"><x-stat-card class="h-100" icon="stack" tone="success" label="Different items received" :value="$summary['items']" /></div>
+                    <div class="col-6 col-lg-3"><x-stat-card class="h-100" icon="cash-stack" tone="warning" label="Value received (Taka)" :value="$money0($summary['value'])" /></div>
+                    <div class="col-6 col-lg-3"><x-stat-card class="h-100" icon="hourglass-split" tone="danger" label="Internal POs awaiting delivery" :value="$summary['open_pos']" /></div>
+                </div>
+                @if($summary['top_suppliers']->isNotEmpty())
+                    <div class="mt-3">
+                        <div class="small fw-semibold mb-1">Top suppliers this month by value</div>
+                        @php
+                            $topMax = max(1, (float) $summary['top_suppliers']->max());
+                        @endphp
+                        @foreach($summary['top_suppliers'] as $name => $val)
+                            <div class="d-flex justify-content-between small"><span>{{ $name }}</span><strong>{{ $money0($val) }}</strong></div>
+                            <div class="progress mb-2" style="height:6px;" role="progressbar" aria-label="{{ $name }}" aria-valuenow="{{ $val }}" aria-valuemin="0" aria-valuemax="{{ $topMax }}"><div class="progress-bar" style="width:{{ round($val / $topMax * 100) }}%"></div></div>
+                        @endforeach
+                    </div>
+                @endif
+                <p class="gx-stock-help mt-2 mb-0">You can check every receiving in Purchase History below. Entering a receiving needs the Create right.</p>
+            </div>
+        </div>
+    @endunless
+
+    @if($canCreate)
     <div class="card gx-stock-card mb-4">
         <div class="gx-stock-card-body">
             <h5 class="mb-3">Record Receiving</h5>
@@ -373,7 +412,9 @@
          A draft is NOT a receiving. Nothing here has touched stock and nothing
          here holds a GRN — the number is taken on save, so a draft has none to
          show and is named by the challan instead. --}}
-    @if($drafts->isNotEmpty())
+    @endif {{-- canCreate: entry form --}}
+
+    @if($canCreate && $drafts->isNotEmpty())
         <div class="card gx-stock-card mb-4">
             <div class="gx-stock-card-body">
                 <div class="gx-stock-card-head">
@@ -487,6 +528,7 @@
 
     {{-- Bulk receiving upload. Same shape as the item-master import modal, so
          the two screens are learnt once. --}}
+    @if($canCreate)
     <div class="modal fade" id="importReceivingModal" tabindex="-1" aria-labelledby="importReceivingLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -524,6 +566,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     @include('store.stock._searchable')
     @include('store.stock._line-grid')

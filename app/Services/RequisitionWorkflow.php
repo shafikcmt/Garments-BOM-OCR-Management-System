@@ -828,7 +828,8 @@ class RequisitionWorkflow
             $toBeProcured = $this->requisitions->toBeProcured(
                 $qty,
                 $line->stock_in_hand_snapshot === null ? null : (float) $line->stock_in_hand_snapshot,
-                $line->safety_stock_snapshot === null ? null : (float) $line->safety_stock_snapshot,
+                // Individual: Safety Stock is not added to what is bought.
+                ($requisition->isIndividual() || $line->safety_stock_snapshot === null) ? null : (float) $line->safety_stock_snapshot,
             );
 
             $line->update([

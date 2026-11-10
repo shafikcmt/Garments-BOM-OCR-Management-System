@@ -28,13 +28,13 @@ class PurchaseQueueService
     ];
 
     /**
-     * @param  array{requisition?: int|null, type?: string|null, q?: string|null}  $filters
+     * @param  array{requisition?: int|null, type?: string|null, q?: string|null, category?: string|null}  $filters
      * @return Collection<int, PurchaseRequisitionItem> each with ->outstanding_qty and ->requisition loaded
      */
     public function lines(array $filters = []): Collection
     {
         $items = PurchaseRequisitionItem::query()
-            ->with(['requisition:id,requisition_no,requisition_date,level,requisition_type,status,department_role,approved_at', 'stockItem:id,name,uom,sku'])
+            ->with(['requisition:id,requisition_no,requisition_date,level,requisition_type,status,department_role,approved_at', 'stockItem:id,name,uom,sku,category', 'itemCategory'])
             ->where('to_be_procured_qty', '>', 0)
             ->whereHas('requisition', fn ($q) => $this->approvedSheets($q, $filters))
             ->orderBy('purchase_requisition_id')
@@ -51,11 +51,21 @@ class PurchaseQueueService
                 max(0.0, (float) $i->to_be_procured_qty - ($covered[$i->id] ?? 0.0))
             ))
             ->filter(fn (PurchaseRequisitionItem $i) => $i->outstanding_qty > 0)
+            ->each(fn (PurchaseRequisitionItem $i) => $i->setAttribute('category_name', self::categoryOf($i)))
+            ->when(! empty($filters['category']), fn (Collection $c) => $c->filter(fn (PurchaseRequisitionItem $i) => $i->category_name === $filters['category']))
             ->when($needle !== '', fn (Collection $c) => $c->filter(fn (PurchaseRequisitionItem $i) => str_contains(
                 mb_strtolower($i->displayName().' '.($i->specification ?? '').' '.($i->requisition?->requisition_no ?? '')),
                 $needle
             )))
             ->values();
+    }
+
+    /** The group a line belongs to: the requisition line's category, else the item master's, else "Uncategorised". */
+    public static function categoryOf(PurchaseRequisitionItem $line): string
+    {
+        $name = trim((string) ($line->itemCategory?->name ?? $line->stockItem?->category ?? ''));
+
+        return $name !== '' ? $name : 'Uncategorised';
     }
 
     /** Count for the sidebar badge / queue header. */

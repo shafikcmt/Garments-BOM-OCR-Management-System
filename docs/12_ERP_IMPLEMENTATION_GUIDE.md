@@ -501,15 +501,15 @@ Closes the gap between an approved General Stock requisition and the Store's rec
 Approved Final / Individual requisition (to_be_procured_qty > 0)
   -> To Purchase queue            PurchaseQueueService
   -> Comparative Statement        ComparativeStatementService   draft -> submitted -> checked -> approved
-  -> Internal PO per supplier     PurchaseOrderService          draft -> issued -> partially_received -> received
+  -> Internal PO per supplier     PurchaseOrderService          draft -> checked -> issued -> partially_received -> received
   -> Record Receiving "Against PO" StockPurchaseController      stock_purchases.gs_purchase_order_id / _item_id
 ```
 
 **Decisions taken (owner can change):**
 - **Own tables** (`gs_comparative_statements`, `gs_cs_items`, `gs_cs_suppliers`, `gs_cs_quotes`, `gs_purchase_orders`, `gs_purchase_order_items`, `gs_purchase_sequences`), not `booking_pos`: that one is buyer / BOM / buyer-scope. Consumables belong to no buyer.
-- **Role** `supply_chain_general`: view + create only, found by normalised name so a role already made on live ("Supply chain general") is reused, never duplicated. Check, approve and authorise are permissions Admin gives per person (Portal Access), so nobody approves their own work. Permissions: `store.purchase_cs.{view,create,review,approve}`, `store.purchase_po.{view,create,approve}`. The `store` role is deliberately NOT admitted to these screens.
-- **Maker / checker:** the preparer of a CS cannot check or approve it; the maker of a PO cannot authorise it. The same person may hold check and approve.
-- **Numbers:** `CS-26-27/0001`, `PO-26-27/HS-0001`; counter per financial year starting July (`config/purchasing.php`).
+- **Role** `supply_chain_general`: view + create only, found by normalised name so a role already made on live ("Supply chain general") is reused, never duplicated. Check, approve and authorise are permissions Admin gives per person (Portal Access), so nobody approves their own work. Permissions: `store.purchase_cs.{view,create,review,approve}`, `store.purchase_po.{view,create,review,approve}`. The `store` role is deliberately NOT admitted to these screens.
+- **Maker / checker:** the preparer of a CS cannot check or approve it; the maker of a PO cannot check or authorise it, and the checker cannot authorise it (PO = 2 approval points: Checked By, Authorised Signatory; CS = 3 sign-off boxes: Jr. Executive - SCM prepares, Manager - SCM checks, Approved By). The same person may hold check and approve.
+- **Numbers:** `CS-26-27/0001`, `PO-26-27/T-081` (the real POs are `PO-26-27/T-068`, `T-080`; `T` is also the PO's Reference No.; set `PURCHASING_PO_FIRST_NO` to carry on after the last hand-booked PO); counter per financial year starting July (`config/purchasing.php`).
 - **Quantity to buy** is the requisition line's `To Be Procured` (the approver's figure). A line already on a live CS is taken; cancelling the CS returns it. One line may be split over several CS, never above its quantity.
 - **PO rate and quantity are copied from the approved CS and locked.** The PO edit screen changes only header text and each line's due-on / remark.
 - **Receiving against a PO is strict:** same supplier, only PO lines, never more than still expected. Receiving without a PO still works as before.
@@ -517,7 +517,7 @@ Approved Final / Individual requisition (to_be_procured_qty > 0)
 - Printed forms follow the factory's paper forms: CS `HAPL-03-0345` (A4 landscape), PO (A4 portrait, amount in words).
 
 **Open questions for the owner:**
-1. PO number: what does `HS` stand for, and does the series restart each financial year? The sample PO is `PO-25-26/HS-420` dated 24-Oct-26, while this build counts July to June (so Oct 2026 is `26-27`). Set `PURCHASING_FY_START_MONTH` if the factory counts differently.
+1. PO number: the October 2026 POs are `PO-26-27/T-068` and `T-080`, so the build uses code `T` and 3 digits. What does `T` stand for, does it change per unit, and what is the number to continue from (`PURCHASING_PO_FIRST_NO`)? Set `PURCHASING_FY_START_MONTH` if the financial year is not July to June.
 2. Is the CS chain Jr. Executive, Manager - SCM, Approved By the full chain? Does a small amount skip a step?
 3. The handwritten note on the sample CS ("take approval / advance from internal audit before purchasing"): is there a rule (an amount above X) that should become a gate?
 4. Is one supplier ever acceptable? Today a CS needs 2 (`PURCHASING_MIN_SUPPLIERS`).

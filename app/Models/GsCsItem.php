@@ -10,7 +10,7 @@ class GsCsItem extends Model
     protected $table = 'gs_cs_items';
 
     protected $fillable = [
-        'gs_comparative_statement_id', 'purchase_requisition_item_id', 'stock_item_id', 'item_name',
+        'gs_comparative_statement_id', 'purchase_requisition_item_id', 'stock_item_id', 'item_name', 'category',
         'uom', 'qty', 'specification', 'current_supplier', 'selected_supplier_id', 'remarks', 'sort_order',
     ];
 

@@ -60,7 +60,12 @@ class DashboardController extends Controller
             )->count(),
         ];
 
-        return view('store.dashboard', compact('stats', 'stockLevels') + [
+        $user = auth()->user();
+        $purchasing = ($user?->can('store.purchase_cs.view') || $user?->can('store.purchase_po.view'))
+            ? app(\App\Services\PurchasingDashboardService::class)->summary()
+            : null;
+
+        return view('store.dashboard', compact('stats', 'stockLevels', 'purchasing') + [
             'recentActivity' => $this->recentActivity(),
         ] + $this->requisitionSummary(auth()->user()));
     }

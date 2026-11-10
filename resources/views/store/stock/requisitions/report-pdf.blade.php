@@ -63,6 +63,7 @@
 <head>
     <meta charset="utf-8">
     @include("store.stock.requisitions._report-styles")
+    @include("store.stock.requisitions._plain-print-styles")
 </head>
 <body>
 

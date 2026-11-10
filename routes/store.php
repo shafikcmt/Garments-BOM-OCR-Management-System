@@ -70,6 +70,7 @@ Route::prefix('store/reports')
 $storeEntry = 'role_or_perm:store|admin|management'
     .'|store.stock_report.view|store.items.view|store.receiving.view'
     .'|store.issues.view|store.requisition.view|store.setup.view'
+    .'|store.purchase_cs.view|store.purchase_po.view'
     .'|material.closing_stock.view|material.receiving.view'
     .'|material.bulk_issue.view|material.requisitions.view';
 
@@ -89,7 +90,7 @@ $generalStock = 'role_or_perm:store|admin|management'
 // dashboard on any other right still can.
 $generalStockDashboard = 'role_or_perm:store|admin|management'
     .'|store.stock_report.view|store.items.view|store.receiving.view'
-    .'|store.issues.view|store.setup.view';
+    .'|store.issues.view|store.setup.view|store.purchase_cs.view|store.purchase_po.view';
 
 /*
  * Section guards inside General Stock.
@@ -612,6 +613,7 @@ Route::prefix('store/purchasing')
             Route::get('/queue', [PurchaseQueueController::class, 'index'])->name('queue');
 
             Route::get('/cs', [ComparativeStatementController::class, 'index'])->name('cs.index');
+            Route::post('/cs/start', [ComparativeStatementController::class, 'start'])->name('cs.start');
             Route::get('/cs/create', [ComparativeStatementController::class, 'create'])->name('cs.create');
             Route::post('/cs', [ComparativeStatementController::class, 'store'])->name('cs.store');
             Route::get('/cs/{cs}', [ComparativeStatementController::class, 'show'])->name('cs.show');
@@ -631,6 +633,8 @@ Route::prefix('store/purchasing')
             Route::get('/po/{order}', [InternalPurchaseOrderController::class, 'show'])->name('po.show');
             Route::get('/po/{order}/edit', [InternalPurchaseOrderController::class, 'edit'])->name('po.edit');
             Route::put('/po/{order}', [InternalPurchaseOrderController::class, 'update'])->name('po.update');
+            Route::post('/po/{order}/check', [InternalPurchaseOrderController::class, 'check'])->name('po.check');
+            Route::post('/po/{order}/send-back', [InternalPurchaseOrderController::class, 'sendBack'])->name('po.send-back');
             Route::post('/po/{order}/authorise', [InternalPurchaseOrderController::class, 'authorise'])->name('po.authorise');
             Route::post('/po/{order}/cancel', [InternalPurchaseOrderController::class, 'cancel'])->name('po.cancel');
             Route::get('/po/{order}/pdf', [InternalPurchaseOrderController::class, 'pdf'])->name('po.pdf');

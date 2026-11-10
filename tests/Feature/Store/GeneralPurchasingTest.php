@@ -139,13 +139,25 @@ it('numbers CS and PO per financial year, restarting every July', function () {
     DB::transaction(function () use ($gen) {
         expect($gen->nextCs(Carbon::parse('2026-10-24')))->toBe('CS-26-27/0001')
             ->and($gen->nextCs(Carbon::parse('2026-11-02')))->toBe('CS-26-27/0002')
-            ->and($gen->nextPo(Carbon::parse('2026-10-24')))->toBe('PO-26-27/HS-0001')
+            ->and($gen->nextPo(Carbon::parse('2026-10-24')))->toBe('PO-26-27/T-001')
             // June is still the previous financial year; it has its own counter.
             ->and($gen->nextCs(Carbon::parse('2026-06-30')))->toBe('CS-25-26/0001')
             ->and($gen->nextCs(Carbon::parse('2026-07-01')))->toBe('CS-26-27/0003');
     });
 
     expect($gen->previewCs(Carbon::parse('2026-10-24')))->toBe('CS-26-27/0004');
+});
+
+it('starts the PO series after the last hand-booked PO and prints it as T-080', function () {
+    config(['purchasing.po_first_no' => 81]);
+    $gen = app(GsDocumentNumberGenerator::class);
+
+    expect($gen->previewPo(Carbon::parse('2026-10-26')))->toBe('PO-26-27/T-081');
+
+    DB::transaction(function () use ($gen) {
+        expect($gen->nextPo(Carbon::parse('2026-10-26')))->toBe('PO-26-27/T-081')
+            ->and($gen->nextPo(Carbon::parse('2026-10-27')))->toBe('PO-26-27/T-082');
+    });
 });
 
 // ------------------------------------------------------------------ role setup
@@ -373,7 +385,7 @@ it('makes one draft PO per chosen supplier from an approved CS, with the CS rate
 
     $orders = GsPurchaseOrder::with('items')->orderBy('id')->get();
     expect($orders)->toHaveCount(2)
-        ->and($orders->pluck('po_no')->all())->toBe(['PO-26-27/HS-0001', 'PO-26-27/HS-0002'])
+        ->and($orders->pluck('po_no')->all())->toBe(['PO-26-27/T-001', 'PO-26-27/T-002'])
         ->and($orders->pluck('status')->unique()->all())->toBe(['draft']);
 
     $kt = $orders->firstWhere('supplier_name', 'KT Corporation');
@@ -388,7 +400,7 @@ it('makes one draft PO per chosen supplier from an approved CS, with the CS rate
     expect(GsPurchaseOrder::count())->toBe(2);
 });
 
-it('authorises a PO only by someone else, then marks the requisition purchase-action-taken', function () {
+it('checks then authorises a PO by two different people, then marks the requisition purchase-action-taken', function () {
     $sheet = gpApproved([['Bin Liner', 40]]);
     $cs = gpApprovedCs($cs, $sheet);
     $maker = gpUser(['store.purchase_po.approve'], 'PO Maker');
@@ -396,12 +408,27 @@ it('authorises a PO only by someone else, then marks the requisition purchase-ac
     $this->actingAs($maker)->post(route('store.purchasing.po.store', $cs))->assertSessionHasNoErrors();
     $po = GsPurchaseOrder::firstOrFail();
 
-    // The maker cannot authorise their own PO, even with the permission.
+    expect($po->reference_no)->toBe('T-001');
+
+    // Nobody can authorise a PO that has not been checked.
+    $this->actingAs(gpUser(['store.purchase_po.approve'], 'Early'))->post(route('store.purchasing.po.authorise', $po))->assertForbidden();
+
+    // Approval 1: the maker cannot check their own PO, nor can someone without the permission.
+    $maker->givePermissionTo('store.purchase_po.review');
+    $this->actingAs($maker)->post(route('store.purchasing.po.check', $po))->assertForbidden();
+    $this->actingAs(gpUser())->post(route('store.purchasing.po.check', $po))->assertForbidden();
+    $checker = gpUser(['store.purchase_po.review', 'store.purchase_po.approve'], 'PO Checker');
+    $this->actingAs($checker)->post(route('store.purchasing.po.check', $po))->assertSessionHasNoErrors();
+    expect($po->fresh()->status)->toBe('checked')->and($po->fresh()->checked_by)->toBe($checker->id);
+
+    // Approval 2: neither the maker nor the checker may authorise; nor may someone without the permission.
     $this->actingAs($maker)->post(route('store.purchasing.po.authorise', $po))->assertForbidden();
-    // Nor can someone without the permission.
+    $this->actingAs($checker)->post(route('store.purchasing.po.authorise', $po))->assertForbidden();
     $this->actingAs(gpUser())->post(route('store.purchasing.po.authorise', $po))->assertForbidden();
 
+    // Checked but not yet issued: Store cannot receive and the requisition has not moved.
     expect($sheet->fresh()->status)->toBe(PurchaseRequisition::STATUS_APPROVED);
+    expect(GsPurchaseOrder::receivable()->count())->toBe(0);
 
     $authoriser = gpUser(['store.purchase_po.approve'], 'Authoriser');
     $this->actingAs($authoriser)->post(route('store.purchasing.po.authorise', $po))->assertSessionHasNoErrors();
@@ -475,6 +502,7 @@ function gpIssuedPo(): array
 
     // Line 0 of the CS goes to supplier 1 (KT), line 1 as well: one PO.
     $po = GsPurchaseOrder::with('items')->latest('id')->firstOrFail();
+    test()->actingAs(gpUser(['store.purchase_po.review']))->post(route('store.purchasing.po.check', $po))->assertSessionHasNoErrors();
     test()->actingAs(gpUser(['store.purchase_po.approve']))->post(route('store.purchasing.po.authorise', $po))->assertSessionHasNoErrors();
 
     return [$po->fresh('items'), $supplier];
@@ -507,14 +535,14 @@ it('lets Store find an issued PO and load what is still to come', function () {
     [$po] = gpIssuedPo();
     $store = gpStoreUser();
 
-    $this->actingAs($store)->getJson(route('store.stock.purchases.po-search', ['q' => 'HS-0001']))
+    $this->actingAs($store)->getJson(route('store.stock.purchases.po-search', ['q' => 'T-001']))
         ->assertOk()->assertJsonPath('0.po_no', $po->po_no);
 
     $this->actingAs($store)->getJson(route('store.stock.purchases.po-lines', $po))
         ->assertOk()->assertJsonCount(2, 'lines')->assertJsonPath('lines.0.remaining', 30)->assertJsonPath('supplier', 'KT Corporation');
 
     // A draft PO is not open for receiving.
-    $draft = GsPurchaseOrder::create(['po_no' => 'PO-26-27/HS-9999', 'po_date' => '2026-10-24', 'supplier_name' => 'X', 'status' => 'draft']);
+    $draft = GsPurchaseOrder::create(['po_no' => 'PO-26-27/T-999', 'po_date' => '2026-10-24', 'supplier_name' => 'X', 'status' => 'draft']);
     $this->actingAs($store)->getJson(route('store.stock.purchases.po-lines', $draft))->assertNotFound();
 });
 
@@ -579,4 +607,123 @@ it('puts Against PO on the Record Receiving form', function () {
     $html = $this->actingAs(gpStoreUser())->get(route('store.stock.purchases.index'))->assertOk()->getContent();
 
     expect($html)->toContain('id="poSelect"')->toContain($po->po_no)->toContain('gs_purchase_order_item_id');
+});
+
+// ------------------------------------------------- long monthly lists: categories, bulk entry
+
+/** An approved sheet whose items sit in the given categories: [name, qty, category]. */
+function gpApprovedWithCategories(array $lines): PurchaseRequisition
+{
+    $sheet = gpApproved(array_map(fn ($l) => [$l[0], $l[1]], $lines));
+
+    foreach ($lines as [$name, , $category]) {
+        StockItem::where('name', $name)->update(['category' => $category]);
+    }
+
+    return $sheet;
+}
+
+it('groups the To Purchase queue by category, filters by one, and counts the categories', function () {
+    gpApprovedWithCategories([['Bin Liner', 40, 'Cleaning'], ['Floor Wiper', 5, 'Cleaning'], ['Ball Pen', 60, 'Stationery'], ['Mystery', 1, '']]);
+    $user = gpUser();
+
+    $this->actingAs($user)->get(route('store.purchasing.queue'))->assertOk()
+        ->assertSee('Cleaning')->assertSee('Stationery')->assertSee('Uncategorised')
+        ->assertSee('Make CS for Cleaning only');
+
+    $this->actingAs($user)->get(route('store.purchasing.queue', ['category' => 'Stationery']))->assertOk()
+        ->assertSee('Ball Pen')->assertDontSee('Bin Liner')
+        // The category list still offers the others, so the user can switch.
+        ->assertSee('Cleaning (2)', false);
+});
+
+it('starts a CS from many ticked items by POST, in category order, with the category kept', function () {
+    $sheet = gpApprovedWithCategories([['Ball Pen', 60, 'Stationery'], ['Bin Liner', 40, 'Cleaning']]);
+    $user = gpUser();
+
+    $this->actingAs($user)->post(route('store.purchasing.cs.start'), ['lines' => $sheet->items->pluck('id')->all()])
+        ->assertRedirect(route('store.purchasing.cs.create'));
+
+    $html = $this->actingAs($user)->get(route('store.purchasing.cs.create'))->assertOk()->getContent();
+    expect(strpos($html, 'Bin Liner'))->toBeLessThan(strpos($html, 'Ball Pen')) // Cleaning before Stationery
+        ->and($html)->toContain('id="rowSearch"')->toContain('name="lines_json"');
+
+    $this->actingAs($user)->post(route('store.purchasing.cs.start'), [])->assertSessionHasErrors('lines');
+});
+
+it('saves a 600-item statement sent as one JSON field, with the categories', function () {
+    $names = [];
+    for ($n = 1; $n <= 600; $n++) {
+        $names[] = ['Item '.str_pad((string) $n, 3, '0', STR_PAD_LEFT), 2, $n % 2 ? 'Electrical' : 'Hardware'];
+    }
+    $sheet = gpApprovedWithCategories($names);
+    $maker = gpUser();
+
+    $payload = gpPayload($sheet->items, array_fill(0, 600, [10, 9]));
+    $lines = $payload['lines'];
+    foreach ($lines as $i => &$l) { $l['category'] = $names[$i][2]; }
+    unset($l);
+    $payload['lines_json'] = json_encode(array_values($lines));
+    unset($payload['lines']);
+
+    $this->actingAs($maker)->post(route('store.purchasing.cs.store'), $payload + ['action' => 'draft'])->assertSessionHasNoErrors();
+
+    $cs = GsComparativeStatement::with('items.quotes')->firstOrFail();
+    expect($cs->items)->toHaveCount(600)
+        ->and($cs->items->first()->category)->toBe('Electrical')
+        ->and($cs->items->first()->quotes)->toHaveCount(2)
+        ->and($cs->chosenTotal())->toBe(600 * 2 * 9.0);
+
+    // Shown on the screen and the PDF, grouped under its category heading.
+    $this->actingAs($maker)->get(route('store.purchasing.cs.show', $cs))->assertOk()->assertSee('Electrical');
+    $this->actingAs($maker)->get(route('store.purchasing.cs.pdf', $cs))->assertOk();
+});
+
+// ------------------------------------------------------------------- dashboard
+
+it('shows the purchasing panel on the General Stock dashboard, with real figures, only to purchasing users', function () {
+    $sheet = gpApprovedWithCategories([['Bin Liner', 40, 'Cleaning'], ['Ball Pen', 60, 'Stationery']]);
+    $desk = gpUser(['store.requisition.view'], 'Desk');
+
+    $this->actingAs($desk)->get(route('store.dashboard'))->assertOk()
+        ->assertSee('Items waiting to be purchased')->assertSee('Waiting to purchase, by category')
+        ->assertSee('Cleaning')->assertSee('Ordered value per month');
+
+    $summary = app(\App\Services\PurchasingDashboardService::class)->summary();
+    expect($summary['waiting_items'])->toBe(2)->and($summary['trend'])->toHaveCount(6);
+
+    // A plain stock user without purchasing rights does not get the panel.
+    $store = gpStoreUser();
+    $this->actingAs($store)->get(route('store.dashboard'))->assertOk()->assertDontSee('Items waiting to be purchased');
+});
+
+it('counts an authorised PO in this month on the dashboard trend', function () {
+    [$po] = gpIssuedPo();
+    $summary = app(\App\Services\PurchasingDashboardService::class)->summary();
+
+    expect($summary['po']['issued'])->toBe(1)->and($summary['recent_orders'])->toHaveCount(1);
+});
+
+// ------------------------------------------------- view-only Receiving (checkers)
+
+it('shows a view-only Receiving user the history but not the entry form, import or drafts', function () {
+    StockItem::create(['name' => 'Bin Liner', 'uom' => 'Pkt', 'is_active' => true]);
+
+    $viewer = User::factory()->create();
+    $viewer->givePermissionTo(Permission::findOrCreate('store.receiving.view', 'web'));
+
+    $this->actingAs($viewer)->get(route('store.stock.purchases.index'))->assertOk()
+        ->assertSee('Purchase History')->assertSee('Receiving summary')
+        ->assertDontSee('>Record Receiving</h5>', false)->assertDontSee('id="purchaseForm"', false)
+        ->assertDontSee('importReceivingModal', false)->assertDontSee('purchases.drafts', false);
+
+    // They cannot post one either.
+    $this->actingAs($viewer)->post(route('store.stock.purchases.store'), [])->assertForbidden();
+
+    // Whoever may enter receiving still gets the form.
+    $entry = User::factory()->create();
+    $entry->givePermissionTo(Permission::findOrCreate('store.receiving.view', 'web'), Permission::findOrCreate('store.receiving.create', 'web'));
+    $this->actingAs($entry)->get(route('store.stock.purchases.index'))->assertOk()
+        ->assertSee('>Record Receiving</h5>', false)->assertSee('id="purchaseForm"', false)->assertSee('importReceivingModal', false)
+        ->assertDontSee('Receiving summary');
 });

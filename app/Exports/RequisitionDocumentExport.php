@@ -27,6 +27,7 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
 {
     use Exportable;
     use FormatsStoreSheet;
+    use Concerns\PlainPrintLook;
 
     /**
      * @param  Collection<int, array<string, mixed>>  $rows  the requisition's item lines
@@ -74,7 +75,11 @@ class RequisitionDocumentExport implements FromView, WithEvents, WithTitle
     public function registerEvents(): array
     {
         return [
-            AfterSheet::class => fn (AfterSheet $event) => $this->formatStoreSheet($event->sheet->getDelegate()),
+            AfterSheet::class => function (AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+                $this->formatStoreSheet($sheet);
+                $this->plainPrintLook($sheet);
+            },
         ];
     }
 }
