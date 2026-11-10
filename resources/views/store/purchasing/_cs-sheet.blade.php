@@ -35,7 +35,7 @@
 <div class="cs-sheet">
     <table class="nb" style="margin-bottom:6px;">
         <tr>
-            <td style="width:24%;"><div class="logo">HUMANA<small>APPARELS PVT. LTD.</small></div></td>
+            <td style="width:24%;">@include('store.purchasing._logo', ['width' => 120])</td>
             <td class="c">
                 <div class="co">Humana Apparels Pvt. Ltd.</div>
                 <div>Gorai, Mirzapur, Tangail, Bangladesh</div>

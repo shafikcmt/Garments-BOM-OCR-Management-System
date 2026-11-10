@@ -139,13 +139,25 @@ it('numbers CS and PO per financial year, restarting every July', function () {
     DB::transaction(function () use ($gen) {
         expect($gen->nextCs(Carbon::parse('2026-10-24')))->toBe('CS-26-27/0001')
             ->and($gen->nextCs(Carbon::parse('2026-11-02')))->toBe('CS-26-27/0002')
-            ->and($gen->nextPo(Carbon::parse('2026-10-24')))->toBe('PO-26-27/HS-0001')
+            ->and($gen->nextPo(Carbon::parse('2026-10-24')))->toBe('PO-26-27/T-001')
             // June is still the previous financial year; it has its own counter.
             ->and($gen->nextCs(Carbon::parse('2026-06-30')))->toBe('CS-25-26/0001')
             ->and($gen->nextCs(Carbon::parse('2026-07-01')))->toBe('CS-26-27/0003');
     });
 
     expect($gen->previewCs(Carbon::parse('2026-10-24')))->toBe('CS-26-27/0004');
+});
+
+it('starts the PO series after the last hand-booked PO and prints it as T-080', function () {
+    config(['purchasing.po_first_no' => 81]);
+    $gen = app(GsDocumentNumberGenerator::class);
+
+    expect($gen->previewPo(Carbon::parse('2026-10-26')))->toBe('PO-26-27/T-081');
+
+    DB::transaction(function () use ($gen) {
+        expect($gen->nextPo(Carbon::parse('2026-10-26')))->toBe('PO-26-27/T-081')
+            ->and($gen->nextPo(Carbon::parse('2026-10-27')))->toBe('PO-26-27/T-082');
+    });
 });
 
 // ------------------------------------------------------------------ role setup
@@ -373,7 +385,7 @@ it('makes one draft PO per chosen supplier from an approved CS, with the CS rate
 
     $orders = GsPurchaseOrder::with('items')->orderBy('id')->get();
     expect($orders)->toHaveCount(2)
-        ->and($orders->pluck('po_no')->all())->toBe(['PO-26-27/HS-0001', 'PO-26-27/HS-0002'])
+        ->and($orders->pluck('po_no')->all())->toBe(['PO-26-27/T-001', 'PO-26-27/T-002'])
         ->and($orders->pluck('status')->unique()->all())->toBe(['draft']);
 
     $kt = $orders->firstWhere('supplier_name', 'KT Corporation');
@@ -388,7 +400,7 @@ it('makes one draft PO per chosen supplier from an approved CS, with the CS rate
     expect(GsPurchaseOrder::count())->toBe(2);
 });
 
-it('authorises a PO only by someone else, then marks the requisition purchase-action-taken', function () {
+it('checks then authorises a PO by two different people, then marks the requisition purchase-action-taken', function () {
     $sheet = gpApproved([['Bin Liner', 40]]);
     $cs = gpApprovedCs($cs, $sheet);
     $maker = gpUser(['store.purchase_po.approve'], 'PO Maker');
@@ -396,12 +408,27 @@ it('authorises a PO only by someone else, then marks the requisition purchase-ac
     $this->actingAs($maker)->post(route('store.purchasing.po.store', $cs))->assertSessionHasNoErrors();
     $po = GsPurchaseOrder::firstOrFail();
 
-    // The maker cannot authorise their own PO, even with the permission.
+    expect($po->reference_no)->toBe('T-001');
+
+    // Nobody can authorise a PO that has not been checked.
+    $this->actingAs(gpUser(['store.purchase_po.approve'], 'Early'))->post(route('store.purchasing.po.authorise', $po))->assertForbidden();
+
+    // Approval 1: the maker cannot check their own PO, nor can someone without the permission.
+    $maker->givePermissionTo('store.purchase_po.review');
+    $this->actingAs($maker)->post(route('store.purchasing.po.check', $po))->assertForbidden();
+    $this->actingAs(gpUser())->post(route('store.purchasing.po.check', $po))->assertForbidden();
+    $checker = gpUser(['store.purchase_po.review', 'store.purchase_po.approve'], 'PO Checker');
+    $this->actingAs($checker)->post(route('store.purchasing.po.check', $po))->assertSessionHasNoErrors();
+    expect($po->fresh()->status)->toBe('checked')->and($po->fresh()->checked_by)->toBe($checker->id);
+
+    // Approval 2: neither the maker nor the checker may authorise; nor may someone without the permission.
     $this->actingAs($maker)->post(route('store.purchasing.po.authorise', $po))->assertForbidden();
-    // Nor can someone without the permission.
+    $this->actingAs($checker)->post(route('store.purchasing.po.authorise', $po))->assertForbidden();
     $this->actingAs(gpUser())->post(route('store.purchasing.po.authorise', $po))->assertForbidden();
 
+    // Checked but not yet issued: Store cannot receive and the requisition has not moved.
     expect($sheet->fresh()->status)->toBe(PurchaseRequisition::STATUS_APPROVED);
+    expect(GsPurchaseOrder::receivable()->count())->toBe(0);
 
     $authoriser = gpUser(['store.purchase_po.approve'], 'Authoriser');
     $this->actingAs($authoriser)->post(route('store.purchasing.po.authorise', $po))->assertSessionHasNoErrors();
@@ -475,6 +502,7 @@ function gpIssuedPo(): array
 
     // Line 0 of the CS goes to supplier 1 (KT), line 1 as well: one PO.
     $po = GsPurchaseOrder::with('items')->latest('id')->firstOrFail();
+    test()->actingAs(gpUser(['store.purchase_po.review']))->post(route('store.purchasing.po.check', $po))->assertSessionHasNoErrors();
     test()->actingAs(gpUser(['store.purchase_po.approve']))->post(route('store.purchasing.po.authorise', $po))->assertSessionHasNoErrors();
 
     return [$po->fresh('items'), $supplier];
@@ -507,14 +535,14 @@ it('lets Store find an issued PO and load what is still to come', function () {
     [$po] = gpIssuedPo();
     $store = gpStoreUser();
 
-    $this->actingAs($store)->getJson(route('store.stock.purchases.po-search', ['q' => 'HS-0001']))
+    $this->actingAs($store)->getJson(route('store.stock.purchases.po-search', ['q' => 'T-001']))
         ->assertOk()->assertJsonPath('0.po_no', $po->po_no);
 
     $this->actingAs($store)->getJson(route('store.stock.purchases.po-lines', $po))
         ->assertOk()->assertJsonCount(2, 'lines')->assertJsonPath('lines.0.remaining', 30)->assertJsonPath('supplier', 'KT Corporation');
 
     // A draft PO is not open for receiving.
-    $draft = GsPurchaseOrder::create(['po_no' => 'PO-26-27/HS-9999', 'po_date' => '2026-10-24', 'supplier_name' => 'X', 'status' => 'draft']);
+    $draft = GsPurchaseOrder::create(['po_no' => 'PO-26-27/T-999', 'po_date' => '2026-10-24', 'supplier_name' => 'X', 'status' => 'draft']);
     $this->actingAs($store)->getJson(route('store.stock.purchases.po-lines', $draft))->assertNotFound();
 });
 

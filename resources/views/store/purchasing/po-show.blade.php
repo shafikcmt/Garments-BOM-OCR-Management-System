@@ -47,12 +47,25 @@
 
     <div class="card gx-stock-card mb-3">
         <div class="gx-stock-card-body d-flex flex-wrap align-items-start gap-3">
+            @if(isset($allowed['check']))
+                <form method="POST" action="{{ route('store.purchasing.po.check', $order) }}">@csrf
+                    <button class="btn btn-primary"><i class="bi bi-check2-square me-1" aria-hidden="true"></i>Check PO</button>
+                </form>
+            @endif
             @if(isset($allowed['authorise']))
                 <form method="POST" action="{{ route('store.purchasing.po.authorise', $order) }}">@csrf
                     <button class="btn btn-success"><i class="bi bi-patch-check me-1" aria-hidden="true"></i>Authorise PO</button>
                 </form>
-            @elseif($order->isDraft())
-                <span class="small text-muted">A draft. Someone with authority, other than the person who made it, has to authorise it before Store can receive goods.</span>
+            @endif
+            @if(isset($allowed['send_back']))
+                <form method="POST" action="{{ route('store.purchasing.po.send-back', $order) }}">@csrf
+                    <button class="btn btn-outline-secondary"><i class="bi bi-arrow-return-left me-1" aria-hidden="true"></i>Send back</button>
+                </form>
+            @endif
+            @if($order->isDraft() && ! isset($allowed['check']))
+                <span class="small text-muted">Approval 1 of 2: someone other than the person who made it has to check this purchase order.</span>
+            @elseif($order->status === 'checked' && ! isset($allowed['authorise']))
+                <span class="small text-muted">Approval 2 of 2: the Authorised Signatory, who is neither the maker nor the checker, has to authorise it before Store can receive goods.</span>
             @endif
 
             @if(isset($allowed['cancel']))
@@ -64,7 +77,7 @@
         </div>
     </div>
 
-    @if(! $order->isDraft() && $order->status !== 'cancelled')
+    @if(! $order->isPending() && $order->status !== 'cancelled')
         <div class="card gx-stock-card mb-3">
             <div class="gx-stock-card-body">
                 <h6 class="mb-2">Receiving progress</h6>
