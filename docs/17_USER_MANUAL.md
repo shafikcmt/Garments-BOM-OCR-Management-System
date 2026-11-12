@@ -707,7 +707,7 @@ A department or section raises one of two kinds of requisition. On the Purchase 
 
 Stock figures (Stock in Hand, Safety Stock) are shown to everyone who can open an **Individual** requisition. The Store can still correct quantities as before. Every department requisition shows a **Monthly** or **Individual** badge in the lists. Above the list on **Purchase Requisition** and **Requested**, three tabs - **All**, **Monthly** and **Individual** - show each kind on its own, with the number of requisitions in each. The kind is saved with the requisition, so the Category Summary shows Monthly and Individual sheets separately.
 
-**Requested By and Raised By.** In the requisition list, **Requested By** is always the head the requisition goes to (the section head, or the department head when the section has none). **Raised By** is the person who entered it in the system.
+**Requested By and Raised By.** The requisition list shows **Raised By** first, then **Requested By**, in the order it happens. **Raised By** is the person who entered the requisition in the system. **Requested By** is always the head it then goes to (the section head, or the department head when the section has none).
 
 **Stock Summary on the Purchase Requisition page.** The Store Head and Admin see a Stock Summary card above the list: totals, the filters and a chart of the top items. The item-by-item table is not shown on this page, so the requisition list comes straight after. To see every item, use the card's **Excel** or **PDF** download.
 

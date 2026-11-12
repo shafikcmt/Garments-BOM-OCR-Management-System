@@ -268,7 +268,7 @@ it('offers a Print button that loads the same PDF inline', function () {
     expect($response->headers->get('content-disposition'))->toContain('inline');
 });
 
-it('lists the head as Requested By and the account as Raised By', function () {
+it('lists Raised By (the account) first, then Requested By (the head)', function () {
     [$head, $raiser] = indRaiser();
     $sheet = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
 
@@ -276,5 +276,5 @@ it('lists the head as Requested By and the account as Raised By', function () {
 
     $this->actingAs($raiser)->get(route('store.stock.requisitions.index'))
         ->assertOk()
-        ->assertSeeInOrder(['Requested By', 'Raised By', $sheet->requisition_no, 'Cutting Head', 'Cutting Raiser']);
+        ->assertSeeInOrder(['Raised By', 'Requested By', $sheet->requisition_no, 'Cutting Raiser', 'Cutting Head']);
 });

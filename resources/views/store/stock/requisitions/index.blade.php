@@ -169,10 +169,10 @@
                             <th style="min-width:240px;">Requisition No</th>
                             <th style="min-width:110px;">Date</th>
                             <th style="min-width:140px;">Section</th>
-                            {{-- Requested By is the head the sheet goes to; Raised By is
-                                 the account that typed it. --}}
-                            <th style="min-width:150px;">Requested By</th>
+                            {{-- In the order it happens: Raised By is the account that
+                                 typed the sheet, Requested By the head it then goes to. --}}
                             <th style="min-width:150px;">Raised By</th>
+                            <th style="min-width:150px;">Requested By</th>
                             <th class="text-end" style="min-width:80px;">Items</th>
                             <th class="text-end" style="min-width:130px;">Total Amount</th>
                             <th style="min-width:150px;">Status</th>
@@ -187,8 +187,8 @@
                                 </td>
                                 <td class="small">{{ optional($r->requisition_date)->format('d-M-Y') ?? '—' }}</td>
                                 <td class="small">{{ optional($r->indentSection)->name ?: 'All' }}</td>
-                                <td class="small">{{ $r->requestedByName() ?: '—' }}</td>
                                 <td class="small text-muted">{{ optional($r->createdBy)->name ?: '—' }}</td>
+                                <td class="small">{{ $r->requestedByName() ?: '—' }}</td>
                                 <td class="text-end fw-semibold">{{ $r->items_count }}</td>
                                 <td class="text-end fw-semibold">@include('store.stock.requisitions._amount', ['amount' => $r->items_sum_amount])</td>
                                 <td>
