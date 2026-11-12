@@ -696,6 +696,35 @@ class PurchaseRequisition extends Model
         return $this->indentPerson?->name ?: $this->createdBy?->name;
     }
 
+    /**
+     * "Requested By" as the lists print it: always the HEAD the sheet goes to
+     * — its section head when the section has one, else its department head —
+     * the same person the document prints under "Checked by (Department
+     * Head)". The account that typed the sheet is "Raised By".
+     *
+     * A Final Requisition (the Store's own) has no department head, and a
+     * department with no head set falls back to requesterName().
+     */
+    public function requestedByName(): ?string
+    {
+        if (! $this->isDepartmentLevel()) {
+            return $this->requesterName();
+        }
+
+        // One lookup per section / department / raiser on a page of rows.
+        static $heads = [];
+        // (Keyed by the running application too, so one test's rows never answer another's.)
+        $key = spl_object_id(app()).'|'.$this->indent_section_id.'|'.$this->department_role.'|'.$this->created_by;
+
+        if (! array_key_exists($key, $heads)) {
+            $first = \App\Services\RequisitionReviewChain::stepsForRequisition($this)[0] ?? null;
+            $head = $first['head'] ?? RequisitionDepartmentHead::headOf($this->department_role);
+            $heads[$key] = $head?->name;
+        }
+
+        return $heads[$key] ?: $this->requesterName();
+    }
+
     public function storeAckBy()
     {
         return $this->belongsTo(User::class, 'store_ack_by');

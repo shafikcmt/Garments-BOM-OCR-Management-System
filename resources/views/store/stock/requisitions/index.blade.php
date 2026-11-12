@@ -169,7 +169,10 @@
                             <th style="min-width:240px;">Requisition No</th>
                             <th style="min-width:110px;">Date</th>
                             <th style="min-width:140px;">Section</th>
+                            {{-- Requested By is the head the sheet goes to; Raised By is
+                                 the account that typed it. --}}
                             <th style="min-width:150px;">Requested By</th>
+                            <th style="min-width:150px;">Raised By</th>
                             <th class="text-end" style="min-width:80px;">Items</th>
                             <th class="text-end" style="min-width:130px;">Total Amount</th>
                             <th style="min-width:150px;">Status</th>
@@ -181,11 +184,11 @@
                             <tr>
                                 <td>
                                     <div class="fw-bold text-slate-900">{{ $r->requisition_no }} @include('store.stock.requisitions._type-badge', ['r' => $r])</div>
-                                    <div class="gx-stock-spec">raised by {{ optional($r->createdBy)->name ?: '—' }}</div>
                                 </td>
                                 <td class="small">{{ optional($r->requisition_date)->format('d-M-Y') ?? '—' }}</td>
                                 <td class="small">{{ optional($r->indentSection)->name ?: 'All' }}</td>
-                                <td class="small text-muted">{{ $r->requesterName() ?: '—' }}</td>
+                                <td class="small">{{ $r->requestedByName() ?: '—' }}</td>
+                                <td class="small text-muted">{{ optional($r->createdBy)->name ?: '—' }}</td>
                                 <td class="text-end fw-semibold">{{ $r->items_count }}</td>
                                 <td class="text-end fw-semibold">@include('store.stock.requisitions._amount', ['amount' => $r->items_sum_amount])</td>
                                 <td>
@@ -218,7 +221,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="gx-stock-empty">
+                            <tr><td colspan="9" class="gx-stock-empty">
                                 <span class="gx-stock-empty-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
                                 <div class="gx-stock-empty-title">{{ $hasFilters ? 'No requisitions match this filter' : 'No requisitions raised yet' }}</div>
                                 <div class="gx-stock-empty-hint">{{ $hasFilters ? 'Try a different month or status.' : 'Raise one with New Requisition above.' }}</div>

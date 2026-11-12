@@ -707,6 +707,8 @@ A department or section raises one of two kinds of requisition. On the Purchase 
 
 Stock figures (Stock in Hand, Safety Stock) are shown to everyone who can open an **Individual** requisition. The Store can still correct quantities as before. Every department requisition shows a **Monthly** or **Individual** badge in the lists. Above the list on **Purchase Requisition** and **Requested**, three tabs - **All**, **Monthly** and **Individual** - show each kind on its own, with the number of requisitions in each. The kind is saved with the requisition, so the Category Summary shows Monthly and Individual sheets separately.
 
+**Requested By and Raised By.** In the requisition list, **Requested By** is always the head the requisition goes to (the section head, or the department head when the section has none). **Raised By** is the person who entered it in the system.
+
 **Stock Summary on the Purchase Requisition page.** The Store Head and Admin see a Stock Summary card above the list: totals, the filters and a chart of the top items. The item-by-item table is not shown on this page, so the requisition list comes straight after. To see every item, use the card's **Excel** or **PDF** download.
 
 **When can a Monthly requisition be submitted?** A Monthly requisition can be submitted only from the **20th to the end of each month**. A department may raise more than one Monthly requisition for the same month, but each must be submitted in this period. The Store then receives and merges them into that month's Final Requisition. If you press **Submit** outside this period, a message tells you to raise an **Individual** requisition instead. You can still **Save as Draft** on any day. An Individual requisition can be submitted on any day of the month.

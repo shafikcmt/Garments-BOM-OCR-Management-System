@@ -267,3 +267,14 @@ it('offers a Print button that loads the same PDF inline', function () {
     $response = $this->actingAs($raiser)->get(route('store.stock.requisitions.pdf', [$sheet, 'inline' => 1]))->assertOk();
     expect($response->headers->get('content-disposition'))->toContain('inline');
 });
+
+it('lists the head as Requested By and the account as Raised By', function () {
+    [$head, $raiser] = indRaiser();
+    $sheet = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+
+    expect($sheet->requestedByName())->toBe('Cutting Head');
+
+    $this->actingAs($raiser)->get(route('store.stock.requisitions.index'))
+        ->assertOk()
+        ->assertSeeInOrder(['Requested By', 'Raised By', $sheet->requisition_no, 'Cutting Head', 'Cutting Raiser']);
+});
