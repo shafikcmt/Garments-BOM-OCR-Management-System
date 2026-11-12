@@ -97,6 +97,8 @@
                 @include('store.stock.requisitions._stock-summary', [
                     'stockSummary' => $stockSummary,
                     'stockSummaryPage' => $stockSummaryPage,
+                    // The list below is what this page is for; the items are in the downloads.
+                    'showTable' => false,
                 ])
             </div>
         </div>
