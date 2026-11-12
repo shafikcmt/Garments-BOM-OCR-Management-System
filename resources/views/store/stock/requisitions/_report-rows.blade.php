@@ -103,9 +103,9 @@
                     ? ' ('.\App\Models\PurchaseRequisitionItem::NOT_IN_MASTER_NOTE.')'
                     : '')
                 <td>{{ $row['item_name'] }}{{ $notInMaster }}</td>
-                <td>{{ $row['uom'] ?: '—' }}</td>
+                <td class="one-line">{{ $row['uom'] ?: '—' }}</td>
                 <td>{{ $row['specification'] ?: '-' }}</td>
-                <td>{{ $row['type'] ? ($typeLabels[$row['type']] ?? $row['type']) : '-' }}</td>
+                <td class="one-line">{{ $row['type'] ? ($typeLabels[$row['type']] ?? $row['type']) : '-' }}</td>
                 @if($withCategory)<td>{{ $row['category'] ?: '-' }}</td>@endif
                 <td>{{ $row['user_dept'] ?: '-' }}</td>
 

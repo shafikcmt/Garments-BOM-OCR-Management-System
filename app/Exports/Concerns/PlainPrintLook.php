@@ -183,11 +183,41 @@ trait PlainPrintLook
         if ($signatureRow !== null) {
             $space = ($totalRow ?? $tableEnd) + 1;
             for ($row = $space; $row < $signatureRow; $row++) {
-                $sheet->getRowDimension($row)->setRowHeight($row === $space ? 5 : 14);
+                // Clear room between the last item and the signatures, so the
+                // block does not sit against the table on a short sheet.
+                $sheet->getRowDimension($row)->setRowHeight($row === $space ? 8 : 24);
             }
             $sheet->getStyle('A'.$signatureRow.':'.$lastColumn.$signatureRow)->applyFromArray([
                 'borders' => ['top' => $thin],
             ]);
+        }
+
+        // Short text (Uom "Square Feet", Type "New", a section's name) stays on
+        // ONE line: the column is widened to its longest value and wrapping is
+        // switched off. Long text columns (item name, remarks) keep wrapping.
+        for ($col = 2; $col <= $lastIndex; $col++) {
+            $letter = Coordinate::stringFromColumnIndex($col);
+            $longest = 0;
+            $text = false;
+
+            for ($row = $firstData; $row <= $tableEnd; $row++) {
+                if ($row === $totalRow || $sheet->getStyle('A'.$row)->getFill()->getFillType() === Fill::FILL_SOLID) {
+                    continue;
+                }
+                $value = $sheet->getCell($letter.$row)->getValue();
+                if (is_string($value) && $value !== '' && $value[0] !== '=') {
+                    $text = true;
+                    $longest = max($longest, mb_strlen($value));
+                }
+            }
+
+            if ($text && $longest <= 18) {
+                $need = $longest * 1.15 + 2;
+                if (($sheet->getColumnDimension($letter)->getWidth() ?: 0) < $need) {
+                    $sheet->getColumnDimension($letter)->setWidth($need);
+                }
+                $sheet->getStyle($letter.$firstData.':'.$letter.$tableEnd)->getAlignment()->setWrapText(false);
+            }
         }
 
         // Item rows: roomier than a bare text line, so a printed row can be read
@@ -226,6 +256,11 @@ trait PlainPrintLook
                 $sheet->getColumnDimension($letter)->setWidth($width);
             }
         }
+
+        // Wider side margins, and the page centred: the outer border on the
+        // first and last column was falling in the printer's unprintable edge.
+        $sheet->getPageMargins()->setLeft(0.5)->setRight(0.5)->setTop(0.5)->setBottom(0.5);
+        $sheet->getPageSetup()->setHorizontalCentered(true);
 
         if ($signatureRow !== null) {
             // Caption bold; the name bold italic; the designation plain.
