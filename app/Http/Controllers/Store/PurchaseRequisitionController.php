@@ -1016,6 +1016,11 @@ class PurchaseRequisitionController extends Controller
                 'store_ack_at' => now(),
             ]);
 
+            // Stock as the Store finds it today, not as it was when raised.
+            if ($locked->isDepartmentLevel()) {
+                $this->requisitions->refreshStock($locked);
+            }
+
             $this->history->record($locked, PurchaseRequisitionAction::RECEIVED, [
                 'stage' => PurchaseRequisitionAction::STAGE_STORE,
                 'from' => PurchaseRequisition::STATUS_SUBMITTED,

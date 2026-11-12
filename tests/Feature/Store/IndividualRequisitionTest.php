@@ -278,3 +278,35 @@ it('lists Raised By (the account) first, then Requested By (the head)', function
         ->assertOk()
         ->assertSeeInOrder(['Raised By', 'Requested By', $sheet->requisition_no, 'Cutting Raiser', 'Cutting Head']);
 });
+
+it('updates Stock in Hand and To Be Procured when the Store receives the sheet', function () {
+    [$head, $raiser] = indRaiser();
+    $item = StockItem::create(['name' => 'Machine Oil', 'uom' => 'Ltr', 'is_active' => true]);
+    \App\Models\StockPurchase::create(['stock_item_id' => $item->id, 'purchase_date' => now()->startOfMonth()->toDateString(),
+        'rcv_date' => now()->startOfMonth()->toDateString(), 'qty' => 9, 'unit_price' => 100]);
+
+    // Raised today with 9 on the shelf: 5 asked, nothing to buy.
+    test()->actingAs($raiser)->post(route('store.stock.requisitions.store'), [
+        'action' => 'submit', 'mode' => PurchaseRequisition::MODE_MULTI, 'requisition_date' => now()->toDateString(),
+        'requisition_type' => 'individual',
+        'items' => [['stock_item_id' => $item->id, 'qty_requested' => 5]],
+    ])->assertSessionHasNoErrors();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+    $line = $sheet->items()->firstOrFail();
+    expect((float) $line->stock_in_hand_snapshot)->toBe(9.0)->and((float) $line->to_be_procured_qty)->toBe(0.0);
+
+    // The stock is issued before the Store takes the sheet.
+    \Illuminate\Support\Facades\DB::table('stock_issues')->insert([
+        'stock_item_id' => $item->id, 'is_stock_item' => true, 'issue_date' => now()->toDateString(), 'qty' => 9,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    indApprove($head, $sheet)->assertSessionHasNoErrors();
+    expect((float) $line->fresh()->stock_in_hand_snapshot)->toBe(9.0); // the head's step changes nothing
+
+    indApprove(indUser('store', [], ['name' => 'Store Clerk']), $sheet)->assertSessionHasNoErrors();
+    $line->refresh();
+    expect((float) $line->stock_in_hand_snapshot)->toBe(0.0)
+        ->and((float) $line->to_be_procured_qty)->toBe(5.0)
+        ->and((float) $line->amount)->toBe(500.0);
+});

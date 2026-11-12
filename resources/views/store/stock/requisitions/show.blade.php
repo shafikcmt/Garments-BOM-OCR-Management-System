@@ -406,6 +406,9 @@
                 Stock, safety, consumption and last purchase are the figures as at
                 {{ optional($requisition->requisition_date)->format('d M Y') }} — frozen when this requisition was raised,
                 so it still shows the position that justified it.
+                @if($requisition->isDepartmentLevel() && $requisition->store_ack_at)
+                    Stock in Hand and Safety Stock were updated on {{ \App\Support\LocalTime::show($requisition->store_ack_at, 'd M Y') }}, when the Store received it.
+                @endif
             </p>
         </div>
     </div>
