@@ -844,7 +844,7 @@ Sending for checking needs at least 2 suppliers and a priced supplier chosen on 
 
 **Who can do what (Admin).** Admin sets this in **Admin, Users, Portal Access** (or the permission list under **General Stock**):
 - The **Supply Chain General** role can see **To Purchase**, make and edit Comparative Statements, and make and edit Internal POs. It cannot check, approve or authorise.
-- **Comparative Statement: Check**, **Comparative Statement: Approve** **Internal PO: Check** and **Internal PO: Authorise** are given to the right people one by one.
+- **Comparative Statement: Check**, **Comparative Statement: Approve** **Internal PO: Check** and **Internal PO: Authorise** are given to the right people one by one. The switches can be on in any mix: for example Approve alone stays on after you save, even though Check and the PO switches are off.
 - Store needs no purchasing right to receive against a PO. The form code printed on the CS, the consignee and BIN printed on the PO, the PO number code (T) and the first number of the year (`PURCHASING_PO_FIRST_NO`, so the system carries on after the last hand-booked PO) and the minimum number of suppliers are in `config/purchasing.php`.
 
 ---

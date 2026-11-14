@@ -1033,20 +1033,29 @@ class UserController extends Controller
             return;
         }
 
-        foreach (PortalAccess::toggles() as $key => $toggle) {
-            $names = $toggle['permissions'];
+        $on = [];
+        $off = [];
 
-            if (! collect($names)->every(fn ($name) => $this->scope()->mayGrant($name))) {
+        foreach (PortalAccess::toggles() as $key => $toggle) {
+            if (! collect($toggle['permissions'])->every(fn ($name) => $this->scope()->mayGrant($name))) {
                 continue;
             }
 
             if ($request->boolean('portal_access.'.$key)) {
-                $fromRole = $user->getPermissionsViaRoles()->pluck('name');
-                $user->givePermissionTo(collect($names)->reject(fn ($n) => $fromRole->contains($n))->all());
+                $on = array_merge($on, $toggle['permissions']);
             } else {
-                $user->revokePermissionTo($names);
+                $off = array_merge($off, $toggle['permissions']);
             }
         }
+
+        // Switches share permissions (for example store.purchase_cs.view sits in both
+        // Check and Approve). A permission that any switched-on bundle needs is never
+        // revoked because another bundle is off, or that switch would read as off again.
+        $on = array_values(array_unique($on));
+        $fromRole = $user->getPermissionsViaRoles()->pluck('name');
+
+        $user->givePermissionTo(collect($on)->reject(fn ($n) => $fromRole->contains($n))->all());
+        $user->revokePermissionTo(array_values(array_diff(array_unique($off), $on)));
     }
 
     public function store(Request $request)

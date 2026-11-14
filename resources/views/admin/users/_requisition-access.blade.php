@@ -111,8 +111,18 @@
 
             rows.forEach(function (row) {
                 row.querySelector('.js-access-input').addEventListener('change', function (e) {
+                    // A box another switched-on row still needs (e.g. the shared "view" right) stays ticked.
+                    var keep = [];
+                    if (! e.target.checked) {
+                        rows.forEach(function (other) {
+                            if (other !== row && other.querySelector('.js-access-input').checked) {
+                                keep = keep.concat(JSON.parse(other.dataset.permissions));
+                            }
+                        });
+                    }
                     boxesFor(row).forEach(function (b) {
                         if (b.disabled || b.checked === e.target.checked) { return; }
+                        if (! e.target.checked && keep.indexOf(b.dataset.permission) !== -1) { return; }
                         b.checked = e.target.checked;
                         b.dispatchEvent(new Event('change', { bubbles: true }));
                     });
