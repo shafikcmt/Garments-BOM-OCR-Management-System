@@ -1,115 +1,158 @@
 {{--
     The Internal PO as printed: A4 portrait. Table markup only, so DomPDF and the
     screen draw the same page. A draft is marked so it is never mistaken for an
-    authorised order.
+    authorised order. The BIN is the company's fixed number (config), printed
+    whatever an older PO has stored.
 --}}
 @php
-    $fmt = fn ($n) => rtrim(rtrim(number_format((float) $n, 2), '0'), '.');
+    $fmt = fn ($n) => number_format((float) $n, 2);
     $qty = fn ($n) => rtrim(rtrim(number_format((float) $n, 4), '0'), '.');
-    $rows = max(0, 12 - $order->items->count());
+    $rows = max(0, 10 - $order->items->count());
+    $bin = config('purchasing.po_defaults.bin_number');
+    $status = $order->status;
 @endphp
 <style>
-    .po-sheet { font-family: DejaVu Sans, Arial, sans-serif; font-size: 10px; color: #111; width: 100%; }
+    .po-sheet { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9.5px; color: #1f2937; width: 100%; }
     .po-sheet table { border-collapse: collapse; width: 100%; }
-    .po-sheet td, .po-sheet th { border: 1px solid #555; padding: 4px 6px; vertical-align: top; }
-    .po-sheet th { background: #eceff3; text-align: center; font-weight: bold; vertical-align: middle; }
-    .po-sheet .k { color: #555; font-size: 8px; display: block; }
-    .po-sheet .v { font-weight: bold; }
+    .po-sheet td, .po-sheet th { vertical-align: top; }
+    .po-sheet .k { color: #6b7280; font-size: 7.5px; text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 2px; }
+    .po-sheet .v { font-weight: bold; color: #111827; }
+    .po-sheet .banner { text-align: center; font-weight: bold; font-size: 9px; letter-spacing: .5px; padding: 3px 0; margin-bottom: 8px; border: 1px solid; }
+    .po-sheet .banner.draft { color: #b45309; background: #fffbeb; border-color: #fcd34d; }
+    .po-sheet .banner.checked { color: #1d4ed8; background: #eff6ff; border-color: #93c5fd; }
+    .po-sheet .banner.cancelled { color: #b91c1c; background: #fef2f2; border-color: #fca5a5; }
+    .po-sheet .title { font-size: 20px; font-weight: bold; letter-spacing: 3px; color: #1e3a5f; text-align: right; }
+    .po-sheet .company { font-size: 12px; font-weight: bold; color: #111827; }
+    .po-sheet .rule { border-top: 2px solid #1e3a5f; margin: 8px 0 10px; }
+    .po-sheet .meta td { padding: 3px 6px; border: 1px solid #d1d5db; width: 50%; }
+    .po-sheet .meta .k { margin-bottom: 1px; }
+    .po-sheet .box { border: 1px solid #d1d5db; padding: 6px 8px; }
+    .po-sheet .box-h { background: #f3f4f6; border: 1px solid #d1d5db; border-bottom: 0; padding: 3px 8px; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; }
+    .po-sheet .items { margin-top: 10px; }
+    .po-sheet .items th { background: #1e3a5f; color: #fff; border: 1px solid #1e3a5f; padding: 5px 5px; font-size: 8.5px; text-align: center; vertical-align: middle; }
+    .po-sheet .items td { border: 1px solid #d1d5db; padding: 4px 5px; height: 16px; vertical-align: middle; }
+    .po-sheet .items tr.alt td { background: #f9fafb; }
     .po-sheet .num { text-align: right; white-space: nowrap; }
     .po-sheet .c { text-align: center; }
-    .po-sheet h2 { margin: 0; padding: 5px; text-align: center; font-size: 13px; letter-spacing: 1px; border: 1px solid #555; border-bottom: 0; background: #eceff3; }
-    .po-sheet .logo { font-size: 17px; font-weight: bold; letter-spacing: 3px; }
-    .po-sheet .logo small { display: block; font-size: 6px; letter-spacing: 2px; font-weight: normal; }
-    .po-sheet .items td { height: 18px; }
-    .po-sheet .tot td { background: #dde3ec; font-weight: bold; }
-    .po-sheet .sig td { border: 0; padding-top: 52px; width: 50%; }
-    .po-sheet .sig .line { border-top: 1px solid #111; padding-top: 3px; font-weight: bold; }
-    .po-sheet .sig small { font-weight: normal; color: #444; }
-    .po-sheet .draft { color: #b00020; font-weight: bold; text-align: center; font-size: 11px; margin-bottom: 4px; }
+    .po-sheet .totals td { padding: 4px 6px; }
+    .po-sheet .grand { background: #1e3a5f; color: #fff; font-weight: bold; font-size: 10.5px; }
+    .po-sheet .words { margin-top: 8px; padding: 6px 8px; background: #f3f4f6; border-left: 3px solid #1e3a5f; }
+    .po-sheet .sig td { width: 50%; padding-top: 46px; }
+    .po-sheet .sig .line { border-top: 1px solid #111827; padding-top: 3px; font-weight: bold; margin-right: 24px; }
+    .po-sheet .sig .line.r { margin-right: 0; margin-left: 24px; text-align: right; }
+    .po-sheet .sig small { font-weight: normal; color: #6b7280; font-size: 8px; }
 </style>
 <div class="po-sheet">
     @if($order->isPending())
-        <div class="draft">{{ $order->status === \App\Models\GsPurchaseOrder::STATUS_CHECKED ? 'CHECKED: not yet authorised' : 'DRAFT: not yet checked or authorised' }}</div>
-    @elseif($order->status === \App\Models\GsPurchaseOrder::STATUS_CANCELLED)
-        <div class="draft">CANCELLED</div>
+        <div class="banner {{ $status === \App\Models\GsPurchaseOrder::STATUS_CHECKED ? 'checked' : 'draft' }}">{{ $status === \App\Models\GsPurchaseOrder::STATUS_CHECKED ? 'CHECKED: NOT YET AUTHORISED' : 'DRAFT: NOT YET CHECKED OR AUTHORISED' }}</div>
+    @elseif($status === \App\Models\GsPurchaseOrder::STATUS_CANCELLED)
+        <div class="banner cancelled">CANCELLED</div>
     @endif
 
-    <h2>PURCHASE ORDER</h2>
+    {{-- Letterhead: logo and company on the left, title and control numbers on the right. --}}
     <table>
         <tr>
-            <td rowspan="2" style="width:56%;">
-                <span class="k">Invoice To</span>
-                {!! nl2br(e($order->invoice_to)) !!}
+            <td style="width:52%;">
+                @include('store.purchasing._logo', ['width' => 120])
+                <div class="company" style="margin-top:4px;">Humana Apparels Pvt. Ltd</div>
+                <div>{!! nl2br(e($order->invoice_to)) !!}</div>
             </td>
-            <td style="width:26%;"><span class="k">Purchase Order No:</span><span class="v">{{ $order->po_no }}</span></td>
-            <td style="width:18%;"><span class="k">Date:</span><span class="v">{{ $order->po_date?->format('d-M-y') }}</span></td>
-        </tr>
-        <tr>
-            <td><span class="k">Reference No. &amp; Date</span><span class="v">{{ $order->reference_no ?: 'Ref. No. #' }}</span></td>
-            <td rowspan="2">@include('store.purchasing._logo', ['width' => 110])</td>
-        </tr>
-        <tr>
-            <td rowspan="2"><span class="k">Consignee (ship to)</span>{!! nl2br(e($order->consignee)) !!}</td>
-            <td><span class="k">BIN Number:</span><span class="v">{{ $order->bin_number }}</span></td>
-        </tr>
-        <tr>
-            <td><span class="k">Dispatched through</span><span class="v">{{ $order->dispatched_through }}</span></td>
-            <td><span class="k">Destination</span><span class="v">{{ $order->destination }}</span></td>
-        </tr>
-        <tr>
-            <td>
-                <span class="k">Supplier (Bill from)</span>
-                <span class="v">{{ $order->supplier_name }}</span><br>
-                @if(filled($order->supplier_address)){!! nl2br(e($order->supplier_address)) !!}<br>@endif
-                @if(filled($order->supplier_phone))Call: {{ $order->supplier_phone }}@endif
-            </td>
-            <td colspan="2">
-                <span class="k">Mode / Terms of Payment</span>{!! nl2br(e($order->payment_terms)) !!}<br><br>
-                <span class="k">Terms of Delivery</span>{!! nl2br(e($order->delivery_terms)) !!}
+            <td style="width:48%;">
+                <div class="title">PURCHASE ORDER</div>
+                <table class="meta" style="margin-top:6px;">
+                    <tr>
+                        <td><span class="k">PO No.</span><span class="v">{{ $order->po_no }}</span></td>
+                        <td><span class="k">Date</span><span class="v">{{ $order->po_date?->format('d-M-Y') }}</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="k">Reference No.</span><span class="v">{{ $order->reference_no ?: '-' }}</span></td>
+                        <td><span class="k">BIN</span><span class="v">{{ $bin }}</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="k">Dispatched through</span><span class="v">{{ $order->dispatched_through ?: '-' }}</span></td>
+                        <td><span class="k">Destination</span><span class="v">{{ $order->destination ?: '-' }}</span></td>
+                    </tr>
+                </table>
             </td>
         </tr>
     </table>
 
-    <table class="items" style="margin-top:-1px;">
+    <div class="rule"></div>
+
+    {{-- Who we buy from and where it goes. --}}
+    <table>
+        <tr>
+            <td style="width:50%;padding-right:5px;">
+                <div class="box-h">Supplier (Bill from)</div>
+                <div class="box" style="min-height:44px;">
+                    <span class="v">{{ $order->supplier_name }}</span>
+                    @if(filled($order->supplier_address))<br>{!! nl2br(e($order->supplier_address)) !!}@endif
+                    @if(filled($order->supplier_phone))<br>Call: {{ $order->supplier_phone }}@endif
+                </div>
+            </td>
+            <td style="width:50%;padding-left:5px;">
+                <div class="box-h">Consignee (Ship to)</div>
+                <div class="box" style="min-height:44px;">{!! nl2br(e($order->consignee)) !!}</div>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding-right:5px;padding-top:8px;">
+                <div class="box-h">Mode / Terms of Payment</div>
+                <div class="box">{!! nl2br(e($order->payment_terms)) !!}</div>
+            </td>
+            <td style="padding-left:5px;padding-top:8px;">
+                <div class="box-h">Terms of Delivery</div>
+                <div class="box">{!! nl2br(e($order->delivery_terms)) !!}</div>
+            </td>
+        </tr>
+    </table>
+
+    {{-- Items, as approved on the Comparative Statement. --}}
+    <table class="items">
         <thead>
             <tr>
                 <th style="width:5%;">SL</th><th>Item Description of Goods</th><th style="width:9%;">Due on</th>
-                <th style="width:10%;">Quantity</th><th style="width:9%;">Rate</th><th style="width:6%;">Per</th>
-                <th style="width:12%;">Amount</th><th style="width:11%;">Remarks</th>
+                <th style="width:9%;">Qty</th><th style="width:10%;">Rate</th><th style="width:7%;">Per</th>
+                <th style="width:12%;">Amount</th><th style="width:12%;">Remarks</th>
             </tr>
         </thead>
         <tbody>
             @foreach($order->items as $i => $line)
-                <tr>
+                <tr class="{{ $i % 2 ? 'alt' : '' }}">
                     <td class="c">{{ $i + 1 }}</td>
                     <td>{{ $line->item_name }}</td>
                     <td class="c">{{ $line->due_on }}</td>
                     <td class="num">{{ $qty($line->qty) }}</td>
-                    <td class="num">{{ number_format((float) $line->rate, 1) }}</td>
+                    <td class="num">{{ $fmt($line->rate) }}</td>
                     <td class="c">{{ strtoupper((string) $line->uom) }}</td>
                     <td class="num">{{ $fmt($line->amount) }}</td>
                     <td>{{ $line->remarks }}</td>
                 </tr>
             @endforeach
             @for($r = 0; $r < $rows; $r++)
-                <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td class="num">-</td><td></td></tr>
+                <tr class="{{ ($order->items->count() + $r) % 2 ? 'alt' : '' }}"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
             @endfor
-            <tr class="tot">
-                <td colspan="5" style="border:0;background:#fff;"></td>
-                <td class="c">Total</td>
-                <td class="num">{{ $fmt($order->total_amount) }}</td>
-                <td style="border:0;background:#fff;"></td>
-            </tr>
         </tbody>
     </table>
 
-    <p style="margin:10px 0 2px;"><strong>Amount Chargeable (in words)</strong><br>{{ \App\Support\AmountInWords::taka($order->total_amount) }}</p>
+    <table class="totals" style="margin-top:-1px;">
+        <tr>
+            <td style="width:62%;"></td>
+            <td class="grand" style="width:16%;text-align:right;">TOTAL (Tk)</td>
+            <td class="grand num" style="width:22%;">{{ $fmt($order->total_amount) }}</td>
+        </tr>
+    </table>
 
-    <p style="margin:8px 0 0;"><strong>Remarks:</strong><br>
-        @foreach(preg_split('/\r\n|\r|\n/', (string) $order->remarks) as $n => $remark)
-            @if(trim($remark) !== ''){{ $n + 1 }}. {{ $remark }}<br>@endif
-        @endforeach
-    </p>
+    <div class="words"><span class="k">Amount Chargeable (in words)</span><span class="v">{{ \App\Support\AmountInWords::taka($order->total_amount) }}</span></div>
+
+    @if(filled(trim((string) $order->remarks)))
+        <div style="margin-top:8px;">
+            <span class="k">Remarks</span>
+            @foreach(preg_split('/\r\n|\r|\n/', (string) $order->remarks) as $n => $remark)
+                @if(trim($remark) !== ''){{ $n + 1 }}. {{ $remark }}<br>@endif
+            @endforeach
+        </div>
+    @endif
 
     <table class="sig">
         <tr>
@@ -117,9 +160,9 @@
                 <div style="font-size:8px;margin-bottom:2px;">{{ $order->checkedBy?->name }} {{ $order->checked_at?->format('d-m-Y') }}</div>
                 <div class="line">Checked By<br><small>For Humana Apparels Pvt Ltd.</small></div>
             </td>
-            <td style="text-align:right;">
-                <div style="font-size:8px;margin-bottom:2px;">{{ $order->authorisedBy?->name }} {{ $order->authorised_at?->format('d-m-Y') }}</div>
-                <div class="line">Authorised Signatory<br><small>For Humana Apparels Pvt Ltd.</small></div>
+            <td>
+                <div style="font-size:8px;margin-bottom:2px;text-align:right;">{{ $order->authorisedBy?->name }} {{ $order->authorised_at?->format('d-m-Y') }}</div>
+                <div class="line r">Authorised Signatory<br><small>For Humana Apparels Pvt Ltd.</small></div>
             </td>
         </tr>
     </table>

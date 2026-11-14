@@ -124,7 +124,8 @@ class PurchaseOrderService
     }
 
     /**
-     * Edit the header and each line's due-on / remark of a draft PO.
+     * Edit the header of a draft PO. The item lines come from the approved
+     * Comparative Statement and are not editable, and the BIN is fixed.
      *
      * @param  array<string, mixed>  $data
      */
@@ -136,16 +137,9 @@ class PurchaseOrderService
 
         DB::transaction(function () use ($po, $data) {
             $po->update(array_intersect_key($data, array_flip([
-                'po_date', 'reference_no', 'bin_number', 'invoice_to', 'consignee', 'dispatched_through',
+                'po_date', 'reference_no', 'invoice_to', 'consignee', 'dispatched_through',
                 'destination', 'payment_terms', 'delivery_terms', 'remarks',
             ])));
-
-            foreach (($data['lines'] ?? []) as $id => $line) {
-                $po->items()->whereKey((int) $id)->update([
-                    'due_on' => $line['due_on'] ?? null,
-                    'remarks' => $line['remarks'] ?? null,
-                ]);
-            }
         });
 
         return $po->fresh('items');

@@ -443,7 +443,7 @@ it('checks then authorises a PO by two different people, then marks the requisit
         ->and($sheet->fresh()->status)->toBe(PurchaseRequisition::STATUS_APPROVED);
 });
 
-it('edits only the header and due-on of a draft PO, never its rate or quantity', function () {
+it('edits only the header of a draft PO, never its items, rate, quantity or BIN', function () {
     $cs = gpApprovedCs();
     $maker = gpUser();
     $this->actingAs($maker)->post(route('store.purchasing.po.store', $cs));
@@ -455,15 +455,16 @@ it('edits only the header and due-on of a draft PO, never its rate or quantity',
     $this->actingAs($maker)->put(route('store.purchasing.po.update', $po), [
         'po_date' => '2026-10-25',
         'reference_no' => 'REF-9',
-        'bin_number' => '005635381-0406',
+        'bin_number' => '1111',
         'lines' => [$line->id => ['due_on' => '30-Oct-26', 'remarks' => 'Urgent', 'qty' => '999', 'rate' => '1']],
     ])->assertSessionHasNoErrors();
 
     $line->refresh();
     $po->refresh();
     expect($po->reference_no)->toBe('REF-9')
-        ->and($po->bin_number)->toBe('005635381-0406')
-        ->and($line->due_on)->toBe('30-Oct-26')
+        ->and($po->bin_number)->toBe('0056353810406')
+        ->and($line->due_on)->not->toBe('30-Oct-26')
+        ->and($line->remarks)->not->toBe('Urgent')
         ->and((float) $line->qty)->not->toBe(999.0)
         ->and((float) $line->rate)->not->toBe(1.0);
 });
