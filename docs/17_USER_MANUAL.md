@@ -828,6 +828,7 @@ Sending for checking needs at least 2 suppliers and a priced supplier chosen on 
 **3. Check and approve.** The statement moves **Draft, Waiting for Check, Waiting for Approval, Approved**.
 - **Mark as Checked** is the Manager - SCM step. **Approve** is the final step, with an optional approver note (for example "take approval from internal audit before purchasing").
 - **Send Back** returns it to the person who made it with a note saying what to fix; they correct it and send it again.
+- **Alerts.** Nobody has to ask for a check or approval. When a statement is sent for checking, everyone with the **Comparative Statement: Check** right gets an alert (the **Alerts** button, top right) that opens the statement. When it is checked, everyone with the **Approve** right gets one, and the person who made it is told. They are also told when it is approved or sent back.
 - The person who made a statement can never check or approve it. One person may do both the check and the approval if Admin gave them both.
 - **Cancel Statement** (with a reason) puts its items back on **To Purchase**. A statement that already has a purchase order cannot be cancelled until the PO is cancelled.
 
