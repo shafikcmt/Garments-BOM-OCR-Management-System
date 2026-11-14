@@ -727,3 +727,22 @@ it('shows a view-only Receiving user the history but not the entry form, import 
         ->assertSee('>Record Receiving</h5>', false)->assertSee('id="purchaseForm"', false)->assertSee('importReceivingModal', false)
         ->assertDontSee('Receiving summary');
 });
+
+it('alerts the checker, then the approver, then the maker as a CS moves along', function () {
+    $sheet = gpApproved([['T/N DPx5 FFG 18', 30]]);
+    $maker = gpUser(['store.purchase_cs.create'], 'Maker');
+    $checker = gpUser(['store.purchase_cs.review'], 'Checker');
+    $approver = gpUser(['store.purchase_cs.approve'], 'Approver');
+
+    test()->actingAs($maker)->post(route('store.purchasing.cs.store'), gpPayload($sheet->items, [[88, 85]]) + ['action' => 'submit'])->assertSessionHasNoErrors();
+    $cs = GsComparativeStatement::latest('id')->firstOrFail();
+
+    expect(\App\Models\AppNotification::where('user_id', $checker->id)->where('type', 'purchase_cs')->count())->toBe(1)
+        ->and(\App\Models\AppNotification::where('user_id', $approver->id)->count())->toBe(0);
+
+    test()->actingAs($checker)->post(route('store.purchasing.cs.check', $cs))->assertSessionHasNoErrors();
+    expect(\App\Models\AppNotification::where('user_id', $approver->id)->where('type', 'purchase_cs')->count())->toBe(1);
+
+    test()->actingAs($approver)->post(route('store.purchasing.cs.approve', $cs))->assertSessionHasNoErrors();
+    expect(\App\Models\AppNotification::where('user_id', $maker->id)->where('type', 'purchase_cs')->count())->toBe(2);
+});
