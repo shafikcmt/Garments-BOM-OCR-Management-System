@@ -47,7 +47,8 @@ return [
         'invoice_to' => "Humana Apparels Pvt. Ltd\nMomin Nagor, Gorai,\nMirzapur, Tangail",
         'consignee' => "Humana Apparels Pvt. Ltd\nMomin Nagor, Gorai, Mirzapur, Tangail",
         'destination' => 'Momin Nagor, Gorai, Tangail',
-        'bin_number' => env('PURCHASING_BIN_NUMBER', ''),
+        // Fixed company BIN: printed on every PO and not editable on screen.
+        'bin_number' => '0056353810406',
         'dispatched_through' => 'Vendor Transport',
         'payment_terms' => 'One month credit along with work order.',
         'delivery_terms' => "100% quality passed before delivery\nQuantity has to be ensured accurately",

@@ -52,7 +52,7 @@
                     </div>
                     <div class="col-6 col-md-3">
                         <label class="form-label" for="bin_number">BIN number</label>
-                        <input type="text" id="bin_number" name="bin_number" class="form-control" maxlength="60" value="{{ old('bin_number', $order->bin_number) }}">
+                        <input type="text" id="bin_number" class="form-control" value="{{ config('purchasing.po_defaults.bin_number') }}" readonly>
                     </div>
                     <div class="col-6 col-md-3">
                         <label class="form-label" for="dispatched_through">Dispatched through</label>
@@ -83,7 +83,7 @@
                 <div class="table-responsive">
                     <table class="table align-middle gx-stock-table">
                         <thead>
-                            <tr><th>Item</th><th class="text-end">Qty</th><th class="text-end">Rate</th><th class="text-end">Amount</th><th style="min-width:130px;">Due on</th><th style="min-width:200px;">Remarks</th></tr>
+                            <tr><th>Item</th><th class="text-end">Qty</th><th class="text-end">Rate</th><th class="text-end">Amount</th><th>Due on</th><th>Remarks</th></tr>
                         </thead>
                         <tbody>
                             @foreach($order->items as $line)
@@ -92,8 +92,8 @@
                                     <td class="text-end">{{ rtrim(rtrim(number_format((float) $line->qty, 4), '0'), '.') }}</td>
                                     <td class="text-end">{{ rtrim(rtrim(number_format((float) $line->rate, 4), '0'), '.') }}</td>
                                     <td class="text-end">{{ rtrim(rtrim(number_format((float) $line->amount, 2), '0'), '.') }}</td>
-                                    <td><input type="text" name="lines[{{ $line->id }}][due_on]" value="{{ old('lines.'.$line->id.'.due_on', $line->due_on) }}" class="form-control form-control-sm" maxlength="40" aria-label="Due on for {{ $line->item_name }}"></td>
-                                    <td><input type="text" name="lines[{{ $line->id }}][remarks]" value="{{ old('lines.'.$line->id.'.remarks', $line->remarks) }}" class="form-control form-control-sm" maxlength="500" aria-label="Remarks for {{ $line->item_name }}"></td>
+                                    <td>{{ $line->due_on }}</td>
+                                    <td>{{ $line->remarks }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

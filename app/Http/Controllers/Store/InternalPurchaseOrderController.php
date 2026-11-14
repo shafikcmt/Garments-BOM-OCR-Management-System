@@ -85,7 +85,6 @@ class InternalPurchaseOrderController extends Controller
         $data = $request->validate([
             'po_date' => ['required', 'date'],
             'reference_no' => ['nullable', 'string', 'max:100'],
-            'bin_number' => ['nullable', 'string', 'max:60'],
             'invoice_to' => ['nullable', 'string', 'max:1000'],
             'consignee' => ['nullable', 'string', 'max:1000'],
             'dispatched_through' => ['nullable', 'string', 'max:150'],
@@ -93,9 +92,6 @@ class InternalPurchaseOrderController extends Controller
             'payment_terms' => ['nullable', 'string', 'max:1000'],
             'delivery_terms' => ['nullable', 'string', 'max:1000'],
             'remarks' => ['nullable', 'string', 'max:1000'],
-            'lines' => ['nullable', 'array'],
-            'lines.*.due_on' => ['nullable', 'string', 'max:40'],
-            'lines.*.remarks' => ['nullable', 'string', 'max:500'],
         ]);
 
         $this->service->update($order, $data);
