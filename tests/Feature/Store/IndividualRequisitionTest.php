@@ -334,7 +334,7 @@ it('merges individual requisitions of one section at the Store step into the old
     $this->actingAs($clerk)->get(route('store.stock.requisitions.my-approvals'))
         ->assertOk()->assertDontSee('mergeIndividualForm', false);
     $this->actingAs($clerk)->post(route('store.stock.requisitions.merge-individual'), ['ids' => [$first->id, $second->id]])
-        ->assertSessionHasErrors(['ids' => 'Only the Store Head can merge individual requisitions.']);
+        ->assertSessionHasErrors(['ids' => 'Only the Store Head or Store Admin can merge individual requisitions.']);
 
     // The Store Head (Admin > Departments) does.
     $store = $this->approvers['store_head']->assignRole(Role::findOrCreate('store', 'web'));
@@ -374,4 +374,23 @@ it('refuses to merge individual requisitions of different sections', function ()
     $this->actingAs($store)->post(route('store.stock.requisitions.merge-individual'), ['ids' => [$a->id, $b->id]])
         ->assertSessionHasErrors('ids');
     expect($b->fresh()->merged_into_id)->toBeNull();
+});
+
+it('lets a Store Admin (Department Admin on the Store) merge individual requisitions too', function () {
+    [$head, $raiser] = indRaiser();
+    $a = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+    $b = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+    indApprove($head, $a);
+    indApprove($head, $b);
+
+    $storeAdmin = indUser('store', [], ['name' => 'Store Admin', 'is_department_admin' => true]);
+    expect(PurchaseRequisition::isStoreHead($storeAdmin))->toBeFalse()
+        ->and(PurchaseRequisition::canMergeIndividual($storeAdmin))->toBeTrue();
+
+    $this->actingAs($storeAdmin)->get(route('store.stock.requisitions.my-approvals'))
+        ->assertOk()->assertSee('Merge Selected');
+    $this->actingAs($storeAdmin)->post(route('store.stock.requisitions.merge-individual'), ['ids' => [$a->id, $b->id]])
+        ->assertSessionHasNoErrors();
+
+    expect($b->fresh()->merged_into_id)->toBe($a->id);
 });

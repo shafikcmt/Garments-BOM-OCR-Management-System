@@ -146,8 +146,8 @@
                 @php
                     $mergeable = $waiting->filter(fn ($r) => $r->isIndividual()
                         && $r->waitingStage?->stamp_source === \App\Models\RequisitionSignatureBlock::STAMP_STORE_HEAD);
-                    // The Store Head only.
-                    $canMergeIndividual = \App\Models\PurchaseRequisition::isStoreHead(auth()->user())
+                    // The Store Head or a Store Admin only.
+                    $canMergeIndividual = \App\Models\PurchaseRequisition::canMergeIndividual(auth()->user())
                         && $mergeable->groupBy(fn ($r) => $r->indent_section_id.'|'.$r->department_role)
                         ->contains(fn ($group) => $group->count() > 1);
                 @endphp

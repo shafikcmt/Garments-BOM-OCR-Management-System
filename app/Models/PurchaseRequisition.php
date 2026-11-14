@@ -1055,6 +1055,16 @@ class PurchaseRequisition extends Model
                 || self::isStoreHead($user));
     }
 
+    /**
+     * Who may merge Individual requisitions of one section: the Store Head on
+     * Admin > Departments, or a Store Admin (a Store user marked Department
+     * Admin on Users & Roles — shown as "Store Head" on their profile).
+     */
+    public static function canMergeIndividual(?User $user): bool
+    {
+        return self::isStoreHead($user) || StockItem::isStoreAdmin($user);
+    }
+
     /** The Store department head on Admin > Departments — Store, whatever their role. */
     public static function isStoreHead(?User $user): bool
     {

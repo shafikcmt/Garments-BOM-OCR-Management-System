@@ -813,10 +813,9 @@ class PurchaseRequisitionController extends Controller
     {
         $user = $request->user();
 
-        // The Store Head's decision (Admin > Departments, Store's head) — not
-        // every Store user's.
-        if (! PurchaseRequisition::isStoreHead($user)) {
-            return back()->withErrors(['ids' => 'Only the Store Head can merge individual requisitions.']);
+        // The Store Head's (or Store Admin's) decision — not every Store user's.
+        if (! PurchaseRequisition::canMergeIndividual($user)) {
+            return back()->withErrors(['ids' => 'Only the Store Head or Store Admin can merge individual requisitions.']);
         }
 
         $data = $request->validate([
