@@ -216,3 +216,22 @@ it('renders the requisition item lines with SKU badges and the one-row grid layo
 
     expect($html)->toContain('data-sku-labels')->toContain('gx-req-line-head');
 });
+
+it('keeps a Portal Access switch on when another switch sharing its permission is off', function () {
+    $admin = raiseAdmin();
+    Role::findOrCreate('merchant', 'web');
+    foreach (['store.purchase_cs.view', 'store.purchase_cs.review', 'store.purchase_cs.approve', 'store.purchase_po.view', 'store.purchase_po.review', 'store.purchase_po.approve', 'store.requisition.view', 'store.requisition.create'] as $p) {
+        \Spatie\Permission\Models\Permission::findOrCreate($p, 'web');
+    }
+    $user = User::factory()->create(['status' => 1])->assignRole('merchant');
+
+    $this->actingAs($admin)->put(route('admin.users.update', $user), [
+        'name' => $user->name, 'email' => $user->email, 'status' => 1, 'department' => 'merchandising', 'role' => 'merchant',
+        'portal_access_control' => 1, 'portal_access' => ['purchase_cs_approve' => 1],
+    ])->assertSessionHasNoErrors();
+
+    $user = $user->fresh();
+    expect($user->can('store.purchase_cs.approve'))->toBeTrue()
+        ->and($user->can('store.purchase_cs.view'))->toBeTrue()
+        ->and($user->can('store.purchase_po.view'))->toBeTrue();
+});
