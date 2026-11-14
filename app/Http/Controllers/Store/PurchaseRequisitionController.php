@@ -217,11 +217,21 @@ class PurchaseRequisitionController extends Controller
             'type' => ['nullable', 'in:'.PurchaseRequisition::TYPE_MONTHLY.','.PurchaseRequisition::TYPE_INDIVIDUAL],
         ]);
 
+        // Opens on the current month. "All months" posts an empty month, which
+        // is a choice, not a missing one.
+        if (! $request->has('month')) {
+            $filters['month'] = LocalTime::now()->format('Y-m');
+        }
+
         // Every filter except Monthly / Individual: the type tabs count against
         // this, so each tab shows how many of ITS kind match the rest.
         $base = PurchaseRequisition::query()
             ->fromDepartments()
-            ->when($filters['ready'] ?? false, fn ($q) => $q->readyToMerge())
+            // Ready to Merge: received Monthly sheets (into the Final), and
+            // Individual sheets waiting at the Store (into one another).
+            ->when($filters['ready'] ?? false, fn ($q) => $q->where(fn ($w) => $w
+                ->where(fn ($m) => $m->readyToMerge())
+                ->orWhere(fn ($i) => $i->individualAtStore())))
             ->when($filters['month'] ?? null, fn ($q, $month) => $q->forMonth($month))
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($filters['section'] ?? null, fn ($q, $id) => $q->where('indent_section_id', $id))
@@ -267,7 +277,12 @@ class PurchaseRequisitionController extends Controller
             'departmentReviewCount' => $this->departmentReviewCount($request->user()),
             // Step 4: received sheets waiting to go into a final sheet.
             'canMerge' => PurchaseRequisition::canMerge($request->user()),
-            'readyCount' => PurchaseRequisition::query()->fromDepartments()->readyToMerge()->count(),
+            'readyCount' => PurchaseRequisition::query()->fromDepartments()->readyToMerge()->count()
+                + PurchaseRequisition::query()->fromDepartments()->individualAtStore()->count(),
+            // Individual rows on this page the Store Head / Store Admin may merge.
+            'individualAtStore' => PurchaseRequisition::canMergeIndividual($request->user())
+                ? PurchaseRequisition::query()->whereIn('id', $requisitions->pluck('id'))->individualAtStore()->pluck('id')
+                : collect(),
         ]);
     }
 

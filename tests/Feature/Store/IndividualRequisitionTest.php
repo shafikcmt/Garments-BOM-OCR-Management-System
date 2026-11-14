@@ -233,13 +233,14 @@ it('splits the Requested queue and the main list into Monthly and Individual tab
     $clerk = indUser('store', ['store.requisition.create']);
 
     foreach (['store.stock.requisitions.requested', 'store.stock.requisitions.index'] as $route) {
-        $this->actingAs($clerk)->get(route($route))
+        // All months: the Requested queue opens on the current month.
+        $this->actingAs($clerk)->get(route($route, ['month' => '']))
             ->assertOk()->assertSee($monthly->requisition_no)->assertSee($individual->requisition_no)->assertSee('Individual');
 
-        $this->actingAs($clerk)->get(route($route, ['type' => 'individual']))
+        $this->actingAs($clerk)->get(route($route, ['type' => 'individual', 'month' => '']))
             ->assertOk()->assertSee($individual->requisition_no)->assertDontSee($monthly->requisition_no);
 
-        $this->actingAs($clerk)->get(route($route, ['type' => 'monthly']))
+        $this->actingAs($clerk)->get(route($route, ['type' => 'monthly', 'month' => '']))
             ->assertOk()->assertSee($monthly->requisition_no)->assertDontSee($individual->requisition_no);
     }
 });
@@ -395,4 +396,46 @@ it('lets a Store Admin (Department Admin on the Store) merge individual requisit
         ->assertSessionHasNoErrors();
 
     expect($b->fresh()->merged_into_id)->toBe($a->id);
+});
+
+it('lists individual sheets under Ready to Merge on Requested, and merges them there', function () {
+    [$head, $raiser] = indRaiser();
+    $make = function () use ($raiser) {
+        test()->actingAs($raiser)->post(route('store.stock.requisitions.store'), [
+            'action' => 'submit', 'mode' => PurchaseRequisition::MODE_MULTI, 'requisition_date' => now()->toDateString(),
+            'requisition_type' => 'individual',
+            'items' => [['stock_item_id' => StockItem::firstOrCreate(['name' => 'Machine Oil'], ['uom' => 'Ltr', 'is_active' => true])->id, 'qty_requested' => 2]],
+        ])->assertSessionHasNoErrors();
+
+        return PurchaseRequisition::latest('id')->firstOrFail();
+    };
+    $a = $make();
+    $b = $make();
+    indApprove($head, $a);
+    indApprove($head, $b);
+
+    $storeHead = $this->approvers['store_head']->assignRole(Role::findOrCreate('store', 'web'));
+    $this->actingAs($storeHead)->get(route('store.stock.requisitions.requested', ['ready' => 1]))
+        ->assertOk()
+        ->assertSee($a->requisition_no)->assertSee($b->requisition_no)
+        ->assertSee('mergeIndividualForm', false)->assertSee('Merge Individual');
+
+    $this->actingAs($storeHead)->post(route('store.stock.requisitions.merge-individual'), ['ids' => [$a->id, $b->id]])
+        ->assertSessionHasNoErrors();
+    expect($b->fresh()->merged_into_id)->toBe($a->id);
+});
+
+it('opens Requested on the current month, and All months on request', function () {
+    [$head, $raiser] = indRaiser();
+    $old = indRaise($raiser, PurchaseRequisition::TYPE_MONTHLY);   // dated 2026-10-05
+    indApprove($head, $old);
+    $store = indUser('store');
+
+    $this->actingAs($store)->get(route('store.stock.requisitions.requested'))
+        // (Read from the list rows: the flash from the head's approval names the sheet too.)
+        ->assertOk()->assertDontSee('text-slate-900">'.$old->requisition_no, false)
+        ->assertSee('value="'.now('Asia/Dhaka')->format('Y-m').'" selected', false);
+
+    $this->actingAs($store)->get(route('store.stock.requisitions.requested', ['month' => '']))
+        ->assertOk()->assertSee('text-slate-900">'.$old->requisition_no, false);
 });

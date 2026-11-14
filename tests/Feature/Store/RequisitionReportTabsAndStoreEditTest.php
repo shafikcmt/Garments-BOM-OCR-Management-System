@@ -235,7 +235,7 @@ it('offers Edit on the Requested queue', function () {
     $requisition = PurchaseRequisition::first();
 
     $this->actingAs(reportTabsUser())
-        ->get(route('store.stock.requisitions.requested'))
+        ->get(route('store.stock.requisitions.requested', ['month' => '']))
         ->assertOk()
         ->assertSee(route('store.stock.requisitions.edit', $requisition), false);
 });

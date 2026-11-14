@@ -594,6 +594,24 @@ class PurchaseRequisition extends Model
     }
 
     /**
+     * Individual sheets waiting at the Store's Received step, not merged —
+     * what the Store Head / Store Admin can merge into one (mergeIndividual).
+     */
+    public function scopeIndividualAtStore(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query->where($table.'.level', self::LEVEL_DEPARTMENT)
+            ->where($table.'.requisition_type', self::TYPE_INDIVIDUAL)
+            ->where($table.'.status', self::STATUS_SUBMITTED)
+            ->whereNull($table.'.merged_into_id')
+            ->whereHas('stages', fn ($s) => $s
+                ->where('purchase_requisition_stages.status', PurchaseRequisitionStage::STATUS_PENDING)
+                ->where('purchase_requisition_stages.stamp_source', RequisitionSignatureBlock::STAMP_STORE_HEAD)
+                ->whereColumn('purchase_requisition_stages.sequence', $table.'.current_stage'));
+    }
+
+    /**
      * Who may merge: whoever raises the final sheet (the Store side) and may
      * create requisitions — the same pair that opens the entry form for a
      * final sheet.

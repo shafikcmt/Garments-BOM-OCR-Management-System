@@ -125,6 +125,22 @@
                     </button>
                 </form>
             @endif
+            {{-- Individual sheets waiting at the Store: the Store Head or a
+                 Store Admin merges two or more into one (the oldest is kept). --}}
+            @php($individualPick = $individualAtStore->count() > 1 ? $individualAtStore : collect())
+            @if($individualPick->isNotEmpty())
+                <form id="mergeIndividualForm" method="POST" action="{{ route('store.stock.requisitions.merge-individual') }}"
+                      class="d-flex flex-wrap align-items-center gap-2 mb-3 px-3 py-2 border rounded bg-primary-subtle">
+                    @csrf
+                    <i class="bi bi-person-lines-fill text-primary" aria-hidden="true"></i>
+                    <span class="small"><strong>Merge Individual:</strong> tick two or more individual requisitions waiting at the Store to merge them into one.</span>
+                    <span class="small text-muted ms-auto" data-ind-count>0 selected</span>
+                    <button type="submit" class="btn btn-sm btn-primary" data-ind-submit disabled>
+                        <i class="bi bi-intersect me-1" aria-hidden="true"></i>Merge Individual
+                    </button>
+                </form>
+            @endif
+            @php($pickColumn = $mergeable->isNotEmpty() || $individualPick->isNotEmpty())
             @error('ids')
                 <div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ $message }}</div>
             @enderror
@@ -133,8 +149,8 @@
                 <table class="table align-middle gx-stock-table">
                     <thead>
                         <tr>
-                            @if($mergeable->isNotEmpty())
-                                <th style="width:40px;"><input type="checkbox" class="form-check-input" data-merge-all aria-label="Select all requisitions ready to merge"></th>
+                            @if($pickColumn)
+                                <th style="width:40px;">@if($mergeable->isNotEmpty())<input type="checkbox" class="form-check-input" data-merge-all aria-label="Select all requisitions ready to merge">@endif</th>
                             @endif
                             <th style="min-width:240px;">Requisition No</th>
                             <th style="min-width:110px;">Date</th>
@@ -149,9 +165,12 @@
                     <tbody>
                         @forelse($requisitions as $r)
                             <tr>
-                                @if($mergeable->isNotEmpty())
+                                @if($pickColumn)
                                     <td>
-                                        @if($r->isReadyToMerge())
+                                        @if($individualPick->contains($r->id))
+                                            <input type="checkbox" class="form-check-input" name="ids[]" value="{{ $r->id }}" form="mergeIndividualForm"
+                                                   data-ind-row aria-label="Select {{ $r->requisition_no }} to merge">
+                                        @elseif($mergeable->isNotEmpty() && $r->isReadyToMerge())
                                             <input type="checkbox" class="form-check-input" name="ids[]" value="{{ $r->id }}" form="mergeForm"
                                                    data-merge-row data-month="{{ optional($r->requisition_date)->format('Y-m') }}"
                                                    aria-label="Select {{ $r->requisition_no }} to merge">
@@ -210,7 +229,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="{{ $mergeable->isNotEmpty() ? 9 : 8 }}" class="gx-stock-empty">
+                            <tr><td colspan="{{ $pickColumn ? 9 : 8 }}" class="gx-stock-empty">
                                 <span class="gx-stock-empty-icon"><i class="bi bi-inbox" aria-hidden="true"></i></span>
                                 <div class="gx-stock-empty-title">{{ $hasFilters ? 'Nothing matches this filter' : 'No department requests yet' }}</div>
                                 <div class="gx-stock-empty-hint">{{ $hasFilters ? 'Try a different month or status.' : 'Requisitions raised outside the Store appear here as soon as they are submitted.' }}</div>
@@ -226,6 +245,22 @@
     @include('store.stock._searchable')
 </div>
 
+@if($individualPick->isNotEmpty())
+<script>
+    (function () {
+        const rows = Array.from(document.querySelectorAll('[data-ind-row]'));
+        const count = document.querySelector('[data-ind-count]');
+        const submit = document.querySelector('[data-ind-submit]');
+        function refresh() {
+            const n = rows.filter(r => r.checked).length;
+            count.textContent = n + ' selected';
+            submit.disabled = n < 2;
+        }
+        rows.forEach(r => r.addEventListener('change', refresh));
+        refresh();
+    })();
+</script>
+@endif
 @if($mergeable->isNotEmpty())
 <script>
     // Merge selection: one month at a time — ticking a sheet greys out the

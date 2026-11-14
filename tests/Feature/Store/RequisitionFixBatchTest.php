@@ -456,7 +456,7 @@ it('shows a Store clerk on another role what has reached the Store, their own sh
         ->assertOk()->assertSee('All Requisitions')->assertSee(route('store.stock.requisitions.requested'), false)
         ->assertSee('REACHED/1')->assertDontSee('DRAFT/1')->assertDontSee('HEAD/1');
 
-    $this->actingAs($clerk)->get(route('store.stock.requisitions.requested'))
+    $this->actingAs($clerk)->get(route('store.stock.requisitions.requested', ['month' => '']))
         ->assertOk()->assertSee('REACHED/1')->assertDontSee('HEAD/1');
 });
 
@@ -470,5 +470,5 @@ it('keeps a department user without the Store permission on their own sheets', f
     expect(PurchaseRequisition::worksStoreDesk($user))->toBeFalse()
         ->and(PurchaseRequisition::query()->visibleTo($user)->pluck('requisition_no')->all())->toBe(['MINE/1']);
 
-    $this->actingAs($user)->get(route('store.stock.requisitions.requested'))->assertForbidden();
+    $this->actingAs($user)->get(route('store.stock.requisitions.requested', ['month' => '']))->assertForbidden();
 });

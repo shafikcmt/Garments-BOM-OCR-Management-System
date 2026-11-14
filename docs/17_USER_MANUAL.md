@@ -707,11 +707,15 @@ A department or section raises one of two kinds of requisition. On the Purchase 
 
 Stock figures (Stock in Hand, Safety Stock) are shown to everyone who can open an **Individual** requisition. The Store can still correct quantities as before. Every department requisition shows a **Monthly** or **Individual** badge in the lists. Above the list on **Purchase Requisition** and **Requested**, three tabs - **All**, **Monthly** and **Individual** - show each kind on its own, with the number of requisitions in each. The kind is saved with the requisition, so the Category Summary shows Monthly and Individual sheets separately.
 
+**The Requested page opens on the current month.** Choose **All months** in the Month filter to see every month.
+
 **Merging Individual requisitions.** When several Individual requisitions are waiting, the **Store Head** or a **Store Admin** (a Store user marked Department Admin on Users & Roles) can join them into one before receiving them. Other Store users do not see this option.
 
 1. Open **Purchase Requisition > My Approvals**.
 2. Tick two or more **Individual** requisitions waiting at **Received by (Store)**. They can be from the same section or from different sections and departments. A tick box shows only on these rows.
 3. Press **Merge Selected**.
+
+You can also do this on **Purchase Requisition > Requested**: press **Ready to Merge**, which now lists the Individual requisitions waiting at the Store as well as the received Monthly ones. Tick two or more Individual rows and press **Merge Individual**.
 
 The oldest requisition is kept. The items of the others are added to it, and the same item is shown once with the quantities added up. The kept requisition then goes on as before: **Received by Store**, Finance & Commercial Head, Operation Head. The other requisitions show **Merged** and a link to the kept one.  Each item keeps its own **User Dept./ Section**, so you can still see which section asked for it.
 

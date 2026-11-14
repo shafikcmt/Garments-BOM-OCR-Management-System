@@ -108,7 +108,7 @@ it('sends a department submission to its department head, not to the Store', fun
 
     // Not on the Store's queue yet.
     $this->actingAs(storeReviewer())
-        ->get(route('store.stock.requisitions.requested'))
+        ->get(route('store.stock.requisitions.requested', ['month' => '']))
         ->assertOk()
         ->assertDontSee($requisition->requisition_no);
 
@@ -128,7 +128,7 @@ it('goes straight to the Store when the department has no head configured', func
         ->and($requisition->awaitingStoreReceipt())->toBeTrue();
 
     $this->actingAs(storeReviewer())
-        ->get(route('store.stock.requisitions.requested'))
+        ->get(route('store.stock.requisitions.requested', ['month' => '']))
         ->assertSee($requisition->requisition_no);
 });
 
@@ -160,7 +160,7 @@ it('lets the department head approve, which hands the sheet to the Store', funct
         ->and($requisition->awaitingStoreReceipt())->toBeTrue();
 
     $this->actingAs(storeReviewer())
-        ->get(route('store.stock.requisitions.requested'))
+        ->get(route('store.stock.requisitions.requested', ['month' => '']))
         ->assertSee($requisition->requisition_no);
 });
 
@@ -355,7 +355,7 @@ it('leaves a pre-migration requisition (NULL department review) on the Store que
 
     $store = storeReviewer();
     $this->actingAs($store)
-        ->get(route('store.stock.requisitions.requested'))
+        ->get(route('store.stock.requisitions.requested', ['month' => '']))
         ->assertSee($legacy->requisition_no);
 
     $this->actingAs($store)
