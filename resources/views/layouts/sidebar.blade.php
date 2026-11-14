@@ -115,7 +115,28 @@
     // inside its own Store group instead, hence the own-block exclusion.
     $seePurchaseCs = $storeUser?->can('store.purchase_cs.view') ?? false;
     $seePurchasePo = $storeUser?->can('store.purchase_po.view') ?? false;
-    $seePurchasing = ! $hasOwnSidebarBlock && ($seePurchaseCs || $seePurchasePo);
+    // Only Admin is excluded: its own Store group already lists these screens. Every
+    // other role (Merchant, Account, Commercial, Supply Chain, Management) has a block of
+    // its own that does NOT, so a person given a purchasing right there needs this section.
+    $seePurchasing = ! ($storeUser?->hasRole('admin') ?? false) && ($seePurchaseCs || $seePurchasePo);
+
+    // What is waiting on THIS person, shown as a badge so nobody has to open each list.
+    $csWaiting = 0;
+    $poWaiting = 0;
+    if ($seePurchasing && $storeUser) {
+        $csWaiting = \App\Models\GsComparativeStatement::query()->where('prepared_by', '<>', $storeUser->id)
+            ->where(fn ($q) => $q
+                ->when($storeUser->can('store.purchase_cs.review'), fn ($w) => $w->orWhere('status', \App\Models\GsComparativeStatement::STATUS_SUBMITTED))
+                ->when($storeUser->can('store.purchase_cs.approve'), fn ($w) => $w->orWhere('status', \App\Models\GsComparativeStatement::STATUS_CHECKED)))
+            ->when(! $storeUser->can('store.purchase_cs.review') && ! $storeUser->can('store.purchase_cs.approve'), fn ($q) => $q->whereRaw('1 = 0'))
+            ->count();
+        $poWaiting = \App\Models\GsPurchaseOrder::query()
+            ->where(fn ($q) => $q
+                ->when($storeUser->can('store.purchase_po.review'), fn ($w) => $w->orWhere(fn ($d) => $d->where('status', \App\Models\GsPurchaseOrder::STATUS_DRAFT)->where('created_by', '<>', $storeUser->id)))
+                ->when($storeUser->can('store.purchase_po.approve'), fn ($w) => $w->orWhere(fn ($c) => $c->where('status', \App\Models\GsPurchaseOrder::STATUS_CHECKED)->where('created_by', '<>', $storeUser->id)->where('checked_by', '<>', $storeUser->id))))
+            ->when(! $storeUser->can('store.purchase_po.review') && ! $storeUser->can('store.purchase_po.approve'), fn ($q) => $q->whereRaw('1 = 0'))
+            ->count();
+    }
 @endphp
 
 <nav class="sidebar" id="appSidebar" aria-label="Main sidebar navigation">
@@ -621,6 +642,7 @@
                     <li class="sidebar-item">
                         <a href="{{ route('store.purchasing.cs.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.purchasing.cs.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-columns-gap" aria-hidden="true"></i></span><span class="sidebar-link-text">Comparative Statement</span></span>
+                            @if($csWaiting > 0)<span class="badge rounded-pill bg-danger">{{ $csWaiting > 99 ? '99+' : $csWaiting }}</span>@endif
                         </a>
                     </li>
                     @endif
@@ -628,6 +650,7 @@
                     <li class="sidebar-item">
                         <a href="{{ route('store.purchasing.po.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.purchasing.po.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Internal PO</span></span>
+                            @if($poWaiting > 0)<span class="badge rounded-pill bg-danger">{{ $poWaiting > 99 ? '99+' : $poWaiting }}</span>@endif
                         </a>
                     </li>
                     @endif
