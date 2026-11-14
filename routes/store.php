@@ -456,6 +456,10 @@ Route::prefix('store')
 
             // Step 4: received department sheets merged into the Store's final
             // sheet. A fixed path, so declared above /{requisition}.
+            // Several individual sheets of one section, merged into the oldest
+            // at the Store's Received step (My Approvals).
+            Route::post('/requisitions/merge-individual', [PurchaseRequisitionController::class, 'mergeIndividual'])
+                ->name('requisitions.merge-individual');
             Route::post('/requisitions/merge', [PurchaseRequisitionController::class, 'merge'])
                 ->middleware($act('store.requisition.create|store.requisition.final'))->name('requisitions.merge');
             // The review before it: every merged item with its stock, for the

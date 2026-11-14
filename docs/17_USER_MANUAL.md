@@ -707,6 +707,14 @@ A department or section raises one of two kinds of requisition. On the Purchase 
 
 Stock figures (Stock in Hand, Safety Stock) are shown to everyone who can open an **Individual** requisition. The Store can still correct quantities as before. Every department requisition shows a **Monthly** or **Individual** badge in the lists. Above the list on **Purchase Requisition** and **Requested**, three tabs - **All**, **Monthly** and **Individual** - show each kind on its own, with the number of requisitions in each. The kind is saved with the requisition, so the Category Summary shows Monthly and Individual sheets separately.
 
+**Merging Individual requisitions of one section.** When a section sends several Individual requisitions, the **Store Head** can join them into one before receiving them. Other Store users do not see this option.
+
+1. Open **Purchase Requisition > My Approvals**.
+2. Tick two or more **Individual** requisitions of the **same section** that are waiting at **Received by (Store)**. A tick box shows only on these rows.
+3. Press **Merge Selected**.
+
+The oldest requisition is kept. The items of the others are added to it, and the same item is shown once with the quantities added up. The kept requisition then goes on as before: **Received by Store**, Finance & Commercial Head, Operation Head. The other requisitions show **Merged** and a link to the kept one. Requisitions of different sections cannot be merged together.
+
 **Stock is checked again when the Store receives a requisition.** Stock can change between the day a requisition is raised and the day the Store receives it. When the Store presses **Received**, the system reads today's **Stock in Hand** and **Safety Stock** for every item and works out **To Be Procured** and **Amount** again. Example: 2 requested with 4 in stock showed 0 to buy; if the item is out of stock when the Store receives it, it now shows 2 to buy. Quantity requested and rate do not change. A note under the items says the day the stock was updated.
 
 **Requested By and Raised By.** The requisition list shows **Raised By** first, then **Requested By**, in the order it happens. **Raised By** is the person who entered the requisition in the system. **Requested By** is always the head it then goes to (the section head, or the department head when the section has none).

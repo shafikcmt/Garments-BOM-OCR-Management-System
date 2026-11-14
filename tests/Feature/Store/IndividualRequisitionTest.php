@@ -310,3 +310,68 @@ it('updates Stock in Hand and To Be Procured when the Store receives the sheet',
         ->and((float) $line->to_be_procured_qty)->toBe(5.0)
         ->and((float) $line->amount)->toBe(500.0);
 });
+
+it('merges individual requisitions of one section at the Store step into the oldest', function () {
+    [$head, $raiser] = indRaiser();
+    $oil = StockItem::create(['name' => 'Machine Oil', 'uom' => 'Ltr', 'is_active' => true]);
+    $tape = StockItem::create(['name' => 'Tape', 'uom' => 'Roll', 'is_active' => true]);
+
+    $raise = function (array $lines) use ($raiser) {
+        test()->actingAs($raiser)->post(route('store.stock.requisitions.store'), [
+            'action' => 'submit', 'mode' => PurchaseRequisition::MODE_MULTI, 'requisition_date' => '2026-10-05',
+            'requisition_type' => 'individual', 'items' => $lines,
+        ])->assertSessionHasNoErrors();
+
+        return PurchaseRequisition::latest('id')->firstOrFail();
+    };
+    $first = $raise([['stock_item_id' => $oil->id, 'qty_requested' => 5]]);
+    $second = $raise([['stock_item_id' => $oil->id, 'qty_requested' => 3], ['stock_item_id' => $tape->id, 'qty_requested' => 2]]);
+    indApprove($head, $first);
+    indApprove($head, $second);
+
+    // A Store clerk sees no merge, and is refused if they try.
+    $clerk = indUser('store', [], ['name' => 'Store Clerk']);
+    $this->actingAs($clerk)->get(route('store.stock.requisitions.my-approvals'))
+        ->assertOk()->assertDontSee('mergeIndividualForm', false);
+    $this->actingAs($clerk)->post(route('store.stock.requisitions.merge-individual'), ['ids' => [$first->id, $second->id]])
+        ->assertSessionHasErrors(['ids' => 'Only the Store Head can merge individual requisitions.']);
+
+    // The Store Head (Admin > Departments) does.
+    $store = $this->approvers['store_head']->assignRole(Role::findOrCreate('store', 'web'));
+    $this->actingAs($store)->get(route('store.stock.requisitions.my-approvals'))
+        ->assertOk()->assertSee('mergeIndividualForm', false)->assertSee('Merge Selected');
+
+    $this->actingAs($store)->post(route('store.stock.requisitions.merge-individual'), ['ids' => [$first->id, $second->id]])
+        ->assertSessionHasNoErrors()->assertRedirect(route('store.stock.requisitions.show', $first));
+
+    $first->refresh();
+    $second->refresh();
+    expect($first->items()->orderBy('id')->get()->mapWithKeys(fn ($l) => [$l->stockItem->name => (float) $l->qty_requested])->all())
+        ->toBe(['Machine Oil' => 8.0, 'Tape' => 2.0])
+        ->and($second->merged_into_id)->toBe($first->id)
+        ->and($second->progressLabel())->toBe('Merged')
+        ->and($first->mergedSources->pluck('id')->all())->toBe([$second->id]);
+
+    // Only the kept sheet still waits at the Store; it carries on as before.
+    $waiting = app(\App\Services\RequisitionWorkflow::class)->waitingFor($store)->pluck('id')->all();
+    expect($waiting)->toBe([$first->id]);
+    indApprove($store, $first)->assertSessionHasNoErrors();
+    expect($first->fresh()->progressLabel())->toBe('With Finance & Commercial Head');
+});
+
+it('refuses to merge individual requisitions of different sections', function () {
+    [$head, $raiser] = indRaiser();
+    $otherHead = indUser('production', [], ['name' => 'Sewing Head']);
+    $sewing = IndentSection::create(['name' => 'Sewing', 'department_key' => 'production', 'head_user_id' => $otherHead->id, 'is_active' => true]);
+    $sewer = indUser('production', ['store.requisition.create'], ['name' => 'Sewing Raiser', 'requisition_section_id' => $sewing->id]);
+
+    $a = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+    $b = indRaise($sewer, PurchaseRequisition::TYPE_INDIVIDUAL);
+    indApprove($head, $a);
+    indApprove($otherHead, $b);
+
+    $store = $this->approvers['store_head']->assignRole(Role::findOrCreate('store', 'web'));
+    $this->actingAs($store)->post(route('store.stock.requisitions.merge-individual'), ['ids' => [$a->id, $b->id]])
+        ->assertSessionHasErrors('ids');
+    expect($b->fresh()->merged_into_id)->toBeNull();
+});

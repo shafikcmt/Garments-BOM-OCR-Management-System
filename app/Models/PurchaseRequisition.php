@@ -844,7 +844,7 @@ class PurchaseRequisition extends Model
         }
 
         if ($this->isMerged() && $this->status === self::STATUS_STORE_REVIEWED) {
-            return 'Merged into Final';
+            return $this->isIndividual() ? 'Merged' : 'Merged into Final';
         }
 
         // A final sheet on its way through the approvals names the stage it

@@ -799,6 +799,107 @@ class PurchaseRequisitionController extends Controller
     }
 
     /**
+     * Merge several INDIVIDUAL requisitions of one section into one.
+     *
+     * Offered on My Approvals to the Store HEAD only, for individual sheets waiting at
+     * the Store's Received step. The oldest sheet is kept: the others' items
+     * are added to it (one line per item, quantities added up) and it carries
+     * on through Received → Finance → Operation as before. The others are
+     * closed as "Merged" and point to it, so nothing is counted twice.
+     *
+     * Only sheets of the SAME section and department can be merged.
+     */
+    public function mergeIndividual(Request $request)
+    {
+        $user = $request->user();
+
+        // The Store Head's decision (Admin > Departments, Store's head) — not
+        // every Store user's.
+        if (! PurchaseRequisition::isStoreHead($user)) {
+            return back()->withErrors(['ids' => 'Only the Store Head can merge individual requisitions.']);
+        }
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:2'],
+            'ids.*' => ['integer', 'distinct'],
+        ], [
+            'ids.required' => 'Tick at least two individual requisitions to merge.',
+            'ids.min' => 'Tick at least two individual requisitions to merge.',
+        ]);
+
+        // Only what is waiting for THIS user at the Store's Received step.
+        $waiting = $this->workflow->waitingFor($user)
+            ->filter(fn (PurchaseRequisition $r) => $r->isIndividual()
+                && $r->waitingStage?->stamp_source === \App\Models\RequisitionSignatureBlock::STAMP_STORE_HEAD)
+            ->keyBy('id');
+
+        $notWaiting = collect($data['ids'])->reject(fn ($id) => $waiting->has($id));
+        if ($notWaiting->isNotEmpty()) {
+            return back()->withErrors(['ids' => 'Only individual requisitions waiting for you at the Store step can be merged. Reload the page and try again.']);
+        }
+
+        $picked = $waiting->only($data['ids']);
+        $groups = $picked->groupBy(fn (PurchaseRequisition $r) => $r->indent_section_id.'|'.$r->department_role);
+        if ($groups->count() > 1) {
+            return back()->withErrors(['ids' => 'Merge requisitions of one section at a time. The selection covers '
+                .$picked->map(fn ($r) => $r->indentSection?->name ?: $r->departmentLabel())->unique()->implode(', ').'.']);
+        }
+
+        $target = DB::transaction(function () use ($data, $user) {
+            $sheets = PurchaseRequisition::whereIn('id', array_map('intval', $data['ids']))
+                ->orderBy('submitted_at')->orderBy('id')
+                ->lockForUpdate()->get();
+
+            $target = $sheets->first();
+            $others = $sheets->slice(1)->values();
+
+            $lines = $this->mergeSourceLines($sheets);
+            if ($lines === []) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['ids' => 'The selected requisitions have no quantities to merge.']);
+            }
+
+            // One line per item, figures recalculated from today's stock.
+            $this->syncItems($target, $lines, Carbon::parse($target->requisition_date));
+
+            $note = 'Merged with '.$others->pluck('requisition_no')->implode(', ').'.';
+            $target->forceFill(['remarks' => trim(($target->remarks ? $target->remarks.' ' : '').$note)])->save();
+
+            foreach ($others as $other) {
+                $other->forceFill([
+                    'merged_into_id' => $target->id,
+                    'merged_at' => now(),
+                    'merged_by' => $user->id,
+                    // Closed: it no longer waits at any stage.
+                    'status' => PurchaseRequisition::STATUS_STORE_REVIEWED,
+                    'store_ack_by' => $user->id,
+                    'store_ack_at' => now(),
+                    'current_stage' => null,
+                ])->save();
+
+                $this->history->record($other, PurchaseRequisitionAction::MERGED, [
+                    'stage' => PurchaseRequisitionAction::STAGE_STORE,
+                    'from' => PurchaseRequisition::STATUS_SUBMITTED,
+                    'comment' => 'Merged into individual requisition '.$target->requisition_no.'.',
+                    'meta' => ['merged_into' => $target->requisition_no],
+                ]);
+            }
+
+            $this->history->record($target, PurchaseRequisitionAction::MERGED, [
+                'stage' => PurchaseRequisitionAction::STAGE_STORE,
+                'comment' => $note,
+                'meta' => ['sources' => $others->pluck('requisition_no')->all()],
+            ]);
+
+            return $target;
+        });
+
+        return redirect()
+            ->route('store.stock.requisitions.show', $target)
+            ->with('success', count($data['ids']).' individual requisitions merged into '.$target->requisition_no
+                .'. Check the items, then mark it Received.');
+    }
+
+    /**
      * Every item line of the sheets being merged, in the shape the Final
      * sheet is written from. Lines an approver set to 0 are left out.
      *
