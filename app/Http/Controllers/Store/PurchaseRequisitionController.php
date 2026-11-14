@@ -799,7 +799,8 @@ class PurchaseRequisitionController extends Controller
     }
 
     /**
-     * Merge several INDIVIDUAL requisitions of one section into one.
+     * Merge several INDIVIDUAL requisitions into one — of one section or of
+     * several.
      *
      * Offered on My Approvals to the Store HEAD only, for individual sheets waiting at
      * the Store's Received step. The oldest sheet is kept: the others' items
@@ -807,7 +808,9 @@ class PurchaseRequisitionController extends Controller
      * on through Received → Finance → Operation as before. The others are
      * closed as "Merged" and point to it, so nothing is counted twice.
      *
-     * Only sheets of the SAME section and department can be merged.
+     * Sheets of different sections or departments may be merged; each line
+     * keeps its own User Dept./ Section, and the kept sheet's header (section,
+     * requester, approvers) carries the merged one.
      */
     public function mergeIndividual(Request $request)
     {
@@ -837,12 +840,8 @@ class PurchaseRequisitionController extends Controller
             return back()->withErrors(['ids' => 'Only individual requisitions waiting for you at the Store step can be merged. Reload the page and try again.']);
         }
 
-        $picked = $waiting->only($data['ids']);
-        $groups = $picked->groupBy(fn (PurchaseRequisition $r) => $r->indent_section_id.'|'.$r->department_role);
-        if ($groups->count() > 1) {
-            return back()->withErrors(['ids' => 'Merge requisitions of one section at a time. The selection covers '
-                .$picked->map(fn ($r) => $r->indentSection?->name ?: $r->departmentLabel())->unique()->implode(', ').'.']);
-        }
+        // Any sections or departments may be merged together (owner,
+        // 2026-11-14); each item keeps its User Dept./ Section.
 
         $target = DB::transaction(function () use ($data, $user) {
             $sheets = PurchaseRequisition::whereIn('id', array_map('intval', $data['ids']))

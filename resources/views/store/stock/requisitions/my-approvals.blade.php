@@ -141,22 +141,20 @@
                     <span class="text-muted small">Oldest first.</span>
                 </div>
                 {{-- Individual requisitions waiting at the Store's Received step
-                     can be merged, several of ONE section into one. The
+                     can be merged into one, from any section. The
                      checkboxes post this form through form="". --}}
                 @php
                     $mergeable = $waiting->filter(fn ($r) => $r->isIndividual()
                         && $r->waitingStage?->stamp_source === \App\Models\RequisitionSignatureBlock::STAMP_STORE_HEAD);
                     // The Store Head or a Store Admin only.
-                    $canMergeIndividual = \App\Models\PurchaseRequisition::canMergeIndividual(auth()->user())
-                        && $mergeable->groupBy(fn ($r) => $r->indent_section_id.'|'.$r->department_role)
-                        ->contains(fn ($group) => $group->count() > 1);
+                    $canMergeIndividual = \App\Models\PurchaseRequisition::canMergeIndividual(auth()->user()) && $mergeable->count() > 1;
                 @endphp
                 @if($canMergeIndividual)
                     <form id="mergeIndividualForm" method="POST" action="{{ route('store.stock.requisitions.merge-individual') }}"
                           class="d-flex flex-wrap align-items-center gap-2 mb-3 px-3 py-2 border rounded bg-info-subtle">
                         @csrf
                         <i class="bi bi-intersect text-info-emphasis" aria-hidden="true"></i>
-                        <span class="small"><strong>Merge:</strong> tick two or more individual requisitions of the same section to merge them into one.</span>
+                        <span class="small"><strong>Merge:</strong> tick two or more individual requisitions to merge them into one.</span>
                         <span class="small text-muted ms-auto" data-merge-count>0 selected</span>
                         <button type="submit" class="btn btn-sm btn-info" data-merge-submit disabled>
                             <i class="bi bi-intersect me-1" aria-hidden="true"></i>Merge Selected

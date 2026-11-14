@@ -359,7 +359,7 @@ it('merges individual requisitions of one section at the Store step into the old
     expect($first->fresh()->progressLabel())->toBe('With Finance & Commercial Head');
 });
 
-it('refuses to merge individual requisitions of different sections', function () {
+it('merges individual requisitions of different sections, each line keeping its section', function () {
     [$head, $raiser] = indRaiser();
     $otherHead = indUser('production', [], ['name' => 'Sewing Head']);
     $sewing = IndentSection::create(['name' => 'Sewing', 'department_key' => 'production', 'head_user_id' => $otherHead->id, 'is_active' => true]);
@@ -372,8 +372,10 @@ it('refuses to merge individual requisitions of different sections', function ()
 
     $store = $this->approvers['store_head']->assignRole(Role::findOrCreate('store', 'web'));
     $this->actingAs($store)->post(route('store.stock.requisitions.merge-individual'), ['ids' => [$a->id, $b->id]])
-        ->assertSessionHasErrors('ids');
-    expect($b->fresh()->merged_into_id)->toBeNull();
+        ->assertSessionHasNoErrors();
+    expect($b->fresh()->merged_into_id)->toBe($a->id)
+        // One item asked by both sections: one line, both sections named.
+        ->and($a->fresh()->items()->pluck('user_dept')->implode(' '))->toContain('Cutting')->toContain('Sewing');
 });
 
 it('lets a Store Admin (Department Admin on the Store) merge individual requisitions too', function () {
