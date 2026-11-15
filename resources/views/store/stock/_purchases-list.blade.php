@@ -69,7 +69,12 @@
                 </div>
             @endif
 
-            <div class="table-responsive">
+            {{-- gx-stock-scroll: the table scrolls inside a box capped at 72vh, so
+                 the sideways scrollbar sits at the bottom of the screen instead
+                 of below all 25 rows, and the header row stays pinned. Without
+                 it the bar was out of sight and Edit / Remove (the last column)
+                 looked missing. --}}
+            <div class="table-responsive gx-stock-scroll">
                 <table class="table align-middle gx-stock-table">
                     <thead>
                         <tr>
