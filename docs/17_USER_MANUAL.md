@@ -853,6 +853,8 @@ Sending for checking needs at least 2 suppliers and a priced supplier chosen on 
 
 **Dashboard.** On **General Stock, Dashboard** anyone who can open Comparative Statements or Internal POs sees a **Purchasing** panel above the stock figures: items waiting to be purchased, statements waiting for check or approval, POs waiting for check or authorising, POs open for receiving, a chart of statements and of POs by stage, the ordered value per month, the waiting items by category (click a category to open it on To Purchase) and the latest POs. Each tile opens the list it counts.
 
+**Correcting a receiving.** In **Purchase History** each item line has an **Edit** button (Store, Admin and Management). It opens the line so you can change the Qty, Unit Price and Remarks, and the RCV Date and Supplier. RCV Date and Supplier are shared by every item on the same GRN, so a change there reaches all of them. GRN No, Challan No and Challan Date are locked. Qty cannot be set below what has already been issued. **Remove** stays with Admin and Management.
+
 **Checking Receiving without entering it.** A person who has only the **Receiving: View** right opens **General Stock, Receiving** and sees a **Receiving summary** (deliveries, items, value, suppliers and POs awaiting delivery this month) and the full **Purchase History** to check. The **Record Receiving** form, **Import** and drafts are hidden; they appear for people with the **Create / Entry** right (and for the Store, Admin and Management roles).
 
 **Who can do what (Admin).** Admin sets this in **Admin, Users, Portal Access** (or the permission list under **General Stock**):
