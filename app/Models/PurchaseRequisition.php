@@ -956,7 +956,7 @@ class PurchaseRequisition extends Model
             return $query->whereRaw('1 = 0');
         }
 
-        if (self::seesEveryRequisition($user)) {
+        if (self::seesWholeCompanyIncludingDrafts($user)) {
             return $query;
         }
 
@@ -1004,7 +1004,7 @@ class PurchaseRequisition extends Model
             return false;
         }
 
-        if (self::seesEveryRequisition($user) || $this->created_by === $user->id) {
+        if (self::seesWholeCompanyIncludingDrafts($user) || $this->created_by === $user->id) {
             return true;
         }
 
@@ -1023,6 +1023,21 @@ class PurchaseRequisition extends Model
         return in_array(RequisitionDepartmentHead::normalizeKey($this->department_role), RequisitionDepartmentHead::departmentsHeadedBy($user), true)
             || ($this->indent_section_id !== null
                 && in_array($this->indent_section_id, RequisitionDepartmentHead::sectionsHeadedBy($user), true));
+    }
+
+    /**
+     * Admin and Management read every sheet, including other people's drafts
+     * and sheets still with their section head.
+     *
+     * The Store side (store role, or store.requisition.final) does NOT. A
+     * requisition is the Store's business only once it has been submitted and,
+     * for a department sheet, accepted by its section head (reachedStore());
+     * before that it belongs to whoever raised it. The Store still sees its own
+     * drafts (created_by) and anything it is named on.
+     */
+    public static function seesWholeCompanyIncludingDrafts(User $user): bool
+    {
+        return $user->hasAnyRole(['admin', 'management']);
     }
 
     /**

@@ -857,6 +857,8 @@ Sending for checking needs at least 2 suppliers and a priced supplier chosen on 
 
 **Why Remove still shows after I untick Receiving, Delete.** On **Users & Roles** the **Whole module** row (View, Edit, Delete...) covers every section of General Stock at once. While **Whole module, Delete** is ticked, the user can still remove receiving lines even if **Receiving, Delete** is empty. That empty box is now shown in amber as **Delete (via Whole module)** to say so. To stop it: untick **Whole module, Delete**, then tick **Delete** on only the sections that should keep it (for example Items and Issues). The same applies to **Edit**.
 
+**Who can see a requisition before it is submitted.** A requisition kept as **Draft** is private to the person who raised it (Admin and Management can still see it). It does not appear in the Store's list, **Requested** queue or counts. A department requisition also stays out of the Store until the section head has checked and accepted it; it appears for the Store only after that. The Store always sees the requisitions it raised itself.
+
 **Checking Receiving without entering it.** A person who has only the **Receiving: View** right opens **General Stock, Receiving** and sees a **Receiving summary** (deliveries, items, value, suppliers and POs awaiting delivery this month) and the full **Purchase History** to check. The **Record Receiving** form, **Import** and drafts are hidden; they appear for people with the **Create / Entry** right (and for the Store, Admin and Management roles).
 
 **Who can do what (Admin).** Admin sets this in **Admin, Users, Portal Access** (or the permission list under **General Stock**):
