@@ -352,6 +352,8 @@
     .gx-perm-chip.is-inherited { border-color: #e2e8f0; background: #f1f5f9; color: #64748b; }
     .gx-perm-chip.is-inherited .gx-perm-mark { background: #94a3b8; border-color: #94a3b8; color: #fff; }
 
+    /* Empty box, but the Whole module box covers it, so the user can still do it. */
+    .gx-perm-chip.is-covered { border-color: #fcd34d; background: #fffbeb; color: #92400e; }
     .gx-perm-chip.is-locked { cursor: not-allowed; }
     .gx-perm-chip.is-open:hover { border-color: var(--gx-secondary, #3B82F6); color: #1d4ed8; }
 

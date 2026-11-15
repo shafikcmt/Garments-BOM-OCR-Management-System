@@ -855,6 +855,8 @@ Sending for checking needs at least 2 suppliers and a priced supplier chosen on 
 
 **Correcting a receiving.** In **Purchase History** each item line has an **Edit** button (Store, Admin and Management). It opens the line so you can change the Qty, Unit Price and Remarks, and the RCV Date and Supplier. RCV Date and Supplier are shared by every item on the same GRN, so a change there reaches all of them. GRN No, Challan No and Challan Date are locked. Qty cannot be set below what has already been issued. **Remove** stays with Admin and Management.
 
+**Why Remove still shows after I untick Receiving, Delete.** On **Users & Roles** the **Whole module** row (View, Edit, Delete...) covers every section of General Stock at once. While **Whole module, Delete** is ticked, the user can still remove receiving lines even if **Receiving, Delete** is empty. That empty box is now shown in amber as **Delete (via Whole module)** to say so. To stop it: untick **Whole module, Delete**, then tick **Delete** on only the sections that should keep it (for example Items and Issues). The same applies to **Edit**.
+
 **Checking Receiving without entering it.** A person who has only the **Receiving: View** right opens **General Stock, Receiving** and sees a **Receiving summary** (deliveries, items, value, suppliers and POs awaiting delivery this month) and the full **Purchase History** to check. The **Record Receiving** form, **Import** and drafts are hidden; they appear for people with the **Create / Entry** right (and for the Store, Admin and Management roles).
 
 **Who can do what (Admin).** Admin sets this in **Admin, Users, Portal Access** (or the permission list under **General Stock**):
