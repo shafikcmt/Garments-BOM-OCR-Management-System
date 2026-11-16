@@ -28,7 +28,7 @@
     .cs-sheet .ctrl td { font-size: 8px; padding: 2px 5px; white-space: nowrap; }
     .cs-sheet .box { border: 1px solid #555; padding: 6px 8px; min-height: 46px; }
     .cs-sheet .sig td { border: 0; text-align: center; vertical-align: bottom; width: 33%; padding-top: 22px; }
-    .cs-sheet .sig .line { border-top: 1px solid #111; padding-top: 3px; font-weight: bold; }
+    .cs-sheet .sig .line { display: inline-block; border-top: 1px solid #111; padding: 3px 2px 0; font-weight: bold; }
     .cs-sheet .sig .who { font-size: 8px; min-height: 22px; }
     .cs-sheet .muted { color: #666; }
 </style>
