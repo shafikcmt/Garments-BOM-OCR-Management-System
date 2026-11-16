@@ -66,6 +66,57 @@ It answers "what needs my attention today" for the buyers you look after. A merc
 
 The numbers come from the same place as **Style Status** (section 2.4), so both screens always agree. If the dashboard says "No orders are linked yet", import the buyer's Excel or create a BOM first (sections 2.2 and 2.2a).
 
+### 2.0a Your menu at a glance
+
+What each item on the left menu is for, in the order you use them. Some items appear only if your role or permissions allow them.
+
+**Start of the day**
+
+| Menu | What it is for |
+|---|---|
+| **Dashboard** | What needs your attention today: late bookings, PI and payment pending, shipments due, follow-ups (section 2.0). |
+| **My Approvals** | Purchase requisitions waiting for **your** approval, with a red count. Press Approve, or Return with a note. Shown only if you are an approver or may see requisitions. |
+| **Follow-ups** | Your to-do list: tasks given to you (by a TnA plan, a meeting or another person) with red / amber / green dates; press **Mark Done** (section 6). |
+| **BOM Approvals** | BOMs waiting to be checked and approved. A merchant sends a BOM from the style page; a Merchandising Head or Management approves here (section 2.6). |
+
+**Order and BOM (the work itself)**
+
+| Menu | What it is for |
+|---|---|
+| **Style Library** | Buyer, season, mother and child styles. Open a style to reach everything about it: orders, size breakdown, BOM, costing, samples, documents (sections 2.1, 2.3a, 2.3b, 2.4c). |
+| **Workspace** | The shared BOM sheet all departments work in. Import the buyer's Excel here (**Import Buyer Excel**, section 2.2) or open a file to edit the Merchandising columns. |
+| **Consumption Master** | Standard materials and consumption per product group, to fill a new BOM quickly (section 2.2b). |
+| **Costing Templates** | Ready cost sheets per product group, to start a pre-costing quickly (section 2.7a). |
+| **Vendors** | Supplier list with contact and bank details; add, edit, import and export (section 2.2b Vendors). |
+
+**Before and around the order**
+
+| Menu | What it is for |
+|---|---|
+| **Inquiries** | A buyer asks for a price: cost it, record the quotation, mark won or lost, print the Quotation PDF (section 2.1a). |
+| **Samples** | Every sample with its Tag ID, due date, buyer comments and history; **Buyer Comments (Lessons)** lists what buyers said (section 2.4b). |
+| **Meetings** | Minutes of order meetings; every agreed action becomes a follow-up task (section 2.4e). |
+
+**Follow the order and report**
+
+| Menu | What it is for |
+|---|---|
+| **Style Status** | How far each style has come, by buyer and season: material ordered, PI, paid, received, issued (sections 2.3 and 2.4). |
+| **OCR Summary** | The Contract, Material, Payment and Clearance summaries made for you, and the OCR Excel download (section 2.4a). |
+| **Analytics** | Order value, margin by buyer or season, lowest-margin styles, and how many quotations were won (section 2.4d). |
+| **Reports** | Merchandising Reports: a filtered, line-by-line view of the Merchandising columns, to preview and download as PDF or Excel. |
+| **Store Reports** | Store's stock, receiving and issue reports, to read what has arrived and been issued. |
+| **Purchase Requisition** | Store requisitions for consumables. Shown only if you have been given the permission. |
+
+**A new order, step by step**
+1. **Inquiries**: record the buyer's request and quote it (if the order starts with an inquiry).
+2. **Style Library**: make sure the style exists (Start Costing on the inquiry makes it for you).
+3. **Workspace > Import Buyer Excel**, or **Create BOM** on the style page. Use **Consumption Master** to fill materials.
+4. On the style page: **Size Breakdown**, **Buyer Orders** (send each customer PO for approval), **Pre-costing**.
+5. **Samples** and **Meetings** while the order runs; **Follow-ups** shows your tasks.
+6. Submit the BOM for approval (**BOM Approvals**); then Supply Chain books the materials.
+7. Watch it in **Style Status**, **OCR Summary** and **Analytics**; use the style's **Post-costing** to see what the materials really cost.
+
 ### 2.1 Style Library
 
 **What it is.** The list of a buyer's styles, kept the same way the buyer's folders are:
@@ -507,10 +558,6 @@ Once the style has a BOM, the costing page shows each costed material next to th
 
 The **Season page** of Style Status shows the **Margin** of each style's latest *final* buyer costing.
 
----
-
-## 3. Supply Chain
-
 ### 2.7a Costing templates (start a costing from a ready sheet)
 
 A costing template is a **ready cost sheet** for a product group, with the usual lines, quantities, wastage and rates, so you do not type them for every style.
@@ -541,6 +588,11 @@ Pre-costing is the estimate. Post-costing looks at what actually happened. **Mat
 A green or red note says how far the material bought so far is below or above the budget. **Below is normal while the order is still being received.** Under it, **By material** lists each material with its received and issued quantity and value. Yellow badges warn about a material **received with no price** (its value counts as zero; add the price on Material Receiving) or **issued but never received** against this style.
 
 **What this page does not know yet:** CM, overhead, commission, claims and the quantity actually shipped are not recorded in the system, so the real **profit** of an order cannot be worked out. Prices on receipts have no currency; they are taken to be in the costing's currency. Management can read the page; it changes nothing.
+
+---
+
+## 3. Supply Chain
+
 ### 3.0 Supply Chain dashboard
 
 **Open it:** log in as Supply Chain; the dashboard is the first page.
@@ -866,6 +918,8 @@ You can only choose people who may see that buyer. One person cannot be given tw
 - Click the style number to see the materials behind the task.
 
 Only the person it was given to, the person who gave it, and Admin can change a task.
+
+**Where your tasks come from.** A task reaches this list from three places: a person asking you to follow up on a style (6.1), a **TnA plan** applied to a style (6.4; the style's **TnA Plan** box shows them), and an **action from a meeting** (section 2.4e). They all look the same here and work the same way. If a task stays overdue for several days, the supervisor is told as well (6.4).
 
 ### 6.3 Reminders
 
