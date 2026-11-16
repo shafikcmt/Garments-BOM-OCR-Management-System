@@ -629,16 +629,26 @@
             @endif
 
             {{-- General Stock purchasing desk: its own short menu, in the order the work flows. --}}
-            @if($seePurchasing)
+            {{-- Management approves Comparative Statements and Internal POs but never
+                 raises them: no To Purchase, and the two lists only appear while
+                 something is waiting for approval. --}}
+            @php
+                $purchasingForApprovalOnly = $storeUser?->hasRole('management') ?? false;
+                $showCs = $seePurchaseCs && (! $purchasingForApprovalOnly || $csWaiting > 0 || request()->routeIs('store.purchasing.cs.*'));
+                $showPo = $seePurchasePo && (! $purchasingForApprovalOnly || $poWaiting > 0 || request()->routeIs('store.purchasing.po.*'));
+            @endphp
+            @if($seePurchasing && ($showCs || $showPo))
             <div class="sidebar-section">
-                <div class="sidebar-section-label">General Stock Purchasing</div>
+                <div class="sidebar-section-label">{{ $purchasingForApprovalOnly ? 'Waiting for Approval' : 'General Stock Purchasing' }}</div>
                 <ul class="sidebar-list">
-                    @if($seePurchaseCs)
+                    @if($seePurchaseCs && ! $purchasingForApprovalOnly)
                     <li class="sidebar-item">
                         <a href="{{ route('store.purchasing.queue') }}" class="sidebar-nav-link {{ request()->routeIs('store.purchasing.queue') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-cart-plus" aria-hidden="true"></i></span><span class="sidebar-link-text">To Purchase</span></span>
                         </a>
                     </li>
+                    @endif
+                    @if($showCs)
                     <li class="sidebar-item">
                         <a href="{{ route('store.purchasing.cs.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.purchasing.cs.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-columns-gap" aria-hidden="true"></i></span><span class="sidebar-link-text">Comparative Statement</span></span>
@@ -646,7 +656,7 @@
                         </a>
                     </li>
                     @endif
-                    @if($seePurchasePo)
+                    @if($showPo)
                     <li class="sidebar-item">
                         <a href="{{ route('store.purchasing.po.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.purchasing.po.*') ? 'is-active' : '' }}">
                             <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Internal PO</span></span>
@@ -741,9 +751,7 @@
                  one of their pages is showing. --}}
             @role('management')
             @php
-                $mgMonitor = request()->routeIs('merchant.status.*') || request()->routeIs('merchant.ocr.*') || request()->routeIs('merchant.analytics.*') || request()->routeIs('supply_chain.supplier_delivery') || request()->routeIs('commercial.shipments.*');
-                $mgMerch = request()->routeIs('merchant.samples.*') || request()->routeIs('merchant.inquiries.*') || request()->routeIs('merchant.meetings.*') || request()->routeIs('merchant.consumption.*') || request()->routeIs('merchant.costing_templates.*');
-                $mgStore = (request()->routeIs('store.material.bulk-issues.*') || request()->routeIs('store.stock.*')) && ! request()->routeIs('store.stock.requisitions.my-approvals');
+                $mgMonitor = request()->routeIs('merchant.status.*') || request()->routeIs('merchant.ocr.*') || request()->routeIs('merchant.analytics.*') || request()->routeIs('supply_chain.supplier_delivery') || request()->routeIs('commercial.shipments.*') || request()->routeIs('store.stock.ledger*');
             @endphp
             <div class="sidebar-section">
                 <div class="sidebar-section-label">Overview</div>
@@ -792,7 +800,7 @@
                 </ul>
             </div>
             <div class="sidebar-section">
-                <div class="sidebar-section-label">Monitor &amp; Operations</div>
+                <div class="sidebar-section-label">Monitor</div>
                 <ul class="sidebar-list">
                     <li class="sidebar-group {{ $mgMonitor ? 'is-open' : '' }}">
                         <button type="button" class="sidebar-group-button {{ $mgMonitor ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $mgMonitor ? 'true' : 'false' }}">
@@ -829,24 +837,14 @@
                                     <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span class="sidebar-link-text">Inbound Shipments</span></span>
                                 </a>
                             </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Stock Report</span></span>
+                                </a>
+                            </li>
                             </ul>
                         </div>
                     </li>
-                    <li class="sidebar-group {{ $mgMerch ? 'is-open' : '' }}">
-                        <button type="button" class="sidebar-group-button {{ $mgMerch ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $mgMerch ? 'true' : 'false' }}">
-                            <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-scissors" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Merchandising</span>
-                            </span>
-                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
-                        </button>
-                        <div class="sidebar-submenu {{ $mgMerch ? 'is-open' : '' }}">
-                            <ul class="sidebar-list">
-                            <li class="sidebar-item">
-                                <a href="{{ route('merchant.samples.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.samples.*') ? 'is-active' : '' }}">
-                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-scissors" aria-hidden="true"></i></span><span class="sidebar-link-text">Samples</span></span>
-                                </a>
-                            </li>
                             <li class="sidebar-item">
                                 <a href="{{ route('merchant.inquiries.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.inquiries.*') ? 'is-active' : '' }}">
                                     <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-chat-left-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Inquiries</span></span>
@@ -870,21 +868,6 @@
                             </ul>
                         </div>
                     </li>
-                    <li class="sidebar-group {{ $mgStore ? 'is-open' : '' }}">
-                        <button type="button" class="sidebar-group-button {{ $mgStore ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $mgStore ? 'true' : 'false' }}">
-                            <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Store &amp; Stock</span>
-                            </span>
-                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
-                        </button>
-                        <div class="sidebar-submenu {{ $mgStore ? 'is-open' : '' }}">
-                            <ul class="sidebar-list">
-                            <li class="sidebar-item">
-                                <a href="{{ route('store.material.bulk-issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.bulk-issues.*') ? 'is-active' : '' }}">
-                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span><span class="sidebar-link-text">Bulk Issuing</span></span>
-                                </a>
-                            </li>
                             <li class="sidebar-item">
                                 <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*')  && ! request()->routeIs('store.stock.requisitions.my-approvals') ? 'is-active' : '' }}">
                                     <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Purchase Requisition</span></span>

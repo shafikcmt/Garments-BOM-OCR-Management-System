@@ -42,7 +42,8 @@ You only see the screens your role needs.
 - **Overview:** Dashboard.
 - **Approvals:** My Approvals (requisitions), BOM Approvals, Follow-ups. A red number means items are waiting for you.
 - **Reports:** Merchandising, Supply Chain, Commercial and Store Reports.
-- **Monitor & Operations:** three folders that stay closed until you need them: *Order & Delivery Status* (Style Status, OCR Summary, Analytics, Supplier Delivery, Inbound Shipments), *Merchandising* (Samples, Inquiries, Meetings, Consumption Master, Costing Templates) and *Store & Stock* (Bulk Issuing, Purchase Requisition, Receiving, Issues, Stock Report, Items, Setup). The folder you are working in opens by itself.
+- **Monitor:** one folder, *Order & Delivery Status* (Style Status, OCR Summary, Analytics, Supplier Delivery, Inbound Shipments, Stock Report). It opens by itself when you are inside it.
+- **Waiting for Approval:** appears only when a Comparative Statement or Internal PO is waiting for you. Management never raises requisitions, purchases or POs, so To Purchase, Purchase Requisition, Receiving, Issuing and similar screens are not in your menu.
 
 **Dashboard.** Read it from top to bottom:
 1. **Needs your decision:** payment requests (PRA), purchase requisitions, BOM approvals and follow-ups waiting for you. Press a box to open the list.
