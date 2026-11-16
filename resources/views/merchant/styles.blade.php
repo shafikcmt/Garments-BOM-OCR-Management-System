@@ -11,7 +11,7 @@
 
     <x-page-header data-aos="fade-down" icon="diagram-3" eyebrow="Merchandising"
                    title="Style Library"
-                   copy="Buyer, season, mother style and child style — the same structure as the buyer folders." />
+                   copy="Your style master: buyer, season, style and linked child styles, with each style's colours, orders, quantity, ship date, materials, costing and samples." />
 
     <x-flash />
 
@@ -89,14 +89,17 @@
                 </form>
 
                 <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
-                        <thead><tr><th>Mother Style</th><th>Group</th><th>Child Styles</th><th class="text-end">Action</th></tr></thead>
+                    <table class="table table-sm align-middle mb-0" style="min-width:0">
+                        <thead><tr>
+                            <th>Style</th><th>Group</th><th class="text-end">Colours</th><th class="text-end">POs</th><th class="text-end">Order qty</th>
+                            <th>Ship date</th><th class="text-end">BOM lines</th><th>Costing</th><th>Samples</th><th class="text-end">Action</th>
+                        </tr></thead>
                         <tbody>
                         @forelse($season->motherStyles as $m)
+                            @php($st = $stats[$m->id] ?? null)
                             <tr>
-                                <td class="fw-semibold">{{ $m->style_no }} @if($m->order_lines_count)<span class="badge bg-success-subtle text-success ms-1">{{ $m->order_lines_count }} order line(s)</span>@endif</td>
-                                <td>{{ $m->product_group ?: '—' }}</td>
-                                <td>
+                                <td style="min-width:150px">
+                                    <div class="fw-semibold">{{ $m->style_no }} @if($m->order_lines_count)<span class="badge bg-success-subtle text-success ms-1">{{ $m->order_lines_count }} order line(s)</span>@endif</div>
                                     @foreach($m->children as $c)
                                         <span class="badge bg-light text-dark border me-1">
                                             {{ $c->style_no }} <small class="text-muted">· {{ \App\Models\ChildStyle::KINDS[$c->kind] ?? $c->kind }}</small>
@@ -106,27 +109,50 @@
                                             </form>
                                         </span>
                                     @endforeach
-                                    <form method="POST" action="{{ route('merchant.styles.children.store', $m) }}" class="d-inline-flex gap-1 mt-1">
+                                    <button type="button" class="btn btn-link btn-sm p-0 mt-1 text-decoration-none" data-bs-toggle="collapse" data-bs-target="#addChild{{ $m->id }}" aria-expanded="false">
+                                        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Child Style
+                                    </button>
+                                    <form id="addChild{{ $m->id }}" method="POST" action="{{ route('merchant.styles.children.store', $m) }}" class="collapse mt-1">
                                         @csrf
-                                        <input name="style_no" class="form-control form-control-sm" style="width:120px" placeholder="Child style" required maxlength="80">
-                                        <select name="kind" class="form-select form-select-sm" style="width:130px">
-                                            @foreach(\App\Models\ChildStyle::KINDS as $k => $label)<option value="{{ $k }}">{{ $label }}</option>@endforeach
-                                        </select>
-                                        <button class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add</button>
+                                        <div class="d-flex flex-column gap-1">
+                                            <input name="style_no" class="form-control form-control-sm" placeholder="Child style no." required maxlength="80" aria-label="Child style of {{ $m->style_no }}">
+                                            <select name="kind" class="form-select form-select-sm" aria-label="Kind">
+                                                @foreach(\App\Models\ChildStyle::KINDS as $k => $label)<option value="{{ $k }}">{{ $label }}</option>@endforeach
+                                            </select>
+                                            <button class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add</button>
+                                        </div>
                                     </form>
                                 </td>
-                                <td class="text-end text-nowrap">
+                                <td>{{ $m->product_group ?: '—' }}</td>
+                                <td class="text-end">{{ $st && $st['colours'] ? $st['colours'] : '—' }}</td>
+                                <td class="text-end">{{ $st && $st['pos'] ? $st['pos'] : '—' }}</td>
+                                <td class="text-end">{{ $st && $st['qty'] > 0 ? number_format($st['qty']) : '—' }}</td>
+                                <td class="text-nowrap">{{ $st && $st['ship'] ? $st['ship']->format('d M Y') : '—' }}@if($st && $st['ship_passed'])<div class="small text-muted">passed</div>@endif</td>
+                                <td class="text-end">{{ $st && $st['materials'] ? number_format($st['materials']) : '—' }}</td>
+                                <td>
+                                    @if($st && $st['has_costing'])
+                                        @if($st['margin'] !== null)<span class="badge {{ $st['margin'] < 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success' }}">{{ $st['margin'] }}% margin</span>@else<span class="badge bg-light text-dark border">Final</span>@endif
+                                    @else<span class="text-muted">—</span>@endif
+                                </td>
+                                <td>
+                                    @if($st && $st['open_samples'] > 0)
+                                        <span class="badge bg-warning-subtle text-warning-emphasis">{{ $st['open_samples'] }} open</span>@if($st['late_samples'] > 0)<span class="badge bg-danger-subtle text-danger ms-1">{{ $st['late_samples'] }} late</span>@endif
+                                    @else<span class="text-muted">—</span>@endif
+                                </td>
+                                <td class="text-end">
+                                  <div class="d-flex flex-column gap-1 align-items-stretch">
                                     <a href="{{ route('merchant.styles.mothers.show', $m) }}" class="btn btn-outline-primary btn-sm">
                                         <i class="bi bi-bar-chart-steps me-1" aria-hidden="true"></i>View Status
                                     </a>
-                                    <form method="POST" class="d-inline" action="{{ route('merchant.styles.mothers.destroy', $m) }}" onsubmit="return confirm('Delete this style and its child styles?')">
+                                    <form method="POST" action="{{ route('merchant.styles.mothers.destroy', $m) }}" onsubmit="return confirm('Delete this style and its child styles?')">
                                         @csrf @method('DELETE')
-                                        <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
+                                        <button class="btn btn-outline-danger btn-sm w-100"><i class="bi bi-trash me-1" aria-hidden="true"></i>Delete</button>
                                     </form>
+                                  </div>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="4" class="text-muted text-center py-3">No styles in this season yet.</td></tr>
+                            <tr><td colspan="10" class="text-muted text-center py-3">No styles in this season yet.</td></tr>
                         @endforelse
                         </tbody>
                     </table>

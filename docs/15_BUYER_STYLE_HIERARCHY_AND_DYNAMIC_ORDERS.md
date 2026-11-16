@@ -1,3 +1,5 @@
+> **Note (2026-11-16):** the Style Library is described to users as one standard style master, never as "the buyer's folders". The folder tree below is only where the hierarchy was first seen.
+>
 > **Superseded in direction by `docs/16_STANDARD_DYNAMIC_ORDER_FORMAT.md`.** The Ann Taylor examples below only illustrate why a buyer-independent standard is needed; do not model the system on that layout.
 
 # Buyer -> Season -> Mother Style -> Child Style (Dynamic Buyer Orders)
