@@ -747,3 +747,94 @@ it('alerts the checker, then the approver, then the maker as a CS moves along', 
     test()->actingAs($approver)->post(route('store.purchasing.cs.approve', $cs))->assertSessionHasNoErrors();
     expect(\App\Models\AppNotification::where('user_id', $maker->id)->where('type', 'purchase_cs')->count())->toBe(2);
 });
+
+// ------------------------------------------------- price comparison and PO by supplier
+
+/** A submitted CS of three machine needles: KT is cheaper on every line, yet $selected is chosen on all of them. */
+function gpNeedleCs(string $selected = '0'): GsComparativeStatement
+{
+    $sheet = gpApproved([['P/M Needle DBX1-FFG-16', 200], ['O/L Needle DCX27-FFG-16', 300], ['F/L Needle UYX128 GAS-FFG-16', 200]]);
+    $payload = gpPayload($sheet->items, [[88, 85], [149, 145], [175, 168]]);
+    foreach ($payload['lines'] as $i => $line) {
+        $payload['lines'][$i]['selected'] = $selected;
+    }
+
+    test()->actingAs(gpUser(['store.purchase_cs.create'], 'Maker'))->post(route('store.purchasing.cs.store'), $payload + ['action' => 'submit'])->assertSessionHasNoErrors();
+
+    return GsComparativeStatement::latest('id')->firstOrFail()->load(['items.quotes', 'suppliers']);
+}
+
+it('compares what was chosen with the lowest price on every line, and says which lines cost more', function () {
+    $cs = gpNeedleCs('0');                                   // Banani chosen everywhere
+    $c = app(\App\Services\CsComparison::class)->for($cs);
+
+    expect($c['chosen_total'])->toBe(97300.0)                // 200x88 + 300x149 + 200x175
+        ->and($c['lowest_total'])->toBe(94100.0)             // 200x85 + 300x145 + 200x168
+        ->and($c['extra'])->toBe(3200.0)->and($c['extra_pct'])->toBe(3.4)
+        ->and($c['not_lowest'])->toHaveCount(3)->and($c['not_lowest'][1]['extra'])->toBe(1200.0)
+        ->and($c['not_lowest'][0]['lowest_name'])->toBe('KT Corporation')->and($c['unchosen'])->toBe(0);
+
+    $kt = collect($c['suppliers'])->first(fn ($r) => $r['supplier']->name === 'KT Corporation');
+    expect($kt)->toMatchArray(['quoted' => 3, 'total' => 94100.0, 'complete' => true, 'lowest_on' => 3, 'chosen_on' => 0])
+        ->and($c['best_single']['supplier']->name)->toBe('KT Corporation');
+
+    $this->actingAs(gpUser())->get(route('store.purchasing.cs.show', $cs))->assertOk()
+        ->assertSee('Price comparison')->assertSee('lowest full quote')->assertSee('more.', false)->assertSee('O/L Needle DCX27-FFG-16')->assertSee('+1,200.00');
+});
+
+it('is satisfied when the lowest price is chosen, and keeps the comparison off the printed form', function () {
+    $cs = gpNeedleCs('1');                                   // KT chosen everywhere
+    $c = app(\App\Services\CsComparison::class)->for($cs);
+    expect($c['extra'])->toBe(0.0)->and($c['not_lowest'])->toBe([])->and($c['chosen_total'])->toBe(94100.0);
+
+    $this->actingAs(gpUser())->get(route('store.purchasing.cs.show', $cs))->assertOk()->assertSee('The chosen supplier is the lowest price on every line');
+
+    $sheet = view('store.purchasing._cs-sheet', ['cs' => $cs])->render();
+    expect($sheet)->not->toContain('Price comparison')->not->toContain('lowest full quote');
+});
+
+it('makes the purchase orders one supplier at a time, or all together', function () {
+    $sheet = gpApproved([['T/N DPx5 FFG 18', 30], ['B/S DPX17 R-18', 10], ['F/L UYx128 FFG 18', 5]]);
+    $maker = gpUser(['store.purchase_cs.create'], 'Maker');
+    // Lines 0 and 2 are cheaper at KT (supplier 1), line 1 at Banani (supplier 0).
+    $this->actingAs($maker)->post(route('store.purchasing.cs.store'), gpPayload($sheet->items, [[88, 85], [119, 120], [175, 168]]) + ['action' => 'submit']);
+    $cs = GsComparativeStatement::firstOrFail();
+    $this->actingAs(gpUser(['store.purchase_cs.review']))->post(route('store.purchasing.cs.check', $cs));
+    $this->actingAs(gpUser(['store.purchase_cs.approve']))->post(route('store.purchasing.cs.approve', $cs));
+    $cs->load('suppliers');
+    $banani = $cs->suppliers->firstWhere('name', 'Banani Trading House');
+    $kt = $cs->suppliers->firstWhere('name', 'KT Corporation');
+
+    $plan = app(\App\Services\PurchaseOrderService::class)->plan($cs->fresh());
+    expect($plan)->toHaveCount(2)->and($plan->firstWhere('supplier.id', $kt->id)['items'])->toBe(2)->and($plan->firstWhere('supplier.id', $banani->id)['items'])->toBe(1);
+
+    $this->actingAs($maker)->get(route('store.purchasing.cs.show', $cs))->assertOk()
+        ->assertSee('Purchase orders by supplier')->assertSee('Make PO for KT Corporation')->assertSee('Make All Purchase Orders (2)');
+
+    // One supplier now.
+    $this->actingAs($maker)->post(route('store.purchasing.po.store', $cs), ['supplier' => $kt->id])->assertSessionHasNoErrors();
+    $orders = GsPurchaseOrder::with('items')->get();
+    expect($orders)->toHaveCount(1)->and($orders[0]->supplier_name)->toBe('KT Corporation')->and($orders[0]->items)->toHaveCount(2)->and((float) $orders[0]->total_amount)->toBe(30 * 85.0 + 5 * 168.0);
+
+    // The same supplier again has nothing left; an unknown supplier is refused; the other one still works.
+    $this->actingAs($maker)->post(route('store.purchasing.po.store', $cs), ['supplier' => $kt->id])->assertSessionHasErrors('cs');
+    $this->post(route('store.purchasing.po.store', $cs), ['supplier' => 999999])->assertSessionHasErrors('cs');
+    $page = $this->get(route('store.purchasing.cs.show', $cs))->assertOk();
+    $page->assertSee('All ordered')->assertSee('Make PO for Banani Trading House')->assertDontSee('Make All Purchase Orders');
+
+    $this->post(route('store.purchasing.po.store', $cs))->assertSessionHasNoErrors();      // "all" now makes the remaining one
+    expect(GsPurchaseOrder::count())->toBe(2)->and(GsPurchaseOrder::where('supplier_name', 'Banani Trading House')->count())->toBe(1);
+
+    $this->post(route('store.purchasing.po.store', $cs))->assertSessionHasErrors('cs');
+    $this->post(route('store.purchasing.po.store', $cs), ['supplier' => $banani->id])->assertSessionHasErrors('cs');
+});
+
+it('keeps making a PO from a CS to people who may create POs, supplier by supplier too', function () {
+    $cs = gpApprovedCs();
+    $viewer = gpUser();   // supply_chain_general holds po.create; take it away to check the per-supplier button is hidden
+    $viewer->revokePermissionTo('store.purchase_po.create');
+    $viewer->roles()->detach();
+    $viewer->givePermissionTo(Permission::findOrCreate('store.purchase_cs.view', 'web'));
+
+    $this->actingAs($viewer)->post(route('store.purchasing.po.store', $cs), ['supplier' => $cs->suppliers->first()->id])->assertForbidden();
+});

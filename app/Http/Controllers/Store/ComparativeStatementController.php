@@ -114,6 +114,8 @@ class ComparativeStatementController extends Controller
         return view('store.purchasing.cs-show', [
             'cs' => $cs,
             'allowed' => $this->service->allowed($cs, $request->user()),
+            'comparison' => app(\App\Services\CsComparison::class)->for($cs),
+            'poPlan' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->plan($cs) : collect(),
         ]);
     }
 
