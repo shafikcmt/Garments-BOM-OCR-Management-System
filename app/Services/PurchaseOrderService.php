@@ -37,15 +37,14 @@ class PurchaseOrderService
     }
 
     /**
-     * @return Collection<int, GsPurchaseOrder> the draft POs created
+     * The items still to order, grouped by the supplier chosen for them: the
+     * lines with a priced chosen supplier and no live PO yet.
+     *
+     * @return Collection<int|string, Collection<int, GsCsItem>> supplier id => items
      */
-    public function createFromStatement(GsComparativeStatement $cs, User $user): Collection
+    private function pendingGroups(GsComparativeStatement $cs): Collection
     {
-        if (! $cs->isApproved()) {
-            throw ValidationException::withMessages(['cs' => 'A purchase order can only be made from an approved Comparative Statement.']);
-        }
-
-        $cs->load(['items.quotes', 'suppliers']);
+        $cs->loadMissing(['items.quotes', 'suppliers']);
 
         $taken = GsPurchaseOrderItem::query()
             ->whereIn('gs_cs_item_id', $cs->items->pluck('id'))
@@ -53,12 +52,61 @@ class PurchaseOrderService
             ->pluck('gs_cs_item_id')
             ->all();
 
-        $groups = $cs->items
+        return $cs->items
             ->reject(fn (GsCsItem $i) => in_array($i->id, $taken, true) || ! $i->selectedQuote() || $i->selectedQuote()->unit_price === null)
             ->groupBy('selected_supplier_id');
+    }
+
+    /**
+     * What can be ordered from each chosen supplier of an approved statement:
+     * the lines and the amount still to order, and the POs already made.
+     *
+     * @return Collection<int, array{supplier: \App\Models\GsCsSupplier, items: int, amount: float, orders: list<string>}>
+     */
+    public function plan(GsComparativeStatement $cs): Collection
+    {
+        $cs->loadMissing(['items.quotes', 'suppliers', 'purchaseOrders']);
+        $pending = $this->pendingGroups($cs);
+
+        return $cs->items->pluck('selected_supplier_id')->filter()->unique()->values()
+            ->map(function ($supplierId) use ($cs, $pending) {
+                $items = $pending->get($supplierId, collect());
+
+                return [
+                    'supplier' => $cs->suppliers->firstWhere('id', (int) $supplierId),
+                    'items' => $items->count(),
+                    'amount' => round((float) $items->sum(fn (GsCsItem $i) => (float) $i->qty * (float) $i->selectedQuote()->unit_price), 2),
+                    'orders' => $cs->purchaseOrders->where('gs_cs_supplier_id', (int) $supplierId)->where('status', '<>', GsPurchaseOrder::STATUS_CANCELLED)->pluck('po_no')->values()->all(),
+                ];
+            })->filter(fn ($row) => $row['supplier'])->values();
+    }
+
+    /**
+     * Make the draft POs: one per chosen supplier, or only the given supplier's.
+     *
+     * @param  int|null  $supplierId  a supplier of this statement (gs_cs_suppliers.id); null = every chosen supplier
+     * @return Collection<int, GsPurchaseOrder> the draft POs created
+     */
+    public function createFromStatement(GsComparativeStatement $cs, User $user, ?int $supplierId = null): Collection
+    {
+        if (! $cs->isApproved()) {
+            throw ValidationException::withMessages(['cs' => 'A purchase order can only be made from an approved Comparative Statement.']);
+        }
+
+        $cs->load(['items.quotes', 'suppliers']);
+
+        $groups = $this->pendingGroups($cs);
+        if ($supplierId !== null) {
+            if (! $cs->suppliers->contains('id', $supplierId)) {
+                throw ValidationException::withMessages(['cs' => 'That supplier is not on this Comparative Statement.']);
+            }
+            $groups = $groups->filter(fn ($items, $key) => (int) $key === $supplierId);
+        }
 
         if ($groups->isEmpty()) {
-            throw ValidationException::withMessages(['cs' => 'Every item of this Comparative Statement already has a purchase order.']);
+            throw ValidationException::withMessages(['cs' => $supplierId !== null
+                ? 'Nothing is left to order from this supplier on this Comparative Statement.'
+                : 'Every item of this Comparative Statement already has a purchase order.']);
         }
 
         $defaults = (array) config('purchasing.po_defaults');

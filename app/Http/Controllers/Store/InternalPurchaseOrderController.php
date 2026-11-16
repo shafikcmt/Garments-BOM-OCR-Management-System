@@ -52,7 +52,8 @@ class InternalPurchaseOrderController extends Controller
     {
         abort_unless($request->user()->can('store.purchase_po.create'), 403);
 
-        $orders = $this->service->createFromStatement($cs, $request->user());
+        $supplierId = $request->validate(['supplier' => ['nullable', 'integer']])['supplier'] ?? null;
+        $orders = $this->service->createFromStatement($cs, $request->user(), $supplierId !== null ? (int) $supplierId : null);
 
         return $orders->count() === 1
             ? redirect()->route('store.purchasing.po.show', $orders->first())->with('success', $orders->first()->po_no.' created as a draft. It needs to be checked, then authorised.')

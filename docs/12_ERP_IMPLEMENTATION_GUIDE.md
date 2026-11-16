@@ -524,4 +524,6 @@ Approved Final / Individual requisition (to_be_procured_qty > 0)
 5. Should Management / Admin see the purchasing screens in their own menu (Admin does; Management has the URLs but no menu entry yet)?
 6. Receiving tolerance: any allowance above the PO quantity (for example 2%)?
 
+**Added 2026-11-16:** a **Price comparison** box on the CS page (screen only, not on the printed form): supplier totals, lowest full quote, chosen total against the lowest price on every line, and the lines where the chosen supplier is not the lowest; and **Make PO for one supplier** from an approved CS (`PurchaseOrderService::plan` and `createFromStatement(..., $supplierId)`), besides making them all. Still open: splitting one item's quantity between two suppliers; requiring a reason when a dearer supplier is chosen (owner to decide).
+
 **Not built yet:** Excel export of a CS, e-mailing the PO to the supplier (booking e-mail), supplier invoice / payment from the PO, PO amendments after issue, tolerance on receiving, a purchasing report (requisition line -> CS -> PO -> received -> issued).

@@ -66,8 +66,9 @@
             @endif
 
             @if(in_array('make_po', $allowed, true))
+                @php($toOrder = $poPlan->where('items', '>', 0)->count())
                 <form method="POST" action="{{ route('store.purchasing.po.store', $cs) }}">@csrf
-                    <button class="btn btn-success"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>Make Purchase Order</button>
+                    <button class="btn btn-success"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>{{ $toOrder > 1 ? 'Make All Purchase Orders (' . $toOrder . ')' : 'Make Purchase Order' }}</button>
                 </form>
             @endif
 
@@ -91,6 +92,41 @@
         </div>
     </div>
 
+    {{-- Order by supplier: one PO per chosen supplier, made together or one supplier at a time. --}}
+    @if($poPlan->count() > 1)
+        <div class="card gx-stock-card mb-3">
+            <div class="gx-stock-card-body">
+                <h6 class="mb-1">Purchase orders by supplier</h6>
+                <p class="small text-muted mb-2">The items go to the supplier chosen for each line, one purchase order per supplier. Make them together with the button above, or one supplier at a time here.</p>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0" style="min-width:0">
+                        <thead><tr><th>Supplier</th><th class="text-end">Items to order</th><th class="text-end">Amount</th><th>Purchase orders made</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach($poPlan as $row)
+                            <tr>
+                                <td class="fw-semibold">{{ $row['supplier']->name }}</td>
+                                <td class="text-end">{{ $row['items'] }}</td>
+                                <td class="text-end">{{ number_format($row['amount'], 2) }}</td>
+                                <td>{{ $row['orders'] ? implode(', ', $row['orders']) : '—' }}</td>
+                                <td class="text-end">
+                                    @if(in_array('make_po', $allowed, true) && $row['items'] > 0)
+                                        <form method="POST" action="{{ route('store.purchasing.po.store', $cs) }}" class="d-inline">@csrf
+                                            <input type="hidden" name="supplier" value="{{ $row['supplier']->id }}">
+                                            <button class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>Make PO for {{ $row['supplier']->name }}</button>
+                                        </form>
+                                    @elseif($row['items'] === 0)
+                                        <span class="text-muted small">All ordered</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if($cs->purchaseOrders->isNotEmpty())
         <div class="card gx-stock-card mb-3">
             <div class="gx-stock-card-body">
@@ -107,6 +143,61 @@
                         </li>
                     @endforeach
                 </ul>
+            </div>
+        </div>
+    @endif
+
+    {{-- Price comparison: screen only, never on the printed form. --}}
+    @if($comparison['has_quotes'])
+        @php($money = fn ($n) => number_format((float) $n, 2))
+        <div class="card gx-stock-card mb-3">
+            <div class="gx-stock-card-body">
+                <h6 class="mb-2">Price comparison</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2" style="min-width:0">
+                        <thead><tr><th>Supplier</th><th class="text-end">Items quoted</th><th class="text-end">Total of its quote</th><th class="text-end">Lowest on</th><th class="text-end">Chosen on</th><th class="text-end">Chosen amount</th></tr></thead>
+                        <tbody>
+                        @foreach($comparison['suppliers'] as $row)
+                            @php($isBest = $comparison['best_single'] && $comparison['best_single']['supplier']->id === $row['supplier']->id)
+                            <tr>
+                                <td class="fw-semibold">{{ $row['supplier']->name }}@if($row['supplier']->is_recommended) <span class="badge bg-light text-dark border">recommended</span>@endif</td>
+                                <td class="text-end">{{ $row['quoted'] }} of {{ $cs->items->count() }}</td>
+                                <td class="text-end {{ $isBest ? 'text-success fw-semibold' : '' }}">{{ $money($row['total']) }}@if($isBest)<div class="small">lowest full quote</div>@endif</td>
+                                <td class="text-end">{{ $row['lowest_on'] }} item(s)</td>
+                                <td class="text-end">{{ $row['chosen_on'] }} item(s)</td>
+                                <td class="text-end">{{ $money($row['chosen_amount']) }}</td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                @if($comparison['extra'] > 0)
+                    <div class="alert alert-warning py-2 mb-2">
+                        The suppliers chosen come to <strong>{{ $money($comparison['chosen_total']) }}</strong>. Taking the lowest price on every line would be <strong>{{ $money($comparison['lowest_total']) }}</strong>:
+                        <strong>{{ $money($comparison['extra']) }}</strong>@if($comparison['extra_pct'] !== null) ({{ $comparison['extra_pct'] }}%)@endif more.
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0" style="min-width:0">
+                            <thead><tr><th>Item where the chosen supplier is not the lowest</th><th class="text-end">Qty</th><th>Chosen</th><th class="text-end">Price</th><th>Lowest</th><th class="text-end">Price</th><th class="text-end">Extra cost</th></tr></thead>
+                            <tbody>
+                            @foreach($comparison['not_lowest'] as $r)
+                                <tr>
+                                    <td>{{ $r['item']->item_name }}@if(filled($r['item']->remarks))<div class="small text-muted">Remark: {{ $r['item']->remarks }}</div>@endif</td>
+                                    <td class="text-end">{{ rtrim(rtrim(number_format($r['qty'], 4), '0'), '.') }}</td>
+                                    <td>{{ $r['chosen_name'] }}</td><td class="text-end">{{ $money($r['chosen_price']) }}</td>
+                                    <td class="text-success">{{ $r['lowest_name'] }}</td><td class="text-end text-success">{{ $money($r['lowest_price']) }}</td>
+                                    <td class="text-end text-danger">+{{ $money($r['extra']) }}</td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @elseif($comparison['chosen_total'] > 0)
+                    <div class="alert alert-success py-2 mb-0">The chosen supplier is the lowest price on every line chosen ({{ $money($comparison['chosen_total']) }}).</div>
+                @endif
+                @if($comparison['unchosen'] > 0)
+                    <p class="small text-muted mt-2 mb-0">{{ $comparison['unchosen'] }} line(s) have quotes but no supplier chosen yet.</p>
+                @endif
             </div>
         </div>
     @endif
