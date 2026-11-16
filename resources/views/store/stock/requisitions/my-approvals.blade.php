@@ -140,10 +140,35 @@
                     <h5 class="mb-0">Waiting for you <span class="badge bg-primary-subtle text-primary ms-1">{{ $waiting->count() }}</span></h5>
                     <span class="text-muted small">Oldest first.</span>
                 </div>
+                {{-- Individual requisitions waiting at the Store's Received step
+                     can be merged into one, from any section. The
+                     checkboxes post this form through form="". --}}
+                @php
+                    $mergeable = $waiting->filter(fn ($r) => $r->isIndividual()
+                        && $r->waitingStage?->stamp_source === \App\Models\RequisitionSignatureBlock::STAMP_STORE_HEAD);
+                    // The Store Head or a Store Admin only.
+                    $canMergeIndividual = \App\Models\PurchaseRequisition::canMergeIndividual(auth()->user()) && $mergeable->count() > 1;
+                @endphp
+                @if($canMergeIndividual)
+                    <form id="mergeIndividualForm" method="POST" action="{{ route('store.stock.requisitions.merge-individual') }}"
+                          class="d-flex flex-wrap align-items-center gap-2 mb-3 px-3 py-2 border rounded bg-info-subtle">
+                        @csrf
+                        <i class="bi bi-intersect text-info-emphasis" aria-hidden="true"></i>
+                        <span class="small"><strong>Merge:</strong> tick two or more individual requisitions to merge them into one.</span>
+                        <span class="small text-muted ms-auto" data-merge-count>0 selected</span>
+                        <button type="submit" class="btn btn-sm btn-info" data-merge-submit disabled>
+                            <i class="bi bi-intersect me-1" aria-hidden="true"></i>Merge Selected
+                        </button>
+                    </form>
+                @endif
+                @error('ids')
+                    <div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>{{ $message }}</div>
+                @enderror
                 <div class="table-responsive">
                     <table class="table align-middle gx-stock-table">
                         <thead>
                             <tr>
+                                @if($canMergeIndividual)<th style="width:36px;"></th>@endif
                                 <th>Requisition No</th>
                                 <th>Level</th>
                                 <th>Department</th>
@@ -159,6 +184,14 @@
                                     [$sinceText, $sinceClass] = $waitingSince($details[$r->id]['days'] ?? null);
                                 @endphp
                                 <tr>
+                                    @if($canMergeIndividual)
+                                        <td>
+                                            @if($mergeable->contains('id', $r->id))
+                                                <input type="checkbox" class="form-check-input" name="ids[]" value="{{ $r->id }}" form="mergeIndividualForm"
+                                                       data-merge-pick aria-label="Select {{ $r->requisition_no }} to merge">
+                                            @endif
+                                        </td>
+                                    @endif
                                     <td class="fw-semibold">{{ $r->requisition_no }} @include('store.stock.requisitions._type-badge', ['r' => $r])</td>
                                     <td>{{ \App\Models\PurchaseRequisition::levelLabels()[$r->level] ?? $r->level }}</td>
                                     <td>{{ $r->isDepartmentLevel() ? ($r->indentSection?->name ?: $r->departmentLabel()) : 'Store' }}</td>
@@ -170,7 +203,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="7" class="text-center text-muted py-4">Nothing is waiting for you.</td></tr>
+                                <tr><td colspan="{{ $canMergeIndividual ? 8 : 7 }}" class="text-center text-muted py-4">Nothing is waiting for you.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -179,4 +212,22 @@
         </div>
     @endif
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    (function () {
+        var picks = document.querySelectorAll('[data-merge-pick]');
+        var button = document.querySelector('[data-merge-submit]');
+        var count = document.querySelector('[data-merge-count]');
+        if (!button) { return; }
+        function update() {
+            var n = Array.prototype.filter.call(picks, function (p) { return p.checked; }).length;
+            count.textContent = n + ' selected';
+            button.disabled = n < 2;
+        }
+        picks.forEach(function (p) { p.addEventListener('change', update); });
+        update();
+    })();
+</script>
 @endsection

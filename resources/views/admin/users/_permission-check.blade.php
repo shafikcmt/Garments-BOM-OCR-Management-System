@@ -32,11 +32,24 @@
     // the input would post the user's existing grant away. The controller
     // preserves it either way, but the screen should not imply otherwise.
     $locked = $readonly || $fromRole || $beyondReach;
+
+    // A section's Edit / Delete (store.receiving.delete) is ALSO granted by the
+    // older whole-module permission (store.delete): the server checks either.
+    // So an empty section box does not mean "no" while the Whole module box is
+    // on — the user can still do it. Say so on the chip instead of letting an
+    // empty box read as a refusal. To really withhold it, untick the Whole
+    // module box and tick the sections that should keep it.
+    $coveredByModule = false;
+    $parts = explode('.', $entry['name']);
+    if (! $checked && count($parts) === 3 && in_array($parts[2], ['edit', 'delete'], true)) {
+        $flat = $parts[0].'.'.$parts[2];
+        $coveredByModule = $roleGranted->contains($flat) || $direct->contains($flat);
+    }
 @endphp
 
-<label class="gx-perm-chip is-{{ $state }} {{ $showLabel ? '' : 'is-compact' }} {{ $locked ? 'is-locked' : '' }}"
+<label class="gx-perm-chip is-{{ $state }} {{ $coveredByModule ? 'is-covered' : '' }} {{ $showLabel ? '' : 'is-compact' }} {{ $locked ? 'is-locked' : '' }}"
        for="{{ $id }}"
-       title="{{ $entry['label'] }}@if($fromRole) — comes with the role @elseif($beyondReach) — you do not hold this permission yourself @endif">
+       title="{{ $entry['label'] }}@if($fromRole) — comes with the role @elseif($beyondReach) — you do not hold this permission yourself @elseif($coveredByModule) — still allowed: the Whole module {{ strtolower($entry['label']) }} box is on. Untick it to restrict this section. @endif">
 
     <input type="checkbox"
            class="gx-perm-input js-perm-box"
@@ -53,6 +66,6 @@
     </span>
 
     <span class="gx-perm-text {{ $showLabel ? '' : 'visually-hidden' }}">
-        {{ $entry['label'] }}@if($fromRole) (from role)@elseif($beyondReach) (not yours to grant)@endif
+        {{ $entry['label'] }}@if($fromRole) (from role)@elseif($beyondReach) (not yours to grant)@elseif($coveredByModule) (via Whole module)@endif
     </span>
 </label>

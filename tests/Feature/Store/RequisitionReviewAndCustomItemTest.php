@@ -94,7 +94,7 @@ it('lists only what the departments sent, not the Store\'s own requisitions', fu
     $storeOwn = submittedRequisition(reviewStoreUser(), $item);
 
     $this->actingAs(reviewStoreUser())
-        ->get(route('store.stock.requisitions.requested'))
+        ->get(route('store.stock.requisitions.requested', ['month' => '']))
         ->assertOk()
         ->assertSee($fromDepartment->requisition_no)
         ->assertDontSee($storeOwn->requisition_no);
@@ -102,7 +102,7 @@ it('lists only what the departments sent, not the Store\'s own requisitions', fu
 
 it('keeps the review queue away from a department user', function () {
     $this->actingAs(reviewDepartmentUser())
-        ->get(route('store.stock.requisitions.requested'))
+        ->get(route('store.stock.requisitions.requested', ['month' => '']))
         ->assertForbidden();
 });
 

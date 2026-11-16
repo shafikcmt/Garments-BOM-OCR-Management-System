@@ -665,6 +665,19 @@
         vertical-align: middle;
     }
 
+    /* Action column pinned to the right edge of a wide table, so Edit / Remove
+       stay on screen without scrolling sideways. Opaque backgrounds, or the
+       cells scrolling underneath would show through. */
+    .gx-stock-table th.gx-sticky-actions,
+    .gx-stock-table td.gx-sticky-actions {
+        position: sticky;
+        right: 0;
+        z-index: 1;
+        background: #fff;
+        box-shadow: -6px 0 8px -6px rgba(15, 23, 42, .18);
+    }
+    .gx-stock-table th.gx-sticky-actions { background: #f8fafc; z-index: 2; }
+
     /* --- Sideways scrolling ----------------------------------------------
      * The Stock Report is 21 columns wide, so it always scrolls. The browser
      * default scrollbar is thin, grey and only appears mid-scroll on Windows,

@@ -5,8 +5,8 @@
 @section('content')
 <div class="container-fluid">
     <x-page-header data-aos="fade-down" icon="clipboard2-check" eyebrow="Management"
-                   title="Management"
-                   copy="Payment Request Approvals — current position and recent activity.">
+                   title="Management Overview"
+                   copy="What needs your decision, where the company stands, and the reports.">
         <x-slot:actions>
             <a href="{{ route('pra_approvals.index') }}" class="btn btn-primary d-inline-flex align-items-center gap-2">
                 <i class="bi bi-inbox" aria-hidden="true"></i>Pending PRA Approvals
@@ -14,31 +14,78 @@
         </x-slot:actions>
     </x-page-header>
 
-    {{-- KPI row. Figures are live counts from payment_requests; the only trend
-         shown is month-on-month PRA volume, and it is hidden when last month
-         had none to compare against rather than showing a meaningless number. --}}
+    {{-- 1. What needs THIS person's decision. Same counts as the sidebar badges. --}}
+    <h2 class="h6 text-uppercase text-muted fw-semibold mb-2">Needs your decision</h2>
     <div class="row g-3 mb-4">
         <div class="col-12 col-sm-6 col-xl-3">
-            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:0ms"
-                icon="hourglass-split" tone="warning"
-                label="Awaiting your action" :value="$myPending"
-                :href="route('pra_approvals.index')" />
+            <x-stat-card class="h-100" icon="cash-coin" tone="warning"
+                label="Payment requests (PRA)" :value="$decisions['pra']" :href="route('pra_approvals.index')" />
         </div>
         <div class="col-12 col-sm-6 col-xl-3">
-            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:100ms"
-                icon="clock-history" tone="primary"
-                label="Pending approval" :value="$stats['pending']"
-                :spark="collect($trend)->pluck('value')->all()" />
+            <x-stat-card class="h-100" icon="clipboard-check" tone="primary"
+                label="Purchase requisitions" :value="$decisions['requisitions']" :href="route('store.stock.requisitions.my-approvals')" />
         </div>
         <div class="col-12 col-sm-6 col-xl-3">
-            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:200ms"
-                icon="check2-circle" tone="success"
-                label="Approved" :value="$stats['approved']" />
+            <x-stat-card class="h-100" icon="patch-check" tone="success"
+                label="BOM approvals" :value="$decisions['bom']" :href="route('bom_approvals.index')" />
         </div>
         <div class="col-12 col-sm-6 col-xl-3">
-            <x-stat-card class="gx-fade-in h-100" style="--gx-delay:300ms"
-                icon="x-circle" tone="danger"
-                label="Rejected" :value="$stats['rejected']" />
+            <x-stat-card class="h-100" icon="check2-square" tone="danger"
+                label="Follow-ups due" :value="$decisions['followups']" :href="route('follow_ups.index')" />
+        </div>
+    </div>
+
+    {{-- 2. Company position: orders and the material pipeline, all buyers. --}}
+    @if($orders || $supply)
+        <h2 class="h6 text-uppercase text-muted fw-semibold mb-2">Company position</h2>
+        <div class="row g-3 mb-4">
+            @if($orders)
+                @php $ok = $orders['kpis']; @endphp
+                <div class="col-6 col-md-4 col-xl-2">
+                    <x-stat-card class="h-100" icon="bag-check" tone="primary" label="Open orders" :value="$ok['orders']" :href="route('merchant.status.index')" />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <x-stat-card class="h-100" icon="box-seam" tone="primary" label="Order qty (pcs)" :value="number_format((float) $ok['order_qty'])" :href="route('merchant.status.index')" />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <x-stat-card class="h-100" icon="calendar-event" tone="warning" label="Shipping in 14 days" :value="$ok['shipping_soon']" :href="route('merchant.status.index')" />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <x-stat-card class="h-100" icon="exclamation-triangle" tone="danger" label="Booking late" :value="$ok['booking_late']" :href="route('supply_chain.reports.index')" />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <x-stat-card class="h-100" icon="file-earmark-text" tone="warning" label="PI pending" :value="$ok['pi_pending']" :href="route('supply_chain.reports.index')" />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <x-stat-card class="h-100" icon="credit-card" tone="warning" label="Payment pending" :value="$ok['payment_pending']" :href="route('supply_chain.reports.index')" />
+                </div>
+            @endif
+            @if($supply)
+                @php $sk = $supply['kpis']; @endphp
+                <div class="col-6 col-md-4 col-xl-2">
+                    <x-stat-card class="h-100" icon="truck" tone="primary" label="In transit" :value="$sk['in_transit']" :href="route('commercial.shipments.index')" />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <x-stat-card class="h-100" icon="hourglass-split" tone="danger" label="Arrival overdue" :value="$sk['eta_overdue']" :href="route('supply_chain.supplier_delivery')" />
+                </div>
+                <div class="col-6 col-md-4 col-xl-2">
+                    <x-stat-card class="h-100" icon="cash-stack" tone="danger" label="Payment overdue" :value="$sk['payment_overdue']" :href="route('supply_chain.reports.index')" />
+                </div>
+            @endif
+        </div>
+    @endif
+
+    {{-- 3. Payment request (PRA) position. --}}
+    <h2 class="h6 text-uppercase text-muted fw-semibold mb-2">Payment requests</h2>
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-sm-4">
+            <x-stat-card class="h-100" icon="clock-history" tone="primary" label="Pending approval" :value="$stats['pending']" :spark="collect($trend)->pluck('value')->all()" />
+        </div>
+        <div class="col-12 col-sm-4">
+            <x-stat-card class="h-100" icon="check2-circle" tone="success" label="Approved" :value="$stats['approved']" />
+        </div>
+        <div class="col-12 col-sm-4">
+            <x-stat-card class="h-100" icon="x-circle" tone="danger" label="Rejected" :value="$stats['rejected']" />
         </div>
     </div>
 
@@ -105,12 +152,22 @@
         </div>
 
         <div class="col-12 col-xl-5">
-            <x-card class="gx-fade-in h-100" style="--gx-delay:700ms" title="Quick actions">
+            <x-card class="gx-fade-in h-100" style="--gx-delay:700ms" title="Reports">
                 <div class="row g-3">
                     <div class="col-12 col-sm-6 col-xl-12">
-                        <x-quick-action icon="inbox" tone="warning" title="Pending PRA Approvals"
-                            description="Review what is waiting on you"
-                            :href="route('pra_approvals.index')" />
+                        <x-quick-action icon="file-earmark-bar-graph" tone="primary" title="Merchandising Reports"
+                            description="Orders, styles and BOM"
+                            :href="route('merchant.reports.index')" />
+                    </div>
+                    <div class="col-12 col-sm-6 col-xl-12">
+                        <x-quick-action icon="file-earmark-bar-graph" tone="warning" title="Supply Chain Reports"
+                            description="PO, PI and payment follow-up"
+                            :href="route('supply_chain.reports.index')" />
+                    </div>
+                    <div class="col-12 col-sm-6 col-xl-12">
+                        <x-quick-action icon="file-earmark-bar-graph" tone="success" title="Commercial Reports"
+                            description="Shipments and documents"
+                            :href="route('commercial.reports.index')" />
                     </div>
                     <div class="col-12 col-sm-6 col-xl-12">
                         <x-quick-action icon="file-earmark-bar-graph" tone="primary" title="Store Reports"

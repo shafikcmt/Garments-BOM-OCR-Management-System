@@ -443,7 +443,7 @@ it('checks then authorises a PO by two different people, then marks the requisit
         ->and($sheet->fresh()->status)->toBe(PurchaseRequisition::STATUS_APPROVED);
 });
 
-it('edits only the header and due-on of a draft PO, never its rate or quantity', function () {
+it('edits only the header of a draft PO, never its items, rate, quantity or BIN', function () {
     $cs = gpApprovedCs();
     $maker = gpUser();
     $this->actingAs($maker)->post(route('store.purchasing.po.store', $cs));
@@ -455,15 +455,16 @@ it('edits only the header and due-on of a draft PO, never its rate or quantity',
     $this->actingAs($maker)->put(route('store.purchasing.po.update', $po), [
         'po_date' => '2026-10-25',
         'reference_no' => 'REF-9',
-        'bin_number' => '005635381-0406',
+        'bin_number' => '1111',
         'lines' => [$line->id => ['due_on' => '30-Oct-26', 'remarks' => 'Urgent', 'qty' => '999', 'rate' => '1']],
     ])->assertSessionHasNoErrors();
 
     $line->refresh();
     $po->refresh();
     expect($po->reference_no)->toBe('REF-9')
-        ->and($po->bin_number)->toBe('005635381-0406')
-        ->and($line->due_on)->toBe('30-Oct-26')
+        ->and($po->bin_number)->toBe('0056353810406')
+        ->and($line->due_on)->not->toBe('30-Oct-26')
+        ->and($line->remarks)->not->toBe('Urgent')
         ->and((float) $line->qty)->not->toBe(999.0)
         ->and((float) $line->rate)->not->toBe(1.0);
 });
@@ -726,4 +727,23 @@ it('shows a view-only Receiving user the history but not the entry form, import 
     $this->actingAs($entry)->get(route('store.stock.purchases.index'))->assertOk()
         ->assertSee('>Record Receiving</h5>', false)->assertSee('id="purchaseForm"', false)->assertSee('importReceivingModal', false)
         ->assertDontSee('Receiving summary');
+});
+
+it('alerts the checker, then the approver, then the maker as a CS moves along', function () {
+    $sheet = gpApproved([['T/N DPx5 FFG 18', 30]]);
+    $maker = gpUser(['store.purchase_cs.create'], 'Maker');
+    $checker = gpUser(['store.purchase_cs.review'], 'Checker');
+    $approver = gpUser(['store.purchase_cs.approve'], 'Approver');
+
+    test()->actingAs($maker)->post(route('store.purchasing.cs.store'), gpPayload($sheet->items, [[88, 85]]) + ['action' => 'submit'])->assertSessionHasNoErrors();
+    $cs = GsComparativeStatement::latest('id')->firstOrFail();
+
+    expect(\App\Models\AppNotification::where('user_id', $checker->id)->where('type', 'purchase_cs')->count())->toBe(1)
+        ->and(\App\Models\AppNotification::where('user_id', $approver->id)->count())->toBe(0);
+
+    test()->actingAs($checker)->post(route('store.purchasing.cs.check', $cs))->assertSessionHasNoErrors();
+    expect(\App\Models\AppNotification::where('user_id', $approver->id)->where('type', 'purchase_cs')->count())->toBe(1);
+
+    test()->actingAs($approver)->post(route('store.purchasing.cs.approve', $cs))->assertSessionHasNoErrors();
+    expect(\App\Models\AppNotification::where('user_id', $maker->id)->where('type', 'purchase_cs')->count())->toBe(2);
 });

@@ -36,6 +36,20 @@ You only see the screens your role needs.
 
 ---
 
+### 1.1 Management: dashboard and menu
+
+**Menu.** The Management menu is grouped by what you do:
+- **Overview & Approvals:** Dashboard, My Approvals (requisitions), BOM Approvals, Follow-ups. A red number means items are waiting for you.
+- **Reports:** Merchandising, Supply Chain, Commercial and Store Reports.
+- **Monitor:** one folder, *Order & Delivery Status* (Style Status, OCR Summary, Analytics, Supplier Delivery, Inbound Shipments, Stock Report). It opens by itself when you are inside it.
+- **Waiting for Approval:** appears only when a Comparative Statement or Internal PO is waiting for you. Management never raises requisitions, purchases or POs, so To Purchase, Purchase Requisition, Receiving, Issuing and similar screens are not in your menu.
+
+**Dashboard.** Read it from top to bottom:
+1. **Needs your decision:** payment requests (PRA), purchase requisitions, BOM approvals and follow-ups waiting for you. Press a box to open the list.
+2. **Company position:** open orders, order quantity, shipments due in 14 days, late bookings, PI and payment pending, goods in transit, late arrivals and overdue payments for all buyers. Press a box to open the related report.
+3. **Payment requests:** how many are pending, approved and rejected, with the last 6 months.
+4. **Reports:** one press to each department report and the approval history.
+
 ## 2. Merchandising
 
 ### 2.0 Merchandising dashboard
@@ -769,6 +783,24 @@ A department or section raises one of two kinds of requisition. On the Purchase 
 
 Stock figures (Stock in Hand, Safety Stock) are shown to everyone who can open an **Individual** requisition. The Store can still correct quantities as before. Every department requisition shows a **Monthly** or **Individual** badge in the lists. Above the list on **Purchase Requisition** and **Requested**, three tabs - **All**, **Monthly** and **Individual** - show each kind on its own, with the number of requisitions in each. The kind is saved with the requisition, so the Category Summary shows Monthly and Individual sheets separately.
 
+**The Requested page opens on the current month.** Choose **All months** in the Month filter to see every month.
+
+**Merging Individual requisitions.** When several Individual requisitions are waiting, the **Store Head** or a **Store Admin** (a Store user marked Department Admin on Users & Roles) can join them into one before receiving them. Other Store users do not see this option.
+
+1. Open **Purchase Requisition > My Approvals**.
+2. Tick two or more **Individual** requisitions waiting at **Received by (Store)**. They can be from the same section or from different sections and departments. A tick box shows only on these rows.
+3. Press **Merge Selected**.
+
+You can also do this on **Purchase Requisition > Requested**: press **Ready to Merge**, which now lists the Individual requisitions waiting at the Store as well as the received Monthly ones. Tick two or more Individual rows and press **Merge Individual**.
+
+The oldest requisition is kept. The items of the others are added to it, and the same item is shown once with the quantities added up. The kept requisition then goes on as before: **Received by Store**, Finance & Commercial Head, Operation Head. The other requisitions show **Merged** and a link to the kept one.  Each item keeps its own **User Dept./ Section**, so you can still see which section asked for it.
+
+**Stock is checked again when the Store receives a requisition.** Stock can change between the day a requisition is raised and the day the Store receives it. When the Store presses **Received**, the system reads today's **Stock in Hand** and **Safety Stock** for every item and works out **To Be Procured** and **Amount** again. Example: 2 requested with 4 in stock showed 0 to buy; if the item is out of stock when the Store receives it, it now shows 2 to buy. Quantity requested and rate do not change. A note under the items says the day the stock was updated.
+
+**Requested By and Raised By.** The requisition list shows **Raised By** first, then **Requested By**, in the order it happens. **Raised By** is the person who entered the requisition in the system. **Requested By** is always the head it then goes to (the section head, or the department head when the section has none).
+
+**Stock Summary on the Purchase Requisition page.** The Store Head and Admin see a Stock Summary card above the list: totals, the filters and a chart of the top items. The item-by-item table is not shown on this page, so the requisition list comes straight after. To see every item, use the card's **Excel** or **PDF** download.
+
 **When can a Monthly requisition be submitted?** A Monthly requisition can be submitted only from the **20th to the end of each month**. A department may raise more than one Monthly requisition for the same month, but each must be submitted in this period. The Store then receives and merges them into that month's Final Requisition. If you press **Submit** outside this period, a message tells you to raise an **Individual** requisition instead. You can still **Save as Draft** on any day. An Individual requisition can be submitted on any day of the month.
 
 Admin and the Store Head can change this period. Open **Purchase Requisition > Monthly Window** (or **Admin > Settings > Monthly Requisition Window**). There you can switch Monthly requisitions on or off, set the opening and closing day (enter 0 to close on the last day of the month) and, if you wish, type your own message.
@@ -803,7 +835,7 @@ Each approver finds it under **My Approvals** and presses **Approve** or **Retur
 
 If a final sheet is deleted or cancelled, its department sheets become free to merge again.
 
-**The Final Requisition by category.** The final sheet lists its items by category, the largest spend first (the same order as the **Category Summary**), with a **Category** column after **Type**. After each category a highlighted **Category Sum** row shows that category's quantity, quantity to buy and amount. **PDF** and **Excel** download the sheet as it reads. **PDF by Category** and **Excel by Category** add one page or sheet per category after it, as the Monthly Report does. Excel is set for A4 landscape, one page wide, with the table heading repeated on every page. The Excel is made for a black-and-white printer: black text on light grey headings, black borders on every cell, and no merged cells, so you can select and copy any cell. The signature boxes at the bottom run from the left edge to the right edge of the page. In the Excel each box has three lines: the caption (for example Prepared by), the name in bold italic, and the designation. The signing date is on the PDF and next to the name in the top block. Item rows are tall enough to read and write on. The **Monthly Report** (PDF and Excel) has the same plain look: light grey headings, black text and borders, no merged cells, and the signature boxes spread edge to edge. To print a requisition straight from the screen, open it and press **Print**; it prints the same document as the **PDF** button, without saving a file first.
+**The Final Requisition by category.** The final sheet lists its items by category, the largest spend first (the same order as the **Category Summary**), with a **Category** column after **Type**. After each category a highlighted **Category Sum** row shows that category's quantity, quantity to buy and amount. **PDF** and **Excel** download the sheet as it reads. **PDF by Category** and **Excel by Category** add one page or sheet per category after it, as the Monthly Report does. Excel is set for A4 landscape, one page wide, with the table heading repeated on every page. The Excel is made for a black-and-white printer: black text on light grey headings, black borders on every cell, and no merged cells, so you can select and copy any cell. The signature boxes at the bottom run from the left edge to the right edge of the page. In the Excel each box has three lines: the caption (for example Prepared by), the name in bold italic, and the designation. The signing date is on the PDF and next to the name in the top block. Item rows are tall enough to read and write on. The page has wider side margins so the left and right borders are not cut in print, short values such as the unit (Square Feet, Kilogram) stay on one line, the labels in the top block stay on one line, and there is clear space between the last item and the signatures. The **Monthly Report** (PDF and Excel) has the same plain look: light grey headings, black text and borders, no merged cells, and the signature boxes spread edge to edge. To print a requisition straight from the screen, open it and press **Print**; it prints the same document as the **PDF** button, without saving a file first.
 
 The **Category Summary** is built from the same lines, so its category amounts and total are the Final Requisition's figures. The **Monthly Report** recalculates stock across sheets, so its totals can differ slightly.
 
@@ -884,10 +916,12 @@ Sending for checking needs at least 2 suppliers and a priced supplier chosen on 
 **3. Check and approve.** The statement moves **Draft, Waiting for Check, Waiting for Approval, Approved**.
 - **Mark as Checked** is the Manager - SCM step. **Approve** is the final step, with an optional approver note (for example "take approval from internal audit before purchasing").
 - **Send Back** returns it to the person who made it with a note saying what to fix; they correct it and send it again.
+- **Alerts.** Nobody has to ask for a check or approval. When a statement is sent for checking, everyone with the **Comparative Statement: Check** right gets an alert (the **Alerts** button, top right) that opens the statement. When it is checked, everyone with the **Approve** right gets one, and the person who made it is told. They are also told when it is approved or sent back.
+- **Menu and waiting count.** Anyone given a purchasing right sees a **General Stock Purchasing** section in the left menu (**To Purchase**, **Comparative Statement**, **Internal PO**), whatever their role (Merchant, Account, Commercial, Supply Chain, Management and so on). A red number beside **Comparative Statement** or **Internal PO** is how many are waiting for that person's check, approval or authorisation.
 - The person who made a statement can never check or approve it. One person may do both the check and the approval if Admin gave them both.
 - **Cancel Statement** (with a reason) puts its items back on **To Purchase**. A statement that already has a purchase order cannot be cancelled until the PO is cancelled.
 
-**4. Make the Internal PO.** On an approved statement press **Make Purchase Order**. One PO is made for each chosen supplier, as a draft, with the quantities and rates of the statement. The number looks like **PO-26-27/T-081**, and its last part (**T-081**) is also printed as the PO's Reference No. Open the PO and press **Edit** to change the date, reference, BIN, consignee, terms, remarks and each line's **Due on**. Quantity and rate cannot be changed here: they are what was approved. **Print / PDF** gives the purchase order on A4 portrait with the amount in words and **Checked By** and **Authorised Signatory**. A draft prints with "DRAFT: not yet authorised".
+**4. Make the Internal PO.** On an approved statement press **Make Purchase Order**. One PO is made for each chosen supplier, as a draft, with the quantities and rates of the statement. The number looks like **PO-26-27/T-081**, and its last part (**T-081**) is also printed as the PO's Reference No. Open the PO and press **Edit** to change the date, reference, consignee, terms and remarks. The **items table cannot be edited** (item, quantity, rate, due on and remarks come from the approved statement), and the **BIN number (0056353810406) is fixed** for every PO. **Print / PDF** gives the purchase order on one A4 portrait page: letterhead with the logo, PO number, date, reference and BIN, then supplier and consignee boxes, payment and delivery terms, the items table, the total with the amount in words, and **Checked By** and **Authorised Signatory**. A draft prints with "DRAFT: not yet authorised".
 
 **5. Check and authorise the PO (two approvals).** A new PO is a **Draft**. Approval 1: someone with the checking right, who did not make the PO, presses **Check PO** (the Checked By box); it becomes **Checked**. They can press **Send back** to return it to draft if something is wrong. Approval 2: the Authorised Signatory, who is neither the maker nor the checker, presses **Authorise PO**; it becomes **Issued**. Store can receive only against an Issued PO. When every item of a requisition is on an issued PO, the requisition shows **Purchase Action Taken**; cancelling a PO puts it back to **Approved**. A PO that Store has received goods against cannot be cancelled. The printed PO carries the Humana logo and shows DRAFT or CHECKED until it is authorised.
 
@@ -895,11 +929,17 @@ Sending for checking needs at least 2 suppliers and a priced supplier chosen on 
 
 **Dashboard.** On **General Stock, Dashboard** anyone who can open Comparative Statements or Internal POs sees a **Purchasing** panel above the stock figures: items waiting to be purchased, statements waiting for check or approval, POs waiting for check or authorising, POs open for receiving, a chart of statements and of POs by stage, the ordered value per month, the waiting items by category (click a category to open it on To Purchase) and the latest POs. Each tile opens the list it counts.
 
+**Correcting a receiving.** In **Purchase History** each item line has an **Edit** button (Store, Admin and Management). It opens the line so you can change the Qty, Unit Price and Remarks, and the RCV Date and Supplier. RCV Date and Supplier are shared by every item on the same GRN, so a change there reaches all of them. GRN No, Challan No and Challan Date are locked. Qty cannot be set below what has already been issued. **Remove** stays with Admin and Management.
+
+**Why Remove still shows after I untick Receiving, Delete.** On **Users & Roles** the **Whole module** row (View, Edit, Delete...) covers every section of General Stock at once. While **Whole module, Delete** is ticked, the user can still remove receiving lines even if **Receiving, Delete** is empty. That empty box is now shown in amber as **Delete (via Whole module)** to say so. To stop it: untick **Whole module, Delete**, then tick **Delete** on only the sections that should keep it (for example Items and Issues). The same applies to **Edit**.
+
+**Who can see a requisition before it is submitted.** A requisition kept as **Draft** is private to the person who raised it (Admin and Management can still see it). It does not appear in the Store's list, **Requested** queue or counts. A department requisition also stays out of the Store until the section head has checked and accepted it; it appears for the Store only after that. The Store always sees the requisitions it raised itself.
+
 **Checking Receiving without entering it.** A person who has only the **Receiving: View** right opens **General Stock, Receiving** and sees a **Receiving summary** (deliveries, items, value, suppliers and POs awaiting delivery this month) and the full **Purchase History** to check. The **Record Receiving** form, **Import** and drafts are hidden; they appear for people with the **Create / Entry** right (and for the Store, Admin and Management roles).
 
 **Who can do what (Admin).** Admin sets this in **Admin, Users, Portal Access** (or the permission list under **General Stock**):
 - The **Supply Chain General** role can see **To Purchase**, make and edit Comparative Statements, and make and edit Internal POs. It cannot check, approve or authorise.
-- **Comparative Statement: Check**, **Comparative Statement: Approve** **Internal PO: Check** and **Internal PO: Authorise** are given to the right people one by one.
+- **Comparative Statement: Check**, **Comparative Statement: Approve** **Internal PO: Check** and **Internal PO: Authorise** are given to the right people one by one. The switches can be on in any mix: for example Approve alone stays on after you save, even though Check and the PO switches are off.
 - Store needs no purchasing right to receive against a PO. The form code printed on the CS, the consignee and BIN printed on the PO, the PO number code (T) and the first number of the year (`PURCHASING_PO_FIRST_NO`, so the system carries on after the last hand-booked PO) and the minimum number of suppliers are in `config/purchasing.php`.
 
 ---

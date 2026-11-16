@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AppNotification;
 use App\Models\GsComparativeStatement;
 use App\Models\GsCsItem;
 use App\Models\GsCsSupplier;
@@ -139,6 +140,9 @@ class ComparativeStatementService
             'returned_at' => null,
         ])->save();
 
+        $this->tellPermission($cs, 'store.purchase_cs.review', $user, 'Comparative Statement to check',
+            $user->name.' sent '.$cs->cs_no.' for checking.');
+
         return $cs;
     }
 
@@ -153,6 +157,10 @@ class ComparativeStatementService
             'checked_by' => $user->id,
             'checked_at' => now(),
         ])->save();
+
+        $this->tellPermission($cs, 'store.purchase_cs.approve', $user, 'Comparative Statement to approve',
+            $user->name.' checked '.$cs->cs_no.'. It is waiting for your approval.');
+        $this->tellMaker($cs, $user, 'Comparative Statement checked', $user->name.' checked '.$cs->cs_no.' and sent it for approval.');
 
         return $cs;
     }
@@ -170,6 +178,8 @@ class ComparativeStatementService
             'approver_note' => filled($note) ? trim($note) : $cs->approver_note,
         ])->save();
 
+        $this->tellMaker($cs, $user, 'Comparative Statement approved', $user->name.' approved '.$cs->cs_no.'. You can now make the purchase order.');
+
         return $cs;
     }
 
@@ -181,6 +191,8 @@ class ComparativeStatementService
         if (trim($note) === '') {
             throw ValidationException::withMessages(['note' => 'Write what needs to be corrected.']);
         }
+
+        $this->tellMaker($cs, $user, 'Comparative Statement sent back', $user->name.' sent back '.$cs->cs_no.': '.trim($note));
 
         $cs->forceFill([
             'status' => GsComparativeStatement::STATUS_DRAFT,
@@ -320,5 +332,31 @@ class ComparativeStatementService
         if ((int) $cs->prepared_by === (int) $user->id) {
             throw ValidationException::withMessages(['cs' => 'You prepared this Comparative Statement, so someone else has to '.$verb.' it.']);
         }
+    }
+
+    /** Alert everyone who holds a permission, except the person who just acted and the maker. */
+    private function tellPermission(GsComparativeStatement $cs, string $permission, User $by, string $title, string $message): void
+    {
+        User::permission($permission)->where('status', 1)->get()
+            ->reject(fn (User $u) => $u->id === $by->id || (int) $u->id === (int) $cs->prepared_by)
+            ->each(fn (User $u) => $this->notify($u, $by, $title, $message, $cs));
+    }
+
+    /** Tell the person who prepared the sheet (or created it, if it has no preparer yet). */
+    private function tellMaker(GsComparativeStatement $cs, User $by, string $title, string $message): void
+    {
+        $maker = User::find($cs->prepared_by ?: $cs->created_by);
+
+        if ($maker && $maker->id !== $by->id) {
+            $this->notify($maker, $by, $title, $message, $cs);
+        }
+    }
+
+    private function notify(User $to, User $by, string $title, string $message, GsComparativeStatement $cs): void
+    {
+        AppNotification::create([
+            'user_id' => $to->id, 'actor_id' => $by->id, 'type' => 'purchase_cs', 'title' => $title, 'message' => $message,
+            'url' => route('store.purchasing.cs.show', $cs),
+        ]);
     }
 }

@@ -456,7 +456,7 @@ it('shows a Store clerk on another role what has reached the Store, their own sh
         ->assertOk()->assertSee('All Requisitions')->assertSee(route('store.stock.requisitions.requested'), false)
         ->assertSee('REACHED/1')->assertDontSee('DRAFT/1')->assertDontSee('HEAD/1');
 
-    $this->actingAs($clerk)->get(route('store.stock.requisitions.requested'))
+    $this->actingAs($clerk)->get(route('store.stock.requisitions.requested', ['month' => '']))
         ->assertOk()->assertSee('REACHED/1')->assertDontSee('HEAD/1');
 });
 
@@ -470,5 +470,20 @@ it('keeps a department user without the Store permission on their own sheets', f
     expect(PurchaseRequisition::worksStoreDesk($user))->toBeFalse()
         ->and(PurchaseRequisition::query()->visibleTo($user)->pluck('requisition_no')->all())->toBe(['MINE/1']);
 
-    $this->actingAs($user)->get(route('store.stock.requisitions.requested'))->assertForbidden();
+    $this->actingAs($user)->get(route('store.stock.requisitions.requested', ['month' => '']))->assertForbidden();
+});
+
+it('keeps other departments\' drafts and sheets still with their head away from the Store role, but not from Admin', function () {
+    $store = fbUser('store');
+    $admin = fbUser('admin');
+    $cutting = fbSection('Cutting');
+    $tee = fbItem('MS Tee-2/1', 'Electrical');
+
+    fbSheet('SENT/1', '2026-09-05', $cutting, [[$tee, 1, 0, 1]], ['status' => PurchaseRequisition::STATUS_SUBMITTED, 'department_review_status' => PurchaseRequisition::DEPT_REVIEW_APPROVED]);
+    fbSheet('DRAFT/1', '2026-09-05', $cutting, [[$tee, 1, 0, 1]], ['status' => PurchaseRequisition::STATUS_DRAFT]);
+    fbSheet('HEAD/1', '2026-09-05', $cutting, [[$tee, 1, 0, 1]], ['status' => PurchaseRequisition::STATUS_SUBMITTED, 'department_review_status' => PurchaseRequisition::DEPT_REVIEW_PENDING]);
+    fbSheet('OWN/1', '2026-09-05', null, [[$tee, 1, 0, 1]], ['status' => PurchaseRequisition::STATUS_DRAFT, 'created_by' => $store->id]);
+
+    expect(PurchaseRequisition::query()->visibleTo($store)->pluck('requisition_no')->sort()->values()->all())->toBe(['OWN/1', 'SENT/1'])
+        ->and(PurchaseRequisition::query()->visibleTo($admin)->count())->toBe(4);
 });

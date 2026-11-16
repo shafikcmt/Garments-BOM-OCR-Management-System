@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PurchaseRequisition;
 use App\Models\StockItem;
 use App\Models\StockPurchase;
 use Illuminate\Support\Carbon;
@@ -102,6 +103,61 @@ class PurchaseRequisitionService
         }
 
         return $out;
+    }
+
+    /**
+     * Bring a sheet's Stock in Hand (and Safety Stock) up to today, and work
+     * out To Be Procured and Amount again from them.
+     *
+     * Called when the Store marks a department's sheet Received: stock can
+     * move between the day a requisition is raised and the day the Store
+     * takes it (an item that had 4 in stock may be out of stock by then), and
+     * what is bought must follow the shelf as the Store finds it. Quantity
+     * requested, rate, consumption and last purchase are left as they were.
+     *
+     * @return int how many lines changed
+     */
+    public function refreshStock(PurchaseRequisition $requisition): int
+    {
+        $lines = $requisition->items()->whereNotNull('stock_item_id')->get();
+
+        if ($lines->isEmpty()) {
+            return 0;
+        }
+
+        $snapshots = $this->snapshots($lines->pluck('stock_item_id')->all());
+        $changed = 0;
+
+        foreach ($lines as $line) {
+            $snapshot = $snapshots[$line->stock_item_id] ?? null;
+
+            if ($snapshot === null || $snapshot['stock_in_hand'] === null) {
+                continue;
+            }
+
+            $stock = (float) $snapshot['stock_in_hand'];
+            $safety = $snapshot['safety_stock'];
+            $toBeProcured = $this->toBeProcured(
+                (float) $line->qty_requested,
+                $stock,
+                // Individual: Safety Stock is not added to what is bought.
+                $requisition->isIndividual() ? null : $safety,
+            );
+
+            $line->fill([
+                'stock_in_hand_snapshot' => $stock,
+                'safety_stock_snapshot' => $safety,
+                'to_be_procured_qty' => $toBeProcured,
+                'amount' => $line->rate_appx !== null ? $toBeProcured * (float) $line->rate_appx : 0,
+            ]);
+
+            if ($line->isDirty()) {
+                $line->save();
+                $changed++;
+            }
+        }
+
+        return $changed;
     }
 
     /**

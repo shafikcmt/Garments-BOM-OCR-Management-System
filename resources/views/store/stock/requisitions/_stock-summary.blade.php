@@ -9,9 +9,13 @@
     Purchase View for the current month, with a link to the full card.
 
     Expects: $stockSummary, and for the full card $stockSummaryPage.
+    $showTable = false leaves the item table (and its pages) out of the full
+    card: the requisition list shows the cards, filters and chart only, and
+    the items stay one click away in the Excel / PDF downloads.
 --}}
 @php
     $compact = $compact ?? false;
+    $showTable = $showTable ?? true;
     $s = $stockSummary;
     $f = $s['filters'];
     $view = $compact ? \App\Services\StockSummaryService::VIEW_PURCHASE : $s['view'];
@@ -218,6 +222,7 @@
         'sectionUrl' => fn (int $id) => $here(['sections' => [(string) $id]] + \App\Services\StockSummaryService::query($f, 'issue')),
         'itemUrl' => fn (string $name) => $here(['search' => $name] + \App\Services\StockSummaryService::query($f, 'issue')),
     ])
+    @if($showTable)
     <div class="table-responsive gx-sum-scroll">
         <table class="table table-sm align-middle mb-0 gx-report-table gx-sum-table">
             <thead>
@@ -262,12 +267,14 @@
             </tbody>
         </table>
     </div>
+    @endif
 @else
     @php($sum = $s['purchase']['totals'])
     {{-- One small chart on the full card; dashboards stay light. --}}
     @unless($compact)
         @include('store.stock.requisitions._purchase-chart', ['chart' => $s['charts']['purchase']])
     @endunless
+    @if($showTable)
     <div class="table-responsive gx-sum-scroll">
         <table class="table table-sm align-middle mb-0 gx-report-table gx-sum-table">
             <thead>
@@ -316,13 +323,14 @@
             </tbody>
         </table>
     </div>
+    @endif
 @endif
 
 @if($compact)
     <p class="text-muted small mb-0 mt-2">{{ $s['period'] }} · Drafts excluded. Current Stock = today. Purchase and stock are company-wide.
         @if($total > $rows->count()) {{ number_format($total - $rows->count()) }} more on the Stock Summary. @endif
     </p>
-@elseif($stockSummaryPage->hasPages())
+@elseif($showTable && $stockSummaryPage->hasPages())
     <div class="mt-3">{{ $stockSummaryPage->links() }}</div>
 @endif
 

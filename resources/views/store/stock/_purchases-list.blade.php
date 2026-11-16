@@ -69,7 +69,12 @@
                 </div>
             @endif
 
-            <div class="table-responsive">
+            {{-- gx-stock-scroll: the table scrolls inside a box capped at 72vh, so
+                 the sideways scrollbar sits at the bottom of the screen instead
+                 of below all 25 rows, and the header row stays pinned. Without
+                 it the bar was out of sight and Edit / Remove (the last column)
+                 looked missing. --}}
+            <div class="table-responsive gx-stock-scroll">
                 <table class="table align-middle gx-stock-table">
                     <thead>
                         <tr>
@@ -88,7 +93,7 @@
                             <th class="text-end">Unit Price</th>
                             <th class="text-end">Received Value</th>
                             <th style="min-width:140px;">Remarks</th>
-                            <th class="text-end gx-stock-actions">Action</th>
+                            <th class="text-end gx-stock-actions gx-sticky-actions">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -156,7 +161,7 @@
                                          enforces the same checks server-side. Both act
                                          on THIS ONE LINE, not the whole delivery —
                                          which is what the confirm below spells out. --}}
-                                    <td class="text-end gx-stock-actions gx-row-actions">
+                                    <td class="text-end gx-stock-actions gx-row-actions gx-sticky-actions">
                                         @if($canEdit)
                                             <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPurchase{{ $line->id }}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit</button>
                                         @endif
@@ -214,7 +219,7 @@
                                     <td class="text-end small">—</td>
                                     <td class="text-end fw-semibold">{{ $money($group->group_total_value) }}</td>
                                     <td class="small text-muted">—</td>
-                                    <td class="text-end gx-stock-actions"><span class="text-muted small">—</span></td>
+                                    <td class="text-end gx-stock-actions gx-sticky-actions"><span class="text-muted small">—</span></td>
                                 </tr>
                             @endforelse
                         @empty

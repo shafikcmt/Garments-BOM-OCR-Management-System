@@ -955,6 +955,12 @@ class RequisitionWorkflow
         };
 
         $requisition->save();
+
+        // The Store has just taken a department's sheet: its stock figures
+        // follow the shelf as it is today, not as it was when raised.
+        if ($stamp === RequisitionSignatureBlock::STAMP_STORE_HEAD && $requisition->isDepartmentLevel()) {
+            $this->requisitions->refreshStock($requisition);
+        }
     }
 
     /**
@@ -972,6 +978,8 @@ class RequisitionWorkflow
                     'store_ack_by' => $requisition->store_ack_by ?? $user->id,
                     'store_ack_at' => $requisition->store_ack_at ?? now(),
                 ])->save();
+
+                $this->requisitions->refreshStock($requisition);
             }
 
             return;

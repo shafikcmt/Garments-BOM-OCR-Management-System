@@ -240,14 +240,14 @@
                  not linked. --}}
             @if($requisition->mergedInto)
                 <div class="alert alert-info border-0 mt-3 mb-0 small">
-                    <i class="bi bi-intersect me-1" aria-hidden="true"></i><strong>Merged into final requisition</strong>
+                    <i class="bi bi-intersect me-1" aria-hidden="true"></i><strong>Merged into {{ $requisition->isIndividual() ? 'individual' : 'final' }} requisition</strong>
                     @if($requisition->mergedInto->isVisibleTo(auth()->user()))
                         <a href="{{ route('store.stock.requisitions.show', $requisition->mergedInto) }}" class="fw-semibold">{{ $requisition->mergedInto->requisition_no }}</a>
                     @else
                         {{ $requisition->mergedInto->requisition_no }}
                     @endif
                     ({{ $requisition->mergedInto->progressLabel() }})@if($requisition->merged_at) on {{ $requisition->merged_at->local()->format('d-M-Y') }}@endif.
-                    <span class="d-block mt-1">The final requisition carries these items through Store Head, Finance &amp; Commercial and Operation Head approval.</span>
+                    <span class="d-block mt-1">{{ $requisition->isIndividual() ? 'That requisition carries these items through the rest of the approval.' : 'The final requisition carries these items through Store Head, Finance & Commercial and Operation Head approval.' }}</span>
                 </div>
             @elseif($requisition->isReadyToMerge())
                 <div class="alert alert-light border mt-3 mb-0 small">
@@ -256,7 +256,7 @@
             @endif
             @if($requisition->mergedSources->isNotEmpty())
                 <div class="gx-merged mt-3">
-                    <div class="gx-merged-head"><i class="bi bi-intersect me-1" aria-hidden="true"></i>Merged from {{ $requisition->mergedSources->count() }} department requisition{{ $requisition->mergedSources->count() === 1 ? '' : 's' }}</div>
+                    <div class="gx-merged-head"><i class="bi bi-intersect me-1" aria-hidden="true"></i>Merged from {{ $requisition->mergedSources->count() }} {{ $requisition->isIndividual() ? 'individual' : 'department' }} requisition{{ $requisition->mergedSources->count() === 1 ? '' : 's' }}</div>
                     <div class="gx-merged-chips">
                         @foreach($requisition->mergedSources as $source)
                             @php($label = $source->indentSection?->name ?: ($source->departmentLabel() ?: ucfirst(strtolower(explode('/', $source->requisition_no)[1] ?? $source->requisition_no))))
@@ -406,6 +406,9 @@
                 Stock, safety, consumption and last purchase are the figures as at
                 {{ optional($requisition->requisition_date)->format('d M Y') }} — frozen when this requisition was raised,
                 so it still shows the position that justified it.
+                @if($requisition->isDepartmentLevel() && $requisition->store_ack_at)
+                    Stock in Hand and Safety Stock were updated on {{ \App\Support\LocalTime::show($requisition->store_ack_at, 'd M Y') }}, when the Store received it.
+                @endif
             </p>
         </div>
     </div>

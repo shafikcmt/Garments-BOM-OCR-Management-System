@@ -97,6 +97,8 @@
                 @include('store.stock.requisitions._stock-summary', [
                     'stockSummary' => $stockSummary,
                     'stockSummaryPage' => $stockSummaryPage,
+                    // The list below is what this page is for; the items are in the downloads.
+                    'showTable' => false,
                 ])
             </div>
         </div>
@@ -167,6 +169,9 @@
                             <th style="min-width:240px;">Requisition No</th>
                             <th style="min-width:110px;">Date</th>
                             <th style="min-width:140px;">Section</th>
+                            {{-- In the order it happens: Raised By is the account that
+                                 typed the sheet, Requested By the head it then goes to. --}}
+                            <th style="min-width:150px;">Raised By</th>
                             <th style="min-width:150px;">Requested By</th>
                             <th class="text-end" style="min-width:80px;">Items</th>
                             <th class="text-end" style="min-width:130px;">Total Amount</th>
@@ -179,11 +184,11 @@
                             <tr>
                                 <td>
                                     <div class="fw-bold text-slate-900">{{ $r->requisition_no }} @include('store.stock.requisitions._type-badge', ['r' => $r])</div>
-                                    <div class="gx-stock-spec">raised by {{ optional($r->createdBy)->name ?: '—' }}</div>
                                 </td>
                                 <td class="small">{{ optional($r->requisition_date)->format('d-M-Y') ?? '—' }}</td>
                                 <td class="small">{{ optional($r->indentSection)->name ?: 'All' }}</td>
-                                <td class="small text-muted">{{ $r->requesterName() ?: '—' }}</td>
+                                <td class="small text-muted">{{ optional($r->createdBy)->name ?: '—' }}</td>
+                                <td class="small">{{ $r->requestedByName() ?: '—' }}</td>
                                 <td class="text-end fw-semibold">{{ $r->items_count }}</td>
                                 <td class="text-end fw-semibold">@include('store.stock.requisitions._amount', ['amount' => $r->items_sum_amount])</td>
                                 <td>
@@ -216,7 +221,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="gx-stock-empty">
+                            <tr><td colspan="9" class="gx-stock-empty">
                                 <span class="gx-stock-empty-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
                                 <div class="gx-stock-empty-title">{{ $hasFilters ? 'No requisitions match this filter' : 'No requisitions raised yet' }}</div>
                                 <div class="gx-stock-empty-hint">{{ $hasFilters ? 'Try a different month or status.' : 'Raise one with New Requisition above.' }}</div>

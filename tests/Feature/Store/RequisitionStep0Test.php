@@ -91,8 +91,12 @@ it('labels the Stock Summary "To Purchase" and its footer "Total"', function () 
     $this->actingAs($store)->get(route('store.stock.requisitions.index'))
         ->assertOk()
         ->assertSee('To Purchase')
-        ->assertSee('>Total</td>', false)
         ->assertDontSee('Total-');
+
+    // The item table (and its "Total" footer) is no longer drawn on the list
+    // page; its wording in the shared partial is unchanged.
+    expect(file_get_contents(resource_path('views/store/stock/requisitions/_stock-summary.blade.php')))
+        ->toContain('<td></td><td colspan="3">Total</td>');
 });
 
 it('offers the month filter as named months, keeping an older selected month', function () {

@@ -89,11 +89,14 @@ it('shows the card, with both views, to a holder of the permission and to Admin'
         ->assertOk()
         ->assertSee('id="stock-summary"', false)
         ->assertSee('Purchase View')->assertSee('Issue View')
-        ->assertSee('Pencil HB')->assertSee('Current Stock')->assertSee('To Purchase');
+        ->assertSee('To Purchase')
+        // The item table is not on the list page; the items are in the downloads.
+        ->assertDontSee('<table class="table table-sm align-middle mb-0 gx-report-table gx-sum-table">', false);
 
     $this->actingAs($user)->get(route('store.stock.requisitions.index', ['sum' => SUM_AUGUST['sum'] + ['view' => 'issue']]))
         ->assertOk()
-        ->assertSee('Approx Rate')->assertSee('Issue Bal. Value')->assertSee('CAD &amp; Sample', false)->assertSee('40.0%');
+        ->assertSee('40.0%')
+        ->assertDontSee('<table class="table table-sm align-middle mb-0 gx-report-table gx-sum-table">', false);
 
     foreach (['purchase', 'issue'] as $view) {
         $query = ['sum' => SUM_AUGUST['sum'] + ['view' => $view]];
@@ -160,7 +163,7 @@ it('gives the Issue View the same totals as Requirement vs Issue for the same fi
         ->and(collect($summary['cards']['issue'])->pluck('value', 'label')['Issued %'])->toEqual($rvi['summary']['pct']);
 });
 
-it('lists every item 25 a page, with totals over all filtered rows', function () {
+it('pages every item 25 at a time, with totals over all filtered rows', function () {
     $section = sumSection();
     $lines = [];
     foreach (range(1, 30) as $n) {
@@ -173,15 +176,18 @@ it('lists every item 25 a page, with totals over all filtered rows', function ()
     expect($summary['purchase']['rows'])->toHaveCount(30)
         ->and($summary['purchase']['totals']['requested'])->toEqual(465.0);   // 1 + 2 + … + 30
 
-    $page1 = $this->actingAs($user)->get(route('store.stock.requisitions.index', SUM_AUGUST))->assertOk()->getContent();
-    $page2 = $this->actingAs($user)->get(route('store.stock.requisitions.index', SUM_AUGUST + ['sum_page' => 2]))->assertOk()->getContent();
+    // 25 a page, highest To Purchase first: Item 30 opens page 1, Item 01
+    // closes page 2. (The list page no longer draws this table; the paging
+    // still serves the service's callers.)
+    $rows = $summary['purchase']['rows'];
+    $pager = app(StockSummaryService::class);
+    $page1 = $pager->page($rows, 1, 'sum_page', '/', [])->getCollection()->pluck('item_name');
+    $page2 = $pager->page($rows, 2, 'sum_page', '/', [])->getCollection()->pluck('item_name');
+    expect($page1)->toHaveCount(25)->toContain('Item 30')->not->toContain('Item 05')
+        ->and($page2)->toHaveCount(5)->toContain('Item 01')->not->toContain('Item 30');
 
-    // Highest To Purchase first: Item 30 opens page 1, Item 01 closes page 2.
-    // Read from the table only — the chart above it covers every row.
-    $table = fn (string $html) => substr($html, strpos($html, 'gx-sum-table'));
-    [$page1, $page2] = [$table($page1), $table($page2)];
-    expect($page1)->toContain('Item 30')->not->toContain('Item 05')->toContain('465')
-        ->and($page2)->toContain('Item 01')->not->toContain('Item 30')->toContain('465');
+    $this->actingAs($user)->get(route('store.stock.requisitions.index', SUM_AUGUST))->assertOk()
+        ->assertDontSee('<table class="table table-sm align-middle mb-0 gx-report-table gx-sum-table">', false);
 });
 
 it('keeps the list filters and the summary filters apart', function () {

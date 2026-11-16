@@ -594,6 +594,24 @@ class PurchaseRequisition extends Model
     }
 
     /**
+     * Individual sheets waiting at the Store's Received step, not merged —
+     * what the Store Head / Store Admin can merge into one (mergeIndividual).
+     */
+    public function scopeIndividualAtStore(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query->where($table.'.level', self::LEVEL_DEPARTMENT)
+            ->where($table.'.requisition_type', self::TYPE_INDIVIDUAL)
+            ->where($table.'.status', self::STATUS_SUBMITTED)
+            ->whereNull($table.'.merged_into_id')
+            ->whereHas('stages', fn ($s) => $s
+                ->where('purchase_requisition_stages.status', PurchaseRequisitionStage::STATUS_PENDING)
+                ->where('purchase_requisition_stages.stamp_source', RequisitionSignatureBlock::STAMP_STORE_HEAD)
+                ->whereColumn('purchase_requisition_stages.sequence', $table.'.current_stage'));
+    }
+
+    /**
      * Who may merge: whoever raises the final sheet (the Store side) and may
      * create requisitions — the same pair that opens the entry form for a
      * final sheet.
@@ -694,6 +712,35 @@ class PurchaseRequisition extends Model
     public function requesterName(): ?string
     {
         return $this->indentPerson?->name ?: $this->createdBy?->name;
+    }
+
+    /**
+     * "Requested By" as the lists print it: always the HEAD the sheet goes to
+     * — its section head when the section has one, else its department head —
+     * the same person the document prints under "Checked by (Department
+     * Head)". The account that typed the sheet is "Raised By".
+     *
+     * A Final Requisition (the Store's own) has no department head, and a
+     * department with no head set falls back to requesterName().
+     */
+    public function requestedByName(): ?string
+    {
+        if (! $this->isDepartmentLevel()) {
+            return $this->requesterName();
+        }
+
+        // One lookup per section / department / raiser on a page of rows.
+        static $heads = [];
+        // (Keyed by the running application too, so one test's rows never answer another's.)
+        $key = spl_object_id(app()).'|'.$this->indent_section_id.'|'.$this->department_role.'|'.$this->created_by;
+
+        if (! array_key_exists($key, $heads)) {
+            $first = \App\Services\RequisitionReviewChain::stepsForRequisition($this)[0] ?? null;
+            $head = $first['head'] ?? RequisitionDepartmentHead::headOf($this->department_role);
+            $heads[$key] = $head?->name;
+        }
+
+        return $heads[$key] ?: $this->requesterName();
     }
 
     public function storeAckBy()
@@ -815,7 +862,7 @@ class PurchaseRequisition extends Model
         }
 
         if ($this->isMerged() && $this->status === self::STATUS_STORE_REVIEWED) {
-            return 'Merged into Final';
+            return $this->isIndividual() ? 'Merged' : 'Merged into Final';
         }
 
         // A final sheet on its way through the approvals names the stage it
@@ -909,7 +956,7 @@ class PurchaseRequisition extends Model
             return $query->whereRaw('1 = 0');
         }
 
-        if (self::seesEveryRequisition($user)) {
+        if (self::seesWholeCompanyIncludingDrafts($user)) {
             return $query;
         }
 
@@ -957,7 +1004,7 @@ class PurchaseRequisition extends Model
             return false;
         }
 
-        if (self::seesEveryRequisition($user) || $this->created_by === $user->id) {
+        if (self::seesWholeCompanyIncludingDrafts($user) || $this->created_by === $user->id) {
             return true;
         }
 
@@ -976,6 +1023,21 @@ class PurchaseRequisition extends Model
         return in_array(RequisitionDepartmentHead::normalizeKey($this->department_role), RequisitionDepartmentHead::departmentsHeadedBy($user), true)
             || ($this->indent_section_id !== null
                 && in_array($this->indent_section_id, RequisitionDepartmentHead::sectionsHeadedBy($user), true));
+    }
+
+    /**
+     * Admin and Management read every sheet, including other people's drafts
+     * and sheets still with their section head.
+     *
+     * The Store side (store role, or store.requisition.final) does NOT. A
+     * requisition is the Store's business only once it has been submitted and,
+     * for a department sheet, accepted by its section head (reachedStore());
+     * before that it belongs to whoever raised it. The Store still sees its own
+     * drafts (created_by) and anything it is named on.
+     */
+    public static function seesWholeCompanyIncludingDrafts(User $user): bool
+    {
+        return $user->hasAnyRole(['admin', 'management']);
     }
 
     /**
@@ -1024,6 +1086,16 @@ class PurchaseRequisition extends Model
             && (self::seesEveryRequisition($user)
                 || $user->can('store.requisition.review')
                 || self::isStoreHead($user));
+    }
+
+    /**
+     * Who may merge Individual requisitions of one section: the Store Head on
+     * Admin > Departments, or a Store Admin (a Store user marked Department
+     * Admin on Users & Roles — shown as "Store Head" on their profile).
+     */
+    public static function canMergeIndividual(?User $user): bool
+    {
+        return self::isStoreHead($user) || StockItem::isStoreAdmin($user);
     }
 
     /** The Store department head on Admin > Departments — Store, whatever their role. */
