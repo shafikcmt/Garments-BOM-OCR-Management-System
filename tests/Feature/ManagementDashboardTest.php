@@ -104,3 +104,23 @@ it('shows a real percentage when both months have data', function () {
     // 1 last month -> 2 this month
     expect($delta)->toBe(100.0);
 });
+
+it('leads with what needs the manager’s decision and the company position', function () {
+    $this->actingAs(managementUser())
+        ->get(route('management.dashboard'))
+        ->assertOk()
+        ->assertSeeInOrder(['Needs your decision', 'Company position', 'Payment requests', 'Reports']);
+});
+
+it('groups the management menu instead of listing every screen flat', function () {
+    $this->actingAs(managementUser())
+        ->get(route('management.dashboard'))
+        ->assertOk()
+        ->assertSeeInOrder(['Overview', 'Approvals', 'Reports', 'Monitor &amp; Operations'], false)
+        ->assertSee('Order &amp; Delivery Status', false)
+        ->assertSee('Store &amp; Stock', false)
+        // nothing was removed from the menu
+        ->assertSee('Bulk Issuing')
+        ->assertSee('Costing Templates')
+        ->assertSee('Supplier Delivery');
+});

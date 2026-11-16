@@ -735,9 +735,18 @@
             </div>
             @endrole
 
+            {{-- MANAGEMENT. Same links as before, grouped by what a manager does:
+                 decide, read reports, monitor, and (rarely) look into a
+                 department's working screens. Groups open by themselves when
+                 one of their pages is showing. --}}
             @role('management')
+            @php
+                $mgMonitor = request()->routeIs('merchant.status.*') || request()->routeIs('merchant.ocr.*') || request()->routeIs('merchant.analytics.*') || request()->routeIs('supply_chain.supplier_delivery') || request()->routeIs('commercial.shipments.*');
+                $mgMerch = request()->routeIs('merchant.samples.*') || request()->routeIs('merchant.inquiries.*') || request()->routeIs('merchant.meetings.*') || request()->routeIs('merchant.consumption.*') || request()->routeIs('merchant.costing_templates.*');
+                $mgStore = (request()->routeIs('store.material.bulk-issues.*') || request()->routeIs('store.stock.*')) && ! request()->routeIs('store.stock.requisitions.my-approvals');
+            @endphp
             <div class="sidebar-section">
-                <div class="sidebar-section-label">Main Menu</div>
+                <div class="sidebar-section-label">Overview</div>
                 <ul class="sidebar-list">
                     <li class="sidebar-item">
                         <a href="{{ route('management.dashboard') }}" class="sidebar-nav-link {{ request()->routeIs('management.dashboard') ? 'is-active' : '' }}">
@@ -747,157 +756,167 @@
                             </span>
                         </a>
                     </li>
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Approvals</div>
+                <ul class="sidebar-list">
                     @include('layouts._my-approvals-link', [])
-                    @include('layouts._followup-link')
                     @include('layouts._bom-approval-link')
-                    <li class="sidebar-item">
-                        <a href="{{ route('merchant.status.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.status.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-bar-chart-steps" aria-hidden="true"></i></span><span class="sidebar-link-text">Style Status</span></span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('merchant.ocr.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.ocr.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-table" aria-hidden="true"></i></span><span class="sidebar-link-text">OCR Summary</span></span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('merchant.samples.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.samples.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-scissors" aria-hidden="true"></i></span><span class="sidebar-link-text">Samples</span></span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('merchant.inquiries.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.inquiries.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-chat-left-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Inquiries</span></span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('merchant.meetings.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.meetings.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-people" aria-hidden="true"></i></span><span class="sidebar-link-text">Meetings</span></span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('merchant.analytics.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.analytics.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i></span><span class="sidebar-link-text">Analytics</span></span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('merchant.consumption.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.consumption.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Consumption Master</span></span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('merchant.costing_templates.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.costing_templates.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-ruled" aria-hidden="true"></i></span><span class="sidebar-link-text">Costing Templates</span></span>
-                        </a>
-                    </li>
+                    @include('layouts._followup-link')
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Reports</div>
+                <ul class="sidebar-list">
                     <li class="sidebar-item">
                         <a href="{{ route('merchant.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.reports.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Merchandising Reports</span>
-                            </span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('supply_chain.supplier_delivery') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.supplier_delivery') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span><span class="sidebar-link-text">Supplier Delivery</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Merchandising Reports</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('supply_chain.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.reports.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Supply Chain Reports</span>
-                            </span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('commercial.shipments.index') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.shipments.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span class="sidebar-link-text">Inbound Shipments</span></span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Supply Chain Reports</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('commercial.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.reports.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Commercial Reports</span>
-                            </span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Commercial Reports</span></span>
                         </a>
                     </li>
                     <li class="sidebar-item">
                         <a href="{{ route('store.reports.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.reports.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Store Reports</span>
-                            </span>
+                            <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span><span class="sidebar-link-text">Store Reports</span></span>
                         </a>
                     </li>
-                    {{-- Management records no issues; the link is here so they can
-                         review and correct what Store recorded. --}}
-                    <li class="sidebar-item">
-                        <a href="{{ route('store.material.bulk-issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.bulk-issues.*') ? 'is-active' : '' }}">
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Monitor &amp; Operations</div>
+                <ul class="sidebar-list">
+                    <li class="sidebar-group {{ $mgMonitor ? 'is-open' : '' }}">
+                        <button type="button" class="sidebar-group-button {{ $mgMonitor ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $mgMonitor ? 'true' : 'false' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Bulk Issuing</span>
+                                <span class="sidebar-icon"><i class="bi bi-activity" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Order &amp; Delivery Status</span>
                             </span>
-                        </a>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+                        </button>
+                        <div class="sidebar-submenu {{ $mgMonitor ? 'is-open' : '' }}">
+                            <ul class="sidebar-list">
+                            <li class="sidebar-item">
+                                <a href="{{ route('merchant.status.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.status.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-bar-chart-steps" aria-hidden="true"></i></span><span class="sidebar-link-text">Style Status</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('merchant.ocr.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.ocr.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-table" aria-hidden="true"></i></span><span class="sidebar-link-text">OCR Summary</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('merchant.analytics.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.analytics.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-graph-up-arrow" aria-hidden="true"></i></span><span class="sidebar-link-text">Analytics</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('supply_chain.supplier_delivery') }}" class="sidebar-nav-link {{ request()->routeIs('supply_chain.supplier_delivery') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span><span class="sidebar-link-text">Supplier Delivery</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('commercial.shipments.index') }}" class="sidebar-nav-link {{ request()->routeIs('commercial.shipments.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span class="sidebar-link-text">Inbound Shipments</span></span>
+                                </a>
+                            </li>
+                            </ul>
+                        </div>
                     </li>
-                    {{-- Same reason as Bulk Issuing above: Management carries the
-                         store.edit / store.delete rights for these General Stock
-                         screens, so it needs a way to reach them. Same order and
-                         icons as the store role's own General Stock block. --}}
-                    {{-- Named in full to keep it distinct from the material
-                         Requisitions under Buyer/Style Stock. --}}
-                    <li class="sidebar-item">
-                        <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*') && ! request()->routeIs('store.stock.requisitions.my-approvals') ? 'is-active' : '' }}">
+                    <li class="sidebar-group {{ $mgMerch ? 'is-open' : '' }}">
+                        <button type="button" class="sidebar-group-button {{ $mgMerch ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $mgMerch ? 'true' : 'false' }}">
                             <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Purchase Requisition</span>
+                                <span class="sidebar-icon"><i class="bi bi-scissors" aria-hidden="true"></i></span>
+                                <span class="sidebar-link-text">Merchandising</span>
                             </span>
-                        </a>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+                        </button>
+                        <div class="sidebar-submenu {{ $mgMerch ? 'is-open' : '' }}">
+                            <ul class="sidebar-list">
+                            <li class="sidebar-item">
+                                <a href="{{ route('merchant.samples.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.samples.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-scissors" aria-hidden="true"></i></span><span class="sidebar-link-text">Samples</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('merchant.inquiries.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.inquiries.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-chat-left-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Inquiries</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('merchant.meetings.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.meetings.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-people" aria-hidden="true"></i></span><span class="sidebar-link-text">Meetings</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('merchant.consumption.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.consumption.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-list-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Consumption Master</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('merchant.costing_templates.index') }}" class="sidebar-nav-link {{ request()->routeIs('merchant.costing_templates.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-file-earmark-ruled" aria-hidden="true"></i></span><span class="sidebar-link-text">Costing Templates</span></span>
+                                </a>
+                            </li>
+                            </ul>
+                        </div>
                     </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Receiving</span>
-                            </span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('store.stock.issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Issues</span>
-                            </span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Stock Report</span>
-                            </span>
-                        </a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="{{ route('store.stock.items.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">
+                    <li class="sidebar-group {{ $mgStore ? 'is-open' : '' }}">
+                        <button type="button" class="sidebar-group-button {{ $mgStore ? 'is-active' : '' }}" data-sidebar-group-toggle aria-expanded="{{ $mgStore ? 'true' : 'false' }}">
                             <span class="sidebar-link-main">
                                 <span class="sidebar-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Items</span>
+                                <span class="sidebar-link-text">Store &amp; Stock</span>
                             </span>
-                        </a>
-                    </li>
-                    {{-- Purchase Setup and Issue Setup are one screen now. Their
-                         old routes redirect here, so both spellings still
-                         highlight this entry. --}}
-                    <li class="sidebar-item">
-                        <a href="{{ route('store.stock.setup') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.setup') || request()->routeIs('store.stock.purchase-setup.*') || request()->routeIs('store.stock.issue-setup.*') ? 'is-active' : '' }}">
-                            <span class="sidebar-link-main">
-                                <span class="sidebar-icon"><i class="bi bi-sliders" aria-hidden="true"></i></span>
-                                <span class="sidebar-link-text">Setup</span>
-                            </span>
-                        </a>
+                            <span class="sidebar-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+                        </button>
+                        <div class="sidebar-submenu {{ $mgStore ? 'is-open' : '' }}">
+                            <ul class="sidebar-list">
+                            <li class="sidebar-item">
+                                <a href="{{ route('store.material.bulk-issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.material.bulk-issues.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span><span class="sidebar-link-text">Bulk Issuing</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('store.stock.requisitions.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.requisitions.*')  && ! request()->routeIs('store.stock.requisitions.my-approvals') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span><span class="sidebar-link-text">Purchase Requisition</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('store.stock.purchases.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.purchases.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span class="sidebar-link-text">Receiving</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('store.stock.issues.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.issues.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></span><span class="sidebar-link-text">Issues</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('store.stock.ledger') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.ledger*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-journal-text" aria-hidden="true"></i></span><span class="sidebar-link-text">Stock Report</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('store.stock.items.index') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.items.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span><span class="sidebar-link-text">Items</span></span>
+                                </a>
+                            </li>
+                            <li class="sidebar-item">
+                                <a href="{{ route('store.stock.setup') }}" class="sidebar-nav-link {{ request()->routeIs('store.stock.setup')  || request()->routeIs('store.stock.purchase-setup.*') || request()->routeIs('store.stock.issue-setup.*') ? 'is-active' : '' }}">
+                                    <span class="sidebar-link-main"><span class="sidebar-icon"><i class="bi bi-sliders" aria-hidden="true"></i></span><span class="sidebar-link-text">Setup</span></span>
+                                </a>
+                            </li>
+                            </ul>
+                        </div>
                     </li>
                 </ul>
             </div>
