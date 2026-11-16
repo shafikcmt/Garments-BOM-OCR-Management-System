@@ -7,6 +7,7 @@ use App\Models\Buyer;
 use App\Models\BuyerSeason;
 use App\Models\ChildStyle;
 use App\Models\MotherStyle;
+use App\Models\OrderLine;
 use App\Models\FollowUpTask;
 use App\Services\BomApprovals;
 use App\Services\Costings;
@@ -19,8 +20,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Buyer -> Season -> Mother Style -> Child Style.
  *
- * The merchant's one place to organise styles the way the buyer folders do, so
- * any buyer's Excel can be matched to the same structure. Buyer scoping follows
+ * The merchant's one place for the style master: one standard structure for every
+ * buyer, so any buyer's Excel can be matched to it by an import profile. Buyer scoping follows
  * the rest of Merchandising: a confined user sees and edits only their buyers.
  */
 class StyleLibraryController extends Controller
@@ -50,7 +51,58 @@ class StyleLibraryController extends Controller
             'children' => ChildStyle::whereHas('mother', fn ($q) => $q->whereIn('buyer_id', $buyers->pluck('id')))->count(),
         ];
 
-        return view('merchant.styles', compact('buyers', 'buyer', 'seasons', 'season', 'totals'));
+        $stats = $season ? $this->styleStats($season->motherStyles) : [];
+
+        return view('merchant.styles', compact('buyers', 'buyer', 'seasons', 'season', 'totals', 'stats'));
+    }
+
+    /**
+     * The standard style-list figures of each style of a season, read in a few
+     * queries for the whole list: colours, customer POs, order quantity, ship
+     * date, material lines, final costing margin and samples. A colour / PO in two
+     * files counts once (the largest quantity).
+     *
+     * @param  \Illuminate\Support\Collection<int, MotherStyle>  $mothers
+     * @return array<int, array<string, mixed>>
+     */
+    private function styleStats($mothers): array
+    {
+        if ($mothers->isEmpty()) {
+            return [];
+        }
+        $ids = $mothers->pluck('id');
+        $today = \Illuminate\Support\Carbon::today();
+
+        $lines = OrderLine::whereIn('mother_style_id', $ids)->get(['mother_style_id', 'gmts_color', 'customer_po_no', 'order_qty', 'ship_date'])->groupBy('mother_style_id');
+        $materials = \Illuminate\Support\Facades\DB::table('bom_items')->join('order_lines', 'order_lines.id', '=', 'bom_items.order_line_id')
+            ->whereIn('order_lines.mother_style_id', $ids)->selectRaw('order_lines.mother_style_id as mid, count(*) as n')->groupBy('order_lines.mother_style_id')->pluck('n', 'mid');
+        $costings = app(Costings::class)->latestFinal($mothers);
+        $samples = \App\Models\Sample::whereIn('mother_style_id', $ids)->get(['mother_style_id', 'status', 'required_date'])->groupBy('mother_style_id');
+        $norm = fn ($v) => mb_strtolower(trim((string) $v));
+
+        $out = [];
+        foreach ($mothers as $m) {
+            $l = $lines->get($m->id, collect());
+            $dates = $l->pluck('ship_date')->filter();
+            $upcoming = $dates->filter(fn ($d) => $d->gte($today))->min();
+            $open = ($samples->get($m->id) ?? collect())->filter(fn ($s) => ! in_array($s->status, \App\Models\Sample::CLOSED, true));
+            $costing = $costings->get($m->id);
+
+            $out[$m->id] = [
+                'colours' => $l->pluck('gmts_color')->map($norm)->filter()->unique()->count(),
+                'pos' => $l->pluck('customer_po_no')->map($norm)->filter()->unique()->count(),
+                'qty' => (float) $l->groupBy(fn ($x) => $norm($x->gmts_color) . '|' . $norm($x->customer_po_no))->sum(fn ($g) => (float) $g->max('order_qty')),
+                'ship' => $upcoming ?? $dates->max(),
+                'ship_passed' => $upcoming === null && $dates->isNotEmpty(),
+                'materials' => (int) ($materials[$m->id] ?? 0),
+                'margin' => $costing?->marginPct(),
+                'has_costing' => $costing !== null,
+                'open_samples' => $open->count(),
+                'late_samples' => $open->filter(fn ($s) => $s->required_date && $s->required_date->lt($today))->count(),
+            ];
+        }
+
+        return $out;
     }
 
     /** Where one mother style stands: orders, materials, PO, PI, payment, receipt, issue. */

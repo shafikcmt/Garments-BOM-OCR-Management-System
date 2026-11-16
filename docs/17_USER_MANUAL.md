@@ -119,7 +119,7 @@ What each item on the left menu is for, in the order you use them. Some items ap
 
 ### 2.1 Style Library
 
-**What it is.** The list of a buyer's styles, kept the same way the buyer's folders are:
+**What it is.** Your **style master**: one standard list of styles for every buyer, whatever layout the buyer's own files have. Each style sits under its buyer and season:
 
 ```
 Buyer  ->  Season  ->  Mother style  ->  Child style
@@ -129,6 +129,16 @@ Ann Taylor   SP27       748268            866317 (linked style no.)
 
 - **Mother style** is the main style number.
 - **Child style** is a style linked to it, for example another style number shown in brackets, or a fit such as PETITE or CURVY.
+
+**What the style list shows.** Choose a buyer and a season; each style has one line with:
+- **Group:** the product group (for example DENIM). Costing templates and the Consumption Master use it.
+- **Colours** and **POs:** how many colours and customer POs the style has.
+- **Order qty:** pieces ordered (a colour and PO repeated in two files counts once).
+- **Ship date:** the nearest date still ahead; "passed" if every date is behind you.
+- **BOM lines:** how many material lines the style has.
+- **Costing:** the margin of its latest final buyer costing, if there is one.
+- **Samples:** how many are still open, and how many of those are late.
+Press **View Status** to open the style, or **Add Child Style** to link a child style. A dash means nothing is entered yet.
 
 **Open it:** left menu, **Style Library**.
 
