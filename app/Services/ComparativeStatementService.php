@@ -256,6 +256,11 @@ class ComparativeStatementService
             'cs_date' => $data['cs_date'],
             'recommendation' => $data['recommendation'] ?? null,
             'remarks' => $data['remarks'] ?? null,
+            'signatories' => collect($data['signatories'] ?? [])
+                ->filter(fn ($b) => filled($b['label'] ?? null))
+                ->take(GsComparativeStatement::MAX_SIGNATORIES)
+                ->map(fn ($b) => ['label' => trim($b['label']), 'role' => $b['role'] ?? 'blank'])
+                ->values()->all() ?: null,
         ];
     }
 

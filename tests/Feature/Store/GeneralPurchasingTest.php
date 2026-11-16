@@ -838,3 +838,34 @@ it('keeps making a PO from a CS to people who may create POs, supplier by suppli
 
     $this->actingAs($viewer)->post(route('store.purchasing.po.store', $cs), ['supplier' => $cs->suppliers->first()->id])->assertForbidden();
 });
+
+it('prints the standard three signature boxes when none were set', function () {
+    $cs = gpApprovedCs();
+    $html = view('store.purchasing._cs-sheet', ['cs' => $cs->fresh()->load(['preparedBy', 'checkedBy', 'approvedBy'])])->render();
+
+    expect($html)->toContain('Jr. Executive - SCM')->toContain('Manager - SCM')->toContain('Approved By');
+});
+
+it('lets the maker choose the signature boxes, and fills names from the workflow', function () {
+    $sheet = gpApproved([['P/M Needle DBX1', 10]]);
+    $maker = gpUser(['store.purchase_cs.create'], 'Maker One');
+    $payload = gpPayload($sheet->items, [[88, 85]], ['signatories' => [
+        ['label' => 'Merchandiser', 'role' => 'prepared'],
+        ['label' => 'Head of SCM', 'role' => 'checked'],
+        ['label' => 'Director', 'role' => 'blank'],
+        ['label' => 'MD', 'role' => 'approved'],
+        ['label' => '', 'role' => 'blank'],
+    ]]);
+
+    $this->actingAs($maker)->post(route('store.purchasing.cs.store'), $payload + ['action' => 'draft'])->assertSessionHasNoErrors();
+    $cs = GsComparativeStatement::latest('id')->firstOrFail();
+
+    expect($cs->signBoxes())->toHaveCount(4)->and($cs->signBoxes()[2])->toBe(['label' => 'Director', 'role' => 'blank']);
+
+    $cs->update(['prepared_by' => $maker->id, 'prepared_at' => now()]);   // as if submitted
+    $html = view('store.purchasing._cs-sheet', ['cs' => $cs->fresh()->load(['preparedBy', 'checkedBy', 'approvedBy'])])->render();
+    expect($html)->toContain('Merchandiser')->toContain('Head of SCM')->toContain('Director')->toContain('>MD<')
+        ->not->toContain('Jr. Executive - SCM')->toContain('Maker One');
+
+    $this->actingAs($maker)->get(route('store.purchasing.cs.edit', $cs))->assertOk()->assertSee('Signature boxes on the printed form')->assertSee('Head of SCM');
+});

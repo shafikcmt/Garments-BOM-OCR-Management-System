@@ -144,20 +144,25 @@
         {!! nl2br(e($cs->recommendation)) !!}
     </div>
 
+    @php
+        $boxes = $cs->signBoxes();
+        $width = floor(100 / max(1, count($boxes)));
+        $whoFor = fn ($role) => match ($role) {
+            'prepared' => $cs->preparedBy ? [$cs->preparedBy->name, $cs->prepared_at] : null,
+            'checked' => $cs->checkedBy ? [$cs->checkedBy->name, $cs->checked_at] : null,
+            'approved' => $cs->approvedBy ? [$cs->approvedBy->name, $cs->approved_at] : null,
+            default => null,
+        };
+    @endphp
     <table class="sig">
         <tr>
-            <td>
-                <div class="who">@if($cs->preparedBy){{ $cs->preparedBy->name }}<br>{{ $cs->prepared_at?->format('d-m-Y') }}@endif</div>
-                <div class="line">Jr. Executive - SCM</div>
-            </td>
-            <td>
-                <div class="who">@if($cs->checkedBy){{ $cs->checkedBy->name }}<br>{{ $cs->checked_at?->format('d-m-Y') }}@endif</div>
-                <div class="line">Manager - SCM</div>
-            </td>
-            <td>
-                <div class="who">@if($cs->approvedBy){{ $cs->approvedBy->name }}<br>{{ $cs->approved_at?->format('d-m-Y') }}@endif</div>
-                <div class="line">Approved By</div>
-            </td>
+            @foreach($boxes as $box)
+                @php $who = $whoFor($box['role']); @endphp
+                <td style="width:{{ $width }}%;">
+                    <div class="who">@if($who){{ $who[0] }}<br>{{ $who[1]?->format('d-m-Y') }}@endif</div>
+                    <div class="line">{{ $box['label'] }}</div>
+                </td>
+            @endforeach
         </tr>
     </table>
 

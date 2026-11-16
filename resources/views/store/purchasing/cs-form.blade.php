@@ -280,6 +280,24 @@
                         <label class="form-label" for="remarks">Remarks</label>
                         <textarea id="remarks" name="remarks" rows="3" class="form-control">{{ $state['remarks'] }}</textarea>
                     </div>
+                    <div class="col-12">
+                        <label class="form-label">Signature boxes on the printed form</label>
+                        @php($signSlots = range(0, \App\Models\GsComparativeStatement::MAX_SIGNATORIES - 1))
+                        <div class="row g-2">
+                            @foreach($signSlots as $i)
+                                @php($box = $state['signatories'][$i] ?? ['label' => '', 'role' => 'blank'])
+                                <div class="col-12 col-md-6 col-xl">
+                                    <input type="text" name="signatories[{{ $i }}][label]" value="{{ $box['label'] ?? '' }}" maxlength="60" class="form-control form-control-sm mb-1" placeholder="Box {{ $i + 1 }} title (empty = not printed)">
+                                    <select name="signatories[{{ $i }}][role]" class="form-select form-select-sm">
+                                        @foreach(\App\Models\GsComparativeStatement::SIGN_ROLES as $key => $text)
+                                            <option value="{{ $key }}" @selected(($box['role'] ?? 'blank') === $key)>{{ $text }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="form-text">Leave a title empty to drop that box. Up to {{ \App\Models\GsComparativeStatement::MAX_SIGNATORIES }} boxes; the name and date fill in automatically as the sheet is submitted, checked and approved.</div>
+                    </div>
                 </div>
             </div>
         </div>
