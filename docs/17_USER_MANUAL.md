@@ -36,6 +36,21 @@ You only see the screens your role needs.
 
 ---
 
+### 1.1 Management: dashboard and menu
+
+**Menu.** The Management menu is grouped by what you do:
+- **Overview:** Dashboard.
+- **Approvals:** My Approvals (requisitions), BOM Approvals, Follow-ups. A red number means items are waiting for you.
+- **Reports:** Merchandising, Supply Chain, Commercial and Store Reports.
+- **Monitor:** one folder, *Order & Delivery Status* (Style Status, OCR Summary, Analytics, Supplier Delivery, Inbound Shipments, Stock Report). It opens by itself when you are inside it.
+- **Waiting for Approval:** appears only when a Comparative Statement or Internal PO is waiting for you. Management never raises requisitions, purchases or POs, so To Purchase, Purchase Requisition, Receiving, Issuing and similar screens are not in your menu.
+
+**Dashboard.** Read it from top to bottom:
+1. **Needs your decision:** payment requests (PRA), purchase requisitions, BOM approvals and follow-ups waiting for you. Press a box to open the list.
+2. **Company position:** open orders, order quantity, shipments due in 14 days, late bookings, PI and payment pending, goods in transit, late arrivals and overdue payments for all buyers. Press a box to open the related report.
+3. **Payment requests:** how many are pending, approved and rejected, with the last 6 months.
+4. **Reports:** one press to each department report and the approval history.
+
 ## 2. Merchandising
 
 ### 2.0 Merchandising dashboard
