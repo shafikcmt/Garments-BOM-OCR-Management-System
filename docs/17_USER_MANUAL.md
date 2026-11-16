@@ -39,8 +39,7 @@ You only see the screens your role needs.
 ### 1.1 Management: dashboard and menu
 
 **Menu.** The Management menu is grouped by what you do:
-- **Overview:** Dashboard.
-- **Approvals:** My Approvals (requisitions), BOM Approvals, Follow-ups. A red number means items are waiting for you.
+- **Overview & Approvals:** Dashboard, My Approvals (requisitions), BOM Approvals, Follow-ups. A red number means items are waiting for you.
 - **Reports:** Merchandising, Supply Chain, Commercial and Store Reports.
 - **Monitor:** one folder, *Order & Delivery Status* (Style Status, OCR Summary, Analytics, Supplier Delivery, Inbound Shipments, Stock Report). It opens by itself when you are inside it.
 - **Waiting for Approval:** appears only when a Comparative Statement or Internal PO is waiting for you. Management never raises requisitions, purchases or POs, so To Purchase, Purchase Requisition, Receiving, Issuing and similar screens are not in your menu.
