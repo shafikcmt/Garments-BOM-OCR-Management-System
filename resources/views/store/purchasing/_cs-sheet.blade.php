@@ -8,7 +8,7 @@
     $fmt = fn ($n) => rtrim(rtrim(number_format((float) $n, 2), '0'), '.');
     $qty = fn ($n) => rtrim(rtrim(number_format((float) $n, 4), '0'), '.');
     $suppliers = $cs->suppliers;
-    $cols = 6 + ($suppliers->count() * 3) + 1;
+    $categories = collect($cs->items)->pluck('category')->filter(fn ($c) => filled($c))->unique()->values();
 @endphp
 <style>
     .cs-sheet { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9px; color: #111; width: 100%; }
@@ -41,8 +41,8 @@
                 <div>Gorai, Mirzapur, Tangail, Bangladesh</div>
                 <div class="form">Comparative Statement &amp; PO Approval Form</div>
             </td>
-            <td style="width:22%;">
-                <table class="ctrl">
+            <td style="width:24%;vertical-align:top;text-align:right;">
+                <table class="ctrl" align="right" style="width:auto;margin-left:auto;">
                     <tr><td>Code: {{ $cs->form_code }}</td></tr>
                     <tr><td>Issue Date: {{ $cs->form_issue_date }}</td></tr>
                     <tr><td>Version No: {{ $cs->form_version_no }}</td></tr>
@@ -59,6 +59,13 @@
             <td class="c" style="width:33%;">Status: <strong>{{ $cs->statusLabel() }}</strong></td>
             <td class="num">Prepared from approved purchase requisition lines</td>
         </tr>
+        @if($categories->isNotEmpty())
+            {{-- Material category sits here, under CS No and outside the item
+                 table, instead of as a banner row inside it. --}}
+            <tr>
+                <td colspan="3" style="padding-top:2px;">Category: <strong>{{ $categories->implode(', ') }}</strong></td>
+            </tr>
+        @endif
     </table>
 
     <table>
@@ -83,9 +90,6 @@
         </thead>
         <tbody>
             @foreach($cs->items as $i => $item)
-                @if(filled($item->category) && ($i === 0 || $cs->items[$i - 1]->category !== $item->category))
-                    <tr><td colspan="{{ $cols }}" style="background:#f3f5f8;font-weight:bold;">{{ $item->category }}</td></tr>
-                @endif
                 <tr>
                     <td class="c">{{ $i + 1 }}</td>
                     <td>{{ $item->item_name }}</td>
