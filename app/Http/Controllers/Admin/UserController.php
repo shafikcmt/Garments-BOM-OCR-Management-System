@@ -663,6 +663,35 @@ class UserController extends Controller
     }
 
     /**
+     * Whether this actor may set which buyers a Merchandising department admin
+     * OWNS from the user's own screen (the same buyers.department_admin_id the
+     * Buyers screen writes). Super admin only, and only for a merchant
+     * department admin: those are the only users who may own a buyer.
+     */
+    private function mayAssignOwnership(User $target, ?string $role = null): bool
+    {
+        return (bool) auth()->user()?->hasRole('admin')
+            && $target->is_department_admin
+            && ($role ?? $target->primaryRoleName()) === 'merchant';
+    }
+
+    /** Write the owned-buyer set from the "Buyers this admin owns" box, when it was on the page. */
+    private function syncOwnership(Request $request, User $user): void
+    {
+        if (! $request->has('owned_buyers_control') || ! $this->mayAssignOwnership($user, $this->postedRole($request, $user))) {
+            return;
+        }
+
+        $posted = collect((array) $request->input('owned_buyer_ids', []))
+            ->map(fn ($id) => (int) $id)->filter()->unique()->values();
+
+        $valid = Buyer::whereIn('id', $posted)->pluck('id');
+
+        Buyer::whereIn('id', $valid)->update(['department_admin_id' => $user->id]);
+        Buyer::where('department_admin_id', $user->id)->whereNotIn('id', $valid)->update(['department_admin_id' => null]);
+    }
+
+    /**
      * The role a save is asking for, which is not always the stored one.
      *
      * departmentRules() already refuses a role that does not belong to the
@@ -1186,6 +1215,15 @@ class UserController extends Controller
         // WHO is being edited still applies here; the save re-derives all of it
         // from the department actually posted.
         $assignableBuyers = $this->assignableBuyersForEditScreen($user);
+
+        // Ownership of buyers, for a merchant department admin, set by a super
+        // admin: every active buyer with its current owner, so a second buyer
+        // can be given without leaving this screen.
+        $ownableBuyers = $this->mayAssignOwnership($user)
+            ? Buyer::with('departmentAdmin:id,name')->where('is_active', true)->orderBy('buyer_name')->get()
+            : collect();
+        $ownedBuyerIds = $user->ownedBuyers()->pluck('id')->map(fn ($id) => (int) $id)->all();
+
         $mayUnconfineBuyers = $this->mayUnconfineBuyersOnScreen($user);
 
         // Which departments the block applies to, and which roles are carved
@@ -1225,6 +1263,8 @@ class UserController extends Controller
                 'assignedBuyers',
                 'buyerAccessBuyers',
                 'assignableBuyers',
+                'ownableBuyers',
+                'ownedBuyerIds',
                 'mayUnconfineBuyers',
                 'buyerScopedDepartments',
                 'buyerUnscopedRoles',
@@ -1308,6 +1348,7 @@ class UserController extends Controller
         // the widget - once it was allowed onto the page - validate nothing and
         // sync nothing, while reporting success.
         $this->syncBuyerAssignment($request, $user);
+        $this->syncOwnership($request, $user);
 
         $user->syncRoles([$data['role']]);
 

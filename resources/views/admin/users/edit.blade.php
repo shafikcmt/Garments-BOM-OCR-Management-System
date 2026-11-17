@@ -326,8 +326,10 @@
                                 </div>
                                 <div class="form-text">
                                     @if($user->isDepartmentAdmin())
-                                        Owns {{ $assignedBuyers->count() > 1 ? 'these buyers' : 'this buyer' }}. Change from
-                                        <a href="{{ route('admin.buyers.index') }}">Admin &rsaquo; Buyers</a>.
+                                        Owns {{ $assignedBuyers->count() > 1 ? 'these buyers' : 'this buyer' }}.
+                                        @if($ownableBuyers->isEmpty())
+                                            Change from <a href="{{ route('admin.buyers.index') }}">Admin &rsaquo; Buyers</a>.
+                                        @endif
                                     @else
                                         Inherited from the department admin who created this account.
                                     @endif
@@ -375,6 +377,41 @@
                                         buyer access is set above.
                                     </div>
                                 @endif
+                            </div>
+                        @endif
+
+                        {{-- Which buyers a Merchandising department admin OWNS. The
+                             same field the Buyers screen writes
+                             (buyers.department_admin_id), offered here to a super
+                             admin so a second or third buyer can be given in one
+                             place. Ticking a buyer another admin owns moves it
+                             to this person; the label says so first. --}}
+                        @if($ownableBuyers->isNotEmpty())
+                            <div class="mb-4">
+                                <input type="hidden" name="owned_buyers_control" value="1">
+                                <label class="form-label fw-semibold d-block mb-1">Buyers this admin owns</label>
+                                <div class="form-text mb-2">
+                                    Tick every buyer this person is responsible for. They see and manage the files, styles and team of these buyers.
+                                    A buyer that already has another owner moves to this person when you tick it.
+                                </div>
+                                <div class="row g-1">
+                                    @foreach($ownableBuyers as $ownBuyer)
+                                        @php($ownedByOther = $ownBuyer->departmentAdmin && (int) $ownBuyer->department_admin_id !== (int) $user->id)
+                                        <div class="col-12 col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="owned_buyer_ids[]" value="{{ $ownBuyer->id }}"
+                                                       id="ownBuyer{{ $ownBuyer->id }}"
+                                                       @checked(in_array((string) $ownBuyer->id, array_map('strval', (array) old('owned_buyer_ids', $ownedBuyerIds)), true))>
+                                                <label class="form-check-label" for="ownBuyer{{ $ownBuyer->id }}">
+                                                    {{ $ownBuyer->buyer_name }}
+                                                    @if($ownedByOther)
+                                                        <span class="text-muted small">(now {{ $ownBuyer->departmentAdmin->name }})</span>
+                                                    @endif
+                                                </label>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
                             </div>
                         @endif
 
