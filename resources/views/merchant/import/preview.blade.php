@@ -23,7 +23,7 @@
         </div>
         @if($duplicateCount > 0)
             <div class="alert alert-warning mb-3"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
-                <strong>{{ $duplicateCount }}</strong> of these rows are already in that file (same values in every matched column). They are skipped unless you untick the box below the Import button.
+                <strong>{{ $duplicateCount }}</strong> of these {{ \Illuminate\Support\Str::plural('row', $rowCount) }} {{ $duplicateCount === 1 ? 'is' : 'are' }} already in that file (same values in every matched column). They are skipped unless you untick the box below the Import button.
             </div>
         @endif
     @endif
@@ -100,7 +100,7 @@
         </div>
     </div>
 
-    <div class="d-flex gap-2 mt-3">
+    <div class="d-flex gap-2 mt-3 align-items-start">
         <form method="POST" action="{{ route('merchant.import.confirm') }}">
             @csrf
             <button class="btn btn-primary"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>{{ $targetFile ? 'Add '.$rowCount.' Rows to File' : 'Import '.$rowCount.' Rows' }}</button>
@@ -108,7 +108,7 @@
                 <div class="form-check mt-2">
                     <input type="hidden" name="skip_duplicates" value="0">
                     <input class="form-check-input" type="checkbox" name="skip_duplicates" value="1" id="skipDup" checked>
-                    <label class="form-check-label small" for="skipDup">Skip the {{ $duplicateCount }} rows already in the file</label>
+                    <label class="form-check-label small" for="skipDup">Skip the {{ $duplicateCount }} {{ \Illuminate\Support\Str::plural('row', $duplicateCount) }} already in the file</label>
                 </div>
             @endif
         </form>
