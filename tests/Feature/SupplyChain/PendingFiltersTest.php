@@ -20,7 +20,7 @@ beforeEach(function () {
 
     $pos = 1;
     foreach (['buyer_name' => 'Buyer Name', 'season_name' => 'Season Name', 'contract_shipment_date' => 'Contract Shipment Date',
-              'material_description' => 'Material Description', 'sap_code' => 'SAP Code', 'vendor_name' => 'Vendor Name',
+              'material_type' => 'Material Type', 'material_description' => 'Material Description', 'sap_code' => 'SAP Code', 'vendor_name' => 'Vendor Name',
               'remarks' => 'Remarks', 'materials_ordered' => 'Materials to be Ordered'] as $key => $name) {
         $this->h[$key] = ExcelHeader::create(['header_name' => $name, 'header_key' => $key, 'owner_role_id' => $owner->id, 'position' => $pos++, 'field_type' => 'text', 'is_active' => true]);
     }
@@ -65,4 +65,15 @@ it('searches the item and booking columns, not a remark on another material', fu
 
     expect($page->total())->toBe(1)
         ->and($page->first()->booking_preview['item_name'])->toBe('POCKETING');
+});
+
+it('searches the item name the row shows, not words inside another material description', function () {
+    // Shown as THREAD (Material Type), but its description mentions pocketing.
+    ($this->line)($this->wovenFile, ['material_type' => 'THREAD', 'material_description' => 'POLY THREAD FOR POCKETING', 'vendor_name' => 'V4', 'sap_code' => 'S4', 'materials_ordered' => '9']);
+    ($this->line)($this->wovenFile, ['material_type' => 'POCKETING', 'material_description' => 'TC POCKETING', 'vendor_name' => 'V5', 'sap_code' => 'S5', 'materials_ordered' => '9']);
+
+    $page = $this->withoutVite()->actingAs($this->user)->get(route('supply_chain.bookings.index', ['keyword' => 'pocketing']))->assertOk()->viewData('pendingRows');
+
+    expect($page->total())->toBe(2)   // the plain POCKETING row from setup and the new POCKETING-type row
+        ->and($page->pluck('booking_preview')->pluck('item_name')->all())->each->toBe('POCKETING');
 });
