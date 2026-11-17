@@ -466,3 +466,44 @@ it('refuses a designation from a department admin and leaves the stored one alon
 
     expect($this->member->fresh()->designation)->toBe('Merchandiser');
 });
+
+it('lets a super admin set which buyers a merchant department admin owns, from the user screen', function () {
+    \Spatie\Permission\Models\Role::findOrCreate('admin', 'web');
+    \Spatie\Permission\Models\Role::findOrCreate('merchant', 'web');
+    $super = \App\Models\User::factory()->create()->assignRole('admin');
+    $head = \App\Models\User::factory()->create(['is_department_admin' => true])->assignRole('merchant');
+    $other = \App\Models\User::factory()->create(['is_department_admin' => true])->assignRole('merchant');
+    $macys = \App\Models\Buyer::create(['buyer_name' => 'MACYS', 'is_active' => true, 'department_admin_id' => $head->id]);
+    $ann = \App\Models\Buyer::create(['buyer_name' => 'ANN', 'is_active' => true]);
+    $hugo = \App\Models\Buyer::create(['buyer_name' => 'HUGO', 'is_active' => true, 'department_admin_id' => $other->id]);
+
+    $this->actingAs($super)->get(route('admin.users.edit', $head))->assertOk()
+        ->assertSee('Buyers this admin owns')->assertSee('(now '.$other->name.')');
+
+    $payload = ['name' => $head->name, 'email' => $head->email, 'status' => 1, 'role' => 'merchant', 'department' => 'merchandising'];
+
+    // Give ANN and HUGO as well, drop nothing.
+    $this->actingAs($super)->put(route('admin.users.update', $head), $payload + ['owned_buyers_control' => 1, 'owned_buyer_ids' => [$macys->id, $ann->id, $hugo->id]]);
+    expect($head->ownedBuyers()->pluck('buyer_name')->sort()->values()->all())->toBe(['ANN', 'HUGO', 'MACYS'])
+        ->and($other->ownedBuyers()->count())->toBe(0);
+
+    // Un-tick MACYS: it becomes unowned.
+    $this->actingAs($super)->put(route('admin.users.update', $head), $payload + ['owned_buyers_control' => 1, 'owned_buyer_ids' => [$ann->id, $hugo->id]]);
+    expect($macys->fresh()->department_admin_id)->toBeNull();
+
+    // A post without the marker leaves ownership alone.
+    $this->actingAs($super)->put(route('admin.users.update', $head), $payload);
+    expect($head->ownedBuyers()->count())->toBe(2);
+});
+
+it('does not offer or obey the ownership box for anyone but a super admin or a merchant department admin', function () {
+    \Spatie\Permission\Models\Role::findOrCreate('merchant', 'web');
+    $member = \App\Models\User::factory()->create()->assignRole('merchant');
+    $super = \App\Models\User::factory()->create()->assignRole('admin');
+    $buyer = \App\Models\Buyer::create(['buyer_name' => 'ANN', 'is_active' => true]);
+
+    $this->actingAs($super)->get(route('admin.users.edit', $member))->assertOk()->assertDontSee('Buyers this admin owns');
+
+    $this->actingAs($super)->put(route('admin.users.update', $member), ['name' => $member->name, 'email' => $member->email, 'status' => 1, 'role' => 'merchant', 'department' => 'merchandising', 'owned_buyers_control' => 1, 'owned_buyer_ids' => [$buyer->id]]);
+    expect($buyer->fresh()->department_admin_id)->toBeNull();
+});
