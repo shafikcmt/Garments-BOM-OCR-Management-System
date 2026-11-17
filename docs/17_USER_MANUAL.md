@@ -55,7 +55,7 @@ You only see the screens your role needs.
 The Admin menu is grouped so every entry stays reachable:
 
 - **Main menu**: Dashboard, My Approvals, Follow-ups, BOM Approvals.
-- **Departments**: Merchandising, Supply Chain, Commercial and Store, each a folder of that department's screens.
+- **Departments**: Merchandising, Supply Chain (including To Purchase, Comparative Statement, Internal PO and CS Signatures), Commercial and Store, each a folder of that department's screens.
 - **Administration**: Workspace, Users & Roles, Booking Setup, **Requisition Setup** (Departments, Requisition Signatures, Monthly Requisition Window, Item SKU) and **Settings** (Alert Settings, PI / PRA Settings, PRA Approvers, Email Templates).
 - Press a folder to open it. Only one folder is open at a time, and the folder holding the page you are on opens by itself and scrolls into view.
 
@@ -919,8 +919,10 @@ Final or Individual requisition approved
 2. **Items and rates.** For each item enter the quantity (never more than is left on the requisition), the specification or brand, and each supplier's **unit price**. The lowest price on an item turns green. The circle beside a price chooses that supplier for that item: it is ticked for you when you type the first price, and you can change it. **Choose lowest price for every item** and **Choose recommended supplier** do it for all items at once.
 3. **Entering many prices.** Use **Find an item**, the **Category** filter and **Show: Items still missing a price** to work through the list. The line on the right counts how many items each supplier has a price for. Press **Copy item list** and paste into Excel to send suppliers the items in the order shown. When a quotation comes back in that order, copy its price column in Excel, click the first price box under that supplier and press **Ctrl+V**: every price drops into its row (copy two columns to fill two suppliers at once; text such as "Tk 1,040" is read as 1040). **Enter** moves down to the next item. The statement prints with a heading row for each category.
 4. Write the **Recommendation from committee members**.
-   - Under it, **Signature boxes on the printed form** lets you set the titles printed at the bottom (up to 5; the standard ones are Jr. Executive - SCM, Manager - SCM and Approved By). For each box choose whose name and date fill in automatically (the person who prepared, checked or approved the sheet) or **Blank signature line** for a box that is signed by hand, for example a Director. Clear a title to drop that box.
+   - Under it, **Signature boxes on the printed form** starts with the boxes Admin set in **Settings → CS Signatures** (see below) and lets you change them for this sheet only. You can set the titles printed at the bottom (up to 5; the standard ones are Jr. Executive - SCM, Manager - SCM and Approved By). For each box choose whose name and date fill in automatically (the person who prepared, checked or approved the sheet) or **Blank signature line** for a box that is signed by hand, for example a Director. Clear a title to drop that box.
 5. Press **Save Draft**, or **Save & Send for Checking**.
+
+**Setting the standard signature boxes (Admin).** Open **Supply Chain → CS Signatures** (Admin menu: Departments → Supply Chain). Enter up to 5 titles in print order, and for each choose whose name and date fill in (preparer, checker, approver, or a blank line). Press **Save Signature Boxes**. Every new Comparative Statement starts with these; sheets already made keep their own boxes. **Use Standard Three** goes back to Jr. Executive - SCM, Manager - SCM and Approved By.
 
 Sending for checking needs at least 2 suppliers and a priced supplier chosen on every item. The statement number looks like **CS-26-27/0001** and restarts every financial year (July to June). You can split one requisition item over two statements, but never ask for more than it has left. **Print / PDF** gives the form on A4 landscape with the form code, the supplier columns, the chosen suppliers highlighted, the terms and the three signature boxes: **Jr. Executive - SCM**, **Manager - SCM**, **Approved By**.
 

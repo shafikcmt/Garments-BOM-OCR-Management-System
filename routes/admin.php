@@ -106,6 +106,10 @@ Route::prefix('admin')
         Route::get('/requisition-signatures', [RequisitionSignatureSettingController::class, 'edit'])->name('requisition-signatures.edit');
         Route::post('/requisition-signatures', [RequisitionSignatureSettingController::class, 'update'])->name('requisition-signatures.update');
 
+        // The signature boxes a new General Stock Comparative Statement starts with.
+        Route::get('/cs-signatures', [\App\Http\Controllers\Admin\CsSignatureSettingController::class, 'edit'])->name('cs-signatures.edit');
+        Route::post('/cs-signatures', [\App\Http\Controllers\Admin\CsSignatureSettingController::class, 'update'])->name('cs-signatures.update');
+
         // Departments, their roles and heads, and their sections with heads —
         // what routes a department's requisition and what the user form offers.
         Route::get('/departments', [DepartmentController::class, 'index'])->name('departments.index');
