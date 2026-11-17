@@ -266,6 +266,20 @@
                                     'startsOpen' => $buyerAccessStartsOpen,
                                 ])
 
+                                @if($user->isDepartmentAdmin())
+                                    <div class="form-text mt-2">
+                                        @if(! empty($ownedBuyerNames))
+                                            Owns {{ implode(', ', $ownedBuyerNames) }} (set under Admin &rsaquo; Buyers).
+                                        @else
+                                            Owns no buyer yet &mdash; ownership is separate and is set in Admin &rsaquo; Buyers.
+                                        @endif
+                                        Buyer access ticked above is extra access: this person sees and works on those buyers' files, but does not become the buyer's department admin or its approver.
+                                        @if(empty($ownedBuyerNames) && empty($currentBuyerIds))
+                                            <span class="text-warning-emphasis d-block">This department admin owns no buyer and has no buyer access, so they see every buyer. Tick the buyers they should work on.</span>
+                                        @endif
+                                    </div>
+                                @endif
+
                                 {{-- Buyers assigned by another admin are not in
                                      the list above and are not touched by a save
                                      here. Saying so stops this reading as the
