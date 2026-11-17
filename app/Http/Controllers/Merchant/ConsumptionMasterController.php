@@ -88,25 +88,47 @@ class ConsumptionMasterController extends Controller
             ->map(fn ($r) => ConsumptionMaster::materialKey($r->sap_code, $r->material_description))->all();
 
         $added = 0;
+        $noDescription = 0;
         $position = (int) ConsumptionMaster::max('position');
+
+        // The BOM table is looser than the master: its description can be empty
+        // and its text columns have no length limit, while the master needs a
+        // description and has short columns. One such line used to stop the whole
+        // copy with a database error (a 500 page), so lines are checked and
+        // shortened to fit instead.
+        $fit = fn ($value, int $max) => ($text = trim((string) $value)) === '' ? null : mb_substr($text, 0, $max);
+
         foreach ($library->materialsOf($mother) as $m) {
             if ($m['consumption'] === null || in_array(ConsumptionMaster::materialKey($m['sap_code'], $m['description']), $existing, true)) {
                 continue;
             }
+
+            $description = $fit($m['description'], 255);
+
+            if ($description === null) {
+                $noDescription++;
+
+                continue;
+            }
+
             ConsumptionMaster::create([
-                'buyer_id' => $mother->buyer_id, 'product_group' => $mother->product_group, 'material_type' => $m['type'],
-                'material_description' => $m['description'], 'sap_code' => $m['sap_code'], 'material_color' => $m['color'],
-                'uom' => $m['uom'], 'consumption' => $m['consumption'], 'wastage_percent' => $m['wastage'],
+                'buyer_id' => $mother->buyer_id, 'product_group' => $fit($mother->product_group, 120), 'material_type' => $fit($m['type'], 60),
+                'material_description' => $description, 'sap_code' => $fit($m['sap_code'], 60), 'material_color' => $fit($m['color'], 120),
+                'uom' => $fit($m['uom'], 20), 'consumption' => min(max((float) $m['consumption'], 0), 9999999),
+                'wastage_percent' => $m['wastage'] === null ? null : min(max((float) $m['wastage'], 0), 100),
                 'position' => ++$position, 'updated_by' => $request->user()->id,
             ]);
             $added++;
         }
 
         $note = $mother->product_group ? '' : ' The style has no product group, so these apply to every style of the buyer.';
+        if ($noDescription > 0) {
+            $note .= ' '.$noDescription.' BOM '.($noDescription === 1 ? 'line' : 'lines').' without a material description '.($noDescription === 1 ? 'was' : 'were').' skipped.';
+        }
 
         return back()->with($added > 0 ? 'success' : 'warning', $added > 0
             ? $added . ' material(s) added from style ' . $mother->style_no . '.' . $note
-            : 'Nothing new to add from style ' . $mother->style_no . '.');
+            : 'Nothing new to add from style ' . $mother->style_no . '.' . $note);
     }
 
     private function validated(Request $request): array

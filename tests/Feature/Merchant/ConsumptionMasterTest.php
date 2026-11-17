@@ -84,3 +84,20 @@ it('learns the master from a style BOM once, and keeps other roles out', functio
     $mgmt = User::factory()->create(['status' => 1])->assignRole(Role::findOrCreate('management', 'web'));
     $this->actingAs($mgmt)->get(route('merchant.consumption.index'))->assertOk()->assertSee('Shell fabric');
 });
+
+it('copies a style BOM even when some lines have no description or very long text', function () {
+    $file = ExcelFile::create(['file_name' => 'c.xlsx', 'original_file_name' => 'c.xlsx', 'file_path' => 'c', 'status' => 'processing', 'uploaded_by' => $this->merchant->id, 'buyer_id' => $this->buyer->id]);
+    $line = OrderLine::create(['excel_file_id' => $file->id, 'line_key' => 'k', 'buyer_id' => $this->buyer->id, 'mother_style_id' => $this->mother->id, 'style_no' => '748268', 'gmts_color' => 'WHITE', 'order_qty' => 100]);
+    $bom = fn (int $n, array $over) => BomItem::create($over + ['order_line_id' => $line->id, 'excel_row_id' => ExcelRow::create(['excel_file_id' => $file->id, 'row_number' => $n])->id, 'initial_consumption' => 1.0]);
+
+    $bom(1, ['material_description' => null]);                                   // no description: skipped, not a crash
+    $bom(2, ['material_description' => 'Shell fabric', 'material_type' => str_repeat('T', 90), 'uom' => 'Yards of fabric roll', 'sap_code' => str_repeat('9', 80)]);
+    $bom(3, ['material_description' => 'Thread', 'initial_consumption' => 2.5]);
+
+    $this->actingAs($this->merchant)->post(route('merchant.consumption.from_style'), ['mother_style_id' => $this->mother->id])
+        ->assertSessionHas('success');
+
+    expect(ConsumptionMaster::count())->toBe(2);
+    $shell = ConsumptionMaster::where('material_description', 'Shell fabric')->firstOrFail();
+    expect(mb_strlen($shell->material_type))->toBe(60)->and(mb_strlen($shell->uom))->toBe(20)->and(mb_strlen($shell->sap_code))->toBe(60);
+});
