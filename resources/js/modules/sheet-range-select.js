@@ -2,7 +2,9 @@
  * Excel-style rectangular cell selection for the Workspace sheet, copy only.
  *
  * Phase 1a of the multi-select work, and deliberately READ-ONLY: it selects
- * cells and it copies them to the clipboard. It never writes a cell value, so
+ * cells and it copies them to the clipboard. It never writes a cell value
+ * (it only tells the sheet page which rectangle is selected, see
+ * table.sheetSelection, so Ctrl+V can fill it), so
  * it cannot interact with the save path, the draft/restore system, or the
  * unchanged-cell pruning that stops a save being truncated. Pasting INTO the
  * sheet is untouched and still belongs entirely to handleMultiPaste() in
@@ -76,6 +78,9 @@ function setup(table) {
             right: Math.max(anchor.col, focus.col),
         };
     }
+
+    /** The selected rectangle when it spans more than one cell, else null. Read by the paste handler in the sheet page. */
+    table.sheetSelection = () => (painted.size > 1 ? rect() : null);
 
     function paint() {
         const box = rect();
@@ -282,6 +287,6 @@ function setup(table) {
         const cols = box.right - box.left + 1;
 
         status.hidden = false;
-        status.textContent = `${rows} row${rows === 1 ? '' : 's'} x ${cols} column${cols === 1 ? '' : 's'} selected — press Ctrl+C to copy`;
+        status.textContent = `${rows} row${rows === 1 ? '' : 's'} x ${cols} column${cols === 1 ? '' : 's'} selected — Ctrl+C to copy, Ctrl+V to paste into them`;
     }
 }

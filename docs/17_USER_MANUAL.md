@@ -218,6 +218,12 @@ Merchandising and Admin work inquiries for the buyers they hold. Management can 
 4. Press **Add N Rows to File**. The new rows appear at the end of the file; formula columns are calculated, the BOM is updated, and an approved BOM that gained lines goes back for approval.
 **Added the wrong file?** On **Existing Files**, **More**, **Undo last import**. It removes that block of rows again, but only while nobody has edited those rows or used them (for example a PO was raised), and only for the latest import of that file. A locked file, or another buyer's file, cannot take new rows.
 
+**Copy and paste in the sheet.** Drag over cells to select a block (the note beside Search says how many). Then:
+- **Ctrl+C** copies the block; paste it into Excel or into another place in the sheet.
+- **Ctrl+V** pastes into the selected block. One copied value fills **every** selected cell. A copied block fills the selection and repeats to cover it when the selection is a whole multiple of it. Otherwise it lands from the top-left selected cell.
+- The text can come from outside too (Excel, Word, an e-mail). Cells you cannot edit, and calculated cells, are left unchanged and counted in the message.
+- Pasted cells turn green. Press **Save Changes** to keep them. With no block selected, click a cell and paste as before (several rows or columns from Excel spread to the cells below and to the right).
+
 **More room for the sheet.** On an open file, press **Hide order details** (above the sheet, under "Excel Work Sheet") to hide the Order Information box and its filters, so the grid uses the whole screen. A **Back** button stays beside it. Press **Show order details** to bring the box back. The browser remembers your choice for next time.
 
 **Editing a file across several pages.** A file shows 20, 50 or 100 rows at a time. You can filter by style, edit on one page, move to the next page, edit there too, and press **Save Changes** once. An orange note beside the button, for example "3 unsaved edits on other pages", tells you what is waiting; Save Changes saves them all together with this page's edits. The edits are kept in your browser until you save, so a page change or refresh does not lose them. Only your own browser holds them: if you switch computer before saving, they are gone.
