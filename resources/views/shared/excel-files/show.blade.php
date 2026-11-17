@@ -607,10 +607,18 @@
 
     .excel-table-wrap {
         overflow: auto;
-        max-height: 72vh;
+        max-height: 78vh;
         background: #fff;
         border-top: 1px solid var(--po-line-soft, #EEF3F8);
     }
+
+    /* Order details hidden: the grid takes the height the summary card gave up.
+       Remembered per browser (see the toggle in the work-sheet toolbar). */
+    .ws-details-hidden .order-summary-card { display: none; }
+    .ws-details-hidden .excel-table-wrap { max-height: calc(100vh - 150px); min-height: 360px; }
+    .excel-work-card { scroll-margin-top: 72px; }
+    .ws-toolbar-back { display: none; }
+    .ws-details-hidden .ws-toolbar-back { display: inline-flex; }
 
     .excel-data-table {
         min-width: 1780px;
@@ -1730,6 +1738,7 @@
         </form>
     @endif
 
+    <script>try { if (localStorage.getItem('ws_details_hidden') === '1') document.documentElement.classList.add('ws-details-hidden'); } catch (e) {}</script>
     <div class="order-summary-card mb-2">
         <div class="order-summary-top">
             <div class="order-summary-meta">
@@ -1922,6 +1931,14 @@
                 <div class="table-toolbar-left">
                     <h4 class="section-title">Excel Work Sheet</h4>
                     <p class="paste-note">Multiple row/column paste supported.</p>
+                    <div class="d-flex gap-1 mt-1 d-print-none">
+                        <button type="button" id="toggleOrderDetails" class="btn btn-outline-secondary btn-sm" style="min-height:28px;font-size:11px;" aria-pressed="false">
+                            <i class="bi bi-arrows-collapse me-1" aria-hidden="true"></i><span id="toggleOrderDetailsText">Hide order details</span>
+                        </button>
+                        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary btn-sm ws-toolbar-back" style="min-height:28px;font-size:11px;align-items:center;">
+                            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back
+                        </a>
+                    </div>
                 </div>
 
                 <div class="d-flex gap-2 flex-wrap align-items-center">
@@ -4352,6 +4369,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
     restoreDraftIfNeeded();
     updatePendingBadge();
+
+    // Hide / show the order details so the grid can use the whole screen.
+    const detailsToggle = document.getElementById('toggleOrderDetails');
+    const detailsToggleText = document.getElementById('toggleOrderDetailsText');
+
+    function paintDetailsToggle() {
+        const hidden = document.documentElement.classList.contains('ws-details-hidden');
+        if (detailsToggleText) detailsToggleText.textContent = hidden ? 'Show order details' : 'Hide order details';
+        if (detailsToggle) {
+            detailsToggle.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+            const icon = detailsToggle.querySelector('i');
+            if (icon) icon.className = 'bi me-1 ' + (hidden ? 'bi-arrows-expand' : 'bi-arrows-collapse');
+        }
+    }
+
+    if (detailsToggle) {
+        paintDetailsToggle();
+        detailsToggle.addEventListener('click', function () {
+            const nowHidden = document.documentElement.classList.toggle('ws-details-hidden');
+            try { localStorage.setItem('ws_details_hidden', nowHidden ? '1' : '0'); } catch (e) {}
+            paintDetailsToggle();
+            // The header's height is measured for the sticky filter row.
+            if (typeof syncSheetHeadHeight === 'function') setTimeout(syncSheetHeadHeight, 0);
+            if (nowHidden) {
+                document.querySelector('.excel-work-card')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            }
+        });
+    }
 
     // The filter row sticks just under the header row, whatever height the
     // header ends up (role badges and long names wrap).

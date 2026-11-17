@@ -212,3 +212,11 @@ it('keeps Delete behind the More menu in the Existing Files list', function () {
 
     expect($html)->toContain('</i>More')->toContain('Delete file')->not->toMatch('/btn btn-sm btn-danger">\s*<i class="bi bi-trash me-1"[^>]*><\/i>Delete\s/');
 });
+
+it('offers the Hide order details toggle on the file sheet', function () {
+    $user = mwScopeUser([$this->macys->id], BuyerScope::MODE_SPECIFIC);
+    $file = \App\Models\ExcelFile::where('buyer_id', $this->macys->id)->firstOrFail();
+
+    $this->actingAs($user)->get(route('uploaded-files.show', $file->id))
+        ->assertOk()->assertSee('id="toggleOrderDetails"', false)->assertSee('Hide order details');
+});
