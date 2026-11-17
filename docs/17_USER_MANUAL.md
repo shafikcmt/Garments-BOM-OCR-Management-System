@@ -211,6 +211,13 @@ Merchandising and Admin work inquiries for the buyers they hold. Management can 
 
 ### 2.2 Import Buyer Excel (any buyer, any layout)
 
+**Adding more orders to an existing file.** When a buyer sends more order lines for a season that already has a file, you do not need to add the rows one by one.
+1. Open **Workspace**, **Existing Files**, press **More** on the file, then **Add rows from Excel**. (Or start **Import Buyer Excel** yourself and choose the same buyer and season.)
+2. In step 1, under **Where should the rows go?**, keep **Add to the end of an existing file** and pick the file. Only files of the same buyer and season are offered. Choose **Create a new file** if you want a separate file instead.
+3. Match the columns and check the preview as usual. The preview says how many rows will be added after the last row, and warns when some rows are **already in the file** (same values in every matched column). They are skipped unless you untick **Skip the N rows already in the file**.
+4. Press **Add N Rows to File**. The new rows appear at the end of the file; formula columns are calculated, the BOM is updated, and an approved BOM that gained lines goes back for approval.
+**Added the wrong file?** On **Existing Files**, **More**, **Undo last import**. It removes that block of rows again, but only while nobody has edited those rows or used them (for example a PO was raised), and only for the latest import of that file. A locked file, or another buyer's file, cannot take new rows.
+
 **Editing a file across several pages.** A file shows 20, 50 or 100 rows at a time. You can filter by style, edit on one page, move to the next page, edit there too, and press **Save Changes** once. An orange note beside the button, for example "3 unsaved edits on other pages", tells you what is waiting; Save Changes saves them all together with this page's edits. The edits are kept in your browser until you save, so a page change or refresh does not lose them. Only your own browser holds them: if you switch computer before saving, they are gone.
 
 **This is the one way to upload.** On **Workspace**, the **New Excel File Upload** tab has one main button, **Import Buyer Excel**. An older **Quick upload (sample format only)** form is folded under it; use it only for a file made from **Download Sample**, and prefer **Import Buyer Excel** for everything else.

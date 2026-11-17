@@ -233,6 +233,7 @@ Route::prefix('merchant')
         Route::get('/import/map', [ImportWizardController::class, 'map'])->name('import.map');
         Route::post('/import/preview', [ImportWizardController::class, 'preview'])->name('import.preview');
         Route::post('/import/confirm', [ImportWizardController::class, 'confirm'])->name('import.confirm');
+        Route::post('/import/{import}/undo', [ImportWizardController::class, 'undo'])->name('import.undo');
         Route::post('/import/cancel', [ImportWizardController::class, 'cancel'])->name('import.cancel');
 
         Route::get('/excel/sample', [ExcelUploadController::class, 'downloadSample'])->name('excel.sample');

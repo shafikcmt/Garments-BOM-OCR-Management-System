@@ -17,6 +17,17 @@
     <x-flash />
     @include('merchant.import._steps', ['current' => 3])
 
+    @if($targetFile)
+        <div class="alert alert-info"><i class="bi bi-files me-1" aria-hidden="true"></i>
+            <strong>{{ $rowCount }}</strong> rows will be added after row <strong>{{ $targetRowCount }}</strong> of "{{ $targetFile->original_file_name ?: $targetFile->file_name }}". No new file is made.
+        </div>
+        @if($duplicateCount > 0)
+            <div class="alert alert-warning mb-3"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                <strong>{{ $duplicateCount }}</strong> of these rows are already in that file (same values in every matched column). They are skipped unless you untick the box below the Import button.
+            </div>
+        @endif
+    @endif
+
     <div class="row g-3 mb-3">
         <div class="col-6 col-xl-3"><x-stat-card icon="list-ul" tone="primary" label="Rows to import" :value="$rowCount" /></div>
         <div class="col-6 col-xl-3"><x-stat-card icon="columns-gap" tone="success" label="Columns matched" :value="$mappedCount" /></div>
@@ -92,7 +103,14 @@
     <div class="d-flex gap-2 mt-3">
         <form method="POST" action="{{ route('merchant.import.confirm') }}">
             @csrf
-            <button class="btn btn-primary"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Import {{ $rowCount }} Rows</button>
+            <button class="btn btn-primary"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>{{ $targetFile ? 'Add '.$rowCount.' Rows to File' : 'Import '.$rowCount.' Rows' }}</button>
+            @if($targetFile && $duplicateCount > 0)
+                <div class="form-check mt-2">
+                    <input type="hidden" name="skip_duplicates" value="0">
+                    <input class="form-check-input" type="checkbox" name="skip_duplicates" value="1" id="skipDup" checked>
+                    <label class="form-check-label small" for="skipDup">Skip the {{ $duplicateCount }} rows already in the file</label>
+                </div>
+            @endif
         </form>
         <a href="{{ route('merchant.import.map') }}?sheet={{ urlencode($state['sheet']) }}&header_row={{ $state['header_row'] }}" class="btn btn-outline-secondary">Back to matching</a>
         <form method="POST" action="{{ route('merchant.import.cancel') }}">
