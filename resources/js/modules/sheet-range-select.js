@@ -81,6 +81,8 @@ function setup(table) {
 
     /** The selected rectangle when it spans more than one cell, else null. Read by the paste handler in the sheet page. */
     table.sheetSelection = () => (painted.size > 1 ? rect() : null);
+    /** The selected block as tab/newline text (for Cut). */
+    table.sheetSelectionText = () => (painted.size > 1 ? toTsv(rect()) : null);
 
     function paint() {
         const box = rect();
@@ -287,6 +289,6 @@ function setup(table) {
         const cols = box.right - box.left + 1;
 
         status.hidden = false;
-        status.textContent = `${rows} row${rows === 1 ? '' : 's'} x ${cols} column${cols === 1 ? '' : 's'} selected — Ctrl+C to copy, Ctrl+V to paste into them`;
+        status.textContent = `${rows} row${rows === 1 ? '' : 's'} x ${cols} column${cols === 1 ? '' : 's'} selected — Ctrl+C copy, Ctrl+V paste, Delete clear`;
     }
 }

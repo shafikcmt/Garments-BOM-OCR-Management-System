@@ -3020,7 +3020,39 @@ document.addEventListener('DOMContentLoaded', function () {
         return rows;
     }
 
-    function pasteIntoRange(box, grid) {
+    // Delete / Backspace clears the selected block; Ctrl+X copies it, then clears.
+    function clearRange(box) {
+        const blank = [['']];
+        pasteIntoRange(box, blank, 'cleared');
+    }
+
+    function isOtherField(target) {
+        return target && target.matches && target.matches('input, textarea, select') && !target.classList.contains('excel-editable-cell');
+    }
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+
+        const box = selectedRange();
+        if (!box || isOtherField(event.target)) return;
+
+        event.preventDefault();
+        clearRange(box);
+    });
+
+    document.addEventListener('cut', function (event) {
+        const box = selectedRange();
+        if (!box || isOtherField(event.target)) return;
+
+        const text = table.sheetSelectionText ? table.sheetSelectionText() : null;
+        if (text === null) return;
+
+        event.preventDefault();
+        event.clipboardData?.setData('text/plain', text);
+        clearRange(box);
+    });
+
+    function pasteIntoRange(box, grid, mode) {
         const h = grid.length;
         const w = Math.max(...grid.map(r => r.length));
         const selRows = box.bottom - box.top + 1;
@@ -3064,7 +3096,7 @@ document.addEventListener('DOMContentLoaded', function () {
             markWorksheetChanged();
         }
 
-        let message = filled + (filled === 1 ? ' cell' : ' cells') + ' pasted. Press Save Changes to keep them.';
+        let message = filled + (filled === 1 ? ' cell' : ' cells') + (mode === 'cleared' ? ' cleared' : ' pasted') + '. Press Save Changes to keep ' + (mode === 'cleared' ? 'this' : 'them') + '.';
         if (skipped > 0) {
             message += ' ' + skipped + ' read-only or calculated ' + (skipped === 1 ? 'cell was' : 'cells were') + ' left unchanged.';
         }
