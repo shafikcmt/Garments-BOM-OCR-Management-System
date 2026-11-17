@@ -28,18 +28,51 @@ class GsComparativeStatement extends Model
     protected $fillable = [
         'cs_no', 'cs_date', 'status',
         'form_code', 'form_issue_date', 'form_version_no', 'form_revision_no',
-        'recommendation', 'approver_note', 'remarks',
+        'recommendation', 'approver_note', 'remarks', 'signatories',
         'prepared_by', 'prepared_at', 'checked_by', 'checked_at', 'approved_by', 'approved_at',
         'return_note', 'returned_by', 'returned_at', 'cancel_reason', 'created_by',
     ];
 
     protected $casts = [
         'cs_date' => 'date',
+        'signatories' => 'array',
         'prepared_at' => 'datetime',
         'checked_at' => 'datetime',
         'approved_at' => 'datetime',
         'returned_at' => 'datetime',
     ];
+
+    public const SIGN_ROLES = [
+        'prepared' => 'Name of the preparer',
+        'checked' => 'Name of the checker',
+        'approved' => 'Name of the approver',
+        'blank' => 'Blank signature line',
+    ];
+
+    public const MAX_SIGNATORIES = 5;
+
+    /** @return list<array{label: string, role: string}> */
+    public static function defaultSignatories(): array
+    {
+        return [
+            ['label' => 'Jr. Executive - SCM', 'role' => 'prepared'],
+            ['label' => 'Manager - SCM', 'role' => 'checked'],
+            ['label' => 'Approved By', 'role' => 'approved'],
+        ];
+    }
+
+    /** Boxes printed under the recommendation; older sheets fall back to the standard three. @return list<array{label: string, role: string}> */
+    public function signBoxes(): array
+    {
+        $boxes = collect($this->signatories ?? [])
+            ->filter(fn ($b) => is_array($b) && filled($b['label'] ?? null))
+            ->map(fn ($b) => [
+                'label' => (string) $b['label'],
+                'role' => array_key_exists($b['role'] ?? '', self::SIGN_ROLES) ? $b['role'] : 'blank',
+            ])->values()->all();
+
+        return $boxes ?: self::defaultSignatories();
+    }
 
     /** @return array<string, string> */
     public static function statusLabels(): array

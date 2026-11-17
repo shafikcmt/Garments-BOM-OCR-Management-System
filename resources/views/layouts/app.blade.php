@@ -199,8 +199,17 @@
                     group.classList.toggle('is-open', !isOpen);
                     submenu.classList.toggle('is-open', !isOpen);
                     this.setAttribute('aria-expanded', String(!isOpen));
+
+                    // Keep the whole opened group on screen, so none of its
+                    // links is left below the fold of the scrolling menu.
+                    if (!isOpen) {
+                        setTimeout(function () { submenu.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 220);
+                    }
                 });
             });
+
+            // On load, bring the current page's menu entry into view.
+            (document.querySelector('.sidebar-menu .sidebar-submenu.is-open') || document.querySelector('.sidebar-menu .is-active'))?.scrollIntoView({ block: 'nearest' });
 
             function syncSidebarHashActive() {
                 const currentHash = window.location.hash.replace('#', '');
