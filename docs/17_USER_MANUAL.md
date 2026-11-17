@@ -50,6 +50,15 @@ You only see the screens your role needs.
 3. **Payment requests:** how many are pending, approved and rejected, with the last 6 months.
 4. **Reports:** one press to each department report and the approval history.
 
+### The Admin menu (left side)
+
+The Admin menu is grouped so every entry stays reachable:
+
+- **Main menu**: Dashboard, My Approvals, Follow-ups, BOM Approvals.
+- **Departments**: Merchandising, Supply Chain, Commercial and Store, each a folder of that department's screens.
+- **Administration**: Workspace, Users & Roles, Booking Setup, **Requisition Setup** (Departments, Requisition Signatures, Monthly Requisition Window, Item SKU) and **Settings** (Alert Settings, PI / PRA Settings, PRA Approvers, Email Templates).
+- Press a folder to open it. Only one folder is open at a time, and the folder holding the page you are on opens by itself and scrolls into view.
+
 ## 2. Merchandising
 
 ### 2.0 Merchandising dashboard
