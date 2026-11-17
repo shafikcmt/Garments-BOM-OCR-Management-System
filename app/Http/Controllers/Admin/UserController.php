@@ -649,8 +649,12 @@ class UserController extends Controller
             return false;
         }
 
+        // A department admin OWNS buyers through the Buyers screen, but may also
+        // be GIVEN access to further buyers without owning them (a shared team,
+        // or a Supply Chain admin who works a buyer Merchandising heads). That
+        // is a super admin's call, because it widens what the admin can see.
         if ($target->is_department_admin) {
-            return false;
+            return (bool) $actor->hasRole('admin');
         }
 
         if ($actor->hasRole('admin')) {
@@ -741,10 +745,22 @@ class UserController extends Controller
         $actor = auth()->user();
 
         if ($actor->hasRole('admin') || ! $actor->isBuyerConfined()) {
-            return Buyer::where('is_active', true)->orderBy('buyer_name')->get();
+            return $this->withoutOwned($target, Buyer::where('is_active', true)->orderBy('buyer_name')->get());
         }
 
         return Buyer::whereIn('id', $actor->scopedBuyerIds())->orderBy('buyer_name')->get();
+    }
+
+    /** A department admin's own buyers are set as ownership, so Buyer Access lists the others. */
+    private function withoutOwned(User $target, $buyers)
+    {
+        if (! $target->is_department_admin) {
+            return $buyers;
+        }
+
+        $owned = $target->ownedBuyers()->pluck('id')->all();
+
+        return $buyers->reject(fn ($b) => in_array($b->id, $owned, true))->values();
     }
 
     /**
@@ -772,7 +788,7 @@ class UserController extends Controller
         $actor = auth()->user();
 
         if ($actor->hasRole('admin') || ! $actor->isBuyerConfined()) {
-            return Buyer::where('is_active', true)->orderBy('buyer_name')->get();
+            return $this->withoutOwned($target, Buyer::where('is_active', true)->orderBy('buyer_name')->get());
         }
 
         return Buyer::whereIn('id', $actor->scopedBuyerIds())->orderBy('buyer_name')->get();
@@ -808,6 +824,7 @@ class UserController extends Controller
     private function mayUnconfineBuyers(User $target, ?string $role = null): bool
     {
         return $this->mayAssignBuyers($target, $role)
+            && ! $target->is_department_admin
             && (bool) auth()->user()?->hasRole('admin');
     }
 
@@ -822,6 +839,7 @@ class UserController extends Controller
     private function mayUnconfineBuyersOnScreen(User $target): bool
     {
         return $this->mayAssignBuyersToTarget($target)
+            && ! $target->is_department_admin
             && (bool) auth()->user()?->hasRole('admin');
     }
 
@@ -878,6 +896,15 @@ class UserController extends Controller
         // department admin always posts a non-empty set. min:1 here is the same
         // INVARIANT creation holds: 'specific' with no buyers denies the user
         // every tagged record while the screen shows them as assigned.
+        if ($user->is_department_admin) {
+            // Their own buyers already confine them; extra access may be emptied.
+            // With none owned, emptying it would leave them unconfined, so one is required.
+            $rules['buyer_ids'] = $user->ownedBuyers()->exists() ? ['nullable', 'array'] : ['required', 'array', 'min:1'];
+            $rules['buyer_ids.*'] = ['integer', Rule::in($assignable)];
+
+            return $rules;
+        }
+
         if ($this->postedBuyerScopeMode($request, $user) === BuyerScope::MODE_SPECIFIC) {
             $rules['buyer_ids'] = ['required', 'array', 'min:1'];
             $rules['buyer_ids.*'] = ['integer', Rule::in($assignable)];
@@ -941,6 +968,14 @@ class UserController extends Controller
 
         $final = array_values(array_unique(array_merge($chosen, $untouched)));
         sort($final);
+
+        // A department admin: Buyer Access is extra to what they own. Mode and
+        // the primary buyer are not read for them, so only the pivot changes.
+        if ($user->is_department_admin) {
+            $user->buyers()->sync($final);
+
+            return;
+        }
 
         $this->assertBuyerScopeCoherent(BuyerScope::MODE_SPECIFIC, $final);
 
@@ -1251,7 +1286,11 @@ class UserController extends Controller
         $buyerAccessStartsOpen = BuyerScope::appliesToRole($user->primaryRoleName())
             && in_array($storedDepartment, $buyerScopedDepartments, true);
 
-        $currentBuyerIds = $assignedBuyers->pluck('id')->map(fn ($id) => (int) $id)->all();
+        // For a department admin the ticks are their extra Buyer Access, not the
+        // buyers they own (those are the ownership box / Buyers screen).
+        $currentBuyerIds = ($user->isDepartmentAdmin() ? $buyerAccessBuyers : $assignedBuyers)
+            ->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $ownedBuyerNames = $user->isDepartmentAdmin() ? $assignedBuyers->pluck('buyer_name')->all() : [];
         $currentBuyerScopeMode = $user->isBuyerConfined()
             ? BuyerScope::MODE_SPECIFIC
             : BuyerScope::MODE_ALL;
@@ -1270,6 +1309,7 @@ class UserController extends Controller
                 'buyerUnscopedRoles',
                 'buyerAccessStartsOpen',
                 'currentBuyerIds',
+                'ownedBuyerNames',
                 'currentBuyerScopeMode'
             ),
             $this->permissionMatrixData($user)

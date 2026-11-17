@@ -201,16 +201,52 @@ it('does not offer an inactive buyer, and refuses one posted by hand', function 
         ->assertSessionHasErrors('buyer_ids.0');
 });
 
-it('never assigns buyers to a department admin, who owns them instead', function () {
+it('lets a super admin give a department admin extra buyer access, without making them owner', function () {
     $otherAdmin = User::factory()->create(['is_department_admin' => true])->assignRole('merchant');
+    $ownerOfA = $this->buyerA->fresh()->department_admin_id;
+    $this->buyerB->update(['department_admin_id' => $otherAdmin->id]);   // owns B
 
     $this->actingAs($this->superAdmin)
         ->put(route('admin.users.update', $otherAdmin), buyerEditPayload($otherAdmin, [
             'buyer_assignment_control' => '1',
-            'buyer_scope_mode' => BuyerScope::MODE_SPECIFIC,
+            'buyer_scope_mode' => BuyerScope::MODE_ALL,       // never obeyed for an admin
             'buyer_ids' => [$this->buyerA->id],
         ]))
         ->assertRedirect();
+
+    $fresh = $otherAdmin->fresh();
+    expect($fresh->buyers()->pluck('buyers.id')->all())->toBe([$this->buyerA->id])
+        ->and($this->buyerA->fresh()->department_admin_id)->toBe($ownerOfA)     // access, not ownership
+        ->and($this->buyerB->fresh()->department_admin_id)->toBe($otherAdmin->id)
+        ->and($fresh->scopedBuyerIds())->toContain($this->buyerA->id)->toContain($this->buyerB->id);
+});
+
+it('lets a supply chain department admin be given a buyer, and refuses to empty an admin who owns nothing', function () {
+    \Spatie\Permission\Models\Role::findOrCreate('supply_chain', 'web');
+    $sc = User::factory()->create(['is_department_admin' => true])->assignRole('supply_chain');
+
+    $this->actingAs($this->superAdmin)
+        ->put(route('admin.users.update', $sc), buyerEditPayload($sc, [
+            'department' => 'supply_chain', 'role' => 'supply_chain',
+            'buyer_assignment_control' => '1', 'buyer_ids' => [$this->buyerA->id, $this->buyerB->id],
+        ]))->assertRedirect();
+    expect($sc->fresh()->buyers()->count())->toBe(2);
+
+    // Empty set: would un-confine an admin who owns nothing, so it is refused.
+    $this->actingAs($this->superAdmin)
+        ->put(route('admin.users.update', $sc), buyerEditPayload($sc, [
+            'department' => 'supply_chain', 'role' => 'supply_chain', 'buyer_assignment_control' => '1', 'buyer_ids' => [],
+        ]))->assertSessionHasErrors('buyer_ids');
+    expect($sc->fresh()->buyers()->count())->toBe(2);
+});
+
+it('does not let a department admin hand buyers to another department admin', function () {
+    $otherAdmin = User::factory()->create(['is_department_admin' => true])->assignRole('merchant');
+
+    $this->actingAs($this->deptAdmin)
+        ->put(route('admin.users.update', $otherAdmin), buyerEditPayload($otherAdmin, [
+            'buyer_assignment_control' => '1', 'buyer_ids' => [$this->buyerA->id],
+        ]));
 
     expect($otherAdmin->fresh()->buyers()->count())->toBe(0);
 });
@@ -405,13 +441,15 @@ it('never offers the mode choice to a department admin, even mid-move', function
         ->assertDontSee('buyerScopeModeAll', false);
 });
 
-/* A department admin target still owns buyers through the Buyer screen, so the
- * widget stays off their edit screen whatever department is selected. */
-it('still keeps the widget off a department admin edit screen', function () {
+/* A department admin target gets the Buyer Access list for EXTRA buyers (their own
+ * are ownership), never the All / Specific radio. */
+it('shows a department admin edit screen the extra access list but no mode choice', function () {
     $this->actingAs($this->superAdmin)
         ->get(route('admin.users.edit', $this->deptAdmin))
         ->assertOk()
-        ->assertDontSee('buyer_assignment_control', false);
+        ->assertSee('buyer_assignment_control', false)
+        ->assertSee('extra access')
+        ->assertDontSee('buyerScopeModeAll', false);
 });
 
 // --- Designation --------------------------------------------------------------
