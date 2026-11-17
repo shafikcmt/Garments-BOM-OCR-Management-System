@@ -202,6 +202,9 @@
                                                 <form action="{{ route('uploaded-files.destroy', $file->id) }}"
                                                       method="POST"
                                                       data-file-delete-form
+                                                      data-confirm-title="Delete this file?"
+                                                      data-confirm-message="This removes the uploaded file and all of its worksheet rows. It cannot be undone."
+                                                      data-confirm-label="Delete file"
                                                       data-file-id="{{ $file->id }}">
                                                     @csrf
                                                     @method('DELETE')
@@ -365,8 +368,9 @@
             return;
         }
 
-        if (! window.confirm('Are you sure you want to delete this file? This will remove the uploaded file and all worksheet rows.')) {
-            event.preventDefault();
+        // The confirmation is the shared dialog (data-confirm-* on the form);
+        // this runs again once it is confirmed, and only then clears the draft.
+        if (form.dataset.confirmed !== '1') {
             return;
         }
 

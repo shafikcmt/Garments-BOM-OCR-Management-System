@@ -286,6 +286,71 @@
             });
         });
     </script>
+    {{-- One confirmation dialog for the whole app. A form opts in with
+         data-confirm-message (and optionally data-confirm-title,
+         data-confirm-label, data-confirm-tone="danger|primary"); it replaces
+         the browser's plain alert box. --}}
+    <div class="modal fade" id="appConfirmModal" tabindex="-1" aria-labelledby="appConfirmTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+            <div class="modal-content border-0 shadow-lg" style="border-radius:18px;">
+                <div class="modal-body p-4 text-center">
+                    <span id="appConfirmIcon" class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width:56px;height:56px;font-size:24px;background:#fee2e2;color:#dc2626;">
+                        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+                    </span>
+                    <h5 id="appConfirmTitle" class="mb-2" style="font-weight:700;">Are you sure?</h5>
+                    <p id="appConfirmMessage" class="text-muted mb-4"></p>
+                    <div class="d-flex gap-2 justify-content-center">
+                        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Cancel</button>
+                        <button type="button" class="btn btn-danger px-4" id="appConfirmOk"><i class="bi bi-trash me-1" aria-hidden="true"></i><span id="appConfirmOkText">Delete</span></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function () {
+        const modalEl = document.getElementById('appConfirmModal');
+        if (!modalEl || !window.bootstrap) return;
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        const okBtn = document.getElementById('appConfirmOk');
+        let pending = null;
+
+        document.addEventListener('submit', function (event) {
+            const form = event.target;
+            if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-confirm-message')) return;
+            if (form.dataset.confirmed === '1') return;
+
+            event.preventDefault();
+            pending = { form: form, submitter: event.submitter || null };
+
+            const danger = (form.dataset.confirmTone || 'danger') === 'danger';
+            document.getElementById('appConfirmTitle').textContent = form.dataset.confirmTitle || 'Are you sure?';
+            document.getElementById('appConfirmMessage').textContent = form.dataset.confirmMessage;
+            document.getElementById('appConfirmOkText').textContent = form.dataset.confirmLabel || 'Confirm';
+            okBtn.className = 'btn px-4 ' + (danger ? 'btn-danger' : 'btn-primary');
+            const icon = document.getElementById('appConfirmIcon');
+            icon.style.background = danger ? '#fee2e2' : '#dbeafe';
+            icon.style.color = danger ? '#dc2626' : '#2563eb';
+            modal.show();
+        });
+
+        okBtn.addEventListener('click', function () {
+            if (!pending) return;
+            const { form, submitter } = pending;
+            pending = null;
+            form.dataset.confirmed = '1';
+            modal.hide();
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit(submitter && form.contains(submitter) ? submitter : undefined);
+            } else {
+                form.submit();
+            }
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function () { pending = null; });
+    })();
+    </script>
+
     @yield('scripts')
 @include('layouts._password-toggle')
 </body>

@@ -50,6 +50,14 @@ You only see the screens your role needs.
 3. **Payment requests:** how many are pending, approved and rejected, with the last 6 months.
 4. **Reports:** one press to each department report and the approval history.
 
+### The Merchant menu (left side)
+
+Everyday items stay on top: Dashboard, My Approvals, Follow-ups, BOM Approvals, Style Library and Workspace. The rest sit in three folders you open with a click: **Buyer Desk** (Inquiries, Samples, Meetings), **Costing & Materials** (Consumption Master, Costing Templates, Vendors) and **Reports & Status** (Style Status, Reports, Analytics, OCR Summary, Store Reports). The folder holding the page you are on opens by itself. Nothing was removed; the less-used screens are just tucked into folders.
+
+### Confirmation windows
+
+Risky actions such as **Delete file** ask first in a centred window with **Cancel** and a red confirm button, instead of the browser's plain alert box. Press **Cancel** and nothing changes.
+
 ### The Admin menu (left side)
 
 The Admin menu is grouped so every entry stays reachable:
