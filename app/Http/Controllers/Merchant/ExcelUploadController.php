@@ -491,7 +491,7 @@ class ExcelUploadController extends Controller
             ->get();
     }
 
-    protected function bulkCreateRowsAndCells(ExcelFile $excelFile, Collection $allHeaders, array $rows, int $userId): void
+    protected function bulkCreateRowsAndCells(ExcelFile $excelFile, Collection $allHeaders, array $rows, int $userId, ?int $importId = null): void
     {
         if (empty($rows)) {
             return;
@@ -510,6 +510,7 @@ class ExcelUploadController extends Controller
                 // write no change-log entries, so nothing about them afterwards
                 // distinguishes them from a row added a moment ago.
                 'origin' => \App\Models\ExcelRow::ORIGIN_IMPORTED,
+                'excel_file_import_id' => $importId,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];

@@ -6,6 +6,8 @@ use App\Models\Buyer;
 use App\Models\BuyerImportProfile;
 use App\Models\BuyerSeason;
 use App\Models\ExcelFile;
+use App\Models\ExcelFileImport;
+use App\Services\ExcelFileAppend;
 use App\Services\BomTableSync;
 use App\Services\ImportColumnMatcher;
 use App\Support\StyleHierarchy;
@@ -47,7 +49,7 @@ class ImportWizardController extends ExcelUploadController
     /** Reading stops after this many blank rows in a row (nothing in the matched columns). */
     private const MAX_BLANK_ROWS = 200;
 
-    public function __construct(private ImportColumnMatcher $matcher)
+    public function __construct(private ImportColumnMatcher $matcher, private ExcelFileAppend $append)
     {
     }
 
@@ -60,7 +62,10 @@ class ImportWizardController extends ExcelUploadController
         $buyers = $this->allowedBuyers($request);
         $seasons = BuyerSeason::whereIn('buyer_id', $buyers->pluck('id'))->orderBy('code')->pluck('code')->unique()->values();
 
-        return view('merchant.import.choose', compact('buyers', 'seasons'));
+        $existingFiles = $this->append->candidates($request->user(), $buyers->pluck('id')->all());
+        $preselect = $request->integer('file') ? $existingFiles->firstWhere('id', $request->integer('file')) : null;
+
+        return view('merchant.import.choose', compact('buyers', 'seasons', 'existingFiles', 'preselect'));
     }
 
     public function upload(Request $request)
@@ -73,10 +78,26 @@ class ImportWizardController extends ExcelUploadController
             'buyer_id' => ['required', 'integer', 'in:' . implode(',', $buyerIds ?: [0])],
             'season_code' => ['required', 'string', 'max:50'],
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt'],
+            'target_file_id' => ['nullable', 'integer'],
         ], [
             'buyer_id.in' => 'Choose one of your buyers.',
             'season_code.required' => 'Enter the season, for example SP27.',
         ]);
+
+        $targetId = null;
+
+        if (filled($data['target_file_id'] ?? null)) {
+            $target = ExcelFile::with('season')->find((int) $data['target_file_id']);
+            $why = $target
+                ? $this->append->refusal($target, $request->user(), (int) $data['buyer_id'], $data['season_code'])
+                : 'That file no longer exists.';
+
+            if ($why !== null) {
+                return back()->withInput()->withErrors(['target_file_id' => $why.' Choose "Create a new file" or another file.']);
+            }
+
+            $targetId = $target->id;
+        }
 
         $this->discard($request);
 
@@ -89,6 +110,7 @@ class ImportWizardController extends ExcelUploadController
             'original_name' => $file->getClientOriginalName(),
             'buyer_id' => (int) $data['buyer_id'],
             'season_code' => mb_strtoupper(trim($data['season_code'])),
+            'target_file_id' => $targetId,
         ]);
 
         return redirect()->route('merchant.import.map');
@@ -147,6 +169,7 @@ class ImportWizardController extends ExcelUploadController
         $autoContinue = $firstArrival && ($autoPicked || $allMatched);
 
         return view('merchant.import.map', [
+            'targetFile' => ! empty($state['target_file_id']) ? ExcelFile::find($state['target_file_id']) : null,
             'state' => $state,
             'buyer' => Buyer::find($state['buyer_id']),
             'sheets' => $sheets,
@@ -223,11 +246,18 @@ class ImportWizardController extends ExcelUploadController
         $styles = $summary['styles'];
 
         $mappedIds = array_values($mapping);
+
+        // Adding to an existing file: which of these rows are already in it.
+        $targetFile = ! empty($state['target_file_id']) ? ExcelFile::find($state['target_file_id']) : null;
+        $duplicateRows = $targetFile ? $this->append->duplicates($targetFile, $read['rows'], $mappedIds) : [];
         $missingRequired = $headers->filter(fn ($h) => $h->is_required && ! in_array($h->id, $mappedIds, true))->pluck('header_name')->values();
 
         return view('merchant.import.preview', [
             'state' => $state,
             'buyer' => Buyer::find($state['buyer_id']),
+            'targetFile' => $targetFile,
+            'targetRowCount' => $targetFile ? $targetFile->rows()->count() : 0,
+            'duplicateCount' => count($duplicateRows),
             'rowCount' => count($read['rows']),
             'mappedCount' => count($mapping),
             'skippedCount' => count($read['titles']) - count($mapping),
@@ -268,6 +298,10 @@ class ImportWizardController extends ExcelUploadController
 
         if ($read['rows'] === []) {
             return redirect()->route('merchant.import.map')->with('warning', 'No data rows were found.');
+        }
+
+        if (! empty($state['target_file_id'])) {
+            return $this->confirmAppend($request, $state, $read, $mapping);
         }
 
         $userId = $request->user()->id;
@@ -328,6 +362,136 @@ class ImportWizardController extends ExcelUploadController
 
         return redirect()->route('merchant.workspace', ['tab' => 'files'])
             ->with('success', count($read['rows']) . ' rows imported for season ' . $state['season_code'] . '. Formula fields are calculated automatically.');
+    }
+
+    /**
+     * Add the matched rows to the END of an existing file instead of making a
+     * new one. Same buyer and season only; locks and buyer access are checked
+     * again here because the wizard may have sat open for a while.
+     *
+     * @param  array{rows: array, titles: array}  $read
+     * @param  array<int, int>  $mapping
+     */
+    private function confirmAppend(Request $request, array $state, array $read, array $mapping)
+    {
+        $user = $request->user();
+        $file = ExcelFile::with('season')->find($state['target_file_id']);
+        $why = $file ? $this->append->refusal($file, $user, (int) $state['buyer_id'], $state['season_code']) : 'The file no longer exists.';
+
+        if ($why !== null) {
+            return redirect()->route('merchant.import.index')->with('warning', $why.' Nothing was added.');
+        }
+
+        $rows = $read['rows'];
+        $skipped = 0;
+
+        if ($request->boolean('skip_duplicates', true)) {
+            $duplicates = array_flip($this->append->duplicates($file, $rows, array_values($mapping)));
+            $skipped = count($duplicates);
+            $rows = array_diff_key($rows, $duplicates);
+        }
+
+        if ($rows === []) {
+            return redirect()->route('merchant.import.map')
+                ->with('warning', 'Every row of this file is already in "'.$file->original_file_name.'", so nothing was added.');
+        }
+
+        @set_time_limit(300);
+
+        $allHeaders = $this->allActiveHeaders();
+        $count = count($rows);
+
+        $import = DB::transaction(function () use ($file, $state, $rows, $allHeaders, $user, $skipped, $count) {
+            $start = (int) $file->rows()->max('row_number');
+
+            // Number the new rows on from the end of the file.
+            $numbered = [];
+            $n = $start;
+            foreach ($rows as $values) {
+                $numbered[++$n] = $values;
+            }
+
+            $import = ExcelFileImport::create([
+                'excel_file_id' => $file->id,
+                'user_id' => $user->id,
+                'source_name' => $state['original_name'],
+                'row_count' => $count,
+                'skipped_duplicates' => $skipped,
+                'first_row_number' => $start + 1,
+                'last_row_number' => $n,
+            ]);
+
+            $this->bulkCreateRowsAndCells($file, $allHeaders, $numbered, $user->id, $import->id);
+            $file->update(['total_rows' => (int) $file->rows()->count()]);
+
+            \App\Models\ActivityLog::create([
+                'excel_file_id' => $file->id,
+                'row_id' => null,
+                'header_id' => null,
+                'old_value' => null,
+                'new_value' => 'Added '.$count.' rows from '.$state['original_name'],
+                'action' => 'import_appended',
+                'user_id' => $user->id,
+            ]);
+
+            return $import;
+        });
+
+        // Keep the uploaded workbook for the record.
+        Storage::move($state['path'], 'excel_uploads/appended/'.time().'_'.$state['original_name']);
+
+        if (! empty($state['save_profile'])) {
+            $this->saveProfile($state, $read['titles'], $mapping, $user->id);
+        }
+
+        app(\App\Services\UnmappedImportColumns::class)->record((int) $state['buyer_id'], $read['titles'], $mapping, $file->id);
+
+        app(\App\Http\Controllers\Shared\ExcelFileController::class)->recalculateFile($file, $user->id);
+
+        $newRowIds = $import->rows()->pluck('id')->all();
+
+        try {
+            app(BomTableSync::class)->syncRows($file, $newRowIds);
+        } catch (\Throwable $e) {
+            Log::warning('BOM table sync failed for appended rows of file '.$file->id.': '.$e->getMessage());
+        }
+
+        // An approved BOM that gained lines goes back for approval, like any edit.
+        try {
+            app(\App\Services\BomApprovals::class)->afterRowsChanged($newRowIds);
+        } catch (\Throwable $e) {
+            Log::warning('BOM change check failed after append: '.$e->getMessage());
+        }
+
+        $this->notifyOtherRoles(
+            $file,
+            'excel_uploaded',
+            'Rows added to a file',
+            $user->name.' added '.$count.' rows from '.$state['original_name'].' to file: '.$file->original_file_name
+        );
+
+        $request->session()->forget(self::SESSION);
+
+        return redirect()->route('uploaded-files.show', $file->id)
+            ->with('success', $count.' rows added at the end of this file'.($skipped ? ', '.$skipped.' already there were skipped' : '').'.');
+    }
+
+    /** Undo the latest "add to existing file" import, when nothing was done with its rows. */
+    public function undo(Request $request, ExcelFileImport $import)
+    {
+        $this->authorizeImport($request);
+
+        $blockers = $this->append->undoBlockers($import, $request->user());
+
+        if ($blockers !== []) {
+            return redirect()->route('merchant.workspace', ['tab' => 'files'])
+                ->with('warning', 'This import cannot be undone: '.implode(', and ', $blockers).'.');
+        }
+
+        $count = $this->append->undo($import, $request->user());
+
+        return redirect()->route('merchant.workspace', ['tab' => 'files'])
+            ->with('success', $count.' rows added from "'.$import->source_name.'" were removed again.');
     }
 
     public function cancel(Request $request)

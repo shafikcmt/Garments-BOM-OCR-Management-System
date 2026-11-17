@@ -117,6 +117,15 @@
                             && ! $isLockedForCurrentUser
                             && ! $isBuyerLockedForCurrentUser;
 
+                        // Adding rows from a new Excel, and undoing the latest such
+                        // import, share the More menu with Delete.
+                        $canAppendThisFile = $authUser?->mayUploadBom()
+                            && ($authUser->hasRole('admin') || $authUser->hasRole('merchant'))
+                            && ! $isLockedForCurrentUser
+                            && ! $isBuyerLockedForCurrentUser
+                            && $file->buyer_id && $file->buyer_season_id;
+                        $latestImport = $canAppendThisFile ? app(\App\Services\ExcelFileAppend::class)->latestActive($file) : null;
+
                         $statusClass = match($status) {
                             'pending' => 'warning',
                             'processing' => 'info',
@@ -187,7 +196,7 @@
                                     </button>
                                 @endif
 
-                                @if($canDeleteThisFile)
+                                @if($canDeleteThisFile || $canAppendThisFile)
                                     {{-- Delete sits behind "More" so a stray click on the
                                          row cannot remove a file. data-file-delete-form
                                          carries the id so the handler below can drop this
@@ -198,10 +207,34 @@
                                             <i class="bi bi-three-dots me-1" aria-hidden="true"></i>More
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                            @if($canAppendThisFile)
+                                                <li>
+                                                    <a class="dropdown-item" href="{{ route('merchant.import.index', ['file' => $file->id]) }}">
+                                                        <i class="bi bi-file-earmark-plus me-2" aria-hidden="true"></i>Add rows from Excel
+                                                    </a>
+                                                </li>
+                                            @endif
+                                            @if($latestImport)
+                                                <li>
+                                                    <form action="{{ route('merchant.import.undo', $latestImport->id) }}" method="POST"
+                                                          data-confirm-title="Undo the last import?"
+                                                          data-confirm-message="The {{ $latestImport->row_count }} rows added from {{ $latestImport->source_name }} are removed again. This works only while nobody has worked on them."
+                                                          data-confirm-label="Undo import">
+                                                        @csrf
+                                                        <button type="submit" class="dropdown-item">
+                                                            <i class="bi bi-arrow-counterclockwise me-2" aria-hidden="true"></i>Undo last import ({{ $latestImport->row_count }} rows)
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            @endif
+                                            @if($canDeleteThisFile)
                                             <li>
                                                 <form action="{{ route('uploaded-files.destroy', $file->id) }}"
                                                       method="POST"
                                                       data-file-delete-form
+                                                      data-confirm-title="Delete this file?"
+                                                      data-confirm-message="This removes the uploaded file and all of its worksheet rows. It cannot be undone."
+                                                      data-confirm-label="Delete file"
                                                       data-file-id="{{ $file->id }}">
                                                     @csrf
                                                     @method('DELETE')
@@ -210,6 +243,7 @@
                                                     </button>
                                                 </form>
                                             </li>
+                                            @endif
                                         </ul>
                                     </div>
                                 @endif
@@ -365,8 +399,9 @@
             return;
         }
 
-        if (! window.confirm('Are you sure you want to delete this file? This will remove the uploaded file and all worksheet rows.')) {
-            event.preventDefault();
+        // The confirmation is the shared dialog (data-confirm-* on the form);
+        // this runs again once it is confirmed, and only then clears the draft.
+        if (form.dataset.confirmed !== '1') {
             return;
         }
 

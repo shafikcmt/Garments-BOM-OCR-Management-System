@@ -17,6 +17,7 @@ class ExcelRow extends Model
         'duplicated_from_row_id',
         'duplicated_at',
         'origin',
+        'excel_file_import_id',
     ];
 
     protected $casts = [

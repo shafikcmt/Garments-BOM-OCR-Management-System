@@ -17,6 +17,10 @@
     <x-flash />
     @include('merchant.import._steps', ['current' => 2])
 
+    @if($targetFile)
+        <div class="alert alert-info"><i class="bi bi-files me-1" aria-hidden="true"></i>These rows will be <strong>added to the end of</strong> "{{ $targetFile->original_file_name ?: $targetFile->file_name }}", not made into a new file.</div>
+    @endif
+
     <x-card class="mb-3">
         <form method="GET" action="{{ route('merchant.import.map') }}" class="row g-2 align-items-end">
             <div class="col-12 col-md-4">

@@ -65,3 +65,19 @@ it('lets admin set the default CS signature boxes, which only new sheets use', f
 
     $this->actingAs(User::factory()->create())->get(route('admin.cs-signatures.edit'))->assertForbidden();
 });
+
+it('groups the merchant menu into folders and keeps every entry', function () {
+    Role::findOrCreate('merchant', 'web');
+    $merchant = User::factory()->create();
+    $merchant->assignRole('merchant');
+
+    $html = $this->actingAs($merchant)->get(route('merchant.workspace'))->assertOk()->getContent();
+
+    foreach (['Buyer Desk', 'Costing &amp; Materials', 'Reports &amp; Status'] as $folder) {
+        expect($html)->toContain('>'.$folder.'<');
+    }
+
+    foreach (['Style Library', 'Workspace', 'Inquiries', 'Samples', 'Meetings', 'Consumption Master', 'Costing Templates', 'Vendors', 'Style Status', 'Reports', 'Analytics', 'OCR Summary', 'Store Reports'] as $entry) {
+        expect($html)->toContain('>'.$entry.'<');
+    }
+});
