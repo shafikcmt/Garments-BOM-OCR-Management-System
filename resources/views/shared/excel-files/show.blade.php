@@ -1930,7 +1930,7 @@
             <div class="table-toolbar">
                 <div class="table-toolbar-left">
                     <h4 class="section-title">Excel Work Sheet</h4>
-                    <p class="paste-note">Multiple row/column paste supported.</p>
+                    <p class="paste-note">Select cells by dragging, then Ctrl+V to paste into all of them. Copy from Excel works too.</p>
                     <div class="d-flex gap-1 mt-1 d-print-none">
                         <button type="button" id="toggleOrderDetails" class="btn btn-outline-secondary btn-sm" style="min-height:28px;font-size:11px;" aria-pressed="false">
                             <i class="bi bi-arrows-collapse me-1" aria-hidden="true"></i><span id="toggleOrderDetailsText">Hide order details</span>
@@ -2969,7 +2969,133 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    /* ---- Paste into a selected block of cells -----------------------------
+     * Drag over cells to select a block, then Ctrl+V:
+     *   - one copied value fills EVERY selected cell;
+     *   - a copied block fills the selection, repeated to cover it when the
+     *     selection is a whole multiple of it (as Excel does);
+     *   - otherwise it lands from the top-left cell of the selection.
+     * The text can come from this sheet or from outside (Excel, Word, e-mail).
+     * Calculated and read-only cells are left alone and counted.
+     */
+    function selectedRange() {
+        return table && typeof table.sheetSelection === 'function' ? table.sheetSelection() : null;
+    }
+
+    function parseClipboard(text) {
+        // Excel wraps a cell holding a tab, line break or quote in "...".
+        const rows = [];
+        let row = [];
+        let cur = '';
+        let quoted = false;
+
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+
+            if (quoted) {
+                if (ch === '"') {
+                    if (text[i + 1] === '"') { cur += '"'; i++; } else { quoted = false; }
+                } else {
+                    cur += ch;
+                }
+            } else if (ch === '"' && cur === '') {
+                quoted = true;
+            } else if (ch === '\t') {
+                row.push(cur); cur = '';
+            } else if (ch === '\n') {
+                row.push(cur); rows.push(row); row = []; cur = '';
+            } else if (ch !== '\r') {
+                cur += ch;
+            }
+        }
+
+        row.push(cur);
+        rows.push(row);
+
+        // A trailing line break is the end of the last row, not an extra row.
+        if (rows.length > 1 && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === '') {
+            rows.pop();
+        }
+
+        return rows;
+    }
+
+    function pasteIntoRange(box, grid) {
+        const h = grid.length;
+        const w = Math.max(...grid.map(r => r.length));
+        const selRows = box.bottom - box.top + 1;
+        const selCols = box.right - box.left + 1;
+
+        let targets = []; // [row, col, value]
+
+        if (h === 1 && w === 1) {
+            for (let r = box.top; r <= box.bottom; r++) {
+                for (let c = box.left; c <= box.right; c++) targets.push([r, c, grid[0][0]]);
+            }
+        } else if ((selRows > h || selCols > w) && selRows % h === 0 && selCols % w === 0) {
+            for (let r = 0; r < selRows; r++) {
+                for (let c = 0; c < selCols; c++) targets.push([box.top + r, box.left + c, grid[r % h][c % w] ?? '']);
+            }
+        } else {
+            for (let r = 0; r < h; r++) {
+                for (let c = 0; c < grid[r].length; c++) targets.push([box.top + r, box.left + c, grid[r][c]]);
+            }
+        }
+
+        clearRestoredHighlights();
+        let filled = 0;
+        let skipped = 0;
+
+        targets.forEach(([r, c, value]) => {
+            const input = editableGrid[r] && editableGrid[r][c];
+
+            if (!input || input.readOnly || input.disabled) {
+                skipped++;
+                return;
+            }
+
+            input.value = value;
+            highlightRestoredInput(input);
+            filled++;
+        });
+
+        if (filled > 0) {
+            updateLiveFormulas();
+            markWorksheetChanged();
+        }
+
+        let message = filled + (filled === 1 ? ' cell' : ' cells') + ' pasted. Press Save Changes to keep them.';
+        if (skipped > 0) {
+            message += ' ' + skipped + ' read-only or calculated ' + (skipped === 1 ? 'cell was' : 'cells were') + ' left unchanged.';
+        }
+        showDraftToast(message);
+    }
+
+    // Ctrl+V with a block selected. The block selection takes focus out of the
+    // cell, so this listens on the page rather than on an input; typing in the
+    // search or header boxes is left alone.
+    document.addEventListener('paste', function (event) {
+        const box = selectedRange();
+        if (!box) return;
+
+        const target = event.target;
+        if (target && target.matches && target.matches('input, textarea, select') && !target.classList.contains('excel-editable-cell')) {
+            return;
+        }
+
+        const text = (event.clipboardData || window.clipboardData).getData('text');
+        if (!text) return;
+
+        event.preventDefault();
+        pasteIntoRange(box, parseClipboard(text));
+    });
+
     function handleMultiPaste(input, event) {
+        // A block is selected: the page-level handler above fills it.
+        if (selectedRange()) {
+            return;
+        }
+
         const clipboard = (event.clipboardData || window.clipboardData).getData('text');
 
         if (!clipboard || (!clipboard.includes('\n') && !clipboard.includes('\t'))) {

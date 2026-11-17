@@ -473,7 +473,7 @@ class ImportWizardController extends ExcelUploadController
         $request->session()->forget(self::SESSION);
 
         return redirect()->route('uploaded-files.show', $file->id)
-            ->with('success', $count.' rows added at the end of this file'.($skipped ? ', '.$skipped.' already there were skipped' : '').'.');
+            ->with('success', $count.' '.Str::plural('row', $count).' added at the end of this file'.($skipped ? ', '.$skipped.' already there '.($skipped === 1 ? 'was' : 'were').' skipped' : '').'.');
     }
 
     /** Undo the latest "add to existing file" import, when nothing was done with its rows. */

@@ -2577,6 +2577,38 @@ class BookingController extends Controller
             ->values()
             ->all();
 
+        // STYLE: the aliases are listed in order of preference, and a contract
+        // number is only the last resort. Taking whichever matching cell came
+        // first in the row put the contract number (HAPLANN/SUM27/11) in the
+        // booking's Style No whenever its column sat before Style Name.
+        if ($group === 'style') {
+            $rank = array_flip($aliases);
+            $best = null;
+            $bestRank = PHP_INT_MAX;
+
+            foreach ($row->cells as $cell) {
+                $value = trim((string) $cell->value);
+
+                if (! $cell->header || $value === '') {
+                    continue;
+                }
+
+                $r = min(
+                    $rank[$this->normalize($cell->header->header_key)] ?? PHP_INT_MAX,
+                    $rank[$this->normalize($cell->header->header_name)] ?? PHP_INT_MAX
+                );
+
+                if ($r < $bestRank) {
+                    $bestRank = $r;
+                    $best = $value;
+                }
+            }
+
+            if ($best !== null) {
+                return $best;
+            }
+        }
+
         foreach ($row->cells as $cell) {
             if (! $cell->header) {
                 continue;

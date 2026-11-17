@@ -385,6 +385,9 @@
     <style>
         tr:has(.dropdown-menu.show) { position: relative; z-index: 20; }
         tr:has(.dropdown-menu.show) .dropdown-menu { z-index: 30; }
+        /* The scrolling table box clips a menu that opens past its last row, so
+           it grows while a row menu is open (three entries need about 170px). */
+        .gx-table-scroll:has(.dropdown-menu.show) { min-height: 260px; }
     </style>
     {{-- Delete used to sit on the file page, where submitting it also cleared
          that file's unsaved-draft key from localStorage. The button moved here,
