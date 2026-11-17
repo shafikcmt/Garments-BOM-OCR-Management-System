@@ -644,7 +644,7 @@
     }
 
     .excel-data-table thead tr.filter-row th {
-        top: 46px;
+        top: var(--sheet-head-h, 46px);
         z-index: 2;
         background: #ffffff;
         padding: 4px 5px;
@@ -652,12 +652,17 @@
         box-shadow: inset 0 -1px 0 var(--po-line-soft, #EEF3F8);
     }
 
+    /* The sticky ladder, bottom to top: first body column (1) < header cells
+       (3) < filter-row cells (2 -> raised) < header and filter first column
+       (6 / 5). The body's first column used to share z-index 4 with the header's
+       and, coming later in the page, painted OVER it, so the first rows slid
+       across the header while scrolling. */
     .excel-data-table thead th:first-child,
     .excel-data-table thead tr.filter-row th:first-child,
     .excel-data-table tbody td:first-child {
         position: sticky;
         left: 0;
-        z-index: 4;
+        z-index: 1;
         background: #fff;
         min-width: 78px;
         width: 78px;
@@ -667,6 +672,11 @@
 
     .excel-data-table thead th:first-child {
         background: var(--po-tint, #E0F2FE);
+        z-index: 6;
+    }
+
+    .excel-data-table thead tr.filter-row th:first-child {
+        z-index: 5;
     }
 
     .excel-data-table thead tr.filter-row th:first-child {
@@ -1978,6 +1988,7 @@
                     @endif
 
                     @if(count($editableHeaderIds) > 0)
+                        <span id="pendingOtherPagesBadge" class="badge text-bg-warning d-none align-self-center" role="status"></span>
                         <button type="submit" class="btn btn-primary btn-sm" id="saveChangesButton">
                             Save Changes
                         </button>
@@ -2687,20 +2698,61 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
+    /* ---- Edits made on OTHER pages ------------------------------------
+     * The sheet shows one page of rows at a time, but a merchant edits across
+     * pages (often after filtering by style). The draft therefore keeps every
+     * unsaved edit for this file, not only the ones on the page in view, and
+     * Save Changes sends them all in one go. Names are cells[rowId][headerId],
+     * so they are stable across pages and filters.
+     */
+    const pagedInputNames = new Set(editableInputs.map(input => input.name));
+
+    function readDraftFields() {
+        try {
+            const raw = localStorage.getItem(draftKey);
+            return raw ? getDraftFields(JSON.parse(raw)) : {};
+        } catch (error) {
+            return {};
+        }
+    }
+
+    function offPageDraftFields() {
+        const result = {};
+
+        Object.entries(readDraftFields()).forEach(([name, value]) => {
+            if (!pagedInputNames.has(name)) {
+                result[name] = value;
+            }
+        });
+
+        return result;
+    }
+
+    function updatePendingBadge() {
+        const badge = document.getElementById('pendingOtherPagesBadge');
+        if (!badge) return;
+
+        const count = Object.keys(offPageDraftFields()).length;
+        badge.textContent = count + ' unsaved edit' + (count === 1 ? '' : 's') + ' on other pages \u2014 Save Changes saves them all';
+        badge.classList.toggle('d-none', count === 0);
+    }
+
     function saveDraftToLocal(force = false) {
         // Important: clicking/focusing a cell must not create a draft.
         // Draft will be saved only after user actually changes a value.
-        if (!force && !userEditedWorksheet) {
+        if (!force && !userEditedWorksheet && !hasRealChanges(offPageDraftFields())) {
             return;
         }
 
-        const changed = getChangedFields();
+        const merged = { ...offPageDraftFields(), ...getChangedFields() };
 
-        if (hasRealChanges(changed)) {
-            localStorage.setItem(draftKey, JSON.stringify(buildDraftPayload(changed)));
+        if (hasRealChanges(merged)) {
+            localStorage.setItem(draftKey, JSON.stringify(buildDraftPayload(merged)));
         } else {
             clearDraft();
         }
+
+        updatePendingBadge();
     }
 
     function scheduleDraftSave() {
@@ -2761,7 +2813,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function markWorksheetChanged() {
         userEditedWorksheet = hasRealChanges(getChangedFields());
 
-        if (userEditedWorksheet) {
+        if (userEditedWorksheet || hasRealChanges(offPageDraftFields())) {
             scheduleDraftSave();
         } else {
             clearDraft();
@@ -2805,9 +2857,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const visibleDraft = getVisibleDraftChanges(draftFields);
 
-        // If no visible input needs restore, remove stale draft so modal does not keep showing.
+        // Edits that belong to other pages stay in the draft and are saved
+        // with the next Save Changes; only this page's stale ones are dropped.
         if (!hasRealChanges(visibleDraft)) {
-            clearDraft();
+            const offPage = offPageDraftFields();
+
+            if (hasRealChanges(offPage)) {
+                localStorage.setItem(draftKey, JSON.stringify(buildDraftPayload(offPage)));
+            } else {
+                clearDraft();
+            }
+
+            updatePendingBadge();
             return;
         }
 
@@ -3772,13 +3833,27 @@ document.addEventListener('DOMContentLoaded', function () {
     if (form) {
         form.addEventListener('submit', function () {
             isSubmitting = true;
+
+            // Unsaved edits from other pages go in with this save. Read them
+            // BEFORE the draft is cleared.
+            const offPage = offPageDraftFields();
             clearDraft();
+            form.querySelectorAll('input[data-off-page-edit]').forEach(el => el.remove());
+
+            Object.entries(offPage).forEach(([name, value]) => {
+                const hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = name;
+                hidden.value = value ?? '';
+                hidden.setAttribute('data-off-page-edit', '1');
+                form.appendChild(hidden);
+            });
 
             const pruned = pruneUnchangedCells();
             const cellsCountField = document.getElementById('cellsCountField');
 
             if (cellsCountField) {
-                cellsCountField.value = String(editableInputs.length - pruned.length);
+                cellsCountField.value = String(editableInputs.length - pruned.length + Object.keys(offPage).length);
             }
 
             // If the navigation never happens (validation, a blocked submit, the
@@ -4276,6 +4351,18 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     restoreDraftIfNeeded();
+    updatePendingBadge();
+
+    // The filter row sticks just under the header row, whatever height the
+    // header ends up (role badges and long names wrap).
+    function syncSheetHeadHeight() {
+        const headCell = table?.querySelector('thead tr:first-child th');
+        if (headCell) {
+            table.style.setProperty('--sheet-head-h', headCell.getBoundingClientRect().height + 'px');
+        }
+    }
+    syncSheetHeadHeight();
+    window.addEventListener('resize', syncSheetHeadHeight);
 });
 </script>
 @endsection
