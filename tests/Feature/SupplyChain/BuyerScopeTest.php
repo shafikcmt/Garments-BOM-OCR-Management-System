@@ -501,12 +501,13 @@ it('offers a one-buyer user only the buyers, seasons and vendors they may see in
     $this->withoutVite()->actingAs($user)->get(route('supply_chain.bookings.index'))
         ->assertOk()
         ->assertViewHas('filterOptions', function ($options) {
-            $buyers = $options['buyers']->all();
+            $buyers = collect($options['buyers'])->pluck('label')->all();
             $vendors = $options['vendors']->all();
 
-            // Alpha is Buyer A's, Charlie sits in an untagged file (visible to everyone by design).
-            return in_array('Alpha', $buyers, true) && in_array('Charlie', $buyers, true)
-                && ! in_array('Bravo', $buyers, true)
+            // The registered buyer A (named by the Buyers screen, not by the sheet text), and
+            // Charlie, who sits in an untagged file (visible to everyone by design).
+            return in_array('Buyer A', $buyers, true) && in_array('Charlie', $buyers, true)
+                && ! in_array('Buyer B', $buyers, true) && ! in_array('Bravo', $buyers, true)
                 && in_array('Vendor Alpha', $vendors, true) && ! in_array('Vendor Bravo', $vendors, true);
         });
 });
@@ -516,7 +517,7 @@ it('still offers an all-buyers user every buyer in the filters', function () {
 
     $this->withoutVite()->actingAs($user)->get(route('supply_chain.bookings.index'))
         ->assertOk()
-        ->assertViewHas('filterOptions', fn ($options) => collect(['Alpha', 'Bravo', 'Charlie'])->every(fn ($b) => in_array($b, $options['buyers']->all(), true)));
+        ->assertViewHas('filterOptions', fn ($options) => collect(['Buyer A', 'Buyer B', 'Charlie'])->every(fn ($b) => in_array($b, collect($options['buyers'])->pluck('label')->all(), true)));
 });
 
 it('groups rows of one vendor and SAP Code only among the rows the user may see', function () {

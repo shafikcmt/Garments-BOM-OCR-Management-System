@@ -12,6 +12,7 @@ use App\Models\Buyer;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\ExcelCell;
+use App\Models\ExcelFile;
 use App\Models\ExcelFileChangeLog;
 use App\Models\ExcelHeader;
 use App\Models\ExcelRow;
@@ -1368,7 +1369,7 @@ class BookingController extends Controller
         $filterOptions = [];
         if ($includeFilters) {
             $filterOptions = [
-                'buyers' => $this->dropdownOptions('buyer'),
+                'buyers' => $this->buyerFilterOptions(),
                 'seasons' => $this->dropdownOptions('season'),
                 'sap_codes' => $this->dropdownOptions('sap_code'),
                 'vendors' => $this->dropdownOptions('vendor'),
@@ -1560,7 +1561,7 @@ class BookingController extends Controller
         $this->applyBuyerScope($pendingRowsQuery);
 
         $this->applyHasBookingSourceData($pendingRowsQuery);
-        $this->applyCellFilter($pendingRowsQuery, 'buyer', $request->input('buyer'));
+        $this->applyBuyerFilter($pendingRowsQuery, $request->input('buyer'));
         $this->applyCellFilter($pendingRowsQuery, 'season', $request->input('season'));
         $this->applyCellFilter($pendingRowsQuery, 'sap_code', $request->input('sap_code'));
         $this->applyCellFilter($pendingRowsQuery, 'vendor', $request->input('vendor'));
@@ -2047,6 +2048,59 @@ class BookingController extends Controller
             ->latest('id');
     }
 
+    /**
+     * The Buyer filter: the registered buyers that have files (so two buyers whose
+     * sheets both say "Ann-Taylor" in the Buyer Name column are still two choices),
+     * plus the Buyer Name text of files that carry no registered buyer.
+     *
+     * @return \Illuminate\Support\Collection<int, array{value: string, label: string}>
+     */
+    protected function buyerFilterOptions()
+    {
+        $viewer = $this->buyerScopeViewer();
+        $scoped = $viewer?->isBuyerConfined() ? $viewer->scopedBuyerIds() : null;
+
+        $fileBuyerIds = ExcelFile::query()->whereNotNull('buyer_id')->distinct()->pluck('buyer_id');
+
+        $registered = \App\Models\Buyer::query()
+            ->whereIn('id', $fileBuyerIds)
+            ->when($scoped !== null, fn ($q) => $q->whereIn('id', $scoped))
+            ->orderBy('buyer_name')
+            ->get(['id', 'buyer_name'])
+            ->map(fn ($b) => ['value' => 'id:'.$b->id, 'label' => $b->buyer_name]);
+
+        $headerIds = $this->headerIdsForGroup('buyer');
+
+        $untagged = collect();
+        if (! empty($headerIds)) {
+            $untagged = ExcelCell::query()
+                ->whereIn('header_id', $headerIds)
+                ->whereNotNull('value')
+                ->whereRaw("TRIM(value) <> ''")
+                ->whereHas('row', fn ($row) => $row->whereHas('excelFile', fn ($file) => $file->whereNull('buyer_id')))
+                ->distinct()->orderBy('value')->limit(200)->pluck('value')
+                ->map(fn ($v) => trim((string) $v))->filter()
+                ->unique(fn ($v) => $this->normalize($v))
+                ->map(fn ($v) => ['value' => $v, 'label' => $v]);
+        }
+
+        return $registered->concat($untagged)->values();
+    }
+
+    /** "id:5" picks a registered buyer by the file's buyer; anything else is the old Buyer Name text match. */
+    protected function applyBuyerFilter($query, ?string $value): void
+    {
+        $value = trim((string) $value);
+
+        if (preg_match('/^id:(\d+)$/', $value, $m)) {
+            $query->whereHas('excelFile', fn ($file) => $file->where('buyer_id', (int) $m[1]));
+
+            return;
+        }
+
+        $this->applyCellFilter($query, 'buyer', $value);
+    }
+
     protected function applyCellFilter($query, string $group, ?string $value): void
     {
         $value = trim((string) $value);
@@ -2163,9 +2217,21 @@ class BookingController extends Controller
             ->take(5)
             ->values();
 
+        // The box promises "buyer / season / vendor / item / style / PO", so only
+        // those columns are searched. Searching every cell of the row pulled in
+        // rows that merely mention the word somewhere else (a remark, a note on
+        // another material), such as THREAD lines for a POCKETING search.
+        $headerIds = collect(['buyer', 'season', 'vendor', 'item', 'description', 'sap_code', 'style', 'po_no'])
+            ->flatMap(fn ($group) => $this->headerIdsForGroup($group))
+            ->unique()->values()->all();
+
         foreach ($terms as $term) {
             $term = mb_strtolower($term);
-            $query->whereHas('cells', function ($cellQuery) use ($term) {
+            $query->whereHas('cells', function ($cellQuery) use ($term, $headerIds) {
+                if ($headerIds !== []) {
+                    $cellQuery->whereIn('header_id', $headerIds);
+                }
+
                 $cellQuery->whereRaw('LOWER(value) LIKE ?', ['%' . $term . '%']);
             });
         }
