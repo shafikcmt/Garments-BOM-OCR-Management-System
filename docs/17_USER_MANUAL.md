@@ -221,6 +221,7 @@ Merchandising and Admin work inquiries for the buyers they hold. Management can 
 **Copy and paste in the sheet.** Drag over cells to select a block (the note beside Search says how many). Then:
 - **Ctrl+C** copies the block; paste it into Excel or into another place in the sheet.
 - **Ctrl+V** pastes into the selected block. One copied value fills **every** selected cell. A copied block fills the selection and repeats to cover it when the selection is a whole multiple of it. Otherwise it lands from the top-left selected cell.
+- **Delete** (or **Backspace**) empties every selected cell. **Ctrl+X** copies the block and then empties it. Press **Save Changes** to keep it; leave the page without saving and nothing is lost from the file.
 - The text can come from outside too (Excel, Word, an e-mail). Cells you cannot edit, and calculated cells, are left unchanged and counted in the message.
 - Pasted cells turn green. Press **Save Changes** to keep them. With no block selected, click a cell and paste as before (several rows or columns from Excel spread to the cells below and to the right).
 
