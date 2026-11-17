@@ -188,19 +188,30 @@
                                 @endif
 
                                 @if($canDeleteThisFile)
-                                    {{-- data-file-delete-form carries the id so
-                                         the handler below can drop this file's
-                                         unsaved-draft key on the way out. --}}
-                                    <form action="{{ route('uploaded-files.destroy', $file->id) }}"
-                                          method="POST"
-                                          data-file-delete-form
-                                          data-file-id="{{ $file->id }}">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-danger">
-                                            <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
+                                    {{-- Delete sits behind "More" so a stray click on the
+                                         row cannot remove a file. data-file-delete-form
+                                         carries the id so the handler below can drop this
+                                         file's unsaved-draft key on the way out. --}}
+                                    <div class="dropdown">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown"
+                                                data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false">
+                                            <i class="bi bi-three-dots me-1" aria-hidden="true"></i>More
                                         </button>
-                                    </form>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                            <li>
+                                                <form action="{{ route('uploaded-files.destroy', $file->id) }}"
+                                                      method="POST"
+                                                      data-file-delete-form
+                                                      data-file-id="{{ $file->id }}">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <i class="bi bi-trash me-2" aria-hidden="true"></i>Delete file
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        </ul>
+                                    </div>
                                 @endif
                             </div>
 
@@ -335,6 +346,12 @@
 @endif
 
 @if($canDeleteFilesByRole)
+    {{-- The row cards each form their own stacking layer; lift the row whose
+         menu is open so the menu is not painted under the row below it. --}}
+    <style>
+        tr:has(.dropdown-menu.show) { position: relative; z-index: 20; }
+        tr:has(.dropdown-menu.show) .dropdown-menu { z-index: 30; }
+    </style>
     {{-- Delete used to sit on the file page, where submitting it also cleared
          that file's unsaved-draft key from localStorage. The button moved here,
          so the clearing moves with it — otherwise a draft would outlive the

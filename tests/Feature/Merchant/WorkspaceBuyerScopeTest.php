@@ -204,3 +204,11 @@ it('leaves the upload buyer dropdown alone', function () {
         ->assertOk()
         ->assertViewHas('scopedBuyer', fn ($buyer) => $buyer?->buyer_name === 'MACYS');
 });
+
+it('keeps Delete behind the More menu in the Existing Files list', function () {
+    $html = $this->actingAs(mwScopeUser([$this->macys->id], BuyerScope::MODE_SPECIFIC))
+        ->get(route('merchant.workspace', ['tab' => 'files']))
+        ->assertOk()->getContent();
+
+    expect($html)->toContain('</i>More')->toContain('Delete file')->not->toMatch('/btn btn-sm btn-danger">\s*<i class="bi bi-trash me-1"[^>]*><\/i>Delete\s/');
+});
