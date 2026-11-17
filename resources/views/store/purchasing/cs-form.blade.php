@@ -296,7 +296,7 @@
                                 </div>
                             @endforeach
                         </div>
-                        <div class="form-text">Leave a title empty to drop that box. Up to {{ \App\Models\GsComparativeStatement::MAX_SIGNATORIES }} boxes; the name and date fill in automatically as the sheet is submitted, checked and approved.</div>
+                        <div class="form-text">New sheets start with the boxes set by Admin in Settings &rarr; CS Signatures; change them here for this sheet only. Leave a title empty to drop that box. Up to {{ \App\Models\GsComparativeStatement::MAX_SIGNATORIES }} boxes; the name and date fill in automatically as the sheet is submitted, checked and approved.</div>
                     </div>
                 </div>
             </div>

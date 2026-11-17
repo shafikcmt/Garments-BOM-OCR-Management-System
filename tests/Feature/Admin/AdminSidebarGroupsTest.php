@@ -38,3 +38,30 @@ it('opens the group that holds the current page', function () {
 
     expect($html)->toMatch('/sidebar-group is-open[^>]*>\s*<button[^>]*>\s*<span class="sidebar-link-main">\s*<span class="sidebar-icon"><i class="bi bi-clipboard-check"/');
 });
+
+it('lets admin set the default CS signature boxes, which only new sheets use', function () {
+    Role::findOrCreate('admin', 'web');
+    $admin = User::factory()->create();
+    $admin->assignRole('admin');
+
+    expect(\App\Models\GsComparativeStatement::defaultSignatories())->toHaveCount(3);
+
+    $this->actingAs($admin)->get(route('admin.cs-signatures.edit'))->assertOk()->assertSee('Jr. Executive - SCM');
+    $this->actingAs($admin)->post(route('admin.cs-signatures.update'), ['boxes' => [
+        ['label' => 'Buyer', 'role' => 'prepared'],
+        ['label' => 'GM', 'role' => 'approved'],
+        ['label' => '', 'role' => 'blank'],
+    ]])->assertRedirect(route('admin.cs-signatures.edit'));
+
+    expect(\App\Models\GsComparativeStatement::defaultSignatories())->toBe([
+        ['label' => 'Buyer', 'role' => 'prepared'], ['label' => 'GM', 'role' => 'approved'],
+    ]);
+
+    // A sheet that stored nothing keeps the standard three, whatever the default now is.
+    expect((new \App\Models\GsComparativeStatement)->signBoxes())->toHaveCount(3);
+
+    $this->actingAs($admin)->post(route('admin.cs-signatures.update'), ['reset' => 1])->assertRedirect();
+    expect(\App\Models\GsComparativeStatement::defaultSignatories())->toHaveCount(3);
+
+    $this->actingAs(User::factory()->create())->get(route('admin.cs-signatures.edit'))->assertForbidden();
+});

@@ -51,8 +51,10 @@ class GsComparativeStatement extends Model
 
     public const MAX_SIGNATORIES = 5;
 
-    /** @return list<array{label: string, role: string}> */
-    public static function defaultSignatories(): array
+    public const SIGN_SETTING = 'cs_signatories';
+
+    /** The three boxes every sheet printed before this was configurable; kept for sheets that stored none. @return list<array{label: string, role: string}> */
+    public static function standardSignatories(): array
     {
         return [
             ['label' => 'Jr. Executive - SCM', 'role' => 'prepared'],
@@ -61,17 +63,30 @@ class GsComparativeStatement extends Model
         ];
     }
 
+    /** The boxes a NEW sheet starts with: Admin > Settings > CS Signatures, else the standard three. @return list<array{label: string, role: string}> */
+    public static function defaultSignatories(): array
+    {
+        $saved = json_decode((string) \App\Models\AppSetting::get(self::SIGN_SETTING, ''), true);
+
+        return self::cleanSignatories(is_array($saved) ? $saved : []) ?: self::standardSignatories();
+    }
+
+    /** @return list<array{label: string, role: string}> */
+    public static function cleanSignatories(array $boxes): array
+    {
+        return collect($boxes)
+            ->filter(fn ($b) => is_array($b) && filled($b['label'] ?? null))
+            ->take(self::MAX_SIGNATORIES)
+            ->map(fn ($b) => [
+                'label' => trim((string) $b['label']),
+                'role' => array_key_exists($b['role'] ?? '', self::SIGN_ROLES) ? $b['role'] : 'blank',
+            ])->values()->all();
+    }
+
     /** Boxes printed under the recommendation; older sheets fall back to the standard three. @return list<array{label: string, role: string}> */
     public function signBoxes(): array
     {
-        $boxes = collect($this->signatories ?? [])
-            ->filter(fn ($b) => is_array($b) && filled($b['label'] ?? null))
-            ->map(fn ($b) => [
-                'label' => (string) $b['label'],
-                'role' => array_key_exists($b['role'] ?? '', self::SIGN_ROLES) ? $b['role'] : 'blank',
-            ])->values()->all();
-
-        return $boxes ?: self::defaultSignatories();
+        return self::cleanSignatories($this->signatories ?? []) ?: self::standardSignatories();
     }
 
     /** @return array<string, string> */
