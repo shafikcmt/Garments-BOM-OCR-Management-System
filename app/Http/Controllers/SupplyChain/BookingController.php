@@ -1405,7 +1405,16 @@ class BookingController extends Controller
 
         $ids = (clone $query)->pluck('id')->map(fn ($id) => (int) $id)->all();
 
-        $keyHeaderIds = collect(['buyer', 'season', 'ihod', 'vendor', 'sap_code'])
+        // The keyword box searches what the list SHOWS: buyer, season, vendor, SAP
+        // Code, style, PO number and the item name the row displays. The query has
+        // already narrowed by columns; this check is on the displayed values, so a
+        // THREAD row whose material description mentions pocketing is not returned
+        // for "pocketing".
+        $keywordTerms = collect(preg_split('/\s+/', trim((string) $request->input('keyword'))))
+            ->map(fn ($t) => mb_strtolower(trim((string) $t)))->filter()->take(5)->values()->all();
+        $shownText = [];
+
+        $keyHeaderIds = collect(['buyer', 'season', 'ihod', 'vendor', 'sap_code'] + ($keywordTerms ? [5 => 'item', 6 => 'style', 7 => 'po_no'] : []))
             ->flatMap(fn ($group) => $this->headerIdsForGroup($group))->unique()->values()->all();
 
         $hasPo = [];
@@ -1420,7 +1429,14 @@ class BookingController extends Controller
                 ->whereIn('id', $chunk)
                 ->with(['cells' => fn ($cells) => $cells->whereIn('header_id', $keyHeaderIds ?: [0])->with('header')])
                 ->get(['id'])
-                ->each(function (ExcelRow $row) use (&$keyOf, $hasPo) {
+                ->each(function (ExcelRow $row) use (&$keyOf, $hasPo, $keywordTerms, &$shownText) {
+                    if ($keywordTerms) {
+                        $shownText[$row->id] = mb_strtolower(implode(' | ', array_filter(array_map(
+                            fn ($group) => (string) $this->valueFor($row, $group),
+                            ['buyer', 'season', 'vendor', 'sap_code', 'item', 'style', 'po_no']
+                        ))));
+                    }
+
                     $key = isset($hasPo[$row->id]) ? '' : $this->bookingGroupKey([
                         'buyer_name' => $this->valueFor($row, 'buyer'),
                         'season_name' => $this->valueFor($row, 'season'),
@@ -1430,6 +1446,20 @@ class BookingController extends Controller
                     ]);
                     $keyOf[$row->id] = $key;
                 });
+        }
+
+        if ($keywordTerms) {
+            $ids = array_values(array_filter($ids, function ($id) use ($keywordTerms, $shownText) {
+                $text = $shownText[$id] ?? '';
+
+                foreach ($keywordTerms as $term) {
+                    if (! str_contains($text, $term)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }));
         }
 
         // Group members by key, in list order; the first member leads the group.
