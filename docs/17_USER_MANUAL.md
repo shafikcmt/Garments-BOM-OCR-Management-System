@@ -701,6 +701,10 @@ The row shows how many source rows it holds, up to three of their items, and the
 
 **Why a page can have few rows.** If many rows have no vendor and no SAP Code, they merge into one booking per ship date. Fill in **Vendor Name** and **SAP Code** in the Workspace and they split into separate bookings.
 
+**The Buyer filter** lists the buyers registered in the system that have files (for example ANNTAYLOR (WOVEN) and ANNTAYLOR (DENIM)), even when the sheets of both write the same name in the Buyer Name column. Files with no registered buyer are offered by the name typed in their Buyer Name column.
+
+**Quick keyword search** looks only in the columns its hint names: buyer, season, vendor, item and its description, SAP Code, style and PO number. A word that appears in a remark or note of another material no longer brings that row in. Several words must all match. Rows that match are still merged into one booking by the rules above, so a search for POCKETING can still show "POCKETING, THREAD" when both have no vendor and no SAP Code: fill those two in the Workspace to keep them apart.
+
 **Who sees what.** The list and its filters (**Buyer**, **Season**, **SAP Code**, **Vendor**, **IHOD**) show only the buyers you are assigned to, plus files that have no buyer set. A booking never pulls in rows of a buyer you cannot see. If you still see a buyer you are not assigned to, that buyer's file has no buyer set: ask Admin to tag the file.
 
 ### 3.1a Materials Ordered, Booking Qty and PO status

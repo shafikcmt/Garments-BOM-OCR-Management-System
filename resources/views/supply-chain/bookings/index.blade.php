@@ -682,8 +682,8 @@
                         <label class="form-label">Buyer</label>
                         <select name="buyer" class="form-select booking-auto-filter">
                             <option value="">All Buyer</option>
-                            @foreach($filterOptions['buyers'] as $buyer)
-                                <option value="{{ $buyer }}" @selected($selectedBuyer === $buyer)>{{ $buyer }}</option>
+                            @foreach($filterOptions['buyers'] as $buyerOption)
+                                <option value="{{ $buyerOption['value'] }}" @selected($selectedBuyer === $buyerOption['value'])>{{ $buyerOption['label'] }}</option>
                             @endforeach
                         </select>
                     </div>
