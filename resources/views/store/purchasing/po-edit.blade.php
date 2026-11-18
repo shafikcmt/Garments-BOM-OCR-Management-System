@@ -66,13 +66,34 @@
                         <label class="form-label" for="payment_terms">Mode / terms of payment</label>
                         <textarea id="payment_terms" name="payment_terms" rows="3" class="form-control">{{ old('payment_terms', $order->payment_terms) }}</textarea>
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label" for="delivery_terms">Terms of delivery</label>
-                        <textarea id="delivery_terms" name="delivery_terms" rows="3" class="form-control">{{ old('delivery_terms', $order->delivery_terms) }}</textarea>
+                    @php
+                        $splitLines = fn ($text) => array_values(array_filter(preg_split('/\r\n|\r|\n/', (string) $text), fn ($l) => trim($l) !== ''));
+                        $deliveryLines = old('delivery_lines', $splitLines($order->delivery_terms)) ?: [''];
+                        $remarkLines = old('remark_lines', $splitLines($order->remarks)) ?: [''];
+                    @endphp
+                    {{-- One box per line. Terms of delivery holds up to 5 lines. --}}
+                    <div class="col-12 col-md-4" data-lines data-max="5">
+                        <label class="form-label">Terms of delivery <span class="text-muted small">(up to 5 lines)</span></label>
+                        <div data-lines-list>
+                            @foreach($deliveryLines as $line)
+                                <input type="text" name="delivery_lines[]" class="form-control form-control-sm mb-1" maxlength="190" value="{{ $line }}" aria-label="Terms of delivery line">
+                            @endforeach
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" data-lines-add data-name="delivery_lines[]">
+                            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Line
+                        </button>
+                        @error('delivery_terms')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label class="form-label" for="remarks">Remarks (one per line)</label>
-                        <textarea id="remarks" name="remarks" rows="3" class="form-control">{{ old('remarks', $order->remarks) }}</textarea>
+                    <div class="col-12 col-md-4" data-lines data-max="10">
+                        <label class="form-label">Remarks <span class="text-muted small">(numbered on the PO)</span></label>
+                        <div data-lines-list>
+                            @foreach($remarkLines as $line)
+                                <input type="text" name="remark_lines[]" class="form-control form-control-sm mb-1" maxlength="190" value="{{ $line }}" aria-label="Remark">
+                            @endforeach
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mt-1" data-lines-add data-name="remark_lines[]">
+                            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Remark
+                        </button>
                     </div>
                 </div>
             </div>
@@ -109,4 +130,25 @@
         </div>
     </form>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    // Add Line / Add Remark: one more box, up to the list's limit.
+    document.querySelectorAll('[data-lines]').forEach(function (group) {
+        var list = group.querySelector('[data-lines-list]');
+        var add = group.querySelector('[data-lines-add]');
+        var max = parseInt(group.dataset.max || '10', 10);
+        function refresh() { add.disabled = list.querySelectorAll('input').length >= max; }
+        add.addEventListener('click', function () {
+            var input = list.querySelector('input').cloneNode(false);
+            input.value = '';
+            list.appendChild(input);
+            input.focus();
+            refresh();
+        });
+        refresh();
+    });
+</script>
+
 @endsection

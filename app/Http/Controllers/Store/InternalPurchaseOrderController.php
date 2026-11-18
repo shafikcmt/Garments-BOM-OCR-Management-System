@@ -83,6 +83,14 @@ class InternalPurchaseOrderController extends Controller
     {
         abort_unless(isset($this->service->allowed($order, $request->user())['edit']), 403, 'This purchase order can no longer be edited.');
 
+        // The edit form posts Terms of Delivery and Remarks one line per box.
+        foreach (['delivery_lines' => 'delivery_terms', 'remark_lines' => 'remarks'] as $lines => $field) {
+            if (is_array($request->input($lines))) {
+                $kept = array_values(array_filter(array_map(fn ($l) => trim((string) $l), $request->input($lines)), fn ($l) => $l !== ''));
+                $request->merge([$field => $kept === [] ? null : implode("\n", $kept)]);
+            }
+        }
+
         $data = $request->validate([
             'po_date' => ['required', 'date'],
             'reference_no' => ['nullable', 'string', 'max:100'],
@@ -94,6 +102,12 @@ class InternalPurchaseOrderController extends Controller
             'delivery_terms' => ['nullable', 'string', 'max:1000'],
             'remarks' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        // Terms of Delivery print in a fixed box: five lines at most.
+        $deliveryLines = array_filter(preg_split('/\r\n|\r|\n/', (string) ($data['delivery_terms'] ?? '')), fn ($l) => trim($l) !== '');
+        if (count($deliveryLines) > 5) {
+            return back()->withInput()->withErrors(['delivery_terms' => 'Terms of delivery can have up to 5 lines.']);
+        }
 
         $this->service->update($order, $data);
 

@@ -888,3 +888,33 @@ it('highlights only the lowest unit price cell, and prints a supplier comment ab
         ->not->toContain('class="chosen"')
         ->toContain('class="terms note">N.B. The model offered does not match the sample.</td>');
 });
+
+it('saves Terms of Delivery (up to 5 lines) and Remarks one line per box, and prints them in their boxes', function () {
+    $cs = gpApprovedCs();
+    $maker = gpUser();
+    $this->actingAs($maker)->post(route('store.purchasing.po.store', $cs));
+    $po = GsPurchaseOrder::firstOrFail();
+
+    $this->actingAs($maker)->get(route('store.purchasing.po.edit', $po))->assertOk()
+        ->assertSee('Add Line')->assertSee('Add Remark');
+
+    $this->actingAs($maker)->put(route('store.purchasing.po.update', $po), [
+        'po_date' => '2026-10-25',
+        'delivery_lines' => ['Line 1', 'Line 2', 'Line 3', 'Line 4', 'Line 5', 'Line 6'],
+    ])->assertSessionHasErrors(['delivery_terms' => 'Terms of delivery can have up to 5 lines.']);
+
+    $this->actingAs($maker)->put(route('store.purchasing.po.update', $po), [
+        'po_date' => '2026-10-25',
+        'delivery_lines' => ['100% quality passed before delivery', '', 'Quantity has to be ensured accurately'],
+        'remark_lines' => ['Supply to be completed as soon as possible.', 'Price is excluding VAT.'],
+    ])->assertSessionHasNoErrors();
+
+    $po->refresh();
+    expect($po->delivery_terms)->toBe("100% quality passed before delivery\nQuantity has to be ensured accurately")
+        ->and($po->remarks)->toBe("Supply to be completed as soon as possible.\nPrice is excluding VAT.");
+
+    $html = view('store.purchasing._po-sheet', ['order' => $po->load('items')])->render();
+    expect($html)->toContain('class="terms-pair"')
+        ->toContain('1. Supply to be completed as soon as possible.<br>2. Price is excluding VAT.<br>')
+        ->toContain('<div class="line">Checked By</div>')->toContain('<div class="line">Authorised Signatory</div>');
+});
