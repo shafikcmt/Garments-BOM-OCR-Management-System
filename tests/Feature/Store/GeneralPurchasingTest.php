@@ -886,5 +886,5 @@ it('highlights only the lowest unit price cell, and prints a supplier comment ab
     expect(substr_count($html, 'class="num lowest"'))->toBe(2)
         ->and($html)->toContain('class="num lowest">85<')->toContain('class="num lowest">140<')
         ->not->toContain('class="chosen"')
-        ->toContain('<div class="note">N.B. The model offered does not match the sample.</div>');
+        ->toContain('class="terms note">N.B. The model offered does not match the sample.</td>');
 });

@@ -22,7 +22,7 @@
     /* The lowest unit price of each item — that one cell, not the column. */
     .cs-sheet .lowest { background: #d9f0df; font-weight: bold; }
     /* The optional comment above a supplier's details. */
-    .cs-sheet .note { background: #fff4b8; font-weight: bold; padding: 2px 3px; margin-bottom: 4px; }
+    .cs-sheet td.note { background: #fff4b8; font-weight: bold; }
     .cs-sheet .tot td { background: #dde3ec; font-weight: bold; }
     .cs-sheet .terms { vertical-align: top; font-size: 8px; line-height: 1.45; }
     .cs-sheet .co { font-size: 12px; font-weight: bold; }
@@ -126,11 +126,21 @@
                 @endforeach
                 <td style="background:#fff;"></td>
             </tr>
+            {{-- The optional supplier comments, in a row of their own above
+                 the details. Drawn only when at least one supplier has one. --}}
+            @if($suppliers->contains(fn ($s) => filled($s->comment)))
+                <tr>
+                    <td colspan="6"></td>
+                    @foreach($suppliers as $s)
+                        <td colspan="3" class="terms {{ filled($s->comment) ? 'note' : '' }}">{!! nl2br(e($s->comment)) !!}</td>
+                    @endforeach
+                    <td></td>
+                </tr>
+            @endif
             <tr>
                 <td colspan="6"></td>
                 @foreach($suppliers as $s)
                     <td colspan="3" class="terms">
-                        @if(filled($s->comment))<div class="note">{!! nl2br(e($s->comment)) !!}</div>@endif
                         @if(filled($s->terms)){!! nl2br(e($s->terms)) !!}<br>@endif
                         <strong>{{ $s->name }}</strong><br>
                         @if(filled($s->address)){!! nl2br(e($s->address)) !!}<br>@endif
@@ -139,20 +149,20 @@
                 @endforeach
                 <td></td>
             </tr>
+            {{-- Joined to the table, border to border, so no gap is left at
+                 the sides: the chosen total, then the recommendation. --}}
+            <tr>
+                <td colspan="{{ 7 + 3 * $suppliers->count() }}" class="num">Total of the suppliers chosen: <strong>{{ $fmt($cs->chosenTotal()) }}</strong>
+                    <span class="muted">(lowest unit price highlighted; * = recommended supplier)</span></td>
+            </tr>
+            <tr>
+                <td colspan="{{ 7 + 3 * $suppliers->count() }}" style="vertical-align:top;height:46px;padding:6px 8px;">
+                    <strong><em>Recommendation From Committee Members:</em></strong><br>
+                    {!! nl2br(e($cs->recommendation)) !!}
+                </td>
+            </tr>
         </tbody>
     </table>
-
-    <table class="nb" style="margin-top:3px;">
-        <tr>
-            <td class="num">Total of the suppliers chosen: <strong>{{ $fmt($cs->chosenTotal()) }}</strong>
-                <span class="muted">(lowest unit price highlighted; * = recommended supplier)</span></td>
-        </tr>
-    </table>
-
-    <div class="box" style="margin-top:6px;">
-        <strong><em>Recommendation From Committee Members:</em></strong><br>
-        {!! nl2br(e($cs->recommendation)) !!}
-    </div>
 
     @php
         $boxes = $cs->signBoxes();
