@@ -9,7 +9,7 @@
     $isAdminDashboard = request()->routeIs('admin.dashboard');
     $isAdminWorkspace = request()->routeIs('admin.workspace') || request()->routeIs('uploaded-files.*') || request()->routeIs('admin.headers.*') || request()->routeIs('admin.unmapped.*');
     $isAdminUserRole = request()->routeIs('admin.users.*') || request()->routeIs('admin.roles.*');
-    $isAdminBookingSettings = request()->routeIs('admin.suppliers.*') || request()->routeIs('admin.buyers.*') || request()->routeIs('admin.booking-delivery-destinations.*') || request()->routeIs('admin.booking-instructions.*') || request()->routeIs('admin.po-generate-control.*');
+    $isAdminBookingSettings = request()->routeIs('admin.suppliers.*') || request()->routeIs('admin.supplier-options.*') || request()->routeIs('admin.buyers.*') || request()->routeIs('admin.booking-delivery-destinations.*') || request()->routeIs('admin.booking-instructions.*') || request()->routeIs('admin.po-generate-control.*');
     $isAdminSettings = request()->routeIs('admin.alert-settings.*') || request()->routeIs('admin.payment-settings.*') || request()->routeIs('admin.email-templates.*') || request()->routeIs('admin.pra-approvers.*') || request()->routeIs('admin.pra-approvals.*');
     // Store screens Admin shares with the store role: Bulk Issuing corrections,
     // reports, and the General Stock purchase / setup screens Admin owns the
@@ -322,6 +322,7 @@
                         <div class="sidebar-submenu {{ $isAdminBookingSettings ? 'is-open' : '' }}">
                             <span class="sidebar-submenu-rail"></span>
                             <a href="{{ route('admin.suppliers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.suppliers.*') ? 'is-active' : '' }}">Vendors</a>
+                            <a href="{{ route('admin.supplier-options.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.supplier-options.*') ? 'is-active' : '' }}">Vendor Options</a>
                             <a href="{{ route('admin.buyers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.buyers.*') ? 'is-active' : '' }}">Buyers</a>
                             <a href="{{ route('admin.booking-delivery-destinations.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.booking-delivery-destinations.*') ? 'is-active' : '' }}">Destinations</a>
                             <a href="{{ route('admin.booking-instructions.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.booking-instructions.*') ? 'is-active' : '' }}">Instructions</a>

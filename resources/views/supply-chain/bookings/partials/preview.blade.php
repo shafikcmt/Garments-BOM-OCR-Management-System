@@ -23,8 +23,8 @@
     $deliveryDestinationName = trim((string) ($bookingData['delivery_destination_name'] ?? ''));
     $deliveryDestinationDetails = trim((string) ($bookingData['delivery_destination_details'] ?? ''));
     $hasDeliveryDestination = $deliveryDestinationName !== '' || $deliveryDestinationDetails !== '';
-    $incotermOptions = ['FOB', 'CIF', 'CFR', 'Ex-Works'];
-    $shipModeOptions = ['Sea', 'Air', 'Courier', 'Truck'];
+    $incotermOptions = \App\Models\SupplierOption::names('incoterm');
+    $shipModeOptions = \App\Models\SupplierOption::names('ship_mode');
     $selectedIncoterm = trim((string) ($bookingData['incoterm'] ?? ''));
     $selectedShipMode = trim((string) ($bookingData['ship_mode'] ?? ''));
     $previewFormUid = uniqid('bookingPreviewEdit');

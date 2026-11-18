@@ -293,9 +293,10 @@ The vendor list is the **Vendor Master**: one record per supplier, used by PO bo
 
 **Add a vendor.**
 1. Press **Add Vendor**. Type the vendor name (required) and what you know: type (Local or Foreign), category, country, TIN, VAT/BIN, defaults (currency, payment terms, Incoterm, Ship Mode, Tolerance %, lead time, MOQ), effective and expiry dates, ERP code, remarks.
-2. Press **Save Vendor**. The vendor is saved as a **Draft** and opens on its profile.
-3. On the profile add **Contacts** (as many as you need, one marked Primary), **Addresses** (Registered, Office, Factory, Warehouse; one Primary), **Item categories** supplied (each may have its own lead time, MOQ and tolerance, which win over the vendor defaults), **Business units** (leave empty if every unit may use the vendor) and the **Items** the vendor supplies.
-4. Press **Submit for Approval**. Name, type and country must be filled.
+2. **Item Type:** tick every type this vendor supplies (for example both **Fabric** and **Accessories**). **Incoterm** and **Ship Mode** are chosen from lists Admin manages (see Vendor Options below).
+3. Press **Save Vendor**. The vendor is saved as a **Draft** and opens on its profile.
+4. On the profile add **Contacts** (as many as you need, one marked Primary), **Addresses** (Registered, Office, Factory, Warehouse; one Primary), **Item categories** supplied (each may have its own lead time, MOQ and tolerance, which win over the vendor defaults), **Business units** (leave empty if every unit may use the vendor) and the **Items** the vendor supplies.
+5. Press **Submit for Approval**. Name, type and country must be filled.
 
 **Approve.** A person with the *vendors.approve* right opens the profile and presses **Start Review**, then **Approve** (the vendor becomes Active and gets a code like VND-00012 if it had none) or **Reject** (a reason is required; the maker can edit and submit again).
 
@@ -320,6 +321,10 @@ The vendor list is the **Vendor Master**: one record per supplier, used by PO bo
 5. You get a summary: vendors created, contacts, addresses, categories and bank requests. New vendors are **Drafts**; bank accounts become **requests** that another approver must accept. Without bank rights, bank rows are skipped with a note.
 
 Only Admin can delete a vendor. The Store's own supplier list (**Store, Purchase Setup**) is separate and unchanged.
+
+**Admin's Vendors screen has the same Export Excel and Import Excel.** Open **Admin, Booking Setup, Vendors**: press **Export Excel** to download every vendor, or **Import Excel** then **Download Template** to upload new vendors. The file format and rules are exactly the ones above. **Vendor Options** (below) is one button away on the same screen.
+
+**Vendor Options (Admin).** Open **Booking Setup, Vendor Options**. Three lists are shown: **Item Types**, **Incoterms** and **Ship Modes**. To add a choice, type it in the box of that list and press **Add** (a name already in the list is refused). To remove one, press **Delete** beside it. Deleting a choice does **not** change vendors that already use it: they keep their value, it still prints on their PO, and it still shows on their own form. The new choices appear at once on the vendor form and on the booking PO preview (Incoterm, Ship Mode).
 
 ### 2.2a Create a BOM on screen (no Excel needed)
 
@@ -725,6 +730,9 @@ The row shows how many source rows it holds, up to three of their items, and the
 
 - **Materials Ordered** (Workspace, Supply Chain column) fills itself with the **Materials To Be Ordered** figure. You can type a different quantity over it at any time. While you have not changed it, it follows Materials To Be Ordered if that figure changes.
 - The **Booking Qty** on the PO (booking format) is taken from **Materials Ordered**.
+- **Combine into one PO (toggle).** Above the list choose how lines are combined into one PO. It applies to the list, the preview and **Generate PO** together.
+  - **Item-wise (vendor + SAP code)** is the default. Lines with the same vendor and SAP code become one PO, even for different styles, buyers or seasons. If a line has **no vendor yet**, lines of the **same item and description** are combined instead, so you can fill the vendor in once on the PO. Inside the PO, lines are listed item by item (for example all TC POCKETING 110X76 together, then TC POCKETING 96X72).
+  - **Strict match (buyer, season, IHOD, vendor, SAP)** combines lines only when **all five** are the same. If any one differs, they stay in separate POs.
 - **Material Order Status** shows **PO Pending** until a PO number exists. When you press **Generate PO**, the **Material PO Number** and **PO Date** (today) are written to every line of that PO in the Workspace, and the status changes to Short PO Qty, PO Raised or Excess Qty PO by comparing Materials Ordered with Materials To Be Ordered.
 
 ### 3.x Attaching documents to a payment request (PRA)

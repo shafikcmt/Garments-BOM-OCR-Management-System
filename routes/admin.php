@@ -53,7 +53,11 @@ Route::prefix('admin')
         Route::put('tna-settings', [\App\Http\Controllers\Admin\TnaTemplateController::class, 'settings'])->name('tna.settings');
         Route::resource('tna', \App\Http\Controllers\Admin\TnaTemplateController::class)->except(['show'])->parameters(['tna' => 'tna']);
 
+        Route::get('suppliers/export', [SupplierController::class, 'export'])->name('suppliers.export');
+        Route::get('suppliers/template', [SupplierController::class, 'template'])->name('suppliers.template');
+        Route::post('suppliers/import', [SupplierController::class, 'import'])->name('suppliers.import');
         Route::resource('suppliers', SupplierController::class)->except(['show']);
+        Route::resource('supplier-options', \App\Http\Controllers\Admin\SupplierOptionController::class)->only(['index', 'store', 'destroy']);
         Route::resource('buyers', BuyerController::class)->except(['show']);
 
         // Who works on a buyer. Assignment only — buyer_scope_mode is never

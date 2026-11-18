@@ -240,7 +240,6 @@ class VendorMaster
         $supplier->forceFill([
             'contact_person' => $c?->name, 'email' => $c?->email, 'phone' => $c?->phone,
             'address' => $a?->address, 'city' => $a?->city,
-            'item_type' => $supplier->itemCategories()->first()?->category_name ?? $supplier->item_type,
         ])->saveQuietly();
     }
 
