@@ -12,7 +12,9 @@
     $status = $order->status;
 @endphp
 <style>
-    .po-sheet { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9.5px; color: #1f2937; width: 100%; }
+    .po-sheet { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9.5px; color: #1f2937; }
+    /* The whole order inside one rounded frame. */
+    .po-sheet { border: 1.2px solid #1e3a5f; border-radius: 10px; padding: 12px 14px 10px; }
     .po-sheet table { border-collapse: collapse; width: 100%; }
     .po-sheet td, .po-sheet th { vertical-align: top; }
     .po-sheet .k { color: #6b7280; font-size: 7.5px; text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 2px; }
