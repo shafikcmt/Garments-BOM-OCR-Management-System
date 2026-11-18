@@ -53,6 +53,26 @@ class SupplierController extends Controller
             ->with('success', 'Supplier deleted successfully.');
     }
 
+    /*
+     * Excel export / upload template / bulk import. Same file format and rules as
+     * Merchant > Vendors, so both screens delegate to one implementation; an
+     * import only adds new vendors and never overwrites an existing one.
+     */
+    public function export(Request $request)
+    {
+        return app(\App\Http\Controllers\Merchant\VendorEntryController::class)->export($request);
+    }
+
+    public function template()
+    {
+        return app(\App\Http\Controllers\Merchant\VendorEntryController::class)->template();
+    }
+
+    public function import(Request $request)
+    {
+        return app(\App\Http\Controllers\Merchant\VendorEntryController::class)->import($request);
+    }
+
     public function validatedData(Request $request, ?Supplier $supplier = null): array
     {
         $data = $request->validate([

@@ -185,10 +185,58 @@
                     <p class="supplier-copy">Manage supplier master data, booking defaults, incoterm and shipping information from one clean table.</p>
                 </div>
             </div>
-            <a href="{{ route('admin.suppliers.create') }}" class="btn btn-primary px-4 d-inline-flex align-items-center gap-2">
-                <i class="bi bi-plus-circle" aria-hidden="true"></i> Add Vendor
-            </a>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ route('admin.suppliers.export') }}" class="btn btn-outline-primary d-inline-flex align-items-center gap-2">
+                    <i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Export Excel
+                </a>
+                <button type="button" class="btn btn-outline-primary d-inline-flex align-items-center gap-2" data-bs-toggle="collapse" data-bs-target="#vendorImport" aria-controls="vendorImport">
+                    <i class="bi bi-upload" aria-hidden="true"></i> Import Excel
+                </button>
+                <a href="{{ route('admin.supplier-options.index') }}" class="btn btn-outline-secondary d-inline-flex align-items-center gap-2">
+                    <i class="bi bi-list-check" aria-hidden="true"></i> Vendor Options
+                </a>
+                <a href="{{ route('admin.suppliers.create') }}" class="btn btn-primary px-4 d-inline-flex align-items-center gap-2">
+                    <i class="bi bi-plus-circle" aria-hidden="true"></i> Add Vendor
+                </a>
+            </div>
         </div>
+    </div>
+
+    @foreach ([
+        ['key' => 'import_errors', 'tone' => 'danger', 'heading' => 'These rows need correcting before the file can be imported:'],
+        ['key' => 'import_skipped', 'tone' => 'warning', 'heading' => 'These rows were skipped:'],
+    ] as $report)
+        @if(session($report['key']))
+            <div class="alert alert-{{ $report['tone'] }}" role="alert">
+                <div class="fw-semibold mb-1">{{ $report['heading'] }}</div>
+                <ul class="mb-0 ps-3 small" style="max-height:220px; overflow-y:auto;">
+                    @foreach(session($report['key']) as $line)<li>{{ $line }}</li>@endforeach
+                </ul>
+            </div>
+        @endif
+    @endforeach
+    @if(session('warning'))<div class="alert alert-warning">{{ session('warning') }}</div>@endif
+
+    <div class="collapse {{ session('import_errors') || session('import_skipped') || $errors->has('file') ? 'show' : '' }}" id="vendorImport">
+        <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+            <h6 class="fw-bold">Import vendors from Excel</h6>
+            <p class="text-muted small mb-3">
+                Fill the upload template and upload it. The file is checked as a whole: if any row has a problem nothing is imported.
+                A vendor already on the list is skipped, never overwritten; use <strong>Edit</strong> to change it.
+            </p>
+            <form method="POST" action="{{ route('admin.suppliers.import') }}" enctype="multipart/form-data" class="row g-2 align-items-end">
+                @csrf
+                <div class="col-12 col-md-6 col-xl-5">
+                    <label class="form-label" for="vendorFile">Excel or CSV file <span class="text-danger">*</span></label>
+                    <input id="vendorFile" type="file" name="file" accept=".xlsx,.xls,.csv" class="form-control @error('file') is-invalid @enderror" required>
+                    @error('file')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-auto d-flex gap-2">
+                    <button class="btn btn-primary"><i class="bi bi-upload me-1" aria-hidden="true"></i>Import</button>
+                    <a href="{{ route('admin.suppliers.template') }}" class="btn btn-outline-secondary"><i class="bi bi-download me-1" aria-hidden="true"></i>Download Template</a>
+                </div>
+            </form>
+        </div></div>
     </div>
 
     <div class="row g-3 mb-3">

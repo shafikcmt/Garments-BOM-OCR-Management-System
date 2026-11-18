@@ -306,6 +306,8 @@ A column that was skipped on purpose but matches another department's header (fo
 3. The file is checked as a whole. If any row has a problem (a missing name, an invalid email, a Tolerance % outside 0 to 100, a Vendor Code already used by another vendor) **nothing is imported** and the rows to correct are listed. Fix them and upload again.
 4. A vendor already on the list (same name, in any capital or small letters) is **skipped** and never overwritten; use **Edit** to change it. Skipped rows are listed after the import.
 
+**Admin's Vendors screen has the same Export Excel and Import Excel.** Open **Admin, Booking Setup, Vendors**: press **Export Excel** to download every vendor, or **Import Excel** then **Download Template** to upload new vendors. The file format and rules are exactly the ones above. **Vendor Options** (below) is one button away on the same screen.
+
 **Vendor Options (Admin).** Open **Booking Setup, Vendor Options**. Three lists are shown: **Item Types**, **Incoterms** and **Ship Modes**. To add a choice, type it in the box of that list and press **Add** (a name already in the list is refused). To remove one, press **Delete** beside it. Deleting a choice does **not** change vendors that already use it: they keep their value, it still prints on their PO, and it still shows on their own form. The new choices appear at once on the vendor form and on the booking PO preview (Incoterm, Ship Mode).
 
 The vendor goes into the same list Admin manages (**Admin, Vendors**), so it can be used for bookings and payment requests, and your changes show there too. Only Admin can delete a vendor. The Store's own supplier list (**Store, Purchase Setup**, then open a supplier) has the same Bank Details fields.

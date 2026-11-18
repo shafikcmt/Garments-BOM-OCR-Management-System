@@ -61,3 +61,13 @@ it('still accepts a single item_type text value', function () {
 
     expect(Supplier::firstOrFail()->item_type)->toBe('Zipper');
 });
+
+it('gives admin the vendor Excel export, template and import', function () {
+    $admin = optionsAdmin();
+    Supplier::create(['supplier_name' => 'ACME']);
+
+    $this->actingAs($admin)->get(route('admin.suppliers.index'))->assertOk()->assertSee('Export Excel')->assertSee('Import Excel');
+    $this->get(route('admin.suppliers.export'))->assertOk();
+    $this->get(route('admin.suppliers.template'))->assertOk();
+    $this->post(route('admin.suppliers.import'), [])->assertSessionHasErrors('file');
+});
