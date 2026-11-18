@@ -751,6 +751,13 @@
                         <i class="bi bi-search booking-search-icon" aria-hidden="true"></i>
                         <input type="text" name="keyword" value="{{ $selectedKeyword }}" class="form-control booking-auto-filter-text" placeholder="Search buyer / season / vendor / item / style / PO keyword...">
                     </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="groupMode">Combine into one PO</label>
+                        <select id="groupMode" name="group_mode" class="form-select booking-auto-filter" autocomplete="off">
+                            <option value="item" @selected(request('group_mode') !== 'strict')>Item-wise (vendor + SAP code)</option>
+                            <option value="strict" @selected(request('group_mode') === 'strict')>Strict match (buyer, season, IHOD, vendor, SAP)</option>
+                        </select>
+                    </div>
                     <div class="col-md-1">
                         <label class="form-label" for="perPage">Rows</label>
                         <select id="perPage" name="per_page" class="form-select booking-auto-filter" autocomplete="off">
@@ -1227,6 +1234,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function postJson(url, payload = {}) {
+        // Preview and generate must combine rows by the same rule the list shows.
+        const groupModeSelect = document.getElementById('groupMode');
+        if (groupModeSelect && payload && typeof payload === 'object' && !('group_mode' in payload)) {
+            payload = Object.assign({ group_mode: groupModeSelect.value }, payload);
+        }
         const response = await fetch(url, {
             method: 'POST',
             headers: {

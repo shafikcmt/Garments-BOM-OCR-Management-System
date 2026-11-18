@@ -716,6 +716,9 @@ The row shows how many source rows it holds, up to three of their items, and the
 
 - **Materials Ordered** (Workspace, Supply Chain column) fills itself with the **Materials To Be Ordered** figure. You can type a different quantity over it at any time. While you have not changed it, it follows Materials To Be Ordered if that figure changes.
 - The **Booking Qty** on the PO (booking format) is taken from **Materials Ordered**.
+- **Combine into one PO (toggle).** Above the list choose how lines are combined into one PO. It applies to the list, the preview and **Generate PO** together.
+  - **Item-wise (vendor + SAP code)** is the default. Lines with the same vendor and SAP code become one PO, even for different styles, buyers or seasons. If a line has **no vendor yet**, lines of the **same item and description** are combined instead, so you can fill the vendor in once on the PO. Inside the PO, lines are listed item by item (for example all TC POCKETING 110X76 together, then TC POCKETING 96X72).
+  - **Strict match (buyer, season, IHOD, vendor, SAP)** combines lines only when **all five** are the same. If any one differs, they stay in separate POs.
 - **Material Order Status** shows **PO Pending** until a PO number exists. When you press **Generate PO**, the **Material PO Number** and **PO Date** (today) are written to every line of that PO in the Workspace, and the status changes to Short PO Qty, PO Raised or Excess Qty PO by comparing Materials Ordered with Materials To Be Ordered.
 
 ### 3.x Attaching documents to a payment request (PRA)

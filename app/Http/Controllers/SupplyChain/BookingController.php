@@ -1414,7 +1414,7 @@ class BookingController extends Controller
             ->map(fn ($t) => mb_strtolower(trim((string) $t)))->filter()->take(5)->values()->all();
         $shownText = [];
 
-        $keyHeaderIds = collect(['buyer', 'season', 'ihod', 'vendor', 'sap_code'] + ($keywordTerms ? [5 => 'item', 6 => 'style', 7 => 'po_no'] : []))
+        $keyHeaderIds = collect(array_merge(['buyer', 'season', 'ihod', 'vendor', 'sap_code', 'item', 'description'], $keywordTerms ? ['style', 'po_no'] : []))
             ->flatMap(fn ($group) => $this->headerIdsForGroup($group))->unique()->values()->all();
 
         $hasPo = [];
@@ -1443,6 +1443,8 @@ class BookingController extends Controller
                         'ihod' => $this->valueFor($row, 'ihod'),
                         'vendor_name' => $this->valueFor($row, 'vendor'),
                         'sap_code' => $this->valueFor($row, 'sap_code'),
+                        'item_name' => $this->valueFor($row, 'item'),
+                        'description' => $this->valueFor($row, 'description'),
                     ]);
                     $keyOf[$row->id] = $key;
                 });
@@ -1872,9 +1874,16 @@ class BookingController extends Controller
         // Coarse narrowing must follow the same scheme as bookingGroupKey(): when a SAP
         // Code drives the group, narrow by vendor + SAP Code (styles/buyers may differ);
         // otherwise keep the legacy buyer/season/ihod/vendor narrowing.
-        if (trim((string) ($rowData['sap_code'] ?? '')) !== '') {
+        if ($this->groupMode() === self::GROUP_MODE_STRICT) {
+            foreach (['buyer' => 'buyer_name', 'season' => 'season_name', 'ihod' => 'ihod', 'vendor' => 'vendor_name', 'sap_code' => 'sap_code'] as $group => $field) {
+                $this->applyCellFilter($query, $group, $rowData[$field] ?? null);
+            }
+        } elseif (trim((string) ($rowData['sap_code'] ?? '')) !== '') {
             $this->applyCellFilter($query, 'vendor', $rowData['vendor_name'] ?? null);
             $this->applyCellFilter($query, 'sap_code', $rowData['sap_code'] ?? null);
+        } elseif (trim((string) ($rowData['vendor_name'] ?? '')) === '' && trim((string) ($rowData['item_name'] ?? '')) !== '') {
+            // Item-wise with no vendor: same item name (the key also checks description).
+            $this->applyCellFilter($query, 'item', $rowData['item_name']);
         } else {
             $this->applyCellFilter($query, 'buyer', $rowData['buyer_name'] ?? null);
             $this->applyCellFilter($query, 'season', $rowData['season_name'] ?? null);
@@ -1893,8 +1902,38 @@ class BookingController extends Controller
             ->values();
     }
 
+    public const GROUP_MODE_ITEM = 'item';
+    public const GROUP_MODE_STRICT = 'strict';
+
+    /**
+     * How pending rows are combined into one PO. Read once per request from the
+     * `group_mode` input (list filter, preview and generate all send it, so the
+     * list, the preview and the generated PO always use the same rule):
+     *  - item   (default): same vendor + SAP Code is one PO even across styles,
+     *           buyers and seasons; lines are listed item by item.
+     *  - strict: buyer, season, IHOD, vendor and SAP Code must ALL match.
+     */
+    protected function groupMode(): string
+    {
+        return request()->input('group_mode') === self::GROUP_MODE_STRICT
+            ? self::GROUP_MODE_STRICT
+            : self::GROUP_MODE_ITEM;
+    }
+
     protected function bookingGroupKey(array $data): string
     {
+        if ($this->groupMode() === self::GROUP_MODE_STRICT) {
+            $parts = [
+                $this->normalize($data['buyer_name'] ?? ''),
+                $this->normalize($data['season_name'] ?? ''),
+                $this->normalize($data['ihod'] ?? ''),
+                $this->normalize($data['vendor_name'] ?? ''),
+                $this->normalize($data['sap_code'] ?? ''),
+            ];
+
+            return collect($parts)->filter()->isEmpty() ? '' : 'strict|' . implode('|', $parts);
+        }
+
         // Business rule: group same SAP Code (material) for the same vendor into one
         // booking/PO, even when the styles differ. When a SAP Code is present it drives
         // the grouping; otherwise fall back to the legacy buyer/season/ihod/vendor key so
@@ -1903,6 +1942,14 @@ class BookingController extends Controller
 
         if ($sapCode !== '') {
             return 'sap|' . $this->normalize($data['vendor_name'] ?? '') . '|' . $sapCode;
+        }
+
+        // Item-wise, vendor not known yet: nobody to group by, so the same item
+        // (name + description) is one booking across buyers, seasons and styles.
+        // The vendor can then be filled in once on the PO.
+        $itemName = $this->normalize($data['item_name'] ?? '');
+        if ($this->normalize($data['vendor_name'] ?? '') === '' && $itemName !== '') {
+            return 'item||' . $itemName . '|' . $this->normalize($data['description'] ?? '');
         }
 
         $parts = [
@@ -2989,8 +3036,20 @@ class BookingController extends Controller
 
         $items = collect($sourceRows)
             ->map(fn (array $rowData) => $this->bookingLineItemFromData($rowData, $supplier, (float) $tolerancePercent))
-            ->values()
-            ->all();
+            ->values();
+
+        // Item-wise: all lines of one item sit together (POCKETING, then INTERLINING...),
+        // each item keeping the original row order inside it. Strict mode keeps the
+        // order of the source rows.
+        if ($this->groupMode() === self::GROUP_MODE_ITEM) {
+            $items = $items
+                ->map(fn (array $item, int $i) => [$item, $i])
+                ->sortBy(fn (array $pair) => [mb_strtolower(trim((string) ($pair[0]['item_name'] ?? ''))), mb_strtolower(trim((string) ($pair[0]['description'] ?? ''))), $pair[1]])
+                ->map(fn (array $pair) => $pair[0])
+                ->values();
+        }
+
+        $items = $items->all();
 
         if (empty($items)) {
             $items = [$this->bookingLineItemFromData([], $supplier, (float) $tolerancePercent)];
