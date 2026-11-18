@@ -12,3 +12,6 @@ Schedule::command('po:check-missing-pi-alerts')->dailyAt('09:00')->timezone('Asi
 // TnA tasks from auto-apply templates first, so the reminder that follows counts them.
 Schedule::command('tna:apply')->dailyAt('08:15')->timezone('Asia/Dhaka');
 Schedule::command('followups:remind')->dailyAt('08:30')->timezone('Asia/Dhaka');
+
+// Vendors past their expiry date become inactive (and the change is audited).
+Schedule::call(fn () => app(\App\Services\VendorMaster::class)->expireOverdue())->name('vendors:expire')->dailyAt('00:30')->timezone('Asia/Dhaka');

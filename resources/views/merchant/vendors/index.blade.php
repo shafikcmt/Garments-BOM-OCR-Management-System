@@ -43,8 +43,8 @@
     <div class="collapse {{ session('import_errors') || session('import_skipped') || $errors->has('file') ? 'show' : '' }}" id="vendorImport">
         <x-card class="mb-3" title="Import vendors from Excel">
             <p class="text-muted small mb-3">
-                Fill the upload template and upload it. The file is checked as a whole: if any row has a problem nothing is imported.
-                A vendor already on the list is skipped, never overwritten; edit it with <strong>Edit</strong> instead.
+                Fill the upload workbook (Vendors, Contacts, Addresses, Item Categories, Bank Accounts sheets) and upload it. The file is checked as a whole: if any row has a problem nothing is imported.
+                New vendors arrive as drafts for approval. A vendor already on the list is skipped, never overwritten; change it on its profile (<strong>Open</strong>) instead.
             </p>
             <form method="POST" action="{{ route('merchant.vendors.import') }}" enctype="multipart/form-data" class="row g-2 align-items-end">
                 @csrf
@@ -64,7 +64,7 @@
     <div class="row g-3 mb-3">
         <div class="col-6 col-md-4"><x-stat-card icon="buildings" tone="primary" label="Vendors" :value="$totals['all']" /></div>
         <div class="col-6 col-md-4"><x-stat-card icon="check2-circle" tone="success" label="Active" :value="$totals['active']" /></div>
-        <div class="col-12 col-md-4"><x-stat-card icon="bank" tone="info" label="With bank details" :value="$totals['with_bank']" /></div>
+        <div class="col-12 col-md-4"><x-stat-card icon="hourglass-split" tone="info" label="Awaiting approval" :value="$totals['pending']" /></div>
     </div>
 
     <x-card body-class="p-0">
@@ -98,7 +98,7 @@
                             <th>Contact</th>
                             <th>Item Type</th>
                             <th>Location</th>
-                            <th>Bank</th>
+                            <th>Approval</th>
                             <th>Status</th>
                             <th class="text-end">Action</th>
                         </tr>
@@ -117,23 +117,15 @@
                                 <td>{{ $vendor->item_type ?: '—' }}</td>
                                 <td>{{ collect([$vendor->city, $vendor->country])->filter()->implode(', ') ?: '—' }}</td>
                                 <td>
-                                    @if($vendor->bank_name || $vendor->bank_account_number)
-                                        <div>{{ $vendor->bank_name ?: 'Bank not named' }}@if($vendor->bank_branch), {{ $vendor->bank_branch }}@endif</div>
-                                        @if($vendor->bank_account_number)
-                                            <div class="small text-muted">Account ending {{ substr(preg_replace('/\s+/', '', $vendor->bank_account_number), -4) }}</div>
-                                        @else
-                                            <div class="small text-warning-emphasis">No account number</div>
-                                        @endif
-                                    @else
-                                        <span class="badge bg-warning-subtle text-warning-emphasis">No bank details</span>
-                                    @endif
+                                    @php $ap = ['draft' => 'secondary', 'submitted' => 'info', 'under_review' => 'info', 'approved' => 'success', 'rejected' => 'danger'][$vendor->approval_status] ?? 'secondary'; @endphp
+                                    <span class="badge bg-{{ $ap }}-subtle text-{{ $ap }}-emphasis">{{ \App\Models\Supplier::APPROVALS[$vendor->approval_status] ?? $vendor->approval_status }}</span>
                                 </td>
                                 <td>
-                                    <span class="badge {{ $vendor->is_active ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' }}">{{ $vendor->is_active ? 'Active' : 'Inactive' }}</span>
+                                    <span class="badge {{ $vendor->vendor_status === 'active' ? 'bg-success-subtle text-success' : ($vendor->vendor_status === 'blocked' ? 'bg-danger-subtle text-danger' : 'bg-secondary-subtle text-secondary') }}">{{ \App\Models\Supplier::STATUSES[$vendor->vendor_status] ?? 'Inactive' }}</span>
                                 </td>
                                 <td class="text-end">
-                                    <a href="{{ route('merchant.vendors.edit', $vendor) }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit
+                                    <a href="{{ route('vendors.show', $vendor) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye me-1" aria-hidden="true"></i>Open
                                     </a>
                                 </td>
                             </tr>

@@ -118,7 +118,7 @@ What each item on the left menu is for, in the order you use them. Some items ap
 | **Workspace** | The shared BOM sheet all departments work in. Import the buyer's Excel here (**Import Buyer Excel**, section 2.2) or open a file to edit the Merchandising columns. |
 | **Consumption Master** | Standard materials and consumption per product group, to fill a new BOM quickly (section 2.2b). |
 | **Costing Templates** | Ready cost sheets per product group, to start a pre-costing quickly (section 2.7a). |
-| **Vendors** | Supplier list with contact and bank details; add, edit, import and export (section 2.2b Vendors). |
+| **Vendors** | Vendor Master: approval workflow, contacts, addresses, bank accounts (approval needed), import and export (section 2.2b Vendors). |
 
 **Before and around the order**
 
@@ -283,34 +283,48 @@ Use this when the buyer's Excel does not look like the standard sample. It does 
 - **New Header:** opens the new-header form with the title already typed in, when the system truly needs a new column.
 - **Ignore:** for columns nobody needs. They move to the **Ignored** tab and can be reopened.
 A column that was skipped on purpose but matches another department's header (for example the buyer's Vendor column) is not listed.
-### 2.2b Vendors: list, add, edit, Excel import and export (with bank details)
+### 2.2b Vendors (Vendor Master): add, approve, contacts, bank accounts, Excel import and export
 
-**Open it:** left menu, **Vendors**. (You can also press **Add Vendor** on the Merchandising Dashboard.)
+The vendor list is the **Vendor Master**: one record per supplier, used by PO booking, PI booking and the material and accessories stores.
 
-**The list.** Every vendor with its contact, item type, location, bank and status. Use the search box (name, code, contact, city or item type). The **Bank** column says which bank is on file and the last four digits of the account, or **No bank details** if none was entered. The full account number is not shown on the list; it appears on the edit form and on Admin's screen.
+**Open it:** left menu, **Vendors** (Admin: **Admin, Vendors**). Press **Open** on a vendor to see its profile.
+
+**Two statuses.** *Approval:* Draft, Submitted, Under Review, Approved or Rejected. *Status:* Active, Inactive or Blocked. A vendor can be chosen for a **new** PO or PI only when it is **Approved and Active**, is not past its **Expiry Date**, has reached its **Effective Date**, and is applicable to the business unit. Each profile says clearly whether the vendor is available and, if not, why.
 
 **Add a vendor.**
-1. Press **Add Vendor**.
-2. Type the vendor name (required) and any contact details.
-2a. **Item Type:** tick every type this vendor supplies (for example both **Fabric** and **Accessories**). **Incoterm** and **Ship Mode** are chosen from a list. If a choice you need is missing, ask Admin to add it (see **Vendor Options** below).
-3. Under **Bank Details** fill what you know: bank name, branch, account name, account number, routing number, SWIFT code. All are optional.
-4. Press **Save Vendor**. You return to the list with a confirmation.
+1. Press **Add Vendor**. Type the vendor name (required) and what you know: type (Local or Foreign), category, country, TIN, VAT/BIN, defaults (currency, payment terms, Incoterm, Ship Mode, Tolerance %, lead time, MOQ), effective and expiry dates, ERP code, remarks.
+2. **Item Type:** tick every type this vendor supplies (for example both **Fabric** and **Accessories**). **Incoterm** and **Ship Mode** are chosen from lists Admin manages (see Vendor Options below).
+3. Press **Save Vendor**. The vendor is saved as a **Draft** and opens on its profile.
+4. On the profile add **Contacts** (as many as you need, one marked Primary), **Addresses** (Registered, Office, Factory, Warehouse; one Primary), **Item categories** supplied (each may have its own lead time, MOQ and tolerance, which win over the vendor defaults), **Business units** (leave empty if every unit may use the vendor) and the **Items** the vendor supplies.
+5. Press **Submit for Approval**. Name, type and country must be filled.
 
-**Edit a vendor.** On the list press **Edit** at the end of the vendor's row. The form opens with the current details, bank details included (the full account number is shown here so you can correct it). Change what you need and press **Save Changes**. The vendor's code must stay different from every other vendor's. Vendors you switch to inactive stay on the list, marked **Inactive**.
+**Approve.** A person with the *vendors.approve* right opens the profile and presses **Start Review**, then **Approve** (the vendor becomes Active and gets a code like VND-00012 if it had none) or **Reject** (a reason is required; the maker can edit and submit again).
 
-**Export to Excel.** Press **Export Excel** above the list. You get an Excel file of the vendors (only the ones your search shows, if you typed one) in the same columns as the upload template, plus **Status**. The account number is shown as its last four digits only (for example `****7890`), because the file leaves the system.
+**Change an approved vendor.** Ordinary details (Incoterm, Ship Mode, Tolerance, lead time, MOQ, dates, remarks, category, country) save at once and are recorded in the **Audit trail**. Changing a controlled detail (name, legal name, code, type, TIN, VAT/BIN, registration number, currency, payment terms, ERP code) is **held for approval** and shown under *Changes waiting for approval*; the approver accepts or rejects it.
+
+**Block, inactivate, reactivate.** A person with the *vendors.block* right can **Block**, **Inactivate** or **Reactivate** an approved vendor. A reason is always required and is kept in the audit trail. A vendor past its expiry date becomes Inactive automatically each night.
+
+**Bank accounts.** Only people with bank rights see this section, and numbers are always shown masked (`****7890`).
+- A person with *vendors.bank.manage* presses **Send for Approval** to add an account, or **Request Deactivation**. Nothing changes yet.
+- A **different** person with *vendors.bank.approve* presses **Approve** or **Reject** (a reason is required to reject). You can never approve your own request.
+- The full number is stored encrypted and is never written to the audit trail, messages or exports.
+
+**On a PO.** When a PO is generated for a vendor from the Vendor Master, the vendor's Incoterm, Ship Mode, Tolerance, payment terms and currency are copied onto the PO. You may change them on that PO. Later changes to the vendor never change a PO already generated. A blocked, inactive, unapproved or expired vendor cannot get a new PO; the message says why. A vendor typed in the sheet that is not in the Vendor Master at all can still be used, as before.
+
+**Export to Excel.** **Export Excel** gives one workbook with sheets *Vendors, Contacts, Addresses, Item Categories* (and *Bank Accounts*, masked, only if you have bank view rights). Only the vendors your search shows, if you typed one.
 
 **Import from Excel.**
-1. Press **Import Excel**, then **Download Template**. Fill one row per vendor; only **Vendor Name** is required. Delete the grey example row.
-2. Choose the file and press **Import**.
-3. The file is checked as a whole. If any row has a problem (a missing name, an invalid email, a Tolerance % outside 0 to 100, a Vendor Code already used by another vendor) **nothing is imported** and the rows to correct are listed. Fix them and upload again.
-4. A vendor already on the list (same name, in any capital or small letters) is **skipped** and never overwritten; use **Edit** to change it. Skipped rows are listed after the import.
+1. Press **Import Excel**, then **Download Template**. The workbook has a sheet for Vendors, Contacts, Addresses, Item Categories and Bank Accounts, with grey example rows and an Instructions sheet.
+2. Put each vendor **once** on the Vendors sheet. On the other sheets start each row with the same Vendor Name; add as many rows as the vendor has contacts, addresses, categories or bank accounts.
+3. Choose the file and press **Import**. The file is checked as a whole: if any row has a problem (missing name, duplicate vendor code, bad email, wrong date, Tolerance outside 0 to 100, a contact for a vendor not on the Vendors sheet) **nothing is imported** and every problem is listed.
+4. A vendor already in the system is **skipped**, never overwritten or duplicated. The older single-sheet file still works.
+5. You get a summary: vendors created, contacts, addresses, categories and bank requests. New vendors are **Drafts**; bank accounts become **requests** that another approver must accept. Without bank rights, bank rows are skipped with a note.
+
+Only Admin can delete a vendor. The Store's own supplier list (**Store, Purchase Setup**) is separate and unchanged.
 
 **Admin's Vendors screen has the same Export Excel and Import Excel.** Open **Admin, Booking Setup, Vendors**: press **Export Excel** to download every vendor, or **Import Excel** then **Download Template** to upload new vendors. The file format and rules are exactly the ones above. **Vendor Options** (below) is one button away on the same screen.
 
 **Vendor Options (Admin).** Open **Booking Setup, Vendor Options**. Three lists are shown: **Item Types**, **Incoterms** and **Ship Modes**. To add a choice, type it in the box of that list and press **Add** (a name already in the list is refused). To remove one, press **Delete** beside it. Deleting a choice does **not** change vendors that already use it: they keep their value, it still prints on their PO, and it still shows on their own form. The new choices appear at once on the vendor form and on the booking PO preview (Incoterm, Ship Mode).
-
-The vendor goes into the same list Admin manages (**Admin, Vendors**), so it can be used for bookings and payment requests, and your changes show there too. Only Admin can delete a vendor. The Store's own supplier list (**Store, Purchase Setup**, then open a supplier) has the same Bank Details fields.
 
 ### 2.2a Create a BOM on screen (no Excel needed)
 

@@ -11,23 +11,21 @@ function vendorMerchant(): User
     return User::factory()->create()->assignRole('merchant');
 }
 
-it('lets a merchant add a vendor with bank details', function () {
+it('lets a merchant add a vendor as a draft, and ignores bank fields posted to the form', function () {
     $this->actingAs(vendorMerchant())->post(route('merchant.vendors.store'), [
         'supplier_name' => 'IDEAL FASTENER',
         'supplier_code' => '',
         'bank_name' => 'Dutch-Bangla Bank',
-        'bank_branch' => 'Motijheel',
-        'bank_account_name' => 'Ideal Fastener Ltd',
         'bank_account_number' => '1234567890',
-        'bank_swift_code' => 'DBBLBDDH',
-        'is_active' => '1',
-    ])->assertRedirect(route('merchant.vendors.index'));
+    ])->assertRedirect();
 
     $vendor = Supplier::firstOrFail();
     expect($vendor->supplier_code)->toBeNull()
-        ->and($vendor->bank_name)->toBe('Dutch-Bangla Bank')
-        ->and($vendor->bank_account_number)->toBe('1234567890')
-        ->and($vendor->bank_swift_code)->toBe('DBBLBDDH');
+        ->and($vendor->approval_status)->toBe('draft')
+        ->and($vendor->vendor_status)->toBe('inactive')
+        ->and($vendor->bank_name)->toBeNull()
+        ->and($vendor->bank_account_number)->toBeNull()
+        ->and($vendor->bankAccounts()->count())->toBe(0);   // bank accounts only via approved requests
 });
 
 it('still adds a vendor with no bank details', function () {
@@ -46,11 +44,11 @@ it('keeps the vendor entry to merchants', function () {
     $this->actingAs($user)->get(route('merchant.vendors.create'))->assertForbidden();
 });
 
-it('shows the vendor form with the bank fields and a dashboard button', function () {
+it('shows the vendor form with the master fields and no bank fields', function () {
     $user = vendorMerchant();
 
     $this->withoutVite()->actingAs($user)->get(route('merchant.vendors.create'))
-        ->assertOk()->assertSee('Bank Details')->assertSee('Account Number')->assertSee('SWIFT Code');
+        ->assertOk()->assertSee('Vendor Type')->assertSee('Default Payment Terms')->assertDontSee('Account Number');
 });
 
 
@@ -63,9 +61,9 @@ it('lists the vendors, with a search, and never shows an account number', functi
     $page = $this->withoutVite()->actingAs($user)->get(route('merchant.vendors.index'))->assertOk();
 
     $page->assertSee('IDEAL FASTENER')->assertSee('LOCAL TRIMS')->assertSee('OLD SUPPLIER')
-        ->assertSee('Dutch-Bangla Bank')->assertSee('Account ending 7890')->assertSee('No bank details')
-        ->assertDontSee('1234567890')                 // the number itself stays on the Admin screen
-        ->assertViewHas('totals', fn ($t) => $t === ['all' => 3, 'active' => 2, 'with_bank' => 1]);
+        ->assertDontSee('1234567890')                 // a legacy number is never shown on the list
+        ->assertDontSee('Dutch-Bangla Bank')
+        ->assertViewHas('totals', fn ($t) => $t === ['all' => 3, 'active' => 2, 'pending' => 0]);
     // The sidebar carries the entry.
     $page->assertSee(route('merchant.vendors.index'), false)->assertSee('Vendors');
 
@@ -80,31 +78,26 @@ it('keeps the vendor list to merchants', function () {
     $this->actingAs(User::factory()->create())->get(route('merchant.vendors.index'))->assertForbidden();
 });
 
-it('lets a merchant edit a vendor, bank details included, and keeps the vendor\'s own code valid', function () {
+it('lets a merchant edit a vendor and keeps the vendor\'s own code valid', function () {
     $vendor = Supplier::create(['supplier_name' => 'IDEAL FASTENER', 'supplier_code' => 'SUP-1', 'is_active' => true]);
     $user = vendorMerchant();
 
     // The form opens filled in, and the list carries an Edit button.
     $this->withoutVite()->actingAs($user)->get(route('merchant.vendors.edit', $vendor))
-        ->assertOk()->assertSee('IDEAL FASTENER')->assertSee('SUP-1')->assertSee('Bank Details');
+        ->assertOk()->assertSee('IDEAL FASTENER')->assertSee('SUP-1');
     $this->withoutVite()->actingAs($user)->get(route('merchant.vendors.index'))
-        ->assertSee(route('merchant.vendors.edit', $vendor), false)->assertSee('Edit');
+        ->assertSee(route('vendors.show', $vendor), false)->assertSee('Open');
 
     $this->actingAs($user)->put(route('merchant.vendors.update', $vendor), [
         'supplier_name' => 'IDEAL FASTENER LTD',
         'supplier_code' => 'SUP-1',               // unchanged: must not clash with itself
-        'phone' => '+880 1711 000111',
-        'bank_name' => 'Brac Bank',
-        'bank_account_number' => '55667788',
-        'is_active' => '1',
-    ])->assertRedirect(route('merchant.vendors.index'));
+        'country' => 'Bangladesh',
+    ])->assertRedirect(route('vendors.show', $vendor));
 
     $vendor->refresh();
     expect($vendor->supplier_name)->toBe('IDEAL FASTENER LTD')
         ->and($vendor->supplier_code)->toBe('SUP-1')
-        ->and($vendor->phone)->toBe('+880 1711 000111')
-        ->and($vendor->bank_name)->toBe('Brac Bank')
-        ->and($vendor->bank_account_number)->toBe('55667788');
+        ->and($vendor->country)->toBe('Bangladesh');
     expect(Supplier::count())->toBe(1);          // edited in place, not duplicated
 });
 
@@ -153,7 +146,7 @@ function vendorRow(array $over = []): array
     return $row;
 }
 
-it('imports vendors from Excel with their bank details, in one go', function () {
+it('imports vendors from the old single-sheet file: contact, address and category rows are created, bank rows need bank permission', function () {
     $user = vendorMerchant();
 
     $this->actingAs($user)->post(route('merchant.vendors.import'), ['file' => vendorXlsx([
@@ -164,8 +157,11 @@ it('imports vendors from Excel with their bank details, in one go', function () 
     expect(Supplier::count())->toBe(2);
     $ideal = Supplier::where('supplier_code', 'SUP-1')->firstOrFail();
     expect($ideal->supplier_name)->toBe('IDEAL FASTENER')
-        ->and($ideal->bank_name)->toBe('Brac Bank')->and($ideal->bank_account_number)->toBe('55667788')->and($ideal->bank_swift_code)->toBe('BRAKBDDH')
-        ->and((float) $ideal->tolerance_percent)->toBe(3.0)->and($ideal->is_active)->toBeTrue();
+        ->and($ideal->contacts()->first()->email)->toBe('ideal@example.com')
+        ->and($ideal->addresses()->first()->city)->toBe('Dhaka')
+        ->and($ideal->bankAccounts()->count())->toBe(0)           // merchant has no bank permission: skipped
+        ->and((float) $ideal->tolerance_percent)->toBe(3.0)
+        ->and($ideal->approval_status)->toBe('draft');
 });
 
 it('imports nothing when one row is wrong, and says which', function () {
@@ -200,14 +196,15 @@ it('skips a vendor already on the list instead of overwriting it, and rejects a 
 it('ignores the template example row and a masked account number from an export', function () {
     $this->actingAs(vendorMerchant())->post(route('merchant.vendors.import'), ['file' => vendorXlsx([
         \App\Imports\VendorListImport::SAMPLE_ROW,
-        vendorRow([0 => 'FROM EXPORT', 16 => '****7890']),
+        vendorRow([0 => 'FROM EXPORT', 13 => 'Brac Bank', 16 => '****7890']),
     ])])->assertSessionHas('success');
 
-    expect(Supplier::count())->toBe(1)->and(Supplier::first()->bank_account_number)->toBeNull();
+    expect(Supplier::count())->toBe(1)->and(Supplier::first()->bankAccounts()->count())->toBe(0);
 });
 
-it('exports the vendor list, filtered by the search, with the account number masked', function () {
-    Supplier::create(['supplier_name' => 'IDEAL FASTENER', 'bank_name' => 'Brac Bank', 'bank_account_number' => '1234567890', 'is_active' => true]);
+it('exports the vendor workbook, filtered by the search, without bank data for a merchant', function () {
+    $ideal = Supplier::create(['supplier_name' => 'IDEAL FASTENER', 'is_active' => true]);
+    $ideal->contacts()->create(['name' => 'Rahim', 'email' => 'r@example.com', 'is_primary' => true]);
     Supplier::create(['supplier_name' => 'LOCAL TRIMS', 'is_active' => false]);
     $user = vendorMerchant();
 
@@ -216,16 +213,15 @@ it('exports the vendor list, filtered by the search, with the account number mas
         $path = tempnam(sys_get_temp_dir(), 'exp') . '.xlsx';
         file_put_contents($path, $response->streamedContent());
 
-        return \PhpOffice\PhpSpreadsheet\IOFactory::load($path)->getActiveSheet()->toArray();
+        return \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
     };
 
-    $all = $read();
-    expect($all[0])->toBe(array_merge(\App\Imports\VendorListImport::COLUMNS, ['Status']));
-    expect(collect($all)->pluck(0)->all())->toBe(['Vendor Name*', 'IDEAL FASTENER', 'LOCAL TRIMS']);
-    $ideal = collect($all)->firstWhere(0, 'IDEAL FASTENER');
-    expect($ideal[16])->toBe('****7890')->and(json_encode($all))->not->toContain('1234567890')->and(end($ideal))->toBe('Active');
+    $book = $read();
+    expect($book->getSheetNames())->toBe(['Vendors', 'Contacts', 'Addresses', 'Item Categories']);   // no Bank Accounts sheet
+    expect(collect($book->getSheetByName('Vendors')->toArray())->pluck(0)->all())->toBe(['Vendor Name*', 'IDEAL FASTENER', 'LOCAL TRIMS']);
+    expect($book->getSheetByName('Contacts')->toArray()[1][1])->toBe('Rahim');
 
-    expect(collect($read(['q' => 'local']))->pluck(0)->all())->toBe(['Vendor Name*', 'LOCAL TRIMS']);
+    expect(collect($read(['q' => 'local'])->getSheetByName('Vendors')->toArray())->pluck(0)->all())->toBe(['Vendor Name*', 'LOCAL TRIMS']);
 });
 
 it('offers a template and keeps import, export and template to merchants', function () {

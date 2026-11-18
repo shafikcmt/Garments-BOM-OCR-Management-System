@@ -1807,6 +1807,13 @@ class BookingController extends Controller
 
             $totalQty = collect($lineData)->sum(fn (array $data) => (float) ($this->numericValue($data['qty'] ?? null) ?? 0));
 
+            // Vendor Master rule: a blocked / inactive / unapproved / expired vendor cannot get a NEW PO.
+            // A vendor that is not in the master at all is allowed, as before.
+            $masterVendor = $this->findSupplierAnyStatus($primaryData['vendor_name'] ?? null, true);
+            if ($masterVendor && ($reason = $masterVendor->unusableReason())) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['vendor_name' => $reason]);
+            }
+
             $bookingPo = BookingPo::create([
                 'excel_file_id' => $primaryRow->excel_file_id,
                 'excel_row_id' => $primaryRow->id,
@@ -1832,7 +1839,7 @@ class BookingController extends Controller
                 'status' => 'applied',
                 'generated_by' => auth()->id(),
                 'generated_at' => $generatedAt,
-            ]);
+            ] + $this->vendorSnapshotColumns($masterVendor, $primaryData['item_type'] ?? null));
 
             $bookingPo->booking_data = $this->defaultBookingData($bookingPo, $lineData);
             $bookingPo->save();
@@ -1848,6 +1855,30 @@ class BookingController extends Controller
 
             return $bookingPo;
         });
+    }
+
+    /**
+     * Vendor terms copied onto a new PO. They are the PO's own values from now on: a later
+     * change to the vendor master never rewrites them, and a user may still override them.
+     *
+     * @return array<string, mixed>
+     */
+    protected function vendorSnapshotColumns(?Supplier $vendor, ?string $category): array
+    {
+        if (! $vendor) {
+            return [];
+        }
+
+        $master = app(\App\Services\VendorMaster::class);
+        $terms = $master->termsFor($vendor, $category);
+
+        return [
+            'supplier_id' => $vendor->id,
+            'vendor_snapshot' => $master->snapshot($vendor, $category),
+            'incoterm' => $terms['incoterm'],
+            'ship_mode' => $terms['ship_mode'],
+            'tolerance_percent' => $terms['tolerance_percent'],
+        ];
     }
 
     protected function pendingRowsForSameBookingGroup(ExcelRow $primaryRow, array $rowData)
@@ -3325,8 +3356,33 @@ BIN: 005635381-0406 TIN: 780096271681",
             return null;
         }
 
+        return $this->vendorLookup($vendorName, true);
+    }
+
+    /**
+     * Vendor master record for a name, whatever its status. Used to explain WHY a
+     * vendor cannot be used (blocked, expired ...) and to avoid creating a duplicate.
+     */
+    protected function findSupplierAnyStatus(?string $vendorName, bool $exactOnly = false): ?Supplier
+    {
+        $vendorName = trim((string) $vendorName);
+
+        if ($vendorName === '') {
+            return null;
+        }
+
+        // An exact name / legal name / code always wins over a partial match, and an active one over an inactive one.
+        $exact = Supplier::query()
+            ->where(fn ($q) => $q->where('supplier_name', $vendorName)->orWhere('legal_name', $vendorName)->orWhere('supplier_code', $vendorName))
+            ->orderByDesc('is_active')->first();
+
+        return $exact ?: ($exactOnly ? null : $this->vendorLookup($vendorName, false));
+    }
+
+    private function vendorLookup(string $vendorName, bool $onlySelectable): ?Supplier
+    {
         return Supplier::query()
-            ->where('is_active', true)
+            ->when($onlySelectable, fn ($q) => $q->selectable())
             ->where(function ($query) use ($vendorName) {
                 // whereLike compiles to ILIKE on PostgreSQL, where a plain LIKE
                 // is case-sensitive. The exact matches above stay as they are:
@@ -3696,7 +3752,7 @@ BIN: 005635381-0406 TIN: 780096271681",
             return;
         }
 
-        $supplier = $this->findSupplier($lookupName) ?: $this->findSupplier($toName) ?: new Supplier();
+        $supplier = $this->findSupplierAnyStatus($lookupName) ?: $this->findSupplierAnyStatus($toName) ?: new Supplier();
         $supplier->supplier_name = $supplier->supplier_name ?: ($lookupName ?: $toName);
 
         if ($toName) {
@@ -3727,7 +3783,12 @@ BIN: 005635381-0406 TIN: 780096271681",
             $supplier->tolerance_percent = $tolerancePercent;
         }
 
-        $supplier->is_active = true;
+        // A vendor learned from a PO document starts as a draft (is_active keeps old
+        // behaviour for new rows); an existing vendor's status is never touched here.
+        if (! $supplier->exists) {
+            $supplier->is_active = true;
+        }
+
         $supplier->save();
     }
 
