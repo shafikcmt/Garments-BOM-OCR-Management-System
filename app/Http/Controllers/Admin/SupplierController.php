@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Supplier;
+use App\Services\VendorMaster;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -23,11 +24,11 @@ class SupplierController extends Controller
 
     public function store(Request $request)
     {
-        Supplier::create($this->validatedData($request));
+        $supplier = app(VendorMaster::class)->create($this->validatedData($request));
 
         return redirect()
-            ->route('admin.suppliers.index')
-            ->with('success', 'Supplier created successfully.');
+            ->route('vendors.show', $supplier)
+            ->with('success', 'Vendor created as a draft. Add contacts, addresses and bank details, then submit it for approval.');
     }
 
     public function edit(Supplier $supplier)
@@ -37,11 +38,11 @@ class SupplierController extends Controller
 
     public function update(Request $request, Supplier $supplier)
     {
-        $supplier->update($this->validatedData($request, $supplier));
+        $held = app(VendorMaster::class)->update($supplier, $this->validatedData($request, $supplier));
 
         return redirect()
-            ->route('admin.suppliers.index')
-            ->with('success', 'Supplier updated successfully.');
+            ->route('vendors.show', $supplier)
+            ->with('success', 'Vendor updated.' . ($held ? ' Some changes wait for approval.' : ''));
     }
 
     public function destroy(Supplier $supplier)
@@ -64,31 +65,32 @@ class SupplierController extends Controller
             ],
             'supplier_name' => ['required', 'string', 'max:255'],
             'legal_name' => ['nullable', 'string', 'max:255'],
+            'vendor_type' => ['nullable', 'in:local,foreign'],
+            'vendor_category' => ['nullable', 'string', 'max:100'],
 
-            'contact_person' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
-
-            'address' => ['nullable', 'string'],
-            'city' => ['nullable', 'string', 'max:100'],
+            'tin' => ['nullable', 'string', 'max:100'],
+            'vat_bin_number' => ['nullable', 'string', 'max:100'],
+            'business_reg_number' => ['nullable', 'string', 'max:100'],
             'country' => ['nullable', 'string', 'max:100'],
 
-            'item_type' => ['nullable', 'string', 'max:100'],
+            'default_currency' => ['nullable', 'string', 'max:10'],
+            'default_payment_terms' => ['nullable', 'string', 'max:150'],
             'incoterm' => ['nullable', 'string', 'max:50'],
             'ship_mode' => ['nullable', 'string', 'max:50'],
             'tolerance_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'lead_time_days' => ['nullable', 'integer', 'min:0', 'max:999'],
+            'moq' => ['nullable', 'numeric', 'min:0'],
 
-            'bank_name' => ['nullable', 'string', 'max:255'],
-            'bank_branch' => ['nullable', 'string', 'max:255'],
-            'bank_account_name' => ['nullable', 'string', 'max:255'],
-            'bank_account_number' => ['nullable', 'string', 'max:100'],
-            'bank_routing_number' => ['nullable', 'string', 'max:100'],
-            'bank_swift_code' => ['nullable', 'string', 'max:50'],
-
-            'is_active' => ['nullable', 'boolean'],
+            'effective_date' => ['nullable', 'date'],
+            'expiry_date' => ['nullable', 'date', 'after_or_equal:effective_date'],
+            'external_erp_code' => ['nullable', 'string', 'max:100'],
+            'remarks' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $data['is_active'] = $request->boolean('is_active');
+        // Contacts, addresses, item categories and bank accounts are kept on the vendor
+        // profile (own tables, bank changes need approval); status changes go through the
+        // approval workflow, so none of those are accepted from this form.
+        $data['vendor_type'] = $data['vendor_type'] ?? 'local';
 
         // An empty code is no code, and has to be stored as null rather than "".
         // The unique index counts empty strings as equal to each other, so a

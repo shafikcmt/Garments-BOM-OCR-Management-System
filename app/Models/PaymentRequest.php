@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class PaymentRequest extends Model
 {
+    use \App\Models\Concerns\LinksVendor;
+
     use HasFactory;
 
     // Existing statuses ('preview', 'draft') are unchanged. These are the
@@ -38,6 +40,7 @@ class PaymentRequest extends Model
     public const FLOW_DEPARTMENTAL = 2;
 
     protected $fillable = [
+        'supplier_id',
         'request_no',
         'supplier_name',
         'buyer_name',

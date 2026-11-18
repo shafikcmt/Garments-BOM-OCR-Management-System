@@ -296,15 +296,19 @@
                             <td>{{ $supplier->incoterm ?? '-' }}</td>
                             <td>{{ $supplier->ship_mode ?? '-' }}</td>
                             <td>
-                                @if($supplier->is_active)
+                                @if($supplier->vendor_status === 'active')
                                     <span class="supplier-status-badge supplier-status-active"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>Active</span>
                                 @else
-                                    <span class="supplier-status-badge supplier-status-inactive"><i class="bi bi-x-circle me-1" aria-hidden="true"></i>Inactive</span>
+                                    <span class="supplier-status-badge supplier-status-inactive"><i class="bi bi-x-circle me-1" aria-hidden="true"></i>{{ \App\Models\Supplier::STATUSES[$supplier->vendor_status] ?? 'Inactive' }}</span>
                                 @endif
+                                <div class="small text-muted mt-1">{{ \App\Models\Supplier::APPROVALS[$supplier->approval_status] ?? $supplier->approval_status }}</div>
                             </td>
                             <td>
                                 <div class="d-flex justify-content-center gap-2">
-                                    <a href="{{ route('admin.suppliers.edit', $supplier) }}" class="btn supplier-action-btn supplier-action-edit" title="Edit vendor">
+                                    <a href="{{ route('vendors.show', $supplier) }}" class="btn supplier-action-btn supplier-action-edit">
+                                        <i class="bi bi-eye" aria-hidden="true"></i><span class="ms-1">Open</span>
+                                    </a>
+                                    <a href="{{ route('admin.suppliers.edit', $supplier) }}" class="btn supplier-action-btn supplier-action-edit">
                                         <i class="bi bi-pencil-square" aria-hidden="true"></i><span class="ms-1">Edit</span>
                                     </a>
 

@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class MaterialReceiving extends Model
 {
+    use \App\Models\Concerns\LinksVendor;
+
     use HasFactory;
     use TriggersMaterialStockLedger;
 
@@ -21,6 +23,7 @@ class MaterialReceiving extends Model
     public const MATCH_LINKED = 'linked';
 
     protected $fillable = [
+        'supplier_id',
         'excel_file_id',
         'excel_row_id',
         'booking_po_id',

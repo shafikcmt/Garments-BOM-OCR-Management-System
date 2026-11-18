@@ -7,9 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class PaymentRequestItem extends Model
 {
+    use \App\Models\Concerns\LinksVendor;
+
     use HasFactory;
 
     protected $fillable = [
+        'supplier_id',
         'payment_request_id',
         'booking_po_id',
         'excel_file_id',

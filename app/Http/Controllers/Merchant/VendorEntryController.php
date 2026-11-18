@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Merchant;
 
 use App\Http\Controllers\Admin\SupplierController;
 use App\Http\Controllers\Controller;
-use App\Exports\VendorListExport;
-use App\Exports\VendorTemplateExport;
+use App\Exports\VendorWorkbookExport;
 use App\Imports\VendorListImport;
+use App\Imports\VendorWorkbookImport;
 use App\Models\Supplier;
+use App\Services\VendorMaster;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
@@ -33,14 +34,10 @@ class VendorEntryController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $withBank = fn ($query) => $query->where(function ($q) {
-            $q->whereNotNull('bank_name')->orWhereNotNull('bank_account_number');
-        });
-
         $totals = [
             'all' => Supplier::count(),
             'active' => Supplier::active()->count(),
-            'with_bank' => $withBank(Supplier::query())->count(),
+            'pending' => Supplier::whereIn('approval_status', ['submitted', 'under_review'])->count(),
         ];
 
         return view('merchant.vendors.index', compact('vendors', 'totals', 'term'));
@@ -53,11 +50,11 @@ class VendorEntryController extends Controller
 
     public function store(Request $request)
     {
-        $supplier = Supplier::create(app(SupplierController::class)->validatedData($request));
+        $supplier = app(VendorMaster::class)->create(app(SupplierController::class)->validatedData($request));
 
         return redirect()
-            ->route('merchant.vendors.index')
-            ->with('success', 'Vendor "' . e($supplier->supplier_name) . '" added.');
+            ->route('vendors.show', $supplier)
+            ->with('success', 'Vendor "' . e($supplier->supplier_name) . '" added as a draft. Add contacts and addresses, then submit it for approval.');
     }
 
     public function edit(Supplier $supplier)
@@ -67,11 +64,11 @@ class VendorEntryController extends Controller
 
     public function update(Request $request, Supplier $supplier)
     {
-        $supplier->update(app(SupplierController::class)->validatedData($request, $supplier));
+        $held = app(VendorMaster::class)->update($supplier, app(SupplierController::class)->validatedData($request, $supplier));
 
         return redirect()
-            ->route('merchant.vendors.index')
-            ->with('success', 'Vendor "' . e($supplier->supplier_name) . '" updated.');
+            ->route('vendors.show', $supplier)
+            ->with('success', 'Vendor "' . e($supplier->supplier_name) . '" updated.' . ($held ? ' Some changes wait for approval.' : ''));
     }
 
     /** Vendors matching the search box (all of them when it is empty). */
@@ -87,24 +84,27 @@ class VendorEntryController extends Controller
         });
     }
 
-    /** The vendor list as Excel: what the search box shows, or everything. */
+    /** The vendor workbook (vendors, contacts, addresses, categories; banks only for those allowed): what the search box shows, or everything. */
     public function export(Request $request)
     {
-        $vendors = $this->searched(trim((string) $request->input('q')))->orderBy('supplier_name')->get();
+        $withBanks = (bool) $request->user()?->can('vendors.bank.view');
+        $vendors = $this->searched(trim((string) $request->input('q')))->orderBy('supplier_name')
+            ->with(['contacts', 'addresses', 'itemCategories'] + ($withBanks ? ['bankAccounts'] : []))->get();
 
-        return Excel::download(new VendorListExport($vendors), 'Vendors-' . now()->format('Y-m-d') . '.xlsx');
+        return Excel::download(new VendorWorkbookExport($vendors, $withBanks), 'Vendors-' . now()->format('Y-m-d') . '.xlsx');
     }
 
-    /** Blank upload template, built from VendorListImport::COLUMNS. */
+    /** Blank upload workbook: one sheet per kind of record, with example rows and instructions. */
     public function template()
     {
-        return Excel::download(new VendorTemplateExport, 'Vendor-Upload-Template.xlsx');
+        return Excel::download(new VendorWorkbookExport, 'Vendor-Upload-Template.xlsx');
     }
 
     /**
-     * Bulk vendor upload. All-or-nothing inside a transaction, and only ever
-     * inserts: a vendor already on the list is reported as skipped, never
-     * overwritten. Same rules as the on-screen form (VendorListImport::parse).
+     * Bulk vendor upload (Vendors / Contacts / Addresses / Item Categories / Bank Accounts sheets,
+     * or the old single-sheet file). All-or-nothing in one transaction; only inserts: a vendor
+     * already on the list is reported as skipped, never overwritten. New vendors are drafts and
+     * bank rows become pending change requests.
      */
     public function import(Request $request)
     {
@@ -118,7 +118,7 @@ class VendorEntryController extends Controller
             return back()->with('warning', 'That file could not be read. Please upload a CSV or Excel file based on the upload template.');
         }
 
-        ['vendors' => $vendors, 'errors' => $errors, 'skipped' => $skipped] = VendorListImport::parse($sheets[0] ?? []);
+        ['vendors' => $vendors, 'errors' => $errors, 'skipped' => $skipped] = VendorWorkbookImport::parse($sheets, (bool) $request->user()?->can('vendors.bank.manage'));
 
         if ($errors) {
             return back()
@@ -133,14 +133,13 @@ class VendorEntryController extends Controller
                 ->with('import_skipped', $skipped);
         }
 
-        DB::transaction(function () use ($vendors) {
-            foreach ($vendors as $vendor) {
-                Supplier::create($vendor);
-            }
-        });
+        $n = app(VendorMaster::class)->import($vendors);
 
         return back()
-            ->with('success', count($vendors) . ' vendor(s) imported.' . ($skipped ? ' ' . count($skipped) . ' row(s) were skipped.' : ''))
+            ->with('success', sprintf(
+                'Import summary: %d vendor(s) created as drafts, %d contact(s), %d address(es), %d item category(ies), %d bank request(s) waiting for approval.%s',
+                $n['vendors'], $n['contacts'], $n['addresses'], $n['categories'], $n['bank_requests'], $skipped ? ' ' . count($skipped) . ' row(s) were skipped.' : ''
+            ))
             ->with('import_skipped', $skipped);
     }
 }

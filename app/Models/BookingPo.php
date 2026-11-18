@@ -31,6 +31,11 @@ class BookingPo extends Model
         'consumption',
         'remarks',
         'booking_data',
+        'supplier_id',
+        'vendor_snapshot',
+        'incoterm',
+        'ship_mode',
+        'tolerance_percent',
         'status',
         'generated_by',
         'generated_at',
@@ -40,6 +45,7 @@ class BookingPo extends Model
 
     protected $casts = [
         'booking_data' => 'array',
+        'vendor_snapshot' => 'array',
         'generated_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
