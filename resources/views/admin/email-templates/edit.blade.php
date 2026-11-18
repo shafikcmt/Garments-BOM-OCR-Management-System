@@ -2,6 +2,14 @@
 
 @section('title', 'Email Templates')
 
+@section('styles')
+<style>
+    .tpl-chip{display:inline-block;background:#e0ecff;color:#1d4ed8;border:1px solid #bfd4ff;border-radius:6px;padding:0 6px;margin:0 1px;font-size:.88em;white-space:nowrap;user-select:all}
+    .tpl-surface:focus{box-shadow:0 0 0 .2rem rgba(37,99,235,.15);border-color:#86b7fe;outline:0}
+    .tpl-surface p{margin:0 0 .75rem}
+</style>
+@endsection
+
 @section('content')
 <div class="container-fluid">
     <x-breadcrumb :items="[
@@ -73,4 +81,52 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+(function () {
+    try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) {}
+    var esc = function (t) { return String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
+
+    document.querySelectorAll('.tpl-editor').forEach(function (box) {
+        var labels = {}; try { labels = JSON.parse(box.dataset.labels || '{}'); } catch (e) {}
+        var surface = box.querySelector('.tpl-surface'), source = box.querySelector('.tpl-source'), toggle = box.querySelector('.tpl-html-toggle');
+        var chip = function (token) {
+            return '<span class="tpl-chip" contenteditable="false" data-token="' + esc(token) + '">' + esc(labels[token] || token) + '</span>';
+        };
+        var toVisual = function (html) { return html.replace(/\{\{\s*[\w.]+\s*\}\}/g, function (m) { return chip(m.replace(/\s+/g, '')); }); };
+        var toHtml = function () {
+            var clone = surface.cloneNode(true);
+            clone.querySelectorAll('.tpl-chip').forEach(function (c) { c.replaceWith(document.createTextNode(c.dataset.token)); });
+            var html = clone.innerHTML.replace(/<div>/g, '<p>').replace(/<\/div>/g, '</p>').replace(/&nbsp;/g, ' ').trim();
+            return html === '<br>' ? '' : html;
+        };
+        var sync = function () { if (!toggle.checked) { source.value = toHtml(); } };
+
+        surface.innerHTML = toVisual(source.value);
+        surface.addEventListener('input', sync);
+        surface.addEventListener('paste', function (e) { e.preventDefault(); document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain')); });
+
+        box.querySelectorAll('[data-cmd]').forEach(function (b) {
+            b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+            b.addEventListener('click', function () { surface.focus(); document.execCommand(b.dataset.cmd, false, null); sync(); });
+        });
+        box.querySelectorAll('[data-token]').forEach(function (b) {
+            b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+            b.addEventListener('click', function () {
+                surface.focus();
+                document.execCommand('insertHTML', false, chip(b.dataset.token) + '&nbsp;');
+                sync();
+            });
+        });
+
+        toggle.addEventListener('change', function () {
+            if (toggle.checked) { source.value = toHtml(); source.classList.remove('d-none'); surface.classList.add('d-none'); box.querySelector('.tpl-toolbar').classList.add('d-none'); }
+            else { surface.innerHTML = toVisual(source.value); source.classList.add('d-none'); surface.classList.remove('d-none'); box.querySelector('.tpl-toolbar').classList.remove('d-none'); }
+        });
+        box.closest('form').addEventListener('submit', function () { sync(); });
+    });
+})();
+</script>
 @endsection
