@@ -87,53 +87,44 @@
         @enderror
     </div>
 
-    <div class="col-md-4">
-        <label class="form-label">Item Type</label>
-        <select name="item_type" class="form-select @error('item_type') is-invalid @enderror">
-            @php
-                // General leads because it is what all but a handful of vendors
-                // are; Thread, Elastic and Lining are the other types already in
-                // use that the list had never offered.
-                $itemTypes = ['General', 'Fabric', 'Zipper', 'Hook & Bar', 'Trim', 'Interlining', 'Scrim', 'Thread', 'Elastic', 'Lining'];
-                $selectedItemType = old('item_type', $supplier->item_type ?? '');
+    @php
+        // Choices are managed by Admin (Booking Setup, Vendor Options). A value the
+        // vendor already holds stays selectable even if it was deleted from the list,
+        // so opening the form to fix a phone number never blanks what the PO prints.
+        $selectedItemTypes = old('item_types') !== null
+            ? array_values(array_filter(array_map('trim', (array) old('item_types'))))
+            : \App\Models\SupplierOption::split(old('item_type', $supplier->item_type ?? ''));
+        $itemTypes = \App\Models\SupplierOption::names('item_type', $selectedItemTypes);
+        $selectedIncoterm = old('incoterm', $supplier->incoterm ?? '');
+        $incoterms = \App\Models\SupplierOption::names('incoterm', [$selectedIncoterm]);
+        $selectedShipMode = old('ship_mode', $supplier->ship_mode ?? '');
+        $shipModes = \App\Models\SupplierOption::names('ship_mode', [$selectedShipMode]);
+    @endphp
 
-                // Same guard as Incoterm and Ship Mode above: a value this list
-                // does not know stays selectable on its own record, so editing a
-                // vendor for any other reason cannot silently blank its type.
-                if ($selectedItemType !== '' && ! in_array($selectedItemType, $itemTypes, true)) {
-                    $itemTypes[] = $selectedItemType;
-                }
-            @endphp
-
-            <option value="">Select Item Type</option>
-            @foreach($itemTypes as $itemType)
-                <option value="{{ $itemType }}" {{ $selectedItemType === $itemType ? 'selected' : '' }}>
-                    {{ $itemType }}
-                </option>
+    <div class="col-md-12">
+        <label class="form-label">Item Type <span class="text-muted fw-normal">(tick all that apply)</span></label>
+        <div class="d-flex flex-wrap gap-2 @error('item_types') is-invalid @enderror">
+            @foreach($itemTypes as $i => $itemType)
+                <div class="form-check form-check-inline border rounded px-3 py-1 m-0">
+                    <input class="form-check-input ms-0 me-2" type="checkbox" name="item_types[]" value="{{ $itemType }}"
+                           id="item_type_{{ $i }}" {{ in_array($itemType, $selectedItemTypes, true) ? 'checked' : '' }}>
+                    <label class="form-check-label" for="item_type_{{ $i }}">{{ $itemType }}</label>
+                </div>
             @endforeach
-        </select>
+            {{-- Sent even when nothing is ticked, so un-ticking everything clears the type. --}}
+            <input type="hidden" name="item_types[]" value="">
+        </div>
+        @error('item_types')
+            <div class="invalid-feedback d-block">{{ $message }}</div>
+        @enderror
         @error('item_type')
-            <div class="invalid-feedback">{{ $message }}</div>
+            <div class="invalid-feedback d-block">{{ $message }}</div>
         @enderror
     </div>
 
     <div class="col-md-4">
         <label class="form-label">Incoterm</label>
         <select name="incoterm" class="form-select @error('incoterm') is-invalid @enderror">
-            @php
-                $incoterms = ['FOB', 'CIF', 'CFR', 'Ex-Works', 'CPT', 'EXW', 'CNF'];
-                $selectedIncoterm = old('incoterm', $supplier->incoterm ?? '');
-
-                // Whatever this vendor already holds stays selectable, even if it is
-                // not one of the terms above. Without this, opening the form to fix a
-                // phone number would blank the incoterm on save, and that value is
-                // printed straight onto the PO/PI. Keeping it record-local means an
-                // odd legacy value cannot spread to the other vendors' dropdowns.
-                if ($selectedIncoterm !== '' && ! in_array($selectedIncoterm, $incoterms, true)) {
-                    $incoterms[] = $selectedIncoterm;
-                }
-            @endphp
-
             <option value="">Select Incoterm</option>
             @foreach($incoterms as $incoterm)
                 <option value="{{ $incoterm }}" {{ $selectedIncoterm === $incoterm ? 'selected' : '' }}>
@@ -149,18 +140,6 @@
     <div class="col-md-4">
         <label class="form-label">Ship Mode</label>
         <select name="ship_mode" class="form-select @error('ship_mode') is-invalid @enderror">
-            @php
-                // Upper case throughout: that is how all but a handful of the stored
-                // values are already written, so the canonical list matches the data
-                // instead of shadowing it with a second casing of the same mode.
-                $shipModes = ['SEA', 'AIR', 'ROAD', 'COURIER', 'TRUCK', 'AIR + SEA', 'SEA + AIR'];
-                $selectedShipMode = old('ship_mode', $supplier->ship_mode ?? '');
-
-                if ($selectedShipMode !== '' && ! in_array($selectedShipMode, $shipModes, true)) {
-                    $shipModes[] = $selectedShipMode;
-                }
-            @endphp
-
             <option value="">Select Ship Mode</option>
             @foreach($shipModes as $shipMode)
                 <option value="{{ $shipMode }}" {{ $selectedShipMode === $shipMode ? 'selected' : '' }}>

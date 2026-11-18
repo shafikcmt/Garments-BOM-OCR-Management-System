@@ -292,6 +292,7 @@ A column that was skipped on purpose but matches another department's header (fo
 **Add a vendor.**
 1. Press **Add Vendor**.
 2. Type the vendor name (required) and any contact details.
+2a. **Item Type:** tick every type this vendor supplies (for example both **Fabric** and **Accessories**). **Incoterm** and **Ship Mode** are chosen from a list. If a choice you need is missing, ask Admin to add it (see **Vendor Options** below).
 3. Under **Bank Details** fill what you know: bank name, branch, account name, account number, routing number, SWIFT code. All are optional.
 4. Press **Save Vendor**. You return to the list with a confirmation.
 
@@ -304,6 +305,8 @@ A column that was skipped on purpose but matches another department's header (fo
 2. Choose the file and press **Import**.
 3. The file is checked as a whole. If any row has a problem (a missing name, an invalid email, a Tolerance % outside 0 to 100, a Vendor Code already used by another vendor) **nothing is imported** and the rows to correct are listed. Fix them and upload again.
 4. A vendor already on the list (same name, in any capital or small letters) is **skipped** and never overwritten; use **Edit** to change it. Skipped rows are listed after the import.
+
+**Vendor Options (Admin).** Open **Booking Setup, Vendor Options**. Three lists are shown: **Item Types**, **Incoterms** and **Ship Modes**. To add a choice, type it in the box of that list and press **Add** (a name already in the list is refused). To remove one, press **Delete** beside it. Deleting a choice does **not** change vendors that already use it: they keep their value, it still prints on their PO, and it still shows on their own form. The new choices appear at once on the vendor form and on the booking PO preview (Incoterm, Ship Mode).
 
 The vendor goes into the same list Admin manages (**Admin, Vendors**), so it can be used for bookings and payment requests, and your changes show there too. Only Admin can delete a vendor. The Store's own supplier list (**Store, Purchase Setup**, then open a supplier) has the same Bank Details fields.
 

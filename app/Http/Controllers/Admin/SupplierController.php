@@ -73,7 +73,9 @@ class SupplierController extends Controller
             'city' => ['nullable', 'string', 'max:100'],
             'country' => ['nullable', 'string', 'max:100'],
 
-            'item_type' => ['nullable', 'string', 'max:100'],
+            'item_type' => ['nullable', 'string', 'max:255'],
+            'item_types' => ['nullable', 'array'],
+            'item_types.*' => ['nullable', 'string', 'max:100'],
             'incoterm' => ['nullable', 'string', 'max:50'],
             'ship_mode' => ['nullable', 'string', 'max:50'],
             'tolerance_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -89,6 +91,15 @@ class SupplierController extends Controller
         ]);
 
         $data['is_active'] = $request->boolean('is_active');
+
+        // The form sends Item Type as several tick boxes (a vendor can supply both
+        // fabric and accessories); the column stays one text value, "Fabric, Accessories".
+        if ($request->has('item_types')) {
+            $data['item_type'] = implode(', ', array_values(array_unique(
+                array_filter(array_map('trim', $data['item_types'] ?? []), fn ($v) => $v !== '')
+            ))) ?: null;
+        }
+        unset($data['item_types']);
 
         // An empty code is no code, and has to be stored as null rather than "".
         // The unique index counts empty strings as equal to each other, so a

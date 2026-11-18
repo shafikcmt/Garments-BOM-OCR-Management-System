@@ -54,6 +54,7 @@ Route::prefix('admin')
         Route::resource('tna', \App\Http\Controllers\Admin\TnaTemplateController::class)->except(['show'])->parameters(['tna' => 'tna']);
 
         Route::resource('suppliers', SupplierController::class)->except(['show']);
+        Route::resource('supplier-options', \App\Http\Controllers\Admin\SupplierOptionController::class)->only(['index', 'store', 'destroy']);
         Route::resource('buyers', BuyerController::class)->except(['show']);
 
         // Who works on a buyer. Assignment only — buyer_scope_mode is never
