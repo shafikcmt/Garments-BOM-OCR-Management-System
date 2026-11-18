@@ -43,10 +43,9 @@
     /* The signing line is only as long as its caption. */
     .po-sheet .sig .line { display: inline-block; border-top: 1px solid #111827; padding: 3px 2px 0; font-weight: bold; }
     .po-sheet .sig small { display: block; font-weight: normal; color: #6b7280; font-size: 8px; }
-    /* Payment and Delivery side by side, always the same height. */
-    .po-sheet .terms-pair td.cell { width: 50%; border: 1px solid #d1d5db; padding: 6px 8px; line-height: 1.5; }
-    .po-sheet .terms-pair td.gap { width: 10px; border: 0; padding: 0; }
-    .po-sheet .terms-pair td.head { background: #f3f4f6; padding: 3px 8px; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; line-height: 1.2; }
+    /* Payment and Delivery: one full-width label / value table. */
+    .po-sheet .terms-pair td.cell { border: 1px solid #d1d5db; padding: 5px 8px; line-height: 1.5; vertical-align: top; }
+    .po-sheet .terms-pair td.head { width: 24%; background: #f3f4f6; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; vertical-align: middle; }
 </style>
 <div class="po-sheet">
     @if($order->isPending())
@@ -103,15 +102,15 @@
         </tr>
     </table>
 
-    {{-- One row for both, so a five-line Terms of Delivery makes the Payment
-         box grow with it instead of breaking the layout. --}}
+    {{-- Payment and Delivery as one full-width table, label on the left:
+         a five-line Terms of Delivery leaves no empty box beside it. --}}
     <table class="terms-pair" style="margin-top:8px;">
         <tr>
-            <td class="cell head">Mode / Terms of Payment</td><td class="gap"></td>
-            <td class="cell head">Terms of Delivery</td>
+            <td class="cell head">Mode / Terms of Payment</td>
+            <td class="cell">{!! nl2br(e($order->payment_terms)) !!}</td>
         </tr>
         <tr>
-            <td class="cell">{!! nl2br(e($order->payment_terms)) !!}</td><td class="gap"></td>
+            <td class="cell head">Terms of Delivery</td>
             <td class="cell">
                 @foreach(array_values(array_filter(preg_split('/\r\n|\r|\n/', (string) $order->delivery_terms), fn ($l) => trim($l) !== '')) as $line)
                     {{ $line }}<br>
