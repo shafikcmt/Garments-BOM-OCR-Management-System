@@ -241,6 +241,7 @@ class ComparativeStatementController extends Controller
             'suppliers.*.address' => ['nullable', 'string', 'max:1000'],
             'suppliers.*.phone' => ['nullable', 'string', 'max:100'],
             'suppliers.*.terms' => ['nullable', 'string', 'max:2000'],
+            'suppliers.*.comment' => ['nullable', 'string', 'max:2000'],
             'recommended_supplier' => ['nullable', 'string', 'max:10'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.purchase_requisition_item_id' => ['required', 'integer', 'exists:purchase_requisition_items,id'],
@@ -281,7 +282,7 @@ class ComparativeStatementController extends Controller
         $suppliers = $cs
             ? $cs->suppliers->values()->map(fn ($s, $i) => [
                 'key' => (string) $i, 'general_stock_supplier_id' => $s->general_stock_supplier_id, 'name' => $s->name,
-                'address' => $s->address, 'phone' => $s->phone, 'terms' => $s->terms,
+                'address' => $s->address, 'phone' => $s->phone, 'terms' => $s->terms, 'comment' => $s->comment,
             ])->all()
             : [];
 

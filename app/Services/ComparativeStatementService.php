@@ -79,6 +79,7 @@ class ComparativeStatementService
                     'address' => $s['address'] ?? null,
                     'phone' => $s['phone'] ?? null,
                     'terms' => $s['terms'] ?? null,
+                    'comment' => filled($s['comment'] ?? null) ? trim((string) $s['comment']) : null,
                     'is_recommended' => (string) ($data['recommended_supplier'] ?? '') === $key,
                     'sort_order' => $i,
                 ]);

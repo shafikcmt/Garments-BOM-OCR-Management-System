@@ -111,6 +111,9 @@
                                 <textarea id="saddr{{ $k }}" name="suppliers[{{ $k }}][address]" rows="2" class="form-control form-control-sm mb-2" data-f="address" @unless($on) disabled @endunless>{{ $s['address'] ?? '' }}</textarea>
                                 <label class="form-label small" for="sterms{{ $k }}">Terms (VAT, credit)</label>
                                 <textarea id="sterms{{ $k }}" name="suppliers[{{ $k }}][terms]" rows="2" class="form-control form-control-sm mb-2" @unless($on) disabled @endunless>{{ $s['terms'] ?? 'Excluding VAT. One month credit along with work order.' }}</textarea>
+                                <label class="form-label small" for="scomment{{ $k }}">Comment <span class="text-muted">(optional)</span></label>
+                                <textarea id="scomment{{ $k }}" name="suppliers[{{ $k }}][comment]" rows="2" class="form-control form-control-sm mb-2"
+                                          placeholder="e.g. N.B. The model offered does not match the sample." @unless($on) disabled @endunless>{{ $s['comment'] ?? '' }}</textarea>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="recommended_supplier" id="rec{{ $k }}" value="{{ $k }}" @checked((string) ($state['recommended'] ?? '') === (string) $k) @unless($on) disabled @endunless>
                                     <label class="form-check-label small" for="rec{{ $k }}">Recommended supplier</label>

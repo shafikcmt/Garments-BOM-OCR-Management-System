@@ -11,7 +11,7 @@ class GsCsSupplier extends Model
 
     protected $fillable = [
         'gs_comparative_statement_id', 'general_stock_supplier_id', 'name', 'address', 'phone',
-        'terms', 'is_recommended', 'sort_order',
+        'terms', 'comment', 'is_recommended', 'sort_order',
     ];
 
     protected $casts = ['is_recommended' => 'boolean'];

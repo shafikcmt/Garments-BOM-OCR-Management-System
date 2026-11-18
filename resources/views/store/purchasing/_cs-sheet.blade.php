@@ -1,6 +1,6 @@
 {{--
     The Comparative Statement as printed: control box top right, one column group
-    per supplier, the chosen supplier highlighted, terms under each supplier,
+    per supplier, the lowest unit price of each item highlighted, terms under each supplier,
     recommendation, and the three sign-off boxes. Table markup only so DomPDF
     (landscape A4) and the screen draw the same sheet.
 --}}
@@ -19,6 +19,10 @@
     .cs-sheet .num { text-align: right; white-space: nowrap; }
     .cs-sheet .c { text-align: center; }
     .cs-sheet .chosen { background: #d9f0df; font-weight: bold; }
+    /* The lowest unit price of each item — that one cell, not the column. */
+    .cs-sheet .lowest { background: #d9f0df; font-weight: bold; }
+    /* The optional comment above a supplier's details. */
+    .cs-sheet .note { background: #fff4b8; font-weight: bold; padding: 2px 3px; margin-bottom: 4px; }
     .cs-sheet .tot td { background: #dde3ec; font-weight: bold; }
     .cs-sheet .terms { vertical-align: top; font-size: 8px; line-height: 1.45; }
     .cs-sheet .co { font-size: 12px; font-weight: bold; }
@@ -97,30 +101,36 @@
                     <td class="num">{{ $qty($item->qty) }}</td>
                     <td>{{ $item->specification }}</td>
                     <td>{{ $item->current_supplier }}</td>
+                    @php
+                        // The lowest quoted unit price for this item; a tie marks each.
+                        $prices = $suppliers->map(fn ($s) => $item->quoteFor($s->id)?->unit_price)->filter(fn ($p) => $p !== null && (float) $p > 0);
+                        $lowest = $prices->isNotEmpty() ? (float) $prices->min() : null;
+                    @endphp
                     @foreach($suppliers as $s)
                         @php
                             $quote = $item->quoteFor($s->id);
-                            $chosen = (int) $item->selected_supplier_id === (int) $s->id;
+                            $isLowest = $lowest !== null && $quote?->unit_price !== null && abs((float) $quote->unit_price - $lowest) < 0.00001;
                         @endphp
-                        <td class="{{ $chosen ? 'chosen' : '' }}">{{ $quote?->specification }}</td>
-                        <td class="num {{ $chosen ? 'chosen' : '' }}">{{ $quote?->unit_price !== null ? $fmt($quote->unit_price) : '' }}</td>
-                        <td class="num {{ $chosen ? 'chosen' : '' }}">{{ $quote?->unit_price !== null ? $fmt($item->qty * $quote->unit_price) : '' }}</td>
+                        <td>{{ $quote?->specification }}</td>
+                        <td class="num {{ $isLowest ? 'lowest' : '' }}">{{ $quote?->unit_price !== null ? $fmt($quote->unit_price) : '' }}</td>
+                        <td class="num">{{ $quote?->unit_price !== null ? $fmt($item->qty * $quote->unit_price) : '' }}</td>
                     @endforeach
                     <td>{{ $item->remarks }}</td>
                 </tr>
             @endforeach
             <tr class="tot">
-                <td colspan="6" style="background:#fff;border:0;"></td>
+                <td colspan="6" style="background:#fff;"></td>
                 @foreach($suppliers as $s)
                     <td colspan="2" class="c">Total</td>
                     <td class="num">{{ $fmt($cs->totalFor($s)) }}</td>
                 @endforeach
-                <td style="background:#fff;border:0;"></td>
+                <td style="background:#fff;"></td>
             </tr>
             <tr>
                 <td colspan="6"></td>
                 @foreach($suppliers as $s)
                     <td colspan="3" class="terms">
+                        @if(filled($s->comment))<div class="note">{!! nl2br(e($s->comment)) !!}</div>@endif
                         @if(filled($s->terms)){!! nl2br(e($s->terms)) !!}<br>@endif
                         <strong>{{ $s->name }}</strong><br>
                         @if(filled($s->address)){!! nl2br(e($s->address)) !!}<br>@endif
@@ -135,7 +145,7 @@
     <table class="nb" style="margin-top:3px;">
         <tr>
             <td class="num">Total of the suppliers chosen: <strong>{{ $fmt($cs->chosenTotal()) }}</strong>
-                <span class="muted">(highlighted; * = recommended supplier)</span></td>
+                <span class="muted">(lowest unit price highlighted; * = recommended supplier)</span></td>
         </tr>
     </table>
 

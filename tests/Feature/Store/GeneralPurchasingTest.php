@@ -869,3 +869,22 @@ it('lets the maker choose the signature boxes, and fills names from the workflow
 
     $this->actingAs($maker)->get(route('store.purchasing.cs.edit', $cs))->assertOk()->assertSee('Signature boxes on the printed form')->assertSee('Head of SCM');
 });
+
+it('highlights only the lowest unit price cell, and prints a supplier comment above the details', function () {
+    $sheet = gpApproved([['P/M Needle DBX1-FFG-16', 200], ['O/L Needle DCX27-FFG-16', 300]]);
+    $payload = gpPayload($sheet->items, [[88, 85], [140, 145]]);
+    $payload['suppliers'][0]['comment'] = 'N.B. The model offered does not match the sample.';
+
+    test()->actingAs(gpUser(['store.purchase_cs.create'], 'Maker'))->post(route('store.purchasing.cs.store'), $payload + ['action' => 'submit'])->assertSessionHasNoErrors();
+    $cs = GsComparativeStatement::latest('id')->firstOrFail()->load(['items.quotes', 'suppliers']);
+
+    expect($cs->suppliers[0]->comment)->toBe('N.B. The model offered does not match the sample.')
+        ->and($cs->suppliers[1]->comment)->toBeNull();
+
+    $html = view('store.purchasing._cs-sheet', ['cs' => $cs])->render();
+    // One lowest cell per line: 85 (KT) on line 1, 140 (Banani) on line 2; no whole-column highlight.
+    expect(substr_count($html, 'class="num lowest"'))->toBe(2)
+        ->and($html)->toContain('class="num lowest">85<')->toContain('class="num lowest">140<')
+        ->not->toContain('class="chosen"')
+        ->toContain('<div class="note">N.B. The model offered does not match the sample.</div>');
+});
