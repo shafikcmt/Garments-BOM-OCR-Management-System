@@ -45,10 +45,29 @@
                         </div>
                     </div>
 
-                    <div class="mb-2">
-                        <label class="form-label fw-semibold">Body (HTML)</label>
-                        <textarea name="body" rows="14" class="form-control" style="font-family:monospace;font-size:13px;" required>{{ $old ? old('body') : ($template->body ?? '') }}</textarea>
-                        <div class="form-text">Raw HTML allowed (e.g. &lt;p&gt;, &lt;strong&gt;, &lt;br&gt;). Senders see this as formatted text, not code. Use the placeholders on the right.</div>
+                    @php($bodyValue = $old ? old('body') : ($template->body ?? ''))
+                    <div class="mb-2 tpl-editor" data-labels='@json($placeholders)'>
+                        <label class="form-label fw-semibold">Email message</label>
+                        <div class="tpl-toolbar d-flex flex-wrap gap-1 mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-cmd="bold"><i class="bi bi-type-bold me-1" aria-hidden="true"></i>Bold</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-cmd="italic"><i class="bi bi-type-italic me-1" aria-hidden="true"></i>Italic</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-cmd="insertUnorderedList"><i class="bi bi-list-ul me-1" aria-hidden="true"></i>Bullet list</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-cmd="undo"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Undo</button>
+                        </div>
+                        <div class="tpl-surface form-control" contenteditable="true" role="textbox" aria-multiline="true" style="min-height:260px;height:auto;line-height:1.6;"></div>
+                        <textarea name="body" rows="14" class="form-control d-none tpl-source" style="font-family:monospace;font-size:13px;" required>{{ $bodyValue }}</textarea>
+
+                        <div class="small fw-semibold mt-3 mb-1">Insert data from the document <span class="text-muted fw-normal">(click where you want it, then click an item)</span></div>
+                        <div class="d-flex flex-wrap gap-1">
+                            @foreach($placeholders as $token => $desc)
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-token="{{ $token }}">{{ $desc }}</button>
+                            @endforeach
+                        </div>
+                        <div class="form-text">Type your message as in a normal letter. The blue boxes are filled in automatically (for example the buyer name) when the email opens. Senders can still change the text before sending.</div>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input tpl-html-toggle" type="checkbox" id="tplHtml{{ $type }}">
+                            <label class="form-check-label small text-muted" for="tplHtml{{ $type }}">Advanced: edit HTML code</label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -76,3 +95,4 @@
         <button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1" aria-hidden="true"></i>Save Template</button>
     </div>
 </form>
+

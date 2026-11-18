@@ -1104,6 +1104,17 @@ On the live server, every push to `master` runs the migrations by itself, and th
 
 ---
 
+### 7a. Email Templates (the standard email text)
+
+**Open it:** **Admin, Settings, Email Templates**. Two tabs: **Payment Request (PRA)** and **PO Booking to Supplier**.
+
+1. Change the **Subject** if needed.
+2. Write the **Email message** like a normal letter. Use **Bold**, **Italic** and **Bullet list** above the box. Plain text is pasted without formatting.
+3. To add data that changes each time (buyer name, season, PO number, supplier, amount...), click in the message where you want it, then click the matching blue item under **Insert data from the document**. It appears as a small blue box, for example *Buyer name(s)*, and is filled in automatically when the email opens. Delete a blue box like a normal word.
+4. Press **Save Template**. Senders can still change the text before they send.
+
+IT staff who prefer code can switch on **Advanced: edit HTML code**.
+
 ## 8. Common questions
 
 **Who makes the BOM? Is it created by the system after I upload the Excel?** The **merchant** makes it: either on screen with **Create BOM** (section 2.2a) or in an Excel file that is uploaded or imported (section 2.2). The system does **not invent** materials or consumption; they come from the merchant (from the buyer's tech pack or the costing). Once the BOM is in, the system takes over: it arranges every line under the right style, season and colour, **calculates** the formula columns, and passes it on to BOM approval, PO, payment, receiving and issue. Filling the materials from standard figures is built: see the Consumption Master (section 2.2b). Fully automatic BOM, without a merchant checking it, is not built and not planned.
