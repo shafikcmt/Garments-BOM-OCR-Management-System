@@ -148,7 +148,7 @@
                 <td colspan="4" class="blank"></td>
                 <td colspan="2" class="grand" style="text-align:right;">TOTAL (Tk)</td>
                 <td class="grand num">{{ $fmt($order->total_amount) }}</td>
-                <td class="blank"></td>
+                <td></td>
             </tr>
         </tbody>
     </table>
