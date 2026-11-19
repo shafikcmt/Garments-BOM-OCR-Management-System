@@ -935,7 +935,8 @@ it('lets the Reference No. be changed after the PO is checked, but not once canc
 
     $html = view('store.purchasing._po-sheet', ['order' => $po->fresh('items')])->render();
     // Consignee under the logo; Payment beside the Supplier, once.
-    expect($html)->toContain('class="ship-box"')->toContain('class="logo-box"')
+    expect($html)->toContain('class="lh"')->toContain('Consignee (Ship to)')
+        ->not->toContain('NOT YET CHECKED')->not->toContain('class="banner')
         ->and(substr_count($html, 'Mode / Terms of Payment'))->toBe(1)
         ->and($html)->not->toContain('#1e3a5f');
 });

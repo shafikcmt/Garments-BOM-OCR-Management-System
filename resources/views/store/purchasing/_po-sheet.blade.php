@@ -1,8 +1,8 @@
 {{--
     The Internal PO as printed: A4 portrait. Table markup only, so DomPDF and the
-    screen draw the same page. A draft is marked so it is never mistaken for an
-    authorised order. The BIN is the company's fixed number (config), printed
-    whatever an older PO has stored.
+    screen draw the same page. The status (draft, checked, cancelled) is shown on
+    the PO screen, not printed (owner, 2026-11-19). The BIN is the company's
+    fixed number (config), printed whatever an older PO has stored.
 --}}
 @php
     $fmt = fn ($n) => number_format((float) $n, 2);
@@ -21,15 +21,9 @@
     .po-sheet td, .po-sheet th { vertical-align: top; }
     .po-sheet .k { color: #6b7280; font-size: 7.5px; text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 2px; }
     .po-sheet .v { font-weight: bold; color: #111827; }
-    .po-sheet .banner { text-align: center; font-weight: bold; font-size: 9px; letter-spacing: .5px; padding: 4px 0; border: 1px solid; }
-    .po-sheet .banner.draft { color: #b45309; background: #fffbeb; border-color: #fcd34d; }
-    .po-sheet .banner.checked { color: #1d4ed8; background: #eff6ff; border-color: #93c5fd; }
-    .po-sheet .banner.cancelled { color: #b91c1c; background: #fef2f2; border-color: #fca5a5; }
     .po-sheet .title { font-size: 20px; font-weight: bold; letter-spacing: 3px; color: #374151; text-align: right; }
     .po-sheet .company { font-size: 12px; font-weight: bold; color: #111827; }
     .po-sheet .rule { border-top: 1px solid #9ca3af; margin: 8px 0 10px; }
-    .po-sheet .meta td { padding: 10px 6px 9px; border: 1px solid #d1d5db; width: 50%; }
-    .po-sheet .meta .k { margin-bottom: 1px; }
     .po-sheet .box { border: 1px solid #d1d5db; padding: 6px 8px; }
     .po-sheet .box-h { background: #f3f4f6; border: 1px solid #d1d5db; border-bottom: 0; padding: 3px 8px; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; }
     .po-sheet .items { margin-top: 10px; }
@@ -45,73 +39,48 @@
     /* The signing line is only as long as its caption. */
     .po-sheet .sig .line { display: inline-block; border-top: 1px solid #111827; padding: 3px 2px 0; font-weight: bold; }
     .po-sheet .sig small { display: block; font-weight: normal; color: #6b7280; font-size: 8px; }
-    .po-sheet .logo-box { border: 1px solid #d1d5db; }
-    .po-sheet .logo-box td { padding: 5px 8px; vertical-align: middle; }
+    .po-sheet .lh td.lbox { border: 1px solid #d1d5db; padding: 4px 8px; line-height: 1.45; vertical-align: middle; }
+    .po-sheet .lh td.mbox { width: 25%; border: 1px solid #d1d5db; padding: 4px 6px; vertical-align: middle; }
+    .po-sheet .lh td.gap { width: 10px; border: 0; padding: 0; }
     .po-sheet .pair td.ph { width: 50%; background: #f3f4f6; border: 1px solid #d1d5db; padding: 3px 8px; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; }
     .po-sheet .pair td.pc { border: 1px solid #d1d5db; padding: 5px 8px; line-height: 1.45; }
     .po-sheet .pair td.gap { width: 10px; border: 0; padding: 0; }
-    .po-sheet .ship-box { margin-top: 6px; border: 1px solid #d1d5db; padding: 3px 8px; line-height: 1.4; }
-    .po-sheet .ship-box .k { margin-bottom: 1px; }
     /* Delivery: one full-width label / value table. */
     .po-sheet .terms-pair td.cell { border: 1px solid #d1d5db; padding: 3px 8px; line-height: 1.4; vertical-align: top; }
     .po-sheet .terms-pair td.head { width: 24%; background: #f3f4f6; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; vertical-align: middle; }
 </style>
 <div class="po-sheet">
-    {{-- Top line: the status (draft, checked, cancelled) on the left and the
-         PURCHASE ORDER title on the right, in one row. --}}
-    <table style="margin-bottom:8px;">
-        <tr>
-            <td style="width:50%;vertical-align:middle;">
-                @if($order->isPending())
-                    <div class="banner {{ $status === \App\Models\GsPurchaseOrder::STATUS_CHECKED ? 'checked' : 'draft' }}">{{ $status === \App\Models\GsPurchaseOrder::STATUS_CHECKED ? 'CHECKED: NOT YET AUTHORISED' : 'DRAFT: NOT YET CHECKED OR AUTHORISED' }}</div>
-                @elseif($status === \App\Models\GsPurchaseOrder::STATUS_CANCELLED)
-                    <div class="banner cancelled">CANCELLED</div>
-                @endif
-            </td>
-            <td style="width:10px;"></td>
-            <td style="width:50%;vertical-align:middle;"><div class="title" style="line-height:1;">PURCHASE ORDER</div></td>
-        </tr>
-    </table>
+    {{-- The title, centred. The PO's status is shown on the screen, not printed. --}}
+    <div class="title" style="text-align:center;line-height:1;margin:6px 0 10px;">PURCHASE ORDER</div>
 
-    {{-- Letterhead: logo and company on the left, title and control numbers on the right. --}}
-    <table>
+    {{-- Letterhead as ONE table so the left and right boxes always line up:
+         the logo box spans the first two PO rows, the Consignee sits beside
+         the third. Same 50% | 10px | 50% split as the boxes below. --}}
+    <table class="lh">
         <tr>
-            {{-- Same split as the Supplier / Payment row below (50% | 10px | 50%),
-                 so the boxes' edges line up down the page. --}}
-            <td style="width:50%;vertical-align:top;">
-                {{-- Logo and company in one bordered box, lined up with the PO
-                     table on the right; the Consignee under it. --}}
-                <table class="logo-box">
+            <td rowspan="2" class="lbox" style="width:50%;padding:0;">
+                <table>
                     <tr>
-                        <td style="width:118px;">@include('store.purchasing._logo', ['width' => 110])</td>
-                        <td style="border-left:1px solid #d1d5db;line-height:1.45;">
+                        <td style="width:118px;padding:5px 8px;vertical-align:middle;">@include('store.purchasing._logo', ['width' => 110])</td>
+                        <td style="border-left:1px solid #d1d5db;padding:5px 8px;line-height:1.45;vertical-align:middle;">
                             <div class="company">Humana Apparels Pvt. Ltd</div>
                             <div>{!! nl2br(e($order->invoice_to)) !!}</div>
                         </td>
                     </tr>
                 </table>
-                <div class="ship-box">
-                    <span class="k">Consignee (Ship to)</span>
-                    <div>{!! nl2br(e($order->consignee)) !!}</div>
-                </div>
             </td>
-            <td style="width:10px;"></td>
-            <td style="width:50%;vertical-align:top;">
-                <table class="meta">
-                    <tr>
-                        <td><span class="k">PO No.</span><span class="v">{{ $order->po_no }}</span></td>
-                        <td><span class="k">Date</span><span class="v">{{ $order->po_date?->format('d-M-Y') }}</span></td>
-                    </tr>
-                    <tr>
-                        <td><span class="k">Reference No.</span><span class="v">{{ $order->reference_no ?: '-' }}</span></td>
-                        <td><span class="k">BIN</span><span class="v">{{ $bin }}</span></td>
-                    </tr>
-                    <tr>
-                        <td><span class="k">Dispatched through</span><span class="v">{{ $order->dispatched_through ?: '-' }}</span></td>
-                        <td><span class="k">Destination</span><span class="v">{{ $order->destination ?: '-' }}</span></td>
-                    </tr>
-                </table>
-            </td>
+            <td rowspan="3" class="gap"></td>
+            <td class="mbox"><span class="k">PO No.</span><span class="v">{{ $order->po_no }}</span></td>
+            <td class="mbox"><span class="k">Date</span><span class="v">{{ $order->po_date?->format('d-M-Y') }}</span></td>
+        </tr>
+        <tr>
+            <td class="mbox"><span class="k">Reference No.</span><span class="v">{{ $order->reference_no ?: '-' }}</span></td>
+            <td class="mbox"><span class="k">BIN</span><span class="v">{{ $bin }}</span></td>
+        </tr>
+        <tr>
+            <td class="lbox"><span class="k">Consignee (Ship to)</span>{!! nl2br(e($order->consignee)) !!}</td>
+            <td class="mbox"><span class="k">Dispatched through</span><span class="v">{{ $order->dispatched_through ?: '-' }}</span></td>
+            <td class="mbox"><span class="k">Destination</span><span class="v">{{ $order->destination ?: '-' }}</span></td>
         </tr>
     </table>
 
