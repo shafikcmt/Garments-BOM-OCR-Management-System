@@ -512,3 +512,70 @@ it('refuses an unknown supplier', function () {
         ]))
         ->assertSessionHasErrors('general_stock_supplier_id');
 });
+
+// --- Challan No: editable with store.receiving.edit_challan -----------------
+
+it('lets a user with the challan permission change the challan of the whole delivery', function () {
+    $item = purchaseItem();
+    $other = purchaseItem('Thread Cone', 'Cone');
+    $line = recordedPurchase($item, 100);
+    $sibling = recordedPurchase($other, 50);
+    $elsewhere = recordedPurchase($item, 10, ['rv_no' => 'GRN-002', 'challan_no' => 'CH-88']);
+
+    $editor = purchaseEditor(['store.receiving.view', 'store.receiving.edit', 'store.receiving.edit_challan']);
+
+    $this->actingAs($editor)
+        ->get(route('store.stock.purchases.index'))
+        ->assertOk()
+        ->assertSee('name="challan_no"', false);
+
+    $this->actingAs($editor)
+        ->put(route('store.stock.purchases.update', $line), purchasePayload($line, ['challan_no' => ' CH-78 ']))
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('success');
+
+    expect($line->fresh()->challan_no)->toBe('CH-78')
+        ->and($sibling->fresh()->challan_no)->toBe('CH-78')
+        ->and($elsewhere->fresh()->challan_no)->toBe('CH-88')
+        ->and($line->fresh()->rv_no)->toBe('GRN-001');
+});
+
+it('lets admin change the challan without a direct grant', function () {
+    $item = purchaseItem();
+    $line = recordedPurchase($item, 100);
+
+    \Spatie\Permission\Models\Role::findOrCreate('admin', 'web');
+    $admin = User::factory()->create(['status' => 1]);
+    $admin->assignRole('admin');
+
+    $this->actingAs($admin)
+        ->put(route('store.stock.purchases.update', $line), purchasePayload($line, ['challan_no' => 'CH-99']))
+        ->assertSessionHasNoErrors();
+
+    expect($line->fresh()->challan_no)->toBe('CH-99');
+});
+
+it('keeps the challan locked for an editor without the challan permission', function () {
+    $item = purchaseItem();
+    recordedPurchase($item, 100);
+
+    $this->actingAs(purchaseEditor())
+        ->get(route('store.stock.purchases.index'))
+        ->assertOk()
+        ->assertDontSee('name="challan_no"', false);
+});
+
+it('refuses a new challan that repeats a receipt already on it', function () {
+    $item = purchaseItem();
+    $supplier = GeneralStockSupplier::firstOrCreate(['name' => 'Test Supplier']);
+    $line = recordedPurchase($item, 100, ['general_stock_supplier_id' => $supplier->id]);
+    recordedPurchase($item, 10, ['rv_no' => 'GRN-002', 'challan_no' => 'CH-88', 'general_stock_supplier_id' => $supplier->id]);
+
+    $editor = purchaseEditor(['store.receiving.view', 'store.receiving.edit', 'store.receiving.edit_challan']);
+
+    $this->actingAs($editor)
+        ->put(route('store.stock.purchases.update', $line), purchasePayload($line, ['challan_no' => 'ch-88']))
+        ->assertSessionHasErrors('challan_no');
+
+    expect($line->fresh()->challan_no)->toBe('CH-77');
+});

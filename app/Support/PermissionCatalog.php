@@ -116,6 +116,7 @@ class PermissionCatalog
         'review' => 'Review',
         'accounts' => 'Accounts Stage',
         'final' => 'Prepare Final Requisition',
+        'edit_challan' => 'Edit Challan No',
     ];
 
     /**

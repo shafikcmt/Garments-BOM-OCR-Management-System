@@ -559,6 +559,8 @@ class StockPurchaseController extends Controller
     {
         $this->authorizeStoreEdit('stock purchase');
 
+        $canEditChallan = self::canEditChallan();
+
         $data = $request->validate([
             // Compared against the LOCKED challan date on the record, not one
             // from the request — the request cannot carry it.
@@ -570,7 +572,12 @@ class StockPurchaseController extends Controller
             'unit_price' => ['required', 'numeric', 'min:0'],
             'general_stock_supplier_id' => ['required', 'exists:general_stock_suppliers,id'],
             'remarks' => ['nullable', 'string', 'max:1000'],
-        ], self::requiredMessages() + [
+        ] + ($canEditChallan ? [
+            // Only for Admin and the users Admin has given
+            // store.receiving.edit_challan; for everyone else the field is
+            // locked on the form and anything posted is ignored.
+            'challan_no' => ['required', 'string', 'max:100'],
+        ] : []), self::requiredMessages() + [
             'unit_price.required' => 'Enter the unit price (0 if free of charge).',
             'rcv_date.after_or_equal' => 'The RCV date cannot be earlier than the challan date ('
                 .$stockPurchase->purchase_date->format('d-M-Y').').',
@@ -583,17 +590,46 @@ class StockPurchaseController extends Controller
 
         $supplierId = $data['general_stock_supplier_id'] ?? null;
 
-        // The same item + challan + supplier + remark as another recorded
-        // receipt is refused; this line is not its own twin.
-        $this->assertNoRepeatedLines(
-            [['stock_item_id' => $stockPurchase->stock_item_id, 'remarks' => $data['remarks'] ?? null]],
-            $stockPurchase->challan_no,
-            (int) $supplierId,
-            $stockPurchase,
-            fn () => 'remarks'
-        );
+        $newChallan = $canEditChallan ? trim((string) $data['challan_no']) : null;
+        $challanChanged = $newChallan !== null && $newChallan !== (string) $stockPurchase->challan_no;
 
-        DB::transaction(function () use ($data, $supplierId, $stockPurchase) {
+        if ($challanChanged) {
+            // The challan belongs to the whole delivery, so every line of it
+            // moves to the new number. None may then collide with a receipt
+            // already recorded under that number (same item, supplier, remark).
+            $delivery = $this->deliveryLines($stockPurchase)->get(['id', 'stock_item_id', 'remarks']);
+            $challan = self::normalized($newChallan);
+            $clash = StockPurchase::query()
+                ->whereIn('stock_item_id', $delivery->pluck('stock_item_id')->unique()->all())
+                ->whereRaw('LOWER(TRIM(challan_no)) = ?', [$challan])
+                ->where('general_stock_supplier_id', (int) $supplierId)
+                ->whereNotIn('id', $delivery->pluck('id')->all())
+                ->get(['stock_item_id', 'remarks'])
+                ->toBase()
+                ->map(fn ($line) => $line->stock_item_id.'|'.self::normalized($line->remarks));
+
+            $mine = $delivery->toBase()->map(fn ($line) => $line->stock_item_id.'|'.self::normalized(
+                $line->id === $stockPurchase->id ? ($data['remarks'] ?? null) : $line->remarks
+            ));
+
+            if ($clash->intersect($mine)->isNotEmpty()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'challan_no' => 'Challan '.$newChallan.' from this supplier already has the same item with the same remark. Use a different challan no.',
+                ]);
+            }
+        } else {
+            // The same item + challan + supplier + remark as another recorded
+            // receipt is refused; this line is not its own twin.
+            $this->assertNoRepeatedLines(
+                [['stock_item_id' => $stockPurchase->stock_item_id, 'remarks' => $data['remarks'] ?? null]],
+                $stockPurchase->challan_no,
+                (int) $supplierId,
+                $stockPurchase,
+                fn () => 'remarks'
+            );
+        }
+
+        DB::transaction(function () use ($data, $supplierId, $stockPurchase, $challanChanged, $newChallan) {
             $this->assertReceiptCovers($stockPurchase, (float) $data['qty']);
 
             $stockPurchase->update([
@@ -608,6 +644,7 @@ class StockPurchaseController extends Controller
             // correctly if the supplier is later renamed or deactivated.
             $this->deliveryLines($stockPurchase)->update([
                 'rcv_date' => $data['rcv_date'],
+                ...($challanChanged ? ['challan_no' => $newChallan] : []),
                 'general_stock_supplier_id' => $supplierId,
                 'supplier_name' => $supplierId
                     ? GeneralStockSupplier::find($supplierId)?->name
@@ -618,6 +655,16 @@ class StockPurchaseController extends Controller
         $this->syncPurchaseOrderOf($stockPurchase);
 
         return back()->with('success', 'Receiving line updated.');
+    }
+
+    /**
+     * Whether the current user may correct the Challan No of a recorded
+     * receiving. Admin always may (Gate::before); anyone else only when Admin
+     * has given them store.receiving.edit_challan, directly or through a role.
+     */
+    public static function canEditChallan(): bool
+    {
+        return auth()->user()?->can('store.receiving.edit_challan') ?? false;
     }
 
     /** @return array<string, string> the header messages a required field shows, create and edit alike */

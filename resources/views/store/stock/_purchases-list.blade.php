@@ -281,6 +281,8 @@
                 $value = fn (string $field, $stored = null) => $wasSubmitted ? old($field, $stored) : $stored;
                 $lineQty = rtrim(rtrim(number_format((float) $line->qty, 4, '.', ''), '0'), '.');
                 $siblingCount = $lines->get($line->group_key)?->count() ?? 1;
+                // Admin, or a user Admin gave store.receiving.edit_challan.
+                $canEditChallan = \App\Http\Controllers\Store\StockPurchaseController::canEditChallan();
             @endphp
             <div class="modal fade" id="editPurchase{{ $line->id }}" tabindex="-1" aria-labelledby="editPurchaseLabel{{ $line->id }}" aria-hidden="true">
                 <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
@@ -324,11 +326,22 @@
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-4">
-                                        <label class="form-label">Challan No<span class="gx-lock-tag">Locked</span></label>
-                                        <div class="gx-edit-locked">
-                                            <i class="bi bi-lock-fill" aria-hidden="true"></i>
-                                            <span class="gx-edit-locked-value">{{ $line->challan_no ?: '—' }}</span>
-                                        </div>
+                                        @if($canEditChallan)
+                                            <label class="form-label" for="editPurchaseChallan{{ $line->id }}">
+                                                Challan No <span class="text-danger">*</span>
+                                                @if($siblingCount > 1)<span class="gx-edit-scope">All {{ $siblingCount }} items</span>@endif
+                                            </label>
+                                            <input type="text" id="editPurchaseChallan{{ $line->id }}" name="challan_no" maxlength="100" required
+                                                   class="form-control @if($wasSubmitted && $errors->has('challan_no')) is-invalid @endif"
+                                                   value="{{ $value('challan_no', $line->challan_no) }}">
+                                            @if($wasSubmitted && $errors->has('challan_no'))<div class="invalid-feedback d-block">{{ \App\Support\FieldMessage::short($errors->first('challan_no')) }}</div>@endif
+                                        @else
+                                            <label class="form-label">Challan No<span class="gx-lock-tag">Locked</span></label>
+                                            <div class="gx-edit-locked">
+                                                <i class="bi bi-lock-fill" aria-hidden="true"></i>
+                                                <span class="gx-edit-locked-value">{{ $line->challan_no ?: '—' }}</span>
+                                            </div>
+                                        @endif
                                     </div>
                                     <div class="col-6 col-md-4">
                                         <label class="form-label">Challan Date<span class="gx-lock-tag">Locked</span></label>
@@ -339,8 +352,14 @@
                                     </div>
                                     <div class="col-12">
                                         <div class="gx-edit-hint">
-                                            These three identify the delivery and group its items together. To correct
-                                            one of them, delete this receiving and enter it again.
+                                            @if($canEditChallan)
+                                                These identify the delivery and group its items together. A new Challan No
+                                                is written to every item received under this GRN. To correct the GRN No or
+                                                Challan Date, delete this receiving and enter it again.
+                                            @else
+                                                These three identify the delivery and group its items together. To correct
+                                                one of them, delete this receiving and enter it again.
+                                            @endif
                                         </div>
                                     </div>
 
