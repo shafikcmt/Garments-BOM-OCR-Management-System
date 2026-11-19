@@ -16,7 +16,7 @@
     .po-sheet { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9.5px; color: #1f2937; }
     /* The whole order inside one frame, square, drawn tight on the body:
        no space between the frame and the content. */
-    .po-sheet { border: 1.2px solid #1e3a5f; padding: 0; }
+    .po-sheet { border: 1px solid #6b7280; padding: 0; }
     .po-sheet table { border-collapse: collapse; width: 100%; }
     .po-sheet td, .po-sheet th { vertical-align: top; }
     .po-sheet .k { color: #6b7280; font-size: 7.5px; text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 2px; }
@@ -25,28 +25,30 @@
     .po-sheet .banner.draft { color: #b45309; background: #fffbeb; border-color: #fcd34d; }
     .po-sheet .banner.checked { color: #1d4ed8; background: #eff6ff; border-color: #93c5fd; }
     .po-sheet .banner.cancelled { color: #b91c1c; background: #fef2f2; border-color: #fca5a5; }
-    .po-sheet .title { font-size: 20px; font-weight: bold; letter-spacing: 3px; color: #1e3a5f; text-align: right; }
+    .po-sheet .title { font-size: 20px; font-weight: bold; letter-spacing: 3px; color: #374151; text-align: right; }
     .po-sheet .company { font-size: 12px; font-weight: bold; color: #111827; }
-    .po-sheet .rule { border-top: 2px solid #1e3a5f; margin: 8px 0 10px; }
+    .po-sheet .rule { border-top: 1px solid #9ca3af; margin: 8px 0 10px; }
     .po-sheet .meta td { padding: 3px 6px; border: 1px solid #d1d5db; width: 50%; }
     .po-sheet .meta .k { margin-bottom: 1px; }
     .po-sheet .box { border: 1px solid #d1d5db; padding: 6px 8px; }
     .po-sheet .box-h { background: #f3f4f6; border: 1px solid #d1d5db; border-bottom: 0; padding: 3px 8px; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; }
     .po-sheet .items { margin-top: 10px; }
-    .po-sheet .items th { background: #1e3a5f; color: #fff; border: 1px solid #1e3a5f; padding: 5px 5px; font-size: 8.5px; text-align: center; vertical-align: middle; }
+    .po-sheet .items th { background: #e5e7eb; color: #111827; border: 1px solid #d1d5db; padding: 5px 5px; font-size: 8.5px; text-align: center; vertical-align: middle; }
     .po-sheet .items td { border: 1px solid #d1d5db; padding: 3px 5px; height: 14px; vertical-align: middle; }
     .po-sheet .items tr.alt td { background: #f9fafb; }
     .po-sheet .num { text-align: right; white-space: nowrap; }
     .po-sheet .c { text-align: center; }
     .po-sheet .totals td { padding: 4px 6px; }
-    .po-sheet .grand { background: #1e3a5f; color: #fff; font-weight: bold; font-size: 10.5px; }
-    .po-sheet .words { margin-top: 8px; padding: 6px 8px; background: #f3f4f6; border-left: 3px solid #1e3a5f; }
+    .po-sheet .grand { background: #e5e7eb; color: #111827; border: 1px solid #d1d5db; font-weight: bold; font-size: 10.5px; }
+    .po-sheet .words { margin-top: 8px; padding: 6px 8px; background: #f3f4f6; border-left: 3px solid #9ca3af; }
     .po-sheet .sig td { width: 50%; padding-top: 40px; }
     /* The signing line is only as long as its caption. */
     .po-sheet .sig .line { display: inline-block; border-top: 1px solid #111827; padding: 3px 2px 0; font-weight: bold; }
     .po-sheet .sig small { display: block; font-weight: normal; color: #6b7280; font-size: 8px; }
-    .po-sheet .pay-box { margin: 6px 8px 0 0; border: 1px solid #d1d5db; background: #f9fafb; padding: 3px 8px; font-size: 8.5px; line-height: 1.4; }
-    .po-sheet .pay-box .k { margin-bottom: 1px; }
+    .po-sheet .logo-box { border: 1px solid #d1d5db; }
+    .po-sheet .logo-box td { padding: 5px 8px; vertical-align: middle; }
+    .po-sheet .ship-box { margin-top: 6px; border: 1px solid #d1d5db; padding: 3px 8px; line-height: 1.4; }
+    .po-sheet .ship-box .k { margin-bottom: 1px; }
     /* Delivery: one full-width label / value table. */
     .po-sheet .terms-pair td.cell { border: 1px solid #d1d5db; padding: 3px 8px; line-height: 1.4; vertical-align: top; }
     .po-sheet .terms-pair td.head { width: 24%; background: #f3f4f6; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; vertical-align: middle; }
@@ -61,21 +63,21 @@
     {{-- Letterhead: logo and company on the left, title and control numbers on the right. --}}
     <table>
         <tr>
-            <td style="width:52%;vertical-align:bottom;">
-                {{-- Logo with the company beside it, using the space to its right. --}}
-                <table>
+            <td style="width:52%;vertical-align:bottom;padding-right:8px;">
+                {{-- Logo and company in one bordered box, lined up with the PO
+                     table on the right; the Consignee under it. --}}
+                <table class="logo-box">
                     <tr>
-                        <td style="width:118px;vertical-align:middle;padding-right:10px;">@include('store.purchasing._logo', ['width' => 110])</td>
-                        <td style="vertical-align:middle;border-left:1px solid #d1d5db;padding-left:10px;line-height:1.45;">
+                        <td style="width:118px;">@include('store.purchasing._logo', ['width' => 110])</td>
+                        <td style="border-left:1px solid #d1d5db;line-height:1.45;">
                             <div class="company">Humana Apparels Pvt. Ltd</div>
                             <div>{!! nl2br(e($order->invoice_to)) !!}</div>
                         </td>
                     </tr>
                 </table>
-                {{-- Mode / Terms of Payment in the space under the logo. --}}
-                <div class="pay-box">
-                    <span class="k">Mode / Terms of Payment</span>
-                    <div>{!! nl2br(e($order->payment_terms)) !!}</div>
+                <div class="ship-box">
+                    <span class="k">Consignee (Ship to)</span>
+                    <div>{!! nl2br(e($order->consignee)) !!}</div>
                 </div>
             </td>
             <td style="width:48%;">
@@ -100,27 +102,21 @@
 
     <div class="rule"></div>
 
-    {{-- Who we buy from and where it goes. --}}
-    <table>
-        <tr>
-            <td style="width:50%;padding-right:5px;">
-                <div class="box-h">Supplier (Bill from)</div>
-                <div class="box" style="min-height:44px;">
-                    <span class="v">{{ $order->supplier_name }}</span>
-                    @if(filled($order->supplier_address))<br>{!! nl2br(e($order->supplier_address)) !!}@endif
-                    @if(filled($order->supplier_phone))<br>Call: {{ $order->supplier_phone }}@endif
-                </div>
-            </td>
-            <td style="width:50%;padding-left:5px;">
-                <div class="box-h">Consignee (Ship to)</div>
-                <div class="box" style="min-height:44px;">{!! nl2br(e($order->consignee)) !!}</div>
-            </td>
-        </tr>
-    </table>
+    {{-- Who we buy from (the Consignee is in the letterhead, under the logo). --}}
+    <div class="box-h">Supplier (Bill from)</div>
+    <div class="box">
+        <span class="v">{{ $order->supplier_name }}</span>
+        @if(filled($order->supplier_address))<br>{!! nl2br(e($order->supplier_address)) !!}@endif
+        @if(filled($order->supplier_phone))<br>Call: {{ $order->supplier_phone }}@endif
+    </div>
 
-    {{-- Terms of Delivery, full width, label on the left (Payment sits under
-         the logo): a five-line Terms of Delivery leaves no empty box. --}}
+    {{-- Payment and Delivery, full width, label on the left: a five-line
+         Terms of Delivery leaves no empty box. --}}
     <table class="terms-pair" style="margin-top:8px;">
+        <tr>
+            <td class="cell head">Mode / Terms of Payment</td>
+            <td class="cell">{!! nl2br(e($order->payment_terms)) !!}</td>
+        </tr>
         <tr>
             <td class="cell head">Terms of Delivery</td>
             <td class="cell">

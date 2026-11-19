@@ -919,7 +919,7 @@ it('saves Terms of Delivery (up to 5 lines) and Remarks one line per box, and pr
         ->toContain('<div class="line">Checked By</div>')->toContain('<div class="line">Authorised Signatory</div>');
 });
 
-it('lets the Reference No. be changed after the PO is checked, but not once cancelled, and prints Payment under the logo', function () {
+it('lets the Reference No. be changed after the PO is checked, but not once cancelled, and prints the Consignee under the logo', function () {
     $cs = gpApprovedCs();
     $maker = gpUser();
     $this->actingAs($maker)->post(route('store.purchasing.po.store', $cs));
@@ -934,5 +934,8 @@ it('lets the Reference No. be changed after the PO is checked, but not once canc
     $this->actingAs($maker)->post(route('store.purchasing.po.reference', $po), ['reference_no' => 'X'])->assertForbidden();
 
     $html = view('store.purchasing._po-sheet', ['order' => $po->fresh('items')])->render();
-    expect($html)->toContain('class="pay-box"')->and(substr_count($html, 'Mode / Terms of Payment'))->toBe(1);
+    // Consignee under the logo; Payment back in the terms table, once.
+    expect($html)->toContain('class="ship-box"')->toContain('class="logo-box"')
+        ->and(substr_count($html, 'Mode / Terms of Payment'))->toBe(1)
+        ->and($html)->not->toContain('#1e3a5f');
 });
