@@ -21,14 +21,14 @@
     .po-sheet td, .po-sheet th { vertical-align: top; }
     .po-sheet .k { color: #6b7280; font-size: 7.5px; text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 2px; }
     .po-sheet .v { font-weight: bold; color: #111827; }
-    .po-sheet .banner { text-align: center; font-weight: bold; font-size: 9px; letter-spacing: .5px; padding: 3px 0; margin-bottom: 8px; border: 1px solid; }
+    .po-sheet .banner { text-align: center; font-weight: bold; font-size: 9px; letter-spacing: .5px; padding: 4px 0; border: 1px solid; }
     .po-sheet .banner.draft { color: #b45309; background: #fffbeb; border-color: #fcd34d; }
     .po-sheet .banner.checked { color: #1d4ed8; background: #eff6ff; border-color: #93c5fd; }
     .po-sheet .banner.cancelled { color: #b91c1c; background: #fef2f2; border-color: #fca5a5; }
     .po-sheet .title { font-size: 20px; font-weight: bold; letter-spacing: 3px; color: #374151; text-align: right; }
     .po-sheet .company { font-size: 12px; font-weight: bold; color: #111827; }
     .po-sheet .rule { border-top: 1px solid #9ca3af; margin: 8px 0 10px; }
-    .po-sheet .meta td { padding: 5px 6px; border: 1px solid #d1d5db; width: 50%; }
+    .po-sheet .meta td { padding: 10px 6px 9px; border: 1px solid #d1d5db; width: 50%; }
     .po-sheet .meta .k { margin-bottom: 1px; }
     .po-sheet .box { border: 1px solid #d1d5db; padding: 6px 8px; }
     .po-sheet .box-h { background: #f3f4f6; border: 1px solid #d1d5db; border-bottom: 0; padding: 3px 8px; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; }
@@ -57,11 +57,21 @@
     .po-sheet .terms-pair td.head { width: 24%; background: #f3f4f6; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; vertical-align: middle; }
 </style>
 <div class="po-sheet">
-    @if($order->isPending())
-        <div class="banner {{ $status === \App\Models\GsPurchaseOrder::STATUS_CHECKED ? 'checked' : 'draft' }}">{{ $status === \App\Models\GsPurchaseOrder::STATUS_CHECKED ? 'CHECKED: NOT YET AUTHORISED' : 'DRAFT: NOT YET CHECKED OR AUTHORISED' }}</div>
-    @elseif($status === \App\Models\GsPurchaseOrder::STATUS_CANCELLED)
-        <div class="banner cancelled">CANCELLED</div>
-    @endif
+    {{-- Top line: the status (draft, checked, cancelled) on the left and the
+         PURCHASE ORDER title on the right, in one row. --}}
+    <table style="margin-bottom:8px;">
+        <tr>
+            <td style="width:50%;vertical-align:middle;">
+                @if($order->isPending())
+                    <div class="banner {{ $status === \App\Models\GsPurchaseOrder::STATUS_CHECKED ? 'checked' : 'draft' }}">{{ $status === \App\Models\GsPurchaseOrder::STATUS_CHECKED ? 'CHECKED: NOT YET AUTHORISED' : 'DRAFT: NOT YET CHECKED OR AUTHORISED' }}</div>
+                @elseif($status === \App\Models\GsPurchaseOrder::STATUS_CANCELLED)
+                    <div class="banner cancelled">CANCELLED</div>
+                @endif
+            </td>
+            <td style="width:10px;"></td>
+            <td style="width:50%;vertical-align:middle;"><div class="title" style="line-height:1;">PURCHASE ORDER</div></td>
+        </tr>
+    </table>
 
     {{-- Letterhead: logo and company on the left, title and control numbers on the right. --}}
     <table>
@@ -87,8 +97,7 @@
             </td>
             <td style="width:10px;"></td>
             <td style="width:50%;vertical-align:top;">
-                <div class="title" style="line-height:1;margin-top:-2px;">PURCHASE ORDER</div>
-                <table class="meta" style="margin-top:8px;">
+                <table class="meta">
                     <tr>
                         <td><span class="k">PO No.</span><span class="v">{{ $order->po_no }}</span></td>
                         <td><span class="k">Date</span><span class="v">{{ $order->po_date?->format('d-M-Y') }}</span></td>
