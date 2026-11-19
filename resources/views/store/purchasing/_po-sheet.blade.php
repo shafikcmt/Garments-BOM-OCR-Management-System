@@ -7,8 +7,8 @@
 @php
     $fmt = fn ($n) => number_format((float) $n, 2);
     $qty = fn ($n) => rtrim(rtrim(number_format((float) $n, 4), '0'), '.');
-    // A few blank rows under the items, not a page of them: the body stays compact.
-    $rows = max(0, 5 - $order->items->count());
+    // The items table always shows at least 10 rows: the items, then blank rows.
+    $rows = max(0, 10 - $order->items->count());
     $bin = config('purchasing.po_defaults.bin_number');
     $status = $order->status;
 @endphp
