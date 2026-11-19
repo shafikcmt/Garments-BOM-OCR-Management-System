@@ -193,6 +193,18 @@ class PurchaseOrderService
         return $po->fresh('items');
     }
 
+    /** Change only the Reference No. — allowed at any status but Cancelled. */
+    public function updateReference(GsPurchaseOrder $po, ?string $reference): GsPurchaseOrder
+    {
+        if ($po->status === GsPurchaseOrder::STATUS_CANCELLED) {
+            throw ValidationException::withMessages(['reference_no' => 'A cancelled purchase order cannot be changed.']);
+        }
+
+        $po->update(['reference_no' => filled($reference) ? trim($reference) : null]);
+
+        return $po;
+    }
+
     /** Draft -> Checked: the Checked By box (approval point 1 of 2). */
     public function check(GsPurchaseOrder $po, User $user): GsPurchaseOrder
     {
@@ -278,6 +290,9 @@ class PurchaseOrderService
 
         return array_filter([
             'edit' => $po->isDraft() && $user->can('store.purchase_po.create'),
+            // Reference No. alone stays editable after the PO is checked or
+            // issued (a supplier's quotation ref often comes later); not once cancelled.
+            'reference' => $po->status !== GsPurchaseOrder::STATUS_CANCELLED && $user->can('store.purchase_po.create'),
             'check' => $po->isDraft() && $user->can('store.purchase_po.review') && (int) $po->created_by !== (int) $user->id,
             'send_back' => $po->status === GsPurchaseOrder::STATUS_CHECKED
                 && ($user->can('store.purchase_po.review') || $user->can('store.purchase_po.approve')),

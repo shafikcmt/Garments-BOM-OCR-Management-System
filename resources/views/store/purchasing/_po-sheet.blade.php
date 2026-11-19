@@ -45,7 +45,9 @@
     /* The signing line is only as long as its caption. */
     .po-sheet .sig .line { display: inline-block; border-top: 1px solid #111827; padding: 3px 2px 0; font-weight: bold; }
     .po-sheet .sig small { display: block; font-weight: normal; color: #6b7280; font-size: 8px; }
-    /* Payment and Delivery: one full-width label / value table. */
+    .po-sheet .pay-box { margin: 6px 8px 0 0; border: 1px solid #d1d5db; background: #f9fafb; padding: 3px 8px; font-size: 8.5px; line-height: 1.4; }
+    .po-sheet .pay-box .k { margin-bottom: 1px; }
+    /* Delivery: one full-width label / value table. */
     .po-sheet .terms-pair td.cell { border: 1px solid #d1d5db; padding: 3px 8px; line-height: 1.4; vertical-align: top; }
     .po-sheet .terms-pair td.head { width: 24%; background: #f3f4f6; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; vertical-align: middle; }
 </style>
@@ -59,7 +61,7 @@
     {{-- Letterhead: logo and company on the left, title and control numbers on the right. --}}
     <table>
         <tr>
-            <td style="width:52%;vertical-align:middle;">
+            <td style="width:52%;vertical-align:bottom;">
                 {{-- Logo with the company beside it, using the space to its right. --}}
                 <table>
                     <tr>
@@ -70,6 +72,11 @@
                         </td>
                     </tr>
                 </table>
+                {{-- Mode / Terms of Payment in the space under the logo. --}}
+                <div class="pay-box">
+                    <span class="k">Mode / Terms of Payment</span>
+                    <div>{!! nl2br(e($order->payment_terms)) !!}</div>
+                </div>
             </td>
             <td style="width:48%;">
                 <div class="title">PURCHASE ORDER</div>
@@ -111,13 +118,9 @@
         </tr>
     </table>
 
-    {{-- Payment and Delivery as one full-width table, label on the left:
-         a five-line Terms of Delivery leaves no empty box beside it. --}}
+    {{-- Terms of Delivery, full width, label on the left (Payment sits under
+         the logo): a five-line Terms of Delivery leaves no empty box. --}}
     <table class="terms-pair" style="margin-top:8px;">
-        <tr>
-            <td class="cell head">Mode / Terms of Payment</td>
-            <td class="cell">{!! nl2br(e($order->payment_terms)) !!}</td>
-        </tr>
         <tr>
             <td class="cell head">Terms of Delivery</td>
             <td class="cell">

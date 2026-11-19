@@ -637,6 +637,7 @@ Route::prefix('store/purchasing')
             Route::get('/po/{order}', [InternalPurchaseOrderController::class, 'show'])->name('po.show');
             Route::get('/po/{order}/edit', [InternalPurchaseOrderController::class, 'edit'])->name('po.edit');
             Route::put('/po/{order}', [InternalPurchaseOrderController::class, 'update'])->name('po.update');
+            Route::post('/po/{order}/reference', [InternalPurchaseOrderController::class, 'updateReference'])->name('po.reference');
             Route::post('/po/{order}/check', [InternalPurchaseOrderController::class, 'check'])->name('po.check');
             Route::post('/po/{order}/send-back', [InternalPurchaseOrderController::class, 'sendBack'])->name('po.send-back');
             Route::post('/po/{order}/authorise', [InternalPurchaseOrderController::class, 'authorise'])->name('po.authorise');

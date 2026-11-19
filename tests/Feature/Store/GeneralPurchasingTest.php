@@ -918,3 +918,21 @@ it('saves Terms of Delivery (up to 5 lines) and Remarks one line per box, and pr
         ->toContain('1. Supply to be completed as soon as possible.<br>2. Price is excluding VAT.<br>')
         ->toContain('<div class="line">Checked By</div>')->toContain('<div class="line">Authorised Signatory</div>');
 });
+
+it('lets the Reference No. be changed after the PO is checked, but not once cancelled, and prints Payment under the logo', function () {
+    $cs = gpApprovedCs();
+    $maker = gpUser();
+    $this->actingAs($maker)->post(route('store.purchasing.po.store', $cs));
+    $po = GsPurchaseOrder::firstOrFail();
+    $po->forceFill(['status' => GsPurchaseOrder::STATUS_CHECKED])->save();
+
+    $this->actingAs($maker)->get(route('store.purchasing.po.show', $po))->assertOk()->assertSee('Save Reference');
+    $this->actingAs($maker)->post(route('store.purchasing.po.reference', $po), ['reference_no' => 'QTN-2026-118'])->assertSessionHasNoErrors();
+    expect($po->fresh()->reference_no)->toBe('QTN-2026-118');
+
+    $po->forceFill(['status' => GsPurchaseOrder::STATUS_CANCELLED])->save();
+    $this->actingAs($maker)->post(route('store.purchasing.po.reference', $po), ['reference_no' => 'X'])->assertForbidden();
+
+    $html = view('store.purchasing._po-sheet', ['order' => $po->fresh('items')])->render();
+    expect($html)->toContain('class="pay-box"')->and(substr_count($html, 'Mode / Terms of Payment'))->toBe(1);
+});

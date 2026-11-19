@@ -114,6 +114,15 @@ class InternalPurchaseOrderController extends Controller
         return redirect()->route('store.purchasing.po.show', $order)->with('success', $order->po_no.' saved.');
     }
 
+    public function updateReference(Request $request, GsPurchaseOrder $order)
+    {
+        abort_unless(isset($this->service->allowed($order, $request->user())['reference']), 403, 'You cannot change this purchase order.');
+        $data = $request->validate(['reference_no' => ['nullable', 'string', 'max:100']]);
+        $this->service->updateReference($order, $data['reference_no'] ?? null);
+
+        return back()->with('success', $order->po_no.': Reference No. saved.');
+    }
+
     public function check(Request $request, GsPurchaseOrder $order)
     {
         abort_unless(isset($this->service->allowed($order, $request->user())['check']), 403, 'You cannot check this purchase order.');

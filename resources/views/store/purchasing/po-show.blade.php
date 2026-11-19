@@ -45,6 +45,20 @@
         <div class="alert alert-danger"><strong>Cancelled:</strong> {{ $order->cancel_reason }}</div>
     @endif
 
+    {{-- Reference No. can be changed at any status but Cancelled. --}}
+    @if(isset($allowed['reference']))
+        <form method="POST" action="{{ route('store.purchasing.po.reference', $order) }}" class="d-flex flex-wrap align-items-end gap-2 mb-3">
+            @csrf
+            <div>
+                <label class="form-label small mb-1" for="poReference">Reference No.</label>
+                <input type="text" id="poReference" name="reference_no" maxlength="100" value="{{ old('reference_no', $order->reference_no) }}"
+                       class="form-control form-control-sm @error('reference_no') is-invalid @enderror" style="min-width:220px;">
+            </div>
+            <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Save Reference</button>
+            @error('reference_no')<div class="text-danger small w-100">{{ $message }}</div>@enderror
+        </form>
+    @endif
+
     <div class="card gx-stock-card mb-3">
         <div class="gx-stock-card-body d-flex flex-wrap align-items-start gap-3">
             @if(isset($allowed['check']))
