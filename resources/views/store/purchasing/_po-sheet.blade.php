@@ -47,6 +47,9 @@
     .po-sheet .sig small { display: block; font-weight: normal; color: #6b7280; font-size: 8px; }
     .po-sheet .logo-box { border: 1px solid #d1d5db; }
     .po-sheet .logo-box td { padding: 5px 8px; vertical-align: middle; }
+    .po-sheet .pair td.ph { width: 50%; background: #f3f4f6; border: 1px solid #d1d5db; padding: 3px 8px; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; }
+    .po-sheet .pair td.pc { border: 1px solid #d1d5db; padding: 5px 8px; line-height: 1.45; }
+    .po-sheet .pair td.gap { width: 10px; border: 0; padding: 0; }
     .po-sheet .ship-box { margin-top: 6px; border: 1px solid #d1d5db; padding: 3px 8px; line-height: 1.4; }
     .po-sheet .ship-box .k { margin-bottom: 1px; }
     /* Delivery: one full-width label / value table. */
@@ -102,21 +105,26 @@
 
     <div class="rule"></div>
 
-    {{-- Who we buy from (the Consignee is in the letterhead, under the logo). --}}
-    <div class="box-h">Supplier (Bill from)</div>
-    <div class="box">
-        <span class="v">{{ $order->supplier_name }}</span>
-        @if(filled($order->supplier_address))<br>{!! nl2br(e($order->supplier_address)) !!}@endif
-        @if(filled($order->supplier_phone))<br>Call: {{ $order->supplier_phone }}@endif
-    </div>
+    {{-- Who we buy from, and on what payment terms, side by side and always
+         the same height (the Consignee is in the letterhead, under the logo). --}}
+    <table class="pair">
+        <tr>
+            <td class="ph">Supplier (Bill from)</td><td class="gap"></td><td class="ph">Mode / Terms of Payment</td>
+        </tr>
+        <tr>
+            <td class="pc">
+                <span class="v">{{ $order->supplier_name }}</span>
+                @if(filled($order->supplier_address))<br>{!! nl2br(e($order->supplier_address)) !!}@endif
+                @if(filled($order->supplier_phone))<br>Call: {{ $order->supplier_phone }}@endif
+            </td>
+            <td class="gap"></td>
+            <td class="pc">{!! nl2br(e($order->payment_terms)) !!}</td>
+        </tr>
+    </table>
 
-    {{-- Payment and Delivery, full width, label on the left: a five-line
+    {{-- Terms of Delivery, full width, label on the left: a five-line
          Terms of Delivery leaves no empty box. --}}
     <table class="terms-pair" style="margin-top:8px;">
-        <tr>
-            <td class="cell head">Mode / Terms of Payment</td>
-            <td class="cell">{!! nl2br(e($order->payment_terms)) !!}</td>
-        </tr>
         <tr>
             <td class="cell head">Terms of Delivery</td>
             <td class="cell">
