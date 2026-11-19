@@ -33,6 +33,8 @@
     .po-sheet .num { text-align: right; white-space: nowrap; }
     .po-sheet .c { text-align: center; }
     .po-sheet .totals td { padding: 4px 6px; }
+    .po-sheet .items tr.total-row td.blank { border: 0; background: #fff; }
+    .po-sheet .items tr.total-row td { height: 18px; padding: 4px 5px; }
     .po-sheet .grand { background: #e5e7eb; color: #111827; border: 1px solid #d1d5db; font-weight: bold; font-size: 10.5px; }
     .po-sheet .words { margin-top: 8px; padding: 6px 8px; background: #f3f4f6; border-left: 3px solid #9ca3af; }
     .po-sheet .sig td { width: 50%; padding-top: 40px; }
@@ -141,15 +143,14 @@
             @for($r = 0; $r < $rows; $r++)
                 <tr class="{{ ($order->items->count() + $r) % 2 ? 'alt' : '' }}"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
             @endfor
+            {{-- The total in the items table itself, so it sits under Amount. --}}
+            <tr class="total-row">
+                <td colspan="4" class="blank"></td>
+                <td colspan="2" class="grand" style="text-align:right;">TOTAL (Tk)</td>
+                <td class="grand num">{{ $fmt($order->total_amount) }}</td>
+                <td class="blank"></td>
+            </tr>
         </tbody>
-    </table>
-
-    <table class="totals" style="margin-top:-1px;">
-        <tr>
-            <td style="width:62%;"></td>
-            <td class="grand" style="width:16%;text-align:right;">TOTAL (Tk)</td>
-            <td class="grand num" style="width:22%;">{{ $fmt($order->total_amount) }}</td>
-        </tr>
     </table>
 
     <div class="words"><span class="k">Amount Chargeable (in words)</span><span class="v">{{ \App\Support\AmountInWords::taka($order->total_amount) }}</span></div>

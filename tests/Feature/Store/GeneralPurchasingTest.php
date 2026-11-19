@@ -940,3 +940,14 @@ it('lets the Reference No. be changed after the PO is checked, but not once canc
         ->and(substr_count($html, 'Mode / Terms of Payment'))->toBe(1)
         ->and($html)->not->toContain('#1e3a5f');
 });
+
+it('prints the PO total inside the items table, under the Amount column', function () {
+    $cs = gpApprovedCs();
+    $this->actingAs(gpUser())->post(route('store.purchasing.po.store', $cs));
+    $po = GsPurchaseOrder::firstOrFail()->load('items');
+
+    $html = view('store.purchasing._po-sheet', ['order' => $po])->render();
+    // 4 + 2 + Amount + Remarks = the 8 item columns.
+    expect($html)->toContain('<tr class="total-row">')->not->toContain('class="totals"')
+        ->and(preg_match('/<tr class="total-row">\s*<td colspan="4" class="blank"><\/td>\s*<td colspan="2" class="grand"[^>]*>TOTAL \(Tk\)<\/td>\s*<td class="grand num">[^<]+<\/td>\s*<td class="blank"><\/td>/', $html))->toBe(1);
+});
