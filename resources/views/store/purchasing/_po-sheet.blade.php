@@ -28,7 +28,7 @@
     .po-sheet .title { font-size: 20px; font-weight: bold; letter-spacing: 3px; color: #374151; text-align: right; }
     .po-sheet .company { font-size: 12px; font-weight: bold; color: #111827; }
     .po-sheet .rule { border-top: 1px solid #9ca3af; margin: 8px 0 10px; }
-    .po-sheet .meta td { padding: 3px 6px; border: 1px solid #d1d5db; width: 50%; }
+    .po-sheet .meta td { padding: 5px 6px; border: 1px solid #d1d5db; width: 50%; }
     .po-sheet .meta .k { margin-bottom: 1px; }
     .po-sheet .box { border: 1px solid #d1d5db; padding: 6px 8px; }
     .po-sheet .box-h { background: #f3f4f6; border: 1px solid #d1d5db; border-bottom: 0; padding: 3px 8px; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; }
@@ -66,7 +66,9 @@
     {{-- Letterhead: logo and company on the left, title and control numbers on the right. --}}
     <table>
         <tr>
-            <td style="width:52%;vertical-align:bottom;padding-right:8px;">
+            {{-- Same split as the Supplier / Payment row below (50% | 10px | 50%),
+                 so the boxes' edges line up down the page. --}}
+            <td style="width:50%;vertical-align:top;">
                 {{-- Logo and company in one bordered box, lined up with the PO
                      table on the right; the Consignee under it. --}}
                 <table class="logo-box">
@@ -83,9 +85,10 @@
                     <div>{!! nl2br(e($order->consignee)) !!}</div>
                 </div>
             </td>
-            <td style="width:48%;">
-                <div class="title">PURCHASE ORDER</div>
-                <table class="meta" style="margin-top:6px;">
+            <td style="width:10px;"></td>
+            <td style="width:50%;vertical-align:top;">
+                <div class="title" style="line-height:1;margin-top:-2px;">PURCHASE ORDER</div>
+                <table class="meta" style="margin-top:8px;">
                     <tr>
                         <td><span class="k">PO No.</span><span class="v">{{ $order->po_no }}</span></td>
                         <td><span class="k">Date</span><span class="v">{{ $order->po_date?->format('d-M-Y') }}</span></td>
