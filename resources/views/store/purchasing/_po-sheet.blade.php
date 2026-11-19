@@ -7,7 +7,8 @@
 @php
     $fmt = fn ($n) => number_format((float) $n, 2);
     $qty = fn ($n) => rtrim(rtrim(number_format((float) $n, 4), '0'), '.');
-    $rows = max(0, 10 - $order->items->count());
+    // A few blank rows under the items, not a page of them: the body stays compact.
+    $rows = max(0, 5 - $order->items->count());
     $bin = config('purchasing.po_defaults.bin_number');
     $status = $order->status;
 @endphp
@@ -32,7 +33,7 @@
     .po-sheet .box-h { background: #f3f4f6; border: 1px solid #d1d5db; border-bottom: 0; padding: 3px 8px; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; }
     .po-sheet .items { margin-top: 10px; }
     .po-sheet .items th { background: #1e3a5f; color: #fff; border: 1px solid #1e3a5f; padding: 5px 5px; font-size: 8.5px; text-align: center; vertical-align: middle; }
-    .po-sheet .items td { border: 1px solid #d1d5db; padding: 4px 5px; height: 16px; vertical-align: middle; }
+    .po-sheet .items td { border: 1px solid #d1d5db; padding: 3px 5px; height: 14px; vertical-align: middle; }
     .po-sheet .items tr.alt td { background: #f9fafb; }
     .po-sheet .num { text-align: right; white-space: nowrap; }
     .po-sheet .c { text-align: center; }
@@ -44,7 +45,7 @@
     .po-sheet .sig .line { display: inline-block; border-top: 1px solid #111827; padding: 3px 2px 0; font-weight: bold; }
     .po-sheet .sig small { display: block; font-weight: normal; color: #6b7280; font-size: 8px; }
     /* Payment and Delivery: one full-width label / value table. */
-    .po-sheet .terms-pair td.cell { border: 1px solid #d1d5db; padding: 5px 8px; line-height: 1.5; vertical-align: top; }
+    .po-sheet .terms-pair td.cell { border: 1px solid #d1d5db; padding: 3px 8px; line-height: 1.4; vertical-align: top; }
     .po-sheet .terms-pair td.head { width: 24%; background: #f3f4f6; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; vertical-align: middle; }
 </style>
 <div class="po-sheet">
@@ -58,9 +59,16 @@
     <table>
         <tr>
             <td style="width:52%;vertical-align:middle;">
-                @include('store.purchasing._logo', ['width' => 110])
-                <div class="company" style="margin-top:1px;">Humana Apparels Pvt. Ltd</div>
-                <div>{!! nl2br(e($order->invoice_to)) !!}</div>
+                {{-- Logo with the company beside it, using the space to its right. --}}
+                <table>
+                    <tr>
+                        <td style="width:118px;vertical-align:middle;padding-right:10px;">@include('store.purchasing._logo', ['width' => 110])</td>
+                        <td style="vertical-align:middle;border-left:1px solid #d1d5db;padding-left:10px;line-height:1.45;">
+                            <div class="company">Humana Apparels Pvt. Ltd</div>
+                            <div>{!! nl2br(e($order->invoice_to)) !!}</div>
+                        </td>
+                    </tr>
+                </table>
             </td>
             <td style="width:48%;">
                 <div class="title">PURCHASE ORDER</div>
