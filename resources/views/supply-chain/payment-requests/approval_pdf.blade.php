@@ -212,18 +212,15 @@
                     <img src="{{ $sign['src'] }}" alt="signature" class="sign-img">
                     <div class="sign-line"></div>
                     <div class="sign-meta">
-                        @if($sign['name'])<div class="sign-name">{{ $sign['name'] }}</div>@endif
                         @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
-                        <div>{{ !empty($sign['date']) ? 'Signature & Date: ' . $sign['date'] : 'Signature & Date' }}</div>
+                        <div>Signature &amp; Date</div>
                     </div>
                 @elseif(!empty($sign['pending']))
                     {{-- Not yet signed. The name (when one person is expected)
                          is shown to help whoever is chasing the paperwork, and
                          the caption is what stops it reading as an endorsement.
                          No image, ever, on a pending block. --}}
-                    <div class="sign-text">
-                        @if($sign['name'])<span class="sign-name">{{ $sign['name'] }}</span>@endif
-                    </div>
+                    <div class="sign-text">&nbsp;</div>
                     <div class="sign-line"></div>
                     <div class="sign-meta">
                         @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
@@ -231,10 +228,7 @@
                     </div>
                 @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
                     {{-- Actor known but no signature image uploaded: typed name + date --}}
-                    <div class="sign-text">
-                        @if($sign['name'])<span class="sign-name">{{ $sign['name'] }}</span>@endif
-                        @if($sign['date'])<span> — {{ $sign['date'] }}</span>@endif
-                    </div>
+                    <div class="sign-text">&nbsp;</div>
                     <div class="sign-line"></div>
                     <div class="sign-meta">
                         @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif

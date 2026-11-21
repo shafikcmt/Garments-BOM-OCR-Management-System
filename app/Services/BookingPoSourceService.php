@@ -270,7 +270,12 @@ class BookingPoSourceService
         // PO number so PI Amount, Budget, Savings and Qty reflect the WHOLE PO
         // (matching the Booking Format total) instead of only the primary line.
         // Single-row bookings have no siblings, so their output is unchanged.
-        $style = $this->sourceValueForBookingPo($bookingPo, 'style') ?: $bookingPo->style_name;
+        // The style's own number first (e.g. 100247242MN). The wider 'style' group
+        // also matches Contract Number columns (HAPLMACYS/SU27/09) and, reading
+        // cells in sheet order, could return one of those instead of the style.
+        $style = $this->sourceValueForBookingPo($bookingPo, 'style_name')
+            ?: $this->sourceValueForBookingPo($bookingPo, 'style')
+            ?: $bookingPo->style_name;
         $sapCode = $this->sourceValueForBookingPo($bookingPo, 'sap_code') ?: $bookingPo->supplier_article;
         $materialType = $this->sourceValueForBookingPo($bookingPo, 'material_type') ?: $bookingPo->item_type;
         $materialDescription = $this->sourceValueForBookingPo($bookingPo, 'material_description') ?: $bookingPo->description ?: $bookingPo->item_name;
@@ -304,7 +309,7 @@ class BookingPoSourceService
             }
 
             $piNumber = $this->joinDistinct([$piNumber, $this->sourceValueForRow($siblingRow, 'pi_number')]) ?: $piNumber;
-            $style = $this->joinDistinct([$style, $this->sourceValueForRow($siblingRow, 'style')]) ?: $style;
+            $style = $this->joinDistinct([$style, $this->sourceValueForRow($siblingRow, 'style_name') ?: $this->sourceValueForRow($siblingRow, 'style')]) ?: $style;
             $sapCode = $this->joinDistinct([$sapCode, $this->sourceValueForRow($siblingRow, 'sap_code')]) ?: $sapCode;
             $materialType = $this->joinDistinct([$materialType, $this->sourceValueForRow($siblingRow, 'material_type')]) ?: $materialType;
             $materialDescription = $this->joinDistinct([$materialDescription, $this->sourceValueForRow($siblingRow, 'material_description')]) ?: $materialDescription;
@@ -441,7 +446,7 @@ class BookingPoSourceService
 
         return array_replace($base, [
             'excel_row_id' => $isPrimary ? $bookingPo->excel_row_id : $row->id,
-            'style_name' => $read('style') ?: $fallback($bookingPo->style_name),
+            'style_name' => $read('style_name') ?: $read('style') ?: $fallback($bookingPo->style_name),
             'sap_code' => $read('sap_code') ?: $fallback($bookingPo->supplier_article),
             'material_type' => $read('material_type') ?: $fallback($bookingPo->item_type),
             'material_description' => $read('material_description')
