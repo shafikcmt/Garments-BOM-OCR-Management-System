@@ -11,11 +11,14 @@
         $groupQtyTotal = $row->booking_group_qty_total ?? null;
         $displayQty = $groupCount > 1 && $groupQtyTotal !== null ? $groupQtyTotal : $qtyValue;
         $groupItems = collect($row->booking_group_items ?? [])->filter()->unique()->values();
+        $ppTotal = (float) ($row->booking_group_pp_total ?? 0);
         if ($isApplied && $po && !empty($po->booking_data['items'])) {
             $groupCount = count($po->booking_data['items']);
             $groupItems = collect($po->booking_data['items'])->pluck('item_name')->filter()->unique()->values();
             $displayQty = $po->qty !== null && $po->qty !== '' ? $po->qty : $displayQty;
+            $ppTotal = collect($po->booking_data['items'])->sum(fn ($item) => \App\Support\PpQty::number($item['pp_qty'] ?? null));
         }
+        $qtyNumber = is_numeric(str_replace(',', '', (string) $displayQty)) ? (float) str_replace(',', '', (string) $displayQty) : null;
     @endphp
     <tr data-row-id="{{ $row->id }}" data-po-id="{{ $po?->id }}" data-status="{{ $isApplied ? 'applied' : 'pending' }}">
         <td class="text-center">
@@ -39,7 +42,14 @@
         </td>
         {{-- po-num: right-aligned with tabular figures, so quantities line up
              digit-for-digit down the column. --}}
-        <td class="po-num fw-bold">{{ $displayQty !== '' && $displayQty !== null ? $displayQty : '-' }}</td>
+        <td class="po-num fw-bold">
+            {{ $displayQty !== '' && $displayQty !== null ? $displayQty : '-' }}
+            {{-- PP Qty is added on the PO as Total Qty; show it so the list
+                 agrees with the Total Qty the preview prints. --}}
+            @if($ppTotal > 0 && $qtyNumber !== null)
+                <div class="small text-muted fw-normal">+ {{ rtrim(rtrim(number_format($ppTotal, 2, '.', ''), '0'), '.') }} PP = {{ rtrim(rtrim(number_format($qtyNumber + $ppTotal, 2, '.', ''), '0'), '.') }}</div>
+            @endif
+        </td>
         <td class="text-center action-cell">
             @if($isApplied)
                 <div class="d-inline-flex align-items-center justify-content-center gap-2 booking-action-wrap">

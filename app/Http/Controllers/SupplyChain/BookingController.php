@@ -1511,6 +1511,12 @@ class BookingController extends Controller
         $wanted = array_values(array_unique(array_merge(
             $this->headerIdsForGroup('item'),
             $this->headerIdsForGroup('qty'),
+            // Booking Qty is the Materials Ordered column (bookingQtyValueFor()
+            // reads it first) and is NOT part of the 'qty' group, so without it
+            // a grouped row fell back to Materials To Be Ordered and its total
+            // disagreed with the booking preview and the PO.
+            $this->headerIdsForGroup('materials_ordered'),
+            $this->headerIdsForGroup('pp_qty'),
             $this->quantityCalculationHeaderIds(),
         )));
 
@@ -1523,24 +1529,27 @@ class BookingController extends Controller
 
             $items = [];
             $qty = 0.0;
+            $ppQty = 0.0;
 
             foreach (array_chunk($members, 400) as $chunk) {
                 ExcelRow::query()
                     ->whereIn('id', $chunk)
                     ->with(['cells' => fn ($cells) => $cells->whereIn('header_id', $wanted ?: [0])->with('header')])
                     ->get(['id'])
-                    ->each(function (ExcelRow $member) use (&$items, &$qty) {
+                    ->each(function (ExcelRow $member) use (&$items, &$qty, &$ppQty) {
                         $item = $this->valueFor($member, 'item');
                         if ($item !== null && trim($item) !== '') {
                             $items[$this->normalize($item)] = trim($item);
                         }
                         $qty += (float) ($this->numericValue($this->bookingQtyValueFor($member)) ?? 0);
+                        $ppQty += \App\Support\PpQty::number($this->valueFor($member, 'pp_qty'));
                     });
             }
 
             $row->booking_group_count = count($members);
             $row->booking_group_items = array_values($items);
             $row->booking_group_qty_total = $qty;
+            $row->booking_group_pp_total = $ppQty;
         }
     }
 
@@ -1620,6 +1629,7 @@ class BookingController extends Controller
             $row->booking_status = $this->rowBookingStatus($row);
             $row->booking_group_count = 1;
             $row->booking_group_qty_total = $this->numericValue($row->booking_preview['qty'] ?? null);
+            $row->booking_group_pp_total = \App\Support\PpQty::number($row->booking_preview['pp_qty'] ?? null);
             $row->booking_group_items = [$row->booking_preview['item_name'] ?? null];
 
             $groupKey = $this->bookingGroupKey($row->booking_preview);
@@ -1629,6 +1639,7 @@ class BookingController extends Controller
                     $existing = $seenGroups[$groupKey];
                     $existing->booking_group_count = (int) ($existing->booking_group_count ?? 1) + 1;
                     $existing->booking_group_qty_total = (float) ($existing->booking_group_qty_total ?? 0) + (float) ($this->numericValue($row->booking_preview['qty'] ?? null) ?? 0);
+                    $existing->booking_group_pp_total = (float) ($existing->booking_group_pp_total ?? 0) + \App\Support\PpQty::number($row->booking_preview['pp_qty'] ?? null);
                     $items = collect($existing->booking_group_items ?? [])
                         ->push($row->booking_preview['item_name'] ?? null)
                         ->filter()
