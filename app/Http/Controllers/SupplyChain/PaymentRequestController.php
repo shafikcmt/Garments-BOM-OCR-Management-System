@@ -1995,7 +1995,20 @@ class PaymentRequestController extends Controller
         // .xlsx groups them the same way the preview and the PDF do.
         $styleMerges = [];
 
+        // Height each body row needs for its longest wrapping cell (8pt text,
+        // about 11pt a line). Collected here, applied with the other row heights.
+        $bodyHeights = [];
+
         foreach ($approvalRows as $row) {
+            $wrapLines = max(
+                1,
+                (int) ceil(mb_strlen((string) ($row['comments'] ?? '')) / 17),
+                (int) ceil(mb_strlen((string) ($row['vendor_name'] ?? '')) / 24),
+                (int) ceil(mb_strlen((string) ($row['material_type'] ?? '')) / 17),
+                (int) ceil(mb_strlen((string) ($row['material_po_number'] ?? '')) / 22),
+                (int) ceil(mb_strlen((string) ($row['material_pi_number'] ?? '')) / 23),
+            );
+            $bodyHeights[$rowNo] = max(28, $wrapLines * 11 + 6);
             $span = (int) ($row['style_rowspan'] ?? 1);
             if ($span > 1) {
                 $styleMerges[] = ['B' . $rowNo, 'B' . ($rowNo + $span - 1)];
@@ -2087,7 +2100,7 @@ class PaymentRequestController extends Controller
         // footer below is positioned from their sum.
         $rowHeights = [1 => 36, 2 => 22, 3 => 22, 4 => 22, 5 => 24, 6 => 24, 7 => 24, 8 => 24, 9 => 22, 10 => 24, $tableStart => 30];
         foreach (range($tableStart + 1, $lastBodyRow) as $bodyRow) {
-            $rowHeights[$bodyRow] = 28;
+            $rowHeights[$bodyRow] = $bodyHeights[$bodyRow] ?? 28;
         }
         $grandRow = $lastBodyRow + 1;
         $rowHeights[$grandRow] = 26;
@@ -2095,11 +2108,17 @@ class PaymentRequestController extends Controller
         // SIGNATURES SIT IN THE PAGE FOOTER. Excel cannot pin cells to the bottom
         // of a printed page, so blank spacer rows are sized to push the block down
         // until it ends at the foot of the page it starts on. A4 landscape at the
-        // fit-to-width scale holds about 690pt of sheet rows; a short PRA gets its
+        // fit-to-width scale holds about 4pt of sheet rows per column character; a short PRA gets its
         // signatures at the bottom of page 1, a long one at the bottom of its last
         // page.
         $signHeight = 22 + 40 + 22;
-        $pageHeight = 690;
+        // The page holds more sheet rows the narrower the sheet is, because
+        // fit-to-width shrinks a wide table. Measured on a real print preview, an
+        // A4 landscape page carries about 4.15pt of rows per character of total
+        // column width; 4.0 keeps a safety margin so the signatures never spill
+        // onto a second page.
+        $columnWidths = ['A' => 16, 'B' => 16, 'C' => 14, 'D' => 20, 'E' => 18, 'F' => 19, 'G' => 14, 'H' => 16, 'I' => 16, 'J' => 14, 'K' => 15, 'L' => 14, 'M' => 14, 'N' => 1.5];
+        $pageHeight = (int) round(array_sum($columnWidths) * 4.0);
         $usedHeight = array_sum($rowHeights);
         $spacer = $pageHeight - ($usedHeight % $pageHeight) - $signHeight - 6;
         if ($spacer < 14) {
@@ -2168,7 +2187,6 @@ class PaymentRequestController extends Controller
         // Column widths follow their COLUMN through the reorder (A IHOD, B Style,
         // C PCD, D Vendor, E PO, F PI, G Item, H Pay Term, I Ex Mill, J Comments,
         // K Budget, L Amount). M is the narrow print spacer.
-        $columnWidths = ['A' => 16, 'B' => 16, 'C' => 14, 'D' => 20, 'E' => 18, 'F' => 19, 'G' => 14, 'H' => 16, 'I' => 16, 'J' => 14, 'K' => 15, 'L' => 14, 'M' => 14, 'N' => 1.5];
         foreach ($columnWidths as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
