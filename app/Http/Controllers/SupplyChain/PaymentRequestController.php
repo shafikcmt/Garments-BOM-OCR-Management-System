@@ -1835,52 +1835,63 @@ class PaymentRequestController extends Controller
             ? [optional($paymentRequiredDate)->format('d'), optional($paymentRequiredDate)->format('m'), optional($paymentRequiredDate)->format('Y')]
             : ['-', '-', '-'];
 
-        // HEADER BAND. The logo sits alone in A1:C3 and the company name has its
-        // own line beneath it (A4) — they used to share A1:B3 and printed on top
-        // of each other. Row 1 is tall enough for the 20pt title; at the flat
-        // 22pt every row used to get, the title was clipped.
+        // HEADER BAND, three boxes side by side (rows 1-4):
+        //   A:C  logo + company name      D:F  title + PR number      G:L  dates
+        // Each is outlined so the top of the sheet reads as a designed header and
+        // not loose text. Column M is a narrow spacer inside the print area: it
+        // keeps the right-hand borders of column L from being clipped at the page
+        // edge in print preview.
         $align = \PhpOffice\PhpSpreadsheet\Style\Alignment::class;
+        $border = \PhpOffice\PhpSpreadsheet\Style\Border::class;
+        $boxStyle = ['borders' => ['outline' => ['borderStyle' => $border::BORDER_THIN, 'color' => ['argb' => 'FF4B5FAE']]]];
+
         $logoPath = public_path('images/humana-logo.png');
         if (file_exists($logoPath)) {
             $drawing = new \PhpOffice\PhpSpreadsheet\Worksheet\Drawing();
             $drawing->setName('Logo');
             $drawing->setPath($logoPath);
-            $drawing->setHeight(52);
+            $drawing->setHeight(46);
             $drawing->setCoordinates('A1');
-            $drawing->setOffsetX(6);
-            $drawing->setOffsetY(4);
+            $drawing->setOffsetX(10);
+            $drawing->setOffsetY(8);
             $drawing->setWorksheet($sheet);
         }
 
         $sheet->mergeCells('A4:C4');
-        $sheet->mergeCells('D1:H1');
-        $sheet->mergeCells('D2:H2');
-        $sheet->mergeCells('I1:L1');
+        $sheet->mergeCells('D1:F2');
+        $sheet->mergeCells('D3:F4');
+        $sheet->mergeCells('G1:L2');
         $sheet->setCellValue('A4', 'HUMANA APPARELS PVT. LTD.');
         $sheet->setCellValue('D1', 'Payment Request Approval');
-        $sheet->setCellValue('D2', $paymentRequest->request_no);
-        $sheet->setCellValue('I1', 'Date:  ' . optional($paymentRequest->created_at)->format('jS M-Y'));
+        $sheet->setCellValue('D3', $paymentRequest->request_no);
+        $sheet->setCellValue('G1', 'Date:  ' . optional($paymentRequest->created_at)->format('jS M-Y'));
         $sheet->getStyle('A1:L4')->getFont()->getColor()->setARGB('FF000B6F');
         $sheet->getStyle('A4')->getFont()->setBold(true)->setSize(9);
-        $sheet->getStyle('A4')->getAlignment()->setVertical($align::VERTICAL_CENTER);
+        $sheet->getStyle('A4')->getAlignment()->setVertical($align::VERTICAL_CENTER)->setIndent(1);
         $sheet->getStyle('D1')->getFont()->setBold(true)->setSize(20);
-        $sheet->getStyle('D2')->getFont()->setSize(10);
-        $sheet->getStyle('D1:H2')->getAlignment()->setHorizontal($align::HORIZONTAL_CENTER)->setVertical($align::VERTICAL_CENTER);
-        $sheet->getStyle('I1:L1')->getAlignment()->setHorizontal($align::HORIZONTAL_RIGHT)->setVertical($align::VERTICAL_CENTER);
+        $sheet->getStyle('D3')->getFont()->setSize(10);
+        $sheet->getStyle('D1:F4')->getAlignment()->setHorizontal($align::HORIZONTAL_CENTER)->setVertical($align::VERTICAL_CENTER);
+        $sheet->getStyle('G1:L2')->getAlignment()->setHorizontal($align::HORIZONTAL_RIGHT)->setVertical($align::VERTICAL_CENTER)->setIndent(1);
+        $sheet->getStyle('G1')->getFont()->setBold(true);
 
-        // Payment Require Date: the label spans G:I (right-aligned) so it is no
-        // longer cut off in a single column, then day / month / year in J / K / L.
-        $sheet->mergeCells('G3:I3');
+        // Payment Require Date: label over G:I, then day / month / year in J / K / L.
+        $sheet->mergeCells('G3:I4');
         $sheet->setCellValue('G3', 'Payment Require Date:');
-        $sheet->setCellValue('J3', $paymentRequiredParts[0]);
-        $sheet->setCellValue('K3', $paymentRequiredParts[1]);
-        $sheet->setCellValue('L3', $paymentRequiredParts[2]);
-        $sheet->getStyle('G3:L3')->getFont()->setBold(true)->getColor()->setARGB('FF000B6F');
-        $sheet->getStyle('G3:I3')->getAlignment()->setHorizontal($align::HORIZONTAL_RIGHT)->setVertical($align::VERTICAL_CENTER);
-        $sheet->getStyle('J3:L3')->applyFromArray([
-            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF8EA0D4']]],
+        $sheet->getStyle('G3:I4')->getFont()->setBold(true)->getColor()->setARGB('FF000B6F');
+        $sheet->getStyle('G3:I4')->getAlignment()->setHorizontal($align::HORIZONTAL_RIGHT)->setVertical($align::VERTICAL_CENTER)->setIndent(1);
+        foreach (['J' => 0, 'K' => 1, 'L' => 2] as $dateColumn => $partIndex) {
+            $sheet->mergeCells($dateColumn . '3:' . $dateColumn . '4');
+            $sheet->setCellValue($dateColumn . '3', $paymentRequiredParts[$partIndex]);
+        }
+        $sheet->getStyle('J3:L4')->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['argb' => 'FF000B6F']],
+            'borders' => ['allBorders' => ['borderStyle' => $border::BORDER_THIN, 'color' => ['argb' => 'FF8EA0D4']]],
             'alignment' => ['horizontal' => $align::HORIZONTAL_CENTER, 'vertical' => $align::VERTICAL_CENTER],
         ]);
+
+        foreach (['A1:C4', 'D1:F4', 'G1:L4'] as $headerBox) {
+            $sheet->getStyle($headerBox)->applyFromArray($boxStyle);
+        }
 
         $sheet->setCellValue('A5', 'Buyer');
         $sheet->setCellValue('B5', ':');
@@ -1932,10 +1943,10 @@ class PaymentRequestController extends Controller
         $tableStart = 11;
         $sheet->fromArray($headers, null, 'A' . $tableStart);
         $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . $tableStart)->applyFromArray([
-            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF000B6F']],
-            'font' => ['bold' => true, 'size' => 8, 'color' => ['argb' => 'FFFFFFFF']],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFE3EBF8']],
+            'font' => ['bold' => true, 'size' => 8, 'color' => ['argb' => 'FF000B6F']],
             'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'wrapText' => true],
-            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF4253A8']]],
+            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF8EA0D4']]],
         ]);
         $sheet->getRowDimension($tableStart)->setRowHeight(26);
 
@@ -2025,23 +2036,51 @@ class PaymentRequestController extends Controller
             }
         }
 
-        $rowNo += 4;
-        // Dynamic Prepared / Checked / Approved By signatures for this PRA, with
-        // the static admin signatures as the fallback. Same box layout as before.
+        // ROW HEIGHTS by role (points). Kept in one place because the signature
+        // footer below is positioned from their sum.
+        $rowHeights = [1 => 36, 2 => 22, 3 => 22, 4 => 22, 5 => 24, 6 => 24, 7 => 24, 8 => 24, 9 => 22, 10 => 24, $tableStart => 30];
+        foreach (range($tableStart + 1, $lastBodyRow) as $bodyRow) {
+            $rowHeights[$bodyRow] = 28;
+        }
+        $grandRow = $lastBodyRow + 1;
+        $rowHeights[$grandRow] = 26;
+
+        // SIGNATURES SIT IN THE PAGE FOOTER. Excel cannot pin cells to the bottom
+        // of a printed page, so blank spacer rows are sized to push the block down
+        // until it ends at the foot of the page it starts on. A4 landscape at the
+        // fit-to-width scale holds about 690pt of sheet rows; a short PRA gets its
+        // signatures at the bottom of page 1, a long one at the bottom of its last
+        // page.
+        $signHeight = 22 + 40 + 22;
+        $pageHeight = 690;
+        $usedHeight = array_sum($rowHeights);
+        $spacer = $pageHeight - ($usedHeight % $pageHeight) - $signHeight - 6;
+        if ($spacer < 14) {
+            $spacer += $pageHeight;
+        }
+        $spacerRows = max(1, (int) ceil($spacer / 120));
+        $spacerEach = $spacer / $spacerRows;
+        foreach (range($grandRow + 1, $grandRow + $spacerRows) as $spacerRow) {
+            $rowHeights[$spacerRow] = $spacerEach;
+        }
+
+        $rowNo = $grandRow + $spacerRows + 1;
+
+        // Prepared / Checked / Approved By for this PRA (dynamic signatures with
+        // the static admin ones as the fallback). FOUR boxes on a departmental
+        // PRA, three on a legacy one.
         $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocksFor($paymentRequest, false);
-        // The last block runs to L so the boxes still span the full table.
-        // FOUR columns on a departmental PRA, three on a legacy one — indexing a
-        // fixed three-entry list would fatal on the fourth block rather than
-        // merely look wrong.
         $signatureColumns = count($signatureBlocks) === 4
             ? [['A', 'C'], ['D', 'F'], ['G', 'I'], ['J', 'L']]
             : [['A', 'C'], ['E', 'G'], ['I', 'L']];
 
-        // Each box is four rows: caption, a tall signing space that ends in the
-        // signature line (the signature image, when there is one, sits in it),
-        // the designation, and the "Signature & Date" label. No typed name or
-        // date and no "Pending approval" line — the same content as the PDF.
-        $signRows = ['title' => $rowNo, 'space' => $rowNo + 1, 'designation' => $rowNo + 2, 'label' => $rowNo + 3];
+        // Each box is three rows: caption, a tall signing space that ends in the
+        // signature line (the signature image sits in it), and the
+        // "Signature & Date" label. No typed name, date or designation.
+        $signRows = ['title' => $rowNo, 'space' => $rowNo + 1, 'label' => $rowNo + 2];
+        $rowHeights[$signRows['title']] = 22;
+        $rowHeights[$signRows['space']] = 40;
+        $rowHeights[$signRows['label']] = 22;
 
         foreach ($signatureBlocks as $index => $block) {
             [$from, $to] = $signatureColumns[$index];
@@ -2051,9 +2090,6 @@ class PaymentRequestController extends Controller
             }
 
             $sheet->setCellValue($from . $signRows['title'], $block['title']);
-            if (! empty($block['designation'])) {
-                $sheet->setCellValue($from . $signRows['designation'], $block['designation']);
-            }
             $sheet->setCellValue($from . $signRows['label'], 'Signature & Date');
 
             if (! empty($block['path'])) {
@@ -2075,40 +2111,21 @@ class PaymentRequestController extends Controller
             $sheet->getStyle($range)->getAlignment()->setVertical($align::VERTICAL_CENTER)->setHorizontal($align::HORIZONTAL_LEFT)->setIndent(1);
             $sheet->getStyle($from . $signRows['title'])->getFont()->setBold(true)->setSize(10);
             $sheet->getStyle($from . $signRows['space'] . ':' . $to . $signRows['space'])->applyFromArray([
-                'borders' => ['bottom' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF000B6F']]],
+                'borders' => ['bottom' => ['borderStyle' => $border::BORDER_THIN, 'color' => ['argb' => 'FF000B6F']]],
             ]);
         }
 
-        // Widths follow their COLUMN through the reorder, they are not fixed to
-        // a letter. Vendor Name keeps the 20 it always had (it holds the longest
-        // text) and Contract Shipment keeps the 16 that fits a date — leaving
-        // these as they were would have squeezed Vendor into 16 and given a
-        // date column 20.
-        //   A IHOD · B Style · C PCD · D Vendor · E PO · F PI
-        //   G Item Name · H Payment Term · I Ex Mill · J Comments · K Budget · L Amount
-        $columnWidths = ['A' => 16, 'B' => 16, 'C' => 14, 'D' => 20, 'E' => 18, 'F' => 19, 'G' => 14, 'H' => 16, 'I' => 16, 'J' => 14, 'K' => 14, 'L' => 15];
+        // Column widths follow their COLUMN through the reorder (A IHOD, B Style,
+        // C PCD, D Vendor, E PO, F PI, G Item, H Pay Term, I Ex Mill, J Comments,
+        // K Budget, L Amount). M is the narrow print spacer.
+        $columnWidths = ['A' => 16, 'B' => 16, 'C' => 14, 'D' => 20, 'E' => 18, 'F' => 19, 'G' => 14, 'H' => 16, 'I' => 16, 'J' => 14, 'K' => 14, 'L' => 15, 'M' => 1.5];
         foreach ($columnWidths as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
 
-        // Row heights by role. A flat 22pt clipped the 20pt title, the five-line OCR
-        // box and every wrapped body cell, and left the signing space far too
-        // short to sign in.
-        foreach (range(1, $rowNo + 4) as $row) {
-            $sheet->getRowDimension($row)->setRowHeight(22);
+        foreach (range(1, $signRows['label']) as $row) {
+            $sheet->getRowDimension($row)->setRowHeight($rowHeights[$row] ?? 22);
         }
-        $sheet->getRowDimension(1)->setRowHeight(36);
-        foreach ([5, 6, 7, 8] as $ocrRow) {
-            $sheet->getRowDimension($ocrRow)->setRowHeight(24);
-        }
-        $sheet->getRowDimension(10)->setRowHeight(24);
-        $sheet->getRowDimension($tableStart)->setRowHeight(30);
-        foreach (range($tableStart + 1, $lastBodyRow) as $bodyRow) {
-            $sheet->getRowDimension($bodyRow)->setRowHeight(28);
-        }
-        $sheet->getRowDimension($lastBodyRow + 1)->setRowHeight(26);
-        $sheet->getRowDimension($signRows['space'])->setRowHeight(40);
-
         $sheet->getPageMargins()->setTop(0.4);
         $sheet->getPageMargins()->setBottom(0.4);
         $sheet->getPageMargins()->setLeft(0.3);
@@ -2117,10 +2134,8 @@ class PaymentRequestController extends Controller
         $sheet->getPageSetup()->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4);
         $sheet->getPageSetup()->setFitToWidth(1);
         $sheet->getPageSetup()->setFitToHeight(0);
-        $sheet->getPageSetup()->setPrintArea('A1:' . $lastColumn . $signRows['label']);
+        $sheet->getPageSetup()->setPrintArea('A1:M' . $signRows['label']);
         $sheet->getPageSetup()->setHorizontalCentered(true);
-        // No frozen pane: the header band plus the table heading is 11 rows, which
-        // on a laptop screen left almost no room to scroll the data rows.
 
         $tmp = tempnam(sys_get_temp_dir(), 'payment_request_');
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
