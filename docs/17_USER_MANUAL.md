@@ -799,6 +799,8 @@ The **QTY** column of the pending list is the **Booking Qty** (the *Materials Or
 
 If the supplier or buyer gives the PP Qty **free**, type **Yes** in the **PP Qty Free** column of that line in the Workspace. The PP Qty is then not billed and PI Amount = PI Rate x Booking Qty. Leave the column blank (or **No**) when the PP Qty is charged.
 
+The quantity used is always the **Materials Ordered** that Supply Chain filled in on the Workspace, never *Materials To Be Ordered*. So if you change Materials Ordered, the PI Amount on the next PRA preview follows it.
+
 **On the PRA preview:** if a line has a PP Qty, a **PP Qty billing** box appears above the sheet. For each line choose **Billed** or **Free**, then press **Update amount**. The PI Amount and Total PI Amount on the sheet change at once, and the choice you see is saved when you press **Create PRA**. The box starts from the **PP Qty Free** column of the Workspace. Changing it here affects only this PRA; the Workspace is not changed.
 
 PP Qty can be typed with a unit (for example *25 yds*); only the number is used in the calculation.
