@@ -1929,6 +1929,19 @@ class PaymentRequestController extends Controller
             $sheet->getStyle($headerBox)->applyFromArray($boxStyle);
         }
 
+        // MERGED CELLS DRAW THEIR BORDERS FROM THEIR TOP-LEFT CELL in several
+        // viewers and print previews (LibreOffice, WPS), so an outline put only on
+        // the range edge went missing on merged areas — the dates box and the OCR
+        // box lost their right and bottom lines. Each merged area therefore also
+        // carries its own outer sides on the top-left cell. Excel hides the inner
+        // edges of a merge, so this changes nothing there.
+        $edge = ['borderStyle' => $border::BORDER_THIN, 'color' => ['argb' => 'FF4B5FAE']];
+        $sheet->getStyle('A4')->applyFromArray(['borders' => ['left' => $edge, 'bottom' => $edge, 'right' => $edge]]);
+        $sheet->getStyle('D1')->applyFromArray(['borders' => ['top' => $edge, 'left' => $edge, 'right' => $edge]]);
+        $sheet->getStyle('D3')->applyFromArray(['borders' => ['left' => $edge, 'right' => $edge, 'bottom' => $edge]]);
+        $sheet->getStyle('K1')->applyFromArray(['borders' => ['top' => $edge, 'left' => $edge, 'right' => $edge]]);
+        $sheet->getStyle('K3')->applyFromArray(['borders' => ['left' => $edge, 'right' => $edge]]);
+
         $sheet->setCellValue('A5', 'Buyer');
         $sheet->setCellValue('B5', ':');
         $sheet->setCellValue('C5', $list($summary['buyers'] ?? [], $paymentRequest->buyer_name ?: '-'));
@@ -1957,6 +1970,10 @@ class PaymentRequestController extends Controller
             'alignment' => ['wrapText' => true, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP],
             'borders' => ['outline' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF4B5FAE']]],
         ]);
+        // Merged: also give the top-left cell all four sides (see the header boxes).
+        $sheet->getStyle('J5')->getBorders()->getAllBorders()
+            ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN)
+            ->getColor()->setARGB('FF4B5FAE');
 
         $sheet->mergeCells('A8:E9');
         $sheet->setCellValue('A8', "* Buyer nominated supplier.\n  No excess quantity has been booked.");
@@ -2118,7 +2135,11 @@ class PaymentRequestController extends Controller
         // column width; 4.0 keeps a safety margin so the signatures never spill
         // onto a second page.
         $columnWidths = ['A' => 16, 'B' => 16, 'C' => 14, 'D' => 20, 'E' => 18, 'F' => 19, 'G' => 14, 'H' => 16, 'I' => 16, 'J' => 14, 'K' => 15, 'L' => 14, 'M' => 14, 'N' => 1.5];
-        $pageHeight = (int) round(array_sum($columnWidths) * 4.0);
+        // A PRA of normal length is fitted to ONE page (fit-to-height 1 below), so
+        // an over-estimate here can only shrink the sheet slightly and never push
+        // the signatures onto a second page. Only a long PRA flows over pages.
+        $singlePage = ($lastBodyRow - $tableStart) <= 24;
+        $pageHeight = (int) round(array_sum($columnWidths) * ($singlePage ? 4.15 : 3.9));
         $usedHeight = array_sum($rowHeights);
         $spacer = $pageHeight - ($usedHeight % $pageHeight) - $signHeight - 6;
         if ($spacer < 14) {
@@ -2201,7 +2222,7 @@ class PaymentRequestController extends Controller
         $sheet->getPageSetup()->setOrientation(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE);
         $sheet->getPageSetup()->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4);
         $sheet->getPageSetup()->setFitToWidth(1);
-        $sheet->getPageSetup()->setFitToHeight(0);
+        $sheet->getPageSetup()->setFitToHeight($singlePage ? 1 : 0);
         $sheet->getPageSetup()->setPrintArea('A1:N' . $signRows['label']);
         $sheet->getPageSetup()->setHorizontalCentered(true);
 
