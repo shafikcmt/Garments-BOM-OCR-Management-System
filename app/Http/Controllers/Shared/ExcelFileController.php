@@ -2408,7 +2408,13 @@ class ExcelFileController extends Controller
                 ? 'Waiting for PO'
                 : (blank($materialPiNumber) ? 'PI Pending' : 'PI Received');
 
-            $piAmount = $piRate * $materialsOrdered;
+            // PP Qty is billed on top of the booking quantity unless the supplier or
+            // buyer provides it free (PP Qty Free = Yes).
+            $chargeablePpQty = \App\Support\PpQty::chargeable(
+                $this->valAny($cellMap, $headerIdByKey, ['pp_qty', 'p_p_qty', 'pp_quantity']),
+                $this->valAny($cellMap, $headerIdByKey, ['pp_qty_free', 'pp_free', 'free_pp_qty']),
+            );
+            $piAmount = $piRate * ($materialsOrdered + $chargeablePpQty);
 
             $paymentReqdDate = $committedExMill ? $committedExMill->copy()->subDays(7) : null;
 

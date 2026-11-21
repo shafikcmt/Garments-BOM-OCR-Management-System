@@ -204,6 +204,8 @@ class PaymentRequestController extends Controller
             'booking_po_ids' => ['required', 'array', 'min:1'],
             'booking_po_ids.*' => ['integer', 'exists:booking_pos,id'],
             'payment_required_date' => ['nullable', 'date'],
+            'pp_free' => ['nullable', 'array'],
+            'pp_free.*' => ['in:0,1'],
         ]);
 
         $selectedIds = collect($validated['booking_po_ids'])
@@ -211,12 +213,15 @@ class PaymentRequestController extends Controller
             ->unique()
             ->values();
 
+        $ppChoices = (array) ($validated['pp_free'] ?? []);
+
         $paymentRequiredInput = $validated['payment_required_date'] ?? PaymentRequestSettings::defaultPaymentRequiredDate()->toDateString();
         $snapshots = $this->snapshotsForSelectedBookingPos($selectedIds)
             ->map(fn (array $snapshot) => array_replace($snapshot, [
                 'payment_required_date' => $paymentRequiredInput,
             ]))
             ->values();
+        $snapshots = $this->applyPpChoices($snapshots, $ppChoices);
 
         if ($snapshots->isEmpty()) {
             return redirect()
@@ -261,8 +266,21 @@ class PaymentRequestController extends Controller
         $canOverrideBudget = (bool) auth()->user()?->can('override-style-budget');
         $createOnDepartmentalFlow = PaymentRequestSettings::departmentalFlowEnabled();
         $stepTwoAssignees = $this->stepTwoAssignees($snapshots);
+        $ppLines = $snapshots
+            ->filter(fn (array $row) => (float) ($row['pp_qty_number'] ?? 0) > 0)
+            ->map(fn (array $row) => [
+                'key' => $this->ppLineKey($row),
+                'po_no' => $row['po_no'] ?? '',
+                'style' => $row['style_name'] ?? '',
+                'item' => $row['material_description'] ?? '',
+                'qty' => (float) ($row['qty'] ?? 0),
+                'pp_qty' => (float) $row['pp_qty_number'],
+                'rate' => (float) ($row['pi_rate'] ?? 0),
+                'free' => (bool) ($row['pp_free'] ?? false),
+                'amount' => (float) ($row['pi_amount'] ?? 0),
+            ])->values();
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'checkerPool', 'budgetCheck', 'canOverrideBudget', 'createOnDepartmentalFlow', 'stepTwoAssignees'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'ppLines', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'checkerPool', 'budgetCheck', 'canOverrideBudget', 'createOnDepartmentalFlow', 'stepTwoAssignees'));
     }
 
     /**
@@ -299,6 +317,8 @@ class PaymentRequestController extends Controller
             // Ignored entirely on the legacy path — see below.
             'assignee_step2' => ['nullable', 'integer'],
             // Supporting documents (PI copy, etc.) — optional.
+            'pp_free' => ['nullable', 'array'],
+            'pp_free.*' => ['in:0,1'],
             'documents' => ['nullable', 'array', 'max:10'],
             'documents.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,xls,xlsx,csv,doc,docx'],
         ], [
@@ -336,6 +356,7 @@ class PaymentRequestController extends Controller
                 'payment_required_date' => $paymentRequiredDate,
             ]))
             ->values();
+        $snapshots = $this->applyPpChoices($snapshots, (array) ($validated['pp_free'] ?? []));
 
         if ($snapshots->isEmpty()) {
             return back()->with('warning', 'No eligible PI received / payment pending row was selected. Please check PI Number, PI Status and Payment Status.');
@@ -1028,6 +1049,38 @@ class PaymentRequestController extends Controller
             ->header('Content-Disposition', 'attachment; filename="' . $fileName . '.xls"')
             ->header('Pragma', 'no-cache')
             ->header('Expires', '0');
+    }
+
+    /**
+     * Key of one PRA line for the PP Qty Free choice: the booking PO plus its
+     * source row.
+     */
+    protected function ppLineKey(array $snapshot): string
+    {
+        return ($snapshot['booking_po_id'] ?? 0) . '-' . ($snapshot['excel_row_id'] ?? 0);
+    }
+
+    /**
+     * Apply the creator's PP Qty Free choices (Yes = free, No = billed). A line
+     * with no choice keeps the sheet's PP Qty Free default.
+     *
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $snapshots
+     * @param  array<string, mixed>  $choices
+     */
+    protected function applyPpChoices(\Illuminate\Support\Collection $snapshots, array $choices): \Illuminate\Support\Collection
+    {
+        return $snapshots->map(function (array $snapshot) use ($choices) {
+            if ((float) ($snapshot['pp_qty_number'] ?? 0) <= 0) {
+                return $snapshot;
+            }
+
+            $key = $this->ppLineKey($snapshot);
+            $free = array_key_exists($key, $choices)
+                ? (string) $choices[$key] === '1'
+                : (bool) ($snapshot['pp_free'] ?? false);
+
+            return $this->sourceService->applyPpChoice($snapshot, $free);
+        })->values();
     }
 
     protected function snapshotsForSelectedBookingPos($selectedIds): \Illuminate\Support\Collection

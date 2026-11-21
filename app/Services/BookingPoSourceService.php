@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\PpQty;
 use App\Mail\PiMissingAlertMail;
 use App\Models\AppNotification;
 use App\Models\BookingPo;
@@ -169,6 +170,67 @@ class BookingPoSourceService
         return $this->isBlankValue($pmtDocNo) ? 'Pmt Pending' : 'Pmt Done';
     }
 
+    /**
+     * The PP quantity that is billed for a booking PO's own row: PP Qty, or zero
+     * when the PP Qty Free column says the supplier/buyer provides it free.
+     */
+    protected function chargeablePpForBookingPo(BookingPo $bookingPo): float
+    {
+        return PpQty::chargeable(
+            $this->sourceValueForBookingPo($bookingPo, 'pp_qty'),
+            $this->sourceValueForBookingPo($bookingPo, 'pp_free'),
+        );
+    }
+
+    protected function chargeablePpForRow(ExcelRow $row): float
+    {
+        return PpQty::chargeable(
+            $this->sourceValueForRow($row, 'pp_qty'),
+            $this->sourceValueForRow($row, 'pp_free'),
+        );
+    }
+
+    /**
+     * PI Amount = PI Rate x (Booking Qty + chargeable PP Qty).
+     *
+     * The saved PI Amount cell can still hold the old Rate x Booking Qty, so when
+     * there is a billable PP quantity the amount is rebuilt from the rate. With no
+     * PP quantity (or a free one) the saved amount is used exactly as before.
+     */
+    protected function piAmountWithPp(?float $sourceAmount, float $rate, ?float $qty, float $chargeablePp): float
+    {
+        if ($chargeablePp > 0 && $rate > 0) {
+            return $rate * (($qty ?? 0) + $chargeablePp);
+        }
+
+        return $sourceAmount ?? ($rate * ($qty ?? 0));
+    }
+
+    /**
+     * Re-price one snapshot line for the PP Qty choice made on the PRA screen.
+     *
+     * Free: PI Amount = PI Rate x Booking Qty. Billed: PI Rate x (Booking Qty +
+     * PP Qty). A line with no PP Qty, or no rate, is returned unchanged.
+     *
+     * @param  array<string, mixed>  $line
+     * @return array<string, mixed>
+     */
+    public function applyPpChoice(array $line, bool $free): array
+    {
+        $pp = (float) ($line['pp_qty_number'] ?? 0);
+        $rate = (float) ($line['pi_rate'] ?? 0);
+
+        if ($pp <= 0 || $rate <= 0) {
+            return $line;
+        }
+
+        $amount = $rate * ((float) ($line['qty'] ?? 0) + ($free ? 0.0 : $pp));
+        $line['pp_free'] = $free;
+        $line['pi_amount'] = $amount;
+
+        return $line;
+    }
+
     public function paymentSnapshot(BookingPo $bookingPo): array
     {
         $bookingPo->loadMissing(['excelFile.uploader', 'excelRow.cells.header', 'generatedBy']);
@@ -181,7 +243,7 @@ class BookingPoSourceService
 
         $piRate = $this->numericValue($this->sourceValueForBookingPo($bookingPo, 'pi_rate')) ?? 0.0;
         $sourcePiAmount = $this->numericValue($this->sourceValueForBookingPo($bookingPo, 'pi_amount'));
-        $piAmount = $sourcePiAmount ?? ($piRate * ($materialsOrdered ?? 0));
+        $piAmount = $this->piAmountWithPp($sourcePiAmount, $piRate, $materialsOrdered, $this->chargeablePpForBookingPo($bookingPo));
         $budget = $this->numericValue($this->sourceValueForBookingPo($bookingPo, 'budget'));
         $sourceSavings = $this->numericValue($this->sourceValueForBookingPo($bookingPo, 'savings'));
 
@@ -219,8 +281,12 @@ class BookingPoSourceService
                 ?? $this->sourceValueForRow($siblingRow, 'qty')
             );
             $rowRate = $this->numericValue($this->sourceValueForRow($siblingRow, 'pi_rate')) ?? 0.0;
-            $rowPiAmount = $this->numericValue($this->sourceValueForRow($siblingRow, 'pi_amount'))
-                ?? ($rowRate * ($rowMaterials ?? 0));
+            $rowPiAmount = $this->piAmountWithPp(
+                $this->numericValue($this->sourceValueForRow($siblingRow, 'pi_amount')),
+                $rowRate,
+                $rowMaterials,
+                $this->chargeablePpForRow($siblingRow),
+            );
             $piAmount += $rowPiAmount;
 
             $rowBudget = $this->numericValue($this->sourceValueForRow($siblingRow, 'budget'));
@@ -269,6 +335,8 @@ class BookingPoSourceService
             'pi_status' => $this->bookingPoPiStatus($bookingPo),
             'pi_rate' => $piRate,
             'pi_amount' => $piAmount,
+            'pp_qty_number' => PpQty::number($this->sourceValueForBookingPo($bookingPo, 'pp_qty')),
+            'pp_free' => PpQty::isFree($this->sourceValueForBookingPo($bookingPo, 'pp_free')),
             'budget' => $budget,
             'savings' => $savings,
             'delivery_term' => $this->sourceValueForBookingPo($bookingPo, 'delivery_term'),
@@ -361,7 +429,12 @@ class BookingPoSourceService
 
         $qty = $this->numericValue($read('materials_ordered') ?? $read('qty') ?? $fallback($bookingPo->qty));
         $rate = $this->numericValue($read('pi_rate')) ?? 0.0;
-        $amount = $this->numericValue($read('pi_amount')) ?? ($rate * ($qty ?? 0));
+        $amount = $this->piAmountWithPp(
+            $this->numericValue($read('pi_amount')),
+            $rate,
+            $qty,
+            PpQty::chargeable($read('pp_qty'), $read('pp_free')),
+        );
         $budget = $this->numericValue($read('budget'));
         $savings = $this->numericValue($read('savings'))
             ?? ($budget !== null ? ($budget - $amount) : null);
@@ -378,6 +451,8 @@ class BookingPoSourceService
             'qty' => $qty,
             'pi_rate' => $rate,
             'pi_amount' => $amount,
+            'pp_qty_number' => PpQty::number($read('pp_qty')),
+            'pp_free' => PpQty::isFree($read('pp_free')),
             'budget' => $budget,
             'savings' => $savings,
             'pi_number' => $read('pi_number') ?: $primaryPiNumber,
@@ -1423,6 +1498,9 @@ class BookingPoSourceService
             'pi_status' => ['pi_status', 'PI Status'],
             'pi_rate' => ['pi_rate', 'invoiced_rate_scm', 'invoiced_rate', 'PI Rate', 'Invoiced Rate(SCM)', 'Invoiced Rate'],
             'pi_amount' => ['pi_amount', 'PI Amount'],
+            // PP (pre-production) quantity and the Yes/No column that marks it free.
+            'pp_qty' => ['pp_qty', 'p_p_qty', 'pp_quantity', 'p_p_quantity', 'PP Qty', 'P/P Qty'],
+            'pp_free' => ['pp_qty_free', 'pp_free', 'free_pp_qty', 'PP Qty Free', 'PP Free'],
             'payment_reqd_date' => ['payment_reqd_date', 'payment_req_d_date', 'payment_required_date', 'payment_due_date', "Payment Req'd Date", 'Payment Reqd Date', 'Payment Required Date', 'Payment Due Date'],
             'pcd_required' => ['pcd_required', 'pcd_required_date', 'pcd_req_date', 'pcd_date', 'PCD Required', 'PCD Required Date'],
             'payment_status' => ['payment_status', 'Payment Status'],
