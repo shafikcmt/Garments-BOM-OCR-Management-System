@@ -115,7 +115,7 @@
                     {{-- Unsigned; the caption is what keeps a name from reading as a signature. --}}
                     <br><br>
                     @if($sign['designation']){{ $sign['designation'] }}<br>@endif
-                    <em>Pending approval</em>
+                    Signature &amp; Date
                 @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
                     <br><br>
                     @if($sign['designation']){{ $sign['designation'] }}<br>@endif

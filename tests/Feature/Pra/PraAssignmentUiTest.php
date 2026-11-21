@@ -345,8 +345,9 @@ it('previews a departmental PRA with four dynamic signature blocks and no fixed 
         ->toContain('alt="Prepared By signature"')
         ->toContain('signatures/creator.png')
         ->toContain('Creator')
-        // The other three are unsigned and say so, exactly three times.
-        ->and(substr_count($html, 'Pending approval'))->toBe(3)
+        // The other three are unsigned: they show the same Signature & Date caption
+        // as Prepared By, not a "Pending approval" status line.
+        ->and($html)->not->toContain('Pending approval')
         // Nothing fixed leaks through — not a name, not an image.
         ->and($html)->not->toContain('Fixed Officer')
         ->and($html)->not->toContain('signatures/fixed.png');

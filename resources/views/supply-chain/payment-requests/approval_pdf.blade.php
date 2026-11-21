@@ -58,8 +58,8 @@
         .completed-line { margin-top:10px; font-size:9px; color:#000b6f; }
         .completed-line strong { font-weight:800; }
         .sign td + td { border-left:1px solid #8d9bd3; }
-        .sign-title { font-size:9px; font-weight:800; margin-bottom:14px; }
-        .sign-text { font-size:9px; margin-bottom:14px; }
+        .sign-title { font-size:9px; font-weight:800; margin-bottom:6px; }
+        .sign-text { font-size:9px; margin-bottom:9px; }
         .sign-line { border-bottom:1px solid #000b6f; height:1px; }
         .sign-img { max-height:42px; max-width:100%; margin-bottom:4px; }
         .sign-meta { font-size:8.5px; line-height:1.4; margin-top:4px; }
@@ -224,7 +224,7 @@
                     <div class="sign-line"></div>
                     <div class="sign-meta">
                         @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
-                        <div class="sign-pending">Pending approval</div>
+                        <div>Signature &amp; Date</div>
                     </div>
                 @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
                     {{-- Actor known but no signature image uploaded: typed name + date --}}
