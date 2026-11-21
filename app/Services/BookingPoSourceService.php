@@ -206,6 +206,31 @@ class BookingPoSourceService
         return $sourceAmount ?? ($rate * ($qty ?? 0));
     }
 
+    /**
+     * Re-price one snapshot line for the PP Qty choice made on the PRA screen.
+     *
+     * Free: PI Amount = PI Rate x Booking Qty. Billed: PI Rate x (Booking Qty +
+     * PP Qty). A line with no PP Qty, or no rate, is returned unchanged.
+     *
+     * @param  array<string, mixed>  $line
+     * @return array<string, mixed>
+     */
+    public function applyPpChoice(array $line, bool $free): array
+    {
+        $pp = (float) ($line['pp_qty_number'] ?? 0);
+        $rate = (float) ($line['pi_rate'] ?? 0);
+
+        if ($pp <= 0 || $rate <= 0) {
+            return $line;
+        }
+
+        $amount = $rate * ((float) ($line['qty'] ?? 0) + ($free ? 0.0 : $pp));
+        $line['pp_free'] = $free;
+        $line['pi_amount'] = $amount;
+
+        return $line;
+    }
+
     public function paymentSnapshot(BookingPo $bookingPo): array
     {
         $bookingPo->loadMissing(['excelFile.uploader', 'excelRow.cells.header', 'generatedBy']);
@@ -310,6 +335,8 @@ class BookingPoSourceService
             'pi_status' => $this->bookingPoPiStatus($bookingPo),
             'pi_rate' => $piRate,
             'pi_amount' => $piAmount,
+            'pp_qty_number' => PpQty::number($this->sourceValueForBookingPo($bookingPo, 'pp_qty')),
+            'pp_free' => PpQty::isFree($this->sourceValueForBookingPo($bookingPo, 'pp_free')),
             'budget' => $budget,
             'savings' => $savings,
             'delivery_term' => $this->sourceValueForBookingPo($bookingPo, 'delivery_term'),
@@ -424,6 +451,8 @@ class BookingPoSourceService
             'qty' => $qty,
             'pi_rate' => $rate,
             'pi_amount' => $amount,
+            'pp_qty_number' => PpQty::number($read('pp_qty')),
+            'pp_free' => PpQty::isFree($read('pp_free')),
             'budget' => $budget,
             'savings' => $savings,
             'pi_number' => $read('pi_number') ?: $primaryPiNumber,

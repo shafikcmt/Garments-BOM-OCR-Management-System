@@ -205,6 +205,53 @@
             </div>
         </div>
 
+        @if($isPreview && ($ppLines ?? collect())->isNotEmpty())
+            {{-- PP QTY BILLING. PP Qty is normally billed with the booking qty;
+                 a supplier/buyer may provide it free. The creator decides per
+                 line here, the preview re-prices, and Create PRA saves it. --}}
+            <div class="mx-auto mb-3 pra-no-print" style="max-width:1120px;">
+                <form method="GET" action="{{ route('supply_chain.payment_requests.preview') }}" id="ppChoiceForm" class="card border-0 shadow-sm rounded-3">
+                    @foreach($bookingPoIds as $bookingPoId)
+                        <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
+                    @endforeach
+                    <input type="hidden" name="payment_required_date" id="ppChoiceDate" value="{{ $paymentRequiredInput }}">
+                    <div class="card-body p-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <div class="fw-bold"><i class="bi bi-calculator me-1" aria-hidden="true"></i> PP Qty billing</div>
+                            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Update amount</button>
+                        </div>
+                        <div class="small text-muted mb-2">PI Amount = PI Rate &times; (Booking Qty + PP Qty). Choose <strong>Free</strong> where the supplier or buyer provides the PP Qty at no charge.</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr><th>PO No.</th><th>Style</th><th>Item</th><th class="text-end">Booking Qty</th><th class="text-end">PP Qty</th><th class="text-end">PI Rate</th><th>PP billing</th><th class="text-end">PI Amt (USD)</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($ppLines as $pp)
+                                        <tr>
+                                            <td>{{ $pp['po_no'] ?: '-' }}</td>
+                                            <td>{{ $pp['style'] ?: '-' }}</td>
+                                            <td>{{ \Illuminate\Support\Str::limit($pp['item'] ?: '-', 40) }}</td>
+                                            <td class="text-end">{{ number_format($pp['qty'], 2) }}</td>
+                                            <td class="text-end">{{ number_format($pp['pp_qty'], 2) }}</td>
+                                            <td class="text-end">{{ number_format($pp['rate'], 4) }}</td>
+                                            <td>
+                                                <select name="pp_free[{{ $pp['key'] }}]" class="form-select form-select-sm" style="min-width:110px;" aria-label="PP Qty billing">
+                                                    <option value="0" {{ ! $pp['free'] ? 'selected' : '' }}>Billed</option>
+                                                    <option value="1" {{ $pp['free'] ? 'selected' : '' }}>Free</option>
+                                                </select>
+                                            </td>
+                                            <td class="text-end fw-semibold">$ {{ number_format($pp['amount'], 2) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        @endif
+
         @if($isPreview && !empty($budgetCheck['lines']))
             @php $money2 = fn ($v) => number_format((float) $v, 2); @endphp
             <div class="mx-auto mb-3" style="max-width:1120px;">
@@ -430,6 +477,9 @@
                                 <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
                             @endforeach
                             <input type="hidden" name="payment_required_date" id="paymentRequiredCreateDate" value="{{ $paymentRequiredInput }}">
+                            @foreach(($ppLines ?? collect()) as $pp)
+                                <input type="hidden" name="pp_free[{{ $pp['key'] }}]" value="{{ $pp['free'] ? '1' : '0' }}">
+                            @endforeach
                             <div class="modal-header">
                                 <h5 class="modal-title"><i class="bi bi-check2-circle text-success me-1" aria-hidden="true"></i> Create Payment Request Approval</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -789,6 +839,14 @@
             previewDate.addEventListener('change', syncDate);
             previewDate.addEventListener('input', syncDate);
             syncDate();
+
+            // The PP Qty form reloads the preview, so it must carry the picked date.
+            const ppDate = document.getElementById('ppChoiceDate');
+            if (ppDate) {
+                previewDate.addEventListener('change', function () { ppDate.value = previewDate.value; });
+                previewDate.addEventListener('input', function () { ppDate.value = previewDate.value; });
+                ppDate.value = previewDate.value;
+            }
 
             // Final safety: re-sync when the Create modal opens.
             const createModal = document.getElementById('createPraModal');
