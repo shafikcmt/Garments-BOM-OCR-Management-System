@@ -80,9 +80,9 @@
              their width back. Measured: 20 rows on one page for normal values,
              12 with long wrapping ones - both unchanged from before Budget was
              added. Re-measure if you move these. --}}
-        .w-vendor { width: 14%; } .w-style { width: 8%; } .w-pcd { width: 7%; } .w-term { width: 10%; }
-        .w-po { width: 10%; } .w-pi { width: 10%; } .w-type { width: 9%; } .w-cship { width: 7%; } .w-exmill { width: 7%; }
-        .w-budget { width: 8%; } .w-amount { width: 10%; }
+        .w-vendor { width: 12%; } .w-style { width: 8%; } .w-pcd { width: 7%; } .w-term { width: 9%; }
+        .w-po { width: 9%; } .w-pi { width: 9%; } .w-type { width: 8%; } .w-cship { width: 7%; } .w-exmill { width: 7%; }
+        .w-budget { width: 7%; } .w-amount { width: 9%; } .w-saving { width: 8%; }
     </style>
 </head>
 <body>
@@ -166,8 +166,9 @@
             <th class="w-type">Item Name</th>
             <th class="w-term">Pay Term</th>
             <th class="w-exmill">Ex Mill</th>
-            <th class="w-budget right">Budget</th>
             <th class="w-amount right">PI Amt (USD)</th>
+            <th class="w-budget right">Budget</th>
+            <th class="w-saving right">Saving</th>
         </tr>
     </thead>
     <tbody>
@@ -189,15 +190,20 @@
                 <td class="center">{{ $row['material_type'] ?: '-' }}</td>
                 <td class="center">{{ $row['payment_term'] ?: '-' }}</td>
                 <td class="center">{{ $row['committed_ex_mill'] ?: '-' }}</td>
-                <td class="right">{{ isset($row['budget']) ? '$' . $money($row['budget']) : '-' }}</td>
                 <td class="right">${{ $money($row['pi_amount'] ?? 0) }}</td>
+                <td class="right">{{ isset($row['budget']) ? '$' . $money($row['budget']) : '-' }}</td>
+                @php $rowSaving = isset($row['budget']) ? (float) $row['budget'] - (float) ($row['pi_amount'] ?? 0) : null; @endphp
+                <td class="right" @if($rowSaving !== null && $rowSaving < 0) style="color:#b42318;" @endif>{{ $rowSaving === null ? '-' : ($rowSaving < 0 ? '-$' . $money(abs($rowSaving)) : '$' . $money($rowSaving)) }}</td>
             </tr>
         @empty
-            <tr><td colspan="11" class="center">No payment request item found.</td></tr>
+            <tr><td colspan="12" class="center">No payment request item found.</td></tr>
         @endforelse
+        @php $budgetDone = (bool) ($summary['budget_complete'] ?? false); $savingSum = (float) ($summary['saving_sum'] ?? 0); @endphp
         <tr class="grand">
-            <td colspan="10">Grand Total</td>
+            <td colspan="9">Grand Total</td>
             <td class="right">${{ $money($summary['total_pi_amount'] ?? 0) }}</td>
+            <td class="right">{{ $budgetDone ? '$' . $money($summary['budget_sum'] ?? 0) : '' }}</td>
+            <td class="right">{{ $budgetDone ? ($savingSum < 0 ? '-$' . $money(abs($savingSum)) : '$' . $money($savingSum)) : '' }}</td>
         </tr>
     </tbody>
 </table>

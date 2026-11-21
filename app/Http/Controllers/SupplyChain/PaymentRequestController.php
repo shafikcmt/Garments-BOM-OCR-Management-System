@@ -1594,7 +1594,9 @@ class PaymentRequestController extends Controller
             'payment_required_date' => $item->payment_required_date ?: data_get($item->data, 'payment_required_date'),
             'buyer_name' => $item->buyer_name,
             'season_name' => $item->season_name,
-            'sales_contract' => data_get($item->data, 'sales_contract'),
+            // Saved with the PRA from now on; a PRA made before that read the
+            // contract from the Workspace row it came from.
+            'sales_contract' => data_get($item->data, 'sales_contract') ?: $this->salesContractFromSource($item),
             'payment_status' => $item->payment_status,
             'final_status' => data_get($item->data, 'final_status'),
             'vendor_type' => data_get($item->data, 'vendor_type'),
@@ -1602,6 +1604,32 @@ class PaymentRequestController extends Controller
             'delivery_term' => $item->delivery_term,
             'source_count' => 1,
         ];
+    }
+
+    /** @var array<int, string|null> */
+    protected array $salesContractCache = [];
+
+    /**
+     * The Sales Contract of the Workspace row a PRA line came from. Only used
+     * for a line whose saved snapshot has none (a PRA created before the field
+     * existed); null when the row is gone or carries no contract.
+     */
+    protected function salesContractFromSource(PaymentRequestItem $item): ?string
+    {
+        $rowId = (int) $item->excel_row_id;
+
+        if ($rowId <= 0) {
+            return null;
+        }
+
+        if (! array_key_exists($rowId, $this->salesContractCache)) {
+            $row = \App\Models\ExcelRow::with('cells.header')->find($rowId);
+            $this->salesContractCache[$rowId] = $row
+                ? $this->sourceService->sourceValueForRow($row, 'sales_contract')
+                : null;
+        }
+
+        return $this->salesContractCache[$rowId];
     }
 
     protected function mergeApprovalRows($rows): array
@@ -1634,6 +1662,7 @@ class PaymentRequestController extends Controller
             'payment_required_date' => $paymentRequiredDate ?: ($first['payment_required_date'] ?? null),
             'buyer_name' => $this->joinUnique($rows->pluck('buyer_name')), 
             'season_name' => $this->joinUnique($rows->pluck('season_name')), 
+            'sales_contract' => $this->joinUnique($rows->pluck('sales_contract')),
             'payment_status' => $this->joinUnique($rows->pluck('payment_status')), 
             'final_status' => $this->joinUnique($rows->pluck('final_status')), 
             'vendor_type' => $this->joinUnique($rows->pluck('vendor_type')), 
@@ -1653,6 +1682,11 @@ class PaymentRequestController extends Controller
             'total_pi_amount' => $rows->sum(fn (array $row) => (float) ($row['pi_amount'] ?? 0)),
             'total_budget' => 0,
             'total_savings' => 0,
+            // Budget and Saving totals are only trustworthy when EVERY line has a
+            // budget; the renderers print them only then.
+            'budget_complete' => $rows->isNotEmpty() && $rows->every(fn (array $row) => isset($row['budget'])),
+            'budget_sum' => $rows->sum(fn (array $row) => (float) ($row['budget'] ?? 0)),
+            'saving_sum' => $rows->sum(fn (array $row) => (float) ($row['budget'] ?? 0)) - $rows->sum(fn (array $row) => (float) ($row['pi_amount'] ?? 0)),
             'total_po_count' => $rows->pluck('material_po_number')->flatMap(fn ($value) => explode(',', (string) $value))->map(fn ($value) => trim($value))->filter()->unique(fn ($value) => Str::lower($value))->count(),
             'pending_payment_count' => $rows->filter(fn (array $row) => $this->sourceService->normalize($row['payment_status'] ?? '') === 'pmt_pending')->count(),
             'earliest_payment_required_date' => $earliestPaymentRequired,
@@ -1828,7 +1862,7 @@ class PaymentRequestController extends Controller
         // L, not K: Budget was added as a 12th column between Comments and PI
         // Amount. Every merge, style range and signature span below is keyed to
         // this table's width, so they all moved one column right with it.
-        $lastColumn = 'L';
+        $lastColumn = 'M';
         $list = fn ($values, $fallback = '-') => collect($values ?? [])->map(fn ($value) => trim((string) $value))->filter()->take(5)->implode(', ') ?: $fallback;
         $moneyFormat = '$#,##0.00;[Red]($#,##0.00)';
         $paymentRequiredDate = $summary['earliest_payment_required_date'] ?? null;
@@ -1838,7 +1872,7 @@ class PaymentRequestController extends Controller
             : ['-', '-', '-'];
 
         // HEADER BAND, three boxes side by side (rows 1-4):
-        //   A:C  logo + company name      D:I  title + PR number      J:L  dates
+        //   A:C  logo + company name      D:J  title + PR number      K:M  dates
         // Each is outlined so the top of the sheet reads as a designed header and
         // not loose text. Column M is a narrow spacer inside the print area: it
         // keeps the right-hand borders of column L from being clipped at the page
@@ -1864,34 +1898,34 @@ class PaymentRequestController extends Controller
         // dates box J:L (43 wide). The Payment Require Date is a label over three
         // day / month / year boxes so it fits the narrow right-hand box.
         $sheet->mergeCells('A4:C4');
-        $sheet->mergeCells('D1:I2');
-        $sheet->mergeCells('D3:I4');
-        $sheet->mergeCells('J1:L2');
-        $sheet->mergeCells('J3:L3');
+        $sheet->mergeCells('D1:J2');
+        $sheet->mergeCells('D3:J4');
+        $sheet->mergeCells('K1:M2');
+        $sheet->mergeCells('K3:M3');
         $sheet->setCellValue('A4', 'HUMANA APPARELS PVT. LTD.');
         $sheet->setCellValue('D1', 'Payment Request Approval');
         $sheet->setCellValue('D3', $paymentRequest->request_no);
-        $sheet->setCellValue('J1', 'Date:  ' . optional($paymentRequest->created_at)->format('jS M-Y'));
-        $sheet->setCellValue('J3', 'Payment Require Date:');
-        $sheet->setCellValue('J4', $paymentRequiredParts[0]);
-        $sheet->setCellValue('K4', $paymentRequiredParts[1]);
-        $sheet->setCellValue('L4', $paymentRequiredParts[2]);
-        $sheet->getStyle('A1:L4')->getFont()->getColor()->setARGB('FF000B6F');
+        $sheet->setCellValue('K1', 'Date:  ' . optional($paymentRequest->created_at)->format('jS M-Y'));
+        $sheet->setCellValue('K3', 'Payment Require Date:');
+        $sheet->setCellValue('K4', $paymentRequiredParts[0]);
+        $sheet->setCellValue('L4', $paymentRequiredParts[1]);
+        $sheet->setCellValue('M4', $paymentRequiredParts[2]);
+        $sheet->getStyle('A1:M4')->getFont()->getColor()->setARGB('FF000B6F');
         $sheet->getStyle('A4')->getFont()->setBold(true)->setSize(9);
         $sheet->getStyle('A4')->getAlignment()->setVertical($align::VERTICAL_CENTER)->setIndent(1);
         $sheet->getStyle('D1')->getFont()->setBold(true)->setSize(20);
         $sheet->getStyle('D3')->getFont()->setSize(10);
-        $sheet->getStyle('D1:I4')->getAlignment()->setHorizontal($align::HORIZONTAL_CENTER)->setVertical($align::VERTICAL_CENTER);
-        $sheet->getStyle('J1:L3')->getAlignment()->setHorizontal($align::HORIZONTAL_CENTER)->setVertical($align::VERTICAL_CENTER);
-        $sheet->getStyle('J1')->getFont()->setBold(true);
-        $sheet->getStyle('J3')->getFont()->setBold(true)->setSize(9);
-        $sheet->getStyle('J4:L4')->applyFromArray([
+        $sheet->getStyle('D1:J4')->getAlignment()->setHorizontal($align::HORIZONTAL_CENTER)->setVertical($align::VERTICAL_CENTER);
+        $sheet->getStyle('K1:M3')->getAlignment()->setHorizontal($align::HORIZONTAL_CENTER)->setVertical($align::VERTICAL_CENTER);
+        $sheet->getStyle('K1')->getFont()->setBold(true);
+        $sheet->getStyle('K3')->getFont()->setBold(true)->setSize(9);
+        $sheet->getStyle('K4:M4')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['argb' => 'FF000B6F']],
             'borders' => ['allBorders' => ['borderStyle' => $border::BORDER_THIN, 'color' => ['argb' => 'FF8EA0D4']]],
             'alignment' => ['horizontal' => $align::HORIZONTAL_CENTER, 'vertical' => $align::VERTICAL_CENTER],
         ]);
 
-        foreach (['A1:C4', 'D1:I4', 'J1:L4'] as $headerBox) {
+        foreach (['A1:C4', 'D1:J4', 'K1:M4'] as $headerBox) {
             $sheet->getStyle($headerBox)->applyFromArray($boxStyle);
         }
 
@@ -1909,16 +1943,16 @@ class PaymentRequestController extends Controller
         $sheet->mergeCells('C7:E7');
         $sheet->getStyle('A5:C7')->getFont()->setBold(true)->getColor()->setARGB('FF000B6F');
 
-        $sheet->mergeCells('I5:L8');
+        $sheet->mergeCells('J5:M8');
         // Auto-filled from the Accounts Team check (step 4) on a departmental
         // PRA. Null — and so the original hand-signed blank — for a legacy PRA
         // and for any departmental one that has not reached step 4.
         $ocrCheck = \App\Support\PaymentRequestSettings::ocrCheckFor($paymentRequest);
-        $sheet->setCellValue('I5', $ocrCheck
+        $sheet->setCellValue('J5', $ocrCheck
             ? "OCR Checked:     ☒ Yes      ☐ No\n\nChecker Name     : " . $ocrCheck['name']
                 . "\n\nDate             : " . $ocrCheck['date']
             : "OCR Checked:     ☐ Yes      ☐ No\n\nChecker Name     : ______________________\n\nDate             : ______________________");
-        $sheet->getStyle('I5:L8')->applyFromArray([
+        $sheet->getStyle('J5:M8')->applyFromArray([
             'font' => ['bold' => true, 'size' => 9, 'color' => ['argb' => 'FF000B6F']],
             'alignment' => ['wrapText' => true, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP],
             'borders' => ['outline' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF4B5FAE']]],
@@ -1929,10 +1963,10 @@ class PaymentRequestController extends Controller
         $sheet->getStyle('A8:E9')->getFont()->getColor()->setARGB('FF000B6F');
         $sheet->getStyle('A8:E9')->getAlignment()->setWrapText(true);
 
-        $sheet->mergeCells('I10:L10');
-        $sheet->setCellValue('I10', 'Total PI Amount: $ ' . number_format((float) ($summary['total_pi_amount'] ?? 0), 2));
-        $sheet->getStyle('I10:L10')->getFont()->setBold(true)->setSize(11)->getColor()->setARGB('FF000B6F');
-        $sheet->getStyle('I10:L10')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
+        $sheet->mergeCells('J10:M10');
+        $sheet->setCellValue('J10', 'Total PI Amount: $ ' . number_format((float) ($summary['total_pi_amount'] ?? 0), 2));
+        $sheet->getStyle('J10:M10')->getFont()->setBold(true)->setSize(11)->getColor()->setARGB('FF000B6F');
+        $sheet->getStyle('J10:M10')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
 
         // Column order matches the preview, the PDF and the HTML Excel export.
         // The row array below is written positionally with fromArray(), so any
@@ -1941,11 +1975,10 @@ class PaymentRequestController extends Controller
         // Preview filter reads the same contract_shipment_date column) - same
         // field, same value, only the label changed.
         //
-        // Budget sits immediately LEFT OF PI AMOUNT rather than immediately
-        // after Ex Mill, because this export is the only one of the three with a
-        // Comments column. Keeping the two money columns adjacent holds the same
-        // invariant everywhere: Budget is the column just left of PI Amount.
-        $headers = ['IHOD', 'Style', 'PCD Required', 'Vendor Name', 'Material PO Number', 'Material PI Number', 'Item Name', 'Payment Term', 'Committed Ex Mill', 'Comments', 'Budget', 'PI Amount (USD)'];
+        // The three money columns close the table in the same order on every
+        // renderer: PI Amount, Budget, then Saving (Budget - PI Amount). This
+        // export is the only one with a Comments column, which sits before them.
+        $headers = ['IHOD', 'Style', 'PCD Required', 'Vendor Name', 'Material PO Number', 'Material PI Number', 'Item Name', 'Payment Term', 'Committed Ex Mill', 'Comments', 'PI Amount (USD)', 'Budget', 'Saving'];
         $tableStart = 11;
         $sheet->fromArray($headers, null, 'A' . $tableStart);
         $sheet->getStyle('A' . $tableStart . ':' . $lastColumn . $tableStart)->applyFromArray([
@@ -1980,11 +2013,13 @@ class PaymentRequestController extends Controller
                 $row['payment_term'] ?: '-',
                 $row['committed_ex_mill'] ?: '-',
                 $row['comments'] ?: '(blank)',
+                (float) ($row['pi_amount'] ?? 0),
                 // A recorded budget is written as a NUMBER so the money format
                 // applies; an absent one as "-", matching every other empty cell
-                // in this table. It must never be written as 0.
+                // in this table. It must never be written as 0. Saving is
+                // Budget - PI Amount, and "-" when there is no budget.
                 isset($row['budget']) ? (float) $row['budget'] : '-',
-                (float) ($row['pi_amount'] ?? 0),
+                isset($row['budget']) ? (float) $row['budget'] - (float) ($row['pi_amount'] ?? 0) : '-',
             ], null, 'A' . $rowNo);
             $sheet->getStyle('A' . $rowNo . ':' . $lastColumn . $rowNo)->applyFromArray([
                 'font' => ['size' => 8],
@@ -2011,8 +2046,14 @@ class PaymentRequestController extends Controller
         // would read as a real ceiling and make a normal PRA look wildly over
         // budget. summaryFromApprovalRows() keeps total_budget at 0 accordingly.
         $sheet->setCellValue('A' . $rowNo, 'Grand Total');
-        $sheet->setCellValue('L' . $rowNo, (float) ($summary['total_pi_amount'] ?? 0));
-        $sheet->mergeCells('A' . $rowNo . ':K' . $rowNo);
+        $sheet->setCellValue('K' . $rowNo, (float) ($summary['total_pi_amount'] ?? 0));
+        // Budget and Saving totals only when EVERY line has a budget — a partial
+        // sum would read as a real ceiling.
+        if (! empty($summary['budget_complete'])) {
+            $sheet->setCellValue('L' . $rowNo, (float) ($summary['budget_sum'] ?? 0));
+            $sheet->setCellValue('M' . $rowNo, (float) ($summary['saving_sum'] ?? 0));
+        }
+        $sheet->mergeCells('A' . $rowNo . ':J' . $rowNo);
         $sheet->getStyle('A' . $rowNo . ':' . $lastColumn . $rowNo)->applyFromArray([
             'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFEAF0FB']],
             'font' => ['bold' => true, 'size' => 10, 'color' => ['argb' => 'FF000B6F']],
@@ -2020,7 +2061,7 @@ class PaymentRequestController extends Controller
         ]);
         // Both money columns carry the money format and right alignment. Budget
         // rows holding "-" are text, which the format leaves alone.
-        foreach (['K', 'L'] as $moneyColumn) {
+        foreach (['K', 'L', 'M'] as $moneyColumn) {
             $sheet->getStyle($moneyColumn . ($tableStart + 1) . ':' . $moneyColumn . $rowNo)->getNumberFormat()->setFormatCode($moneyFormat);
             $sheet->getStyle($moneyColumn . ($tableStart + 1) . ':' . $moneyColumn . $rowNo)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_RIGHT);
         }
@@ -2070,7 +2111,7 @@ class PaymentRequestController extends Controller
             $rowHeights[$spacerRow] = $spacerEach;
         }
         // The spacer is empty space: make sure no cell in it carries a border.
-        $sheet->getStyle('A' . ($grandRow + 1) . ':M' . ($grandRow + $spacerRows))
+        $sheet->getStyle('A' . ($grandRow + 1) . ':N' . ($grandRow + $spacerRows))
             ->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_NONE);
 
         $rowNo = $grandRow + $spacerRows + 1;
@@ -2080,8 +2121,8 @@ class PaymentRequestController extends Controller
         // PRA, three on a legacy one.
         $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocksFor($paymentRequest, false);
         $signatureColumns = count($signatureBlocks) === 4
-            ? [['A', 'C'], ['D', 'F'], ['G', 'I'], ['J', 'L']]
-            : [['A', 'C'], ['E', 'G'], ['I', 'L']];
+            ? [['A', 'C'], ['D', 'F'], ['G', 'I'], ['J', 'M']]
+            : [['A', 'C'], ['E', 'G'], ['I', 'M']];
 
         // Each box is three rows: caption, a tall signing space that ends in the
         // signature line (the signature image sits in it), and the
@@ -2127,7 +2168,7 @@ class PaymentRequestController extends Controller
         // Column widths follow their COLUMN through the reorder (A IHOD, B Style,
         // C PCD, D Vendor, E PO, F PI, G Item, H Pay Term, I Ex Mill, J Comments,
         // K Budget, L Amount). M is the narrow print spacer.
-        $columnWidths = ['A' => 16, 'B' => 16, 'C' => 14, 'D' => 20, 'E' => 18, 'F' => 19, 'G' => 14, 'H' => 16, 'I' => 16, 'J' => 14, 'K' => 14, 'L' => 15, 'M' => 1.5];
+        $columnWidths = ['A' => 16, 'B' => 16, 'C' => 14, 'D' => 20, 'E' => 18, 'F' => 19, 'G' => 14, 'H' => 16, 'I' => 16, 'J' => 14, 'K' => 15, 'L' => 14, 'M' => 14, 'N' => 1.5];
         foreach ($columnWidths as $column => $width) {
             $sheet->getColumnDimension($column)->setWidth($width);
         }
@@ -2143,7 +2184,7 @@ class PaymentRequestController extends Controller
         $sheet->getPageSetup()->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4);
         $sheet->getPageSetup()->setFitToWidth(1);
         $sheet->getPageSetup()->setFitToHeight(0);
-        $sheet->getPageSetup()->setPrintArea('A1:M' . $signRows['label']);
+        $sheet->getPageSetup()->setPrintArea('A1:N' . $signRows['label']);
         $sheet->getPageSetup()->setHorizontalCentered(true);
 
         $tmp = tempnam(sys_get_temp_dir(), 'payment_request_');
