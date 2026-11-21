@@ -1836,7 +1836,7 @@ class PaymentRequestController extends Controller
             : ['-', '-', '-'];
 
         // HEADER BAND, three boxes side by side (rows 1-4):
-        //   A:C  logo + company name      D:F  title + PR number      G:L  dates
+        //   A:C  logo + company name      D:I  title + PR number      J:L  dates
         // Each is outlined so the top of the sheet reads as a designed header and
         // not loose text. Column M is a narrow spacer inside the print area: it
         // keeps the right-hand borders of column L from being clipped at the page
@@ -1857,39 +1857,39 @@ class PaymentRequestController extends Controller
             $drawing->setWorksheet($sheet);
         }
 
+        // Symmetric about the page centre: logo box A:C (46 wide), title box D:I
+        // (103 wide, so the title sits dead centre of the 192-wide table) and the
+        // dates box J:L (43 wide). The Payment Require Date is a label over three
+        // day / month / year boxes so it fits the narrow right-hand box.
         $sheet->mergeCells('A4:C4');
-        $sheet->mergeCells('D1:F2');
-        $sheet->mergeCells('D3:F4');
-        $sheet->mergeCells('G1:L2');
+        $sheet->mergeCells('D1:I2');
+        $sheet->mergeCells('D3:I4');
+        $sheet->mergeCells('J1:L2');
+        $sheet->mergeCells('J3:L3');
         $sheet->setCellValue('A4', 'HUMANA APPARELS PVT. LTD.');
         $sheet->setCellValue('D1', 'Payment Request Approval');
         $sheet->setCellValue('D3', $paymentRequest->request_no);
-        $sheet->setCellValue('G1', 'Date:  ' . optional($paymentRequest->created_at)->format('jS M-Y'));
+        $sheet->setCellValue('J1', 'Date:  ' . optional($paymentRequest->created_at)->format('jS M-Y'));
+        $sheet->setCellValue('J3', 'Payment Require Date:');
+        $sheet->setCellValue('J4', $paymentRequiredParts[0]);
+        $sheet->setCellValue('K4', $paymentRequiredParts[1]);
+        $sheet->setCellValue('L4', $paymentRequiredParts[2]);
         $sheet->getStyle('A1:L4')->getFont()->getColor()->setARGB('FF000B6F');
         $sheet->getStyle('A4')->getFont()->setBold(true)->setSize(9);
         $sheet->getStyle('A4')->getAlignment()->setVertical($align::VERTICAL_CENTER)->setIndent(1);
         $sheet->getStyle('D1')->getFont()->setBold(true)->setSize(20);
         $sheet->getStyle('D3')->getFont()->setSize(10);
-        $sheet->getStyle('D1:F4')->getAlignment()->setHorizontal($align::HORIZONTAL_CENTER)->setVertical($align::VERTICAL_CENTER);
-        $sheet->getStyle('G1:L2')->getAlignment()->setHorizontal($align::HORIZONTAL_RIGHT)->setVertical($align::VERTICAL_CENTER)->setIndent(1);
-        $sheet->getStyle('G1')->getFont()->setBold(true);
-
-        // Payment Require Date: label over G:I, then day / month / year in J / K / L.
-        $sheet->mergeCells('G3:I4');
-        $sheet->setCellValue('G3', 'Payment Require Date:');
-        $sheet->getStyle('G3:I4')->getFont()->setBold(true)->getColor()->setARGB('FF000B6F');
-        $sheet->getStyle('G3:I4')->getAlignment()->setHorizontal($align::HORIZONTAL_RIGHT)->setVertical($align::VERTICAL_CENTER)->setIndent(1);
-        foreach (['J' => 0, 'K' => 1, 'L' => 2] as $dateColumn => $partIndex) {
-            $sheet->mergeCells($dateColumn . '3:' . $dateColumn . '4');
-            $sheet->setCellValue($dateColumn . '3', $paymentRequiredParts[$partIndex]);
-        }
-        $sheet->getStyle('J3:L4')->applyFromArray([
+        $sheet->getStyle('D1:I4')->getAlignment()->setHorizontal($align::HORIZONTAL_CENTER)->setVertical($align::VERTICAL_CENTER);
+        $sheet->getStyle('J1:L3')->getAlignment()->setHorizontal($align::HORIZONTAL_CENTER)->setVertical($align::VERTICAL_CENTER);
+        $sheet->getStyle('J1')->getFont()->setBold(true);
+        $sheet->getStyle('J3')->getFont()->setBold(true)->setSize(9);
+        $sheet->getStyle('J4:L4')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['argb' => 'FF000B6F']],
             'borders' => ['allBorders' => ['borderStyle' => $border::BORDER_THIN, 'color' => ['argb' => 'FF8EA0D4']]],
             'alignment' => ['horizontal' => $align::HORIZONTAL_CENTER, 'vertical' => $align::VERTICAL_CENTER],
         ]);
 
-        foreach (['A1:C4', 'D1:F4', 'G1:L4'] as $headerBox) {
+        foreach (['A1:C4', 'D1:I4', 'J1:L4'] as $headerBox) {
             $sheet->getStyle($headerBox)->applyFromArray($boxStyle);
         }
 
@@ -2063,6 +2063,9 @@ class PaymentRequestController extends Controller
         foreach (range($grandRow + 1, $grandRow + $spacerRows) as $spacerRow) {
             $rowHeights[$spacerRow] = $spacerEach;
         }
+        // The spacer is empty space: make sure no cell in it carries a border.
+        $sheet->getStyle('A' . ($grandRow + 1) . ':M' . ($grandRow + $spacerRows))
+            ->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_NONE);
 
         $rowNo = $grandRow + $spacerRows + 1;
 
