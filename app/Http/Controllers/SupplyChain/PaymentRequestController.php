@@ -1594,6 +1594,7 @@ class PaymentRequestController extends Controller
             'payment_required_date' => $item->payment_required_date ?: data_get($item->data, 'payment_required_date'),
             'buyer_name' => $item->buyer_name,
             'season_name' => $item->season_name,
+            'sales_contract' => data_get($item->data, 'sales_contract'),
             'payment_status' => $item->payment_status,
             'final_status' => data_get($item->data, 'final_status'),
             'vendor_type' => data_get($item->data, 'vendor_type'),
@@ -1661,6 +1662,7 @@ class PaymentRequestController extends Controller
             'delivery_terms' => $this->uniqueRowValues($rows, 'delivery_term'),
             'buyers' => $this->uniqueRowValues($rows, 'buyer_name'),
             'seasons' => $this->uniqueRowValues($rows, 'season_name'),
+            'sales_contracts' => $this->uniqueRowValues($rows, 'sales_contract'),
             'suppliers' => $this->uniqueRowValues($rows, 'vendor_name'),
             'shipment_months' => $this->uniqueRowValues($rows, 'shipment_month'),
             'vendor_types' => $this->uniqueRowValues($rows, 'vendor_type'),
@@ -1899,9 +1901,13 @@ class PaymentRequestController extends Controller
         $sheet->setCellValue('A6', 'Season');
         $sheet->setCellValue('B6', ':');
         $sheet->setCellValue('C6', $list($summary['seasons'] ?? [], $paymentRequest->season_name ?: '-'));
+        $sheet->setCellValue('A7', 'Sales Contract');
+        $sheet->setCellValue('B7', ':');
+        $sheet->setCellValue('C7', $list($summary['sales_contracts'] ?? [], '-'));
         $sheet->mergeCells('C5:E5');
         $sheet->mergeCells('C6:E6');
-        $sheet->getStyle('A5:C6')->getFont()->setBold(true)->getColor()->setARGB('FF000B6F');
+        $sheet->mergeCells('C7:E7');
+        $sheet->getStyle('A5:C7')->getFont()->setBold(true)->getColor()->setARGB('FF000B6F');
 
         $sheet->mergeCells('I5:L8');
         // Auto-filled from the Accounts Team check (step 4) on a departmental

@@ -43,7 +43,7 @@
         <td class="box">{{ $paymentRequiredParts[2] }}</td>
     </tr>
     <tr>
-        <td colspan="5" class="no-border"><strong>Buyer</strong> &nbsp; : &nbsp; {{ $list($summary['buyers'] ?? [], $paymentRequest->buyer_name ?: '-') }}<br><strong>Season</strong> : &nbsp; {{ $list($summary['seasons'] ?? [], $paymentRequest->season_name ?: '-') }}<br><br>* Buyer nominated supplier.<br>&nbsp;&nbsp;No excess quantity has been booked.</td>
+        <td colspan="5" class="no-border"><strong>Buyer</strong> &nbsp; : &nbsp; {{ $list($summary['buyers'] ?? [], $paymentRequest->buyer_name ?: '-') }}<br><strong>Season</strong> : &nbsp; {{ $list($summary['seasons'] ?? [], $paymentRequest->season_name ?: '-') }}<br><strong>Sales Contract</strong> : &nbsp; {{ $list($summary['sales_contracts'] ?? [], '-') }}<br><br>* Buyer nominated supplier.<br>&nbsp;&nbsp;No excess quantity has been booked.</td>
         <td colspan="3" class="no-border"></td>
         @php $ocrCheck = \App\Support\PaymentRequestSettings::ocrCheckFor($paymentRequest); @endphp
         {{-- Auto-filled from the Accounts Team check (step 4) on a departmental

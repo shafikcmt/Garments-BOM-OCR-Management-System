@@ -793,6 +793,10 @@ Commercial and Admin record shipments for the buyers they hold; Management can r
 
 The **QTY** column of the pending list is the **Booking Qty** (the *Materials Ordered* column) of every order the row combines, the same figure the booking preview prints in **Booking Qty**. When the orders carry a **PP Qty**, a small line under the quantity shows it, for example *+ 40 PP = 3000*, which equals the **Total Qty** at the bottom of the preview.
 
+### 3.x3 Sales Contract on the PRA
+
+The PRA shows **Sales Contract** under **Season**, on the screen, the PDF and the Excel. It is read from the Workspace **Sales Contract** column when there is one, otherwise from **Initial Contract Number** or **Contract Number**. If a PRA covers several contracts they are listed together. A PRA created before this change shows **-** until it is created again.
+
 ### 3.y PP Qty and PI Amount
 
 **PI Amount = PI Rate x (Booking Qty + PP Qty).** The PP Qty on the booking format is billed together with the booking quantity, so the PI Amount in the Workspace and on the Payment Request (PRA) includes it. Example: rate 6.18, booking 4,061, PP 25 gives 6.18 x 4,086.

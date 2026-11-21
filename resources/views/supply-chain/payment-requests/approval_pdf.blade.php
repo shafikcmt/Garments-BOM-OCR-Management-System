@@ -126,7 +126,8 @@
         <td style="width:65%;">
             <div class="buyer">
                 Buyer&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: &nbsp;{{ $list($summary['buyers'] ?? [], $paymentRequest->buyer_name ?: '-') }}<br>
-                Season&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: &nbsp;{{ $list($summary['seasons'] ?? [], $paymentRequest->season_name ?: '-') }}
+                Season&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: &nbsp;{{ $list($summary['seasons'] ?? [], $paymentRequest->season_name ?: '-') }}<br>
+                Sales Contract&nbsp;: &nbsp;{{ $list($summary['sales_contracts'] ?? [], '-') }}
             </div>
             <div class="note">* Buyer nominated supplier.<br>&nbsp;&nbsp;No excess quantity has been booked.</div>
         </td>

@@ -315,6 +315,7 @@
                     <div class="pra-info mt-3">
                         <div>Buyer <span class="d-inline-block mx-4">:</span> {{ $list($summary['buyers'] ?? [], $paymentRequest->buyer_name ?: '-') }}</div>
                         <div>Season <span class="d-inline-block mx-3">:</span> {{ $list($summary['seasons'] ?? [], $paymentRequest->season_name ?: '-') }}</div>
+                        <div>Sales Contract <span class="d-inline-block mx-2">:</span> {{ $list($summary['sales_contracts'] ?? [], '-') }}</div>
                     </div>
                     <div class="pra-note mt-3">
                         * Buyer nominated supplier.<br>
