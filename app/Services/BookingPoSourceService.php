@@ -93,6 +93,32 @@ class BookingPoSourceService
             ->values()
             ->all();
 
+        // MATERIALS ORDERED is the quantity Supply Chain fills in, and the alias
+        // list below ranks it ahead of Materials To Be Ordered, which is only the
+        // fallback. Taking whichever matching cell came first in the sheet put the
+        // calculated Materials To Be Ordered (a column further left) ahead of the
+        // typed figure, so PI Amount was built on the wrong quantity.
+        if ($group === 'materials_ordered') {
+            foreach ($aliases as $alias) {
+                foreach ($row->cells as $cell) {
+                    if (! $cell->header) {
+                        continue;
+                    }
+
+                    $value = trim((string) $cell->value);
+                    if ($this->isBlankValue($value)) {
+                        continue;
+                    }
+
+                    if ($this->normalize($cell->header->header_key) === $alias
+                        || $this->normalize($cell->header->header_name) === $alias
+                        || $this->normalize($cell->header->formula_key ?? '') === $alias) {
+                        return $value;
+                    }
+                }
+            }
+        }
+
         foreach ($row->cells as $cell) {
             if (! $cell->header) {
                 continue;
@@ -193,14 +219,18 @@ class BookingPoSourceService
     /**
      * PI Amount = PI Rate x (Booking Qty + chargeable PP Qty).
      *
-     * The saved PI Amount cell can still hold the old Rate x Booking Qty, so when
-     * there is a billable PP quantity the amount is rebuilt from the rate. With no
-     * PP quantity (or a free one) the saved amount is used exactly as before.
+     * The saved PI Amount cell can still hold an amount worked out on an older
+     * quantity, so the amount is rebuilt from the rate whenever a rate and a
+     * quantity exist.
      */
     protected function piAmountWithPp(?float $sourceAmount, float $rate, ?float $qty, float $chargeablePp): float
     {
-        if ($chargeablePp > 0 && $rate > 0) {
-            return $rate * (($qty ?? 0) + $chargeablePp);
+        // Always built from the Materials Ordered quantity Supply Chain filled in,
+        // never from a saved PI Amount that may have been worked out on an older
+        // quantity. The saved amount is only used when there is no rate or no
+        // quantity to calculate from.
+        if ($rate > 0 && ($qty ?? 0) > 0) {
+            return $rate * ($qty + $chargeablePp);
         }
 
         return $sourceAmount ?? ($rate * ($qty ?? 0));

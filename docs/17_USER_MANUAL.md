@@ -789,11 +789,17 @@ On Inbound Shipments press **Clearance Summary**. It shows what is not yet in-ho
 
 Commercial and Admin record shipments for the buyers they hold; Management can read them.
 
+### 3.x2 Qty on the Pending PO list and the booking preview
+
+The **QTY** column of the pending list is the **Booking Qty** (the *Materials Ordered* column) of every order the row combines, the same figure the booking preview prints in **Booking Qty**. When the orders carry a **PP Qty**, a small line under the quantity shows it, for example *+ 40 PP = 3000*, which equals the **Total Qty** at the bottom of the preview.
+
 ### 3.y PP Qty and PI Amount
 
 **PI Amount = PI Rate x (Booking Qty + PP Qty).** The PP Qty on the booking format is billed together with the booking quantity, so the PI Amount in the Workspace and on the Payment Request (PRA) includes it. Example: rate 6.18, booking 4,061, PP 25 gives 6.18 x 4,086.
 
 If the supplier or buyer gives the PP Qty **free**, type **Yes** in the **PP Qty Free** column of that line in the Workspace. The PP Qty is then not billed and PI Amount = PI Rate x Booking Qty. Leave the column blank (or **No**) when the PP Qty is charged.
+
+The quantity used is always the **Materials Ordered** that Supply Chain filled in on the Workspace, never *Materials To Be Ordered*. So if you change Materials Ordered, the PI Amount on the next PRA preview follows it.
 
 **On the PRA preview:** if a line has a PP Qty, a **PP Qty billing** box appears above the sheet. For each line choose **Billed** or **Free**, then press **Update amount**. The PI Amount and Total PI Amount on the sheet change at once, and the choice you see is saved when you press **Create PRA**. The box starts from the **PP Qty Free** column of the Workspace. Changing it here affects only this PRA; the Workspace is not changed.
 
