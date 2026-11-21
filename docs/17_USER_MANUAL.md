@@ -797,6 +797,10 @@ The **QTY** column of the pending list is the **Booking Qty** (the *Materials Or
 
 The PRA shows **Sales Contract** under **Season**, on the screen, the PDF and the Excel. It is read from the Workspace **Sales Contract** column when there is one, otherwise from **Initial Contract Number** or **Contract Number**. If a PRA covers several contracts they are listed together. A PRA created before this change shows **-** until it is created again.
 
+### 3.x4 PI Amt, Budget and Saving on the PRA
+
+The three money columns at the right of the PRA table are, in this order: **PI Amt (USD)**, **Budget** and **Saving**. **Saving = Budget - PI Amt**. A negative Saving (the PI is above the budget) is shown with a minus sign and in red. A line with no budget shows **-** in Budget and Saving. The **Grand Total** row shows the Budget and Saving totals only when every line has a budget; otherwise those two cells stay blank, so a partial sum is never mistaken for a real budget. The screen, PDF and Excel are the same.
+
 ### 3.y PP Qty and PI Amount
 
 **PI Amount = PI Rate x (Booking Qty + PP Qty).** The PP Qty on the booking format is billed together with the booking quantity, so the PI Amount in the Workspace and on the Payment Request (PRA) includes it. Example: rate 6.18, booking 4,061, PP 25 gives 6.18 x 4,086.

@@ -95,9 +95,9 @@
          flat 1% off everything: the free-text columns wrap when squeezed, and a
          wrapped cell makes the whole row taller, which is what costs pages in
          print. See the fuller note in approval_pdf.blade.php. --}}
-    .c-vendor { width:14%; } .c-style { width:8%; } .c-pcd { width:7%; } .c-term { width:10%; } .c-po { width:10%; }
-    .c-pi { width:10%; } .c-type { width:9%; } .c-cship { width:7%; } .c-exmill { width:7%; }
-    .c-budget { width:8%; } .c-amount { width:10%; }
+    .c-vendor { width:12%; } .c-style { width:8%; } .c-pcd { width:7%; } .c-term { width:9%; } .c-po { width:9%; }
+    .c-pi { width:9%; } .c-type { width:8%; } .c-cship { width:7%; } .c-exmill { width:7%; }
+    .c-budget { width:7%; } .c-amount { width:9%; } .c-saving { width:8%; }
     .pra-sign-area { margin-top:52px; color:#000b6f; }
     .pra-sign-title { font-size:13px; font-weight:800; margin-bottom:10px; }
     .pra-sign-text { font-size:13px; margin-bottom:22px; }
@@ -371,8 +371,13 @@
                             {{-- The line's allocated budget, right-aligned beside
                                  PI Amt so the two money columns read down their
                                  decimal points together. --}}
-                            <th class="c-budget text-end">Budget</th>
+                            {{-- PI Amt, then the line's Budget, then the Saving
+                                 (Budget - PI Amt). The money columns sit together
+                                 at the right so they read down their decimal
+                                 points as one block. --}}
                             <th class="c-amount text-end">PI Amt (USD)</th>
+                            <th class="c-budget text-end">Budget</th>
+                            <th class="c-saving text-end">Saving</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -401,20 +406,26 @@
                                 {{-- null means the sheet recorded no budget for
                                      this line, which prints "-" like any other
                                      empty cell. It must not become $0.00. --}}
-                                <td class="text-end">{{ isset($row['budget']) ? '$ ' . $money($row['budget']) : '-' }}</td>
                                 <td class="text-end fw-bold">$ {{ $money($row['pi_amount'] ?? 0) }}</td>
+                                <td class="text-end">{{ isset($row['budget']) ? '$ ' . $money($row['budget']) : '-' }}</td>
+                                @php $rowSaving = isset($row['budget']) ? (float) $row['budget'] - (float) ($row['pi_amount'] ?? 0) : null; @endphp
+                                <td class="text-end fw-semibold {{ $rowSaving !== null && $rowSaving < 0 ? 'text-danger' : '' }}">{{ $rowSaving === null ? '-' : ($rowSaving < 0 ? '-$ ' . $money(abs($rowSaving)) : '$ ' . $money($rowSaving)) }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="11" class="text-center py-5 text-muted">No payment request item found.</td></tr>
+                            <tr><td colspan="12" class="text-center py-5 text-muted">No payment request item found.</td></tr>
                         @endforelse
                     </tbody>
                     <tfoot>
-                        {{-- No Budget total: the column is filled on only some rows,
-                             so a partial sum would read as a real ceiling and make a
-                             normal PRA look wildly over budget. The cell stays blank. --}}
+                        {{-- Budget and Saving totals only when EVERY line has a
+                             budget: the column is filled on only some rows, so a
+                             partial sum would read as a real ceiling and make a
+                             normal PRA look wildly over budget. Otherwise blank. --}}
+                        @php $budgetDone = (bool) ($summary['budget_complete'] ?? false); $savingSum = (float) ($summary['saving_sum'] ?? 0); @endphp
                         <tr>
-                            <td colspan="10">Grand Total</td>
+                            <td colspan="9">Grand Total</td>
                             <td class="text-end">$ {{ $money($summary['total_pi_amount'] ?? 0) }}</td>
+                            <td class="text-end">{{ $budgetDone ? '$ ' . $money($summary['budget_sum'] ?? 0) : '' }}</td>
+                            <td class="text-end {{ $budgetDone && $savingSum < 0 ? 'text-danger' : '' }}">{{ $budgetDone ? ($savingSum < 0 ? '-$ ' . $money(abs($savingSum)) : '$ ' . $money($savingSum)) : '' }}</td>
                         </tr>
                     </tfoot>
                 </table>
