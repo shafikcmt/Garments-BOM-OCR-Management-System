@@ -43,7 +43,9 @@ class OrderChangeNotifier
         $recipients = User::where('id', '!=', $actor->id)
             ->whereHas('roles', fn ($q) => $q->whereIn('name', DepartmentRoles::rolesFor('store')))
             ->get()
-            ->reject(fn (User $u) => $file->isBuyerLockedForUser($u));
+            ->reject(fn (User $u) => $file->isBuyerLockedForUser($u))
+            // The link opens the file, so only people who can open the Workspace.
+            ->filter(fn (User $u) => $u->canOpenWorkspace());
 
         foreach ($byStyle as $styleId => $group) {
             $style = $styles->get($styleId);
