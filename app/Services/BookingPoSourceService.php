@@ -93,12 +93,15 @@ class BookingPoSourceService
             ->values()
             ->all();
 
+        // SALES CONTRACT follows the same rule: the alias list ranks the dedicated
+        // Sales Contract column ahead of the plain Contract Number fallbacks.
+        //
         // MATERIALS ORDERED is the quantity Supply Chain fills in, and the alias
         // list below ranks it ahead of Materials To Be Ordered, which is only the
         // fallback. Taking whichever matching cell came first in the sheet put the
         // calculated Materials To Be Ordered (a column further left) ahead of the
         // typed figure, so PI Amount was built on the wrong quantity.
-        if ($group === 'materials_ordered') {
+        if (in_array($group, ['materials_ordered', 'sales_contract'], true)) {
             foreach ($aliases as $alias) {
                 foreach ($row->cells as $cell) {
                     if (! $cell->header) {
@@ -309,6 +312,7 @@ class BookingPoSourceService
         $sapCode = $this->sourceValueForBookingPo($bookingPo, 'sap_code') ?: $bookingPo->supplier_article;
         $materialType = $this->sourceValueForBookingPo($bookingPo, 'material_type') ?: $bookingPo->item_type;
         $materialDescription = $this->sourceValueForBookingPo($bookingPo, 'material_description') ?: $bookingPo->description ?: $bookingPo->item_name;
+        $salesContract = $this->sourceValueForBookingPo($bookingPo, 'sales_contract');
 
         foreach ($this->siblingSourceRows($bookingPo) as $siblingRow) {
             $rowMaterials = $this->numericValue(
@@ -342,6 +346,7 @@ class BookingPoSourceService
             $style = $this->joinDistinct([$style, $this->sourceValueForRow($siblingRow, 'style_name') ?: $this->sourceValueForRow($siblingRow, 'style')]) ?: $style;
             $sapCode = $this->joinDistinct([$sapCode, $this->sourceValueForRow($siblingRow, 'sap_code')]) ?: $sapCode;
             $materialType = $this->joinDistinct([$materialType, $this->sourceValueForRow($siblingRow, 'material_type')]) ?: $materialType;
+            $salesContract = $this->joinDistinct([$salesContract, $this->sourceValueForRow($siblingRow, 'sales_contract')]) ?: $salesContract;
             $materialDescription = $this->joinDistinct([$materialDescription, $this->sourceValueForRow($siblingRow, 'material_description')]) ?: $materialDescription;
         }
 
@@ -368,6 +373,7 @@ class BookingPoSourceService
             'qty' => $materialsOrdered ?? $this->numericValue($bookingPo->qty),
             'pi_number' => $piNumber,
             'pi_status' => $this->bookingPoPiStatus($bookingPo),
+            'sales_contract' => $salesContract,
             'pi_rate' => $piRate,
             'pi_amount' => $piAmount,
             'pp_qty_number' => PpQty::number($this->sourceValueForBookingPo($bookingPo, 'pp_qty')),
@@ -484,6 +490,7 @@ class BookingPoSourceService
             'material_color' => $read('material_color') ?: $fallback($bookingPo->color),
             'size' => $read('size') ?: $fallback($bookingPo->size_width),
             'qty' => $qty,
+            'sales_contract' => $read('sales_contract') ?: ($base['sales_contract'] ?? null),
             'pi_rate' => $rate,
             'pi_amount' => $amount,
             'pp_qty_number' => PpQty::number($read('pp_qty')),
@@ -1451,6 +1458,7 @@ class BookingPoSourceService
             'pi_status' => str_contains($header, 'pi_status'),
             'pi_rate' => str_contains($header, 'pi_rate') || str_contains($header, 'invoiced_rate_scm') || $header === 'invoiced_rate',
             'pi_amount' => str_contains($header, 'pi_amount'),
+            'sales_contract' => str_contains($header, 'sales_contract'),
             'payment_reqd_date' => str_contains($header, 'payment_reqd_date') || str_contains($header, 'payment_required_date') || str_contains($header, 'payment_due_date'),
             'pcd_required' => str_contains($header, 'pcd_required') || str_contains($header, 'pcd_req') || str_contains($header, 'pcd_date'),
             'payment_status' => str_contains($header, 'payment_status'),
@@ -1533,6 +1541,10 @@ class BookingPoSourceService
             'pi_status' => ['pi_status', 'PI Status'],
             'pi_rate' => ['pi_rate', 'invoiced_rate_scm', 'invoiced_rate', 'PI Rate', 'Invoiced Rate(SCM)', 'Invoiced Rate'],
             'pi_amount' => ['pi_amount', 'PI Amount'],
+            // The buyer's sales contract number printed on the PRA. A dedicated
+            // Sales Contract column wins; the Initial / plain Contract Number
+            // columns are the fallback, in that order.
+            'sales_contract' => ['sales_contract', 'sales_contract_no', 'sales_contract_number', 'buyer_sales_contract', 'sales_contract_no_', 'Sales Contract', 'Sales Contract No', 'Sales Contract Number', 'Buyer Sales Contract', 'initial_contract_number', 'contract_number', 'Initial Contract Number', 'Contract Number'],
             // PP (pre-production) quantity and the Yes/No column that marks it free.
             'pp_qty' => ['pp_qty', 'p_p_qty', 'pp_quantity', 'p_p_quantity', 'PP Qty', 'P/P Qty'],
             'pp_free' => ['pp_qty_free', 'pp_free', 'free_pp_qty', 'PP Qty Free', 'PP Free'],
