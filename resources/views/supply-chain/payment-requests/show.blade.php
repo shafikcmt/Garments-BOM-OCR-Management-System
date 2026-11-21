@@ -428,24 +428,20 @@
                             <img src="{{ $sign['src'] }}" alt="{{ $sign['title'] }} signature" class="pra-sign-img">
                             <div class="pra-sign-line"></div>
                             <div class="pra-sign-meta">
-                                @if($sign['name'])<div class="pra-sign-name">{{ $sign['name'] }}</div>@endif
                                 @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
                                 <div>Signature &amp; Date</div>
                             </div>
                         @elseif(!empty($sign['pending']))
                             {{-- Named but unsigned. The caption is what keeps a
                                  name on a signature line from reading as one. --}}
-                            <div class="pra-sign-text">{{ $sign['name'] ?: '' }}</div>
+                            <div class="pra-sign-text">&nbsp;</div>
                             <div class="pra-sign-line"></div>
                             <div class="pra-sign-meta">
                                 @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
                                 <div class="fst-italic text-muted">Pending approval</div>
                             </div>
                         @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
-                            <div class="pra-sign-text">
-                                <span class="pra-sign-name">{{ $sign['name'] }}</span>
-                                @if($sign['date']) — {{ $sign['date'] }}@endif
-                            </div>
+                            <div class="pra-sign-text">&nbsp;</div>
                             <div class="pra-sign-line"></div>
                             <div class="pra-sign-meta">
                                 @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif

@@ -109,16 +109,15 @@
                 <strong>{{ $sign['title'] }}</strong><br>
                 @if($sign['src'])
                     <img src="{{ $sign['src'] }}" alt="Signature of {{ $sign['name'] ?? 'approver' }}" style="max-height:40px;"><br>
-                    {{ $sign['name'] }}{{ !empty($sign['date']) ? ' — ' . $sign['date'] : '' }}<br>
                     @if($sign['designation']){{ $sign['designation'] }}<br>@endif
                     Signature &amp; Date
                 @elseif(!empty($sign['pending']))
                     {{-- Unsigned; the caption is what keeps a name from reading as a signature. --}}
-                    <br>{{ $sign['name'] }}<br>
+                    <br><br>
                     @if($sign['designation']){{ $sign['designation'] }}<br>@endif
                     <em>Pending approval</em>
                 @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
-                    <br>{{ $sign['name'] }}{{ !empty($sign['date']) ? ' — ' . $sign['date'] : '' }}<br>
+                    <br><br>
                     @if($sign['designation']){{ $sign['designation'] }}<br>@endif
                     Signature &amp; Date
                 @else
