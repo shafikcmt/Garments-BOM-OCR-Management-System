@@ -99,8 +99,8 @@
     .c-pi { width:10%; } .c-type { width:9%; } .c-cship { width:7%; } .c-exmill { width:7%; }
     .c-budget { width:8%; } .c-amount { width:10%; }
     .pra-sign-area { margin-top:52px; color:#000b6f; }
-    .pra-sign-title { font-size:13px; font-weight:800; margin-bottom:30px; }
-    .pra-sign-text { font-size:13px; margin-bottom:30px; }
+    .pra-sign-title { font-size:13px; font-weight:800; margin-bottom:10px; }
+    .pra-sign-text { font-size:13px; margin-bottom:22px; }
     .pra-sign-line { border-bottom:1px solid #000b6f; height:1px; }
     .pra-sign-sep { border-left:1px solid #8d9bd3; }
     .pra-sign-img { max-height:54px; max-width:100%; object-fit:contain; display:block; margin-bottom:6px; }
@@ -137,8 +137,8 @@
         .pra-check-box .mb-3 { margin-bottom:.5rem !important; }
         .pra-total { font-size:13px; margin-bottom:6px; }
         .pra-sign-area { margin-top:22px; }
-        .pra-sign-title { font-size:10.5px; margin-bottom:16px; }
-        .pra-sign-text { font-size:10.5px; margin-bottom:16px; }
+        .pra-sign-title { font-size:10.5px; margin-bottom:6px; }
+        .pra-sign-text { font-size:10.5px; margin-bottom:12px; }
         .pra-sign-img { max-height:38px; }
         .pra-sign-meta { font-size:9.5px; }
 
@@ -438,7 +438,7 @@
                             <div class="pra-sign-line"></div>
                             <div class="pra-sign-meta">
                                 @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
-                                <div class="fst-italic text-muted">Pending approval</div>
+                                <div>Signature &amp; Date</div>
                             </div>
                         @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
                             <div class="pra-sign-text">&nbsp;</div>
