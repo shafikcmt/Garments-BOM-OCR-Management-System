@@ -127,6 +127,9 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/profile/signature', [ProfileController::class, 'destroySignature'])->name('profile.signature.destroy');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    // Vendor defaults (incoterm, payment term, ship mode) for the Workspace vendor column.
+    Route::get('/uploaded-files-supplier-defaults', [ExcelFileController::class, 'supplierDefaults'])->name('uploaded-files.supplier_defaults');
+
     Route::get('/uploaded-files/{excelFile}', [ExcelFileController::class, 'show'])->name('uploaded-files.show');
     Route::put('/uploaded-files/{excelFile}', [ExcelFileController::class, 'update'])->name('uploaded-files.update');
     Route::post('/uploaded-files/{excelFile}/rows', [ExcelFileController::class, 'addRow'])->name('uploaded-files.rows.store');

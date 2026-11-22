@@ -2106,6 +2106,17 @@
                 {{-- data-cell-select opts this table into drag/shift-click range
                      selection and Ctrl+C copy (resources/js/modules/sheet-range-select.js).
                      Selection and copy only — that module never writes a cell. --}}
+                {{-- ADMIN-MANAGED DROPDOWNS. One list per source for the whole sheet; the
+                     cells point at it with list="dl-<source>". The cell stays a normal
+                     text input, so typing, keyboard moves and saving work as before, and a
+                     value that is not in the list is still accepted. --}}
+                @foreach(($optionLists ?? []) as $optionSource => $optionNames)
+                    <datalist id="dl-{{ $optionSource }}">
+                        @foreach($optionNames as $optionName)
+                            <option value="{{ $optionName }}"></option>
+                        @endforeach
+                    </datalist>
+                @endforeach
                 <table class="table table-bordered excel-data-table" id="excelDataTable" data-cell-select>
                     <thead>
                         <tr>
@@ -2370,6 +2381,11 @@
                                                 data-header-id="{{ $header->id }}"
                                                 data-header-key="{{ $header->header_key }}"
                                                 @if($inputType === 'number') step="any" @endif
+                                                @if($header->options_source && $inputType === 'text')
+                                                    list="dl-{{ $header->options_source }}"
+                                                    data-options-source="{{ $header->options_source }}"
+                                                @endif
+                                                @if(in_array($header->header_key, ['vendor_name', 'supplier_name', 'vendor'], true)) data-vendor-cell="1" @endif
                                             >
                                         @else
                                             <div
@@ -4567,5 +4583,43 @@ document.addEventListener('DOMContentLoaded', function () {
     syncSheetHeadHeight();
     window.addEventListener('resize', syncSheetHeadHeight);
 });
+</script>
+<script>
+    // CHOOSING A VENDOR FILLS ITS DEFAULTS. When the Vendor cell of a row changes,
+    // the vendor's Incoterm, Payment Term and Ship Mode are read from the vendor
+    // master and put into this row's matching dropdown columns - but only cells
+    // that are still empty, so nothing already typed is overwritten.
+    document.addEventListener('DOMContentLoaded', function () {
+        const url = @json(route('uploaded-files.supplier_defaults'));
+        const sourceToKey = { incoterm: 'incoterm', payment_term: 'payment_term', ship_mode: 'ship_mode' };
+
+        document.addEventListener('change', function (event) {
+            const input = event.target;
+            if (!input || !input.matches || !input.matches('input[data-vendor-cell]')) return;
+
+            const name = (input.value || '').trim();
+            const row = input.closest('tr');
+            if (!name || !row) return;
+
+            fetch(url + '?name=' + encodeURIComponent(name), { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                .then(function (response) { return response.ok ? response.json() : null; })
+                .then(function (data) {
+                    if (!data || !data.found) return;
+
+                    row.querySelectorAll('input[data-options-source]').forEach(function (cell) {
+                        const key = sourceToKey[cell.dataset.optionsSource];
+                        const value = key ? (data[key] || '') : '';
+
+                        if (value !== '' && (cell.value || '').trim() === '' && !cell.readOnly && !cell.disabled) {
+                            cell.value = value;
+                            // Same events a typed value raises, so the sheet marks itself changed.
+                            cell.dispatchEvent(new Event('input', { bubbles: true }));
+                            cell.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    });
+                })
+                .catch(function () { /* the vendor lookup is a convenience; ignore failures */ });
+        });
+    });
 </script>
 @endsection

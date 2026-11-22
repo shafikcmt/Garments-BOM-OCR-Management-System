@@ -20,14 +20,14 @@
             <div>
                 <div class="app-hero-eyebrow">Admin / Booking Setup</div>
                 <h3 class="app-hero-title mb-0">Vendor Options</h3>
-                <div class="small text-muted">Choices shown on the vendor form and booking PO. Deleting one does not change vendors that already use it.</div>
+                <div class="small text-muted">Choices shown on the vendor form, the booking PO and the dropdown columns of the Workspace (set per column on Excel Header Control). Deleting one does not change vendors or rows that already use it.</div>
             </div>
         </div>
     </div>
 
     <div class="row g-3">
         @foreach($types as $type => $title)
-            <div class="col-lg-4">
+            <div class="col-md-6 col-xl-3">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-transparent fw-semibold">{{ $title }}</div>
                     <div class="card-body">

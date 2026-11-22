@@ -161,6 +161,18 @@
                 </div>
 
                 <div class="col-md-4">
+                    <label class="form-label">Dropdown options</label>
+                    <select name="options_source" class="form-select @error('options_source') is-invalid @enderror">
+                        <option value="">None (type freely)</option>
+                        @foreach(\App\Models\SupplierOption::TYPES as $sourceKey => $sourceTitle)
+                            <option value="{{ $sourceKey }}" @selected(old('options_source', $header->options_source ?? '') === $sourceKey)>{{ $sourceTitle }}</option>
+                        @endforeach
+                    </select>
+                    @error('options_source')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    <small class="text-muted">Workspace-e ei column-e dropdown dekhabe. List ta Admin &gt; Booking Setup &gt; Vendor Options theke manage hoy; list-e na thaka value-o type kora jay.</small>
+                </div>
+
+                <div class="col-md-4">
                     <label class="form-label">Value Mode</label>
                     <select name="value_mode" id="value_mode" class="form-select @error('value_mode') is-invalid @enderror" required>
                         <option value="input" @selected(old('value_mode', $header->value_mode ?? 'input') === 'input')>Input</option>

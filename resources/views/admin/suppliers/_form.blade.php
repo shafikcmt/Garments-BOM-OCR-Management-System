@@ -84,8 +84,13 @@
 
     <div class="col-md-4">
         <label class="form-label">Default Payment Terms</label>
-        <input type="text" name="default_payment_terms"  class="form-control @error('default_payment_terms') is-invalid @enderror"
+        <input type="text" name="default_payment_terms" list="paymentTermOptions" autocomplete="off" class="form-control @error('default_payment_terms') is-invalid @enderror"
                value="{{ old('default_payment_terms', ($supplier->default_payment_terms ?? '') instanceof \DateTimeInterface ? $supplier->default_payment_terms->format('Y-m-d') : ($supplier->default_payment_terms ?? '')) }}" placeholder="LC at sight / 30 days">
+        <datalist id="paymentTermOptions">
+            @foreach(\App\Models\SupplierOption::names('payment_term') as $paymentTermOption)
+                <option value="{{ $paymentTermOption }}"></option>
+            @endforeach
+        </datalist>
         @error('default_payment_terms')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 

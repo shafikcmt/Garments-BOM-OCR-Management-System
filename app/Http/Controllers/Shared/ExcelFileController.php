@@ -274,7 +274,17 @@ class ExcelFileController extends Controller
             ? $activityService->forRole($myDepartmentRole, $excelFile)
             : null;
 
+        // Admin-managed dropdown lists for the columns that have one (Excel Header
+        // Control > Dropdown options), keyed by list name.
+        $optionLists = $headers
+            ->pluck('options_source')
+            ->filter()
+            ->unique()
+            ->mapWithKeys(fn ($source) => [$source => \App\Models\SupplierOption::names($source)])
+            ->all();
+
         return view('shared.excel-files.show', compact(
+            'optionLists',
             'excelFile',
             'headers',
             'showAllColumns',
@@ -449,6 +459,39 @@ class ExcelFileController extends Controller
 
         return $orderInfo;
     }
+   /**
+     * Vendor master defaults for the Workspace: the Delivery Term (incoterm),
+     * Payment Term and Ship Mode kept on the vendor, so choosing a vendor on a
+     * row can fill those columns. Empty strings when the vendor is unknown.
+     */
+    public function supplierDefaults(Request $request)
+    {
+        $name = trim((string) $request->query('name', ''));
+        $empty = ['found' => false, 'incoterm' => '', 'payment_term' => '', 'ship_mode' => ''];
+
+        if ($name === '') {
+            return response()->json($empty);
+        }
+
+        $escaped = addcslashes($name, '%_\\');
+
+        $supplier = \App\Models\Supplier::query()
+            ->selectable()
+            ->where(fn ($q) => $q->whereLike('supplier_name', $escaped)->orWhereLike('legal_name', $escaped)->orWhereLike('supplier_code', $escaped))
+            ->first();
+
+        if (! $supplier) {
+            return response()->json($empty);
+        }
+
+        return response()->json([
+            'found' => true,
+            'incoterm' => (string) $supplier->incoterm,
+            'payment_term' => (string) $supplier->default_payment_terms,
+            'ship_mode' => (string) $supplier->ship_mode,
+        ]);
+    }
+
    public function update(Request $request, ExcelFile $excelFile)
     {
         $user = auth()->user();
