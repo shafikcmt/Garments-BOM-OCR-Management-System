@@ -206,6 +206,7 @@ class PaymentRequestController extends Controller
             'payment_required_date' => ['nullable', 'date'],
             'pp_free' => ['nullable', 'array'],
             'pp_free.*' => ['in:0,1'],
+            'pra_mode' => ['nullable', 'in:single,multi'],
         ]);
 
         $selectedIds = collect($validated['booking_po_ids'])
@@ -228,6 +229,13 @@ class PaymentRequestController extends Controller
                 ->route('supply_chain.payment_requests.index')
                 ->with('warning', 'No eligible PI received / payment pending row was selected. Please check PI Number, PI Status and Payment Status.');
         }
+
+        if ($violation = $this->singleVendorViolation($validated['pra_mode'] ?? null, $snapshots)) {
+            return redirect()->route('supply_chain.payment_requests.index')->with('warning', $violation);
+        }
+
+        $praMode = $validated['pra_mode'] ?? null;
+        $vendorCount = $this->vendorCountOf($snapshots);
 
         $paymentRequest = new PaymentRequest([
             'request_no' => 'PREVIEW-' . now()->format('Ymd'),
@@ -280,7 +288,7 @@ class PaymentRequestController extends Controller
                 'amount' => (float) ($row['pi_amount'] ?? 0),
             ])->values();
 
-        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'ppLines', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'checkerPool', 'budgetCheck', 'canOverrideBudget', 'createOnDepartmentalFlow', 'stepTwoAssignees'));
+        return view('supply-chain.payment-requests.show', compact('paymentRequest', 'summary', 'approvalRows', 'isPreview', 'ppLines', 'praMode', 'vendorCount', 'bookingPoIds', 'paymentRequiredInput', 'approverPool', 'checkerPool', 'budgetCheck', 'canOverrideBudget', 'createOnDepartmentalFlow', 'stepTwoAssignees'));
     }
 
     /**
@@ -319,6 +327,7 @@ class PaymentRequestController extends Controller
             // Supporting documents (PI copy, etc.) — optional.
             'pp_free' => ['nullable', 'array'],
             'pp_free.*' => ['in:0,1'],
+            'pra_mode' => ['nullable', 'in:single,multi'],
             'documents' => ['nullable', 'array', 'max:10'],
             'documents.*' => ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,xls,xlsx,csv,doc,docx'],
         ], [
@@ -357,6 +366,10 @@ class PaymentRequestController extends Controller
             ]))
             ->values();
         $snapshots = $this->applyPpChoices($snapshots, (array) ($validated['pp_free'] ?? []));
+
+        if ($violation = $this->singleVendorViolation($validated['pra_mode'] ?? null, $snapshots)) {
+            return back()->with('warning', $violation);
+        }
 
         if ($snapshots->isEmpty()) {
             return back()->with('warning', 'No eligible PI received / payment pending row was selected. Please check PI Number, PI Status and Payment Status.');
@@ -464,6 +477,8 @@ class PaymentRequestController extends Controller
                     'payment_status_summary' => $snapshots->countBy('payment_status')->all(),
                     'payment_required_date' => $paymentRequiredDate,
                     'source' => 'supply_chain_payment_request',
+                    // 'multi' when the PRA pays more than one vendor.
+                    'vendor_mode' => $this->vendorCountOf($snapshots) > 1 ? 'multi' : 'single',
                     'budget_override' => $overrideMeta,
                 ],
             ]);
@@ -1049,6 +1064,35 @@ class PaymentRequestController extends Controller
             ->header('Content-Disposition', 'attachment; filename="' . $fileName . '.xls"')
             ->header('Pragma', 'no-cache')
             ->header('Expires', '0');
+    }
+
+    /**
+     * How many different vendors a set of PRA lines pays.
+     *
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $snapshots
+     */
+    protected function vendorCountOf(\Illuminate\Support\Collection $snapshots): int
+    {
+        return $snapshots
+            ->pluck('supplier_name')
+            ->map(fn ($name) => Str::lower(trim((string) $name)))
+            ->filter()
+            ->unique()
+            ->count();
+    }
+
+    /**
+     * Refuse a SINGLE-VENDOR request that reaches past one vendor. 'multi' and an
+     * absent mode (the old per-row Preview) are not restricted.
+     */
+    protected function singleVendorViolation(?string $mode, \Illuminate\Support\Collection $snapshots): ?string
+    {
+        if ($mode !== 'single' || $this->vendorCountOf($snapshots) <= 1) {
+            return null;
+        }
+
+        return 'A single-vendor PRA can include only one vendor, but the selected rows belong to '
+            . $this->vendorCountOf($snapshots) . ' vendors. Select rows of one vendor, or use Multi Vendor PRA.';
     }
 
     /**
