@@ -3,6 +3,21 @@
 @section('styles')
 <style>
     .payment-request-table-wrap { overflow: visible; }
+    /* Floating bar shown while rows are ticked. */
+    .pra-select-bar {
+        position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 1040;
+        display: flex; align-items: center; justify-content: space-between; gap: 28px;
+        min-width: 360px; max-width: calc(100vw - 32px);
+        padding: 10px 14px 10px 12px; border-radius: 16px;
+        background: #0f1b4d; color: #fff; box-shadow: 0 14px 38px rgba(15, 27, 77, .38);
+    }
+    .pra-select-bar[hidden] { display: none; }
+    .pra-select-info { display: flex; align-items: center; gap: 12px; }
+    .pra-select-count {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 34px; height: 34px; padding: 0 8px; border-radius: 10px;
+        background: #2f5bea; font-weight: 800; font-size: 15px;
+    }
     .payment-request-table { width: 100%; table-layout: fixed; min-width: 0; }
     .payment-request-table th,
     .payment-request-table td {
@@ -269,25 +284,27 @@
         <div class="card-header bg-white border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h6 class="fw-bold mb-0">Pending PI Payment <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle ms-1">{{ $pendingRows->total() }}</span></h6>
-                <div class="small text-muted">POs already sent for approval are hidden here. Click Preview to review the format, then Create the Payment Request Approval.</div>
+                <div class="small text-muted">POs already sent for approval are hidden here. Use <strong>Preview</strong> on a row for one PO, or tick several rows (any vendors) to put them in one PRA.</div>
             </div>
         </div>
 
-        {{-- ONE PRA FOR SEVERAL ROWS. Tick rows, then choose the kind of PRA:
-             Single Vendor (every ticked row must be one vendor) or Multi Vendor
-             (any rows, one approval covering several vendors). The Preview button
-             on a row still makes a PRA for that one PO. Ticks are per page. --}}
-        <form method="GET" action="{{ route('supply_chain.payment_requests.preview') }}" id="praBulkForm"
-              class="px-3 pb-3 d-flex flex-wrap align-items-center gap-2">
-            <input type="hidden" name="pra_mode" id="praBulkMode" value="">
-            <span class="small fw-semibold"><span id="praSelectedCount">0</span> selected</span>
-            <button type="submit" class="btn btn-sm btn-primary" id="praSingleBtn" data-mode="single" disabled>
-                <i class="bi bi-eye me-1" aria-hidden="true"></i>Preview Single Vendor PRA
-            </button>
-            <button type="submit" class="btn btn-sm btn-outline-primary" id="praMultiBtn" data-mode="multi" disabled>
-                <i class="bi bi-eye me-1" aria-hidden="true"></i>Preview Multi Vendor PRA
-            </button>
-            <span class="small text-muted" id="praSelectionHint">Tick the rows to include.</span>
+        {{-- ONE PRA FOR SEVERAL ROWS. Tick rows (any vendors) and a floating bar
+             appears with the count, vendors and total. The Preview button on a row
+             still makes a PRA for that one PO. Ticks are per page. --}}
+        <form method="GET" action="{{ route('supply_chain.payment_requests.preview') }}" id="praBulkForm" class="pra-select-bar" hidden>
+            <div class="pra-select-info">
+                <span class="pra-select-count" id="praSelectedCount">0</span>
+                <div class="lh-sm">
+                    <div class="fw-semibold" id="praSelectionTitle">rows selected</div>
+                    <div class="small opacity-75" id="praSelectionHint"></div>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-link text-white text-decoration-none" id="praSelectClear">Clear</button>
+                <button type="submit" class="btn btn-light btn-sm fw-semibold px-3" id="praBulkBtn" disabled>
+                    <i class="bi bi-eye me-1" aria-hidden="true"></i>Preview PRA
+                </button>
+            </div>
         </form>
         <div class="payment-request-table-wrap">
             <table class="table table-hover align-middle mb-0 payment-request-table">
@@ -327,7 +344,7 @@
                     @forelse($pendingRows as $row)
                         <tr>
                             <td class="text-center">
-                                <input type="checkbox" class="form-check-input pra-row-check" value="{{ $row['booking_po_id'] }}"
+                                <input type="checkbox" class="form-check-input pra-row-check" value="{{ $row['booking_po_id'] }}" data-amount="{{ (float) ($row['pi_amount'] ?? 0) }}"
                                        data-vendor="{{ \Illuminate\Support\Str::lower(trim((string) $row['supplier_name'])) }}"
                                        data-vendor-name="{{ $row['supplier_name'] ?: '-' }}"
                                        aria-label="Select PO {{ $row['po_no'] ?: '' }}">
@@ -524,33 +541,29 @@
             refreshCombine();
         }
 
-        // --- Single / multi vendor selection -----------------------------------
+        // --- Select rows for one PRA (any vendors) -------------------------------
         const bulkForm = document.getElementById('praBulkForm');
         if (bulkForm) {
             const checks = Array.from(document.querySelectorAll('.pra-row-check'));
             const selectAll = document.getElementById('praSelectAll');
-            const singleBtn = document.getElementById('praSingleBtn');
-            const multiBtn = document.getElementById('praMultiBtn');
+            const bulkBtn = document.getElementById('praBulkBtn');
             const countEl = document.getElementById('praSelectedCount');
+            const titleEl = document.getElementById('praSelectionTitle');
             const hintEl = document.getElementById('praSelectionHint');
-            const modeInput = document.getElementById('praBulkMode');
+            const fmtMoney = function (n) { return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
 
             const refresh = function () {
                 const picked = checks.filter(function (c) { return c.checked; });
                 const vendors = new Set(picked.map(function (c) { return c.dataset.vendor; }));
-                countEl.textContent = picked.length;
-                singleBtn.disabled = picked.length < 1 || vendors.size !== 1;
-                multiBtn.disabled = picked.length < 2;
+                const total = picked.reduce(function (sum, c) { return sum + Number(c.dataset.amount || 0); }, 0);
 
-                if (picked.length === 0) {
-                    hintEl.textContent = 'Tick the rows to include.';
-                } else if (vendors.size > 1) {
-                    hintEl.textContent = vendors.size + ' vendors selected: use Multi Vendor PRA, or tick rows of one vendor for a Single Vendor PRA.';
-                } else if (picked.length === 1) {
-                    hintEl.textContent = 'Tick one more row for a Multi Vendor PRA, or preview this one.';
-                } else {
-                    hintEl.textContent = 'One vendor selected.';
-                }
+                bulkForm.hidden = picked.length === 0;
+                countEl.textContent = picked.length;
+                titleEl.textContent = picked.length === 1 ? 'row selected' : 'rows selected';
+                bulkBtn.disabled = picked.length < 2;
+                hintEl.textContent = picked.length < 2
+                    ? 'Tick one more row, or use Preview on the row'
+                    : vendors.size + (vendors.size === 1 ? ' vendor' : ' vendors') + ' · ' + fmtMoney(total);
 
                 if (selectAll) {
                     selectAll.checked = checks.length > 0 && picked.length === checks.length;
@@ -564,9 +577,9 @@
                     refresh();
                 });
             }
-
-            [singleBtn, multiBtn].forEach(function (btn) {
-                btn.addEventListener('click', function () { modeInput.value = btn.dataset.mode; });
+            document.getElementById('praSelectClear').addEventListener('click', function () {
+                checks.forEach(function (c) { c.checked = false; });
+                refresh();
             });
 
             bulkForm.addEventListener('submit', function () {

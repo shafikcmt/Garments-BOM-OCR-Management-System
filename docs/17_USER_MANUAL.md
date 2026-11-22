@@ -793,16 +793,16 @@ Commercial and Admin record shipments for the buyers they hold; Management can r
 
 The **QTY** column of the pending list is the **Booking Qty** (the *Materials Ordered* column) of every order the row combines, the same figure the booking preview prints in **Booking Qty**. When the orders carry a **PP Qty**, a small line under the quantity shows it, for example *+ 40 PP = 3000*, which equals the **Total Qty** at the bottom of the preview.
 
-### 3.x2b One PRA for several rows: single vendor or multi vendor
+### 3.x2b One PRA for several rows (any vendors)
 
-On the **Payment Request Approval** screen, the **Pending PI Payment** list has a tick box on every row. The **Preview** button on a row still makes a PRA for that one PO.
+On the **Payment Request Approval** screen, the **Pending PI Payment** list has a tick box on every row. The **Preview** button on a row makes a PRA for that one PO.
 
-1. Tick the rows you want in one PRA (the box in the heading ticks every row on the page). Ticks are per page.
-2. Press **Preview Single Vendor PRA** when all ticked rows belong to **one vendor**. If you tick rows of different vendors this button stays off and a hint tells you why.
-3. Press **Preview Multi Vendor PRA** to cover **several vendors in one approval** (two or more rows). The preview shows a **Multi Vendor PRA** badge with the number of vendors.
-4. Check the preview and press **Create PRA** as usual. The PRA list shows all the vendors of a multi-vendor PRA in the Supplier column.
+1. To put several rows in one PRA, tick them (the box in the heading ticks every row on the page). Ticks are per page. The vendors can be different.
+2. A bar appears at the bottom of the screen with the number of rows, the number of vendors and the total. Press **Clear** to untick everything.
+3. Press **Preview PRA** (it turns on when two or more rows are ticked). The preview shows a **Multi Vendor PRA** badge when more than one vendor is included.
+4. Check the preview and press **Create PRA** as usual.
 
-The rest of the approval, payment and documents work the same for both kinds.
+The rest of the approval, payment and documents work the same however many vendors the PRA has.
 
 ### 3.x2c Printing several existing PRAs as one sheet
 
