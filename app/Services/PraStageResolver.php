@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Buyer;
 use App\Models\PaymentRequest;
 use App\Models\PraApproval;
+use App\Models\PraStepApprover;
 use App\Models\PaymentRequestItem;
 use App\Models\User;
 use App\Support\DepartmentRoles;
@@ -165,9 +166,12 @@ class PraStageResolver
     {
         // Buyers are read only when the step is scoped, exactly as before — an
         // unscoped step never touched the items relation and still does not.
+        $allBuyerIds = $this->buyerIdsFor($paymentRequest);
+
         return $this->resolveForBuyers(
             $sequence,
-            $this->isBuyerScoped($sequence) ? $this->buyerIdsFor($paymentRequest) : []
+            $this->isBuyerScoped($sequence) ? $allBuyerIds : [],
+            $allBuyerIds
         );
     }
 
@@ -183,9 +187,12 @@ class PraStageResolver
      * class's question — PraWorkflow attaches that on top of what is returned
      * here, and never narrows it.
      *
-     * @param  list<int>  $buyerIds
+     * @param  list<int>  $buyerIds  The buyers that scope the step (empty on an unscoped step).
+     * @param  list<int>|null  $designationBuyerIds  All of the PRA's buyers, for the admin's
+     *                                  buyer-specific approver rules, which apply on any step.
+     *                                  Defaults to $buyerIds.
      */
-    public function resolveForBuyers(int $sequence, array $buyerIds): PraStageActors
+    public function resolveForBuyers(int $sequence, array $buyerIds, ?array $designationBuyerIds = null): PraStageActors
     {
         $definition = $this->definitionFor($sequence);
         $department = $definition['department'];
@@ -218,6 +225,17 @@ class PraStageResolver
                 : $this->confineToBuyers($inPost, $buyerIds);
         }
 
+        // ADMIN-CHOSEN APPROVERS WIN. When an Admin named people for this step
+        // (Settings > PRA Approval Routing), exactly those people may act: they
+        // are not narrowed by department or buyer access, because choosing them
+        // is the grant. Nothing named leaves the automatic result untouched.
+        $designated = $this->designatedUsers($sequence, $designationBuyerIds ?? $buyerIds);
+
+        if ($designated !== null) {
+            $users = $designated;
+            $postIsFilled = $designated->isNotEmpty();
+        }
+
         return new PraStageActors(
             sequence: $sequence,
             label: $definition['label'],
@@ -231,6 +249,45 @@ class PraStageResolver
             note: ($buyerScoped && $buyerIds === []) ? self::NOTE_UNTAGGED_PRA : null,
             postIsFilled: $postIsFilled,
         );
+    }
+
+    /**
+     * The people an Admin named for this step, or null when nobody was named.
+     *
+     * A rule for one of the PRA's buyers wins over the all-buyers rule; several
+     * buyers on one PRA add their people together. Only active users count, so
+     * a deactivated person cannot be left holding a step (an all-inactive list
+     * comes back empty and the step reports itself unrouted).
+     *
+     * @param  list<int>  $buyerIds
+     * @return Collection<int, User>|null
+     */
+    protected function designatedUsers(int $sequence, array $buyerIds): ?Collection
+    {
+        if (! PraStepApprover::isAvailable()) {
+            return null;
+        }
+
+        $rows = PraStepApprover::query()->where('sequence', $sequence)->get();
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $buyerIds = collect($buyerIds)->map(fn ($id) => (int) $id)->all();
+        $forBuyers = $rows->filter(fn ($row) => $row->buyer_id !== null && in_array((int) $row->buyer_id, $buyerIds, true));
+        $chosen = $forBuyers->isNotEmpty() ? $forBuyers : $rows->whereNull('buyer_id');
+
+        if ($chosen->isEmpty()) {
+            // Rules exist, but only for other buyers: this PRA is routed as before.
+            return null;
+        }
+
+        return User::query()
+            ->whereIn('id', $chosen->pluck('user_id')->unique()->all())
+            ->where('status', 1)
+            ->orderBy('name')
+            ->get();
     }
 
     /**

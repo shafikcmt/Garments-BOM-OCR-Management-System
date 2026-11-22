@@ -638,7 +638,12 @@
                             </div>
 
                             @if($departmentalStage && ! $departmentalStage->isActionable())
-                                <div class="alert alert-warning border-0 small">{{ $departmentalStage->problem() }}</div>
+                                <div class="alert alert-warning border-0 small">
+                                    {{ $departmentalStage->problem() }}
+                                    @if(auth()->user()?->hasRole('admin') && \Illuminate\Support\Facades\Route::has('admin.pra-routing.index'))
+                                        <a href="{{ route('admin.pra-routing.index') }}" class="alert-link ms-1">Open PRA Approval Routing</a>
+                                    @endif
+                                </div>
                             @endif
 
                             <div class="row g-2">
