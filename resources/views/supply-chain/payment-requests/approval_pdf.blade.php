@@ -132,7 +132,7 @@
             <table class="date-parts">
                 <tr>
                     <td>{{ $paymentRequiredDate ? optional($paymentRequiredDate)->format('d') : '-' }}</td>
-                    <td>{{ $paymentRequiredDate ? optional($paymentRequiredDate)->format('m') : '-' }}</td>
+                    <td>{{ $paymentRequiredDate ? strtoupper(optional($paymentRequiredDate)->format('M')) : '-' }}</td>
                     <td>{{ $paymentRequiredDate ? optional($paymentRequiredDate)->format('Y') : '-' }}</td>
                 </tr>
             </table>
