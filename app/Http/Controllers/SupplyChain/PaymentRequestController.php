@@ -1641,7 +1641,8 @@ class PaymentRequestController extends Controller
                 ['material_type', 'asc'],
                 ['material_po_number', 'asc'],
             ])
-            ->pipe(fn ($rows) => $this->annotateStyleSpans($rows));
+            ->pipe(fn ($rows) => $this->annotateStyleSpans($rows))
+            ->pipe(fn ($rows) => $this->annotateItemSpans($rows));
     }
 
     /**
@@ -1666,6 +1667,41 @@ class PaymentRequestController extends Controller
      * needed to make the runs whole; if the sort above ever stops leading with
      * vendor and style, re-check this.
      */
+    /**
+     * Marks each run of CONSECUTIVE rows that share Style, Vendor AND Item Name,
+     * so the renderers print the item name once as a spanning cell instead of
+     * repeating it down the table (a style with five "Size Label" lines shows it
+     * once). Same convention as annotateStyleSpans(): 'item_rowspan' is the run
+     * length on the first row and 0 on the rows it covers. Vendor is part of the
+     * key so an item is never spanned across two vendors' rows. Nothing is
+     * reordered or changed, so the totals are unaffected.
+     */
+    protected function annotateItemSpans($rows): \Illuminate\Support\Collection
+    {
+        $rows = collect($rows)->values()->all();
+        $count = count($rows);
+        $key = fn (array $row) => Str::lower(trim((string) ($row['style'] ?? '')))
+            . '|' . Str::lower(trim((string) ($row['vendor_name'] ?? '')))
+            . '|' . Str::lower(trim((string) ($row['material_type'] ?? '')));
+        $index = 0;
+
+        while ($index < $count) {
+            $run = 1;
+            while ($index + $run < $count && $key($rows[$index + $run]) === $key($rows[$index])) {
+                $run++;
+            }
+
+            $rows[$index]['item_rowspan'] = $run;
+            for ($offset = 1; $offset < $run; $offset++) {
+                $rows[$index + $offset]['item_rowspan'] = 0;
+            }
+
+            $index += $run;
+        }
+
+        return collect($rows);
+    }
+
     protected function annotateStyleSpans($rows): \Illuminate\Support\Collection
     {
         $rows = collect($rows)->values()->all();
@@ -2169,6 +2205,8 @@ class PaymentRequestController extends Controller
         // written: one entry per run of consecutive rows sharing a style, so the
         // .xlsx groups them the same way the preview and the PDF do.
         $styleMerges = [];
+        // Same for the Item Name column (G): one merged cell per run of rows sharing it.
+        $itemMerges = [];
 
         // Height each body row needs for its longest wrapping cell (8pt text,
         // about 11pt a line). Collected here, applied with the other row heights.
@@ -2187,6 +2225,11 @@ class PaymentRequestController extends Controller
             $span = (int) ($row['style_rowspan'] ?? 1);
             if ($span > 1) {
                 $styleMerges[] = ['B' . $rowNo, 'B' . ($rowNo + $span - 1)];
+            }
+
+            $itemSpan = (int) ($row['item_rowspan'] ?? 1);
+            if ($itemSpan > 1) {
+                $itemMerges[] = ['G' . $rowNo, 'G' . ($rowNo + $itemSpan - 1)];
             }
 
             $sheet->fromArray([
@@ -2221,12 +2264,13 @@ class PaymentRequestController extends Controller
         // mergeCells keeps the top-left value and blanks the rest, so writing
         // every row first and merging second leaves exactly the style that
         // started the run. Bold + centred to match the other two renderers.
-        foreach ($styleMerges as [$from, $to]) {
+        foreach (array_merge($styleMerges, $itemMerges) as [$from, $to]) {
             $sheet->mergeCells($from . ':' . $to);
             $sheet->getStyle($from . ':' . $to)->getAlignment()
                 ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER)
                 ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle($from . ':' . $to)->getFont()->setBold(true);
+            // Style is bold; Item Name is plain, as on the other renderers.
+            $sheet->getStyle($from . ':' . $to)->getFont()->setBold(str_starts_with($from, 'B'));
         }
 
         // The label spans A..K (through Budget) and the total sits in L. Budget
