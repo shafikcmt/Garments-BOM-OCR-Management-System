@@ -854,7 +854,7 @@ People you choose are also given access to the PRA approval screens, and they do
 
 If the supplier or buyer gives the PP Qty **free**, type **Yes** in the **PP Qty Free** column of that line in the Workspace. The PP Qty is then not billed and PI Amount = PI Rate x Booking Qty. Leave the column blank (or **No**) when the PP Qty is charged.
 
-The PI Amount on a PRA is always **the PI Amount shown in the Workspace** for that line (rate x Materials Ordered, plus a billed PP Qty), so the PRA and the Workspace agree. If you change Materials Ordered, PI Rate or PP Qty in the Workspace, press **Save Changes** there first; the next PRA preview then shows the new amount.
+**PI Amount = PI Rate x (Materials Ordered + billed PP Qty)**, in the Workspace and on the PRA alike. The Workspace used to show PI Rate x *Materials To Be Ordered* while you were typing and the saved figure used Materials Ordered; both now use Materials Ordered, so what you see, what is saved and what the PRA prints are the same number. If you change Materials Ordered, PI Rate or PP Qty in the Workspace, press **Save Changes** there first; the next PRA preview then shows the new amount.
 
 **On the PRA preview:** if a line has a PP Qty, a **PP Qty billing** box appears above the sheet. For each line choose **Billed** or **Free**, then press **Update amount**. The PI Amount and Total PI Amount on the sheet change at once, and the choice you see is saved when you press **Create PRA**. The box starts from the **PP Qty Free** column of the Workspace. Changing it here affects only this PRA; the Workspace is not changed.
 
