@@ -1222,9 +1222,20 @@ class PaymentRequestController extends Controller
             }
 
             $key = $this->ppLineKey($snapshot);
-            $free = array_key_exists($key, $choices)
-                ? (string) $choices[$key] === '1'
-                : (bool) ($snapshot['pp_free'] ?? false);
+
+            // The line already carries the Workspace's PI Amount, which follows the
+            // sheet's own PP Qty Free column. Only a choice that DIFFERS from that
+            // default re-prices the line; the form posts every line's current
+            // choice, so an unchanged one must leave the Workspace amount alone.
+            if (! array_key_exists($key, $choices)) {
+                return $snapshot;
+            }
+
+            $free = (string) $choices[$key] === '1';
+
+            if ($free === (bool) ($snapshot['pp_free'] ?? false)) {
+                return $snapshot;
+            }
 
             return $this->sourceService->applyPpChoice($snapshot, $free);
         })->values();
