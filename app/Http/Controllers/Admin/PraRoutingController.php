@@ -55,7 +55,19 @@ class PraRoutingController extends Controller
         return view('admin.pra-routing.index', [
             'available' => $available,
             'steps' => $steps,
-            'users' => User::query()->where('status', 1)->orderBy('name')->get(['id', 'name', 'email']),
+            // Everyone who could be chosen, with their role as a small hint so two people
+            // with similar names can be told apart.
+            'users' => User::query()
+                ->where('status', 1)
+                ->with('roles:id,name')
+                ->orderBy('name')
+                ->get(['id', 'name', 'email'])
+                ->map(fn (User $user) => [
+                    'id' => (int) $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => ucwords(str_replace('_', ' ', (string) $user->roles->first()?->name)),
+                ])->values(),
             'buyers' => Buyer::query()->orderBy('buyer_name')->get(['id', 'buyer_name']),
         ]);
     }

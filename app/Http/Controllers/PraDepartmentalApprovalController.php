@@ -184,6 +184,9 @@ class PraDepartmentalApprovalController extends Controller
 
     public function approve(Request $request, PaymentRequest $paymentRequest)
     {
+        // The sidebar badge is cached per user for a few seconds; acting on a PRA changes it.
+        \App\Support\PraQueueCount::forget(auth()->id());
+
         $this->assertDepartmental($paymentRequest);
 
         $validated = $request->validate([
@@ -268,6 +271,9 @@ class PraDepartmentalApprovalController extends Controller
 
     public function reject(Request $request, PaymentRequest $paymentRequest)
     {
+        // The sidebar badge is cached per user for a few seconds; acting on a PRA changes it.
+        \App\Support\PraQueueCount::forget(auth()->id());
+
         $this->assertDepartmental($paymentRequest);
 
         $validated = $request->validate([

@@ -835,6 +835,10 @@ On a Workspace file the top buttons are **Original** and **Export**.
 
 Export contains the columns you are allowed to see on the screen (the columns your buyer hides stay out unless you switched on **Show all columns**), and it always exports **every row**, even if you have a search or filter on. A file locked by Admin, or belonging to another buyer, cannot be exported by users who cannot open it.
 
+### 3.x8 The PRA Approvals badge
+
+If you approve payment requests, the **PRA Approvals** item in the left menu (under **Approvals**) shows a red number: the PRAs waiting for **you** at your step right now. It matches the list you see when you open it. The number refreshes within about half a minute, and straight away after you approve or reject one.
+
 ### 3.x6 Workspace dropdown columns and vendor defaults
 
 **Dropdowns.** The **Delivery Term**, **Payment Term** and **Ship Mode** columns of the Workspace now show a dropdown list when you click in the cell: pick a value or type your own. The lists are the same ones the vendor form uses.
@@ -847,13 +851,16 @@ Export contains the columns you are allowed to see on the screen (the columns yo
 
 ### 3.x5 Admin: who approves each PRA step (PRA Approval Routing)
 
-A PRA moves through five steps: Merchant Team Check, Merchant Head Approval, Accounts Team Check, Accounts Head Approval and Commercial Head Completion. By default each step goes to the right department **automatically** (Merchandising only to people who have access to the PRA's buyer). If nobody qualifies, the PRA shows *"This PRA cannot proceed..."*.
+A PRA moves through five steps: 2 Merchant Team Check, 3 Merchant Head Approval, 4 Accounts Team Check, 5 Accounts Head Approval and 6 Commercial Head Completion. By default each step goes to the right department **automatically** (Merchandising only to people who have access to the PRA's buyer). If nobody qualifies, the PRA shows *"This PRA cannot proceed..."*.
 
-**To choose the approvers yourself:** open **Admin > Settings > PRA Approval Routing**.
+**To choose the approvers yourself:** open **Admin > Settings > PRA Approval Routing**. Each step is one card that shows who handles it now: the names of the people you chose (blue tags) or the automatic rule.
 
-1. Find the step. Under **Approvers for all buyers**, type a name to find a person and tick everyone who may act at this step. Press **Save for all buyers**. Any one of them can complete the step.
-2. For one buyer only, open **Add or change a buyer rule**, pick the buyer, tick the people and press **Save buyer rule**. A buyer rule is used instead of the all-buyers rule for that buyer. Press **Remove** to delete it.
-3. To go back to the automatic routing, untick everyone and press **Save for all buyers**.
+1. Press **Change approvers** on the step. A window opens with the people list (the ones already chosen are ticked and shown first).
+2. Type in the search box to find a person by name or email. Switch on **Selected only** to see just the ticked ones. The counter shows how many are selected.
+3. Choose **All buyers** or **One buyer** at the top of the window (for one buyer, pick the buyer). A buyer rule is used instead of the all-buyers rule for that buyer.
+4. Press **Save**. Any one of the chosen people can complete the step.
+5. **Add buyer rule** on a card does the same for one buyer straight away; **Edit** and **Remove** on a buyer rule change or delete it.
+6. To go back to the automatic routing, untick everyone and press **Save**.
 
 People you choose are also given access to the PRA approval screens, and they do not need buyer access. Only active users count. A change applies to every PRA from now on, including ones already waiting. When the *cannot proceed* message shows, an Admin sees an **Open PRA Approval Routing** link next to it.
 
