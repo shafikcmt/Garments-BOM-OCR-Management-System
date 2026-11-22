@@ -2122,7 +2122,7 @@ class PaymentRequestController extends Controller
         $grandRow = $lastBodyRow + 1;
         $rowHeights[$grandRow] = 26;
 
-        // SIGNATURES SIT IN THE PAGE FOOTER. Excel cannot pin cells to the bottom
+        // SIGNATURE POSITION. Excel cannot pin cells to the bottom
         // of a printed page, so blank spacer rows are sized to push the block down
         // until it ends at the foot of the page it starts on. A4 landscape at the
         // fit-to-width scale holds about 4pt of sheet rows per column character; a short PRA gets its
@@ -2141,10 +2141,18 @@ class PaymentRequestController extends Controller
         $singlePage = ($lastBodyRow - $tableStart) <= 24;
         $pageHeight = (int) round(array_sum($columnWidths) * ($singlePage ? 4.15 : 3.9));
         $usedHeight = array_sum($rowHeights);
-        $spacer = $pageHeight - ($usedHeight % $pageHeight) - $signHeight - 6;
-        if ($spacer < 14) {
-            $spacer += $pageHeight;
+        // The block follows the table but sits about 62% of the way down the page
+        // when the table is short, so it moves with the content: few rows leave it
+        // a little higher, more rows push it lower. A long table leaves only a
+        // small gap. If it would not fit on the page it starts, it moves to the
+        // top of the next one.
+        $pageOffset = $usedHeight % $pageHeight;
+        $target = $pageHeight * 0.62;
+        $spacer = $pageOffset < $target ? $target - $pageOffset : 20;
+        if ($pageOffset + $spacer + $signHeight > $pageHeight) {
+            $spacer = $pageHeight - $pageOffset;
         }
+        $spacer = max(14, $spacer);
         $spacerRows = max(1, (int) ceil($spacer / 120));
         $spacerEach = $spacer / $spacerRows;
         foreach (range($grandRow + 1, $grandRow + $spacerRows) as $spacerRow) {
