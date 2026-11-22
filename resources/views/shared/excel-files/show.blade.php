@@ -3365,18 +3365,17 @@ document.addEventListener('DOMContentLoaded', function () {
         return Number.isFinite(parsed) ? parsed : 0;
     }
 
-    // PP Qty is free text ("25 yds"): only its leading number counts, and a "Yes"
-    // style value in the PP Qty Free column switches the charge off. Same rule as
-    // App\Support\PpQty and the server-side PI Amount in
-    // ExcelFileController::recalculateFile - keep the three in step.
+    // PP Qty is free text ("25 yds"): only its leading number counts.
     function ppQtyNumber(value) {
         if (blank(value)) return 0;
         const match = String(value).trim().match(/-?\d[\d,]*(?:\.\d+)?|-?\.\d+/);
         return match ? Math.max(0, Number(match[0].replace(/,/g, '')) || 0) : 0;
     }
 
+    // PP Qty is NOT billed unless the PP Qty Free column says No / Billed
+    // (blank and Yes both mean free). Same rule as App\Support\PpQty.
     function ppQtyIsFree(value) {
-        return ['yes', 'y', 'free', 'foc', 'true', '1', 'free of cost', 'free of charge'].indexOf(String(value ?? '').trim().toLowerCase()) !== -1;
+        return ['no', 'n', 'billed', 'bill', 'charged', 'paid', 'false', '0'].indexOf(String(value ?? '').trim().toLowerCase()) === -1;
     }
 
     function percent(value) {
@@ -3556,17 +3555,17 @@ document.addEventListener('DOMContentLoaded', function () {
             const piStatus = materialOrderStatus === 'PO Pending'
                 ? 'Waiting for PO'
                 : (blank(materialPiNumber) ? 'PI Pending' : 'PI Received');
-            // PI Amount = PI Rate x (Materials Ordered + billed PP Qty). This is the
-            // same figure the server stores on save and the PRA prints, so the sheet,
-            // the saved cell and the PRA always agree. (It used to be PI Rate x
-            // Materials To Be Ordered here, which disagreed with the server.)
+            // PI Amount = PI Rate x Materials Ordered. A PP Qty is added only when the
+            // PP Qty Free column says No / Billed. This is the same figure the server
+            // stores on save and the PRA prints, so the sheet, the saved cell and the
+            // PRA always agree.
             const ppQtyBilled = ppQtyIsFree(valAny(rowData, ['pp_qty_free', 'pp_free', 'free_pp_qty']))
                 ? 0
                 : ppQtyNumber(valAny(rowData, ['pp_qty', 'p_p_qty', 'pp_quantity']));
             const piAmount = piRate * (materialsOrdered + ppQtyBilled);
             const piWorking = ppQtyBilled > 0
                 ? 'PI Rate ' + piRate + ' x (Materials Ordered ' + materialsOrdered + ' + PP Qty ' + ppQtyBilled + ' billed) = ' + fmtNum(piAmount)
-                    + '. Set PP Qty Free to Yes if the PP Qty is not charged.'
+                    + '. PP Qty is billed because PP Qty Free says No.'
                 : 'PI Rate ' + piRate + ' x Materials Ordered ' + materialsOrdered + ' = ' + fmtNum(piAmount);
             let paymentReqdDate = committedExMill ? addDays(committedExMill, -7) : null;
 

@@ -5,16 +5,19 @@ namespace App\Support;
 /**
  * PP (pre-production / sample) quantity rules for PI amount.
  *
- * PP Qty is normally charged by the supplier, so PI Amount is
- * PI Rate x (Booking Qty + PP Qty). Some suppliers or buyers provide the PP
- * quantity free of charge; the PP Qty Free column (Yes) switches the charge off
- * for that line. The PP Qty cell is free text on the booking format ("25 yds"),
- * so only its leading number is used.
+ * BY DEFAULT PP QTY IS NOT BILLED: PI Amount = PI Rate x Materials Ordered, the
+ * same as the PP Qty Free column set to "Yes". A line is billed only when its
+ * PP Qty Free column says No (or Billed), and then PI Amount =
+ * PI Rate x (Materials Ordered + PP Qty). The PP Qty cell is free text on the
+ * booking format ("25 yds"), so only its leading number is used.
+ *
+ * The Workspace screen, the saved Workspace cell and the PRA all use this one
+ * rule (the screen's copy is in the Workspace view's script - keep them in step).
  */
 final class PpQty
 {
-    /** Values of the "PP Qty Free" column that mean the PP quantity is not charged. */
-    private const FREE_VALUES = ['yes', 'y', 'free', 'foc', 'true', '1', 'free of cost', 'free of charge'];
+    /** Values of the "PP Qty Free" column that BILL the PP quantity. Anything else, blank included, is free. */
+    private const BILLED_VALUES = ['no', 'n', 'billed', 'bill', 'charged', 'paid', 'false', '0'];
 
     public static function number(mixed $value): float
     {
@@ -29,7 +32,7 @@ final class PpQty
 
     public static function isFree(mixed $flag): bool
     {
-        return in_array(strtolower(trim((string) $flag)), self::FREE_VALUES, true);
+        return ! in_array(strtolower(trim((string) $flag)), self::BILLED_VALUES, true);
     }
 
     /** The PP quantity that is billed: zero when it is free. */

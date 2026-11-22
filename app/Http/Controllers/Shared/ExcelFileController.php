@@ -2603,8 +2603,9 @@ class ExcelFileController extends Controller
                 ? 'Waiting for PO'
                 : (blank($materialPiNumber) ? 'PI Pending' : 'PI Received');
 
-            // PP Qty is billed on top of the booking quantity unless the supplier or
-            // buyer provides it free (PP Qty Free = Yes).
+            // PP Qty is NOT billed by default (PI Amount = rate x Materials Ordered);
+            // it is added only when the PP Qty Free column says No / Billed. Same rule
+            // as App\Support\PpQty and the Workspace screen.
             $chargeablePpQty = \App\Support\PpQty::chargeable(
                 $this->valAny($cellMap, $headerIdByKey, ['pp_qty', 'p_p_qty', 'pp_quantity']),
                 $this->valAny($cellMap, $headerIdByKey, ['pp_qty_free', 'pp_free', 'free_pp_qty']),
