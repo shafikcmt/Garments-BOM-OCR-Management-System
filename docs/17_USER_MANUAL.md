@@ -822,6 +822,16 @@ The PRA shows **Sales Contract** under **Season**, on the screen, the PDF and th
 
 The three money columns at the right of the PRA table are, in this order: **PI Amt (USD)**, **Budget** and **Saving**. **Saving = Budget - PI Amt**. A negative Saving (the PI is above the budget) is shown with a minus sign and in red. A line with no budget shows **-** in Budget and Saving. The **Grand Total** row shows the Budget and Saving totals only when every line has a budget; otherwise those two cells stay blank, so a partial sum is never mistaken for a real budget. The screen, PDF and Excel are the same.
 
+### 3.x6 Workspace dropdown columns and vendor defaults
+
+**Dropdowns.** The **Delivery Term**, **Payment Term** and **Ship Mode** columns of the Workspace now show a dropdown list when you click in the cell: pick a value or type your own. The lists are the same ones the vendor form uses.
+
+**Admin: managing the lists.** Open **Admin > Booking Setup > Vendor Options**. There are four lists: **Item Types**, **Incoterms** (used for Delivery Term), **Ship Modes** and **Payment Terms**. Type a new choice and press **Add**, or press **Delete** to remove one. Deleting a choice never changes vendors or Workspace rows that already use it.
+
+**Admin: which column uses which list.** Open **Admin > Excel Header Control**, edit a column and set **Dropdown options** to one of the lists (or **None** for a plain text column). Any column can be given a list this way.
+
+**Vendor defaults.** When you choose or type a **Vendor** on a Workspace row, its **Delivery Term**, **Payment Term** and **Ship Mode** are filled in from the vendor's record (Incoterm, Default Payment Terms and Ship Mode on the vendor form). Only cells that are still empty are filled, so nothing you typed is overwritten. Press **Save Changes** as usual.
+
 ### 3.x5 Admin: who approves each PRA step (PRA Approval Routing)
 
 A PRA moves through five steps: Merchant Team Check, Merchant Head Approval, Accounts Team Check, Accounts Head Approval and Commercial Head Completion. By default each step goes to the right department **automatically** (Merchandising only to people who have access to the PRA's buyer). If nobody qualifies, the PRA shows *"This PRA cannot proceed..."*.

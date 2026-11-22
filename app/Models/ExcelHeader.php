@@ -17,6 +17,7 @@ class ExcelHeader extends Model
         'owner_role_id',
         'position',
         'field_type',
+        'options_source',
         'value_mode',
         'formula_key',
         'formula_meta',

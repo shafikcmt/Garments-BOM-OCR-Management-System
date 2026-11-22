@@ -11,6 +11,7 @@ class SupplierOption extends Model
         'item_type' => 'Item Types',
         'incoterm' => 'Incoterms',
         'ship_mode' => 'Ship Modes',
+        'payment_term' => 'Payment Terms',
     ];
 
     protected $fillable = ['type', 'name', 'sort_order'];

@@ -149,6 +149,8 @@ class HeaderController extends Controller
             'owner_role_id' => ['required', 'exists:roles,id'],
             'position' => ['required', 'integer', 'min:1'],
             'field_type' => ['required', 'in:text,number,date'],
+            // Which Admin-managed list (Vendor Options) the Workspace column offers as a dropdown.
+            'options_source' => ['nullable', Rule::in(array_keys(\App\Models\SupplierOption::TYPES))],
             'value_mode' => ['required', 'in:input,formula,conditional'],
             'formula_key' => [
                 Rule::requiredIf(fn () => in_array($request->input('value_mode'), ['formula', 'conditional'], true)),
