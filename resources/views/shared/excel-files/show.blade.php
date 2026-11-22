@@ -113,6 +113,8 @@
 @endphp
 
 <style>
+    /* A PI Amount that includes a billed PP Qty carries a small "+PP" tag. */
+    .pi-has-pp::after { content: ' +PP'; font-size: 9px; font-weight: 800; color: #b45309; }
 
     .notification-highlight-cell {
     background: #fff3cd !important;
@@ -3459,6 +3461,25 @@ document.addEventListener('DOMContentLoaded', function () {
         display.classList.add('formula-live-updated');
     }
 
+    // Explain a live calculated cell: a tooltip with the working, and a small
+    // "+PP" marker when a PP Qty is part of it, so a figure that is not simply
+    // quantity x rate is never a surprise.
+    function setFormulaNote(row, keys, note, flagged) {
+        for (const key of keys) {
+            const normalized = normalizeHeaderKey(key);
+            const index = headerIndexByKey[normalized];
+            if (index === undefined) continue;
+
+            const cell = row.querySelectorAll('td')[index + 1];
+            const display = cell ? cell.querySelector('[data-formula-output="1"]') : null;
+            if (!display) return;
+
+            display.title = note;
+            display.classList.toggle('pi-has-pp', !!flagged);
+            return;
+        }
+    }
+
     function calculateLiveFormulas() {
         const rows = rowElements();
         let previousFormulaKey = null;
@@ -3543,6 +3564,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? 0
                 : ppQtyNumber(valAny(rowData, ['pp_qty', 'p_p_qty', 'pp_quantity']));
             const piAmount = piRate * (materialsOrdered + ppQtyBilled);
+            const piWorking = ppQtyBilled > 0
+                ? 'PI Rate ' + piRate + ' x (Materials Ordered ' + materialsOrdered + ' + PP Qty ' + ppQtyBilled + ' billed) = ' + fmtNum(piAmount)
+                    + '. Set PP Qty Free to Yes if the PP Qty is not charged.'
+                : 'PI Rate ' + piRate + ' x Materials Ordered ' + materialsOrdered + ' = ' + fmtNum(piAmount);
             let paymentReqdDate = committedExMill ? addDays(committedExMill, -7) : null;
 
             // A created PRA overrides the formula. Matching is by PI No., so every
@@ -3603,6 +3628,7 @@ document.addEventListener('DOMContentLoaded', function () {
             setFormulaValue(row, ['material_order_status'], materialOrderStatus);
             setFormulaValue(row, ['pi_status'], piStatus);
             setFormulaValue(row, ['pi_amount'], fmtNum(piAmount));
+            setFormulaNote(row, ['pi_amount'], piWorking, ppQtyBilled > 0);
             setFormulaValue(row, ['payment_reqd_date', 'payment_req_d_date', 'payment_required_date'], (pra && pra.reqd) ? pra.reqd : fmtDate(paymentReqdDate));
             if (pra && pra.submission) {
                 setFormulaValue(row, ['pi_summary_submission_date', 'pi_summary_submission'], pra.submission);
