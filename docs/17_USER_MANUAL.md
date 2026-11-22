@@ -879,6 +879,7 @@ Prepared (section staff) -> Checked by Section / Department Head -> Received by 
 1. Section staff open **Purchase Requisition**, fill the items and press **Submit Requisition** (or **Save as Draft** to finish later).
 2. The Section Head (or the Department Head if there is no section) finds it under **My Approvals** and presses **Approve**, or **Return** with a note so the requester can correct it and submit again.
 3. Any Store user opens the **Requested** tab and presses **Received**.
+   The number on the **Requested** tab counts only the sheets waiting for the Store to press **Received**. Sheets still with a head, already received, or with a later approver (Finance, Operation) are not counted, and neither are Final Requisitions.
 
 Store users do not raise sheets for a section. Each section raises its own.
 
