@@ -433,10 +433,15 @@
                     @forelse($paymentRequests as $paymentRequest)
                         <tr>
                             <td class="text-center">
-                                @if($paymentRequest->isMergeable() && (int) $paymentRequest->created_by === (int) auth()->id())
+                                @if($paymentRequest->isMergeable())
                                     <input type="checkbox" class="form-check-input pra-merge-check" value="{{ $paymentRequest->id }}"
                                            data-amount="{{ (float) $paymentRequest->total_pi_amount }}"
                                            aria-label="Select {{ $paymentRequest->request_no }} to merge">
+                                @else
+                                    {{-- Shown greyed out with the reason, so a missing tick box is never a mystery. --}}
+                                    <input type="checkbox" class="form-check-input" disabled
+                                           title="{{ $paymentRequest->status === 'merged' ? 'Already merged into another PRA' : (! $paymentRequest->isDepartmentalFlow() ? 'Only departmental PRAs can be merged' : 'Cannot merge: this PRA has already moved past the first step') }}"
+                                           aria-label="{{ $paymentRequest->request_no }} cannot be merged">
                                 @endif
                             </td>
                             <td class="fw-bold">

@@ -725,9 +725,11 @@ class PaymentRequestController extends Controller
      * MERGE SEVERAL EXISTING PRAs INTO ONE NEW PRA.
      *
      * For PRAs raised separately that should have gone as one approval (often
-     * different vendors). Only the creator's own departmental PRAs that are still
-     * waiting at the first step with no decision taken can be merged — merging
-     * after someone signed would rewrite a signed document.
+     * different vendors). Any Supply Chain user who can see the PRAs may merge
+     * them (the list is shared), but only departmental PRAs still waiting at the
+     * first step with no decision taken — merging after someone signed would
+     * rewrite a signed document. The merged PRA is created by the person who
+     * merges, and records which PRAs it came from.
      *
      * The lines are MOVED to the new PRA (not copied), so every PO/PI, budget and
      * total counts exactly once. Each source PRA stays on record as "Merged" with
@@ -755,9 +757,7 @@ class PaymentRequestController extends Controller
         foreach ($sources as $source) {
             $this->authorizePaymentRequest($source);
 
-            if ((int) $source->created_by !== (int) auth()->id() && ! auth()->user()->hasRole('admin')) {
-                $problems[] = $source->request_no . ' was created by someone else';
-            } elseif (! $source->isMergeable()) {
+            if (! $source->isMergeable()) {
                 $problems[] = $source->request_no . ' has already moved on from the first step (or is not a departmental PRA)';
             } elseif ($source->items->isEmpty()) {
                 $problems[] = $source->request_no . ' has no lines';
