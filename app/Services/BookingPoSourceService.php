@@ -220,23 +220,26 @@ class BookingPoSourceService
     }
 
     /**
-     * PI Amount = PI Rate x (Booking Qty + chargeable PP Qty).
+     * The PI Amount of one PRA line: THE WORKSPACE'S OWN PI Amount.
      *
-     * The saved PI Amount cell can still hold an amount worked out on an older
-     * quantity, so the amount is rebuilt from the rate whenever a rate and a
-     * quantity exist.
+     * The Workspace works the amount out (PI Rate x (Materials Ordered + billed
+     * PP Qty), see ExcelFileController::recalculateFile) and stores it in the PI
+     * Amount cell on every save. The PRA shows exactly that cell, so the two can
+     * never disagree. Re-deriving it here from separately read rate / quantity /
+     * PP cells gave a different figure whenever those reads picked a different
+     * column than the Workspace did (Materials To Be Ordered instead of
+     * Materials Ordered, a PP Qty not found), which is the mismatch this
+     * replaces.
+     *
+     * Only when the cell holds nothing is the amount built from rate x quantity.
      */
     protected function piAmountWithPp(?float $sourceAmount, float $rate, ?float $qty, float $chargeablePp): float
     {
-        // Always built from the Materials Ordered quantity Supply Chain filled in,
-        // never from a saved PI Amount that may have been worked out on an older
-        // quantity. The saved amount is only used when there is no rate or no
-        // quantity to calculate from.
-        if ($rate > 0 && ($qty ?? 0) > 0) {
-            return $rate * ($qty + $chargeablePp);
+        if ($sourceAmount !== null) {
+            return $sourceAmount;
         }
 
-        return $sourceAmount ?? ($rate * ($qty ?? 0));
+        return $rate * (($qty ?? 0) + $chargeablePp);
     }
 
     /**
