@@ -272,24 +272,43 @@
                 <div class="small text-muted">POs already sent for approval are hidden here. Click Preview to review the format, then Create the Payment Request Approval.</div>
             </div>
         </div>
+
+        {{-- ONE PRA FOR SEVERAL ROWS. Tick rows, then choose the kind of PRA:
+             Single Vendor (every ticked row must be one vendor) or Multi Vendor
+             (any rows, one approval covering several vendors). The Preview button
+             on a row still makes a PRA for that one PO. Ticks are per page. --}}
+        <form method="GET" action="{{ route('supply_chain.payment_requests.preview') }}" id="praBulkForm"
+              class="px-3 pb-3 d-flex flex-wrap align-items-center gap-2">
+            <input type="hidden" name="pra_mode" id="praBulkMode" value="">
+            <span class="small fw-semibold"><span id="praSelectedCount">0</span> selected</span>
+            <button type="submit" class="btn btn-sm btn-primary" id="praSingleBtn" data-mode="single" disabled>
+                <i class="bi bi-eye me-1" aria-hidden="true"></i>Preview Single Vendor PRA
+            </button>
+            <button type="submit" class="btn btn-sm btn-outline-primary" id="praMultiBtn" data-mode="multi" disabled>
+                <i class="bi bi-eye me-1" aria-hidden="true"></i>Preview Multi Vendor PRA
+            </button>
+            <span class="small text-muted" id="praSelectionHint">Tick the rows to include.</span>
+        </form>
         <div class="payment-request-table-wrap">
             <table class="table table-hover align-middle mb-0 payment-request-table">
                 <colgroup>
-                    <col style="width:11%">
-                    <col style="width:7%">
-                    <col style="width:7%">
-                    <col style="width:8%">
-                    <col style="width:10%">
+                    <col style="width:3%">
                     <col style="width:10%">
                     <col style="width:7%">
-                    <col style="width:8%">
-                    <col style="width:8%">
+                    <col style="width:7%">
                     <col style="width:7%">
                     <col style="width:9%">
+                    <col style="width:10%">
+                    <col style="width:7%">
                     <col style="width:8%">
+                    <col style="width:8%">
+                    <col style="width:6%">
+                    <col style="width:9%">
+                    <col style="width:9%">
                 </colgroup>
                 <thead class="table-light">
                     <tr>
+                        <th class="text-center"><input type="checkbox" class="form-check-input" id="praSelectAll" aria-label="Select all rows on this page"></th>
                         <th title="Vendor Name">Vendor</th>
                         <th title="Style">Style</th>
                         <th title="PCD Required">PCD Req.</th>
@@ -307,6 +326,12 @@
                 <tbody>
                     @forelse($pendingRows as $row)
                         <tr>
+                            <td class="text-center">
+                                <input type="checkbox" class="form-check-input pra-row-check" value="{{ $row['booking_po_id'] }}"
+                                       data-vendor="{{ \Illuminate\Support\Str::lower(trim((string) $row['supplier_name'])) }}"
+                                       data-vendor-name="{{ $row['supplier_name'] ?: '-' }}"
+                                       aria-label="Select PO {{ $row['po_no'] ?: '' }}">
+                            </td>
                             <td title="{{ $row['supplier_name'] ?: '-' }}">
                                 <div class="fw-semibold text-truncate">{{ $row['supplier_name'] ?: '-' }}</div>
                                 <div class="text-muted small text-truncate" title="{{ ($row['buyer_name'] ?: '-') . ' · ' . ($row['season_name'] ?: '-') }}">{{ $row['buyer_name'] ?: '-' }} · {{ $row['season_name'] ?: '-' }}</div>
@@ -349,7 +374,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="12" class="text-center py-5 text-muted">
+                            <td colspan="13" class="text-center py-5 text-muted">
                                 <i class="bi bi-inbox fs-1 d-block mb-2" aria-hidden="true"></i>
                                 No pending PI payment rows found. Verify PI Number, Payment Status, and Payment Doc No headers in the workspace.
                             </td>
@@ -359,7 +384,7 @@
                 @if($pendingRows->count())
                     <tfoot class="table-light">
                         <tr>
-                            <th colspan="10" class="text-end">Grand Total</th>
+                            <th colspan="11" class="text-end">Grand Total</th>
                             <th class="text-end">{{ number_format((float) ($kpis['total_pi_amount'] ?? 0), 2) }}</th>
                             <th></th>
                         </tr>
@@ -457,6 +482,65 @@
 @section('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // --- Single / multi vendor selection -----------------------------------
+        const bulkForm = document.getElementById('praBulkForm');
+        if (bulkForm) {
+            const checks = Array.from(document.querySelectorAll('.pra-row-check'));
+            const selectAll = document.getElementById('praSelectAll');
+            const singleBtn = document.getElementById('praSingleBtn');
+            const multiBtn = document.getElementById('praMultiBtn');
+            const countEl = document.getElementById('praSelectedCount');
+            const hintEl = document.getElementById('praSelectionHint');
+            const modeInput = document.getElementById('praBulkMode');
+
+            const refresh = function () {
+                const picked = checks.filter(function (c) { return c.checked; });
+                const vendors = new Set(picked.map(function (c) { return c.dataset.vendor; }));
+                countEl.textContent = picked.length;
+                singleBtn.disabled = picked.length < 1 || vendors.size !== 1;
+                multiBtn.disabled = picked.length < 2;
+
+                if (picked.length === 0) {
+                    hintEl.textContent = 'Tick the rows to include.';
+                } else if (vendors.size > 1) {
+                    hintEl.textContent = vendors.size + ' vendors selected: use Multi Vendor PRA, or tick rows of one vendor for a Single Vendor PRA.';
+                } else if (picked.length === 1) {
+                    hintEl.textContent = 'Tick one more row for a Multi Vendor PRA, or preview this one.';
+                } else {
+                    hintEl.textContent = 'One vendor selected.';
+                }
+
+                if (selectAll) {
+                    selectAll.checked = checks.length > 0 && picked.length === checks.length;
+                }
+            };
+
+            checks.forEach(function (c) { c.addEventListener('change', refresh); });
+            if (selectAll) {
+                selectAll.addEventListener('change', function () {
+                    checks.forEach(function (c) { c.checked = selectAll.checked; });
+                    refresh();
+                });
+            }
+
+            [singleBtn, multiBtn].forEach(function (btn) {
+                btn.addEventListener('click', function () { modeInput.value = btn.dataset.mode; });
+            });
+
+            bulkForm.addEventListener('submit', function () {
+                bulkForm.querySelectorAll('input[name="booking_po_ids[]"]').forEach(function (n) { n.remove(); });
+                checks.filter(function (c) { return c.checked; }).forEach(function (c) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'booking_po_ids[]';
+                    input.value = c.value;
+                    bulkForm.appendChild(input);
+                });
+            });
+
+            refresh();
+        }
+
         const modalEl = document.getElementById('overBudgetModal');
         if (!modalEl || !window.bootstrap) return;
 

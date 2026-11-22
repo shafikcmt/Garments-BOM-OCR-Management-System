@@ -793,6 +793,17 @@ Commercial and Admin record shipments for the buyers they hold; Management can r
 
 The **QTY** column of the pending list is the **Booking Qty** (the *Materials Ordered* column) of every order the row combines, the same figure the booking preview prints in **Booking Qty**. When the orders carry a **PP Qty**, a small line under the quantity shows it, for example *+ 40 PP = 3000*, which equals the **Total Qty** at the bottom of the preview.
 
+### 3.x2b One PRA for several rows: single vendor or multi vendor
+
+On the **Payment Request Approval** screen, the **Pending PI Payment** list has a tick box on every row. The **Preview** button on a row still makes a PRA for that one PO.
+
+1. Tick the rows you want in one PRA (the box in the heading ticks every row on the page). Ticks are per page.
+2. Press **Preview Single Vendor PRA** when all ticked rows belong to **one vendor**. If you tick rows of different vendors this button stays off and a hint tells you why.
+3. Press **Preview Multi Vendor PRA** to cover **several vendors in one approval** (two or more rows). The preview shows a **Multi Vendor PRA** badge with the number of vendors.
+4. Check the preview and press **Create PRA** as usual. The PRA list shows all the vendors of a multi-vendor PRA in the Supplier column.
+
+The rest of the approval, payment and documents work the same for both kinds.
+
 ### 3.x3 Sales Contract on the PRA
 
 The PRA shows **Sales Contract** under **Season**, on the screen, the PDF and the Excel. It is read from the Workspace **Sales Contract** column when there is one, otherwise from **Initial Contract Number** or **Contract Number**. If a PRA covers several contracts they are listed together. A PRA created before this change shows **-** until it is created again.

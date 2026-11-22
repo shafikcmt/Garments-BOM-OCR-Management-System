@@ -160,6 +160,9 @@
                     @if($isPreview)
                         <span class="pra-preview-badge"><i class="bi bi-eye" aria-hidden="true"></i> Preview Mode</span>
                         <span class="pra-preview-help">Review the Payment Required Date, then click Create PRA to generate the approval.</span>
+                        @if(($vendorCount ?? 1) > 1)
+                            <span class="badge rounded-pill bg-info-subtle text-info-emphasis border border-info-subtle">Multi Vendor PRA &middot; {{ $vendorCount }} vendors</span>
+                        @endif
                     @endif
                 </div>
 
@@ -215,6 +218,7 @@
                         <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
                     @endforeach
                     <input type="hidden" name="payment_required_date" id="ppChoiceDate" value="{{ $paymentRequiredInput }}">
+                    @if(! empty($praMode))<input type="hidden" name="pra_mode" value="{{ $praMode }}">@endif
                     <div class="card-body p-3">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                             <div class="fw-bold"><i class="bi bi-calculator me-1" aria-hidden="true"></i> PP Qty billing</div>
@@ -485,6 +489,7 @@
                                 <input type="hidden" name="booking_po_ids[]" value="{{ $bookingPoId }}">
                             @endforeach
                             <input type="hidden" name="payment_required_date" id="paymentRequiredCreateDate" value="{{ $paymentRequiredInput }}">
+                            @if(! empty($praMode))<input type="hidden" name="pra_mode" value="{{ $praMode }}">@endif
                             @foreach(($ppLines ?? collect()) as $pp)
                                 <input type="hidden" name="pp_free[{{ $pp['key'] }}]" value="{{ $pp['free'] ? '1' : '0' }}">
                             @endforeach

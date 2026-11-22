@@ -53,7 +53,7 @@ function uiConfine(User $user, Buyer $buyer): User
 }
 
 /** One BOM row on the buyer with enough cells to be a payable PO line. */
-function uiPayablePo(Buyer $buyer, string $poNo, string $pi): BookingPo
+function uiPayablePo(Buyer $buyer, string $poNo, string $pi, string $vendor = 'Vendor'): BookingPo
 {
     $file = ExcelFile::create([
         'file_name' => 'bom.xlsx', 'original_file_name' => 'bom.xlsx', 'file_path' => 'bom.xlsx',
@@ -62,7 +62,7 @@ function uiPayablePo(Buyer $buyer, string $poNo, string $pi): BookingPo
     $row = ExcelRow::create(['excel_file_id' => $file->id, 'row_number' => 1]);
 
     foreach ([
-        'buyer_name' => $buyer->buyer_name, 'style_name' => 'Style', 'vendor_name' => 'Vendor',
+        'buyer_name' => $buyer->buyer_name, 'style_name' => 'Style', 'vendor_name' => $vendor,
         'pi_number' => $pi, 'pi_status' => 'PI Received',
     ] as $key => $value) {
         ExcelCell::create([
@@ -74,7 +74,7 @@ function uiPayablePo(Buyer $buyer, string $poNo, string $pi): BookingPo
 
     return BookingPo::create([
         'excel_file_id' => $file->id, 'excel_row_id' => $row->id, 'po_no' => $poNo,
-        'buyer_name' => $buyer->buyer_name, 'vendor_name' => 'Vendor',
+        'buyer_name' => $buyer->buyer_name, 'vendor_name' => $vendor,
         'generated_at' => now(), 'status' => 'completed', 'completed_at' => now(),
     ]);
 }
@@ -428,4 +428,30 @@ it('rejects a document type that is not allowed', function () {
         ->assertSessionHasErrors('documents.0');
 
     expect(PaymentRequest::count())->toBe(0);
+});
+
+
+// --- Single vendor / multi vendor PRA ---------------------------------------
+
+it('refuses a single-vendor PRA that spans two vendors and allows it as a multi-vendor PRA', function () {
+    $second = uiPayablePo($this->buyer, 'PO-2', 'PI-2', 'Other Vendor');
+    $ids = [$this->po->id, $second->id];
+
+    $this->actingAs($this->creator)
+        ->get(route('supply_chain.payment_requests.preview', ['booking_po_ids' => $ids, 'pra_mode' => 'single']))
+        ->assertRedirect(route('supply_chain.payment_requests.index'))
+        ->assertSessionHas('warning', fn ($m) => str_contains($m, 'single-vendor'));
+
+    $this->actingAs($this->creator)
+        ->get(route('supply_chain.payment_requests.preview', ['booking_po_ids' => $ids, 'pra_mode' => 'multi']))
+        ->assertOk()
+        ->assertSee('Multi Vendor PRA');
+
+    $this->actingAs($this->creator)
+        ->post(route('supply_chain.payment_requests.store'), ['booking_po_ids' => $ids, 'pra_mode' => 'multi'])
+        ->assertRedirect();
+
+    $pra = PaymentRequest::latest('id')->first();
+    expect($pra->data['vendor_mode'])->toBe('multi')
+        ->and($pra->supplier_name)->toContain('Other Vendor');
 });
