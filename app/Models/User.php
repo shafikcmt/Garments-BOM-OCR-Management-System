@@ -59,6 +59,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Whether this user can open the BOM file Workspace, and so should be told
+     * about file uploads and edits there.
+     *
+     * Mirrors the sidebar: Account, Commercial and Supply Chain have a
+     * Workspace link in their own menu; everyone else (Store, Management, a
+     * narrow store role) needs store.workspace.view, which Admin holds through
+     * Gate::before. A user who never sees the Workspace gets no file
+     * notifications.
+     */
+    public function canOpenWorkspace(): bool
+    {
+        return $this->hasAnyRole(['admin', 'account', 'commercial', 'supply_chain', 'merchant'])
+            || $this->can('store.workspace.view');
+    }
+
+    /**
      * Department key this user belongs to, or null when their role is mapped to
      * no department (or they hold no role at all).
      *

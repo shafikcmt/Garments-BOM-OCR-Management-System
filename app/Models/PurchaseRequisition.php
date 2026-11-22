@@ -490,7 +490,7 @@ class PurchaseRequisition extends Model
     public static function awaitingStoreCountFor(?User $user): int
     {
         return $user && self::seesEveryRequisition($user)
-            ? self::query()->fromDepartments()->where('status', self::STATUS_SUBMITTED)->count()
+            ? self::query()->awaitingStore()->count()
             : 0;
     }
 
@@ -591,6 +591,29 @@ class PurchaseRequisition extends Model
             ->where('requisition_type', '<>', self::TYPE_INDIVIDUAL)
             ->where('status', self::STATUS_STORE_REVIEWED)
             ->whereNull('merged_into_id');
+    }
+
+    /**
+     * Department sheets waiting on the Store right now — the "Requested" tab's
+     * badge. Submitted alone is not enough: a stage-engine sheet keeps status
+     * Submitted while it sits with a later approver (Finance & Commercial Head
+     * and so on), and those are not the Store's to act on. For such a sheet the
+     * current pending stage must be the Store Received step.
+     */
+    public function scopeAwaitingStore(Builder $query): Builder
+    {
+        $table = $query->getModel()->getTable();
+
+        return $query->fromDepartments()
+            // A Final Requisition is the Store's own sheet, never a request to it.
+            ->where($table.'.level', self::LEVEL_DEPARTMENT)
+            ->where($table.'.status', self::STATUS_SUBMITTED)
+            ->whereNull($table.'.merged_into_id')
+            ->where(fn ($q) => $q->whereNull($table.'.workflow_version')
+                ->orWhereHas('stages', fn ($s) => $s
+                    ->where('purchase_requisition_stages.status', PurchaseRequisitionStage::STATUS_PENDING)
+                    ->where('purchase_requisition_stages.stamp_source', RequisitionSignatureBlock::STAMP_STORE_HEAD)
+                    ->whereColumn('purchase_requisition_stages.sequence', $table.'.current_stage')));
     }
 
     /**

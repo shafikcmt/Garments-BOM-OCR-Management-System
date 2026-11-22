@@ -393,7 +393,9 @@ The system **proposes, you decide**: it never makes a BOM without your pressing 
 - **Child style** buttons narrow everything to one child style.
 - **Orders:** one line per color and customer PO, with ship date, quantity and how many materials are ordered or received.
 - **Materials:** every material of the style with its PO, vendor, PI and payment status, received quantity, and its **Stage**. Use the search box or the stage list to find a material.
-- **Order Changes:** every change to the order columns (ship date, PO, colour, BOM quantity, consumption and the like) made in the Workspace: when, who, which colour / PO, the old and the new value. A change saved on several material lines at once shows once ("on 9 material lines"). Which columns count is set by Admin (**Show in Order Changes** on Excel Header Control). **The Store is told:** when a merchant saves a change in one of these columns, every Store user gets a notification "Order changed" naming the style and the columns, once per style per save, so receiving and issue are not done against an old figure. The Store roles are the ones Admin put under the Store department.
+- **Order Changes:** every change to the order columns (ship date, PO, colour, BOM quantity, consumption and the like) made in the Workspace: when, who, which colour / PO, the old and the new value. A change saved on several material lines at once shows once ("on 9 material lines"). Which columns count is set by Admin (**Show in Order Changes** on Excel Header Control). **The Store is told:** when a merchant saves a change in one of these columns, every Store user gets a notification "Order changed" naming the style and the columns, once per style per save, so receiving and issue are not done against an old figure. The Store roles are the ones Admin put under the Store department. Only Store users who can open the **Workspace** get it.
+
+**Who is told about Workspace files.** The alerts "New file uploaded", "Rows added to a file" and "File updated by merchant" go only to people who can open the **Workspace**: Admin, Accounts, Commercial, Supply Chain, and Store or Management users who have Workspace access. A user who never works in the Workspace (for example a purchaser who only does Comparative Statements and POs) does not get them. To give someone these alerts, give them Workspace access (**Admin, Users**, open the person, **General Stock**, **Workspace, View**).
 
 **Stage means the furthest step the material has reached:**
 
@@ -962,6 +964,7 @@ Prepared (section staff) -> Checked by Section / Department Head -> Received by 
 1. Section staff open **Purchase Requisition**, fill the items and press **Submit Requisition** (or **Save as Draft** to finish later).
 2. The Section Head (or the Department Head if there is no section) finds it under **My Approvals** and presses **Approve**, or **Return** with a note so the requester can correct it and submit again.
 3. Any Store user opens the **Requested** tab and presses **Received**.
+   The number on the **Requested** tab counts only the sheets waiting for the Store to press **Received**. Sheets still with a head, already received, or with a later approver (Finance, Operation) are not counted, and neither are Final Requisitions.
 
 Store users do not raise sheets for a section. Each section raises its own.
 

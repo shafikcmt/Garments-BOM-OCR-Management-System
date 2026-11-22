@@ -181,3 +181,27 @@ it('never writes another buyers file name into a confined users notification', f
         expect($notification->message)->not->toContain('macys-bom.xlsx');
     }
 });
+
+/**
+ * A user who never opens the Workspace (a Supply Chain General purchaser on a
+ * narrow store role, for example) is not told about its files. Granting them
+ * Workspace brings the notifications back.
+ */
+it('notifies only users who can open the Workspace', function () {
+    $file = fnFile(null);
+
+    $editor = fnUser('merchant');
+    $purchaser = fnUser('store_general_stock');
+    $withWorkspace = fnUser('store_general_stock');
+    \Spatie\Permission\Models\Permission::findOrCreate('store.workspace.view', 'web');
+    $withWorkspace->givePermissionTo('store.workspace.view');
+    $commercial = fnUser('commercial');
+
+    fnSaveAs($editor, $file);
+
+    $notified = fnNotifiedIds();
+
+    expect($notified)->not->toContain($purchaser->id)
+        ->and($notified)->toContain($withWorkspace->id)
+        ->and($notified)->toContain($commercial->id);
+});

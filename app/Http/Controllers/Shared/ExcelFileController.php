@@ -2318,7 +2318,9 @@ class ExcelFileController extends Controller
                 $query->where('name', 'merchant');
             })
             ->get()
-            ->reject(fn (User $user) => $excelFile->isBuyerLockedForUser($user));
+            ->reject(fn (User $user) => $excelFile->isBuyerLockedForUser($user))
+            // Only people who can open the Workspace hear about its files.
+            ->filter(fn (User $user) => $user->canOpenWorkspace());
 
         foreach ($users as $user) {
             $notification = AppNotification::create([

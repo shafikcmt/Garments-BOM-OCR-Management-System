@@ -155,8 +155,7 @@ class PurchaseRequisitionController extends Controller
             // open that queue, so a department user's screen runs no extra
             // query for a tab they never see.
             'awaitingCount' => ($request->user() && PurchaseRequisition::worksStoreDesk($request->user()))
-                ? PurchaseRequisition::query()->fromDepartments()
-                    ->where('status', PurchaseRequisition::STATUS_SUBMITTED)->count()
+                ? PurchaseRequisition::query()->awaitingStore()->count()
                 : 0,
             // The Department Review tab and its badge, for a department head.
             // Null hides the tab: a user who heads nothing has no such queue.
@@ -268,8 +267,7 @@ class PurchaseRequisitionController extends Controller
             'monthOptions' => $this->monthOptions($filters['month'] ?? null),
             'sections' => IndentSection::selectable()->get(['id', 'name']),
             'statusLabels' => PurchaseRequisition::statusLabels(),
-            'awaitingCount' => PurchaseRequisition::query()->fromDepartments()
-                ->where('status', PurchaseRequisition::STATUS_SUBMITTED)->count(),
+            'awaitingCount' => PurchaseRequisition::query()->awaitingStore()->count(),
             // Decides whether the Edit button is drawn at all — the same
             // question authorizeEditable() asks on the way in, so nobody is
             // offered a button that would refuse them.
@@ -400,8 +398,7 @@ class PurchaseRequisitionController extends Controller
             'monthOptions' => $this->monthOptions($filters['month'] ?? null),
             'departmentReviewCount' => $this->departmentReviewCount($user),
             'awaitingCount' => PurchaseRequisition::seesEveryRequisition($user)
-                ? PurchaseRequisition::query()->fromDepartments()
-                    ->where('status', PurchaseRequisition::STATUS_SUBMITTED)->count()
+                ? PurchaseRequisition::query()->awaitingStore()->count()
                 : 0,
         ]);
     }

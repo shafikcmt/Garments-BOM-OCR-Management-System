@@ -21,6 +21,10 @@ beforeEach(function () {
     $role = Role::findOrCreate('merchant', 'web');
     $this->merchant = User::factory()->create(['status' => 1])->assignRole($role);
     $this->store = User::factory()->create(['status' => 1])->assignRole(Role::findOrCreate('store', 'web'));
+    // The Store role carries Workspace on live (2026_08_11 migration); the
+    // order-change notice goes only to people who can open the Workspace.
+    \Spatie\Permission\Models\Permission::findOrCreate('store.workspace.view', 'web');
+    $this->store->givePermissionTo('store.workspace.view');
     $this->buyer = Buyer::create(['buyer_name' => 'Ann Taylor', 'is_active' => true]);
     $season = BuyerSeason::create(['buyer_id' => $this->buyer->id, 'code' => 'SP27']);
     $this->mother = MotherStyle::create(['buyer_id' => $this->buyer->id, 'buyer_season_id' => $season->id, 'style_no' => '748268']);

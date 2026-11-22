@@ -439,3 +439,32 @@ it('opens Requested on the current month, and All months on request', function (
     $this->actingAs($store)->get(route('store.stock.requisitions.requested', ['month' => '']))
         ->assertOk()->assertSee('text-slate-900">'.$old->requisition_no, false);
 });
+
+it('counts on the Requested badge only sheets waiting at the Store step', function () {
+    [$head, $raiser] = indRaiser();
+    $sheet = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+
+    // Still with the department head: not the Store's yet.
+    expect(PurchaseRequisition::awaitingStore()->count())->toBe(0);
+
+    indApprove($head, $sheet)->assertSessionHasNoErrors();
+    expect(PurchaseRequisition::awaitingStore()->count())->toBe(1);
+
+    $store = indUser('store', ['store.requisition.create'], ['name' => 'Store Clerk']);
+    $this->actingAs($store)->get(route('store.stock.requisitions.requested', ['month' => '']))
+        ->assertOk()->assertSee('bg-primary-subtle text-primary ms-1">1<', false);
+
+    indApprove($store, $sheet)->assertSessionHasNoErrors();
+    expect(PurchaseRequisition::awaitingStore()->count())->toBe(0);
+});
+
+it('does not count a Final Requisition with a later approver on the Requested badge', function () {
+    [$head, $raiser] = indRaiser();
+    $sheet = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+    indApprove($head, $sheet)->assertSessionHasNoErrors();
+
+    // The same submitted sheet, but as a Final Requisition: not a request to the Store.
+    $sheet->forceFill(['level' => PurchaseRequisition::LEVEL_FINAL])->save();
+
+    expect(PurchaseRequisition::awaitingStore()->count())->toBe(0);
+});
