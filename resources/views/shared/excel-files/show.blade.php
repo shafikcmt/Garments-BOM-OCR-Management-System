@@ -1787,6 +1787,13 @@
                        title="Download the file exactly as it was uploaded">
                         <i class="bi bi-download" aria-hidden="true"></i><span class="ms-1">Original</span>
                     </a>
+                    {{-- The workspace as it is now: every row with the data each
+                         department has entered since the upload, as an Excel file. --}}
+                    <a href="{{ route('uploaded-files.download_updated', $excelFile->id) }}"
+                       class="btn btn-outline-primary btn-sm" style="min-height:32px;font-size:12px;"
+                       title="Export the whole sheet to Excel, with the data every department has entered since the upload">
+                        <i class="bi bi-file-earmark-excel" aria-hidden="true"></i><span class="ms-1">Export</span>
+                    </a>
                 @endif
 
                 {{-- The panel below names staff and shows the edit timeline, so

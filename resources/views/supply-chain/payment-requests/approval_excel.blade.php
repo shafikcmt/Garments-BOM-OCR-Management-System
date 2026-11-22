@@ -23,7 +23,7 @@
     $money = fn ($value) => number_format((float) $value, 2);
     $paymentRequiredDate = $summary['earliest_payment_required_date'] ?? null;
     $paymentRequiredParts = $paymentRequiredDate
-        ? [optional($paymentRequiredDate)->format('d'), optional($paymentRequiredDate)->format('m'), optional($paymentRequiredDate)->format('Y')]
+        ? [optional($paymentRequiredDate)->format('d'), strtoupper(optional($paymentRequiredDate)->format('M')), optional($paymentRequiredDate)->format('Y')]
         : ['--', '--', '----'];
 @endphp
 <table>

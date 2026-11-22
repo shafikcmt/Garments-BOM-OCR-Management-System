@@ -2013,6 +2013,158 @@ class ExcelFileController extends Controller
     }
 
     /**
+     * Download the workspace as it is NOW: every row, with the data every
+     * department has entered since the upload (Supply Chain, Store, Accounts ...),
+     * not just what the merchant uploaded. The "Original" button keeps giving
+     * back the uploaded file untouched.
+     *
+     * SAME GATES AS download(): the admin lock excuses an admin, the buyer lock
+     * excuses nobody. SAME COLUMNS AS THE SCREEN: only the columns this user is
+     * allowed to view, and the buyer's hidden columns stay out unless the user
+     * switched on "Show all columns" - taking a file away must never reveal more
+     * than the sheet already shows this person. All rows are exported, whatever
+     * search or filter is active on screen.
+     */
+    public function downloadUpdated(ExcelFile $excelFile)
+    {
+        $user = auth()->user();
+
+        if ($excelFile->isLockedForUser($user) && ! $user->hasRole('admin')) {
+            abort(403, 'This file is locked for you.');
+        }
+
+        if ($excelFile->isBuyerLockedForUser($user)) {
+            abort(403, 'This file belongs to another buyer. Only its own buyer team can download it.');
+        }
+
+        DB::disableQueryLog();
+        @set_time_limit(300);
+        @ini_set('memory_limit', '768M');
+
+        $roleIds = $this->getRoleIds();
+
+        $headers = ExcelHeader::with(['ownerRole', 'editorRoles:id'])
+            ->where('is_active', true)
+            ->orderBy('position')
+            ->get()
+            ->filter(fn ($header) => $this->canViewHeader($header, $roleIds))
+            ->values();
+
+        $showAllColumns = (bool) session('workspace_all_columns.' . $excelFile->id, false);
+        $hiddenForBuyer = $excelFile->buyer_id
+            ? DB::table('buyer_hidden_headers')->where('buyer_id', $excelFile->buyer_id)->pluck('excel_header_id')->map(fn ($id) => (int) $id)->all()
+            : [];
+
+        if (! $showAllColumns && $hiddenForBuyer !== []) {
+            $headers = $headers->reject(fn ($header) => in_array((int) $header->id, $hiddenForBuyer, true))->values();
+        }
+
+        $headerIds = $headers->pluck('id')->all();
+        $baseName = pathinfo((string) ($excelFile->original_file_name ?: $excelFile->file_name ?: 'workspace'), PATHINFO_FILENAME);
+        $fileName = preg_replace('/[^A-Za-z0-9._ -]+/', '_', $baseName) . '_UPDATED_' . now()->format('Ymd_His');
+
+        // Rows in chunks, each with only the visible columns' cells, so a large
+        // file does not load every cell of every row at once.
+        $eachRow = function (callable $callback) use ($excelFile, $headerIds) {
+            $excelFile->rows()
+                ->orderBy('row_number')
+                ->with(['cells' => fn ($cells) => $cells->whereIn('header_id', $headerIds ?: [0])])
+                ->chunk(300, function ($rows) use ($callback) {
+                    foreach ($rows as $row) {
+                        $callback($row);
+                    }
+                });
+        };
+
+        if (! class_exists('PhpOffice\\PhpSpreadsheet\\Spreadsheet')) {
+            return response()->streamDownload(function () use ($headers, $headerIds, $eachRow) {
+                $out = fopen('php://output', 'w');
+                fwrite($out, "\xEF\xBB\xBF");
+                fputcsv($out, array_merge(['Row'], $headers->pluck('header_name')->all()));
+                $eachRow(function ($row) use ($out, $headerIds) {
+                    $byHeader = $row->cells->keyBy('header_id');
+                    fputcsv($out, array_merge([$row->row_number], array_map(fn ($id) => (string) ($byHeader->get($id)->value ?? ''), $headerIds)));
+                });
+                fclose($out);
+            }, $fileName . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Workspace');
+
+        $columnCount = $headers->count() + 1;
+        $lastColumn = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($columnCount);
+
+        // Heading row: Row # then every visible column, with the owning department
+        // under its name so it is clear who fills each column.
+        $sheet->setCellValue('A1', 'Row');
+        foreach ($headers as $index => $header) {
+            $column = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($index + 2);
+            $department = $header->ownerRole?->name ? ucwords(str_replace('_', ' ', $header->ownerRole->name)) : '';
+            $sheet->setCellValue($column . '1', $header->header_name . ($department !== '' ? "\n(" . $department . ')' : ''));
+            $sheet->getColumnDimension($column)->setWidth(max(14, min(34, mb_strlen((string) $header->header_name) + 4)));
+        }
+        $sheet->getColumnDimension('A')->setWidth(8);
+
+        $sheet->getStyle('A1:' . $lastColumn . '1')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 10, 'color' => ['argb' => 'FF000B6F']],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFE3EBF8']],
+            'alignment' => ['wrapText' => true, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER, 'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FF8EA0D4']]],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(42);
+
+        $excelRow = 2;
+        $dateColumns = [];
+        $eachRow(function ($row) use ($sheet, $headers, &$excelRow, &$dateColumns) {
+            $byHeader = $row->cells->keyBy('header_id');
+            $sheet->setCellValue('A' . $excelRow, (int) $row->row_number);
+
+            foreach ($headers as $index => $header) {
+                $value = trim((string) ($byHeader->get($header->id)->value ?? ''));
+
+                if ($value === '') {
+                    continue;
+                }
+
+                $column = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($index + 2);
+
+                if ($header->field_type === 'number' && is_numeric(str_replace(',', '', $value))) {
+                    $sheet->setCellValueExplicit($column . $excelRow, (float) str_replace(',', '', $value), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_NUMERIC);
+                } elseif ($header->field_type === 'date' && ($date = $this->asDate($value))) {
+                    $sheet->setCellValue($column . $excelRow, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($date->copy()->startOfDay()->toDateTime()));
+                    $dateColumns[$column] = true;
+                } else {
+                    $sheet->setCellValueExplicit($column . $excelRow, $value, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                }
+            }
+
+            $excelRow++;
+        });
+
+        $lastRow = max(2, $excelRow - 1);
+
+        foreach (array_keys($dateColumns) as $column) {
+            $sheet->getStyle($column . '2:' . $column . $lastRow)->getNumberFormat()->setFormatCode('dd-mmm-yy');
+        }
+
+        $sheet->getStyle('A2:' . $lastColumn . $lastRow)->applyFromArray([
+            'font' => ['size' => 9],
+            'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
+            'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN, 'color' => ['argb' => 'FFE4E7EF']]],
+        ]);
+        $sheet->freezePane('B2');
+        $sheet->setAutoFilter('A1:' . $lastColumn . $lastRow);
+
+        $tmp = tempnam(sys_get_temp_dir(), 'workspace_updated_');
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($tmp);
+        $spreadsheet->disconnectWorksheets();
+
+        return response()->download($tmp, $fileName . '.xlsx')->deleteFileAfterSend(true);
+    }
+
+    /**
      * Delete the file, its rows and its stored original.
      *
      * THE LOCK CHECKS BELOW ARE THE POINT. This method used to gate on ROLE

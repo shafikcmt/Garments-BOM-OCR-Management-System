@@ -2069,7 +2069,7 @@ class PaymentRequestController extends Controller
         $paymentRequiredDate = $summary['earliest_payment_required_date'] ?? null;
         $paymentRequired = $paymentRequiredDate ? optional($paymentRequiredDate)->format('d / m / Y') : '-';
         $paymentRequiredParts = $paymentRequiredDate
-            ? [optional($paymentRequiredDate)->format('d'), optional($paymentRequiredDate)->format('m'), optional($paymentRequiredDate)->format('Y')]
+            ? [optional($paymentRequiredDate)->format('d'), strtoupper(optional($paymentRequiredDate)->format('M')), optional($paymentRequiredDate)->format('Y')]
             : ['-', '-', '-'];
 
         // HEADER BAND, three boxes side by side (rows 1-4):

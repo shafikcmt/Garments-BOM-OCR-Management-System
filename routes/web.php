@@ -158,6 +158,7 @@ Route::middleware(['auth'])->group(function () {
     // no reason to be all-eligible. Same batched check, no second rule.
     Route::post('/uploaded-files/{excelFile}/rows/delete-selected', [ExcelFileController::class, 'deleteRows'])->name('uploaded-files.rows.destroy_many');
     Route::get('/uploaded-files/{excelFile}/download', [ExcelFileController::class, 'download'])->name('uploaded-files.download');
+    Route::get('/uploaded-files/{excelFile}/download-updated', [ExcelFileController::class, 'downloadUpdated'])->name('uploaded-files.download_updated');
     Route::delete('/uploaded-files/{excelFile}', [ExcelFileController::class, 'destroy'])->name('uploaded-files.destroy');
     Route::patch('/uploaded-files/{excelFile}/lock', [ExcelFileController::class, 'updateLock'])->name('uploaded-files.lock');
      Route::get('/notifications/{notification}', [NotificationController::class, 'open'])
