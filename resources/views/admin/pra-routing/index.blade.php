@@ -143,7 +143,13 @@
             input.addEventListener('input', function () {
                 const term = input.value.trim().toLowerCase();
                 list.querySelectorAll('label[data-name]').forEach(function (row) {
-                    row.style.display = row.dataset.name.indexOf(term) === -1 ? 'none' : '';
+                    // The rows carry Bootstrap's d-flex (display:flex !important), which beats a
+                    // plain inline display:none, so the hide has to be !important as well.
+                    if (row.dataset.name.indexOf(term) === -1) {
+                        row.style.setProperty('display', 'none', 'important');
+                    } else {
+                        row.style.removeProperty('display');
+                    }
                 });
             });
         });
