@@ -236,7 +236,7 @@
                             <div class="fw-bold"><i class="bi bi-calculator me-1" aria-hidden="true"></i> PP Qty billing</div>
                             <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Update amount</button>
                         </div>
-                        <div class="small text-muted mb-2">PI Amount = PI Rate &times; (Booking Qty + PP Qty). Choose <strong>Free</strong> where the supplier or buyer provides the PP Qty at no charge.</div>
+                        <div class="small text-muted mb-2">PI Amount is PI Rate &times; Materials Ordered, the same as the Workspace. PP Qty is <strong>Free</strong> (not added) unless you choose <strong>Billed</strong> for a line.</div>
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
                                 <thead>

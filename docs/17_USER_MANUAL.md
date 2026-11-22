@@ -866,15 +866,13 @@ People you choose are also given access to the PRA approval screens, and they do
 
 ### 3.y PP Qty and PI Amount
 
-**PI Amount = PI Rate x (Booking Qty + PP Qty).** The PP Qty on the booking format is billed together with the booking quantity, so the PI Amount in the Workspace and on the Payment Request (PRA) includes it. Example: rate 6.18, booking 4,061, PP 25 gives 6.18 x 4,086.
+**PI Amount = PI Rate x Materials Ordered.** It is the same in the Workspace (what you see while typing and the saved figure) and on the PRA. The **PP Qty** is **not added** by default, which is the same as setting **PP Qty Free** to **Yes**.
 
-If the supplier or buyer gives the PP Qty **free**, type **Yes** in the **PP Qty Free** column of that line in the Workspace. The PP Qty is then not billed and PI Amount = PI Rate x Booking Qty. Leave the column blank (or **No**) when the PP Qty is charged.
+If a PP Qty is charged by the supplier, type **No** (or **Billed**) in the **PP Qty Free** column of that Workspace line. The PI Amount then becomes PI Rate x (Materials Ordered + PP Qty), and a small **+PP** tag shows next to it. Point at the PI Amount to see the working.
 
-**PI Amount = PI Rate x (Materials Ordered + billed PP Qty)**, in the Workspace and on the PRA alike. The Workspace used to show PI Rate x *Materials To Be Ordered* while you were typing and the saved figure used Materials Ordered; both now use Materials Ordered, so what you see, what is saved and what the PRA prints are the same number. If you change Materials Ordered, PI Rate or PP Qty in the Workspace, press **Save Changes** there first; the next PRA preview then shows the new amount.
+PP Qty can be typed with a unit (for example *25 yds*); only the number is used.
 
-**On the PRA preview:** if a line has a PP Qty, a **PP Qty billing** box appears above the sheet. For each line choose **Billed** or **Free**, then press **Update amount**. The PI Amount and Total PI Amount on the sheet change at once, and the choice you see is saved when you press **Create PRA**. The box starts from the **PP Qty Free** column of the Workspace. Changing it here affects only this PRA; the Workspace is not changed.
-
-PP Qty can be typed with a unit (for example *25 yds*); only the number is used in the calculation.
+**On the PRA preview:** if a line has a PP Qty, a **PP Qty billing** box appears above the sheet. Each line starts as **Free** (matching the Workspace). Choose **Billed** for a line and press **Update amount** to add its PP Qty for this PRA only; the Workspace is not changed. Every time a PRA is previewed or created, the Workspace amounts are recalculated first, so the PRA always shows the current figure.
 
 ## 4. Accounts
 

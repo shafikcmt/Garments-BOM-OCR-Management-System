@@ -1241,6 +1241,30 @@ class PaymentRequestController extends Controller
         })->values();
     }
 
+    /**
+     * Recalculate the Workspace files of these booking POs (the same recalculation
+     * a Workspace save runs). A failure is logged and never blocks the PRA.
+     *
+     * @param  \Illuminate\Support\Collection<int, int>  $bookingPoIds
+     */
+    protected function refreshWorkspaceFor(\Illuminate\Support\Collection $bookingPoIds): void
+    {
+        $sync = app(\App\Services\SupplyChainWorkspaceSync::class);
+
+        if (! $sync->enabled()) {
+            return;
+        }
+
+        BookingPo::query()
+            ->whereIn('id', $bookingPoIds)
+            ->pluck('excel_file_id')
+            ->filter()
+            ->unique()
+            ->each(fn ($fileId) => $sync->queueFile((int) $fileId, auth()->id()));
+
+        $sync->flush();
+    }
+
     protected function snapshotsForSelectedBookingPos($selectedIds): \Illuminate\Support\Collection
     {
         $selectedIds = collect($selectedIds)
@@ -1249,6 +1273,12 @@ class PaymentRequestController extends Controller
             ->values();
 
         $this->assertBuyerAccessForBookingPoIds($selectedIds);
+
+        // ALWAYS READ A FRESH PI AMOUNT. The PRA shows the Workspace's saved PI
+        // Amount cell, which is only rewritten when the file is recalculated. The
+        // files behind the selected POs are recalculated first, so a rule change or
+        // an edit that has not been saved since cannot leave the PRA on an old figure.
+        $this->refreshWorkspaceFor($selectedIds);
 
         $selectedPoNumbers = BookingPo::query()
             ->whereIn('id', $selectedIds)
