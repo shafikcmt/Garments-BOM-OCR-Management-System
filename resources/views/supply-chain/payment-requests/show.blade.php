@@ -208,6 +208,21 @@
             </div>
         </div>
 
+        @if(! $isPreview && $paymentRequest->status === 'merged')
+            <div class="mx-auto mb-3 pra-no-print" style="max-width:1120px;">
+                <div class="alert alert-secondary border-0 shadow-sm rounded-3 mb-0">
+                    <i class="bi bi-intersect me-1" aria-hidden="true"></i>
+                    This PRA was merged into
+                    @if($mergedInto = data_get($paymentRequest->data, 'merged_into.id'))
+                        <a href="{{ route('supply_chain.payment_requests.show', $mergedInto) }}" class="alert-link">{{ data_get($paymentRequest->data, 'merged_into.request_no') }}</a>.
+                    @else
+                        another PRA.
+                    @endif
+                    Its lines and documents are on that PRA.
+                </div>
+            </div>
+        @endif
+
         @if($isPreview && ($ppLines ?? collect())->isNotEmpty())
             {{-- PP QTY BILLING. PP Qty is normally billed with the booking qty;
                  a supplier/buyer may provide it free. The creator decides per

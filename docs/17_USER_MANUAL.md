@@ -741,7 +741,7 @@ When you press **Create PRA** on the preview screen, the box has a **Supporting 
 
 1. Click **Choose files** and select the PI copy and any other related files. You can pick up to 10 files (PDF, image, Excel, CSV or Word), 10 MB each.
 2. Press **Create PRA**. The files are saved with the request.
-3. Everyone who reviews the request (Merchant, Accounts, Commercial, approvers) sees a **Supporting Documents** box on the request page with a **Download** button for each file.
+3. Everyone who reviews the request (Merchant, Accounts, Commercial, approvers) sees a **Supporting Documents** box on the request page. Press **View** to open a PDF or image in a new browser tab without saving it, or **Download** to save the file.
 
 **Resubmitting a rejected PRA.** In **My PRA Status**, press **Resubmit**. The box lists the documents already attached: tick **Tick to remove** on any you want to drop, and use **Supporting documents** to add new or corrected files (for example an updated PI copy). Then press **Resubmit**.
 
@@ -803,6 +803,17 @@ On the **Payment Request Approval** screen, the **Pending PI Payment** list has 
 4. Check the preview and press **Create PRA** as usual. The PRA list shows all the vendors of a multi-vendor PRA in the Supplier column.
 
 The rest of the approval, payment and documents work the same for both kinds.
+
+### 3.x2c Merging PRAs that are already created
+
+If several PRAs were raised separately but should have been one approval, merge them. In the **Payment Request List**:
+
+1. Tick the PRAs you want to merge. Only your own PRAs that are **still waiting at the first step (Merchant Team Check) with nobody having acted** have a tick box.
+2. Press **Merge Selected PRAs** (it turns on when two or more are ticked) and confirm.
+3. A **new PRA** is created with all their lines, vendors, supporting documents and the total. It starts at the first step like any new PRA.
+4. The PRAs you merged stay in the list as **Merged**, marked *Merged into PR-...*, with no lines and no amount. This cannot be undone.
+
+If a PRA has already been checked or approved, it cannot be merged, because that would change a document someone already signed.
 
 ### 3.x3 Sales Contract on the PRA
 

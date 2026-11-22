@@ -168,6 +168,8 @@ Route::middleware(['auth'])->group(function () {
     // Supporting documents attached to a PRA. Authorised per record in the controller.
     Route::get('/pra-documents/{paymentRequest}/{index}', [\App\Http\Controllers\PraDocumentController::class, 'download'])
         ->whereNumber('index')->name('pra_documents.download');
+    Route::get('/pra-documents/{paymentRequest}/{index}/view', [\App\Http\Controllers\PraDocumentController::class, 'view'])
+        ->whereNumber('index')->name('pra_documents.view');
 
     // PRA digital approval — approver-facing screens (any role, gated by the
     // approve-pra permission granted through the admin approver pool).

@@ -455,3 +455,69 @@ it('refuses a single-vendor PRA that spans two vendors and allows it as a multi-
     expect($pra->data['vendor_mode'])->toBe('multi')
         ->and($pra->supplier_name)->toContain('Other Vendor');
 });
+
+// --- Merge existing PRAs ------------------------------------------------------
+
+it('merges two untouched PRAs into one new PRA and closes the originals', function () {
+    $second = uiPayablePo($this->buyer, 'PO-2', 'PI-2', 'Other Vendor');
+
+    foreach ([$this->po, $second] as $po) {
+        $this->actingAs($this->creator)
+            ->post(route('supply_chain.payment_requests.store'), ['booking_po_ids' => [$po->id]])
+            ->assertRedirect();
+    }
+
+    $first = PaymentRequest::orderBy('id')->first();
+    $other = PaymentRequest::orderBy('id')->skip(1)->first();
+
+    $this->actingAs($this->creator)
+        ->post(route('supply_chain.payment_requests.merge'), ['payment_request_ids' => [$first->id, $other->id]])
+        ->assertRedirect();
+
+    $merged = PaymentRequest::latest('id')->first();
+
+    expect($merged->id)->not->toBe($first->id)
+        ->and($merged->items()->count())->toBe(2)
+        ->and($merged->data['vendor_mode'])->toBe('multi')
+        ->and($merged->current_sequence)->toBe(2)
+        ->and($first->fresh()->status)->toBe('merged')
+        ->and($first->fresh()->items()->count())->toBe(0)
+        ->and((float) $first->fresh()->total_pi_amount)->toBe(0.0)
+        ->and($other->fresh()->data['merged_into']['id'])->toBe($merged->id);
+});
+
+it('refuses to merge a PRA that someone has already acted on', function () {
+    $second = uiPayablePo($this->buyer, 'PO-2', 'PI-2', 'Other Vendor');
+
+    foreach ([$this->po, $second] as $po) {
+        $this->actingAs($this->creator)
+            ->post(route('supply_chain.payment_requests.store'), ['booking_po_ids' => [$po->id]]);
+    }
+
+    [$a, $b] = PaymentRequest::orderBy('id')->get()->all();
+    $a->update(['current_sequence' => 3]);
+
+    $this->actingAs($this->creator)
+        ->post(route('supply_chain.payment_requests.merge'), ['payment_request_ids' => [$a->id, $b->id]])
+        ->assertSessionHas('warning', fn ($m) => str_contains($m, 'cannot be merged'));
+
+    expect($b->fresh()->status)->not->toBe('merged');
+});
+
+it('opens a PDF supporting document inline and still allows a download', function () {
+    \Illuminate\Support\Facades\Storage::fake('local');
+
+    $this->actingAs($this->creator)
+        ->post(route('supply_chain.payment_requests.store'), [
+            'booking_po_ids' => [$this->po->id],
+            'documents' => [\Illuminate\Http\UploadedFile::fake()->create('PI-1.pdf', 50, 'application/pdf')],
+        ]);
+
+    $pra = PaymentRequest::sole();
+
+    $view = $this->actingAs($this->creator)->get(route('pra_documents.view', [$pra, 0]))->assertOk();
+    expect($view->headers->get('content-disposition'))->toContain('inline');
+
+    $download = $this->actingAs($this->creator)->get(route('pra_documents.download', [$pra, 0]))->assertOk();
+    expect($download->headers->get('content-disposition'))->toContain('attachment');
+});
