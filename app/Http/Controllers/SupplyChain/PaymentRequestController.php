@@ -1729,8 +1729,17 @@ class PaymentRequestController extends Controller
 
     protected function approvalRowFromItem(PaymentRequestItem $item): array
     {
-        // Rows merge into a single PRA line only when EVERY identity column
-        // matches: Style, Color, Size, Item Name, PO No and PI No.
+        // Rows merge into a single PRA line when Style, Vendor, Item Name, PO No
+        // and PI No all match. COLOUR AND SIZE ARE NOT PART OF THE KEY: a style's
+        // several "Size Label" lines (one per colour or size) are one item to the
+        // approver, so they collapse into ONE line whose PI Amount and Budget are
+        // the SUM of those lines. Different items, POs, PIs, styles or vendors stay
+        // on their own lines.
+        //
+        // (History: the key was once Style, Color and Size alone and fused unlike
+        // items into a comma-joined cell. Item Name, PO and PI were added to stop
+        // that; Color and Size are dropped now because splitting by them printed
+        // the same item many times.)
         //
         // WHY THE LAST THREE WERE ADDED. The key used to be Style, Color and
         // Size alone, so several BOM items sharing one style collapsed into a
@@ -1753,14 +1762,12 @@ class PaymentRequestController extends Controller
         // on each split line. A column left out of the key stays comma-joined,
         // which would simply move the cramped cell rather than remove it.
         $style = $item->style_name ?: data_get($item->data, 'style_name');
-        $color = $item->material_color ?: data_get($item->data, 'material_color');
-        $size = data_get($item->data, 'size') ?: data_get($item->data, 'size_width');
         $materialType = data_get($item->data, 'material_type') ?: $item->material_description ?: $item->material_type;
         $poNumber = $item->po_no ?: data_get($item->data, 'po_no');
         $piNumber = $item->pi_number ?: data_get($item->data, 'pi_number');
 
         return [
-            'merge_key' => $this->mergeKey($style, $color, $size, $materialType, $poNumber, $piNumber),
+            'merge_key' => $this->mergeKey($style, $item->supplier_name, $materialType, $poNumber, $piNumber),
             'booking_po_ids' => collect([$item->booking_po_id])->filter()->values()->all(),
             'vendor_name' => $item->supplier_name ?: '-',
             'style' => $style ?: '-',

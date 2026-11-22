@@ -814,9 +814,9 @@ To print PRAs that were already created (for example for different vendors) toge
 
 This is only a view for printing. Nothing is created, changed or closed, the PRAs keep their own numbers and approval, and the Combined sheet is not an approval document of its own. To get one new approval for several vendors, create a **Multi Vendor PRA** from the Pending PI Payment list instead (section above).
 
-### 3.x3a Style and Item Name shown once
+### 3.x3a One line per item on the PRA
 
-On the PRA table (screen, PDF and Excel), **Style** and **Item Name** are shown once for a run of lines that share them, as one merged cell, instead of repeating on every line. Lines are ordered by vendor, style and item name so the same items sit together. The merged item cell never runs across a different style or a different vendor. Amounts and totals are not affected.
+On the PRA table (screen, PDF and Excel) every **item** of a style is **one line**. Lines of the same style, vendor, item name, PO and PI that differ only by colour or size (for example five *Size Label* lines) are combined: the item shows once, and **PI Amt, Budget and Saving are the totals** of those lines. **Style** is shown once, as a merged cell, for all the items under it. Different items, POs, PIs, styles or vendors stay on separate lines. The Grand Total is the same as before.
 
 ### 3.x3 Sales Contract on the PRA
 
