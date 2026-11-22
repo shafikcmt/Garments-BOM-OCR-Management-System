@@ -944,20 +944,25 @@
                  imply they are one list. Admin is excluded because it holds both
                  permissions and would otherwise see two inboxes.
 
-                 The count deliberately asks only how many departmental PRAs are
-                 mid-chain, not how many are THIS user's — per-record eligibility
-                 needs PraStageResolver, which is far too much work for a badge
-                 rendered on every page. The queue itself is exact. --}}
+                 The badge is PraQueueCount: exactly the PRAs waiting on this user
+                 (the same test as the queue), cached for 30 seconds per user so
+                 it is cheap on every page. --}}
             @if(auth()->user() && ! auth()->user()->hasRole('admin') && auth()->user()->can('pra.departmental.act'))
                 <div class="sidebar-section">
                     <div class="sidebar-section-label">Approvals</div>
                     <ul class="sidebar-list">
                         <li class="sidebar-item">
+                            @php $praQueueCount = \App\Support\PraQueueCount::forUser(auth()->user()); @endphp
                             <a href="{{ route('pra_departmental.index') }}" class="sidebar-nav-link {{ request()->routeIs('pra_departmental.*') ? 'is-active' : '' }}">
                                 <span class="sidebar-link-main">
                                     <span class="sidebar-icon"><i class="bi bi-inbox" aria-hidden="true"></i></span>
                                     <span class="sidebar-link-text">PRA Approvals</span>
                                 </span>
+                                {{-- Same badge as the other approval queues: how many PRAs are
+                                     waiting on this person at their step. --}}
+                                @if($praQueueCount > 0)
+                                    <span class="badge rounded-pill bg-danger">{{ $praQueueCount > 99 ? '99+' : $praQueueCount }}</span>
+                                @endif
                             </a>
                         </li>
                     </ul>

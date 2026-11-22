@@ -835,6 +835,10 @@ On a Workspace file the top buttons are **Original** and **Export**.
 
 Export contains the columns you are allowed to see on the screen (the columns your buyer hides stay out unless you switched on **Show all columns**), and it always exports **every row**, even if you have a search or filter on. A file locked by Admin, or belonging to another buyer, cannot be exported by users who cannot open it.
 
+### 3.x8 The PRA Approvals badge
+
+If you approve payment requests, the **PRA Approvals** item in the left menu (under **Approvals**) shows a red number: the PRAs waiting for **you** at your step right now. It matches the list you see when you open it. The number refreshes within about half a minute, and straight away after you approve or reject one.
+
 ### 3.x6 Workspace dropdown columns and vendor defaults
 
 **Dropdowns.** The **Delivery Term**, **Payment Term** and **Ship Mode** columns of the Workspace now show a dropdown list when you click in the cell: pick a value or type your own. The lists are the same ones the vendor form uses.
