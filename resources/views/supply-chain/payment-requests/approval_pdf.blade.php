@@ -7,15 +7,26 @@
         * { box-sizing: border-box; }
         body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8px; color: #000b6f; margin: 0; }
         table { width: 100%; border-collapse: collapse; }
-        .top td { border: 0; vertical-align: top; padding: 0; }
+        /* HEADER BOXES: logo | title | dates, each outlined, same design as the
+           Excel export. */
+        .head { table-layout: fixed; border: 1px solid #4b5fae; }
+        .head td { border: 1px solid #4b5fae; vertical-align: middle; padding: 6px 10px; }
+        .head .logo-cell { vertical-align: bottom; }
+        .head .title-cell { text-align: center; }
+        .head .dates-cell { padding: 0; }
+        .dates-top { text-align: center; font-size: 9px; font-weight: 700; padding: 9px 6px 7px; }
+        .dates-label { text-align: center; font-size: 8px; font-weight: 700; padding: 0 6px 4px; }
+        .date-parts { table-layout: fixed; }
+        .date-parts td { border: 0; border-top: 1px solid #8ea0d4; border-left: 1px solid #8ea0d4; text-align: center; font-size: 9px; font-weight: 700; padding: 5px 2px; }
+        .date-parts td:first-child { border-left: 0; }
         .logo-text { font-size: 25px; letter-spacing: .09em; font-weight: 600; line-height: .95; }
         .logo-small { font-size: 7px; letter-spacing: .06em; font-weight: 700; padding-left: 48px; }
         .company { font-size: 8.5px; letter-spacing: .08em; font-weight: 700; margin-top: 10px; }
         .logo-img { height: 50px; max-width: 160px; object-fit: contain; }
-        .title { text-align: center; font-size: 25px; font-weight: 800; line-height: 1; letter-spacing: .02em; }
+        .title { text-align: center; font-size: 25px; font-weight: 700; line-height: 1; letter-spacing: .02em; }
         .request-no { text-align: center; font-size: 10.5px; margin-top: 6px; letter-spacing: .04em; }
         .date-area { text-align: right; font-size: 9px; font-weight: 700; line-height: 1.6; }
-        .date-area .date-value { font-weight: 800; white-space: nowrap; }
+        .date-area .date-value { font-weight: 700; white-space: nowrap; }
         {{-- VERTICAL SPACING IS A ONE-PAGE BUDGET. A4 landscape leaves roughly
              577pt of height, and the header/OCR/total/signature chrome around
              the table used to consume about 60% of it — so a PRA fitted only 13
@@ -35,17 +46,22 @@
         .info td { border: 0; vertical-align: top; padding: 7px 0 5px; }
         .buyer { font-size: 9px; line-height: 1.7; font-weight: 700; }
         .note { font-size: 8.5px; line-height: 1.4; font-weight: 700; padding-top: 5px; }
-        .check { min-height: 60px; padding: 8px 10px; font-size: 8.5px; line-height: 1.5; }
+        .check { min-height: 60px; padding: 8px 10px; font-size: 8.5px; line-height: 1.5; border: 1px solid #4a5cb2; }
         .mini-box { display: inline-block; width: 11px; height: 11px; border: 1px solid #91a1d0; vertical-align: middle; margin: 0 5px 0 13px; }
         .line { display: inline-block; border-bottom: 1px solid #4a5cb2; width: 132px; height: 10px; }
-        .total { text-align: right; font-size: 12px; font-weight: 800; margin: 3px 0 5px; }
+        .total { text-align: right; font-size: 12px; font-weight: 700; margin: 3px 0 5px; }
         .report { table-layout: fixed; color: #111827; }
-        .report th { background:#000b6f; color:#fff; border:1px solid #33439e; padding: 4px 3px; font-size: 9px; line-height:1.15; font-weight:800; text-align:center; vertical-align:middle; }
+        .report th { background:#e3ebf8; color:#000b6f; border:1px solid #8ea0d4; padding: 4px 3px; font-size: 9px; line-height:1.15; font-weight:700; text-align:center; vertical-align:middle; }
         .report td { border:1px solid #e2e6ef; padding: 3px 4px; font-size: 9px; line-height:1.15; vertical-align:middle; word-break: break-word; }
         .center { text-align:center; } .right { text-align:right; }
         .style-cell { vertical-align:middle; font-weight:700; }
-        .grand td { background:#eaf0fb !important; color:#000b6f; font-size: 10px; font-weight:800; padding: 5px 5px; }
+        .grand td { background:#eaf0fb !important; color:#000b6f; font-size: 10px; font-weight:700; padding: 5px 5px; }
         .sign { margin-top: 18px; color:#000b6f; }
+        /* SIGNATURES IN THE PAGE FOOTER. A PRA that fits one page pins the block
+           to the bottom of the page; a long one lets it follow the table. */
+        .sign-footer { position: fixed; left: 0; right: 0; bottom: 0; }
+        .sign-footer .sign { margin-top: 0; }
+        .sign-box { height: 40px; }
         .sign td { border:0; width:33.33%; padding:0 22px; vertical-align:bottom; }
         /* Departmental PRAs print FOUR blocks instead of three. Narrower cells
            and tighter gutters keep the row on the same single page — the widths
@@ -56,14 +72,14 @@
            its height whether the value is printed or left blank for signing. */
         .filled { display:inline-block; width:132px; border-bottom:1px solid #4a5cb2; font-weight:700; }
         .completed-line { margin-top:10px; font-size:9px; color:#000b6f; }
-        .completed-line strong { font-weight:800; }
+        .completed-line strong { font-weight:700; }
         .sign td + td { border-left:1px solid #8d9bd3; }
-        .sign-title { font-size:9px; font-weight:800; margin-bottom:6px; }
+        .sign-title { font-size:9px; font-weight:700; margin-bottom:6px; }
         .sign-text { font-size:9px; margin-bottom:9px; }
         .sign-line { border-bottom:1px solid #000b6f; height:1px; }
         .sign-img { max-height:42px; max-width:100%; margin-bottom:4px; }
         .sign-meta { font-size:8.5px; line-height:1.4; margin-top:4px; }
-        .sign-meta .sign-name { font-weight:800; }
+        .sign-meta .sign-name { font-weight:700; }
         {{-- 11 columns summing to 100, mirrored by .c-* in show.blade.php.
 
              WIDTH IS A ROW-HEIGHT BUDGET HERE, not just a look. Every column is
@@ -99,9 +115,9 @@
     // Null until the Accounts Team check (step 4) — an unanswered box, not a "No".
     $ocrCheck = \App\Support\PaymentRequestSettings::ocrCheckFor($paymentRequest);
 @endphp
-<table class="top">
+<table class="head">
     <tr>
-        <td style="width:25%;">
+        <td style="width:25%;" class="logo-cell">
             @if($logoData)
                 <img src="{{ $logoData }}" class="logo-img" alt="Humana">
             @else
@@ -110,13 +126,20 @@
             @endif
             <div class="company">HUMANA APPARELS PVT. LTD.</div>
         </td>
-        <td style="width:50%; padding-top:2px;">
+        <td style="width:50%;" class="title-cell">
             <div class="title">Payment Request Approval</div>
             <div class="request-no">{{ $paymentRequest->request_no }}</div>
         </td>
-        <td style="width:25%;" class="date-area">
-            Date:&nbsp;&nbsp; <span class="date-value">{{ optional($paymentRequest->created_at)->format('jS M-Y') }}</span><br><br>
-            Payment Require Date:&nbsp;&nbsp; <span class="date-value">{{ $paymentRequiredDate ? optional($paymentRequiredDate)->format('jS M-Y') : '-' }}</span>
+        <td style="width:25%;" class="dates-cell">
+            <div class="dates-top">Date:&nbsp; {{ optional($paymentRequest->created_at)->format('jS M-Y') }}</div>
+            <div class="dates-label">Payment Require Date:</div>
+            <table class="date-parts">
+                <tr>
+                    <td>{{ $paymentRequiredDate ? optional($paymentRequiredDate)->format('d') : '-' }}</td>
+                    <td>{{ $paymentRequiredDate ? optional($paymentRequiredDate)->format('m') : '-' }}</td>
+                    <td>{{ $paymentRequiredDate ? optional($paymentRequiredDate)->format('Y') : '-' }}</td>
+                </tr>
+            </table>
         </td>
     </tr>
 </table>
@@ -208,47 +231,32 @@
     </tbody>
 </table>
 
+@php
+    // A PRA of normal length fits one page, so its signatures are pinned to the
+    // page footer. A long one lets them follow the table instead.
+    $pinSignatures = $approvalRows->count() <= 12;
+@endphp
+<div class="{{ $pinSignatures ? 'sign-footer' : '' }}">
 <table class="sign {{ count($signatureBlocks) === 4 ? 'cols-4' : '' }}">
     <tr>
         @foreach($signatureBlocks as $i => $sign)
             {{-- $loop->last, not a hardcoded index 2: the block count is 3 on a
-                 legacy PRA and 4 on a departmental one. --}}
+                 legacy PRA and 4 on a departmental one. Same content in every
+                 block: caption, signing space (the signature image, when there is
+                 one), the line and "Signature & Date". No typed name, date,
+                 designation or "Pending approval". --}}
             <td style="{{ $i === 0 ? 'padding-left:0;' : ($loop->last ? 'padding-right:0;' : '') }}">
                 <div class="sign-title">{{ $sign['title'] }}</div>
-                @if($sign['src'])
-                    <img src="{{ $sign['src'] }}" alt="signature" class="sign-img">
-                    <div class="sign-line"></div>
-                    <div class="sign-meta">
-                        @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
-                        <div>Signature &amp; Date</div>
-                    </div>
-                @elseif(!empty($sign['pending']))
-                    {{-- Not yet signed. The name (when one person is expected)
-                         is shown to help whoever is chasing the paperwork, and
-                         the caption is what stops it reading as an endorsement.
-                         No image, ever, on a pending block. --}}
-                    <div class="sign-text">&nbsp;</div>
-                    <div class="sign-line"></div>
-                    <div class="sign-meta">
-                        @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
-                        <div>Signature &amp; Date</div>
-                    </div>
-                @elseif(!empty($sign['dynamic']) && ($sign['name'] || $sign['date']))
-                    {{-- Actor known but no signature image uploaded: typed name + date --}}
-                    <div class="sign-text">&nbsp;</div>
-                    <div class="sign-line"></div>
-                    <div class="sign-meta">
-                        @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
-                        <div>Signature &amp; Date</div>
-                    </div>
-                @else
-                    <div class="sign-text">Signature &amp; Date</div>
-                    <div class="sign-line"></div>
-                @endif
+                <div class="sign-box">
+                    @if($sign['src'])<img src="{{ $sign['src'] }}" alt="signature" class="sign-img">@endif
+                </div>
+                <div class="sign-line"></div>
+                <div class="sign-meta">Signature &amp; Date</div>
             </td>
         @endforeach
     </tr>
 </table>
+</div>
 
 {{-- Step 6 is a payment, not an endorsement, so it gets a line rather than a
      signature block. Present only once the Commercial Head has completed. --}}
