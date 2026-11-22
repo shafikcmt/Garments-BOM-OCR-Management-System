@@ -57,10 +57,6 @@
         .style-cell { vertical-align:middle; font-weight:700; }
         .grand td { background:#eaf0fb !important; color:#000b6f; font-size: 10px; font-weight:700; padding: 5px 5px; }
         .sign { margin-top: 18px; color:#000b6f; }
-        /* SIGNATURES IN THE PAGE FOOTER. A PRA that fits one page pins the block
-           to the bottom of the page; a long one lets it follow the table. */
-        .sign-footer { position: fixed; left: 0; right: 0; bottom: 0; }
-        .sign-footer .sign { margin-top: 0; }
         .sign-box { height: 40px; }
         .sign td { border:0; width:33.33%; padding:0 22px; vertical-align:bottom; }
         /* Departmental PRAs print FOUR blocks instead of three. Narrower cells
@@ -232,11 +228,16 @@
 </table>
 
 @php
-    // A PRA of normal length fits one page, so its signatures are pinned to the
-    // page footer. A long one lets them follow the table instead.
-    $pinSignatures = $approvalRows->count() <= 12;
+    // THE SIGNATURE BLOCK MOVES WITH THE TABLE. It always follows the table, but a
+    // PRA with few rows is given a gap so the block sits about 60% of the way down
+    // the page (a short table does not leave it stranded right under two rows, and
+    // it is not pinned to the very bottom either). The more rows there are, the
+    // smaller the gap, until a long table simply pushes the block further down.
+    // Heights are estimates in points: about 190 for the header, OCR box and
+    // heading, then about 15 a row.
+    $signGap = max(16, 340 - (190 + 15 * $approvalRows->count()));
 @endphp
-<div class="{{ $pinSignatures ? 'sign-footer' : '' }}">
+<div style="height: {{ $signGap }}pt;"></div>
 <table class="sign {{ count($signatureBlocks) === 4 ? 'cols-4' : '' }}">
     <tr>
         @foreach($signatureBlocks as $i => $sign)
@@ -256,7 +257,6 @@
         @endforeach
     </tr>
 </table>
-</div>
 
 {{-- Step 6 is a payment, not an endorsement, so it gets a line rather than a
      signature block. Present only once the Commercial Head has completed. --}}
