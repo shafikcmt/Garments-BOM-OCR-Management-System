@@ -456,9 +456,9 @@ it('refuses a single-vendor PRA that spans two vendors and allows it as a multi-
         ->and($pra->supplier_name)->toContain('Other Vendor');
 });
 
-// --- Merge existing PRAs ------------------------------------------------------
+// --- Combined print of several existing PRAs ----------------------------------
 
-it('merges two untouched PRAs into one new PRA and closes the originals', function () {
+it('shows several existing PRAs as one read-only combined sheet without changing them', function () {
     $second = uiPayablePo($this->buyer, 'PO-2', 'PI-2', 'Other Vendor');
 
     foreach ([$this->po, $second] as $po) {
@@ -467,41 +467,20 @@ it('merges two untouched PRAs into one new PRA and closes the originals', functi
             ->assertRedirect();
     }
 
-    $first = PaymentRequest::orderBy('id')->first();
-    $other = PaymentRequest::orderBy('id')->skip(1)->first();
+    $ids = PaymentRequest::orderBy('id')->pluck('id')->all();
+    $before = PaymentRequest::count();
 
-    $this->actingAs($this->creator)
-        ->post(route('supply_chain.payment_requests.merge'), ['payment_request_ids' => [$first->id, $other->id]])
-        ->assertRedirect();
+    $html = $this->actingAs($this->creator)
+        ->get(route('supply_chain.payment_requests.combined', ['ids' => $ids]))
+        ->assertOk()
+        ->getContent();
 
-    $merged = PaymentRequest::latest('id')->first();
+    expect($html)->toContain('Combined View')
+        ->toContain('Other Vendor')
+        ->not->toContain('Create PRA');
 
-    expect($merged->id)->not->toBe($first->id)
-        ->and($merged->items()->count())->toBe(2)
-        ->and($merged->data['vendor_mode'])->toBe('multi')
-        ->and($merged->current_sequence)->toBe(2)
-        ->and($first->fresh()->status)->toBe('merged')
-        ->and($first->fresh()->items()->count())->toBe(0)
-        ->and((float) $first->fresh()->total_pi_amount)->toBe(0.0)
-        ->and($other->fresh()->data['merged_into']['id'])->toBe($merged->id);
-});
-
-it('refuses to merge a PRA that someone has already acted on', function () {
-    $second = uiPayablePo($this->buyer, 'PO-2', 'PI-2', 'Other Vendor');
-
-    foreach ([$this->po, $second] as $po) {
-        $this->actingAs($this->creator)
-            ->post(route('supply_chain.payment_requests.store'), ['booking_po_ids' => [$po->id]]);
-    }
-
-    [$a, $b] = PaymentRequest::orderBy('id')->get()->all();
-    $a->update(['current_sequence' => 3]);
-
-    $this->actingAs($this->creator)
-        ->post(route('supply_chain.payment_requests.merge'), ['payment_request_ids' => [$a->id, $b->id]])
-        ->assertSessionHas('warning', fn ($m) => str_contains($m, 'cannot be merged'));
-
-    expect($b->fresh()->status)->not->toBe('merged');
+    expect(PaymentRequest::count())->toBe($before)
+        ->and(PaymentRequest::whereIn('id', $ids)->pluck('status')->unique()->all())->toBe(['pending_check']);
 });
 
 it('opens a PDF supporting document inline and still allows a download', function () {

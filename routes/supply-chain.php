@@ -41,8 +41,12 @@ Route::prefix('supply-chain')
         Route::get('/payment-requests', [PaymentRequestController::class, 'index'])->name('payment_requests.index');
         Route::get('/payment-requests/create', [PaymentRequestController::class, 'create'])->name('payment_requests.create');
         Route::get('/payment-requests/preview', [PaymentRequestController::class, 'preview'])->name('payment_requests.preview');
+        // Print several existing PRAs as one sheet (read-only). Declared before the
+        // {paymentRequest} routes so "combined" is never read as an id.
+        Route::get('/payment-requests/combined', [PaymentRequestController::class, 'combined'])->name('payment_requests.combined');
+        Route::get('/payment-requests/combined/pdf', [PaymentRequestController::class, 'combinedPdf'])->name('payment_requests.combined_pdf');
+        Route::get('/payment-requests/combined/excel', [PaymentRequestController::class, 'combinedExcel'])->name('payment_requests.combined_excel');
         Route::post('/payment-requests', [PaymentRequestController::class, 'store'])->name('payment_requests.store');
-        Route::post('/payment-requests/merge', [PaymentRequestController::class, 'merge'])->name('payment_requests.merge');
         Route::get('/payment-requests/my-status', [PaymentRequestController::class, 'myStatus'])->name('payment_requests.my_status');
         Route::post('/payment-requests/{paymentRequest}/resubmit', [PaymentRequestController::class, 'resubmit'])->name('payment_requests.resubmit');
         Route::get('/payment-requests/{paymentRequest}', [PaymentRequestController::class, 'show'])->name('payment_requests.show');

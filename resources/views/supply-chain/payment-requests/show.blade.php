@@ -4,6 +4,9 @@
 @php
     $approvalRows = collect($approvalRows ?? []);
     $isPreview = (bool) ($isPreview ?? false);
+    // A read-only print view of several existing PRAs as one sheet: laid out like
+    // the create preview, but nothing can be created from it.
+    $isCombined = (bool) ($isCombined ?? false);
     $budgetCheck = $budgetCheck ?? ['exceeded' => false, 'lines' => []];
     $canOverrideBudget = (bool) ($canOverrideBudget ?? false);
     $bookingPoIds = collect($bookingPoIds ?? [])->filter()->unique()->values();
@@ -157,7 +160,10 @@
             <div class="pra-toolbar-card d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div class="d-flex flex-wrap align-items-center gap-2">
                     <a href="{{ route('supply_chain.payment_requests.index') }}" class="pra-back-btn">← Back</a>
-                    @if($isPreview)
+                    @if($isCombined)
+                        <span class="pra-preview-badge"><i class="bi bi-eye" aria-hidden="true"></i> Combined View</span>
+                        <span class="pra-preview-help">Several PRAs on one sheet for printing. Nothing is created or changed.</span>
+                    @elseif($isPreview)
                         <span class="pra-preview-badge"><i class="bi bi-eye" aria-hidden="true"></i> Preview Mode</span>
                         <span class="pra-preview-help">Review the Payment Required Date, then click Create PRA to generate the approval.</span>
                         @if(($vendorCount ?? 1) > 1)
@@ -166,7 +172,13 @@
                     @endif
                 </div>
 
-                @if($isPreview)
+                @if($isCombined)
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" onclick="window.print()" class="btn btn-outline-primary rounded-pill"><i class="bi bi-printer me-1" aria-hidden="true"></i>Print</button>
+                        <a href="{{ route('supply_chain.payment_requests.combined_pdf', ['ids' => $combinedIdsList]) }}" target="_blank" rel="noopener" class="btn btn-outline-danger rounded-pill"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF Preview</a>
+                        <a href="{{ route('supply_chain.payment_requests.combined_excel', ['ids' => $combinedIdsList]) }}" class="btn btn-success rounded-pill"><i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel Download</a>
+                    </div>
+                @elseif($isPreview)
                     <div class="pra-date-panel">
                         <div>
                             <label for="paymentRequiredPreviewDate">Payment Require Date</label>
@@ -207,21 +219,6 @@
                 @endif
             </div>
         </div>
-
-        @if(! $isPreview && $paymentRequest->status === 'merged')
-            <div class="mx-auto mb-3 pra-no-print" style="max-width:1120px;">
-                <div class="alert alert-secondary border-0 shadow-sm rounded-3 mb-0">
-                    <i class="bi bi-intersect me-1" aria-hidden="true"></i>
-                    This PRA was merged into
-                    @if($mergedInto = data_get($paymentRequest->data, 'merged_into.id'))
-                        <a href="{{ route('supply_chain.payment_requests.show', $mergedInto) }}" class="alert-link">{{ data_get($paymentRequest->data, 'merged_into.request_no') }}</a>.
-                    @else
-                        another PRA.
-                    @endif
-                    Its lines and documents are on that PRA.
-                </div>
-            </div>
-        @endif
 
         @if($isPreview && ($ppLines ?? collect())->isNotEmpty())
             {{-- PP QTY BILLING. PP Qty is normally billed with the booking qty;
@@ -319,7 +316,7 @@
                 </div>
                 <div class="col-6 pt-1">
                     <div class="pra-title">Payment Request Approval</div>
-                    <div class="pra-request-no">{{ $isPreview ? 'Preview - PR number will generate after Create' : $paymentRequest->request_no }}</div>
+                    <div class="pra-request-no">{{ $isCombined ? 'Combined: ' . implode(' + ', data_get($paymentRequest->data, 'combined_from', [])) : ($isPreview ? 'Preview - PR number will generate after Create' : $paymentRequest->request_no) }}</div>
                 </div>
                 <div class="col-3">
                     <div class="pra-date mb-3">Date:&nbsp;&nbsp; {{ optional($paymentRequest->created_at)->format('jS M-Y') }}</div>
@@ -493,7 +490,7 @@
             @endif
         </div>
 
-        @if($isPreview)
+        @if($isPreview && ! $isCombined)
             {{-- Create PRA + send for approval --}}
             <div class="modal fade" id="createPraModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
