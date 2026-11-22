@@ -808,7 +808,7 @@ The rest of the approval, payment and documents work the same for both kinds.
 
 If several PRAs were raised separately but should have been one approval, merge them. In the **Payment Request List**:
 
-1. Tick the PRAs you want to merge. Only your own PRAs that are **still waiting at the first step (Merchant Team Check) with nobody having acted** have a tick box.
+1. Tick the PRAs you want to merge. Only PRAs that are **still waiting at the first step (Merchant Team Check) with nobody having acted** can be ticked; the others show a greyed tick box, and hovering over it tells you why. Any Supply Chain user can merge them, and the new PRA is created by the person who merges.
 2. Press **Merge Selected PRAs** (it turns on when two or more are ticked) and confirm.
 3. A **new PRA** is created with all their lines, vendors, supporting documents and the total. It starts at the first step like any new PRA.
 4. The PRAs you merged stay in the list as **Merged**, marked *Merged into PR-...*, with no lines and no amount. This cannot be undone.
