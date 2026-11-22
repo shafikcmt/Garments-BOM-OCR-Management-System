@@ -826,6 +826,15 @@ The PRA shows **Sales Contract** under **Season**, on the screen, the PDF and th
 
 The three money columns at the right of the PRA table are, in this order: **PI Amt (USD)**, **Budget** and **Saving**. **Saving = Budget - PI Amt**. A negative Saving (the PI is above the budget) is shown with a minus sign and in red. A line with no budget shows **-** in Budget and Saving. The **Grand Total** row shows the Budget and Saving totals only when every line has a budget; otherwise those two cells stay blank, so a partial sum is never mistaken for a real budget. The screen, PDF and Excel are the same.
 
+### 3.x7 Exporting the Workspace with everyone's updated data
+
+On a Workspace file the top buttons are **Original** and **Export**.
+
+- **Original** gives back the file exactly as the merchant uploaded it.
+- **Export** downloads an **Excel file of the whole sheet as it is now**: every row, with everything Supply Chain, Store, Accounts and the other departments have entered since the upload, including the calculated columns. The heading of each column shows its department in brackets. Dates and numbers come out as real Excel dates and numbers, the heading row is frozen and has filters.
+
+Export contains the columns you are allowed to see on the screen (the columns your buyer hides stay out unless you switched on **Show all columns**), and it always exports **every row**, even if you have a search or filter on. A file locked by Admin, or belonging to another buyer, cannot be exported by users who cannot open it.
+
 ### 3.x6 Workspace dropdown columns and vendor defaults
 
 **Dropdowns.** The **Delivery Term**, **Payment Term** and **Ship Mode** columns of the Workspace now show a dropdown list when you click in the cell: pick a value or type your own. The lists are the same ones the vendor form uses.
