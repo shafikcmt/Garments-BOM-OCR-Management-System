@@ -72,6 +72,7 @@
         'pending_approval' => 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
         'approved' => 'bg-success-subtle text-success-emphasis border border-success-subtle',
         'rejected' => 'bg-danger-subtle text-danger-emphasis border border-danger-subtle',
+        'merged' => 'bg-dark-subtle text-dark-emphasis border border-dark-subtle',
     ];
     $statusLabel = fn ($status) => \Illuminate\Support\Str::headline((string) $status);
 @endphp
@@ -398,13 +399,25 @@
     </div>
 
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden" id="payment-request-list">
-        <div class="card-header bg-white border-0 py-3">
+        <div class="card-header bg-white border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h6 class="fw-bold mb-0">Payment Request List <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle ms-1">{{ $paymentRequests->total() }}</span></h6>
+
+            {{-- MERGE EXISTING PRAs. Tick two or more PRAs that are still waiting at
+                 the first step (nobody has acted), then merge them into one new
+                 PRA. Only those PRAs have a tick box. --}}
+            <form method="POST" action="{{ route('supply_chain.payment_requests.merge') }}" id="praMergeForm" class="d-flex flex-wrap align-items-center gap-2 m-0">
+                @csrf
+                <span class="small text-muted"><span id="praMergeCount">0</span> selected</span>
+                <button type="submit" class="btn btn-sm btn-primary" id="praMergeBtn" disabled>
+                    <i class="bi bi-intersect me-1" aria-hidden="true"></i>Merge Selected PRAs
+                </button>
+            </form>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
+                        <th style="width:34px;"></th>
                         <th>Request No</th>
                         <th>Supplier</th>
                         <th>Buyer</th>
@@ -419,7 +432,21 @@
                 <tbody>
                     @forelse($paymentRequests as $paymentRequest)
                         <tr>
-                            <td class="fw-bold">{{ $paymentRequest->request_no }}</td>
+                            <td class="text-center">
+                                @if($paymentRequest->isMergeable() && (int) $paymentRequest->created_by === (int) auth()->id())
+                                    <input type="checkbox" class="form-check-input pra-merge-check" value="{{ $paymentRequest->id }}"
+                                           data-amount="{{ (float) $paymentRequest->total_pi_amount }}"
+                                           aria-label="Select {{ $paymentRequest->request_no }} to merge">
+                                @endif
+                            </td>
+                            <td class="fw-bold">
+                                {{ $paymentRequest->request_no }}
+                                @if($paymentRequest->status === 'merged' && data_get($paymentRequest->data, 'merged_into.request_no'))
+                                    <div class="small text-muted fw-normal">Merged into {{ data_get($paymentRequest->data, 'merged_into.request_no') }}</div>
+                                @elseif(data_get($paymentRequest->data, 'merged_from'))
+                                    <div class="small text-muted fw-normal">Merged from {{ collect(data_get($paymentRequest->data, 'merged_from'))->pluck('request_no')->implode(', ') }}</div>
+                                @endif
+                            </td>
                             <td>{{ $paymentRequest->supplier_name ?: '-' }}</td>
                             <td>{{ $paymentRequest->buyer_name ?: '-' }}</td>
                             <td>{{ $paymentRequest->season_name ?: '-' }}</td>
@@ -442,7 +469,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="9" class="text-center py-4 text-muted">No payment request created yet.</td></tr>
+                        <tr><td colspan="10" class="text-center py-4 text-muted">No payment request created yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -482,6 +509,39 @@
 @section('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // --- Merge existing PRAs -------------------------------------------------
+        const mergeForm = document.getElementById('praMergeForm');
+        if (mergeForm) {
+            const mergeChecks = Array.from(document.querySelectorAll('.pra-merge-check'));
+            const mergeBtn = document.getElementById('praMergeBtn');
+            const mergeCount = document.getElementById('praMergeCount');
+            const refreshMerge = function () {
+                const picked = mergeChecks.filter(function (c) { return c.checked; });
+                mergeCount.textContent = picked.length;
+                mergeBtn.disabled = picked.length < 2;
+            };
+            mergeChecks.forEach(function (c) { c.addEventListener('change', refreshMerge); });
+            mergeForm.addEventListener('submit', function (event) {
+                const picked = mergeChecks.filter(function (c) { return c.checked; });
+                const total = picked.reduce(function (sum, c) { return sum + Number(c.dataset.amount || 0); }, 0);
+                const text = 'Merge ' + picked.length + ' PRAs (total $' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    + ') into one new PRA?\n\nThe selected PRAs will be closed as Merged and their lines move to the new PRA. This cannot be undone.';
+                if (!window.confirm(text)) {
+                    event.preventDefault();
+                    return;
+                }
+                mergeForm.querySelectorAll('input[name="payment_request_ids[]"]').forEach(function (n) { n.remove(); });
+                picked.forEach(function (c) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'payment_request_ids[]';
+                    input.value = c.value;
+                    mergeForm.appendChild(input);
+                });
+            });
+            refreshMerge();
+        }
+
         // --- Single / multi vendor selection -----------------------------------
         const bulkForm = document.getElementById('praBulkForm');
         if (bulkForm) {

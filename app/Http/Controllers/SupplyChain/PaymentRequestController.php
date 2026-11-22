@@ -179,7 +179,7 @@ class PaymentRequestController extends Controller
         [$pendingRows, $filterOptions, $kpis, $activeFilters] = $this->pendingPaymentRows($request);
 
         $paymentRequestsQuery = PaymentRequest::query()
-            ->with(['createdBy'])
+            ->with(['createdBy', 'approvals'])
             ->latest('id');
 
         $this->applyBuyerScopeToPaymentRequests($paymentRequestsQuery);
@@ -721,6 +721,129 @@ class PaymentRequestController extends Controller
      * Creator-facing "My PRA Status" list: the PRAs this user created that have
      * an approval flow, with the current status and approver-wise breakdown.
      */
+    /**
+     * MERGE SEVERAL EXISTING PRAs INTO ONE NEW PRA.
+     *
+     * For PRAs raised separately that should have gone as one approval (often
+     * different vendors). Only the creator's own departmental PRAs that are still
+     * waiting at the first step with no decision taken can be merged — merging
+     * after someone signed would rewrite a signed document.
+     *
+     * The lines are MOVED to the new PRA (not copied), so every PO/PI, budget and
+     * total counts exactly once. Each source PRA stays on record as "Merged" with
+     * no lines and no amount, pointing at the new one. Documents travel too.
+     */
+    public function merge(Request $request)
+    {
+        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+
+        $validated = $request->validate([
+            'payment_request_ids' => ['required', 'array', 'min:2'],
+            'payment_request_ids.*' => ['integer', 'exists:payment_requests,id'],
+        ], [
+            'payment_request_ids.min' => 'Tick at least two PRAs to merge.',
+        ]);
+
+        $sources = PaymentRequest::query()
+            ->with(['items', 'approvals'])
+            ->whereIn('id', $validated['payment_request_ids'])
+            ->orderBy('id')
+            ->get();
+
+        $problems = [];
+
+        foreach ($sources as $source) {
+            $this->authorizePaymentRequest($source);
+
+            if ((int) $source->created_by !== (int) auth()->id() && ! auth()->user()->hasRole('admin')) {
+                $problems[] = $source->request_no . ' was created by someone else';
+            } elseif (! $source->isMergeable()) {
+                $problems[] = $source->request_no . ' has already moved on from the first step (or is not a departmental PRA)';
+            } elseif ($source->items->isEmpty()) {
+                $problems[] = $source->request_no . ' has no lines';
+            }
+        }
+
+        if ($sources->count() < 2 || $problems !== []) {
+            return back()->with('warning', 'These PRAs cannot be merged: ' . implode('; ', $problems ?: ['select at least two']) . '.');
+        }
+
+        $items = $sources->flatMap(fn (PaymentRequest $source) => $source->items)->values();
+        $snapshots = $items->map(fn (PaymentRequestItem $item) => (array) ($item->data ?? []))->values();
+
+        $attachments = $sources
+            ->flatMap(fn (PaymentRequest $source) => $source->attachments())
+            ->unique('path')
+            ->values()
+            ->all();
+
+        $required = $items
+            ->pluck('payment_required_date')
+            ->filter()
+            ->map(fn ($date) => \Illuminate\Support\Carbon::parse($date)->toDateString())
+            ->sort()
+            ->first();
+
+        $creatorSignaturePath = auth()->user()?->signature_path;
+
+        $merged = DB::transaction(function () use ($sources, $items, $snapshots, $attachments, $required, $creatorSignaturePath) {
+            $merged = PaymentRequest::create([
+                'request_no' => $this->nextRequestNo(),
+                'supplier_name' => $this->uniqueText($items, 'supplier_name'),
+                'buyer_name' => $this->uniqueText($items, 'buyer_name'),
+                'season_name' => $this->uniqueText($items, 'season_name'),
+                'total_pi_amount' => $items->sum(fn (PaymentRequestItem $item) => (float) $item->pi_amount),
+                'status' => PaymentRequest::STATUS_PENDING_CHECK,
+                'flow_version' => PaymentRequest::FLOW_DEPARTMENTAL,
+                'current_sequence' => PraStageResolver::FIRST_SEQUENCE,
+                'created_by' => auth()->id(),
+                'prepared_signature_path' => $creatorSignaturePath,
+                'remarks' => $sources->pluck('remarks')->map(fn ($r) => trim((string) $r))->filter()->unique()->implode('; ') ?: null,
+                'data' => [
+                    'pi_numbers' => $items->pluck('pi_number')->filter()->unique()->values()->all(),
+                    'po_numbers' => $items->pluck('po_no')->filter()->unique()->values()->all(),
+                    'approval_filters' => $this->approvalFiltersFromSnapshots($snapshots),
+                    'payment_status_summary' => $items->countBy('payment_status')->all(),
+                    'payment_required_date' => $required,
+                    'source' => 'supply_chain_payment_request_merge',
+                    'vendor_mode' => $this->vendorCountOf($snapshots) > 1 ? 'multi' : 'single',
+                    'merged_from' => $sources->map(fn (PaymentRequest $s) => ['id' => $s->id, 'request_no' => $s->request_no])->all(),
+                    'attachments' => $attachments,
+                ],
+            ]);
+
+            PaymentRequestItem::query()
+                ->whereIn('id', $items->pluck('id'))
+                ->update(['payment_request_id' => $merged->id]);
+
+            foreach ($sources as $source) {
+                $data = (array) $source->data;
+                $data['merged_into'] = ['id' => $merged->id, 'request_no' => $merged->request_no];
+                $data['attachments'] = [];
+
+                $source->update([
+                    'status' => PaymentRequest::STATUS_MERGED,
+                    'current_sequence' => null,
+                    'total_pi_amount' => 0,
+                    'data' => $data,
+                ]);
+            }
+
+            return $merged->fresh(['items', 'createdBy', 'approvals']);
+        });
+
+        $stage = $this->workflow->currentStage($merged);
+
+        if ($stage) {
+            $this->approvalService->notifyStageActors($merged, $stage);
+        }
+
+        return redirect()
+            ->route('supply_chain.payment_requests.show', $merged)
+            ->with('success', 'PRA ' . $merged->request_no . ' created by merging ' . $sources->pluck('request_no')->implode(', ')
+                . '. The merged PRAs are now closed.');
+    }
+
     public function myStatus(Request $request)
     {
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
@@ -733,6 +856,7 @@ class PaymentRequestController extends Controller
         // equivalent of "entered a flow" is flow_version, not row count.
         $paymentRequests = PaymentRequest::query()
             ->where('created_by', auth()->id())
+            ->where('status', '!=', PaymentRequest::STATUS_MERGED)
             ->where(fn ($query) => $query
                 ->whereHas('approvals')
                 ->orWhere('flow_version', PaymentRequest::FLOW_DEPARTMENTAL))

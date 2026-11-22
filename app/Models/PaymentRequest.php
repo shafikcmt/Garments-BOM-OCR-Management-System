@@ -18,6 +18,11 @@ class PaymentRequest extends Model
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
 
+    // A PRA whose lines were moved into a merged PRA. It keeps its number and
+    // history but holds no lines and no amount, and takes no further part in
+    // approval.
+    public const STATUS_MERGED = 'merged';
+
     // Flow 2 only. The departmental chain ends in a PAYMENT, not an approval,
     // so it needs a state the legacy flow has no concept of. No flow-1 PRA can
     // ever hold either value — nothing writes them outside PraWorkflow.
@@ -98,6 +103,20 @@ class PaymentRequest extends Model
         return array_values((array) data_get($this->data, 'attachments', []));
     }
 
+    /**
+     * Whether this PRA can still be merged with others: a departmental PRA that
+     * is waiting at its first step and that nobody has acted on yet. Once any
+     * decision exists, merging would rewrite a document someone already signed.
+     * Needs `approvals` loaded to avoid a query per row.
+     */
+    public function isMergeable(): bool
+    {
+        return $this->isDepartmentalFlow()
+            && $this->status === self::STATUS_PENDING_CHECK
+            && (int) $this->current_sequence === \App\Services\PraStageResolver::FIRST_SEQUENCE
+            && $this->approvals->isEmpty();
+    }
+
     public function isDepartmentalFlow(): bool
     {
         return (int) $this->flow_version === self::FLOW_DEPARTMENTAL;
@@ -126,6 +145,7 @@ class PaymentRequest extends Model
         $label = match ($this->status) {
             self::STATUS_COMPLETED => 'Completed — payment recorded',
             self::STATUS_REJECTED => 'Rejected — returned to creator',
+            self::STATUS_MERGED => 'Merged into another PRA',
             default => $this->current_sequence
                 ? 'Step ' . $this->current_sequence . ' — '
                     . app(\App\Services\PraStageResolver::class)

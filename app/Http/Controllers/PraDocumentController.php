@@ -33,6 +33,32 @@ class PraDocumentController extends Controller
         return Storage::disk('local')->download($doc['path'], $doc['name']);
     }
 
+    /**
+     * Open a document in the browser instead of saving it: PDFs and images are
+     * shown inline (the page opens it in a new tab); any other type falls back
+     * to a download, since a browser cannot display it.
+     */
+    public function view(PaymentRequest $paymentRequest, int $index)
+    {
+        $this->authorizeView($paymentRequest);
+
+        $doc = $paymentRequest->attachments()[$index] ?? null;
+        abort_if(! $doc || ! Storage::disk('local')->exists($doc['path']), 404);
+
+        $mime = match (strtolower(pathinfo($doc['name'], PATHINFO_EXTENSION))) {
+            'pdf' => 'application/pdf',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            default => null,
+        };
+
+        if ($mime === null) {
+            return Storage::disk('local')->download($doc['path'], $doc['name']);
+        }
+
+        return Storage::disk('local')->response($doc['path'], $doc['name'], ['Content-Type' => $mime], 'inline');
+    }
+
     protected function authorizeView(PaymentRequest $paymentRequest): void
     {
         $user = auth()->user();
