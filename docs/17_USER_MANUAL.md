@@ -814,6 +814,10 @@ To print PRAs that were already created (for example for different vendors) toge
 
 This is only a view for printing. Nothing is created, changed or closed, the PRAs keep their own numbers and approval, and the Combined sheet is not an approval document of its own. To get one new approval for several vendors, create a **Multi Vendor PRA** from the Pending PI Payment list instead (section above).
 
+### 3.x3a Style and Item Name shown once
+
+On the PRA table (screen, PDF and Excel), **Style** and **Item Name** are shown once for a run of lines that share them, as one merged cell, instead of repeating on every line. Lines are ordered by vendor, style and item name so the same items sit together. The merged item cell never runs across a different style or a different vendor. Amounts and totals are not affected.
+
 ### 3.x3 Sales Contract on the PRA
 
 The PRA shows **Sales Contract** under **Season**, on the screen, the PDF and the Excel. It is read from the Workspace **Sales Contract** column when there is one, otherwise from **Initial Contract Number** or **Contract Number**. If a PRA covers several contracts they are listed together. A PRA created before this change shows **-** until it is created again.
@@ -850,7 +854,7 @@ People you choose are also given access to the PRA approval screens, and they do
 
 If the supplier or buyer gives the PP Qty **free**, type **Yes** in the **PP Qty Free** column of that line in the Workspace. The PP Qty is then not billed and PI Amount = PI Rate x Booking Qty. Leave the column blank (or **No**) when the PP Qty is charged.
 
-The PI Amount on a PRA is always **the PI Amount shown in the Workspace** for that line (rate x Materials Ordered, plus a billed PP Qty), so the PRA and the Workspace agree. If you change Materials Ordered, PI Rate or PP Qty in the Workspace, press **Save Changes** there first; the next PRA preview then shows the new amount.
+**PI Amount = PI Rate x (Materials Ordered + billed PP Qty)**, in the Workspace and on the PRA alike. The Workspace used to show PI Rate x *Materials To Be Ordered* while you were typing and the saved figure used Materials Ordered; both now use Materials Ordered, so what you see, what is saved and what the PRA prints are the same number. If you change Materials Ordered, PI Rate or PP Qty in the Workspace, press **Save Changes** there first; the next PRA preview then shows the new amount.
 
 **On the PRA preview:** if a line has a PP Qty, a **PP Qty billing** box appears above the sheet. For each line choose **Billed** or **Free**, then press **Update amount**. The PI Amount and Total PI Amount on the sheet change at once, and the choice you see is saved when you press **Create PRA**. The box starts from the **PP Qty Free** column of the Workspace. Changing it here affects only this PRA; the Workspace is not changed.
 

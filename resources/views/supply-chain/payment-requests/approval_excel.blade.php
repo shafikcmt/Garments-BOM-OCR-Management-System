@@ -87,7 +87,9 @@
             <td class="center">{{ $row['vendor_name'] ?: '-' }}</td>
             <td class="center">{{ $row['material_po_number'] ?: '-' }}</td>
             <td class="center">{{ $row['material_pi_number'] ?: '-' }}</td>
-            <td class="center">{{ $row['material_type'] ?: '-' }}</td>
+            @if(($row['item_rowspan'] ?? 1) > 0)
+                <td class="center" style="vertical-align:middle;" rowspan="{{ $row['item_rowspan'] ?? 1 }}">{{ $row['material_type'] ?: '-' }}</td>
+            @endif
             <td class="center">{{ $row['payment_term'] ?: '-' }}</td>
             <td class="center">{{ $row['committed_ex_mill'] ?: '-' }}</td>
             <td>{{ $row['comments'] ?: '(blank)' }}</td>

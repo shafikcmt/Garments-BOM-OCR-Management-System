@@ -3356,6 +3356,20 @@ document.addEventListener('DOMContentLoaded', function () {
         return Number.isFinite(parsed) ? parsed : 0;
     }
 
+    // PP Qty is free text ("25 yds"): only its leading number counts, and a "Yes"
+    // style value in the PP Qty Free column switches the charge off. Same rule as
+    // App\Support\PpQty and the server-side PI Amount in
+    // ExcelFileController::recalculateFile - keep the three in step.
+    function ppQtyNumber(value) {
+        if (blank(value)) return 0;
+        const match = String(value).trim().match(/-?\d[\d,]*(?:\.\d+)?|-?\.\d+/);
+        return match ? Math.max(0, Number(match[0].replace(/,/g, '')) || 0) : 0;
+    }
+
+    function ppQtyIsFree(value) {
+        return ['yes', 'y', 'free', 'foc', 'true', '1', 'free of cost', 'free of charge'].indexOf(String(value ?? '').trim().toLowerCase()) !== -1;
+    }
+
     function percent(value) {
         const n = num(value);
         return n > 1 ? n / 100 : n;
@@ -3514,7 +3528,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const piStatus = materialOrderStatus === 'PO Pending'
                 ? 'Waiting for PO'
                 : (blank(materialPiNumber) ? 'PI Pending' : 'PI Received');
-            const piAmount = piRate * materialsToBeOrdered;
+            // PI Amount = PI Rate x (Materials Ordered + billed PP Qty). This is the
+            // same figure the server stores on save and the PRA prints, so the sheet,
+            // the saved cell and the PRA always agree. (It used to be PI Rate x
+            // Materials To Be Ordered here, which disagreed with the server.)
+            const ppQtyBilled = ppQtyIsFree(valAny(rowData, ['pp_qty_free', 'pp_free', 'free_pp_qty']))
+                ? 0
+                : ppQtyNumber(valAny(rowData, ['pp_qty', 'p_p_qty', 'pp_quantity']));
+            const piAmount = piRate * (materialsOrdered + ppQtyBilled);
             let paymentReqdDate = committedExMill ? addDays(committedExMill, -7) : null;
 
             // A created PRA overrides the formula. Matching is by PI No., so every

@@ -416,7 +416,10 @@
                                 <td class="text-center">{{ $row['vendor_name'] ?: '-' }}</td>
                                 <td class="text-center">{{ $row['material_po_number'] ?: '-' }}</td>
                                 <td class="text-center">{{ $row['material_pi_number'] ?: '-' }}</td>
-                                <td class="text-center">{{ $row['material_type'] ?: '-' }}</td>
+                                {{-- Item Name prints once per run of rows sharing it (like Style). --}}
+                                @if(($row['item_rowspan'] ?? 1) > 0)
+                                    <td class="text-center pra-style-cell" style="font-weight:400;" rowspan="{{ $row['item_rowspan'] ?? 1 }}">{{ $row['material_type'] ?: '-' }}</td>
+                                @endif
                                 <td class="text-center">{{ $row['payment_term'] ?: '-' }}</td>
                                 <td class="text-center">{{ $row['committed_ex_mill'] ?: '-' }}</td>
                                 {{-- null means the sheet recorded no budget for
