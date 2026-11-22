@@ -72,7 +72,6 @@
         'pending_approval' => 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
         'approved' => 'bg-success-subtle text-success-emphasis border border-success-subtle',
         'rejected' => 'bg-danger-subtle text-danger-emphasis border border-danger-subtle',
-        'merged' => 'bg-dark-subtle text-dark-emphasis border border-dark-subtle',
     ];
     $statusLabel = fn ($status) => \Illuminate\Support\Str::headline((string) $status);
 @endphp
@@ -402,14 +401,13 @@
         <div class="card-header bg-white border-0 py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h6 class="fw-bold mb-0">Payment Request List <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle ms-1">{{ $paymentRequests->total() }}</span></h6>
 
-            {{-- MERGE EXISTING PRAs. Tick two or more PRAs that are still waiting at
-                 the first step (nobody has acted), then merge them into one new
-                 PRA. Only those PRAs have a tick box. --}}
-            <form method="POST" action="{{ route('supply_chain.payment_requests.merge') }}" id="praMergeForm" class="d-flex flex-wrap align-items-center gap-2 m-0">
-                @csrf
-                <span class="small text-muted"><span id="praMergeCount">0</span> selected</span>
-                <button type="submit" class="btn btn-sm btn-primary" id="praMergeBtn" disabled>
-                    <i class="bi bi-intersect me-1" aria-hidden="true"></i>Merge Selected PRAs
+            {{-- PRINT SEVERAL PRAs AS ONE SHEET. Tick two or more PRAs and open them as
+                 one combined PRA (any mix of vendors) to print or save as PDF /
+                 Excel. Read-only: nothing is created, changed or closed. --}}
+            <form method="GET" action="{{ route('supply_chain.payment_requests.combined') }}" id="praCombineForm" class="d-flex flex-wrap align-items-center gap-2 m-0">
+                <span class="small text-muted"><span id="praCombineCount">0</span> selected</span>
+                <button type="submit" class="btn btn-sm btn-primary" id="praCombineBtn" disabled>
+                    <i class="bi bi-printer me-1" aria-hidden="true"></i>Preview / Print Selected
                 </button>
             </form>
         </div>
@@ -433,24 +431,11 @@
                     @forelse($paymentRequests as $paymentRequest)
                         <tr>
                             <td class="text-center">
-                                @if($paymentRequest->isMergeable())
-                                    <input type="checkbox" class="form-check-input pra-merge-check" value="{{ $paymentRequest->id }}"
-                                           data-amount="{{ (float) $paymentRequest->total_pi_amount }}"
-                                           aria-label="Select {{ $paymentRequest->request_no }} to merge">
-                                @else
-                                    {{-- Shown greyed out with the reason, so a missing tick box is never a mystery. --}}
-                                    <input type="checkbox" class="form-check-input" disabled
-                                           title="{{ $paymentRequest->status === 'merged' ? 'Already merged into another PRA' : (! $paymentRequest->isDepartmentalFlow() ? 'Only departmental PRAs can be merged' : 'Cannot merge: this PRA has already moved past the first step') }}"
-                                           aria-label="{{ $paymentRequest->request_no }} cannot be merged">
-                                @endif
+                                <input type="checkbox" class="form-check-input pra-combine-check" value="{{ $paymentRequest->id }}"
+                                       aria-label="Select {{ $paymentRequest->request_no }}">
                             </td>
                             <td class="fw-bold">
                                 {{ $paymentRequest->request_no }}
-                                @if($paymentRequest->status === 'merged' && data_get($paymentRequest->data, 'merged_into.request_no'))
-                                    <div class="small text-muted fw-normal">Merged into {{ data_get($paymentRequest->data, 'merged_into.request_no') }}</div>
-                                @elseif(data_get($paymentRequest->data, 'merged_from'))
-                                    <div class="small text-muted fw-normal">Merged from {{ collect(data_get($paymentRequest->data, 'merged_from'))->pluck('request_no')->implode(', ') }}</div>
-                                @endif
                             </td>
                             <td>{{ $paymentRequest->supplier_name ?: '-' }}</td>
                             <td>{{ $paymentRequest->buyer_name ?: '-' }}</td>
@@ -514,37 +499,29 @@
 @section('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // --- Merge existing PRAs -------------------------------------------------
-        const mergeForm = document.getElementById('praMergeForm');
-        if (mergeForm) {
-            const mergeChecks = Array.from(document.querySelectorAll('.pra-merge-check'));
-            const mergeBtn = document.getElementById('praMergeBtn');
-            const mergeCount = document.getElementById('praMergeCount');
-            const refreshMerge = function () {
-                const picked = mergeChecks.filter(function (c) { return c.checked; });
-                mergeCount.textContent = picked.length;
-                mergeBtn.disabled = picked.length < 2;
+        // --- Preview / print several existing PRAs as one sheet -----------------
+        const combineForm = document.getElementById('praCombineForm');
+        if (combineForm) {
+            const combineChecks = Array.from(document.querySelectorAll('.pra-combine-check'));
+            const combineBtn = document.getElementById('praCombineBtn');
+            const combineCount = document.getElementById('praCombineCount');
+            const refreshCombine = function () {
+                const picked = combineChecks.filter(function (c) { return c.checked; });
+                combineCount.textContent = picked.length;
+                combineBtn.disabled = picked.length < 2;
             };
-            mergeChecks.forEach(function (c) { c.addEventListener('change', refreshMerge); });
-            mergeForm.addEventListener('submit', function (event) {
-                const picked = mergeChecks.filter(function (c) { return c.checked; });
-                const total = picked.reduce(function (sum, c) { return sum + Number(c.dataset.amount || 0); }, 0);
-                const text = 'Merge ' + picked.length + ' PRAs (total $' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                    + ') into one new PRA?\n\nThe selected PRAs will be closed as Merged and their lines move to the new PRA. This cannot be undone.';
-                if (!window.confirm(text)) {
-                    event.preventDefault();
-                    return;
-                }
-                mergeForm.querySelectorAll('input[name="payment_request_ids[]"]').forEach(function (n) { n.remove(); });
-                picked.forEach(function (c) {
+            combineChecks.forEach(function (c) { c.addEventListener('change', refreshCombine); });
+            combineForm.addEventListener('submit', function () {
+                combineForm.querySelectorAll('input[name="ids[]"]').forEach(function (n) { n.remove(); });
+                combineChecks.filter(function (c) { return c.checked; }).forEach(function (c) {
                     const input = document.createElement('input');
                     input.type = 'hidden';
-                    input.name = 'payment_request_ids[]';
+                    input.name = 'ids[]';
                     input.value = c.value;
-                    mergeForm.appendChild(input);
+                    combineForm.appendChild(input);
                 });
             });
-            refreshMerge();
+            refreshCombine();
         }
 
         // --- Single / multi vendor selection -----------------------------------

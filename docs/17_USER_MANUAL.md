@@ -804,16 +804,15 @@ On the **Payment Request Approval** screen, the **Pending PI Payment** list has 
 
 The rest of the approval, payment and documents work the same for both kinds.
 
-### 3.x2c Merging PRAs that are already created
+### 3.x2c Printing several existing PRAs as one sheet
 
-If several PRAs were raised separately but should have been one approval, merge them. In the **Payment Request List**:
+To print PRAs that were already created (for example for different vendors) together, in the **Payment Request List**:
 
-1. Tick the PRAs you want to merge. Only PRAs that are **still waiting at the first step (Merchant Team Check) with nobody having acted** can be ticked; the others show a greyed tick box, and hovering over it tells you why. Any Supply Chain user can merge them, and the new PRA is created by the person who merges.
-2. Press **Merge Selected PRAs** (it turns on when two or more are ticked) and confirm.
-3. A **new PRA** is created with all their lines, vendors, supporting documents and the total. It starts at the first step like any new PRA.
-4. The PRAs you merged stay in the list as **Merged**, marked *Merged into PR-...*, with no lines and no amount. This cannot be undone.
+1. Tick two or more PRAs.
+2. Press **Preview / Print Selected**. The screen shows one **Combined View** sheet in the normal PRA format with all their lines and the grand total.
+3. Press **Print**, **PDF Preview** or **Excel Download**.
 
-If a PRA has already been checked or approved, it cannot be merged, because that would change a document someone already signed.
+This is only a view for printing. Nothing is created, changed or closed, the PRAs keep their own numbers and approval, and the Combined sheet is not an approval document of its own. To get one new approval for several vendors, create a **Multi Vendor PRA** from the Pending PI Payment list instead (section above).
 
 ### 3.x3 Sales Contract on the PRA
 
