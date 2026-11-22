@@ -411,7 +411,12 @@
                                  because they are never the one who can apply it. --}}
                             <div class="pra-note pra-note-warn">
                                 <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
-                                <div>{{ $stage->problem() }}</div>
+                                <div>
+                                    {{ $stage->problem() }}
+                                    @if(auth()->user()?->hasRole('admin') && \Illuminate\Support\Facades\Route::has('admin.pra-routing.index'))
+                                        <a href="{{ route('admin.pra-routing.index') }}" class="ms-1">Open PRA Approval Routing</a>
+                                    @endif
+                                </div>
                             </div>
                         @elseif($canAct)
                             <div class="pra-decision-divider">Record your decision</div>

@@ -64,7 +64,7 @@ The Admin menu is grouped so every entry stays reachable:
 
 - **Main menu**: Dashboard, My Approvals, Follow-ups, BOM Approvals.
 - **Departments**: Merchandising, Supply Chain (including To Purchase, Comparative Statement, Internal PO and CS Signatures), Commercial and Store, each a folder of that department's screens.
-- **Administration**: Workspace, Users & Roles, Booking Setup, **Requisition Setup** (Departments, Requisition Signatures, Monthly Requisition Window, Item SKU) and **Settings** (Alert Settings, PI / PRA Settings, PRA Approvers, Email Templates).
+- **Administration**: Workspace, Users & Roles, Booking Setup, **Requisition Setup** (Departments, Requisition Signatures, Monthly Requisition Window, Item SKU) and **Settings** (Alert Settings, PI / PRA Settings, PRA Approvers, **PRA Approval Routing**, Email Templates).
 - Press a folder to open it. Only one folder is open at a time, and the folder holding the page you are on opens by itself and scrolls into view.
 
 ## 2. Merchandising
@@ -800,6 +800,18 @@ The PRA shows **Sales Contract** under **Season**, on the screen, the PDF and th
 ### 3.x4 PI Amt, Budget and Saving on the PRA
 
 The three money columns at the right of the PRA table are, in this order: **PI Amt (USD)**, **Budget** and **Saving**. **Saving = Budget - PI Amt**. A negative Saving (the PI is above the budget) is shown with a minus sign and in red. A line with no budget shows **-** in Budget and Saving. The **Grand Total** row shows the Budget and Saving totals only when every line has a budget; otherwise those two cells stay blank, so a partial sum is never mistaken for a real budget. The screen, PDF and Excel are the same.
+
+### 3.x5 Admin: who approves each PRA step (PRA Approval Routing)
+
+A PRA moves through five steps: Merchant Team Check, Merchant Head Approval, Accounts Team Check, Accounts Head Approval and Commercial Head Completion. By default each step goes to the right department **automatically** (Merchandising only to people who have access to the PRA's buyer). If nobody qualifies, the PRA shows *"This PRA cannot proceed..."*.
+
+**To choose the approvers yourself:** open **Admin > Settings > PRA Approval Routing**.
+
+1. Find the step. Under **Approvers for all buyers**, type a name to find a person and tick everyone who may act at this step. Press **Save for all buyers**. Any one of them can complete the step.
+2. For one buyer only, open **Add or change a buyer rule**, pick the buyer, tick the people and press **Save buyer rule**. A buyer rule is used instead of the all-buyers rule for that buyer. Press **Remove** to delete it.
+3. To go back to the automatic routing, untick everyone and press **Save for all buyers**.
+
+People you choose are also given access to the PRA approval screens, and they do not need buyer access. Only active users count. A change applies to every PRA from now on, including ones already waiting. When the *cannot proceed* message shows, an Admin sees an **Open PRA Approval Routing** link next to it.
 
 ### 3.y PP Qty and PI Amount
 

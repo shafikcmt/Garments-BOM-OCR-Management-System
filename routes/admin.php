@@ -94,6 +94,12 @@ Route::prefix('admin')
         Route::get('/alert-settings', [AlertSettingController::class, 'edit'])->name('alert-settings.edit');
         Route::put('/alert-settings', [AlertSettingController::class, 'update'])->name('alert-settings.update');
 
+        // Who approves each step of a departmental PRA (per step, per buyer).
+        Route::get('/pra-routing', [\App\Http\Controllers\Admin\PraRoutingController::class, 'index'])->name('pra-routing.index');
+        Route::post('/pra-routing/{sequence}', [\App\Http\Controllers\Admin\PraRoutingController::class, 'saveStep'])->whereNumber('sequence')->name('pra-routing.save');
+        Route::post('/pra-routing/{sequence}/buyer', [\App\Http\Controllers\Admin\PraRoutingController::class, 'saveBuyer'])->whereNumber('sequence')->name('pra-routing.save_buyer');
+        Route::delete('/pra-routing/{sequence}/buyer/{buyer}', [\App\Http\Controllers\Admin\PraRoutingController::class, 'removeBuyer'])->whereNumber('sequence')->name('pra-routing.remove_buyer');
+
         Route::get('/payment-settings', [PaymentSettingController::class, 'edit'])->name('payment-settings.edit');
         Route::post('/payment-settings', [PaymentSettingController::class, 'update'])->name('payment-settings.update');
 
