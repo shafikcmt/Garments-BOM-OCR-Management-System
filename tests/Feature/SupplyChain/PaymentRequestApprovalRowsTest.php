@@ -129,6 +129,26 @@ it('still merges rows that are identical across every identity column', function
         ->and($rows->first()['source_count'])->toBe(2);
 });
 
+it('collapses lines that differ only by colour or size into one line with the summed amount', function () {
+    // Five "Size Label" lines of one style, one per colour: one item to the
+    // approver, so one line carrying the total, not the same item printed five times.
+    $rows = approvalRows([
+        praItem(['material_type' => 'Size Label', 'material_color' => 'Red', 'size' => 'S', 'pi_amount' => 3.07, 'budget' => 3.59]),
+        praItem(['material_type' => 'Size Label', 'material_color' => 'Blue', 'size' => 'M', 'pi_amount' => 5.52, 'budget' => 6.44]),
+        praItem(['material_type' => 'Size Label', 'material_color' => 'Grey', 'size' => 'L', 'pi_amount' => 4.40, 'budget' => 5.16]),
+        praItem(['material_type' => 'Main Label', 'pi_amount' => 42.65, 'budget' => 42.83]),
+    ]);
+
+    expect($rows)->toHaveCount(2);
+
+    $size = $rows->firstWhere('material_type', 'Size Label');
+
+    expect(round($size['pi_amount'], 2))->toBe(12.99)
+        ->and(round($size['budget'], 2))->toBe(15.19)
+        ->and($size['source_count'])->toBe(3)
+        ->and(round($rows->sum('pi_amount'), 2))->toBe(55.64);
+});
+
 it('keeps different styles on their own lines, as before', function () {
     $rows = approvalRows([
         praItem(['style_name' => 'ST-1', 'pi_amount' => 100]),
