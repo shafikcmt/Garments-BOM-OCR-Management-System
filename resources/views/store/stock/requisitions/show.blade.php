@@ -403,11 +403,17 @@
             </div>
 
             <p class="gx-stock-help mt-3 mb-0">
-                Stock, safety, consumption and last purchase are the figures as at
-                {{ optional($requisition->requisition_date)->format('d M Y') }} — frozen when this requisition was raised,
-                so it still shows the position that justified it.
-                @if($requisition->isDepartmentLevel() && $requisition->store_ack_at)
-                    Stock in Hand and Safety Stock were updated on {{ \App\Support\LocalTime::show($requisition->store_ack_at, 'd M Y') }}, when the Store received it.
+                @if($requisition->isDepartmentLevel() && $requisition->status === \App\Models\PurchaseRequisition::STATUS_SUBMITTED && ! $requisition->merged_into_id)
+                    Consumption and last purchase are the figures as at
+                    {{ optional($requisition->requisition_date)->format('d M Y') }}, when this requisition was raised.
+                    Stock in Hand, Safety Stock and To Be Procured follow the live stock until the Store receives it.
+                @else
+                    Stock, safety, consumption and last purchase are the figures as at
+                    {{ optional($requisition->requisition_date)->format('d M Y') }} — frozen when this requisition was raised,
+                    so it still shows the position that justified it.
+                    @if($requisition->isDepartmentLevel() && $requisition->store_ack_at)
+                        Stock in Hand and Safety Stock were updated on {{ \App\Support\LocalTime::show($requisition->store_ack_at, 'd M Y') }}, when the Store received it.
+                    @endif
                 @endif
             </p>
         </div>

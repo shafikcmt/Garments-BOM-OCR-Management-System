@@ -9,6 +9,25 @@ class StockPurchase extends Model
 {
     use HasFactory;
 
+    /**
+     * A receiving or issue moves the shelf, so sheets still on their way to
+     * the Store follow it (PurchaseRequisitionService::refreshOpenSheetsFor).
+     * Run after the transaction commits, so a rolled-back save changes nothing.
+     */
+    protected static function booted(): void
+    {
+        $refresh = function (self $model): void {
+            $ids = array_filter([$model->stock_item_id, $model->getOriginal('stock_item_id')]);
+
+            \Illuminate\Support\Facades\DB::afterCommit(
+                fn () => app(\App\Services\PurchaseRequisitionService::class)->refreshOpenSheetsFor($ids)
+            );
+        };
+
+        static::saved($refresh);
+        static::deleted($refresh);
+    }
+
     protected $fillable = [
         'stock_item_id',
         'challan_no',
