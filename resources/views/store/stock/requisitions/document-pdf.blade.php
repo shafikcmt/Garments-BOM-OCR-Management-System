@@ -177,10 +177,15 @@
     @endif
 
     <div class="note">
-        Stock, safety, consumption and last purchase are the figures as at
-        {{ $requisitionDate }} — frozen when this requisition was raised.
-        @if($requisition->isDepartmentLevel() && $requisition->store_ack_at)
-            Stock in Hand and Safety Stock were updated on {{ \App\Support\LocalTime::show($requisition->store_ack_at, 'd M Y') }}, when the Store received it.
+        @if($requisition->isDepartmentLevel() && $requisition->status === \App\Models\PurchaseRequisition::STATUS_SUBMITTED && ! $requisition->merged_into_id)
+            Consumption and last purchase are the figures as at {{ $requisitionDate }}, when this requisition was raised.
+            Stock in Hand, Safety Stock and To Be Procured follow the live stock until the Store receives it.
+        @else
+            Stock, safety, consumption and last purchase are the figures as at
+            {{ $requisitionDate }} — frozen when this requisition was raised.
+            @if($requisition->isDepartmentLevel() && $requisition->store_ack_at)
+                Stock in Hand and Safety Stock were updated on {{ \App\Support\LocalTime::show($requisition->store_ack_at, 'd M Y') }}, when the Store received it.
+            @endif
         @endif
     </div>
 

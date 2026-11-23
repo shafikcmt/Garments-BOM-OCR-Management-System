@@ -161,6 +161,39 @@ class PurchaseRequisitionService
     }
 
     /**
+     * Keep Stock in Hand on sheets not yet received by the Store in step with
+     * the shelf. Called whenever a receiving or an issue of General Stock is
+     * saved or removed: a department's sheet that is still on its way to the
+     * Store (Submitted, not merged) is brought up to today for the items
+     * touched, so the Store and the head see what is really there.
+     * After Received by Store the figures stay as the Store took them.
+     *
+     * @param  list<int>  $stockItemIds
+     * @return int how many sheets were refreshed
+     */
+    public function refreshOpenSheetsFor(array $stockItemIds): int
+    {
+        $stockItemIds = array_values(array_unique(array_filter(array_map('intval', $stockItemIds))));
+
+        if ($stockItemIds === []) {
+            return 0;
+        }
+
+        $sheets = PurchaseRequisition::query()
+            ->where('level', PurchaseRequisition::LEVEL_DEPARTMENT)
+            ->where('status', PurchaseRequisition::STATUS_SUBMITTED)
+            ->whereNull('merged_into_id')
+            ->whereHas('items', fn ($q) => $q->whereIn('stock_item_id', $stockItemIds))
+            ->get();
+
+        foreach ($sheets as $sheet) {
+            $this->refreshStock($sheet);
+        }
+
+        return $sheets->count();
+    }
+
+    /**
      * Qty − Stock in Hand + Safety Stock, rounded to a whole figure and
      * floored at zero.
      *

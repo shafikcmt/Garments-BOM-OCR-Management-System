@@ -10,6 +10,25 @@ class StockIssue extends Model
     use HasFactory;
 
     /**
+     * A receiving or issue moves the shelf, so sheets still on their way to
+     * the Store follow it (PurchaseRequisitionService::refreshOpenSheetsFor).
+     * Run after the transaction commits, so a rolled-back save changes nothing.
+     */
+    protected static function booted(): void
+    {
+        $refresh = function (self $model): void {
+            $ids = array_filter([$model->stock_item_id, $model->getOriginal('stock_item_id')]);
+
+            \Illuminate\Support\Facades\DB::afterCommit(
+                fn () => app(\App\Services\PurchaseRequisitionService::class)->refreshOpenSheetsFor($ids)
+            );
+        };
+
+        static::saved($refresh);
+        static::deleted($refresh);
+    }
+
+    /**
      * `is_stock_item` and `item_description` are deliberately NOT fillable.
      * General Stock has one issue type — every issue is against an item in the
      * master — so is_stock_item keeps its database default of true and

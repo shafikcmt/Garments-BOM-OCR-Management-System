@@ -468,3 +468,42 @@ it('does not count a Final Requisition with a later approver on the Requested ba
 
     expect(PurchaseRequisition::awaitingStore()->count())->toBe(0);
 });
+
+it('keeps Stock in Hand live on a sheet until the Store receives it', function () {
+    [$head, $raiser] = indRaiser();
+    $item = StockItem::create(['name' => 'Gel Pen', 'uom' => 'Piece', 'is_active' => true]);
+    $day = now()->startOfMonth()->toDateString();
+    \App\Models\StockPurchase::create(['stock_item_id' => $item->id, 'purchase_date' => $day, 'rcv_date' => $day, 'qty' => 34, 'unit_price' => 10]);
+
+    test()->actingAs($raiser)->post(route('store.stock.requisitions.store'), [
+        'action' => 'submit', 'mode' => PurchaseRequisition::MODE_MULTI, 'requisition_date' => now()->toDateString(),
+        'requisition_type' => 'individual',
+        'items' => [['stock_item_id' => $item->id, 'qty_requested' => 120]],
+    ])->assertSessionHasNoErrors();
+    $sheet = PurchaseRequisition::latest('id')->firstOrFail();
+    $line = $sheet->items()->firstOrFail();
+    expect((float) $line->stock_in_hand_snapshot)->toBe(34.0)->and((float) $line->to_be_procured_qty)->toBe(86.0);
+
+    // Issued while the sheet waits for its head: the sheet follows the shelf.
+    $issue = \App\Models\StockIssue::create(['stock_item_id' => $item->id, 'issue_date' => now()->toDateString(), 'qty' => 8]);
+    $line->refresh();
+    expect((float) $line->stock_in_hand_snapshot)->toBe(26.0)
+        ->and((float) $line->to_be_procured_qty)->toBe(94.0)
+        ->and((float) $line->amount)->toBe(94.0 * (float) $line->rate_appx);
+
+    // Received in, then the issue corrected: still live before the Store step.
+    \App\Models\StockPurchase::create(['stock_item_id' => $item->id, 'purchase_date' => $day, 'rcv_date' => $day, 'qty' => 10, 'unit_price' => 10]);
+    $issue->delete();
+    expect((float) $line->fresh()->stock_in_hand_snapshot)->toBe(44.0);
+
+    indApprove($head, $sheet)->assertSessionHasNoErrors();
+    indApprove(indUser('store', [], ['name' => 'Store Clerk']), $sheet)->assertSessionHasNoErrors();
+    expect($sheet->fresh()->status)->toBe(PurchaseRequisition::STATUS_STORE_REVIEWED);
+
+    // After Received by Store the figures stay as the Store took them.
+    \App\Models\StockIssue::create(['stock_item_id' => $item->id, 'issue_date' => now()->toDateString(), 'qty' => 40]);
+    expect((float) $line->fresh()->stock_in_hand_snapshot)->toBe(44.0);
+
+    $this->actingAs($raiser)->get(route('store.stock.requisitions.show', $sheet))->assertOk()
+        ->assertSee('frozen when this requisition was raised');
+});
