@@ -142,8 +142,13 @@ class RequisitionSignatureSettingController extends Controller
                 ->each(fn ($id) => RequisitionWorkflow::grantView((int) $id));
         });
 
+        // Sheets already on their way follow the new boxes for the stages
+        // they have not reached yet; what is already signed stays.
+        $synced = app(RequisitionWorkflow::class)->syncOpenSheets($levels, $request->user());
+
         return redirect()
             ->route('admin.requisition-signatures.edit')
-            ->with('success', 'Requisition signature settings saved.');
+            ->with('success', 'Requisition signature settings saved.'
+                .($synced > 0 ? ' '.$synced.' open requisition(s) updated to the new signature boxes.' : ''));
     }
 }
