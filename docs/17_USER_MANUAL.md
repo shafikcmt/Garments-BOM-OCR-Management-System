@@ -913,13 +913,13 @@ The **Category Summary** is built from the same lines, so its category amounts a
 Prepared (section staff) -> Section / Department Head -> Received by Store -> Finance & Commercial Head -> Operation Head (final approval)
 ```
 
-It is never merged. The approvers are set by Admin in **Admin > Requisition Signatures**, under **Individual Requisition**. HR Audit is not part of the Monthly (final) or the Individual steps. An Admin can still add it back in Requisition Signatures. Sheets already on their way keep the steps they started with.
+It is never merged. The approvers are set by Admin in **Admin > Requisition Signatures**, under **Individual Requisition**. HR Audit is not part of the Monthly (final) or the Individual steps. An Admin can still add it back in Requisition Signatures. When Admin saves a change there (a box removed, added, or given to another person), sheets already on their way follow it for the steps they have not reached yet. Steps already signed stay as signed. Example: a sheet waiting for the Finance & Commercial Head moves to the Operation Head when Admin removes the Finance box, and its PDF shows the new boxes.
 
 **To Be Procured.** The system works out the quantity to buy for each item: **Qty Requested − Stock in Hand + Safety Stock**, as a round figure. Example: Qty 420, Stock 180, Safety Stock 42.54 (shown as 43) → 420 − 180 + 43 = **283**. If the stock already covers the request and the safety level, To Be Procured is 0. **Individual requisitions do not add Safety Stock**: To Be Procured is Qty Requested − Stock in Hand (the Safety Stock is still shown for reference). Amount = To Be Procured × Rate. All quantities on a requisition (screen, PDF and Excel) are shown as round figures; rates and amounts keep 2 decimals.
 
 **Who sees stock figures.** Hand stock, safety stock and the other stock details on a requisition are shown only to Store, Admin and Management. Other departments see their items and quantities only.
 
-**Admin: who approves.** Admin sets the steps and the person for each step in **Admin > Requisition Signatures**. Nothing in the code needs to change when a person changes.
+**Admin: who approves.** Admin sets the steps and the person for each step in **Admin > Requisition Signatures**. Nothing in the code needs to change when a person changes. Saving also updates the steps still to come on open requisitions; the message after saving says how many were updated.
 
 ### 5.1b Editing a long requisition (a Final Requisition with hundreds of lines)
 

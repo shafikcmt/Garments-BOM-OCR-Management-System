@@ -11,6 +11,7 @@ use App\Models\PurchaseRequisitionStage;
 use App\Models\RequisitionSignatureBlock;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -394,6 +395,140 @@ class RequisitionWorkflow
 
         // The sheet has reached its first approval stage.
         $this->notifier->stageReached($requisition, $this->currentStage($requisition), $raiser);
+    }
+
+    /**
+     * Apply the current signature boxes to sheets already on their way.
+     *
+     * Called when Admin saves the signature settings. A sheet's plan is
+     * written at submit, so without this a box Admin removes (or adds, or
+     * gives to another person) would only reach sheets raised afterwards.
+     *
+     * For each open stage-engine sheet of the saved levels, the stages already
+     * done (before the one it waits at) stay exactly as signed. The stages
+     * still to come are replaced by the boxes that now follow the last done
+     * one. A sheet is left as it is when the new plan has a problem (a box
+     * with no approver) or would leave it nobody to approve.
+     *
+     * @param  list<string>  $levels  signature levels that were saved
+     * @return int how many sheets changed
+     */
+    public function syncOpenSheets(array $levels, ?User $actor = null): int
+    {
+        $changed = 0;
+
+        PurchaseRequisition::query()
+            ->whereNotNull('workflow_version')
+            ->whereNotNull('current_stage')
+            ->whereIn('status', [PurchaseRequisition::STATUS_SUBMITTED, PurchaseRequisition::STATUS_STORE_REVIEWED])
+            ->whereNull('merged_into_id')
+            ->get()
+            ->filter(fn (PurchaseRequisition $r) => in_array($r->signatureLevel(), $levels, true))
+            ->each(function (PurchaseRequisition $requisition) use (&$changed, $actor) {
+                if ($this->syncSheet($requisition, $actor)) {
+                    $changed++;
+                }
+            });
+
+        return $changed;
+    }
+
+    /** One sheet of syncOpenSheets(). True when its plan changed. */
+    private function syncSheet(PurchaseRequisition $requisition, ?User $actor): bool
+    {
+        $cycle = $this->activeCycle($requisition);
+        $current = (int) $requisition->current_stage;
+        $stages = $this->stages($requisition);
+        $done = $stages->filter(fn ($s) => $s->sequence < $current)->values();
+        $ahead = $stages->filter(fn ($s) => $s->sequence >= $current)->values();
+
+        $raiser = $requisition->createdBy()->first();
+        $section = $requisition->indentSection()->first() ?: $raiser?->requisitionSection;
+        $plan = collect($this->plan($requisition->signatureLevel(), $raiser, $section, $requisition->department_role));
+
+        if ($plan->pluck('problem')->filter()->isNotEmpty()) {
+            return false;
+        }
+
+        // Where the sheet stands in the new plan: just after the box of the
+        // last done stage (matched on what the box stamps, else its wording).
+        // Only Prepared done: the whole plan is still ahead.
+        $key = fn ($stamp, $label, $title) => $stamp ?: 'label:'.mb_strtolower(trim((string) $label).'|'.trim((string) $title));
+        $from = 0;
+        foreach ($done->reverse() as $stage) {
+            if ((int) $stage->sequence === 1) {
+                break;
+            }
+            $at = $plan->search(fn ($p) => $key($p['stamp_source'], $p['label'], $p['title'])
+                === $key($stage->stamp_source, $stage->label, $stage->title));
+            if ($at !== false) {
+                $from = $at + 1;
+                break;
+            }
+        }
+
+        $tail = $plan->slice($from)->values();
+
+        // Nobody left to approve: leave the sheet as it is rather than strand it.
+        if ($tail->where('skipped', false)->where('self_approved', false)->isEmpty()) {
+            return false;
+        }
+
+        $sameAsBefore = $ahead->count() === $tail->count()
+            && $ahead->every(fn ($s, $i) => $key($s->stamp_source, $s->label, $s->title) === $key($tail[$i]['stamp_source'], $tail[$i]['label'], $tail[$i]['title'])
+                && (int) $s->assignee_user_id === (int) ($tail[$i]['user']?->id)
+                && $s->assignee_type === $tail[$i]['assignee_type']);
+
+        if ($sameAsBefore) {
+            return false;
+        }
+
+        $before = $this->currentStage($requisition);
+        // A Store-team step the sender pointed at one Store user keeps that person.
+        $directed = $before && $before->assignee_type === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM ? $before : null;
+
+        DB::transaction(function () use ($requisition, $cycle, $current, $tail, $raiser, $directed) {
+            PurchaseRequisitionStage::where('purchase_requisition_id', $requisition->id)
+                ->where('cycle', $cycle)->where('sequence', '>=', $current)->delete();
+
+            foreach ($tail as $i => $stage) {
+                $userId = $stage['user']?->id;
+                $name = $stage['assignee_type'] === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM ? self::STORE_TEAM_NAME : $stage['user']?->name;
+
+                if ($i === 0 && $directed && $stage['assignee_type'] === RequisitionSignatureBlock::ASSIGNEE_STORE_TEAM) {
+                    $userId = $directed->assignee_user_id;
+                    $name = $directed->assignee_name;
+                }
+
+                PurchaseRequisitionStage::create([
+                    'purchase_requisition_id' => $requisition->id,
+                    'cycle' => $cycle,
+                    'sequence' => $current + $i,
+                    'label' => $stage['label'],
+                    'title' => $stage['title'],
+                    'stamp_source' => $stage['stamp_source'],
+                    'assignee_type' => $stage['assignee_type'],
+                    'assignee_user_id' => $userId,
+                    'assignee_name' => $name,
+                    'status' => $stage['skipped'] ? PurchaseRequisitionStage::STATUS_SKIPPED
+                        : ($stage['self_approved'] ? PurchaseRequisitionStage::STATUS_APPROVED : PurchaseRequisitionStage::STATUS_PENDING),
+                    'acted_by' => $stage['self_approved'] ? $raiser?->id : null,
+                    'acted_by_name' => $stage['self_approved'] ? $raiser?->name : null,
+                    'acted_at' => $stage['self_approved'] ? now() : null,
+                ]);
+            }
+
+            $requisition->forceFill(['current_stage' => $this->firstPending($requisition, $cycle)?->sequence])->save();
+        });
+
+        $after = $this->currentStage($requisition);
+
+        if ($after && (! $before || (int) $before->assignee_user_id !== (int) $after->assignee_user_id
+            || $before->label !== $after->label || $before->title !== $after->title)) {
+            $this->notifier->stageReached($requisition, $after, $actor);
+        }
+
+        return true;
     }
 
     /*

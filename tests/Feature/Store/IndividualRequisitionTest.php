@@ -507,3 +507,32 @@ it('keeps Stock in Hand live on a sheet until the Store receives it', function (
     $this->actingAs($raiser)->get(route('store.stock.requisitions.show', $sheet))->assertOk()
         ->assertSee('frozen when this requisition was raised');
 });
+
+it('applies a removed signature box to sheets already on their way, keeping what is signed', function () {
+    [$head, $raiser] = indRaiser();
+    $sheet = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+    indApprove($head, $sheet)->assertSessionHasNoErrors();
+    indApprove(indUser('store', [], ['name' => 'Store Clerk']), $sheet)->assertSessionHasNoErrors();
+    expect($sheet->fresh()->progressLabel())->toBe('With Finance & Commercial Head');
+
+    // Admin removes the Finance & Commercial Head box from the Individual level.
+    RequisitionSignatureBlock::query()->forLevel('individual')->where('title', 'Finance & Commercial Head')->delete();
+    RequisitionSignatureBlock::query()->forLevel('individual')->get()->values()
+        ->each(fn ($b, $i) => $b->forceFill(['sequence' => $i + 1])->save());
+
+    expect(app(\App\Services\RequisitionWorkflow::class)->syncOpenSheets(['individual']))->toBe(1);
+
+    $sheet->refresh();
+    $boxes = app(\App\Services\RequisitionSignatureResolver::class)->forRequisition($sheet);
+    expect(collect($boxes)->pluck('title')->all())
+        ->toBe(['', 'Department Head', 'Store', 'Operation Head'])
+        ->and($sheet->progressLabel())->toBe('With Operation Head')
+        // Signed boxes keep their names.
+        ->and($boxes[1]['name'])->toBe('Cutting Head')
+        ->and($boxes[2]['name'])->toBe('Store Clerk');
+
+    // Saving again changes nothing, and the Operation Head approves it.
+    expect(app(\App\Services\RequisitionWorkflow::class)->syncOpenSheets(['individual']))->toBe(0);
+    indApprove($this->approvers['operation'], $sheet)->assertSessionHasNoErrors();
+    expect($sheet->fresh()->status)->toBe(PurchaseRequisition::STATUS_APPROVED);
+});
