@@ -38,9 +38,11 @@ class PraRoutingController extends Controller
             return [
                 'sequence' => $sequence,
                 'label' => $definition['label'],
-                'automatic' => DepartmentRoles::labelOf($definition['department']) . ' '
-                    . ($definition['actor_kind'] === 'head' ? 'Head' : 'Team')
-                    . ($this->resolver->isBuyerScoped($sequence) ? ', for the buyers they have access to' : ', for all buyers'),
+                'automatic' => $definition['department'] === null
+                    ? 'No department: nobody can act until you choose people'
+                    : DepartmentRoles::labelOf($definition['department']) . ' '
+                        . ($definition['actor_kind'] === 'head' ? 'Head' : 'Team')
+                        . ($this->resolver->isBuyerScoped($sequence) ? ', for the buyers they have access to' : ', for all buyers'),
                 'global_ids' => $forStep->whereNull('buyer_id')->pluck('user_id')->map(fn ($id) => (int) $id)->all(),
                 'global_users' => $forStep->whereNull('buyer_id')->pluck('user.name')->filter()->sort()->values()->all(),
                 'buyer_rules' => $forStep->whereNotNull('buyer_id')->groupBy('buyer_id')->map(fn ($group) => [

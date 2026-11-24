@@ -189,16 +189,19 @@ it('prints the default labels when nothing is configured', function () {
 });
 
 it('prints an admin-edited label', function () {
-    AppSetting::put(PaymentRequestSettings::flow2LabelKey('approved_finance'), 'Approved By (Finance)');
+    \App\Models\PraStep::where('sequence', 5)->update(['signature_label' => 'Approved By (Finance)']);
 
     expect(collect(sbBlocks($this->pra))->firstWhere('officer', 'approved_finance')['title'])
         ->toBe('Approved By (Finance)');
 });
 
-it('falls back to the default when a label is cleared', function () {
-    AppSetting::put(PaymentRequestSettings::flow2LabelKey('checked'), '   ');
+it('prints no box for a step whose box title is cleared, and one more for a step that gets a title', function () {
+    \App\Models\PraStep::where('sequence', 2)->update(['signature_label' => null]);
+    \App\Models\PraStep::where('sequence', 4)->update(['signature_label' => 'Checked By (Accounts)']);
 
-    expect(PaymentRequestSettings::flow2Label('checked'))->toBe('Checked By');
+    expect(collect(sbBlocks($this->pra->fresh()))->pluck('title')->all())->toBe([
+        'Prepared By', 'Approved By (Merchant)', 'Checked By (Accounts)', 'Approved By (Finance and Commercial)',
+    ]);
 });
 
 it('lets a super admin save the labels and nobody else reach the screen', function () {
@@ -211,10 +214,10 @@ it('lets a super admin save the labels and nobody else reach the screen', functi
 
     $this->actingAs($admin)->post(route('admin.payment-settings.update'), [
         'pra_working_days' => 7,
-        'flow2_labels' => ['approved_merchant' => 'Merchandising Approval'],
+        'flow2_labels' => ['prepared' => 'Raised By'],
     ])->assertRedirect();
 
-    expect(PaymentRequestSettings::flow2Label('approved_merchant'))->toBe('Merchandising Approval');
+    expect(PaymentRequestSettings::flow2Label('prepared'))->toBe('Raised By');
 
     // Not an admin -> not this screen.
     $this->actingAs($this->accountsHead)->get(route('admin.payment-settings.edit'))->assertForbidden();

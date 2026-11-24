@@ -190,7 +190,9 @@ class PaymentRequestSettings
     {
         $labels = [];
 
-        foreach (array_keys(self::FLOW2_BLOCKS) as $slug) {
+        // Only the creator's box is titled here; the other boxes belong to the steps
+        // and are titled on Settings > PRA Approval Steps.
+        foreach (array_keys(array_intersect_key(self::FLOW2_BLOCKS, ['prepared' => true])) as $slug) {
             $labels[$slug] = self::flow2Label($slug);
         }
 
@@ -360,20 +362,26 @@ class PaymentRequestSettings
 
         $blocks = [];
 
-        foreach (self::FLOW2_BLOCKS as $slug => $definition) {
-            $title = self::flow2Label($slug);
+        // The creator's box always comes first. They authored the PRA rather than
+        // approving it, so it is filled from the PRA itself, exactly as flow 1 does.
+        $blocks[] = self::dynamicBlock(
+            'prepared', self::flow2Label('prepared'), $pr->createdBy, $pr->created_at, $pr->prepared_signature_path, $embed
+        );
 
-            // The creator's block. They authored the PRA rather than approving
-            // it, so it is filled from the PRA itself, exactly as flow 1 does.
-            if ($definition['sequence'] === null) {
-                $blocks[] = self::dynamicBlock(
-                    $slug, $title, $pr->createdBy, $pr->created_at, $pr->prepared_signature_path, $embed
-                );
+        // Then one box per ACTIVE step that Admin gave a signature title
+        // (Settings > PRA Approval Steps), in chain order.
+        $resolver = app(\App\Services\PraStageResolver::class);
 
+        foreach ($resolver->sequences() as $sequence) {
+            $title = $resolver->definitionFor($sequence)['signature_label'];
+
+            if ($title === null) {
                 continue;
             }
 
-            $decision = $decisions->get($definition['sequence']);
+            // The three built-in boxes keep their original names; any step Admin adds is step_<n>.
+            $slug = [2 => 'checked', 3 => 'approved_merchant', 5 => 'approved_finance'][$sequence] ?? 'step_' . $sequence;
+            $decision = $decisions->get($sequence);
 
             if ($decision) {
                 $blocks[] = self::dynamicBlock(
@@ -387,7 +395,7 @@ class PaymentRequestSettings
             // not written yet, so a buyer-scoped step would resolve against an
             // empty buyer list and could single out the wrong person. Pending,
             // unnamed, is the only honest answer before the PRA exists.
-            $expected = $pr->exists ? self::expectedActor($pr, $definition['sequence']) : null;
+            $expected = $pr->exists ? self::expectedActor($pr, $sequence) : null;
 
             $blocks[] = self::pendingBlock($slug, $title, $expected);
         }
@@ -453,7 +461,9 @@ class PaymentRequestSettings
      */
     public static function completionLineFor(\App\Models\PaymentRequest $pr): ?array
     {
-        return self::actorRecordAt($pr, self::FLOW2_COMPLETION_SEQUENCE);
+        $sequence = self::flaggedSequence('prints_completion', self::FLOW2_COMPLETION_SEQUENCE);
+
+        return $sequence === null ? null : self::actorRecordAt($pr, $sequence);
     }
 
     /**
@@ -469,7 +479,27 @@ class PaymentRequestSettings
      */
     public static function ocrCheckFor(\App\Models\PaymentRequest $pr): ?array
     {
-        return self::actorRecordAt($pr, self::FLOW2_OCR_CHECK_SEQUENCE);
+        $sequence = self::flaggedSequence('prints_ocr_check', self::FLOW2_OCR_CHECK_SEQUENCE);
+
+        return $sequence === null ? null : self::actorRecordAt($pr, $sequence);
+    }
+
+    /**
+     * The active step Admin marked to fill a printed field (the OCR Checked box or
+     * the Paid / Completed by line), or null when none is marked. The built-in
+     * default is used only while the steps are not data yet.
+     */
+    protected static function flaggedSequence(string $flag, int $default): ?int
+    {
+        $resolver = app(\App\Services\PraStageResolver::class);
+
+        foreach ($resolver->sequences() as $sequence) {
+            if ($resolver->definitionFor($sequence)[$flag]) {
+                return $sequence;
+            }
+        }
+
+        return \App\Models\PraStep::isAvailable() && \App\Models\PraStep::query()->exists() ? null : $default;
     }
 
     /**

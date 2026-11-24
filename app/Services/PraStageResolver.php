@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Buyer;
 use App\Models\PaymentRequest;
 use App\Models\PraApproval;
+use App\Models\PraStep;
 use App\Models\PraStepApprover;
 use App\Models\PaymentRequestItem;
 use App\Models\User;
@@ -75,6 +76,10 @@ class PraStageResolver
     public const NOTE_UNTAGGED_PRA = 'untagged_pra';
 
     /**
+     * THE BUILT-IN CHAIN: used only when the pra_steps table does not exist yet or
+     * is empty (a deploy that has not migrated). Admin edits the real chain on
+     * Settings > PRA Approval Steps; see steps().
+     *
      * @var array<int, array{department:string, actor_kind:string, stage:string, label:string}>
      */
     private const STEPS = [
@@ -110,48 +115,144 @@ class PraStageResolver
         ],
     ];
 
+    /** @var array<int, array<string, mixed>>|null */
+    private ?array $stepCache = null;
+
     /**
+     * EVERY STEP, active or not, in chain order, keyed by sequence.
+     *
+     * The real chain is data (pra_steps, edited by Admin); the built-in STEPS are
+     * the fallback. Inactive steps are kept so old decisions still resolve to a
+     * label, but they are not part of the chain (see sequences()).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function steps(): array
+    {
+        if ($this->stepCache !== null) {
+            return $this->stepCache;
+        }
+
+        $steps = [];
+
+        if (PraStep::isAvailable() && PraStep::query()->exists()) {
+            foreach (PraStep::query()->orderBy('position')->orderBy('sequence')->get() as $step) {
+                $steps[(int) $step->sequence] = [
+                    'department' => $step->department ?: null,
+                    'actor_kind' => $step->actor_kind,
+                    'stage' => $step->stage,
+                    'label' => $step->label,
+                    'buyer_scoped' => (bool) $step->buyer_scoped,
+                    'signature_label' => $step->signature_label !== null && trim($step->signature_label) !== '' ? trim($step->signature_label) : null,
+                    'prints_ocr_check' => (bool) $step->prints_ocr_check,
+                    'prints_completion' => (bool) $step->prints_completion,
+                    'is_active' => (bool) $step->is_active,
+                    'position' => (int) $step->position,
+                ];
+            }
+        } else {
+            $position = 0;
+
+            foreach (self::STEPS as $sequence => $step) {
+                $steps[$sequence] = $step + [
+                    'buyer_scoped' => in_array($step['department'], self::BUYER_SCOPED_DEPARTMENTS, true),
+                    'signature_label' => null,
+                    'prints_ocr_check' => $sequence === 4,
+                    'prints_completion' => $sequence === 6,
+                    'is_active' => true,
+                    'position' => ++$position * 10,
+                ];
+            }
+
+            // The built-in signature boxes: Checked / Approved (Merchant) / Approved (Finance and Commercial).
+            $steps[2]['signature_label'] = 'Checked By';
+            $steps[3]['signature_label'] = 'Approved By (Merchant)';
+            $steps[5]['signature_label'] = 'Approved By (Finance and Commercial)';
+        }
+
+        return $this->stepCache = $steps;
+    }
+
+    /** Forget the loaded chain (after Admin edits it within the same request). */
+    public function refresh(): void
+    {
+        $this->stepCache = null;
+    }
+
+    /**
+     * The sequences of the ACTIVE chain, in order.
+     *
      * @return list<int>
      */
     public function sequences(): array
     {
-        return array_keys(self::STEPS);
+        return array_keys(array_filter($this->steps(), fn (array $step) => $step['is_active']));
+    }
+
+    public function firstSequence(): int
+    {
+        return $this->sequences()[0] ?? self::FIRST_SEQUENCE;
+    }
+
+    public function lastSequence(): int
+    {
+        $all = $this->sequences();
+
+        return $all ? end($all) : self::LAST_SEQUENCE;
     }
 
     /**
-     * @return array{department:string, actor_kind:string, stage:string, label:string}
+     * The last step of the chain that approves (stage "approve"): the one that
+     * stamps the legacy approved_by column. Null when no step approves.
+     */
+    public function lastApproveSequence(): ?int
+    {
+        $found = null;
+
+        foreach ($this->sequences() as $sequence) {
+            if ($this->steps()[$sequence]['stage'] === PraApproval::STAGE_APPROVE) {
+                $found = $sequence;
+            }
+        }
+
+        return $found;
+    }
+
+    /**
+     * @return array{department:?string, actor_kind:string, stage:string, label:string, buyer_scoped:bool, signature_label:?string, prints_ocr_check:bool, prints_completion:bool, is_active:bool, position:int}
      */
     public function definitionFor(int $sequence): array
     {
-        if (! isset(self::STEPS[$sequence])) {
+        $steps = $this->steps();
+
+        if (! isset($steps[$sequence])) {
             throw new \InvalidArgumentException("Unknown PRA stage sequence: {$sequence}");
         }
 
-        return self::STEPS[$sequence];
+        return $steps[$sequence];
     }
 
     /**
-     * The step after this one, or null when the chain is finished.
+     * The step after this one in the ACTIVE chain, or null when the chain is
+     * finished. Works from the step's place in the chain, so a PRA sitting on a
+     * step that was since switched off still moves on to the next live one.
      */
     public function nextSequence(int $sequence): ?int
     {
-        $all = $this->sequences();
-        $position = array_search($sequence, $all, true);
+        $position = $this->definitionFor($sequence)['position'];
 
-        if ($position === false) {
-            throw new \InvalidArgumentException("Unknown PRA stage sequence: {$sequence}");
+        foreach ($this->sequences() as $candidate) {
+            if ($this->steps()[$candidate]['position'] > $position) {
+                return $candidate;
+            }
         }
 
-        return $all[$position + 1] ?? null;
+        return null;
     }
 
     public function isBuyerScoped(int $sequence): bool
     {
-        return in_array(
-            $this->definitionFor($sequence)['department'],
-            self::BUYER_SCOPED_DEPARTMENTS,
-            true
-        );
+        return (bool) $this->definitionFor($sequence)['buyer_scoped'];
     }
 
     /**
@@ -195,6 +296,7 @@ class PraStageResolver
     public function resolveForBuyers(int $sequence, array $buyerIds, ?array $designationBuyerIds = null): PraStageActors
     {
         $definition = $this->definitionFor($sequence);
+        // null = a step with no department: only the people Admin names can act.
         $department = $definition['department'];
         $isHead = $definition['actor_kind'] === PraApproval::ACTOR_HEAD;
         $buyerScoped = $this->isBuyerScoped($sequence);
@@ -209,9 +311,9 @@ class PraStageResolver
         // computed unscoped: "nobody is a Merchant Head" and "no Merchant Head
         // covers this buyer" both end as an empty set, and they are different
         // problems with different fixes. Narrowing first would collapse them.
-        $inPost = $isHead
-            ? $this->departmentHeads($department)
-            : $this->teamMembersOf($department);
+        $inPost = $department === null
+            ? collect()
+            : ($isHead ? $this->departmentHeads($department) : $this->teamMembersOf($department));
 
         $postIsFilled = $inPost->isNotEmpty();
 
@@ -239,8 +341,8 @@ class PraStageResolver
         return new PraStageActors(
             sequence: $sequence,
             label: $definition['label'],
-            department: $department,
-            departmentLabel: DepartmentRoles::labelOf($department) ?? $department,
+            department: $department ?? '',
+            departmentLabel: $department === null ? '' : (DepartmentRoles::labelOf($department) ?? $department),
             actorKind: $definition['actor_kind'],
             stage: $definition['stage'],
             users: $users->values(),

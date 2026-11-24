@@ -52,6 +52,7 @@
                     <div class="small text-muted">Choose who approves each step of a Payment Request Approval.</div>
                 </div>
             </div>
+            <a href="{{ route('admin.pra-steps.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-list-ol me-1" aria-hidden="true"></i>Edit steps &amp; signature boxes</a>
             <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#routingHelp" aria-expanded="false">
                 <i class="bi bi-question-circle me-1" aria-hidden="true"></i>How it works
             </button>

@@ -463,10 +463,10 @@
                 </table>
             </div>
 
-            @php $signCol = count($signatureBlocks) === 4 ? 'col-3' : 'col-4'; @endphp
-            <div class="row g-0 pra-sign-area">
+            {{-- As many boxes as Admin set up, equal width (a grid, not fixed columns). --}}
+            <div class="pra-sign-area" style="display:grid;grid-template-columns:repeat({{ max(1, count($signatureBlocks)) }}, minmax(0, 1fr));">
                 @foreach($signatureBlocks as $i => $sign)
-                    <div class="{{ $signCol }} {{ $i === 0 ? 'pe-4' : ($loop->last ? 'ps-4 pra-sign-sep' : 'px-4 pra-sign-sep') }}">
+                    <div class="{{ $i === 0 ? 'pe-3' : ($loop->last ? 'ps-3 pra-sign-sep' : 'px-3 pra-sign-sep') }}">
                         <div class="pra-sign-title">{{ $sign['title'] }}</div>
                         @if($sign['src'])
                             <img src="{{ $sign['src'] }}" alt="{{ $sign['title'] }} signature" class="pra-sign-img">
@@ -553,10 +553,14 @@
                                 @if($createOnDepartmentalFlow ?? false)
                                     <div class="alert alert-info small mb-3">
                                         <div class="fw-semibold mb-1">Reviewers are assigned automatically</div>
-                                        This PRA follows the departmental approval chain:
-                                        Merchant Team &rarr; Merchant Head &rarr; Accounts Team &rarr;
-                                        Accounts Head &rarr; Commercial Head. Each step is routed to the
-                                        right department for you.
+                                        @php
+                                            $chainResolver = app(\App\Services\PraStageResolver::class);
+                                            $chainLabels = collect($chainResolver->sequences())->map(fn ($seq) => $chainResolver->definitionFor($seq)['label'])->all();
+                                            $firstStepLabel = $chainLabels[0] ?? 'the first step';
+                                        @endphp
+                                        This PRA follows the approval chain:
+                                        {{ implode(' → ', $chainLabels) }}.
+                                        Each step is routed to the right people for you.
                                     </div>
 
                                     {{-- THE OPTIONAL PRIMARY ASSIGNEE for the first step.
@@ -570,18 +574,18 @@
                                          first and tells them personally. --}}
                                     @php $assignees = $stepTwoAssignees ?? null; @endphp
                                     <label for="assigneeStep2" class="form-label fw-semibold mb-1">
-                                        Assign Merchant Team Check to
+                                        Assign {{ $firstStepLabel ?? 'the first step' }} to
                                         <span class="text-muted small fw-normal">(optional)</span>
                                     </label>
                                     @if($assignees && $assignees->isActionable())
                                         <select name="assignee_step2" id="assigneeStep2" class="form-select js-searchable">
-                                            <option value="">— Automatic (any eligible Merchant Team member) —</option>
+                                            <option value="">— Automatic (anyone eligible for this step) —</option>
                                             @foreach($assignees->users as $person)
                                                 <option value="{{ $person->id }}" {{ (string) old('assignee_step2') === (string) $person->id ? 'selected' : '' }}>{{ $person->name }}</option>
                                             @endforeach
                                         </select>
                                         <div class="form-text">
-                                            The whole Merchant team can still see and act on this PRA. The person you name is
+                                            Everyone eligible for this step can still see and act on this PRA. The person you name is
                                             shown as the primary assignee and notified directly.
                                         </div>
                                     @elseif($assignees)
@@ -645,12 +649,17 @@
                  separate card, chosen by flow. --}}
             @if($paymentRequest->isDepartmentalFlow())
                 @php
-                    $steps = [
-                        2 => 'Merchant Team Check', 3 => 'Merchant Head Approval',
-                        4 => 'Accounts Team Check', 5 => 'Accounts Head Approval',
-                        6 => 'Commercial Head Completion',
-                    ];
+                    // The ACTIVE chain, plus any step switched off since that this PRA
+                    // already has a decision at (so its history still shows).
+                    $stepResolver = app(\App\Services\PraStageResolver::class);
                     $decisionBySeq = $departmentalDecisions->keyBy('sequence');
+                    $steps = collect($stepResolver->sequences())
+                        ->merge($decisionBySeq->keys())
+                        ->unique()
+                        ->filter(fn ($seq) => isset($stepResolver->steps()[$seq]))
+                        ->sortBy(fn ($seq) => $stepResolver->steps()[$seq]['position'])
+                        ->mapWithKeys(fn ($seq) => [$seq => $stepResolver->steps()[$seq]['label']])
+                        ->all();
                     $isCreator = auth()->id() === $paymentRequest->created_by;
                     // Who each step is pointed at right now — the live assignment
                     // for steps still ahead, the snapshot for steps already taken.

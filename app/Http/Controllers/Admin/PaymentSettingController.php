@@ -40,7 +40,7 @@ class PaymentSettingController extends Controller
             'flow2Labels' => PaymentRequestSettings::flow2Labels(),
             'flow2Defaults' => array_map(
                 fn (array $block) => $block['label'],
-                PaymentRequestSettings::FLOW2_BLOCKS
+                array_intersect_key(PaymentRequestSettings::FLOW2_BLOCKS, ['prepared' => true])
             ),
         ]);
     }
@@ -60,7 +60,7 @@ class PaymentSettingController extends Controller
             $rules["officers.$slug.image"] = ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'];
         }
 
-        foreach (array_keys(PaymentRequestSettings::FLOW2_BLOCKS) as $slug) {
+        foreach (array_keys(array_intersect_key(PaymentRequestSettings::FLOW2_BLOCKS, ['prepared' => true])) as $slug) {
             $rules["flow2_labels.$slug"] = ['nullable', 'string', 'max:80'];
         }
 
@@ -78,7 +78,7 @@ class PaymentSettingController extends Controller
         // Departmental (flow 2) signature labels. Stored under their own key
         // prefix — editing one must never re-title a legacy PRA's document, and
         // a blank falls back to the default rather than printing no heading.
-        foreach (array_keys(PaymentRequestSettings::FLOW2_BLOCKS) as $slug) {
+        foreach (array_keys(array_intersect_key(PaymentRequestSettings::FLOW2_BLOCKS, ['prepared' => true])) as $slug) {
             AppSetting::put(
                 PaymentRequestSettings::flow2LabelKey($slug),
                 trim((string) $request->input("flow2_labels.$slug"))

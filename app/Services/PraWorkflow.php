@@ -45,10 +45,12 @@ class PraWorkflow
      */
     public function start(PaymentRequest $paymentRequest): PaymentRequest
     {
+        $first = $this->resolver->firstSequence();
+
         $paymentRequest->update([
             'flow_version' => PaymentRequest::FLOW_DEPARTMENTAL,
-            'current_sequence' => PraStageResolver::FIRST_SEQUENCE,
-            'status' => $this->statusFor(PraStageResolver::FIRST_SEQUENCE),
+            'current_sequence' => $first,
+            'status' => $this->statusFor($first),
         ]);
 
         return $paymentRequest->refresh();
@@ -222,9 +224,11 @@ class PraWorkflow
         DB::transaction(function () use ($paymentRequest, $user, $stage, $note) {
             $this->recordDecision($paymentRequest, $user, $stage, PraApproval::STATUS_RESTARTED, $note);
 
+            $first = $this->resolver->firstSequence();
+
             $paymentRequest->update([
-                'current_sequence' => PraStageResolver::FIRST_SEQUENCE,
-                'status' => $this->statusFor(PraStageResolver::FIRST_SEQUENCE),
+                'current_sequence' => $first,
+                'status' => $this->statusFor($first),
                 // The chain starts over, so the stamps of the old round must not
                 // survive and claim it was checked or approved.
                 'checked_by' => null,
@@ -272,9 +276,11 @@ class PraWorkflow
             throw PraWorkflowException::notRejected($paymentRequest);
         }
 
+        $first = $this->resolver->firstSequence();
+
         $paymentRequest->update([
-            'current_sequence' => PraStageResolver::FIRST_SEQUENCE,
-            'status' => $this->statusFor(PraStageResolver::FIRST_SEQUENCE),
+            'current_sequence' => $first,
+            'status' => $this->statusFor($first),
         ]);
 
         return $paymentRequest->refresh();
@@ -443,9 +449,11 @@ class PraWorkflow
      */
     protected function legacyActorColumnsFor(int $sequence, User $user): array
     {
+        // The first step of the chain is "the check", the last approving step is "the
+        // approval" (the chain is Admin-defined, so these are found, not fixed).
         return match ($sequence) {
-            PraStageResolver::SEQ_MERCHANT_CHECK => ['checked_by' => $user->id, 'checked_at' => now()],
-            PraStageResolver::SEQ_ACCOUNTS_APPROVE => ['approved_by' => $user->id, 'approved_at' => now()],
+            $this->resolver->firstSequence() => ['checked_by' => $user->id, 'checked_at' => now()],
+            $this->resolver->lastApproveSequence() => ['approved_by' => $user->id, 'approved_at' => now()],
             default => [],
         };
     }

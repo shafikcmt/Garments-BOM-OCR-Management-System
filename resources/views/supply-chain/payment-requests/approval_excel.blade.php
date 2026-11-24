@@ -105,12 +105,15 @@
     <tr class="grand"><td colspan="10">Grand Total</td><td class="right">{{ $money($summary['total_pi_amount'] ?? 0) }}</td><td class="right">{{ $budgetDone ? $money($summary['budget_sum'] ?? 0) : '' }}</td><td class="right">{{ $budgetDone ? $money($summary['saving_sum'] ?? 0) : '' }}</td></tr>
     <tr><td colspan="13" class="no-border"></td></tr>
     @php $signBlocks = \App\Support\PaymentRequestSettings::signatureBlocksFor($paymentRequest, true); @endphp
+    @php
+        // As many boxes as Admin set up, sharing the 13 columns (spare ones to the last boxes).
+        $boxCount = max(1, count($signBlocks));
+        $baseSpan = intdiv(13, $boxCount);
+        $spareSpan = 13 % $boxCount;
+    @endphp
     <tr>
         @foreach($signBlocks as $i => $sign)
-            @if($i > 0)<td colspan="1" class="no-border"></td>@endif
-            {{-- The last block runs one column wider so the three boxes still
-                 span the full 13-column table after Saving was added. --}}
-            <td colspan="{{ $i === count($signBlocks) - 1 ? 5 : 3 }}" class="signature">
+            <td colspan="{{ $baseSpan + ($i >= $boxCount - $spareSpan ? 1 : 0) }}" class="signature">
                 <strong>{{ $sign['title'] }}</strong><br>
                 @if($sign['src'])
                     <img src="{{ $sign['src'] }}" alt="Signature of {{ $sign['name'] ?? 'approver' }}" style="max-height:40px;"><br>

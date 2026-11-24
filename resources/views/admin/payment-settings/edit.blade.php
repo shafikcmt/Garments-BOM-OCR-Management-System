@@ -116,12 +116,12 @@
             <div class="col-12">
                 <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
                     <div class="card-body p-4">
-                        <h5 class="mb-1">Departmental PRA — Signature Labels</h5>
+                        <h5 class="mb-1">Departmental PRA — Prepared By Title</h5>
                         <p class="text-muted small mb-4">
-                            The four headings printed on a PRA that follows the departmental approval chain.
-                            Only the wording is set here — who signs each line is decided by the chain itself
-                            and cannot be changed. Leave a box empty to restore its default.
-                            These do not affect PRAs created on the older check-and-approve flow.
+                            The heading of the creator's signature box on a PRA that follows the departmental approval chain.
+                            The other signature boxes (how many, their order and their titles) are set per step on
+                            <a href="{{ route('admin.pra-steps.index') }}">Settings &gt; PRA Approval Steps</a>.
+                            Leave the box empty to restore the default.
                         </p>
                         <div class="row g-3">
                             @foreach($flow2Labels as $slug => $label)
@@ -137,10 +137,6 @@
                                     @error('flow2_labels.' . $slug)<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
                             @endforeach
-                        </div>
-                        <div class="form-text mt-3">
-                            The Commercial Head's completion is printed as a "Paid / Completed by" line
-                            below the signatures, not as a signature block.
                         </div>
                     </div>
                 </div>
