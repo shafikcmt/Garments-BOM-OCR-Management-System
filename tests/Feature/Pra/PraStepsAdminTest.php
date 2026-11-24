@@ -98,3 +98,18 @@ it('only lets an admin reach the steps screen', function () {
     $this->actingAs($user)->get(route('admin.pra-steps.index'))->assertForbidden();
     $this->actingAs(stepsAdmin())->get(route('admin.pra-steps.index'))->assertOk()->assertSee('PRA Approval Steps');
 });
+
+it('lets an admin turn off the creator box so only the step boxes print', function () {
+    $admin = stepsAdmin();
+
+    $this->actingAs($admin)->post(route('admin.pra-steps.prepared'), ['prepared_title' => 'Prepared By'])
+        ->assertRedirect(route('admin.pra-steps.index'));
+
+    expect(\App\Support\PaymentRequestSettings::preparedBoxEnabled())->toBeFalse();
+
+    $this->actingAs($admin)->post(route('admin.pra-steps.prepared'), ['prepared_enabled' => 1, 'prepared_title' => 'Raised By'])
+        ->assertRedirect();
+
+    expect(\App\Support\PaymentRequestSettings::preparedBoxEnabled())->toBeTrue()
+        ->and(\App\Support\PaymentRequestSettings::flow2Label('prepared'))->toBe('Raised By');
+});

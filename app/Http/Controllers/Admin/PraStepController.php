@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\PaymentRequest;
 use App\Models\PraStep;
 use App\Services\PraStageResolver;
+use App\Models\AppSetting;
 use App\Support\DepartmentRoles;
+use App\Support\PaymentRequestSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -47,8 +49,27 @@ class PraStepController extends Controller
             'waiting' => $waiting,
             'departments' => $departments,
             'boxTitles' => $steps->where('is_active', true)->pluck('signature_label')->filter(fn ($t) => trim((string) $t) !== '')->values(),
+            'preparedEnabled' => PaymentRequestSettings::preparedBoxEnabled(),
+            'preparedTitle' => PaymentRequestSettings::flow2Label('prepared'),
             'maxBoxes' => self::MAX_BOXES,
         ]);
+    }
+
+    /** The creator's "Prepared By" box: print it or not, and its title. */
+    public function savePrepared(Request $request)
+    {
+        $data = $request->validate(['prepared_title' => ['nullable', 'string', 'max:80']]);
+        $enabled = $request->boolean('prepared_enabled');
+
+        if ($enabled) {
+            $this->assertBoxLimit(['signature_label' => null], null, true);
+        }
+
+        AppSetting::put(PaymentRequestSettings::KEY_PREPARED_BOX, $enabled ? '1' : '0');
+        AppSetting::put(PaymentRequestSettings::flow2LabelKey('prepared'), trim((string) ($data['prepared_title'] ?? '')));
+
+        return redirect()->route('admin.pra-steps.index')
+            ->with('success', $enabled ? 'The creator\'s box will be printed.' : 'The creator\'s box is off: only the step boxes print.');
     }
 
     public function store(Request $request)
@@ -161,7 +182,7 @@ class PraStepController extends Controller
     }
 
     /** Prepared By plus the steps' boxes must fit on the printed sheet. */
-    protected function assertBoxLimit(array $data, ?PraStep $editing): void
+    protected function assertBoxLimit(array $data, ?PraStep $editing, bool $creatorBoxOn = false): void
     {
         $others = PraStep::query()
             ->where('is_active', true)
@@ -172,7 +193,10 @@ class PraStepController extends Controller
 
         $mine = trim((string) ($data['signature_label'] ?? '')) !== '' ? 1 : 0;
 
-        if (1 + $others + $mine > self::MAX_BOXES) {
+        // The creator's box counts when it is on (or is being turned on).
+        $creator = ($creatorBoxOn || PaymentRequestSettings::preparedBoxEnabled()) ? 1 : 0;
+
+        if ($creator + $others + $mine > self::MAX_BOXES) {
             abort(redirect()->route('admin.pra-steps.index')->with('warning',
                 'A PRA can print at most ' . self::MAX_BOXES . ' signature boxes (Prepared By + ' . (self::MAX_BOXES - 1) . ' steps). Clear the box title of another step first.'));
         }

@@ -36,6 +36,9 @@ class PaymentRequestSettings
      */
     public const KEY_DEPARTMENTAL_FLOW = 'pra_departmental_flow_enabled';
 
+    /** Whether a departmental PRA prints the creator's "Prepared By" box. On unless Admin turns it off. */
+    public const KEY_PREPARED_BOX = 'pra_flow2_prepared_box_enabled';
+
     public const DEFAULT_WORKING_DAYS = 7;
 
     /**
@@ -161,6 +164,13 @@ class PaymentRequestSettings
      * Its own prefix, never the officerKey() namespace, so the legacy titles and
      * these cannot collide or be edited by accident from the other screen.
      */
+    public static function preparedBoxEnabled(): bool
+    {
+        $stored = AppSetting::get(self::KEY_PREPARED_BOX);
+
+        return $stored === null || $stored === '' ? true : (bool) ((int) $stored);
+    }
+
     public static function flow2LabelKey(string $slug): string
     {
         return "pra_flow2_label_{$slug}";
@@ -364,9 +374,12 @@ class PaymentRequestSettings
 
         // The creator's box always comes first. They authored the PRA rather than
         // approving it, so it is filled from the PRA itself, exactly as flow 1 does.
-        $blocks[] = self::dynamicBlock(
-            'prepared', self::flow2Label('prepared'), $pr->createdBy, $pr->created_at, $pr->prepared_signature_path, $embed
-        );
+        // (Admin can turn this box off when one of the steps already is the first signature.)
+        if (self::preparedBoxEnabled()) {
+            $blocks[] = self::dynamicBlock(
+                'prepared', self::flow2Label('prepared'), $pr->createdBy, $pr->created_at, $pr->prepared_signature_path, $embed
+            );
+        }
 
         // Then one box per ACTIVE step that Admin gave a signature title
         // (Settings > PRA Approval Steps), in chain order.
