@@ -62,13 +62,32 @@
         <div class="card-body p-4">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                 <h6 class="fw-bold mb-0">Signature boxes printed on a PRA</h6>
-                <span class="small text-muted">{{ 1 + $boxTitles->count() }} of {{ $maxBoxes }} possible</span>
+                <span class="small text-muted">{{ ($preparedEnabled ? 1 : 0) + $boxTitles->count() }} of {{ $maxBoxes }} possible</span>
             </div>
             <div class="ps-boxes">
-                <span class="ps-box">Prepared By <span class="text-muted fw-normal">(Supply Chain, the creator)</span></span>
+                @if($preparedEnabled)
+                    <span class="ps-box">{{ $preparedTitle }} <span class="text-muted fw-normal">(the person who created the PRA)</span></span>
+                @endif
                 @foreach($boxTitles as $title)<span class="ps-box">{{ $title }}</span>@endforeach
+                @if(! $preparedEnabled && $boxTitles->isEmpty())<span class="small text-muted">No box is printed yet.</span>@endif
             </div>
-            <div class="small text-muted mt-2">One box for each step that has a <strong>Signature box title</strong>, in the order of the steps below. The "Prepared By" title is set on PI / PRA Settings.</div>
+            <div class="small text-muted mt-2">One box for each step that has a <strong>Signature box title</strong>, in the order of the steps below.</div>
+
+            {{-- THE CREATOR'S OWN BOX. Printed first by default. Turn it off when one of
+                 the steps below is already the first signature (for example "Supply
+                 Chain"), so the sheet does not carry a box too many. --}}
+            <form method="POST" action="{{ route('admin.pra-steps.prepared') }}" class="d-flex flex-wrap align-items-end gap-3 mt-3 pt-3 border-top">
+                @csrf
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="preparedEnabled" name="prepared_enabled" value="1" {{ $preparedEnabled ? 'checked' : '' }}>
+                    <label class="form-check-label fw-semibold" for="preparedEnabled">Print a box for the person who created the PRA</label>
+                </div>
+                <div>
+                    <label class="form-label small mb-1" for="preparedTitle">Its title</label>
+                    <input type="text" class="form-control form-control-sm" id="preparedTitle" name="prepared_title" maxlength="80" value="{{ $preparedTitle }}" placeholder="Prepared By" style="min-width:240px;">
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary mb-2"><i class="bi bi-check2 me-1" aria-hidden="true"></i>Save</button>
+            </form>
         </div>
     </div>
 

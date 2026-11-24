@@ -873,7 +873,7 @@ The steps a PRA goes through, and the signature boxes printed on it, are set by 
 
 - Each step is one card: its name, who does it (a department's **Team** or **Head**, or **Only the people you choose**), the kind (Check, Approve or Payment / completion), whether the person needs access to the PRA's buyer, and its **signature box title** (or "No signature box").
 - **Add step** adds a step at the end. **Up** and **Down** change the order. **Edit** changes a step. **Switch off** takes a step out of the chain (it is never deleted, so old PRAs still show it); a step cannot be switched off while a PRA is waiting on it.
-- A step with a **Signature box title** prints a signature box with that title, for the person who completes the step, in the order of the steps. The first box, **Prepared By** (the person who created the PRA), is always there; its title is on PI / PRA Settings. Up to eight boxes in all.
+- A step with a **Signature box title** prints a signature box with that title, for the person who completes the step, in the order of the steps. In front of them the PRA prints a box for **the person who created it** (default title *Prepared By*). If one of your steps is already the first signature (for example *Supply Chain*), untick **Print a box for the person who created the PRA** at the top of the page and press **Save**, so the sheet has exactly the boxes you set. Up to eight boxes in all.
 - One step can fill the printed **OCR Checked** box and one can print the **Paid / Completed by** line.
 - To say **exactly who** acts at a step, for every buyer or one buyer, press **Who approves each step** (PRA Approval Routing). People chosen there do not need the department role or buyer access.
 

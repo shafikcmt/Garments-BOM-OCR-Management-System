@@ -97,6 +97,7 @@ Route::prefix('admin')
         // The steps and signature boxes of a departmental PRA (how many, order, who for, box titles).
         Route::get('/pra-steps', [\App\Http\Controllers\Admin\PraStepController::class, 'index'])->name('pra-steps.index');
         Route::post('/pra-steps', [\App\Http\Controllers\Admin\PraStepController::class, 'store'])->name('pra-steps.store');
+        Route::post('/pra-steps/prepared-box', [\App\Http\Controllers\Admin\PraStepController::class, 'savePrepared'])->name('pra-steps.prepared');
         Route::put('/pra-steps/{praStep}', [\App\Http\Controllers\Admin\PraStepController::class, 'update'])->name('pra-steps.update');
         Route::post('/pra-steps/{praStep}/move', [\App\Http\Controllers\Admin\PraStepController::class, 'move'])->name('pra-steps.move');
         Route::post('/pra-steps/{praStep}/toggle', [\App\Http\Controllers\Admin\PraStepController::class, 'toggle'])->name('pra-steps.toggle');
