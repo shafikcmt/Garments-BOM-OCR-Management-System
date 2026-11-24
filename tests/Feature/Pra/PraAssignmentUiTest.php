@@ -500,3 +500,86 @@ it('opens a PDF supporting document inline and still allows a download', functio
     $download = $this->actingAs($this->creator)->get(route('pra_documents.download', [$pra, 0]))->assertOk();
     expect($download->headers->get('content-disposition'))->toContain('attachment');
 });
+
+// --- Taking lines off a PRA ---------------------------------------------------
+
+function uiMultiVendorPra($test): array
+{
+    $second = uiPayablePo($test->buyer, 'PO-2', 'PI-2', 'Other Vendor');
+
+    $test->actingAs($test->creator)
+        ->post(route('supply_chain.payment_requests.store'), ['booking_po_ids' => [$test->po->id, $second->id]])
+        ->assertRedirect();
+
+    return [PaymentRequest::sole(), $second];
+}
+
+it('takes one vendor off a PRA, updates the total and frees its lines', function () {
+    [$pra] = uiMultiVendorPra($this);
+    $before = $pra->items()->count();
+    $otherIds = $pra->items()->where('po_no', 'PO-2')->pluck('id')->all();
+
+    $this->actingAs($this->creator)
+        ->post(route('supply_chain.payment_requests.remove_lines', $pra), ['item_ids' => $otherIds, 'reason' => 'Vendor order cancelled'])
+        ->assertRedirect();
+
+    $pra = $pra->fresh();
+
+    expect($pra->items()->count())->toBe($before - count($otherIds))
+        ->and($pra->items()->where('po_no', 'PO-2')->count())->toBe(0)
+        ->and($pra->status)->toBe('pending_check')
+        ->and($pra->current_sequence)->toBe(2)
+        ->and($pra->removedLines())->toHaveCount(1)
+        ->and($pra->removedLines()[0]['reason'])->toBe('Vendor order cancelled');
+
+    // The removed PO/PI is no longer held by a live PRA, so it can be raised again.
+    $this->actingAs($this->creator)
+        ->post(route('supply_chain.payment_requests.store'), ['booking_po_ids' => [uiPayablePoId('PO-2')]])
+        ->assertRedirect();
+});
+
+function uiPayablePoId(string $poNo): int
+{
+    return \App\Models\BookingPo::where('po_no', $poNo)->value('id');
+}
+
+it('sends a PRA that was already checked back to step 2 when lines are removed', function () {
+    [$pra] = uiMultiVendorPra($this);
+    $workflow = app(PraWorkflow::class);
+
+    $workflow->approve($pra->fresh(), $this->merchantA);
+    expect($pra->fresh()->current_sequence)->toBe(3);
+
+    $otherIds = $pra->items()->where('po_no', 'PO-2')->pluck('id')->all();
+
+    $this->actingAs($this->creator)
+        ->post(route('supply_chain.payment_requests.remove_lines', $pra), ['item_ids' => $otherIds, 'reason' => 'Vendor cancelled'])
+        ->assertRedirect();
+
+    $pra = $pra->fresh(['approvals']);
+
+    expect($pra->current_sequence)->toBe(2)
+        ->and($pra->status)->toBe('pending_check')
+        ->and($pra->approvals->pluck('status')->all())->toContain('restarted')
+        // A fresh round: the earlier approval no longer counts towards it.
+        ->and($workflow->currentCycleDecisions($pra))->toHaveCount(0);
+});
+
+it('cancels the PRA when every line is removed and refuses a reason-less request', function () {
+    [$pra] = uiMultiVendorPra($this);
+
+    $this->actingAs($this->creator)
+        ->post(route('supply_chain.payment_requests.cancel', $pra), ['reason' => ''])
+        ->assertSessionHasErrors('reason');
+
+    $this->actingAs($this->creator)
+        ->post(route('supply_chain.payment_requests.cancel', $pra), ['reason' => 'Order cancelled'])
+        ->assertRedirect();
+
+    $pra = $pra->fresh();
+
+    expect($pra->status)->toBe('cancelled')
+        ->and($pra->items()->count())->toBe(0)
+        ->and((float) $pra->total_pi_amount)->toBe(0.0)
+        ->and($pra->current_sequence)->toBeNull();
+});

@@ -18,6 +18,11 @@ class PaymentRequest extends Model
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
 
+    // A PRA that was closed by Supply Chain because all of its lines were taken
+    // off it. It keeps its number and history but holds no lines and no amount,
+    // and its POs/PIs are free to be raised again.
+    public const STATUS_CANCELLED = 'cancelled';
+
     // Flow 2 only. The departmental chain ends in a PAYMENT, not an approval,
     // so it needs a state the legacy flow has no concept of. No flow-1 PRA can
     // ever hold either value — nothing writes them outside PraWorkflow.
@@ -98,6 +103,37 @@ class PaymentRequest extends Model
         return array_values((array) data_get($this->data, 'attachments', []));
     }
 
+    /**
+     * Why lines cannot be taken off this PRA, or null when they can.
+     *
+     * Departmental PRAs only (the 19 legacy ones keep their behaviour), and not
+     * once the payment is done or the PRA was already cancelled. A rejected PRA is
+     * allowed: its creator may trim it before resubmitting.
+     */
+    public function linesCannotChangeReason(): ?string
+    {
+        if (! $this->isDepartmentalFlow()) {
+            return 'Only PRAs on the departmental approval flow can have lines removed.';
+        }
+
+        return match ($this->status) {
+            self::STATUS_COMPLETED => 'This PRA is completed (payment recorded), so its lines cannot be removed.',
+            self::STATUS_CANCELLED => 'This PRA is already cancelled.',
+            default => null,
+        };
+    }
+
+    /**
+     * Lines that were taken off this PRA, newest last: when, by whom, why and
+     * what. Kept in `data` because the lines themselves are deleted.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function removedLines(): array
+    {
+        return array_values((array) data_get($this->data, 'removed_lines', []));
+    }
+
     public function isDepartmentalFlow(): bool
     {
         return (int) $this->flow_version === self::FLOW_DEPARTMENTAL;
@@ -126,6 +162,7 @@ class PaymentRequest extends Model
         $label = match ($this->status) {
             self::STATUS_COMPLETED => 'Completed — payment recorded',
             self::STATUS_REJECTED => 'Rejected — returned to creator',
+            self::STATUS_CANCELLED => 'Cancelled',
             default => $this->current_sequence
                 ? 'Step ' . $this->current_sequence . ' — '
                     . app(\App\Services\PraStageResolver::class)

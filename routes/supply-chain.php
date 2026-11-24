@@ -49,6 +49,9 @@ Route::prefix('supply-chain')
         Route::post('/payment-requests', [PaymentRequestController::class, 'store'])->name('payment_requests.store');
         Route::get('/payment-requests/my-status', [PaymentRequestController::class, 'myStatus'])->name('payment_requests.my_status');
         Route::post('/payment-requests/{paymentRequest}/resubmit', [PaymentRequestController::class, 'resubmit'])->name('payment_requests.resubmit');
+        // Take lines (e.g. one vendor's) off a PRA, or cancel the whole PRA.
+        Route::post('/payment-requests/{paymentRequest}/remove-lines', [PaymentRequestController::class, 'removeLines'])->name('payment_requests.remove_lines');
+        Route::post('/payment-requests/{paymentRequest}/cancel', [PaymentRequestController::class, 'cancel'])->name('payment_requests.cancel');
         Route::get('/payment-requests/{paymentRequest}', [PaymentRequestController::class, 'show'])->name('payment_requests.show');
         Route::get('/payment-requests/{paymentRequest}/download-pdf', [PaymentRequestController::class, 'downloadPdf'])->name('payment_requests.download_pdf');
         Route::get('/payment-requests/{paymentRequest}/download-excel', [PaymentRequestController::class, 'downloadExcel'])->name('payment_requests.download_excel');

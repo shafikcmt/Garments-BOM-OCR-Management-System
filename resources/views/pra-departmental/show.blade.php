@@ -229,6 +229,7 @@
             </div>
 
             @include('partials.pra-documents')
+            @include('partials.pra-removed-lines')
 
             {{-- THE BOOKING PO(S) THIS PRA PAYS FOR. Every viewer sees the summary
                  — it is built from the PRA's own lines and the PO's header, which

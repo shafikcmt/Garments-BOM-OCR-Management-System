@@ -7,6 +7,11 @@
     // A read-only print view of several existing PRAs as one sheet: laid out like
     // the create preview, but nothing can be created from it.
     $isCombined = (bool) ($isCombined ?? false);
+    // Taking lines (e.g. one vendor's) off a saved PRA, or cancelling it. Any Supply
+    // Chain user who can see the PRA may; the PRA must still be changeable.
+    $canChangeLines = ! $isPreview && ! $isCombined && $paymentRequest->exists
+        && auth()->user()?->hasRole('supply_chain')
+        && $paymentRequest->linesCannotChangeReason() === null;
     $budgetCheck = $budgetCheck ?? ['exceeded' => false, 'lines' => []];
     $canOverrideBudget = (bool) ($canOverrideBudget ?? false);
     $bookingPoIds = collect($bookingPoIds ?? [])->filter()->unique()->values();
@@ -212,6 +217,14 @@
                         <button type="button" onclick="window.print()" class="btn btn-outline-primary rounded-pill">Print</button>
                         <a href="{{ route('supply_chain.payment_requests.download_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-outline-danger rounded-pill">PDF Preview</a>
                         <a href="{{ route('supply_chain.payment_requests.download_excel', $paymentRequest) }}" class="btn btn-success rounded-pill">Excel Download</a>
+                        @if($canChangeLines)
+                            <button type="button" class="btn btn-outline-warning rounded-pill" data-bs-toggle="modal" data-bs-target="#manageLinesModal">
+                                <i class="bi bi-scissors me-1" aria-hidden="true"></i>Manage Lines
+                            </button>
+                            <button type="button" class="btn btn-outline-danger rounded-pill" data-bs-toggle="modal" data-bs-target="#cancelPraModal">
+                                <i class="bi bi-x-octagon me-1" aria-hidden="true"></i>Cancel PRA
+                            </button>
+                        @endif
                         <button type="button" class="btn btn-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#sendEmailModal" title="Email this PRA as a PDF attachment">
                             <i class="bi bi-envelope me-1" aria-hidden="true"></i> Send Email
                         </button>
@@ -760,6 +773,7 @@
 
             <div class="mx-auto mt-3 pra-no-print" style="max-width:1120px;">
                 @include('partials.pra-documents')
+                @include('partials.pra-removed-lines')
                 @if($emailLogs->isEmpty())
                     <div class="card border-0 shadow-sm rounded-3">
                         <div class="card-body p-4">
@@ -780,6 +794,86 @@
         @endunless
     </div>
 </div>
+
+@if($canChangeLines)
+    @php
+        // Whether removing lines will send the PRA back to step 2: somebody already acted.
+        $willRestart = $paymentRequest->current_sequence !== null && ($departmentalDecisions ?? collect())->isNotEmpty();
+        $vendorGroups = $paymentRequest->items->groupBy(fn ($item) => $item->supplier_name ?: '-');
+    @endphp
+    <div class="modal fade" id="manageLinesModal" tabindex="-1" aria-labelledby="manageLinesTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content" style="border-radius:var(--gx-radius);">
+                <form method="POST" action="{{ route('supply_chain.payment_requests.remove_lines', $paymentRequest) }}" id="manageLinesForm">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="manageLinesTitle"><i class="bi bi-scissors me-1" aria-hidden="true"></i> Remove lines from {{ $paymentRequest->request_no }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted mb-2">Tick a vendor to take all of its lines off this PRA, or tick single lines. The lines go back to the <strong>Pending PI Payment</strong> list and can be raised in a new PRA.</p>
+                        @if($willRestart)
+                            <div class="alert alert-warning small border-0">This PRA has already been checked or approved at an earlier step. Removing lines changes the document, so it <strong>starts again at step 2</strong> and everyone approves it again.</div>
+                        @endif
+
+                        @foreach($vendorGroups as $vendorName => $vendorItems)
+                            @php $vendorKey = md5((string) $vendorName); @endphp
+                            <div class="border rounded-3 mb-2 overflow-hidden">
+                                <label class="d-flex align-items-center gap-2 bg-light px-3 py-2 mb-0 fw-semibold" style="cursor:pointer;">
+                                    <input type="checkbox" class="form-check-input mt-0 js-vendor-all" data-vendor="{{ $vendorKey }}">
+                                    <span>{{ $vendorName }}</span>
+                                    <span class="ms-auto small text-muted fw-normal">{{ $vendorItems->count() }} line(s) &middot; $ {{ number_format((float) $vendorItems->sum('pi_amount'), 2) }}</span>
+                                </label>
+                                @foreach($vendorItems as $item)
+                                    <label class="d-flex align-items-center gap-2 px-3 py-2 mb-0 border-top small" style="cursor:pointer;">
+                                        <input type="checkbox" class="form-check-input mt-0 js-line" name="item_ids[]" value="{{ $item->id }}" data-vendor="{{ $vendorKey }}" data-amount="{{ (float) $item->pi_amount }}">
+                                        <span class="flex-grow-1">
+                                            {{ $item->style_name ?: '-' }} &middot; {{ $item->material_description ?: ($item->material_type ?: '-') }}
+                                            <span class="text-muted">&middot; {{ $item->po_no ?: '-' }} / {{ $item->pi_number ?: '-' }}</span>
+                                        </span>
+                                        <span class="fw-semibold">$ {{ number_format((float) $item->pi_amount, 2) }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        @endforeach
+
+                        <label for="manageLinesReason" class="form-label fw-semibold mt-3 mb-1">Reason <span class="text-danger">*</span></label>
+                        <textarea name="reason" id="manageLinesReason" rows="2" class="form-control" maxlength="1000" required placeholder="Why are these lines being removed?"></textarea>
+
+                        <div class="small mt-3" id="manageLinesSummary">Nothing ticked.</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger" id="manageLinesSubmit" disabled><i class="bi bi-scissors me-1" aria-hidden="true"></i>Remove selected lines</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="cancelPraModal" tabindex="-1" aria-labelledby="cancelPraTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius:var(--gx-radius);">
+                <form method="POST" action="{{ route('supply_chain.payment_requests.cancel', $paymentRequest) }}">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="cancelPraTitle"><i class="bi bi-x-octagon text-danger me-1" aria-hidden="true"></i> Cancel {{ $paymentRequest->request_no }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted">All {{ $paymentRequest->items->count() }} line(s) come off this PRA, which is then closed as <strong>Cancelled</strong>. The lines go back to the Pending PI Payment list and can be raised again.</p>
+                        <label for="cancelPraReason" class="form-label fw-semibold mb-1">Reason <span class="text-danger">*</span></label>
+                        <textarea name="reason" id="cancelPraReason" rows="2" class="form-control" maxlength="1000" required></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Keep PRA</button>
+                        <button type="submit" class="btn btn-danger"><i class="bi bi-x-octagon me-1" aria-hidden="true"></i>Cancel PRA</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endif
 
 @unless($isPreview)
 <div class="modal fade" id="sendEmailModal" tabindex="-1" aria-labelledby="sendEmailModalLabel" aria-hidden="true">
@@ -852,6 +946,50 @@
 @endsection
 
 @section('scripts')
+@if($canChangeLines ?? false)
+<script>
+    // Manage Lines: ticking a vendor ticks its lines; the summary shows what would be
+    // removed and the new total.
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('manageLinesForm');
+        if (!form) return;
+
+        const lines = Array.from(form.querySelectorAll('.js-line'));
+        const vendors = Array.from(form.querySelectorAll('.js-vendor-all'));
+        const summary = document.getElementById('manageLinesSummary');
+        const submit = document.getElementById('manageLinesSubmit');
+        const total = lines.reduce(function (sum, c) { return sum + Number(c.dataset.amount || 0); }, 0);
+        const money = function (n) { return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+
+        const refresh = function () {
+            const picked = lines.filter(function (c) { return c.checked; });
+            const removed = picked.reduce(function (sum, c) { return sum + Number(c.dataset.amount || 0); }, 0);
+
+            vendors.forEach(function (box) {
+                const mine = lines.filter(function (c) { return c.dataset.vendor === box.dataset.vendor; });
+                box.checked = mine.length > 0 && mine.every(function (c) { return c.checked; });
+            });
+
+            submit.disabled = picked.length === 0;
+            summary.textContent = picked.length === 0
+                ? 'Nothing ticked.'
+                : (picked.length === lines.length
+                    ? 'All ' + picked.length + ' lines ticked: the PRA will be cancelled.'
+                    : picked.length + ' line(s) (' + money(removed) + ') will be removed. New total ' + money(total - removed) + '.');
+        };
+
+        vendors.forEach(function (box) {
+            box.addEventListener('change', function () {
+                lines.filter(function (c) { return c.dataset.vendor === box.dataset.vendor; })
+                    .forEach(function (c) { c.checked = box.checked; });
+                refresh();
+            });
+        });
+        lines.forEach(function (c) { c.addEventListener('change', refresh); });
+        refresh();
+    });
+</script>
+@endif
 @if($isPreview && ($createOnDepartmentalFlow ?? false))
     {{-- The searchable dropdown used across the app (Bookings, Store forms).
          Loaded only on the departmental create preview: the legacy modal has no
