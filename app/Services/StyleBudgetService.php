@@ -78,7 +78,7 @@ class StyleBudgetService
 
         return (float) PaymentRequestItem::query()
             ->join('payment_requests', 'payment_requests.id', '=', 'payment_request_items.payment_request_id')
-            ->where('payment_requests.status', '!=', PaymentRequest::STATUS_REJECTED)
+            ->whereNotIn('payment_requests.status', [PaymentRequest::STATUS_REJECTED, PaymentRequest::STATUS_CANCELLED])
             ->whereRaw('LOWER(TRIM(payment_request_items.style_name)) = ?', [Str::lower($style)])
             ->sum('payment_request_items.pi_amount');
     }

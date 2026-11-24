@@ -824,6 +824,160 @@ class PaymentRequestController extends Controller
         return $this->downloadXlsx($paymentRequest, $summary, 'COMBINED_PAYMENT_REQUEST_APPROVAL.xlsx', $approvalRows);
     }
 
+    /**
+     * TAKE LINES OFF AN EXISTING PRA (for example one vendor's lines, after that
+     * vendor's order was cancelled).
+     *
+     * Any Supply Chain user who can see the PRA (buyer access) may do it. The
+     * removed lines go back to the Pending PI Payment list and can be raised in a
+     * new PRA, single or multi vendor. If the PRA was already being approved it
+     * restarts at step 2 so everyone signs the changed document; if every line is
+     * removed the PRA is cancelled. A line whose Workspace row already has a Pmt
+     * Doc No (paid) cannot be removed.
+     */
+    public function removeLines(Request $request, PaymentRequest $paymentRequest)
+    {
+        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+        $this->authorizePaymentRequest($paymentRequest);
+
+        $validated = $request->validate([
+            'item_ids' => ['required', 'array', 'min:1'],
+            'item_ids.*' => ['integer'],
+            'reason' => ['required', 'string', 'max:1000'],
+        ], [
+            'item_ids.required' => 'Tick the lines to remove.',
+            'item_ids.min' => 'Tick the lines to remove.',
+            'reason.required' => 'Please give a reason.',
+        ]);
+
+        return $this->applyLineRemoval($paymentRequest, collect($validated['item_ids'])->map(fn ($id) => (int) $id)->all(), trim($validated['reason']));
+    }
+
+    /** Cancel a whole PRA: every line comes off it and it is closed. */
+    public function cancel(Request $request, PaymentRequest $paymentRequest)
+    {
+        abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
+        $this->authorizePaymentRequest($paymentRequest);
+
+        $validated = $request->validate(['reason' => ['required', 'string', 'max:1000']], ['reason.required' => 'Please give a reason.']);
+
+        return $this->applyLineRemoval($paymentRequest, $paymentRequest->items()->pluck('id')->all(), trim($validated['reason']));
+    }
+
+    /**
+     * @param  list<int>  $itemIds
+     */
+    protected function applyLineRemoval(PaymentRequest $paymentRequest, array $itemIds, string $reason)
+    {
+        if ($blocked = $paymentRequest->linesCannotChangeReason()) {
+            return back()->with('warning', $blocked);
+        }
+
+        $paymentRequest->load(['items', 'approvals']);
+        $removing = $paymentRequest->items->whereIn('id', $itemIds)->values();
+
+        if ($removing->isEmpty()) {
+            return back()->with('warning', 'None of the ticked lines belong to this PRA.');
+        }
+
+        // A line that is already paid (the Workspace row has a Payment Doc No) must
+        // not be pulled off a PRA.
+        $paid = $removing->filter(function (PaymentRequestItem $item) {
+            $row = $item->excel_row_id ? \App\Models\ExcelRow::with('cells.header')->find($item->excel_row_id) : null;
+
+            return $row && trim((string) $this->sourceService->sourceValueForRow($row, 'pmt_doc_no')) !== '';
+        });
+
+        if ($paid->isNotEmpty()) {
+            return back()->with('warning', 'These lines are already marked paid and cannot be removed: '
+                . $paid->map(fn (PaymentRequestItem $item) => trim($item->po_no . ' / ' . $item->pi_number, ' /'))->unique()->implode(', ') . '.');
+        }
+
+        $remaining = $paymentRequest->items->reject(fn (PaymentRequestItem $item) => $removing->contains('id', $item->id))->values();
+        $cancelling = $remaining->isEmpty();
+        $inProgress = $paymentRequest->current_sequence !== null;
+        // Somebody already acted in this round: the document changes under them.
+        $restart = ! $cancelling && $inProgress && $this->workflow->currentCycleDecisions($paymentRequest)->isNotEmpty();
+        $user = auth()->user();
+
+        DB::transaction(function () use ($paymentRequest, $removing, $remaining, $cancelling, $restart, $reason, $user) {
+            // The lines are deleted (so every PO/PI check, budget and total sees them
+            // gone), but a copy is kept on the PRA for the record.
+            $data = (array) $paymentRequest->data;
+            $data['removed_lines'] = array_merge((array) ($data['removed_lines'] ?? []), [[
+                'at' => now()->toDateTimeString(),
+                'by_id' => $user->id,
+                'by_name' => $user->name,
+                'reason' => $reason,
+                'cancelled' => $cancelling,
+                'lines' => $removing->map(fn (PaymentRequestItem $item) => [
+                    'booking_po_id' => $item->booking_po_id,
+                    'po_no' => $item->po_no,
+                    'pi_number' => $item->pi_number,
+                    'vendor' => $item->supplier_name,
+                    'style' => $item->style_name,
+                    'item' => $item->material_description,
+                    'amount' => (float) $item->pi_amount,
+                ])->values()->all(),
+            ]]);
+
+            // One by one so the model events fire: each deletion refreshes the
+            // Workspace file it came from, which drops this PRA's overrides there.
+            $removing->each->delete();
+
+            if (! $cancelling) {
+                $snapshots = $remaining->map(fn (PaymentRequestItem $item) => (array) ($item->data ?? []))->values();
+                $required = $remaining->pluck('payment_required_date')->filter()
+                    ->map(fn ($date) => \Illuminate\Support\Carbon::parse($date)->toDateString())->sort()->first();
+
+                $data['pi_numbers'] = $remaining->pluck('pi_number')->filter()->unique()->values()->all();
+                $data['po_numbers'] = $remaining->pluck('po_no')->filter()->unique()->values()->all();
+                $data['approval_filters'] = $this->approvalFiltersFromSnapshots($snapshots);
+                $data['payment_status_summary'] = $remaining->countBy('payment_status')->all();
+                $data['payment_required_date'] = $required ?: ($data['payment_required_date'] ?? null);
+                $data['vendor_mode'] = $this->vendorCountOf($snapshots) > 1 ? 'multi' : 'single';
+
+                $paymentRequest->update([
+                    'supplier_name' => $this->uniqueText($remaining, 'supplier_name'),
+                    'buyer_name' => $this->uniqueText($remaining, 'buyer_name'),
+                    'season_name' => $this->uniqueText($remaining, 'season_name'),
+                    'total_pi_amount' => $remaining->sum(fn (PaymentRequestItem $item) => (float) $item->pi_amount),
+                    'data' => $data,
+                ]);
+
+                if ($restart) {
+                    $this->workflow->restartAfterChange($paymentRequest->fresh(['approvals']), $user,
+                        'Lines were removed by ' . $user->name . ': ' . $reason);
+                }
+
+                return;
+            }
+
+            $paymentRequest->update(['data' => $data]);
+            $this->workflow->cancel($paymentRequest->fresh());
+        });
+
+        $paymentRequest = $paymentRequest->fresh(['items', 'createdBy', 'approvals']);
+
+        if ($restart) {
+            $stage = $this->workflow->currentStage($paymentRequest);
+
+            if ($stage) {
+                $this->approvalService->notifyStageActors($paymentRequest, $stage);
+            }
+        }
+
+        $summary = $removing->count() . ' line(s) removed. They are back on the Pending PI Payment list and can be raised in a new PRA.';
+
+        if ($cancelling) {
+            $summary = 'PRA ' . $paymentRequest->request_no . ' cancelled. Its ' . $removing->count() . ' line(s) are back on the Pending PI Payment list.';
+        } elseif ($restart) {
+            $summary .= ' Because the PRA was already being approved, it starts again at step 2.';
+        }
+
+        return redirect()->route('supply_chain.payment_requests.show', $paymentRequest)->with('success', $summary);
+    }
+
     public function myStatus(Request $request)
     {
         abort_if(! auth()->user()?->hasRole('supply_chain'), 403);
@@ -1333,7 +1487,7 @@ class PaymentRequestController extends Controller
     {
         return PaymentRequestItem::query()
             ->join('payment_requests', 'payment_requests.id', '=', 'payment_request_items.payment_request_id')
-            ->where('payment_requests.status', '!=', PaymentRequest::STATUS_REJECTED)
+            ->whereNotIn('payment_requests.status', [PaymentRequest::STATUS_REJECTED, PaymentRequest::STATUS_CANCELLED])
             ->get(['payment_request_items.po_no', 'payment_request_items.pi_number'])
             ->map(fn (PaymentRequestItem $item) => $this->praKey($item->po_no, $item->pi_number))
             ->filter()

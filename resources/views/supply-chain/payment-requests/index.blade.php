@@ -87,6 +87,7 @@
         'pending_approval' => 'bg-warning-subtle text-warning-emphasis border border-warning-subtle',
         'approved' => 'bg-success-subtle text-success-emphasis border border-success-subtle',
         'rejected' => 'bg-danger-subtle text-danger-emphasis border border-danger-subtle',
+        'cancelled' => 'bg-dark-subtle text-dark-emphasis border border-dark-subtle',
     ];
     $statusLabel = fn ($status) => \Illuminate\Support\Str::headline((string) $status);
 @endphp

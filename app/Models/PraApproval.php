@@ -13,6 +13,11 @@ class PraApproval extends Model
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
 
+    // Written when lines were taken off a PRA that was already being approved: it
+    // closes the current cycle (like a rejection) and the PRA starts again at
+    // step 2 in a fresh cycle. The earlier approvals stay in the audit trail.
+    public const STATUS_RESTARTED = 'restarted';
+
     // Sequential approval stages. Legacy rows (created before this feature) and
     // any plain approver row default to STAGE_APPROVE.
     public const STAGE_CHECK = 'check';

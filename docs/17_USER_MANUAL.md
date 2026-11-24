@@ -818,6 +818,22 @@ This is only a view for printing. Nothing is created, changed or closed, the PRA
 
 On the PRA table (screen, PDF and Excel) every **item** of a style is **one line**. Lines of the same style, vendor, item name, PO and PI that differ only by colour or size (for example five *Size Label* lines) are combined: the item shows once, and **PI Amt, Budget and Saving are the totals** of those lines. **Style** is shown once, as a merged cell, for all the items under it. Different items, POs, PIs, styles or vendors stay on separate lines. The Grand Total is the same as before.
 
+### 3.x2d Taking lines off a PRA (for example one vendor's) or cancelling it
+
+If an order is cancelled after its PRA was created (say all of one vendor's items), take those lines off the PRA so they can be raised again.
+
+1. Open the PRA (**View** in the Payment Request List). Any Supply Chain user who has access to the PRA's buyer sees **Manage Lines** and **Cancel PRA** at the top.
+2. Press **Manage Lines**. The lines are grouped by vendor. Tick a vendor to select all of its lines, or tick single lines. The window shows how many lines and how much will be removed, and the new total.
+3. Type the **Reason** (required) and press **Remove selected lines**.
+
+What happens:
+- The lines come off the PRA, its total, vendors and budget figures update, and they go back to the **Pending PI Payment** list, where you can create a new PRA for them (single or multi vendor) as usual.
+- If the PRA had **already been checked or approved** at some step, it **starts again at step 2** (create, check, approve all over again) because the document changed. The earlier approvals stay in its history.
+- If you remove **every** line, or press **Cancel PRA**, the PRA is closed as **Cancelled** and keeps its number and history.
+- A **Lines Removed** box on the PRA lists who removed what, when and why.
+
+Not possible: a PRA that is already **Completed** (payment recorded), a line whose Workspace row already has a **Pmt Doc No** (paid), and the older PRAs that are not on the departmental flow.
+
 ### 3.x3 Sales Contract on the PRA
 
 The PRA shows **Sales Contract** under **Season**, on the screen, the PDF and the Excel. It is read from the Workspace **Sales Contract** column when there is one, otherwise from **Initial Contract Number** or **Contract Number**. If a PRA covers several contracts they are listed together. A PRA created before this change shows **-** until it is created again.

@@ -202,6 +202,63 @@ class PraWorkflow
     }
 
     /**
+     * Lines were taken off a PRA that is part-way through approval: close the
+     * current cycle and start again at step 2, so everyone signs the changed
+     * document. Earlier decisions stay in the audit trail.
+     *
+     * Only for a PRA that is waiting on a step. A rejected PRA needs nothing here
+     * (its creator resubmits it), and a finished one cannot be changed at all.
+     */
+    public function restartAfterChange(PaymentRequest $paymentRequest, User $user, string $note): PaymentRequest
+    {
+        $this->assertDepartmental($paymentRequest);
+
+        $stage = $this->currentStage($paymentRequest);
+
+        if ($stage === null) {
+            throw PraWorkflowException::notInProgress($paymentRequest);
+        }
+
+        DB::transaction(function () use ($paymentRequest, $user, $stage, $note) {
+            $this->recordDecision($paymentRequest, $user, $stage, PraApproval::STATUS_RESTARTED, $note);
+
+            $paymentRequest->update([
+                'current_sequence' => PraStageResolver::FIRST_SEQUENCE,
+                'status' => $this->statusFor(PraStageResolver::FIRST_SEQUENCE),
+                // The chain starts over, so the stamps of the old round must not
+                // survive and claim it was checked or approved.
+                'checked_by' => null,
+                'checked_at' => null,
+                'approved_by' => null,
+                'approved_at' => null,
+            ]);
+        });
+
+        return $paymentRequest->refresh();
+    }
+
+    /**
+     * Close a PRA whose lines have all been taken off. It leaves the chain
+     * (no current step) and keeps its history; whatever it held is free again.
+     */
+    public function cancel(PaymentRequest $paymentRequest): PaymentRequest
+    {
+        $this->assertDepartmental($paymentRequest);
+
+        if (in_array($paymentRequest->status, [PaymentRequest::STATUS_COMPLETED, PaymentRequest::STATUS_CANCELLED], true)) {
+            throw PraWorkflowException::notInProgress($paymentRequest);
+        }
+
+        $paymentRequest->update([
+            'status' => PaymentRequest::STATUS_CANCELLED,
+            'current_sequence' => null,
+            'total_pi_amount' => 0,
+        ]);
+
+        return $paymentRequest->refresh();
+    }
+
+    /**
      * Send a rejected PRA back around: a new cycle, starting again at step 2.
      *
      * The previous cycle's rows stay exactly where they are. activeCycle() reads
@@ -244,8 +301,10 @@ class PraWorkflow
 
         $highest = (int) $rows->max('cycle');
 
+        // A cycle is closed by a rejection, or by a restart (lines were taken off
+        // the PRA, which sends it back to step 2).
         $wasRejected = $rows->where('cycle', $highest)
-            ->contains(fn (PraApproval $row) => $row->isRejected());
+            ->contains(fn (PraApproval $row) => $row->isRejected() || $row->status === PraApproval::STATUS_RESTARTED);
 
         return $wasRejected ? $highest + 1 : $highest;
     }
