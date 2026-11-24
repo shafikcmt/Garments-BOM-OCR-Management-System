@@ -463,10 +463,10 @@
                 </table>
             </div>
 
-            @php $signCol = count($signatureBlocks) === 4 ? 'col-3' : 'col-4'; @endphp
-            <div class="row g-0 pra-sign-area">
+            {{-- As many boxes as Admin set up, equal width (a grid, not fixed columns). --}}
+            <div class="pra-sign-area" style="display:grid;grid-template-columns:repeat({{ max(1, count($signatureBlocks)) }}, minmax(0, 1fr));">
                 @foreach($signatureBlocks as $i => $sign)
-                    <div class="{{ $signCol }} {{ $i === 0 ? 'pe-4' : ($loop->last ? 'ps-4 pra-sign-sep' : 'px-4 pra-sign-sep') }}">
+                    <div class="{{ $i === 0 ? 'pe-3' : ($loop->last ? 'ps-3 pra-sign-sep' : 'px-3 pra-sign-sep') }}">
                         <div class="pra-sign-title">{{ $sign['title'] }}</div>
                         @if($sign['src'])
                             <img src="{{ $sign['src'] }}" alt="{{ $sign['title'] }} signature" class="pra-sign-img">
@@ -553,10 +553,14 @@
                                 @if($createOnDepartmentalFlow ?? false)
                                     <div class="alert alert-info small mb-3">
                                         <div class="fw-semibold mb-1">Reviewers are assigned automatically</div>
-                                        This PRA follows the departmental approval chain:
-                                        Merchant Team &rarr; Merchant Head &rarr; Accounts Team &rarr;
-                                        Accounts Head &rarr; Commercial Head. Each step is routed to the
-                                        right department for you.
+                                        @php
+                                            $chainResolver = app(\App\Services\PraStageResolver::class);
+                                            $chainLabels = collect($chainResolver->sequences())->map(fn ($seq) => $chainResolver->definitionFor($seq)['label'])->all();
+                                            $firstStepLabel = $chainLabels[0] ?? 'the first step';
+                                        @endphp
+                                        This PRA follows the approval chain:
+                                        {{ implode(' → ', $chainLabels) }}.
+                                        Each step is routed to the right people for you.
                                     </div>
 
                                     {{-- THE OPTIONAL PRIMARY ASSIGNEE for the first step.
@@ -570,18 +574,18 @@
                                          first and tells them personally. --}}
                                     @php $assignees = $stepTwoAssignees ?? null; @endphp
                                     <label for="assigneeStep2" class="form-label fw-semibold mb-1">
-                                        Assign Merchant Team Check to
+                                        Assign {{ $firstStepLabel ?? 'the first step' }} to
                                         <span class="text-muted small fw-normal">(optional)</span>
                                     </label>
                                     @if($assignees && $assignees->isActionable())
                                         <select name="assignee_step2" id="assigneeStep2" class="form-select js-searchable">
-                                            <option value="">— Automatic (any eligible Merchant Team member) —</option>
+                                            <option value="">— Automatic (anyone eligible for this step) —</option>
                                             @foreach($assignees->users as $person)
                                                 <option value="{{ $person->id }}" {{ (string) old('assignee_step2') === (string) $person->id ? 'selected' : '' }}>{{ $person->name }}</option>
                                             @endforeach
                                         </select>
                                         <div class="form-text">
-                                            The whole Merchant team can still see and act on this PRA. The person you name is
+                                            Everyone eligible for this step can still see and act on this PRA. The person you name is
                                             shown as the primary assignee and notified directly.
                                         </div>
                                     @elseif($assignees)
@@ -645,12 +649,17 @@
                  separate card, chosen by flow. --}}
             @if($paymentRequest->isDepartmentalFlow())
                 @php
-                    $steps = [
-                        2 => 'Merchant Team Check', 3 => 'Merchant Head Approval',
-                        4 => 'Accounts Team Check', 5 => 'Accounts Head Approval',
-                        6 => 'Commercial Head Completion',
-                    ];
+                    // The ACTIVE chain, plus any step switched off since that this PRA
+                    // already has a decision at (so its history still shows).
+                    $stepResolver = app(\App\Services\PraStageResolver::class);
                     $decisionBySeq = $departmentalDecisions->keyBy('sequence');
+                    $steps = collect($stepResolver->sequences())
+                        ->merge($decisionBySeq->keys())
+                        ->unique()
+                        ->filter(fn ($seq) => isset($stepResolver->steps()[$seq]))
+                        ->sortBy(fn ($seq) => $stepResolver->steps()[$seq]['position'])
+                        ->mapWithKeys(fn ($seq) => [$seq => $stepResolver->steps()[$seq]['label']])
+                        ->all();
                     $isCreator = auth()->id() === $paymentRequest->created_by;
                     // Who each step is pointed at right now — the live assignment
                     // for steps still ahead, the snapshot for steps already taken.
@@ -803,53 +812,122 @@
     @endphp
     <div class="modal fade" id="manageLinesModal" tabindex="-1" aria-labelledby="manageLinesTitle" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content" style="border-radius:var(--gx-radius);">
-                <form method="POST" action="{{ route('supply_chain.payment_requests.remove_lines', $paymentRequest) }}" id="manageLinesForm">
+            <div class="modal-content ml-modal">
+                <form method="POST" action="{{ route('supply_chain.payment_requests.remove_lines', $paymentRequest) }}" id="manageLinesForm" class="d-flex flex-column" style="min-height:0;overflow:hidden;">
                     @csrf
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="manageLinesTitle"><i class="bi bi-scissors me-1" aria-hidden="true"></i> Remove lines from {{ $paymentRequest->request_no }}</h5>
+                    <div class="modal-header ml-head">
+                        <div>
+                            <h5 class="modal-title mb-0" id="manageLinesTitle"><i class="bi bi-scissors me-1" aria-hidden="true"></i> Remove lines</h5>
+                            <div class="small text-muted">{{ $paymentRequest->request_no }} &middot; {{ $paymentRequest->items->count() }} line(s) &middot; {{ $vendorGroups->count() }} vendor(s) &middot; $ {{ number_format((float) $paymentRequest->total_pi_amount, 2) }}</div>
+                        </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body">
-                        <p class="small text-muted mb-2">Tick a vendor to take all of its lines off this PRA, or tick single lines. The lines go back to the <strong>Pending PI Payment</strong> list and can be raised in a new PRA.</p>
+
+                    <div class="modal-body ml-body">
+                        <div class="ml-note">
+                            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                            Tick a vendor to take all of its lines off this PRA, or open it and tick single lines. Removed lines go back to the
+                            <strong>Pending PI Payment</strong> list and can be raised in a new PRA.
+                        </div>
                         @if($willRestart)
-                            <div class="alert alert-warning small border-0">This PRA has already been checked or approved at an earlier step. Removing lines changes the document, so it <strong>starts again at step 2</strong> and everyone approves it again.</div>
+                            <div class="ml-warn">
+                                <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                                This PRA has already been checked or approved. Removing lines changes the document, so it
+                                <strong>starts again at step 2</strong> and everyone approves it again.
+                            </div>
                         @endif
+
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="small fw-semibold text-muted text-uppercase" style="letter-spacing:.06em;">Vendors</div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" id="mlSelectAll">Select all</button>
+                                <span class="text-muted">&middot;</span>
+                                <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" id="mlClear">Clear</button>
+                            </div>
+                        </div>
 
                         @foreach($vendorGroups as $vendorName => $vendorItems)
                             @php $vendorKey = md5((string) $vendorName); @endphp
-                            <div class="border rounded-3 mb-2 overflow-hidden">
-                                <label class="d-flex align-items-center gap-2 bg-light px-3 py-2 mb-0 fw-semibold" style="cursor:pointer;">
-                                    <input type="checkbox" class="form-check-input mt-0 js-vendor-all" data-vendor="{{ $vendorKey }}">
-                                    <span>{{ $vendorName }}</span>
-                                    <span class="ms-auto small text-muted fw-normal">{{ $vendorItems->count() }} line(s) &middot; $ {{ number_format((float) $vendorItems->sum('pi_amount'), 2) }}</span>
-                                </label>
-                                @foreach($vendorItems as $item)
-                                    <label class="d-flex align-items-center gap-2 px-3 py-2 mb-0 border-top small" style="cursor:pointer;">
-                                        <input type="checkbox" class="form-check-input mt-0 js-line" name="item_ids[]" value="{{ $item->id }}" data-vendor="{{ $vendorKey }}" data-amount="{{ (float) $item->pi_amount }}">
-                                        <span class="flex-grow-1">
-                                            {{ $item->style_name ?: '-' }} &middot; {{ $item->material_description ?: ($item->material_type ?: '-') }}
-                                            <span class="text-muted">&middot; {{ $item->po_no ?: '-' }} / {{ $item->pi_number ?: '-' }}</span>
-                                        </span>
-                                        <span class="fw-semibold">$ {{ number_format((float) $item->pi_amount, 2) }}</span>
+                            <div class="ml-vendor" data-vendor="{{ $vendorKey }}">
+                                <div class="ml-vendor-head">
+                                    <label class="ml-check mb-0">
+                                        <input type="checkbox" class="form-check-input js-vendor-all" data-vendor="{{ $vendorKey }}" aria-label="Select all lines of {{ $vendorName }}">
+                                        <span class="ml-vendor-name">{{ $vendorName }}</span>
                                     </label>
-                                @endforeach
+                                    <span class="ml-vendor-meta">
+                                        <span class="ml-count" data-count-for="{{ $vendorKey }}">0 / {{ $vendorItems->count() }}</span>
+                                        <span class="ml-amount">$ {{ number_format((float) $vendorItems->sum('pi_amount'), 2) }}</span>
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-light ml-toggle" data-bs-toggle="collapse" data-bs-target="#mlLines{{ $loop->index }}" aria-expanded="false" aria-controls="mlLines{{ $loop->index }}">
+                                        <span class="ml-toggle-text">Lines</span> <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                <div class="collapse" id="mlLines{{ $loop->index }}">
+                                    <div class="ml-lines">
+                                        @foreach($vendorItems as $item)
+                                            <label class="ml-line">
+                                                <input type="checkbox" class="form-check-input js-line" name="item_ids[]" value="{{ $item->id }}" data-vendor="{{ $vendorKey }}" data-amount="{{ (float) $item->pi_amount }}">
+                                                <span class="ml-line-text">
+                                                    <span class="ml-line-title">{{ $item->material_description ?: ($item->material_type ?: '-') }}</span>
+                                                    <span class="ml-line-sub">{{ $item->style_name ?: '-' }} &middot; {{ $item->po_no ?: '-' }} / {{ $item->pi_number ?: '-' }}</span>
+                                                </span>
+                                                <span class="ml-line-amount">$ {{ number_format((float) $item->pi_amount, 2) }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
                             </div>
                         @endforeach
-
-                        <label for="manageLinesReason" class="form-label fw-semibold mt-3 mb-1">Reason <span class="text-danger">*</span></label>
-                        <textarea name="reason" id="manageLinesReason" rows="2" class="form-control" maxlength="1000" required placeholder="Why are these lines being removed?"></textarea>
-
-                        <div class="small mt-3" id="manageLinesSummary">Nothing ticked.</div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger" id="manageLinesSubmit" disabled><i class="bi bi-scissors me-1" aria-hidden="true"></i>Remove selected lines</button>
+
+                    {{-- The reason and the action stay in view while the list scrolls. --}}
+                    <div class="modal-footer ml-foot">
+                        <div class="w-100">
+                            <label for="manageLinesReason" class="form-label small fw-semibold mb-1">Reason <span class="text-danger">*</span></label>
+                            <textarea name="reason" id="manageLinesReason" rows="2" class="form-control form-control-sm" maxlength="1000" required placeholder="Why are these lines being removed? (for example: order cancelled by vendor)"></textarea>
+                        </div>
+                        <div class="w-100 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div class="ml-summary" id="manageLinesSummary">Nothing ticked.</div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-danger" id="manageLinesSubmit" disabled><i class="bi bi-scissors me-1" aria-hidden="true"></i>Remove selected lines</button>
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+    <style>
+        .ml-modal { border-radius: var(--gx-radius); overflow: hidden; }
+        .ml-head { background: #f7f9fd; }
+        .ml-body { background: #fbfcff; }
+        .ml-note { font-size: 12.5px; color: #4b5778; background: #eef3ff; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+        .ml-warn { font-size: 12.5px; color: #7a4b00; background: #fff3cd; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+        .ml-vendor { border: 1px solid #e3e8f4; border-radius: 14px; background: #fff; margin-bottom: 8px; overflow: hidden; }
+        .ml-vendor.is-picked { border-color: #f1a9a9; box-shadow: 0 0 0 2px #fde8e8; }
+        .ml-vendor-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+        .ml-check { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; cursor: pointer; }
+        .ml-vendor-name { font-weight: 700; color: #0f1b4d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ml-vendor-meta { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; font-size: 12px; }
+        .ml-count { background: #f1f3f8; color: #4b5778; border-radius: 999px; padding: 2px 9px; font-weight: 600; }
+        .ml-vendor.is-picked .ml-count { background: #fde8e8; color: #b42318; }
+        .ml-amount { font-weight: 700; color: #0f1b4d; min-width: 78px; text-align: right; }
+        .ml-toggle { font-size: 12px; padding: 2px 10px; }
+        .ml-toggle i { transition: transform .15s ease; }
+        .ml-toggle[aria-expanded="true"] i { transform: rotate(180deg); }
+        .ml-lines { border-top: 1px solid #eef1f8; max-height: 240px; overflow-y: auto; background: #fbfcff; }
+        .ml-line { display: flex; align-items: center; gap: 10px; padding: 8px 14px; margin: 0; cursor: pointer; border-bottom: 1px solid #f0f2f8; }
+        .ml-line:last-child { border-bottom: 0; }
+        .ml-line:hover { background: #f4f7ff; }
+        .ml-line-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+        .ml-line-title { font-size: 13px; color: #1f2a4d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ml-line-sub { font-size: 11.5px; color: #6b7691; }
+        .ml-line-amount { font-size: 13px; font-weight: 700; color: #0f1b4d; white-space: nowrap; }
+        .ml-foot { flex-direction: column; align-items: stretch; gap: 10px; background: #fff; border-top: 1px solid #e3e8f4; }
+        .ml-summary { font-size: 12.5px; color: #4b5778; font-weight: 600; }
+        .ml-summary.is-active { color: #b42318; }
+    </style>
 
     <div class="modal fade" id="cancelPraModal" tabindex="-1" aria-labelledby="cancelPraTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -948,8 +1026,8 @@
 @section('scripts')
 @if($canChangeLines ?? false)
 <script>
-    // Manage Lines: ticking a vendor ticks its lines; the summary shows what would be
-    // removed and the new total.
+    // Manage Lines: ticking a vendor ticks its lines; each vendor shows "picked / total";
+    // the footer summary says what would be removed and the new total.
     document.addEventListener('DOMContentLoaded', function () {
         const form = document.getElementById('manageLinesForm');
         if (!form) return;
@@ -967,15 +1045,23 @@
 
             vendors.forEach(function (box) {
                 const mine = lines.filter(function (c) { return c.dataset.vendor === box.dataset.vendor; });
-                box.checked = mine.length > 0 && mine.every(function (c) { return c.checked; });
+                const mineOn = mine.filter(function (c) { return c.checked; }).length;
+                box.checked = mine.length > 0 && mineOn === mine.length;
+                box.indeterminate = mineOn > 0 && mineOn < mine.length;
+
+                const counter = form.querySelector('[data-count-for="' + box.dataset.vendor + '"]');
+                if (counter) counter.textContent = mineOn + ' / ' + mine.length;
+                const card = form.querySelector('.ml-vendor[data-vendor="' + box.dataset.vendor + '"]');
+                if (card) card.classList.toggle('is-picked', mineOn > 0);
             });
 
             submit.disabled = picked.length === 0;
+            summary.classList.toggle('is-active', picked.length > 0);
             summary.textContent = picked.length === 0
                 ? 'Nothing ticked.'
                 : (picked.length === lines.length
                     ? 'All ' + picked.length + ' lines ticked: the PRA will be cancelled.'
-                    : picked.length + ' line(s) (' + money(removed) + ') will be removed. New total ' + money(total - removed) + '.');
+                    : picked.length + ' line(s) · ' + money(removed) + ' removed · new total ' + money(total - removed));
         };
 
         vendors.forEach(function (box) {
@@ -986,6 +1072,8 @@
             });
         });
         lines.forEach(function (c) { c.addEventListener('change', refresh); });
+        document.getElementById('mlSelectAll').addEventListener('click', function () { lines.forEach(function (c) { c.checked = true; }); refresh(); });
+        document.getElementById('mlClear').addEventListener('click', function () { lines.forEach(function (c) { c.checked = false; }); refresh(); });
         refresh();
     });
 </script>

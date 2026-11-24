@@ -867,6 +867,18 @@ If you approve payment requests, the **PRA Approvals** item in the left menu (un
 
 **Vendor defaults.** When you choose or type a **Vendor** on a Workspace row, its **Delivery Term**, **Payment Term** and **Ship Mode** are filled in from the vendor's record (Incoterm, Default Payment Terms and Ship Mode on the vendor form). Only cells that are still empty are filled, so nothing you typed is overwritten. Press **Save Changes** as usual.
 
+### 3.x4b Admin: the steps and signature boxes of a PRA (PRA Approval Steps)
+
+The steps a PRA goes through, and the signature boxes printed on it, are set by Admin in **Admin > Settings > PRA Approval Steps**. Nothing is fixed in the program: you can have, for example, seven steps and seven signature boxes.
+
+- Each step is one card: its name, who does it (a department's **Team** or **Head**, or **Only the people you choose**), the kind (Check, Approve or Payment / completion), whether the person needs access to the PRA's buyer, and its **signature box title** (or "No signature box").
+- **Add step** adds a step at the end. **Up** and **Down** change the order. **Edit** changes a step. **Switch off** takes a step out of the chain (it is never deleted, so old PRAs still show it); a step cannot be switched off while a PRA is waiting on it.
+- A step with a **Signature box title** prints a signature box with that title, for the person who completes the step, in the order of the steps. The first box, **Prepared By** (the person who created the PRA), is always there; its title is on PI / PRA Settings. Up to eight boxes in all.
+- One step can fill the printed **OCR Checked** box and one can print the **Paid / Completed by** line.
+- To say **exactly who** acts at a step, for every buyer or one buyer, press **Who approves each step** (PRA Approval Routing). People chosen there do not need the department role or buyer access.
+
+Changes apply to PRAs from now on, including ones already waiting. A PRA that is already at a step carries on from that step in the new order.
+
 ### 3.x5 Admin: who approves each PRA step (PRA Approval Routing)
 
 A PRA moves through five steps: 2 Merchant Team Check, 3 Merchant Head Approval, 4 Accounts Team Check, 5 Accounts Head Approval and 6 Commercial Head Completion. By default each step goes to the right department **automatically** (Merchandising only to people who have access to the PRA's buyer). If nobody qualifies, the PRA shows *"This PRA cannot proceed..."*.

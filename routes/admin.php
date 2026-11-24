@@ -94,6 +94,13 @@ Route::prefix('admin')
         Route::get('/alert-settings', [AlertSettingController::class, 'edit'])->name('alert-settings.edit');
         Route::put('/alert-settings', [AlertSettingController::class, 'update'])->name('alert-settings.update');
 
+        // The steps and signature boxes of a departmental PRA (how many, order, who for, box titles).
+        Route::get('/pra-steps', [\App\Http\Controllers\Admin\PraStepController::class, 'index'])->name('pra-steps.index');
+        Route::post('/pra-steps', [\App\Http\Controllers\Admin\PraStepController::class, 'store'])->name('pra-steps.store');
+        Route::put('/pra-steps/{praStep}', [\App\Http\Controllers\Admin\PraStepController::class, 'update'])->name('pra-steps.update');
+        Route::post('/pra-steps/{praStep}/move', [\App\Http\Controllers\Admin\PraStepController::class, 'move'])->name('pra-steps.move');
+        Route::post('/pra-steps/{praStep}/toggle', [\App\Http\Controllers\Admin\PraStepController::class, 'toggle'])->name('pra-steps.toggle');
+
         // Who approves each step of a departmental PRA (per step, per buyer).
         Route::get('/pra-routing', [\App\Http\Controllers\Admin\PraRoutingController::class, 'index'])->name('pra-routing.index');
         Route::post('/pra-routing/{sequence}', [\App\Http\Controllers\Admin\PraRoutingController::class, 'saveStep'])->whereNumber('sequence')->name('pra-routing.save');

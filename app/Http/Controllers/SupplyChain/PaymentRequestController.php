@@ -71,7 +71,8 @@ class PaymentRequestController extends Controller
             ? []
             : ExcelFile::query()->whereIn('id', $fileIds->all())->whereNotNull('buyer_id')->pluck('buyer_id')->all();
 
-        return $this->resolver->resolveForBuyers(PraStageResolver::SEQ_MERCHANT_CHECK, $buyerIds);
+        // The first step of the chain, whatever Admin has set it to.
+        return $this->resolver->resolveForBuyers($this->resolver->firstSequence(), $buyerIds);
     }
 
     /*
@@ -442,7 +443,7 @@ class PaymentRequestController extends Controller
             $assigneeStepTwo = (int) $validated['assignee_step2'];
 
             if (! $stepTwoAssignees->includes($assigneeStepTwo)) {
-                return back()->with('warning', 'The person selected for the Merchant Team Check step is not eligible to act on this PRA. Choose someone from the list, or leave it automatic.');
+                return back()->with('warning', 'The person selected for the first approval step is not eligible to act on this PRA. Choose someone from the list, or leave it automatic.');
             }
         }
 
@@ -527,8 +528,8 @@ class PaymentRequestController extends Controller
             if (PaymentRequestSettings::departmentalFlowEnabled()) {
                 $paymentRequest->update([
                     'flow_version' => PaymentRequest::FLOW_DEPARTMENTAL,
-                    'current_sequence' => PraStageResolver::FIRST_SEQUENCE,
-                    'status' => PaymentRequest::STATUS_PENDING_CHECK,
+                    'current_sequence' => $this->resolver->firstSequence(),
+                    'status' => $this->workflow->statusFor($this->resolver->firstSequence()),
                 ]);
 
                 return $paymentRequest->fresh(['items', 'createdBy', 'approvals']);
@@ -573,7 +574,7 @@ class PaymentRequestController extends Controller
             // braces with the pre-check above — and writes nothing otherwise.
             if ($assigneeStepTwo !== null) {
                 $paymentRequest = $this->workflow->assign(
-                    $paymentRequest, [PraStageResolver::SEQ_MERCHANT_CHECK => $assigneeStepTwo], auth()->user()
+                    $paymentRequest, [$this->resolver->firstSequence() => $assigneeStepTwo], auth()->user()
                 );
             }
 
@@ -586,7 +587,7 @@ class PaymentRequestController extends Controller
             return redirect()
                 ->route('supply_chain.payment_requests.show', $paymentRequest)
                 ->with('success', 'PRA ' . $paymentRequest->request_no
-                    . ' created and sent to the Merchant team for checking'
+                    . ' created and sent to ' . $this->resolver->definitionFor($this->resolver->firstSequence())['label']
                     . ($stage?->assignee ? ', assigned to ' . $stage->assignee->name : '') . '.');
         }
 
@@ -1048,7 +1049,7 @@ class PaymentRequestController extends Controller
             return redirect()
                 ->route('supply_chain.payment_requests.my_status')
                 ->with('success', 'PRA ' . $paymentRequest->request_no
-                    . ' resubmitted and sent to the Merchant team for checking.');
+                    . ' resubmitted and sent to ' . $this->resolver->definitionFor($this->resolver->firstSequence())['label'] . '.');
         }
 
         $validated = $request->validate([
@@ -2558,12 +2559,24 @@ class PaymentRequestController extends Controller
         $rowNo = $grandRow + $spacerRows + 1;
 
         // Prepared / Checked / Approved By for this PRA (dynamic signatures with
-        // the static admin ones as the fallback). FOUR boxes on a departmental
-        // PRA, three on a legacy one.
+        // the static admin ones as the fallback). As many boxes as Admin set up.
         $signatureBlocks = \App\Support\PaymentRequestSettings::signatureBlocksFor($paymentRequest, false);
-        $signatureColumns = count($signatureBlocks) === 4
-            ? [['A', 'C'], ['D', 'F'], ['G', 'I'], ['J', 'M']]
-            : [['A', 'C'], ['E', 'G'], ['I', 'M']];
+        // ANY NUMBER OF BOXES (Admin sets them): the 13 table columns are shared out
+        // evenly, the last boxes taking the spare columns.
+        $boxCount = max(1, count($signatureBlocks));
+        $baseSpan = intdiv(13, $boxCount);
+        $spare = 13 % $boxCount;
+        $signatureColumns = [];
+        $nextColumn = 1;
+
+        for ($box = 0; $box < $boxCount; $box++) {
+            $span = $baseSpan + ($box >= $boxCount - $spare ? 1 : 0);
+            $signatureColumns[] = [
+                \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($nextColumn),
+                \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($nextColumn + $span - 1),
+            ];
+            $nextColumn += $span;
+        }
 
         // Each box is three rows: caption, a tall signing space that ends in the
         // signature line (the signature image sits in it), and the

@@ -240,7 +240,7 @@
     $signGap = max(16, 340 - (190 + 15 * $approvalRows->count()));
 @endphp
 <div style="height: {{ $signGap }}pt;"></div>
-<table class="sign {{ count($signatureBlocks) === 4 ? 'cols-4' : '' }}">
+<table class="sign">
     <tr>
         @foreach($signatureBlocks as $i => $sign)
             {{-- $loop->last, not a hardcoded index 2: the block count is 3 on a
@@ -248,7 +248,7 @@
                  block: caption, signing space (the signature image, when there is
                  one), the line and "Signature & Date". No typed name, date,
                  designation or "Pending approval". --}}
-            <td style="{{ $i === 0 ? 'padding-left:0;' : ($loop->last ? 'padding-right:0;' : '') }}">
+            <td style="width: {{ round(100 / max(1, count($signatureBlocks)), 2) }}%; padding: 0 {{ count($signatureBlocks) > 5 ? 5 : (count($signatureBlocks) > 3 ? 12 : 22) }}px;{{ $i === 0 ? ' padding-left:0;' : ($loop->last ? ' padding-right:0;' : '') }}">
                 <div class="sign-title">{{ $sign['title'] }}</div>
                 <div class="sign-box">
                     @if($sign['src'])<img src="{{ $sign['src'] }}" alt="signature" class="sign-img">@endif

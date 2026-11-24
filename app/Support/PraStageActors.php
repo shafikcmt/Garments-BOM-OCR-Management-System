@@ -150,6 +150,12 @@ final class PraStageActors
             return null;
         }
 
+        // A step with no department: nobody can act until Admin names the people.
+        if ($this->department === '') {
+            return 'This PRA cannot proceed — nobody is assigned to the "' . $this->label
+                . '" step. Ask a Super Admin to assign approvers (Settings > PRA Approval Steps).';
+        }
+
         $tier = $this->actorKind === PraApproval::ACTOR_HEAD ? 'Head' : 'Team member';
 
         if (! $this->postIsFilled) {
