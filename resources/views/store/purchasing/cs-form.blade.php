@@ -184,7 +184,7 @@
                                 <th rowspan="2" style="min-width:160px;">Specification / Brand &amp; Model</th>
                                 <th rowspan="2" style="min-width:150px;">Current supplier</th>
                                 @for($k = 0; $k < $max; $k++)
-                                    <th colspan="3" class="text-center" data-slot="{{ $k }}" data-head="{{ $k }}" @unless(in_array($k, $active, true)) hidden @endunless>Supplier {{ $k + 1 }}</th>
+                                    <th colspan="3" class="text-center" data-slot="{{ $k }}" data-head="{{ $k }}" @unless(in_array($k, $active, true)) hidden @endunless>{{ trim((string) ($suppliersByKey[(string) $k]['name'] ?? '')) ?: 'Supplier ' . ($k + 1) }}</th>
                                 @endfor
                                 <th rowspan="2" style="min-width:150px;">Remarks</th>
                             </tr>
@@ -402,6 +402,21 @@
     });
     form.addEventListener('change', function (e) { if (e.target.matches('[data-choose]')) recalc(); });
 
+    // The real supplier name once it is typed or picked; "Supplier N" until then.
+    function supplierLabel(k) {
+        var box = form.querySelector('#supplierSlots [data-slot="' + k + '"]');
+        var field = box && box.querySelector('[data-f="name"]');
+        var name = field ? field.value.trim() : '';
+        return name || ('Supplier ' + (k + 1));
+    }
+    function refreshHeads() {
+        form.querySelectorAll('th[data-head]').forEach(function (th) {
+            th.textContent = supplierLabel(parseInt(th.dataset.head, 10));
+        });
+        if (typeof progress === 'function') progress();
+    }
+    form.addEventListener('input', function (e) { if (e.target.matches('[data-f="name"]')) refreshHeads(); });
+
     function setSlot(k, on) {
         form.querySelectorAll('[data-slot="' + k + '"]').forEach(function (el) {
             el.hidden = !on;
@@ -412,6 +427,7 @@
             form.querySelectorAll('[data-price="' + k + '"]').forEach(function (p) { p.value = ''; });
             var rec = document.getElementById('rec' + k); if (rec) rec.checked = false;
         }
+        refreshHeads();
     }
 
     document.getElementById('addSupplier').addEventListener('click', function () {
@@ -431,6 +447,7 @@
             box.querySelector('[data-f="name"]').value = opt.dataset.name || '';
             box.querySelector('[data-f="phone"]').value = opt.dataset.phone || '';
             box.querySelector('[data-f="address"]').value = opt.dataset.address || '';
+            refreshHeads();
         });
     });
 
@@ -464,7 +481,9 @@
         var keys = activeKeys(), n = rows.length, parts = [];
         keys.forEach(function (k) {
             var c = rows.filter(function (r) { return priced(r, k); }).length;
-            parts.push('Supplier ' + (k + 1) + ': ' + c + '/' + n + ' priced');
+            // The name is typed by a person and this line is set as HTML, so escape it.
+            var label = supplierLabel(k).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; });
+            parts.push(label + ': ' + c + '/' + n + ' priced');
         });
         var chosen = rows.filter(function (r) { return r.querySelector('[data-choose]:checked'); }).length;
         parts.push('Chosen: ' + chosen + '/' + n);
