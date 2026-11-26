@@ -13,7 +13,15 @@ use App\Support\PraViewAccess;
  */
 class PraSheetController extends PaymentRequestController
 {
+    /** The PRA sheet inside the app (toolbar + the PDF), not a bare browser PDF tab. */
     public function sheet(PaymentRequest $paymentRequest)
+    {
+        $this->authorizePaymentRequest($paymentRequest);
+
+        return view('pra-departmental.sheet', ['paymentRequest' => $paymentRequest]);
+    }
+
+    public function pdf(PaymentRequest $paymentRequest)
     {
         return $this->downloadPdf($paymentRequest);
     }

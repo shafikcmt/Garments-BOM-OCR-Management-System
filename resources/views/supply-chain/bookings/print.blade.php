@@ -33,25 +33,36 @@
             position: sticky;
             top: 0;
             z-index: 10;
-            text-align: center;
-            padding: 10px;
-            background: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 10px 18px;
+            background: #fff;
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, .06);
+            font-family: Arial, Helvetica, sans-serif;
         }
+        .print-toolbar .tb-title { font-size: 13px; font-weight: 700; color: #0f172a; }
+        .print-toolbar .tb-title small { display: block; font-size: 11px; font-weight: 500; color: #64748b; }
+        .print-toolbar .tb-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .print-toolbar button,
         .print-toolbar a {
             display: inline-block;
-            margin: 0 4px;
-            border: 0;
-            border-radius: 999px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
             padding: 8px 14px;
             font-size: 12px;
             font-weight: 700;
-            color: #fff;
-            background: #006C9D;
+            color: #334155;
+            background: #fff;
             text-decoration: none;
             cursor: pointer;
         }
-        .print-toolbar a { background: #475569; }
+        .print-toolbar a:hover { background: #f1f5f9; }
+        .print-toolbar button.is-primary { background: #006C9D; border-color: #006C9D; color: #fff; }
+        .print-toolbar button.is-primary:hover { background: #005a84; }
         .sheet {
             width: 198mm;
             min-height: 285mm;
@@ -196,11 +207,21 @@
 </head>
 <body>
 @if(!($isPdf ?? false))
+    @php $viaPra = request()->routeIs('pra_departmental.*') ? request()->route('paymentRequest') : null; @endphp
     <div class="print-toolbar">
-        <button type="button" onclick="window.print()">Print / Save as PDF</button>
-        <a href="{{ route('supply_chain.bookings.download', $bookingPo) }}">Download PDF</a>
-        <a href="{{ route('supply_chain.bookings.download_excel', $bookingPo) }}">Download Excel</a>
-        <a href="{{ route('supply_chain.bookings.index') }}">Back to Booking List</a>
+        <div class="tb-title">PO {{ $bookingPo->po_no }}<small>{{ $viaPra ? 'Read-only copy for PRA ' . $viaPra->request_no : 'Booking format' }}</small></div>
+        <div class="tb-actions">
+            @if($viaPra)
+                {{-- An approver has no Booking List or Excel download: those are Supply Chain screens. --}}
+                <a href="{{ route('pra_departmental.show', $viaPra) }}">Back to PRA</a>
+                <a href="{{ route('pra_departmental.po_pdf', [$viaPra, $bookingPo]) }}">Download PDF</a>
+            @else
+                <a href="{{ route('supply_chain.bookings.index') }}">Back to Booking List</a>
+                <a href="{{ route('supply_chain.bookings.download_excel', $bookingPo) }}">Download Excel</a>
+                <a href="{{ route('supply_chain.bookings.download', $bookingPo) }}">Download PDF</a>
+            @endif
+            <button type="button" class="is-primary" onclick="window.print()">Print</button>
+        </div>
     </div>
 @endif
 
