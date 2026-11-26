@@ -25,6 +25,31 @@
                         <option value="individual" @selected(($filters['type'] ?? '') === 'individual')>Individual</option>
                     </select>
                 </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <label class="form-label" for="groupFilter">Group by</label>
+                    <select name="group" id="groupFilter" class="form-select">
+                        <option value="category" @selected($group === 'category')>Category</option>
+                        <option value="requisition" @selected($group === 'requisition')>Requisition</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3 col-xl-2">
+                    <label class="form-label" for="sectionFilter">Section</label>
+                    <select name="section" id="sectionFilter" class="form-select">
+                        <option value="">All sections</option>
+                        @foreach($sections as $section)
+                            <option value="{{ $section->id }}" @selected((string) ($filters['section'] ?? '') === (string) $section->id)>{{ $section->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-6 col-md-3 col-xl-3">
+                    <label class="form-label" for="requisitionFilter">Requisition</label>
+                    <select name="requisition" id="requisitionFilter" class="form-select">
+                        <option value="">All requisitions</option>
+                        @foreach($requisitions as $r)
+                            <option value="{{ $r->id }}" @selected((string) ($filters['requisition'] ?? '') === (string) $r->id)>{{ $r->requisition_no }}{{ $r->isIndividual() ? ' (Individual)' : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
                 <div class="col-6 col-md-3 col-xl-3">
                     <label class="form-label" for="categoryFilter">Category</label>
                     <select name="category" id="categoryFilter" class="form-select">
@@ -34,13 +59,13 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-12 col-md-6 col-xl-3">
+                <div class="col-12 col-md-6 col-xl-4">
                     <label class="form-label" for="search">Search</label>
                     <input type="text" name="q" id="search" value="{{ $filters['q'] ?? '' }}" class="form-control" placeholder="Item, specification or requisition no">
                 </div>
-                <div class="col-12 col-xl-3 gx-stock-filter-actions">
+                <div class="col-12 col-xl-auto gx-stock-filter-actions">
                     <button class="btn btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filter</button>
-                    @if(array_filter($filters))
+                    @if(array_filter(array_diff_key($filters, ['group' => 1])))
                         <a href="{{ route('store.purchasing.queue') }}" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear</a>
                     @endif
                 </div>
@@ -56,7 +81,7 @@
                 <form method="POST" action="{{ route('store.purchasing.cs.start') }}" id="queueForm">
                     @csrf
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-3 px-3 py-2 border rounded bg-body-tertiary position-sticky" style="top:0;z-index:5;">
-                        <span class="small"><strong>{{ number_format($total) }}</strong> item(s) in <strong>{{ $groups->count() }}</strong> categor{{ $groups->count() === 1 ? 'y' : 'ies' }} waiting.</span>
+                        <span class="small"><strong>{{ number_format($total) }}</strong> item(s) in @if($group === 'requisition')<strong>{{ $groups->count() }}</strong> requisition{{ $groups->count() === 1 ? '' : 's' }}@else<strong>{{ $groups->count() }}</strong> categor{{ $groups->count() === 1 ? 'y' : 'ies' }}@endif waiting.</span>
                         @if($canCreate)
                             <button type="button" class="btn btn-sm btn-outline-secondary" data-all="1"><i class="bi bi-check2-all me-1" aria-hidden="true"></i>Select all shown</button>
                             <button type="button" class="btn btn-sm btn-outline-secondary" data-all="0"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear selection</button>
@@ -70,8 +95,11 @@
                     </div>
                     @error('lines')<div class="alert alert-danger py-2 small">{{ $message }}</div>@enderror
 
-                    @foreach($groups as $category => $items)
+                    @foreach($groups as $groupKey => $items)
                         @php($gid = $loop->index)
+                        @php($first = $items->first())
+                        @php($groupReq = $group === 'requisition' ? $first->requisition : null)
+                        @php($category = $group === 'requisition' ? $groupReq->requisition_no : $groupKey)
                         <div class="table-responsive mb-4">
                             <table class="table align-middle gx-stock-table mb-0">
                                 <thead>
@@ -79,14 +107,27 @@
                                         <th colspan="7">
                                             <div class="d-flex flex-wrap align-items-center gap-2">
                                                 @if($canCreate)
-                                                    <input type="checkbox" class="form-check-input" data-group="{{ $gid }}" aria-label="Select every {{ $category }} item">
+                                                    <input type="checkbox" class="form-check-input" data-group="{{ $gid }}" aria-label="Select every item of {{ $category }}">
                                                 @endif
-                                                <i class="bi bi-tags text-primary" aria-hidden="true"></i>
-                                                <span class="fw-semibold">{{ $category }}</span>
+                                                @if($groupReq)
+                                                    <i class="bi bi-file-earmark-text text-primary" aria-hidden="true"></i>
+                                                    <a href="{{ route('store.stock.requisitions.show', $groupReq) }}" class="fw-semibold text-decoration-none">{{ $groupReq->requisition_no }}</a>
+                                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ $groupReq->isIndividual() ? 'Individual' : 'Final' }}</span>
+                                                    <span class="small text-muted">
+                                                        {{ $groupReq->indentSection?->name ?: ($groupReq->department_role ? ucfirst(str_replace('_', ' ', $groupReq->department_role)) : 'Store') }}
+                                                        @if($groupReq->isDepartmentLevel() && ($by = $groupReq->requestedByName()))
+                                                            · Requested by {{ $by }}
+                                                        @endif
+                                                        · {{ optional($groupReq->requisition_date)->format('d-M-Y') }}
+                                                    </span>
+                                                @else
+                                                    <i class="bi bi-tags text-primary" aria-hidden="true"></i>
+                                                    <span class="fw-semibold">{{ $category }}</span>
+                                                @endif
                                                 <span class="badge bg-primary-subtle text-primary">{{ $items->count() }} item(s)</span>
                                                 @if($canCreate)
                                                     <button type="button" class="btn btn-sm btn-outline-primary ms-auto" data-only="{{ $gid }}">
-                                                        <i class="bi bi-columns-gap me-1" aria-hidden="true"></i>Make CS for {{ $category }} only
+                                                        <i class="bi bi-columns-gap me-1" aria-hidden="true"></i>Make CS for {{ $groupReq ? 'this requisition' : $category }} only
                                                     </button>
                                                 @endif
                                             </div>
@@ -99,7 +140,7 @@
                                         <th style="min-width:70px;">UoM</th>
                                         <th class="text-end" style="min-width:110px;">Qty to buy</th>
                                         <th class="text-end" style="min-width:110px;">Last rate</th>
-                                        <th style="min-width:200px;">Requisition</th>
+                                        <th style="min-width:200px;">{{ $group === 'requisition' ? 'Category' : 'Requisition' }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -116,8 +157,12 @@
                                             <td>{{ $line->uom_snapshot ?: $line->stockItem?->uom }}</td>
                                             <td class="text-end">{{ rtrim(rtrim(number_format((float) $line->outstanding_qty, 4), '0'), '.') }}</td>
                                             <td class="text-end">{{ $line->last_purchase_rate_snapshot !== null ? rtrim(rtrim(number_format((float) $line->last_purchase_rate_snapshot, 2), '0'), '.') : '—' }}</td>
-                                            <td class="small">{{ $req->requisition_no }}
-                                                <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ $req->isIndividual() ? 'Individual' : 'Final' }}</span></td>
+                                            @if($group === 'requisition')
+                                                <td class="small">{{ $line->category_name }}</td>
+                                            @else
+                                                <td class="small">{{ $req->requisition_no }}
+                                                    <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ $req->isIndividual() ? 'Individual' : 'Final' }}</span></td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>

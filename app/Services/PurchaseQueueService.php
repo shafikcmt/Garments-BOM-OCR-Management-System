@@ -28,13 +28,13 @@ class PurchaseQueueService
     ];
 
     /**
-     * @param  array{requisition?: int|null, type?: string|null, q?: string|null, category?: string|null}  $filters
+     * @param  array{requisition?: int|null, section?: int|null, type?: string|null, q?: string|null, category?: string|null}  $filters
      * @return Collection<int, PurchaseRequisitionItem> each with ->outstanding_qty and ->requisition loaded
      */
     public function lines(array $filters = []): Collection
     {
         $items = PurchaseRequisitionItem::query()
-            ->with(['requisition:id,requisition_no,requisition_date,level,requisition_type,status,department_role,approved_at', 'stockItem:id,name,uom,sku,category', 'itemCategory'])
+            ->with(['requisition:id,requisition_no,requisition_date,level,requisition_type,status,department_role,approved_at,indent_section_id,created_by', 'requisition.indentSection:id,name', 'stockItem:id,name,uom,sku,category', 'itemCategory'])
             ->where('to_be_procured_qty', '>', 0)
             ->whereHas('requisition', fn ($q) => $this->approvedSheets($q, $filters))
             ->orderBy('purchase_requisition_id')
@@ -115,6 +115,10 @@ class PurchaseQueueService
 
         if (! empty($filters['requisition'])) {
             $query->where('id', (int) $filters['requisition']);
+        }
+
+        if (! empty($filters['section'])) {
+            $query->where('indent_section_id', (int) $filters['section']);
         }
 
         if (($filters['type'] ?? null) === 'individual') {
