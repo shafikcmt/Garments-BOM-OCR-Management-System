@@ -29,6 +29,7 @@ use App\Support\LocalTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
@@ -653,6 +654,70 @@ class PurchaseRequisitionController extends Controller
         });
 
         return back()->with('success', $count.' quantit'.($count === 1 ? 'y' : 'ies').' changed on '
+            .$requisition->requisition_no.'. Approve when ready.');
+    }
+
+    /**
+     * The Section / Department Head the sheet waits for adds items their staff
+     * forgot. Only new items: one already on the sheet is changed with Change
+     * Quantities. Stock, last purchase and rate are read for each new line as
+     * on any sheet; approving stays a separate click.
+     */
+    public function stageAddItems(Request $request, PurchaseRequisition $requisition)
+    {
+        $this->authorizeVisible($requisition);
+        $user = $request->user();
+
+        abort_unless($requisition->usesStageEngine(), 422, 'This requisition follows the earlier approval steps.');
+        abort_unless($this->workflow->canAddItems($requisition, $user), 403, 'Only the head this requisition waits for can add items to it.');
+
+        $data = $request->validate([
+            'new_items' => ['required', 'array', 'min:1', 'max:50'],
+            'new_items.*.stock_item_id' => ['required', 'integer', 'distinct', 'exists:stock_items,id'],
+            'new_items.*.qty_requested' => ['required', 'numeric', 'min:0.0001', 'max:9999999999'],
+            'new_items.*.rate_appx' => ['nullable', 'numeric', 'min:0'],
+            'new_items.*.remarks' => ['nullable', 'string', 'max:1000'],
+            'add_comment' => ['required', 'string', 'max:1000'],
+        ], [
+            'new_items.required' => 'Add at least one item.',
+            'new_items.*.stock_item_id.required' => 'Select the item on every line.',
+            'new_items.*.stock_item_id.distinct' => 'An item can be added only once.',
+            'new_items.*.qty_requested.required' => 'Enter a quantity on every line.',
+            'new_items.*.qty_requested.min' => 'A quantity must be more than 0.',
+            'add_comment.required' => 'Give a reason for adding the items.',
+        ]);
+
+        $count = 0;
+
+        DB::transaction(function () use ($requisition, $user, $data, &$count) {
+            $locked = $this->lockRequisition($requisition);
+            abort_unless($this->workflow->canAddItems($locked, $user), 422,
+                'This stage has already been acted on. Reload the page to see where the requisition is now.');
+
+            $onSheet = $locked->items()->pluck('stock_item_id')->filter()->map(fn ($id) => (int) $id)->all();
+            $clash = collect($data['new_items'])->pluck('stock_item_id')->map(fn ($id) => (int) $id)->intersect($onSheet);
+
+            if ($clash->isNotEmpty()) {
+                $names = StockItem::whereIn('id', $clash->all())->pluck('name')->implode(', ');
+
+                throw ValidationException::withMessages([
+                    'new_items' => $names.' is already on this requisition. Change its quantity under Change Quantities instead.',
+                ]);
+            }
+
+            $before = $locked->items()->pluck('id')->all();
+            $this->syncItems($locked, array_values($data['new_items']), Carbon::parse($locked->requisition_date), true);
+
+            $added = $locked->items()->whereNotIn('id', $before)->get();
+            $count = $added->count();
+
+            $this->requisitions->refreshStock($locked);
+            $this->workflow->recordItemsAdded($locked, $added->map(fn ($line) => [
+                'item' => $line->displayName(), 'change' => 'added', 'old_qty' => 0.0, 'new_qty' => (float) $line->qty_requested,
+            ])->all(), $data['add_comment']);
+        });
+
+        return back()->with('success', $count.' item'.($count === 1 ? '' : 's').' added to '
             .$requisition->requisition_no.'. Approve when ready.');
     }
 
@@ -1376,6 +1441,14 @@ class PurchaseRequisitionController extends Controller
             // person the sheet waits for, at their stage).
             'originalQty' => $this->workflow->originalQuantities($requisition),
             'canChangeQty' => $this->workflow->canAct($requisition, $user),
+            // The head the sheet waits for may also add items; the picker lists the Item Master.
+            'canAddItems' => $this->workflow->canAddItems($requisition, $user),
+            'addableItems' => $this->workflow->canAddItems($requisition, $user)
+                ? $this->requisitions->selectableItems()->map(fn ($it) => [
+                    'id' => $it->id,
+                    'label' => ($it->sku ? $it->sku.' — ' : '').$it->name.($it->brand ? ' ('.$it->brand.')' : '').($it->uom ? ' · '.$it->uom : ''),
+                ])->values()->all()
+                : [],
             // Whether this viewer holds the correction permission AND reads the
             // whole company's requisitions — the Store-correction half of
             // authorizeEditable(), asked the same way so the button and the
@@ -2149,7 +2222,7 @@ class PurchaseRequisitionController extends Controller
      *
      * @param  array<int, array<string, mixed>>  $lines
      */
-    private function syncItems(PurchaseRequisition $requisition, array $lines, Carbon $on): void
+    private function syncItems(PurchaseRequisition $requisition, array $lines, Carbon $on, bool $onlyAdd = false): void
     {
         // The form may carry a line per department; the DOCUMENT carries a line
         // per item, the way the company's requisition workbook has always been
@@ -2178,6 +2251,12 @@ class PurchaseRequisitionController extends Controller
         // the same item. Everything left over is inserted; saved lines nobody
         // claimed are deleted. Every figure is recalculated exactly as before.
         $existing = $requisition->exists ? $requisition->items()->get()->keyBy('id') : collect();
+        // Adding to a saved sheet (the head's Add Items): the saved lines are not
+        // touched and the new ones follow them.
+        $offset = $onlyAdd ? (int) $existing->max('sort_order') + 1 : 0;
+        if ($onlyAdd) {
+            $existing = collect();
+        }
         $itemKey = fn ($stockItemId, $customName) => $stockItemId
             ? 'id:'.(int) $stockItemId
             : 'custom:'.mb_strtolower(trim((string) $customName));
@@ -2210,7 +2289,7 @@ class PurchaseRequisitionController extends Controller
                 // filled, so a line always has exactly one name.
                 'custom_item_name' => $itemId ? null : ($line['custom_item_name'] ?? null),
                 'item_category_id' => $stockItem?->item_category_id,
-                'sort_order' => $index,
+                'sort_order' => $offset + $index,
                 'uom_snapshot' => $stockItem?->uom,
                 'specification' => $line['specification'] ?? $stockItem?->brand,
                 'type' => $line['type'] ?? null,
@@ -2243,7 +2322,7 @@ class PurchaseRequisitionController extends Controller
             }
         }
 
-        $unclaimed = $existing->keys()->reject(fn ($id) => isset($claimed[$id]))->all();
+        $unclaimed = $onlyAdd ? [] : $existing->keys()->reject(fn ($id) => isset($claimed[$id]))->all();
 
         if ($unclaimed !== []) {
             PurchaseRequisitionItem::whereIn('id', $unclaimed)->delete();

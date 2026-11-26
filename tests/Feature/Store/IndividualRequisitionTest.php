@@ -536,3 +536,46 @@ it('applies a removed signature box to sheets already on their way, keeping what
     indApprove($this->approvers['operation'], $sheet)->assertSessionHasNoErrors();
     expect($sheet->fresh()->status)->toBe(PurchaseRequisition::STATUS_APPROVED);
 });
+
+it('lets the head the sheet waits for add new items, and nobody else', function () {
+    [$head, $raiser] = indRaiser();
+    $sheet = indRaise($raiser, PurchaseRequisition::TYPE_INDIVIDUAL);
+    $pen = StockItem::create(['name' => 'Gel Pen', 'uom' => 'Piece', 'is_active' => true]);
+    $day = now()->startOfMonth()->toDateString();
+    \App\Models\StockPurchase::create(['stock_item_id' => $pen->id, 'purchase_date' => $day, 'rcv_date' => $day, 'qty' => 10, 'unit_price' => 20]);
+    $url = route('store.stock.requisitions.stage-add-items', $sheet);
+    $oil = StockItem::where('name', 'Machine Oil')->firstOrFail();
+
+    // The head sees the card; the raiser does not.
+    $this->actingAs($head)->get(route('store.stock.requisitions.show', $sheet))->assertOk()->assertSee('id="addItems"', false);
+    $this->actingAs($raiser)->get(route('store.stock.requisitions.show', $sheet))->assertOk()->assertDontSee('id="addItems"', false);
+    $this->actingAs($raiser)->post($url, ['new_items' => [['stock_item_id' => $pen->id, 'qty_requested' => 4]], 'add_comment' => 'x'])->assertForbidden();
+
+    // A reason is required, and an item already on the sheet is refused.
+    $this->actingAs($head)->post($url, ['new_items' => [['stock_item_id' => $pen->id, 'qty_requested' => 4]]])->assertSessionHasErrors('add_comment');
+    $this->actingAs($head)->post($url, ['new_items' => [['stock_item_id' => $oil->id, 'qty_requested' => 4]], 'add_comment' => 'x'])->assertSessionHasErrors('new_items');
+    expect($sheet->items()->count())->toBe(1);
+
+    $this->actingAs($head)->post($url, [
+        'new_items' => [['stock_item_id' => $pen->id, 'qty_requested' => 25, 'rate_appx' => 22, 'remarks' => 'forgotten']],
+        'add_comment' => 'Staff missed the pen',
+    ])->assertSessionHasNoErrors()->assertSessionHas('success');
+
+    $sheet->refresh();
+    $line = $sheet->items()->where('stock_item_id', $pen->id)->firstOrFail();
+    expect($sheet->items()->count())->toBe(2)
+        ->and((float) $line->qty_requested)->toBe(25.0)
+        ->and((float) $line->stock_in_hand_snapshot)->toBe(10.0)
+        ->and((float) $line->to_be_procured_qty)->toBe(15.0)
+        ->and((float) $line->amount)->toBe(330.0)
+        ->and($line->sort_order)->toBeGreaterThan($sheet->items()->where('stock_item_id', $oil->id)->value('sort_order'))
+        // Still at the head's step: adding items is not approving.
+        ->and($sheet->current_stage)->toBe(2)
+        ->and($sheet->actions()->where('action', 'items_added')->firstOrFail()->comment)->toBe('Staff missed the pen');
+
+    // Once the head has approved, they can no longer add; the Store never could.
+    indApprove($head, $sheet)->assertSessionHasNoErrors();
+    $this->actingAs($head)->post($url, ['new_items' => [['stock_item_id' => $pen->id, 'qty_requested' => 1]], 'add_comment' => 'x'])->assertForbidden();
+    $store = indUser('store', [], ['name' => 'Store Clerk']);
+    $this->actingAs($store)->post($url, ['new_items' => [['stock_item_id' => $pen->id, 'qty_requested' => 1]], 'add_comment' => 'x'])->assertForbidden();
+});
