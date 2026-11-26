@@ -85,10 +85,22 @@
                             </label>
                         </div>
                         <div class="form-text mb-3">
-                            On: Merchant Team &rarr; Merchant Head &rarr; Accounts Team &rarr; Accounts Head
-                            &rarr; Commercial Head, routed automatically.
+                            On: the steps set on
+                            <a href="{{ route('admin.pra-steps.index') }}">Admin &rsaquo; PRA Approval Steps</a>,
+                            routed automatically.
                             Off: the creator picks a checker and approvers when raising the request.
                         </div>
+
+                        {{-- Moved here from the PRA Approvers page: it governs the emails of BOTH
+                             approval processes, so it belongs with the general PRA settings. --}}
+                        <div class="form-check form-switch mb-1 pt-3 border-top">
+                            <input type="hidden" name="pra_approval_mail_enabled" value="0">
+                            <input class="form-check-input" type="checkbox" role="switch" value="1"
+                                   id="praMailEnabled" name="pra_approval_mail_enabled"
+                                   {{ old('pra_approval_mail_enabled', $mailEnabled) ? 'checked' : '' }}>
+                            <label class="form-check-label fw-semibold" for="praMailEnabled">Send approval emails</label>
+                        </div>
+                        <div class="form-text mb-3">Approval requests and results are also emailed. In-app notifications are always on.</div>
 
                         @if($activeApproverCount === 0)
                             <div class="alert alert-warning border-0 small mb-0">

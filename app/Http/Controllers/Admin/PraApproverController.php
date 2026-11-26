@@ -3,11 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AppSetting;
 use App\Models\PraApprover;
 use App\Models\PraApproval;
 use App\Models\User;
-use App\Support\PraApprovalSettings;
 use Illuminate\Http\Request;
 
 /**
@@ -33,7 +31,6 @@ class PraApproverController extends Controller
         return view('admin.pra-approvers.index', [
             'approvers' => $approvers,
             'availableUsers' => $availableUsers,
-            'mailEnabled' => PraApprovalSettings::mailEnabled(),
         ]);
     }
 
@@ -98,13 +95,6 @@ class PraApproverController extends Controller
         $praApprover->delete();
 
         return back()->with('success', 'Approver removed from the pool. Existing approval history is preserved.');
-    }
-
-    public function updateSettings(Request $request)
-    {
-        AppSetting::put(PraApprovalSettings::KEY_MAIL_ENABLED, $request->boolean('pra_approval_mail_enabled') ? '1' : '0');
-
-        return back()->with('success', 'Notification settings updated.');
     }
 
     public function history(Request $request)

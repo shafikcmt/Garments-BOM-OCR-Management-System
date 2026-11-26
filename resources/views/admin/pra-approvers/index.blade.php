@@ -64,22 +64,10 @@
                 </div>
             </div>
 
-            <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
-                <div class="card-body p-4">
-                    <h5 class="mb-1">Notification Settings</h5>
-                    <p class="text-muted small mb-3">Dashboard notifications are always on. Email can be turned off here.</p>
-                    <form method="POST" action="{{ route('admin.pra-approvers.settings') }}">
-                        @csrf
-                        @method('PUT')
-                        <div class="form-check form-switch">
-                            <input type="hidden" name="pra_approval_mail_enabled" value="0">
-                            <input class="form-check-input" type="checkbox" role="switch" id="praMailEnabled"
-                                   name="pra_approval_mail_enabled" value="1" {{ $mailEnabled ? 'checked' : '' }}
-                                   onchange="this.form.submit()">
-                            <label class="form-check-label fw-semibold" for="praMailEnabled">Send approval emails</label>
-                        </div>
-                    </form>
-                </div>
+            <div class="alert alert-info border-0 shadow-sm rounded-3 small mb-0">
+                This pool is for the <strong>old</strong> check-and-approve process only. New payment requests use the
+                steps on <a href="{{ route('admin.pra-steps.index') }}">PRA Approval Steps</a>. The email switch is now on
+                <a href="{{ route('admin.payment-settings.edit') }}">PI / PRA Settings</a>.
             </div>
         </div>
 

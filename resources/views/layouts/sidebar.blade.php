@@ -359,9 +359,25 @@
                             <span class="sidebar-submenu-rail"></span>
                             <a href="{{ route('admin.alert-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.alert-settings.*') ? 'is-active' : '' }}">Alert Settings</a>
                             <a href="{{ route('admin.payment-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.payment-settings.*') ? 'is-active' : '' }}">PI / PRA Settings</a>
-                            <a href="{{ route('admin.pra-approvers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-approvers.*') || request()->routeIs('admin.pra-approvals.*') ? 'is-active' : '' }}">PRA Approvers</a>
+                            @php
+                                // The approver pool belongs to the OLD check-and-approve process. It is
+                                // listed only while it can matter: somebody is in the pool, new PRAs
+                                // are set to use the old process, or an old-process PRA is still open.
+                                try {
+                                    $showPraPool = \App\Models\PraApprover::where('is_active', true)->exists()
+                                        || ! \App\Support\PaymentRequestSettings::departmentalFlowEnabled()
+                                        || \App\Models\PaymentRequest::where('flow_version', \App\Models\PaymentRequest::FLOW_LEGACY)
+                                            ->whereIn('status', ['pending_check', 'pending_approval', 'rejected'])->exists()
+                                        || request()->routeIs('admin.pra-approvers.*');
+                                } catch (\Throwable $e) {
+                                    $showPraPool = true;
+                                }
+                            @endphp
+                            @if($showPraPool)
+                                <a href="{{ route('admin.pra-approvers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-approvers.*') ? 'is-active' : '' }}">PRA Approvers</a>
+                            @endif
                             {{-- One entry for the chain: the steps and boxes, and (from a button on that page) who approves each step. --}}
-                            <a href="{{ route('admin.pra-steps.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-steps.*') || request()->routeIs('admin.pra-routing.*') ? 'is-active' : '' }}">PRA Approval Steps</a>
+                            <a href="{{ route('admin.pra-steps.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-steps.*') || request()->routeIs('admin.pra-routing.*') || request()->routeIs('admin.pra-approvals.*') ? 'is-active' : '' }}">PRA Approval Steps</a>
                             <a href="{{ route('admin.email-templates.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.email-templates.*') ? 'is-active' : '' }}">Email Templates</a>
                         </div>
                     </li>

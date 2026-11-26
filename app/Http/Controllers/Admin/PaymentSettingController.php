@@ -30,6 +30,7 @@ class PaymentSettingController extends Controller
             'workingDays' => PaymentRequestSettings::workingDays(),
             'officers' => $officers,
             'departmentalFlowEnabled' => PaymentRequestSettings::departmentalFlowEnabled(),
+            'mailEnabled' => \App\Support\PraApprovalSettings::mailEnabled(),
             // Turning the chain OFF hands new PRAs back to the legacy flow,
             // which routes to hand-picked people from the approver pool. An
             // empty pool means those PRAs would be created with no approval
@@ -58,6 +59,11 @@ class PaymentSettingController extends Controller
         $validated = $request->validate($rules);
 
         AppSetting::put(PaymentRequestSettings::KEY_WORKING_DAYS, (string) $validated['pra_working_days']);
+
+        AppSetting::put(
+            \App\Support\PraApprovalSettings::KEY_MAIL_ENABLED,
+            $request->boolean('pra_approval_mail_enabled') ? '1' : '0'
+        );
 
         // Affects NEW PRAs only. Nothing already created is rewritten — a PRA's
         // flow is fixed on its own row at creation.

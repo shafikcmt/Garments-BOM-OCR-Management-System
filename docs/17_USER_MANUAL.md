@@ -879,6 +879,12 @@ The steps a PRA goes through, and the signature boxes printed on it, are set by 
 
 Changes apply to PRAs from now on, including ones already waiting. A PRA that is already at a step carries on from that step in the new order.
 
+### 3.x4c Admin: PRA email switch and the old approver pool
+
+The **Send approval emails** switch (approval requests and results are also emailed; in-app notifications are always on) is on **Admin > Settings > PI / PRA Settings**, next to the choice of approval process.
+
+**Admin > Settings > PRA Approvers** (the approver pool) belongs to the **old** check-and-approve process. It appears in the menu only while it can matter: someone is in the pool, new PRAs are set to use the old process, or an old-process PRA is still open. Otherwise it is hidden (the page still opens from its address). The **Approval history** of all decisions is a button on **PRA Approval Steps**.
+
 ### 3.x5 Admin: who approves each PRA step (PRA Approval Routing)
 
 A PRA moves through five steps: 2 Merchant Team Check, 3 Merchant Head Approval, 4 Accounts Team Check, 5 Accounts Head Approval and 6 Commercial Head Completion. By default each step goes to the right department **automatically** (Merchandising only to people who have access to the PRA's buyer). If nobody qualifies, the PRA shows *"This PRA cannot proceed..."*.
