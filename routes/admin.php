@@ -103,6 +103,10 @@ Route::prefix('admin')
         Route::post('/pra-steps/{praStep}/move', [\App\Http\Controllers\Admin\PraStepController::class, 'move'])->name('pra-steps.move');
         Route::post('/pra-steps/{praStep}/toggle', [\App\Http\Controllers\Admin\PraStepController::class, 'toggle'])->name('pra-steps.toggle');
 
+        // Admin correction: send PRAs that are part-way through back to an earlier step.
+        Route::get('/pra-send-back', [\App\Http\Controllers\Admin\PraSendBackController::class, 'index'])->name('pra-send-back.index');
+        Route::post('/pra-send-back', [\App\Http\Controllers\Admin\PraSendBackController::class, 'store'])->name('pra-send-back.store');
+
         // Who approves each step of a departmental PRA (per step, per buyer).
         Route::get('/pra-routing', [\App\Http\Controllers\Admin\PraRoutingController::class, 'index'])->name('pra-routing.index');
         Route::post('/pra-routing/{sequence}', [\App\Http\Controllers\Admin\PraRoutingController::class, 'saveStep'])->whereNumber('sequence')->name('pra-routing.save');

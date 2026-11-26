@@ -242,6 +242,78 @@ class PraWorkflow
     }
 
     /**
+     * ADMIN CORRECTION: put a PRA that is waiting on a step back onto an EARLIER
+     * (or the same) step, so that step is done properly by the right people.
+     *
+     * Used when the chain was changed under a PRA that was already moving, or a
+     * step was signed by the wrong person. A PRA never goes FORWARD this way:
+     * skipping approvals is not a correction.
+     *
+     * HISTORY IS KEPT. The current cycle is closed with a "restarted" row naming
+     * the admin and the reason, exactly as restartAfterChange() does. Decisions
+     * taken BEFORE the target step are still valid, so they are copied into the
+     * new cycle (same person, date and signature) and keep showing on the sheet.
+     * Decisions at or after the target step stay behind in the old cycle.
+     */
+    public function sendBackToStep(PaymentRequest $paymentRequest, User $admin, int $targetSequence, string $note): PaymentRequest
+    {
+        $this->assertDepartmental($paymentRequest);
+
+        $current = $this->currentStage($paymentRequest);
+
+        if ($current === null) {
+            throw PraWorkflowException::notInProgress($paymentRequest);
+        }
+
+        if (! in_array($targetSequence, $this->resolver->sequences(), true)) {
+            throw new \InvalidArgumentException('That step is not part of the approval chain.');
+        }
+
+        $targetPosition = $this->resolver->definitionFor($targetSequence)['position'];
+        $currentPosition = $this->resolver->definitionFor($current->sequence)['position'];
+
+        if ($targetPosition > $currentPosition) {
+            throw new \InvalidArgumentException('A PRA can only be sent back to an earlier step, not forward.');
+        }
+
+        DB::transaction(function () use ($paymentRequest, $admin, $current, $targetSequence, $targetPosition, $note) {
+            $closedCycle = $this->activeCycle($paymentRequest);
+
+            $this->recordDecision(
+                $paymentRequest, $admin, $current, PraApproval::STATUS_RESTARTED,
+                'Sent back to "' . $this->resolver->definitionFor($targetSequence)['label'] . '" by admin: ' . $note
+            );
+
+            $keep = $paymentRequest->approvals
+                ->where('cycle', $closedCycle)
+                ->filter(fn (PraApproval $row) => $row->isApproved()
+                    && isset($this->resolver->steps()[$row->sequence])
+                    && $this->resolver->definitionFor((int) $row->sequence)['position'] < $targetPosition);
+
+            $newCycle = $closedCycle + 1;
+
+            foreach ($keep as $row) {
+                $copy = $row->replicate();
+                $copy->cycle = $newCycle;
+                $copy->save();
+            }
+
+            $paymentRequest->load('approvals');
+
+            $paymentRequest->update([
+                'current_sequence' => $targetSequence,
+                'status' => $this->statusFor($targetSequence),
+                'approved_by' => null,
+                'approved_at' => null,
+            ] + ($targetSequence === $this->resolver->firstSequence()
+                ? ['checked_by' => null, 'checked_at' => null]
+                : []));
+        });
+
+        return $paymentRequest->refresh();
+    }
+
+    /**
      * Close a PRA whose lines have all been taken off. It leaves the chain
      * (no current step) and keeps its history; whatever it held is free again.
      */
