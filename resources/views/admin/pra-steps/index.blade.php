@@ -41,6 +41,7 @@
             </div>
             <div class="d-flex flex-wrap gap-2">
                 <a href="{{ route('admin.pra-routing.index') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-people me-1" aria-hidden="true"></i>Who approves each step</a>
+                <a href="{{ route('admin.pra-approvals.history') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>Approval history</a>
                 <button type="button" class="btn btn-primary btn-sm js-step-edit" data-mode="create"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add step</button>
             </div>
         </div>

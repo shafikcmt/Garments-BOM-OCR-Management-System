@@ -144,7 +144,6 @@ Route::prefix('admin')
         Route::patch('/pra-approvers/{praApprover}', [PraApproverController::class, 'update'])->name('pra-approvers.update');
         Route::patch('/pra-approvers/{praApprover}/checker', [PraApproverController::class, 'toggleChecker'])->name('pra-approvers.checker');
         Route::delete('/pra-approvers/{praApprover}', [PraApproverController::class, 'destroy'])->name('pra-approvers.destroy');
-        Route::put('/pra-approvers/settings', [PraApproverController::class, 'updateSettings'])->name('pra-approvers.settings');
         Route::get('/pra-approvals/history', [PraApproverController::class, 'history'])->name('pra-approvals.history');
     });
 

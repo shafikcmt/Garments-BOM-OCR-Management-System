@@ -78,9 +78,6 @@ class PaymentRequestSettings
      */
     public const FLOW2_BLOCKS = [
         'prepared' => ['label' => 'Prepared By', 'sequence' => null],
-        'checked' => ['label' => 'Checked By', 'sequence' => 2],
-        'approved_merchant' => ['label' => 'Approved By (Merchant)', 'sequence' => 3],
-        'approved_finance' => ['label' => 'Approved By (Finance and Commercial)', 'sequence' => 5],
     ];
 
     /** The chain step whose actor is named on the completion line. */
@@ -189,24 +186,6 @@ class PaymentRequestSettings
         $stored = trim((string) AppSetting::get(self::flow2LabelKey($slug), ''));
 
         return $stored !== '' ? $stored : $default;
-    }
-
-    /**
-     * Every departmental label, keyed by slug — for the settings form.
-     *
-     * @return array<string, string>
-     */
-    public static function flow2Labels(): array
-    {
-        $labels = [];
-
-        // Only the creator's box is titled here; the other boxes belong to the steps
-        // and are titled on Settings > PRA Approval Steps.
-        foreach (array_keys(array_intersect_key(self::FLOW2_BLOCKS, ['prepared' => true])) as $slug) {
-            $labels[$slug] = self::flow2Label($slug);
-        }
-
-        return $labels;
     }
 
     protected static function officerKey(string $officer, string $attribute): string

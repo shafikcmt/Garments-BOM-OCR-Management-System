@@ -359,9 +359,25 @@
                             <span class="sidebar-submenu-rail"></span>
                             <a href="{{ route('admin.alert-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.alert-settings.*') ? 'is-active' : '' }}">Alert Settings</a>
                             <a href="{{ route('admin.payment-settings.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.payment-settings.*') ? 'is-active' : '' }}">PI / PRA Settings</a>
-                            <a href="{{ route('admin.pra-approvers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-approvers.*') || request()->routeIs('admin.pra-approvals.*') ? 'is-active' : '' }}">PRA Approvers</a>
-                            <a href="{{ route('admin.pra-steps.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-steps.*') ? 'is-active' : '' }}">PRA Approval Steps</a>
-                            <a href="{{ route('admin.pra-routing.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-routing.*') ? 'is-active' : '' }}">PRA Approval Routing</a>
+                            @php
+                                // The approver pool belongs to the OLD check-and-approve process. It is
+                                // listed only while it can matter: somebody is in the pool, new PRAs
+                                // are set to use the old process, or an old-process PRA is still open.
+                                try {
+                                    $showPraPool = \App\Models\PraApprover::where('is_active', true)->exists()
+                                        || ! \App\Support\PaymentRequestSettings::departmentalFlowEnabled()
+                                        || \App\Models\PaymentRequest::where('flow_version', \App\Models\PaymentRequest::FLOW_LEGACY)
+                                            ->whereIn('status', ['pending_check', 'pending_approval', 'rejected'])->exists()
+                                        || request()->routeIs('admin.pra-approvers.*');
+                                } catch (\Throwable $e) {
+                                    $showPraPool = true;
+                                }
+                            @endphp
+                            @if($showPraPool)
+                                <a href="{{ route('admin.pra-approvers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-approvers.*') ? 'is-active' : '' }}">PRA Approvers</a>
+                            @endif
+                            {{-- One entry for the chain: the steps and boxes, and (from a button on that page) who approves each step. --}}
+                            <a href="{{ route('admin.pra-steps.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-steps.*') || request()->routeIs('admin.pra-routing.*') || request()->routeIs('admin.pra-approvals.*') ? 'is-active' : '' }}">PRA Approval Steps</a>
                             <a href="{{ route('admin.email-templates.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.email-templates.*') ? 'is-active' : '' }}">Email Templates</a>
                         </div>
                     </li>
@@ -889,10 +905,18 @@
                                    ->whereHas('approvals', fn ($a) => $a->where('approver_id', $praUid)->where('stage', 'approve')->where('status', 'pending'));
                             });
                         })->count();
+                    // The OLD check-and-approve queue is shown only to someone who has (or ever
+                    // had) a PRA on that flow. Everybody else would see two entries both
+                    // called "PRA Approvals" - this one and the departmental queue below -
+                    // for a flow that no new PRA uses.
+                    $showLegacyPraQueue = $praPendingCount > 0
+                        || \App\Models\PraApproval::where('approver_id', $praUid)->where('sequence', \App\Models\PraApproval::SEQUENCE_LEGACY)->exists();
                 @endphp
+                @if($showLegacyPraQueue || auth()->user()->hasRole('admin'))
                 <div class="sidebar-section">
                     <div class="sidebar-section-label">Approvals</div>
                     <ul class="sidebar-list">
+                        @if($showLegacyPraQueue)
                         <li class="sidebar-item">
                             <a href="{{ route('pra_approvals.index') }}" class="sidebar-nav-link {{ request()->routeIs('pra_approvals.*') ? 'is-active' : '' }}">
                                 <span class="sidebar-link-main">
@@ -904,6 +928,7 @@
                                 @endif
                             </a>
                         </li>
+                        @endif
                         {{-- The admin's oversight of the departmental chain: every
                              flow-2 PRA, read-only. Admin has no step of its own,
                              so it gets this list and not the My Step queue. --}}
@@ -919,6 +944,7 @@
                         @endrole
                     </ul>
                 </div>
+                @endif
             @endcan
 
             {{-- The same oversight link for an admin who does not hold approve-pra
