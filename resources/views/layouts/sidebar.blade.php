@@ -376,8 +376,9 @@
                             @if($showPraPool)
                                 <a href="{{ route('admin.pra-approvers.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-approvers.*') ? 'is-active' : '' }}">PRA Approvers</a>
                             @endif
-                            {{-- One entry for the chain: the steps and boxes, and (from a button on that page) who approves each step. --}}
-                            <a href="{{ route('admin.pra-steps.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-steps.*') || request()->routeIs('admin.pra-routing.*') || request()->routeIs('admin.pra-approvals.*') ? 'is-active' : '' }}">PRA Approval Steps</a>
+                            <a href="{{ route('admin.pra-steps.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-steps.*') || request()->routeIs('admin.pra-approvals.*') ? 'is-active' : '' }}">PRA Approval Steps</a>
+                            {{-- Who approves each step, for all buyers or one buyer: its own menu entry. --}}
+                            <a href="{{ route('admin.pra-routing.index') }}" class="sidebar-sub-link {{ request()->routeIs('admin.pra-routing.*') ? 'is-active' : '' }}">PRA Approval Routing</a>
                             <a href="{{ route('admin.email-templates.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.email-templates.*') ? 'is-active' : '' }}">Email Templates</a>
                         </div>
                     </li>

@@ -64,7 +64,7 @@ The Admin menu is grouped so every entry stays reachable:
 
 - **Main menu**: Dashboard, My Approvals, Follow-ups, BOM Approvals.
 - **Departments**: Merchandising, Supply Chain (including To Purchase, Comparative Statement, Internal PO and CS Signatures), Commercial and Store, each a folder of that department's screens.
-- **Administration**: Workspace, Users & Roles, Booking Setup, **Requisition Setup** (Departments, Requisition Signatures, Monthly Requisition Window, Item SKU) and **Settings** (Alert Settings, PI / PRA Settings, PRA Approvers, **PRA Approval Steps**, Email Templates).
+- **Administration**: Workspace, Users & Roles, Booking Setup, **Requisition Setup** (Departments, Requisition Signatures, Monthly Requisition Window, Item SKU) and **Settings** (Alert Settings, PI / PRA Settings, PRA Approvers, **PRA Approval Steps**, **PRA Approval Routing**, Email Templates).
 - Press a folder to open it. Only one folder is open at a time, and the folder holding the page you are on opens by itself and scrolls into view.
 
 ## 2. Merchandising
@@ -889,7 +889,7 @@ The **Send approval emails** switch (approval requests and results are also emai
 
 A PRA moves through five steps: 2 Merchant Team Check, 3 Merchant Head Approval, 4 Accounts Team Check, 5 Accounts Head Approval and 6 Commercial Head Completion. By default each step goes to the right department **automatically** (Merchandising only to people who have access to the PRA's buyer). If nobody qualifies, the PRA shows *"This PRA cannot proceed..."*.
 
-**To choose the approvers yourself:** open **Admin > Settings > PRA Approval Steps** and press **Who approves each step** (this opens the PRA Approval Routing page). Each step is one card that shows who handles it now: the names of the people you chose (blue tags) or the automatic rule.
+**To choose the approvers yourself:** open **Admin > Settings > PRA Approval Routing** (it can also be opened with the **Who approves each step** button on PRA Approval Steps). Each step is one card that shows who handles it now: the names of the people you chose (blue tags) or the automatic rule.
 
 1. Press **Change approvers** on the step. A window opens with the people list (the ones already chosen are ticked and shown first).
 2. Type in the search box to find a person by name or email. Switch on **Selected only** to see just the ticked ones. The counter shows how many are selected.
