@@ -204,6 +204,18 @@
             .page-pad { padding: 0; }
         }
     </style>
+@if(!($isPdf ?? false))
+    <style>
+        /* On screen the A4 sheet is shown larger so it reads without squinting.
+           Print and the PDF keep the exact A4 layout. */
+        @media screen {
+            .sheet { zoom: 1.55; margin: 14px auto 28px; }
+        }
+        @media screen and (max-width: 1100px) {
+            .sheet { zoom: 1.15; }
+        }
+    </style>
+@endif
 </head>
 <body>
 @if(!($isPdf ?? false))
