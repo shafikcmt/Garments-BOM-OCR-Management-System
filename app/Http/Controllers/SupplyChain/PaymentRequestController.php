@@ -2348,7 +2348,7 @@ class PaymentRequestController extends Controller
         // and for any departmental one that has not reached step 4.
         $ocrCheck = \App\Support\PaymentRequestSettings::ocrCheckFor($paymentRequest);
         $sheet->setCellValue('J5', $ocrCheck
-            ? "OCR Checked:     ☒ Yes      ☐ No\n\nChecker Name     : " . $ocrCheck['name']
+            ? "OCR Checked:     ☑ Yes      ☐ No\n\nChecker Name     : " . $ocrCheck['name']
                 . "\n\nDate             : " . $ocrCheck['date']
             : "OCR Checked:     ☐ Yes      ☐ No\n\nChecker Name     : ______________________\n\nDate             : ______________________");
         $sheet->getStyle('J5:M8')->applyFromArray([

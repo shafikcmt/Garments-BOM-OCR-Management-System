@@ -48,7 +48,7 @@
         @php $ocrCheck = \App\Support\PaymentRequestSettings::ocrCheckFor($paymentRequest); @endphp
         {{-- Auto-filled from the Accounts Team check (step 4) on a departmental
              PRA; the original blank form otherwise, legacy PRAs included. --}}
-        <td colspan="5"><strong>OCR Checked:</strong> {{ $ocrCheck ? '☒' : '□' }} Yes &nbsp;&nbsp; □ No<br><br>Checker Name : {{ $ocrCheck ? $ocrCheck['name'] : '__________________' }}<br><br>Date : {{ $ocrCheck ? $ocrCheck['date'] : '__________________' }}</td>
+        <td colspan="5"><strong>OCR Checked:</strong> {{ $ocrCheck ? '☑' : '□' }} Yes &nbsp;&nbsp; □ No<br><br>Checker Name : {{ $ocrCheck ? $ocrCheck['name'] : '__________________' }}<br><br>Date : {{ $ocrCheck ? $ocrCheck['date'] : '__________________' }}</td>
     </tr>
     <tr>
         <td colspan="8" class="no-border"></td>

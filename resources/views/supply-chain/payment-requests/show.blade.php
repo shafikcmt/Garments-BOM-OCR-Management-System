@@ -79,7 +79,7 @@
     .pra-date { font-size:13px; font-weight:700; text-align:right; color:#000b6f; }
     .pra-date-value { font-weight:800; white-space:nowrap; margin-left:6px; }
     .pra-check-box { border:1px solid #4a5cb2; border-radius:3px; min-height:102px; padding:15px 16px; font-size:13px; color:#000b6f; }
-    .pra-mini-box { display:inline-block; width:16px; height:16px; border:1px solid #91a1d0; vertical-align:middle; margin:0 7px 0 18px; }
+    .pra-mini-box { display:inline-block; width:16px; height:16px; text-align:center; font-size:14px; line-height:15px; font-weight:700; color:#000b6f; border:1px solid #91a1d0; vertical-align:middle; margin:0 7px 0 18px; }
     .pra-info { font-size:13px; line-height:2.05; font-weight:700; color:#000b6f; }
     .pra-note { font-size:12px; line-height:1.45; font-weight:700; color:#000b6f; }
     .pra-total { font-size:18px; font-weight:800; text-align:right; color:#000b6f; margin-bottom:10px; }
@@ -355,7 +355,7 @@
                     <div class="pra-check-box">
                         <div class="fw-bold mb-3">
                             OCR Checked:
-                            <span class="pra-mini-box">{{ $ocrCheck ? '×' : '' }}</span> Yes
+                            <span class="pra-mini-box">{{ $ocrCheck ? '✓' : '' }}</span> Yes
                             <span class="pra-mini-box"></span> No
                         </div>
                         <div class="mb-3">Checker Name <span class="mx-3">:</span>
