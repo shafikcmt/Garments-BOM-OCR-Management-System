@@ -3079,6 +3079,23 @@ document.addEventListener('DOMContentLoaded', function () {
         clearRange(box);
     });
 
+    // Ctrl+X on the key itself, for the same reason Ctrl+C is: a block started on a
+    // read-only cell fires no 'cut' event. Copies the block, then clears what may be cleared.
+    document.addEventListener('keydown', function (event) {
+        if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return;
+        if (event.key !== 'x' && event.key !== 'X') return;
+
+        const box = selectedRange();
+        if (!box || isOtherField(event.target)) return;
+
+        const text = table.sheetSelectionText ? table.sheetSelectionText() : null;
+        if (text === null || typeof table.sheetCopy !== 'function') return;
+
+        event.preventDefault();
+        table.sheetCopy(text);
+        clearRange(box);
+    });
+
     document.addEventListener('cut', function (event) {
         const box = selectedRange();
         if (!box || isOtherField(event.target)) return;

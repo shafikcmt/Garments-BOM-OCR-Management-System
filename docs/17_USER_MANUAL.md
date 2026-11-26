@@ -219,7 +219,7 @@ Merchandising and Admin work inquiries for the buyers they hold. Management can 
 **Added the wrong file?** On **Existing Files**, **More**, **Undo last import**. It removes that block of rows again, but only while nobody has edited those rows or used them (for example a PO was raised), and only for the latest import of that file. A locked file, or another buyer's file, cannot take new rows.
 
 **Copy and paste in the sheet.** Drag over cells to select a block (the note beside Search says how many). Then:
-- **Ctrl+C** copies the block; paste it into Excel or into another place in the sheet.
+- **Ctrl+C** copies the block (also Auto and calculated columns); paste it into Excel or into another place in the sheet. **Ctrl+X** copies it and clears the cells that can be edited. A message under the toolbar confirms "Copied N rows x N columns".
 - **Ctrl+V** pastes into the selected block. One copied value fills **every** selected cell. A copied block fills the selection and repeats to cover it when the selection is a whole multiple of it. Otherwise it lands from the top-left selected cell.
 - **Delete** (or **Backspace**) empties every selected cell. **Ctrl+X** copies the block and then empties it. Press **Save Changes** to keep it; leave the page without saving and nothing is lost from the file.
 - The text can come from outside too (Excel, Word, an e-mail). Cells you cannot edit, and calculated cells, are left unchanged and counted in the message.
