@@ -9,7 +9,7 @@
     $qty = fn ($n) => rtrim(rtrim(number_format((float) $n, 4), '0'), '.');
     // The items table always shows at least 10 rows: the items, then blank rows.
     $rows = max(0, 10 - $order->items->count());
-    $bin = config('purchasing.po_defaults.bin_number');
+    $bin = \App\Support\PurchasingSettings::poDefaults()['bin_number'] ?: $order->bin_number;
     $status = $order->status;
 @endphp
 <style>

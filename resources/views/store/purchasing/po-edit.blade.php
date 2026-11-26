@@ -52,7 +52,7 @@
                     </div>
                     <div class="col-6 col-md-3">
                         <label class="form-label" for="bin_number">BIN number</label>
-                        <input type="text" id="bin_number" class="form-control" value="{{ config('purchasing.po_defaults.bin_number') }}" readonly>
+                        <input type="text" id="bin_number" class="form-control" value="{{ \App\Support\PurchasingSettings::poDefaults()['bin_number'] }}" readonly>
                     </div>
                     <div class="col-6 col-md-3">
                         <label class="form-label" for="dispatched_through">Dispatched through</label>
