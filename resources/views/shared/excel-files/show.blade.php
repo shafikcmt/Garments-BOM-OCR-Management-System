@@ -3442,7 +3442,17 @@ document.addEventListener('DOMContentLoaded', function () {
         return n.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
     }
 
-    // Money shown with exactly two decimals (display only).
+    // Cut an amount to whole cents WITHOUT rounding up: supplier proforma invoices
+    // print each line cut to two decimals (65.487 -> 65.48), so PI Amount does the
+    // same and the sheet total matches the invoice. Same rule as App\Support\Money.
+    function floorCents(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return 0;
+        const sign = n < 0 ? -1 : 1;
+        return sign * Math.floor(Number((Math.abs(n) * 100).toFixed(4))) / 100;
+    }
+
+    // Money shown with exactly two decimals.
     function fmtMoney2(value) {
         if (value === null || value === undefined || value === '') return '';
         const n = Number(value);
@@ -3579,7 +3589,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const ppQtyBilled = ppQtyIsFree(valAny(rowData, ['pp_qty_free', 'pp_free', 'free_pp_qty']))
                 ? 0
                 : ppQtyNumber(valAny(rowData, ['pp_qty', 'p_p_qty', 'pp_quantity']));
-            const piAmount = piRate * (materialsOrdered + ppQtyBilled);
+            const piAmount = floorCents(piRate * (materialsOrdered + ppQtyBilled));
             const piWorking = ppQtyBilled > 0
                 ? 'PI Rate ' + piRate + ' x (Materials Ordered ' + materialsOrdered + ' + PP Qty ' + ppQtyBilled + ' billed) = ' + fmtNum(piAmount)
                     + '. PP Qty is billed because PP Qty Free says No.'

@@ -2612,7 +2612,9 @@ class ExcelFileController extends Controller
                 $this->valAny($cellMap, $headerIdByKey, ['pp_qty', 'p_p_qty', 'pp_quantity']),
                 $this->valAny($cellMap, $headerIdByKey, ['pp_qty_free', 'pp_free', 'free_pp_qty']),
             );
-            $piAmount = $piRate * ($materialsOrdered + $chargeablePpQty);
+            // Cut to whole cents (not rounded up), the way the supplier's proforma invoice
+            // prints each line, so the sheet total matches the invoice.
+            $piAmount = \App\Support\Money::floorCents($piRate * ($materialsOrdered + $chargeablePpQty));
 
             $paymentReqdDate = $committedExMill ? $committedExMill->copy()->subDays(7) : null;
 
