@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\PraStageResolver;
 use App\Support\DepartmentRoles;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Settings > PRA Approval Routing.
@@ -37,6 +38,7 @@ class PraRoutingController extends Controller
 
             return [
                 'sequence' => $sequence,
+                'ordinal' => $this->resolver->ordinal($sequence),
                 'label' => $definition['label'],
                 'automatic' => $definition['department'] === null
                     ? 'No department: nobody can act until you choose people'
@@ -45,12 +47,26 @@ class PraRoutingController extends Controller
                         . ($this->resolver->isBuyerScoped($sequence) ? ', for the buyers they have access to' : ', for all buyers'),
                 'global_ids' => $forStep->whereNull('buyer_id')->pluck('user_id')->map(fn ($id) => (int) $id)->all(),
                 'global_users' => $forStep->whereNull('buyer_id')->pluck('user.name')->filter()->sort()->values()->all(),
-                'buyer_rules' => $forStep->whereNotNull('buyer_id')->groupBy('buyer_id')->map(fn ($group) => [
-                    'buyer_id' => (int) $group->first()->buyer_id,
-                    'buyer' => $group->first()->buyer?->buyer_name ?? ('Buyer #' . $group->first()->buyer_id),
-                    'ids' => $group->pluck('user_id')->map(fn ($id) => (int) $id)->all(),
-                    'users' => $group->pluck('user.name')->filter()->sort()->values()->all(),
-                ])->sortBy('buyer')->values()->all(),
+                // Buyers that share exactly the same people are shown (and edited) as ONE
+                // rule: "Macys, Hugo Boss: Ashikullah, Ripa".
+                'buyer_groups' => $forStep->whereNotNull('buyer_id')
+                    ->groupBy('buyer_id')
+                    ->map(fn ($group) => [
+                        'buyer_id' => (int) $group->first()->buyer_id,
+                        'buyer' => $group->first()->buyer?->buyer_name ?? ('Buyer #' . $group->first()->buyer_id),
+                        'ids' => $group->pluck('user_id')->map(fn ($id) => (int) $id)->sort()->values()->all(),
+                        'users' => $group->pluck('user.name')->filter()->sort()->values()->all(),
+                    ])
+                    ->groupBy(fn ($rule) => implode(',', $rule['ids']))
+                    ->map(fn ($rules) => [
+                        'buyer_ids' => $rules->pluck('buyer_id')->all(),
+                        'buyers' => $rules->pluck('buyer')->sort()->values()->all(),
+                        'ids' => $rules->first()['ids'],
+                        'users' => $rules->first()['users'],
+                    ])
+                    ->sortBy(fn ($group) => $group['buyers'][0] ?? '')
+                    ->values()
+                    ->all(),
             ];
         })->all();
 
@@ -85,16 +101,48 @@ class PraRoutingController extends Controller
         return redirect()->route('admin.pra-routing.index')->with('success', $this->savedMessage($sequence, null, $userIds));
     }
 
-    /** Approvers for a step, for one buyer. Empty = that buyer follows the all-buyers rule. */
+    /**
+     * Approvers for a step, for SPECIFIC BUYERS (one or several, but not all).
+     *
+     * The same people are saved for every ticked buyer. When editing an existing
+     * rule, `original_buyer_ids` lists the buyers it covered: any of them that is
+     * no longer ticked loses the rule. No people ticked = the ticked buyers go
+     * back to the all-buyers rule (or the automatic routing).
+     */
     public function saveBuyer(Request $request, int $sequence)
     {
         $this->assertStep($sequence);
-        $data = $request->validate(['buyer_id' => ['required', 'integer', 'exists:buyers,id']]);
+
+        $data = $request->validate([
+            'buyer_ids' => ['required', 'array', 'min:1'],
+            'buyer_ids.*' => ['integer', 'exists:buyers,id'],
+            'original_buyer_ids' => ['nullable', 'array'],
+            'original_buyer_ids.*' => ['integer'],
+        ], [
+            'buyer_ids.required' => 'Tick at least one buyer.',
+            'buyer_ids.min' => 'Tick at least one buyer.',
+        ]);
         $userIds = $this->validatedUserIds($request);
 
-        PraStepApprover::replaceFor($sequence, (int) $data['buyer_id'], $userIds);
+        $buyerIds = collect($data['buyer_ids'])->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $dropped = collect($data['original_buyer_ids'] ?? [])->map(fn ($id) => (int) $id)->diff($buyerIds)->values()->all();
 
-        return redirect()->route('admin.pra-routing.index')->with('success', $this->savedMessage($sequence, (int) $data['buyer_id'], $userIds));
+        DB::transaction(function () use ($sequence, $buyerIds, $dropped, $userIds) {
+            foreach ($buyerIds as $buyerId) {
+                PraStepApprover::replaceFor($sequence, $buyerId, $userIds);
+            }
+
+            foreach ($dropped as $buyerId) {
+                PraStepApprover::replaceFor($sequence, $buyerId, []);
+            }
+        });
+
+        $label = $this->resolver->definitionFor($sequence)['label'];
+        $names = Buyer::whereIn('id', $buyerIds)->orderBy('buyer_name')->pluck('buyer_name')->implode(', ');
+
+        return redirect()->route('admin.pra-routing.index')->with('success', $userIds === []
+            ? "{$label} for {$names}: no one chosen, so they follow the all-buyers rule or the automatic routing."
+            : "{$label} for {$names}: " . count($userIds) . ' approver(s) saved.');
     }
 
     public function removeBuyer(int $sequence, Buyer $buyer)

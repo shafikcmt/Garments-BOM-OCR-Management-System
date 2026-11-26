@@ -672,7 +672,7 @@
                                 <h6 class="fw-bold mb-0"><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i> Approval Progress</h6>
                                 <span class="badge rounded-pill {{ $paymentRequest->status === 'completed' ? 'bg-success-subtle text-success' : ($paymentRequest->status === 'rejected' ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning-emphasis') }}">
                                     @if($departmentalStage)
-                                        Step {{ $departmentalStage->sequence }} — {{ $departmentalStage->label }}
+                                        Step {{ app(\App\Services\PraStageResolver::class)->ordinal($departmentalStage->sequence) }} — {{ $departmentalStage->label }}
                                     @else
                                         {{ ucfirst(str_replace('_', ' ', $paymentRequest->status)) }}
                                     @endif
@@ -701,7 +701,7 @@
                                     <div class="col-12 col-md-6 col-xl-4">
                                         <div class="d-flex justify-content-between align-items-start gap-2 border rounded-3 px-3 py-2">
                                             <div class="min-w-0">
-                                                <div class="fw-semibold small text-slate-900">{{ $seq }}. {{ $label }}</div>
+                                                <div class="fw-semibold small text-slate-900">{{ $loop->iteration }}. {{ $label }}</div>
                                                 <div class="small text-muted">{{ optional($decision?->approver)->name ?? '—' }}</div>
                                                 @if($assignedName)
                                                     <div class="small text-muted"><i class="bi bi-person-check me-1" aria-hidden="true"></i>Assigned to {{ $assignedName }}</div>

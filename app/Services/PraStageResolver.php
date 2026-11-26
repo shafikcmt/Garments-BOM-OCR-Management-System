@@ -189,6 +189,19 @@ class PraStageResolver
         return array_keys(array_filter($this->steps(), fn (array $step) => $step['is_active']));
     }
 
+    /**
+     * The step's place in the ACTIVE chain, counting from 1 - the number people
+     * should see ("Step 3"). The sequence is only the step's permanent id and does
+     * not follow the order Admin gives the steps. A switched-off step falls back to
+     * its id.
+     */
+    public function ordinal(int $sequence): int
+    {
+        $index = array_search($sequence, $this->sequences(), true);
+
+        return $index === false ? $sequence : $index + 1;
+    }
+
     public function firstSequence(): int
     {
         return $this->sequences()[0] ?? self::FIRST_SEQUENCE;

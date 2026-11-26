@@ -99,7 +99,7 @@
                                 </td>
                                 <td class="po-num fw-semibold">{{ number_format((float) $pr->total_pi_amount, 2) }}</td>
                                 <td>
-                                    <span class="po-pill po-pill-blue">Step {{ $stage->sequence }} — {{ $stage->label }}</span>
+                                    <span class="po-pill po-pill-blue">Step {{ app(\App\Services\PraStageResolver::class)->ordinal($stage->sequence) }} — {{ $stage->label }}</span>
                                 </td>
                                 <td class="text-end">
                                     <a href="{{ route('pra_departmental.show', $pr) }}" class="btn btn-sm btn-primary">

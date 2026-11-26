@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Buyer;
+use App\Models\PraStep;
 use App\Models\PraStepApprover;
 use App\Models\User;
 use App\Services\PraStageResolver;
@@ -93,4 +94,43 @@ it('shows the routing screen to an admin and saves a step', function () {
         ->assertRedirect(route('admin.pra-routing.index'));
 
     expect(PraStepApprover::where('sequence', 2)->whereNull('buyer_id')->pluck('user_id')->all())->toBe([$named->id]);
+});
+
+it('saves the same approvers for several specific buyers and drops one that is unticked', function () {
+    $admin = routingUser('Boss Two');
+    $admin->assignRole('admin');
+    $one = Buyer::create(['buyer_name' => 'Macys']);
+    $two = Buyer::create(['buyer_name' => 'Hugo Boss']);
+    $three = Buyer::create(['buyer_name' => 'Marco Polo']);
+    $person = routingUser('Shared Approver');
+
+    $this->actingAs($admin)
+        ->post(route('admin.pra-routing.save_buyer', 3), ['buyer_ids' => [$one->id, $two->id], 'user_ids' => [$person->id]])
+        ->assertRedirect(route('admin.pra-routing.index'));
+
+    $buyers = fn () => PraStepApprover::where('sequence', 3)->whereNotNull('buyer_id')->pluck('buyer_id')->sort()->values()->all();
+    expect($buyers())->toBe([$one->id, $two->id]);
+
+    // Edit the rule: add a third buyer, untick the first.
+    $this->actingAs($admin)
+        ->post(route('admin.pra-routing.save_buyer', 3), [
+            'buyer_ids' => [$two->id, $three->id], 'original_buyer_ids' => [$one->id, $two->id], 'user_ids' => [$person->id],
+        ])->assertRedirect();
+
+    expect($buyers())->toBe([$two->id, $three->id]);
+
+    // Nothing ticked for the people = the rule is removed for those buyers.
+    $this->actingAs($admin)->post(route('admin.pra-routing.save_buyer', 3), ['buyer_ids' => [$two->id, $three->id]])->assertRedirect();
+
+    expect($buyers())->toBe([]);
+
+    // At least one buyer is required.
+    $this->actingAs($admin)->post(route('admin.pra-routing.save_buyer', 3), ['user_ids' => [$person->id]])->assertSessionHasErrors('buyer_ids');
+});
+
+it('numbers the steps by their place in the chain, not their id', function () {
+    PraStep::where('sequence', 3)->update(['position' => 5]);
+
+    expect(app(PraStageResolver::class)->ordinal(3))->toBe(1)
+        ->and(app(PraStageResolver::class)->ordinal(2))->toBe(2);
 });

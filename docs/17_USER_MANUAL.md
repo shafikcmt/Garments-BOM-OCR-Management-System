@@ -893,9 +893,9 @@ A PRA moves through five steps: 2 Merchant Team Check, 3 Merchant Head Approval,
 
 1. Press **Change approvers** on the step. A window opens with the people list (the ones already chosen are ticked and shown first).
 2. Type in the search box to find a person by name or email. Switch on **Selected only** to see just the ticked ones. The counter shows how many are selected.
-3. Choose **All buyers** or **One buyer** at the top of the window (for one buyer, pick the buyer). A buyer rule is used instead of the all-buyers rule for that buyer.
+3. Choose **All buyers** or **Specific buyers** at the top of the window (for specific buyers, tick the buyers; use the search box to find them). A rule for specific buyers is used instead of the all-buyers rule for those buyers.
 4. Press **Save**. Any one of the chosen people can complete the step.
-5. **Add buyer rule** on a card does the same for one buyer straight away; **Edit** and **Remove** on a buyer rule change or delete it.
+5. **Add specific buyers** on a card opens the same window in **Specific buyers** mode: tick **one or more buyers** (but not all), tick the people, and press **Save**. The same people are saved for every ticked buyer. Buyers that share the same people appear together as one rule; **Edit** changes its buyers or people (untick a buyer to take it out of the rule) and **Remove** deletes it for all of its buyers.
 6. To go back to the automatic routing, untick everyone and press **Save**.
 
 People you choose are also given access to the PRA approval screens, and they do not need buyer access. Only active users count. A change applies to every PRA from now on, including ones already waiting. When the *cannot proceed* message shows, an Admin sees an **Open PRA Approval Routing** link next to it.

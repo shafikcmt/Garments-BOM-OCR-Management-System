@@ -188,7 +188,7 @@
         </div>
         <div class="d-flex gap-2 flex-wrap align-items-center">
             @if($stage)
-                <span class="po-pill po-pill-blue"><i class="bi bi-diagram-3" aria-hidden="true"></i>Step {{ $stage->sequence }} — {{ $stage->label }}</span>
+                <span class="po-pill po-pill-blue"><i class="bi bi-diagram-3" aria-hidden="true"></i>Step {{ app(\App\Services\PraStageResolver::class)->ordinal($stage->sequence) }} — {{ $stage->label }}</span>
                 @if($stage->assignee)
                     <span class="po-pill"><i class="bi bi-person-check" aria-hidden="true"></i>Assigned to {{ $stage->isAssignee($user) ? 'you' : $stage->assignee->name }}</span>
                 @endif
@@ -318,7 +318,7 @@
                             <tbody>
                                 @forelse($decisions as $row)
                                     <tr>
-                                        <td><span class="pra-step-no">{{ $row->sequence }}</span></td>
+                                        <td><span class="pra-step-no">{{ app(\App\Services\PraStageResolver::class)->ordinal($row->sequence) }}</span></td>
                                         <td>
                                             <div class="fw-semibold text-capitalize">{{ $row->department }}</div>
                                             <div class="pra-history-sub text-capitalize">{{ $row->actor_kind }}</div>
@@ -363,7 +363,7 @@
                 <div class="po-panel-body">
                     @if($stage)
                         <div class="pra-step-card">
-                            <span class="pra-step-no">{{ $stage->sequence }}</span>
+                            <span class="pra-step-no">{{ app(\App\Services\PraStageResolver::class)->ordinal($stage->sequence) }}</span>
                             <div>
                                 <div class="pra-step-title">{{ $stage->label }}</div>
                                 <div class="pra-step-sub">Current step · {{ $stage->departmentLabel }} {{ $stage->actorKind === 'head' ? 'Head' : 'Team' }}</div>
