@@ -21,6 +21,21 @@ class PraSheetController extends PaymentRequestController
         return view('pra-departmental.sheet', ['paymentRequest' => $paymentRequest]);
     }
 
+    /** The same sheet as HTML, for the in-app paper view (the page frames and scales it). */
+    public function html(PaymentRequest $paymentRequest)
+    {
+        $this->authorizePaymentRequest($paymentRequest);
+
+        [$approvalRows, $summary] = $this->approvalDataFor($paymentRequest);
+
+        return view('supply-chain.payment-requests.approval_pdf', [
+            'paymentRequest' => $paymentRequest,
+            'summary' => $summary,
+            'approvalRows' => $approvalRows,
+            'isPdf' => false,
+        ]);
+    }
+
     public function pdf(PaymentRequest $paymentRequest)
     {
         return $this->downloadPdf($paymentRequest);

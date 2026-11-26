@@ -164,7 +164,11 @@
     .pra-review .pra-doc-body { flex: 1 1 auto; min-width: 0; }
     .pra-review .pra-doc-title { font-size: 13.5px; font-weight: 700; color: var(--po-ink); }
     .pra-review .pra-doc-meta { font-size: 12px; color: var(--po-muted); overflow-wrap: anywhere; }
-    .pra-review .pra-doc-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .pra-review .pra-doc-actions { display: flex; gap: 8px; flex-wrap: nowrap; align-items: center; }
+    .pra-review .pra-doc-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; min-width: 84px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--po-line-soft); background: #fff; color: var(--po-ink); font-size: 12.5px; font-weight: 700; line-height: 1; text-decoration: none; white-space: nowrap; }
+    .pra-review .pra-doc-btn:hover { background: var(--po-paper); color: var(--po-blue-deep); }
+    .pra-review .pra-doc-btn.is-primary { background: var(--po-blue-deep, #006C9D); border-color: var(--po-blue-deep, #006C9D); color: #fff; }
+    .pra-review .pra-doc-btn.is-primary:hover { filter: brightness(1.1); color: #fff; }
 </style>
 @endsection
 
@@ -256,8 +260,8 @@
                             <div class="pra-doc-meta">{{ $paymentRequest->request_no }} &middot; as it will be printed and signed</div>
                         </div>
                         <div class="pra-doc-actions">
-                            <a href="{{ route('pra_departmental.sheet', $paymentRequest) }}" class="btn btn-sm btn-primary"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</a>
-                            <a href="{{ route('pra_departmental.sheet_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-sm po-btn-quiet"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF</a>
+                            <a href="{{ route('pra_departmental.sheet', $paymentRequest) }}" class="pra-doc-btn is-primary"><i class="bi bi-eye" aria-hidden="true"></i>View</a>
+                            <a href="{{ route('pra_departmental.sheet_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="pra-doc-btn"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>PDF</a>
                         </div>
                     </div>
                     @foreach($bookingPos as $docEntry)
@@ -268,8 +272,8 @@
                                 <div class="pra-doc-meta">{{ $docEntry['po']->vendor_name ?: '—' }}@if($docEntry['po']->generated_at) &middot; Generated {{ $docEntry['po']->generated_at->format('d M Y') }}@endif</div>
                             </div>
                             <div class="pra-doc-actions">
-                                <a href="{{ route('pra_departmental.po', [$paymentRequest, $docEntry['po']]) }}" class="btn btn-sm btn-primary"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</a>
-                                <a href="{{ route('pra_departmental.po_pdf', [$paymentRequest, $docEntry['po']]) }}" target="_blank" rel="noopener" class="btn btn-sm po-btn-quiet"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF</a>
+                                <a href="{{ route('pra_departmental.po', [$paymentRequest, $docEntry['po']]) }}" class="pra-doc-btn is-primary"><i class="bi bi-eye" aria-hidden="true"></i>View</a>
+                                <a href="{{ route('pra_departmental.po_pdf', [$paymentRequest, $docEntry['po']]) }}" target="_blank" rel="noopener" class="pra-doc-btn"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>PDF</a>
                             </div>
                         </div>
                     @endforeach
