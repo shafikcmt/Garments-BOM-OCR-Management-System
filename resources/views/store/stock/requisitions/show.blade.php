@@ -488,6 +488,7 @@
          their staff forgot. Changing a quantity of a line already on the
          sheet stays under Change Quantities above. --}}
     @if($canAddItems ?? false)
+        @include('store.stock._searchable')
         <div class="card gx-stock-card mt-4" id="addItems">
             <div class="gx-stock-card-body">
                 <div class="gx-stock-card-head">
@@ -501,37 +502,45 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('store.stock.requisitions.stage-add-items', $requisition) }}" id="addItemsForm">
+                <form method="POST" action="{{ route('store.stock.requisitions.stage-add-items', $requisition) }}" id="addItemsForm" novalidate>
                     @csrf
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle mb-2">
-                            <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th class="text-end" style="width:130px;">Qty</th>
-                                    <th class="text-end" style="width:130px;">Rate (Appx.)</th>
-                                    <th style="width:220px;">Remarks</th>
-                                    <th style="width:100px;"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="addItemsRows"></tbody>
-                        </table>
+                    <div id="addItemsRows" class="d-grid gap-2 mb-2"></div>
+
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="addItemsAdd">
+                            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Another Item
+                        </button>
+                        <span class="text-muted small" id="addItemsCount"></span>
                     </div>
-                    <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="addItemsAdd">
-                        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Another Item
-                    </button>
 
-                    <label class="form-label fw-semibold d-block" for="addItemsReason">Reason</label>
-                    <textarea name="add_comment" id="addItemsReason" class="form-control mb-2" rows="2" maxlength="1000" required
-                              placeholder="Why are these items being added?">{{ old('add_comment') }}</textarea>
-                    <div class="form-text mb-3">Saved in the requisition history with every item added. Stock and last purchase are filled in for each item.</div>
-
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Add Items
-                    </button>
+                    <div class="row g-3 align-items-end">
+                        <div class="col-12 col-lg">
+                            <label class="form-label fw-semibold" for="addItemsReason">Reason <span class="text-danger">*</span></label>
+                            <textarea name="add_comment" id="addItemsReason" class="form-control" rows="2" maxlength="1000" required
+                                      placeholder="Why are these items being added?">{{ old('add_comment') }}</textarea>
+                        </div>
+                        <div class="col-12 col-lg-auto">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Add Items to Requisition
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-text mt-2">Saved in the requisition history with every item added. Stock and last purchase are filled in for each item.</div>
                 </form>
             </div>
         </div>
+
+        <style>
+            #addItems .gx-add-line { border: 1px solid #e2e8f0; border-radius: .75rem; background: #fff; padding: .7rem .8rem; }
+            #addItems .gx-add-fields { display: grid; gap: .5rem .6rem; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
+            @media (min-width: 992px) {
+                #addItems .gx-add-fields { grid-template-columns: minmax(0, 3.2fr) minmax(0, 1.1fr) minmax(0, .7fr) minmax(0, .9fr) minmax(0, .9fr) minmax(0, 1.6fr) auto; }
+            }
+            @media (max-width: 991.98px) { #addItems .gx-add-field.is-item, #addItems .gx-add-field.is-remarks { grid-column: 1 / -1; } }
+            #addItems .gx-add-field .form-label { font-size: .66rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 750; color: #64748b; margin-bottom: .2rem; }
+            #addItems .gx-add-hint { font-size: .72rem; color: #64748b; margin-top: .35rem; min-height: 1rem; }
+            #addItems .gx-add-no { font-size: .72rem; font-weight: 700; color: #1d4ed8; }
+        </style>
     @endif
 
     @include('store.stock.requisitions._history', ['requisition' => $requisition])
@@ -597,35 +606,92 @@
 <script>
     (function () {
         var items = @json($addableItems);
+        var snapshotUrl = @json(route('store.stock.requisitions.item-snapshot', ['stockItem' => '__ID__']));
         var body = document.getElementById('addItemsRows');
+        var countEl = document.getElementById('addItemsCount');
         var next = 0;
         var old = @json(old('new_items', []));
+
+        function esc(text) { return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+
+        function renumber() {
+            var rows = body.querySelectorAll('.gx-add-line');
+            rows.forEach(function (row, i) { row.querySelector('.gx-add-no').textContent = i + 1; });
+            countEl.textContent = rows.length + (rows.length === 1 ? ' item' : ' items') + ' to add';
+        }
+
+        function plain(n) { return String(Math.round(parseFloat(n) * 100) / 100); }
+
+        function showHint(row, data) {
+            var parts = [];
+            if (data.stock_in_hand !== undefined && data.stock_in_hand !== null) { parts.push('In hand ' + plain(data.stock_in_hand)); }
+            if (data.last_purchase_rate) { parts.push('Last rate ' + plain(data.last_purchase_rate)); }
+            row.querySelector('.gx-add-hint').textContent = parts.join(' \u00b7 ');
+        }
 
         function addRow(values) {
             values = values || {};
             var i = next++;
-            var tr = document.createElement('tr');
-            var select = '<select class="form-select form-select-sm" name="new_items[' + i + '][stock_item_id]" required aria-label="Item"><option value="">Select item…</option>';
+            var row = document.createElement('div');
+            row.className = 'gx-add-line';
+            row.innerHTML =
+                '<div class="gx-add-fields">' +
+                    '<div class="gx-add-field is-item"><label class="form-label"><span class="gx-add-no"></span>&nbsp; Item Name <span class="text-danger">*</span></label>' +
+                        '<select class="form-select form-select-sm js-searchable js-add-item" data-lazy-items data-sku-labels name="new_items[' + i + '][stock_item_id]" aria-required="true"><option value="">Select item\u2026</option></select></div>' +
+                    '<div class="gx-add-field"><label class="form-label">SKU</label><input type="text" class="form-control form-control-sm js-add-sku" readonly tabindex="-1" placeholder="\u2014"></div>' +
+                    '<div class="gx-add-field"><label class="form-label">Uom</label><input type="text" class="form-control form-control-sm text-center js-add-uom" readonly tabindex="-1" placeholder="\u2014"></div>' +
+                    '<div class="gx-add-field"><label class="form-label">Qty <span class="text-danger">*</span></label><input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm text-end" name="new_items[' + i + '][qty_requested]" aria-label="Quantity" placeholder="0"></div>' +
+                    '<div class="gx-add-field"><label class="form-label">Rate Appx.</label><input type="number" step="0.01" min="0" class="form-control form-control-sm text-end js-add-rate" name="new_items[' + i + '][rate_appx]" aria-label="Rate" placeholder="0.00"></div>' +
+                    '<div class="gx-add-field is-remarks"><label class="form-label">Remarks</label><input type="text" maxlength="1000" class="form-control form-control-sm" name="new_items[' + i + '][remarks]" aria-label="Remarks" placeholder="Optional"></div>' +
+                    '<div class="gx-add-field"><button type="button" class="btn btn-outline-danger btn-sm js-add-remove"><i class="bi bi-trash me-1" aria-hidden="true"></i>Remove</button></div>' +
+                '</div><div class="gx-add-hint"></div>';
+
+            var select = row.querySelector('.js-add-item');
             items.forEach(function (it) {
-                select += '<option value="' + it.id + '"' + (String(values.stock_item_id) === String(it.id) ? ' selected' : '') + '>' +
-                    it.label.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>';
+                var opt = document.createElement('option');
+                opt.value = it.id;
+                opt.textContent = it.label;
+                if (String(values.stock_item_id) === String(it.id)) { opt.selected = true; }
+                select.appendChild(opt);
             });
-            select += '</select>';
-            tr.innerHTML = '<td>' + select + '</td>' +
-                '<td><input type="number" step="0.0001" min="0.0001" required class="form-control form-control-sm text-end" name="new_items[' + i + '][qty_requested]" aria-label="Quantity"></td>' +
-                '<td><input type="number" step="0.01" min="0" class="form-control form-control-sm text-end" name="new_items[' + i + '][rate_appx]" aria-label="Rate"></td>' +
-                '<td><input type="text" maxlength="1000" class="form-control form-control-sm" name="new_items[' + i + '][remarks]" aria-label="Remarks"></td>' +
-                '<td><button type="button" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Remove</button></td>';
-            tr.querySelector('[name$="[qty_requested]"]').value = values.qty_requested || '';
-            tr.querySelector('[name$="[rate_appx]"]').value = values.rate_appx || '';
-            tr.querySelector('[name$="[remarks]"]').value = values.remarks || '';
-            tr.querySelector('button').addEventListener('click', function () {
-                if (body.children.length > 1) { tr.remove(); }
+            row.querySelector('[name$="[qty_requested]"]').value = values.qty_requested || '';
+            row.querySelector('[name$="[rate_appx]"]').value = values.rate_appx || '';
+            row.querySelector('[name$="[remarks]"]').value = values.remarks || '';
+
+            select.addEventListener('change', function () {
+                var id = select.value;
+                row.querySelector('.js-add-sku').value = '';
+                row.querySelector('.js-add-uom').value = '';
+                row.querySelector('.gx-add-hint').textContent = '';
+                if (!id) { return; }
+                fetch(snapshotUrl.replace('__ID__', encodeURIComponent(id)), { headers: { 'Accept': 'application/json' } })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (data) {
+                        if (!data) { return; }
+                        row.querySelector('.js-add-sku').value = data.sku || '';
+                        row.querySelector('.js-add-uom').value = data.uom || '';
+                        var rate = row.querySelector('.js-add-rate');
+                        if (!rate.value && data.last_purchase_rate) { rate.value = plain(data.last_purchase_rate); }
+                        showHint(row, data);
+                    })
+                    .catch(function () { /* The server fills the figures on save. */ });
             });
-            body.appendChild(tr);
+
+            row.querySelector('.js-add-remove').addEventListener('click', function () {
+                if (body.children.length > 1) { row.remove(); renumber(); }
+            });
+
+            body.appendChild(row);
+            if (window.gxBuildSearchable) { window.gxBuildSearchable(select); }
+            if (select.value) { select.dispatchEvent(new Event('change')); }
+            renumber();
         }
 
-        document.getElementById('addItemsAdd').addEventListener('click', function () { addRow(); });
+        document.getElementById('addItemsAdd').addEventListener('click', function () {
+            addRow();
+            var last = body.lastElementChild.querySelector('.ts-control input, select');
+            if (last) { last.focus(); }
+        });
         (Object.keys(old).length ? Object.values(old) : [{}]).forEach(addRow);
     })();
 </script>
