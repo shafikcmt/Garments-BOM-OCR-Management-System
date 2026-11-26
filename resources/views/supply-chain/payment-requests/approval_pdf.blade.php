@@ -47,7 +47,7 @@
         .buyer { font-size: 9px; line-height: 1.7; font-weight: 700; }
         .note { font-size: 8.5px; line-height: 1.4; font-weight: 700; padding-top: 5px; }
         .check { min-height: 60px; padding: 8px 10px; font-size: 8.5px; line-height: 1.5; border: 1px solid #4a5cb2; }
-        .mini-box { display: inline-block; width: 11px; height: 11px; border: 1px solid #91a1d0; vertical-align: middle; margin: 0 5px 0 13px; }
+        .mini-box { display: inline-block; width: 11px; height: 11px; text-align: center; font-size: 10px; line-height: 11px; font-weight: 700; color: #000b6f; border: 1px solid #91a1d0; vertical-align: middle; margin: 0 5px 0 13px; }
         .line { display: inline-block; border-bottom: 1px solid #4a5cb2; width: 132px; height: 10px; }
         .total { text-align: right; font-size: 12px; font-weight: 700; margin: 3px 0 5px; }
         .report { table-layout: fixed; color: #111827; }
@@ -156,7 +156,7 @@
                  this prints the original blank form for signing by hand. --}}
             <div class="check">
                 <strong>OCR Checked:</strong>
-                <span class="mini-box">{{ $ocrCheck ? '×' : '' }}</span> Yes
+                <span class="mini-box">{{ $ocrCheck ? '✓' : '' }}</span> Yes
                 <span class="mini-box"></span> No<br>
                 Checker Name&nbsp;&nbsp;&nbsp;&nbsp;:
                 @if($ocrCheck)<span class="filled">{{ $ocrCheck['name'] }}</span>@else<span class="line"></span>@endif<br>
