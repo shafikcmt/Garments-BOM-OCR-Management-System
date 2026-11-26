@@ -169,12 +169,12 @@
         <tr>
             <td>
                 <div style="font-size:8px;margin-bottom:2px;">{{ $order->checkedBy?->name }} {{ $order->checked_at?->format('d-m-Y') }}</div>
-                <div class="line">Checked By</div>
+                <div class="line">{{ \App\Support\PurchasingSettings::poSignLabels()['checked'] }}</div>
                 <small>For Humana Apparels Pvt Ltd.</small>
             </td>
             <td style="text-align:right;">
                 <div style="font-size:8px;margin-bottom:2px;">{{ $order->authorisedBy?->name }} {{ $order->authorised_at?->format('d-m-Y') }}</div>
-                <div class="line">Authorised Signatory</div>
+                <div class="line">{{ \App\Support\PurchasingSettings::poSignLabels()['authorised'] }}</div>
                 <small>For Humana Apparels Pvt Ltd.</small>
             </td>
         </tr>

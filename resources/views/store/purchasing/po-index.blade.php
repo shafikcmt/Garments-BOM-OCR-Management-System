@@ -14,6 +14,12 @@
     <x-flash />
     @include('store.purchasing._nav')
 
+    @if(\App\Support\PurchasingSettings::mayManage(auth()->user()))
+        <div class="mb-3 text-end">
+            <a href="{{ route('store.purchasing.po.settings') }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-sliders me-1" aria-hidden="true"></i>PO format &amp; approvers</a>
+        </div>
+    @endif
+
     <div class="card gx-stock-card">
         <div class="gx-stock-card-body">
             <form method="GET" class="row g-3 gx-stock-filter mb-3">
