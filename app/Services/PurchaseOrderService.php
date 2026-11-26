@@ -109,7 +109,8 @@ class PurchaseOrderService
                 : 'Every item of this Comparative Statement already has a purchase order.']);
         }
 
-        $defaults = (array) config('purchasing.po_defaults');
+        // Config values, overridden by what Admin / a department head saved on the PO Setup screen.
+        $defaults = \App\Support\PurchasingSettings::poDefaults() + (array) config('purchasing.po_defaults');
 
         return DB::transaction(function () use ($cs, $user, $groups, $defaults) {
             $orders = collect();

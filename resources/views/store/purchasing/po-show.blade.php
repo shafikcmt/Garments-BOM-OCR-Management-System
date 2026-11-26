@@ -79,7 +79,7 @@
             @if($order->isDraft() && ! isset($allowed['check']))
                 <span class="small text-muted">Approval 1 of 2: someone other than the person who made it has to check this purchase order.</span>
             @elseif($order->status === 'checked' && ! isset($allowed['authorise']))
-                <span class="small text-muted">Approval 2 of 2: the Authorised Signatory, who is neither the maker nor the checker, has to authorise it before Store can receive goods.</span>
+                <span class="small text-muted">Approval 2 of 2: the {{ \App\Support\PurchasingSettings::poSignLabels()['authorised'] }}, who is neither the maker nor the checker, has to authorise it before Store can receive goods.</span>
             @endif
 
             @if(isset($allowed['cancel']))

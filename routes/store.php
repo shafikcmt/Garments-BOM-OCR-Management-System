@@ -636,6 +636,10 @@ Route::prefix('store/purchasing')
 
         Route::middleware('role_or_perm:admin|management|store.purchase_po.view')->group(function () {
             Route::get('/po', [InternalPurchaseOrderController::class, 'index'])->name('po.index');
+            // PO format defaults and who gives each purchase approval (Admin and department heads; checked in the controller).
+            Route::get('/po-setup', [\App\Http\Controllers\Store\PurchaseSettingsController::class, 'index'])->name('po.settings');
+            Route::post('/po-setup/format', [\App\Http\Controllers\Store\PurchaseSettingsController::class, 'saveFormat'])->name('po.settings.format');
+            Route::post('/po-setup/approvers', [\App\Http\Controllers\Store\PurchaseSettingsController::class, 'saveApprovers'])->name('po.settings.approvers');
             Route::post('/cs/{cs}/po', [InternalPurchaseOrderController::class, 'storeFromStatement'])->name('po.store');
             Route::get('/po/{order}', [InternalPurchaseOrderController::class, 'show'])->name('po.show');
             Route::get('/po/{order}/edit', [InternalPurchaseOrderController::class, 'edit'])->name('po.edit');
