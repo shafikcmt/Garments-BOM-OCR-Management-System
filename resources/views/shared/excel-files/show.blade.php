@@ -1642,6 +1642,18 @@
 
     .po-row-locked { background: #fff7ed !important; }
     .file-row-locked { background: #f8fafc !important; }
+    .col-pick { position: fixed; z-index: 1085; width: 280px; max-width: calc(100vw - 16px); background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 14px 34px rgba(15,23,42,.18); display: none; }
+    .col-pick.is-open { display: block; }
+    .col-pick-head { padding: 8px 12px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #64748b; border-bottom: 1px solid #eef2f7; }
+    .col-pick-list { max-height: 260px; overflow-y: auto; padding: 4px 0; }
+    .col-pick-item { display: flex; align-items: center; gap: 8px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; }
+    .col-pick-item:hover { background: #f1f5f9; }
+    .col-pick-item input { flex: 0 0 auto; }
+    .col-pick-empty { padding: 12px; font-size: 12px; color: #64748b; }
+    .col-pick-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid #eef2f7; }
+    .col-pick-foot .col-pick-count { font-size: 11.5px; color: #64748b; }
+    .col-pick-foot button { border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: #334155; }
+    .col-pick-foot button.is-primary { background: #006C9D; border-color: #006C9D; color: #fff; }
     .pi-total-chip { margin-top: 4px; display: inline-block; padding: 2px 9px; border-radius: 999px; background: #e7f6ec; color: #17673a; font-size: 11px; font-weight: 800; white-space: nowrap; }
     .pi-total-chip span { font-weight: 600; opacity: .8; }
     .po-row-lock-badge,
@@ -3899,6 +3911,134 @@ document.addEventListener('DOMContentLoaded', function () {
     if (applySheetSearchButton) {
         applySheetSearchButton.addEventListener('click', submitServerSheetSearch);
     }
+
+    /* TICK-LIST UNDER A COLUMN SEARCH BOX
+     * Click a column's search box and the values that column holds appear with
+     * tick boxes. Ticking writes them into the box as a comma list (the same
+     * multi-value search typed by hand), and Apply runs the normal search, so
+     * there is no second filter. Typing narrows the list. */
+    (function () {
+        const valuesUrl = @json(route('uploaded-files.column_values', $excelFile));
+        const panel = document.createElement('div');
+        panel.className = 'col-pick';
+        panel.innerHTML = '<div class="col-pick-head"></div><div class="col-pick-list"></div>'
+            + '<div class="col-pick-foot"><span class="col-pick-count"></span><span><button type="button" data-pick-clear>Clear</button> <button type="button" class="is-primary" data-pick-apply>Apply</button></span></div>';
+        document.body.appendChild(panel);
+
+        const head = panel.querySelector('.col-pick-head');
+        const list = panel.querySelector('.col-pick-list');
+        const count = panel.querySelector('.col-pick-count');
+        let activeInput = null;
+        let timer = null;
+        let token = 0;
+        let interacted = false;
+        ['mousedown', 'keydown', 'touchstart'].forEach(name => document.addEventListener(name, () => { interacted = true; }, true));
+
+        const terms = (input) => input.value.split(',').map(t => t.trim()).filter(Boolean);
+        const setTerms = (input, items) => { input.value = items.join(', '); updateCount(); };
+        const updateCount = () => {
+            const n = activeInput ? terms(activeInput).length : 0;
+            count.textContent = n ? n + ' selected' : 'Nothing selected';
+        };
+
+        function place(input) {
+            const box = input.getBoundingClientRect();
+            const left = Math.max(8, Math.min(box.left, window.innerWidth - panel.offsetWidth - 8));
+            panel.style.left = left + 'px';
+            panel.style.top = (box.bottom + 4) + 'px';
+        }
+
+        function render(values, truncated) {
+            const chosen = new Set(terms(activeInput).map(t => t.toLowerCase()));
+            list.innerHTML = '';
+
+            if (!values.length) {
+                list.innerHTML = '<div class="col-pick-empty">No matching values.</div>';
+                return;
+            }
+
+            values.forEach(value => {
+                const label = document.createElement('label');
+                label.className = 'col-pick-item';
+                const box = document.createElement('input');
+                box.type = 'checkbox';
+                box.className = 'form-check-input';
+                box.checked = chosen.has(value.toLowerCase());
+                box.addEventListener('change', () => {
+                    const current = terms(activeInput).filter(t => t.toLowerCase() !== value.toLowerCase());
+                    if (box.checked) current.push(value);
+                    setTerms(activeInput, current);
+                });
+                const text = document.createElement('span');
+                text.textContent = value;
+                label.append(box, text);
+                list.appendChild(label);
+            });
+
+            if (truncated) {
+                const more = document.createElement('div');
+                more.className = 'col-pick-empty';
+                more.textContent = 'More values exist. Type to narrow the list.';
+                list.appendChild(more);
+            }
+        }
+
+        function load() {
+            if (!activeInput) return;
+            const mine = ++token;
+            // Narrow by what is being typed after the last comma.
+            const typed = activeInput.value.split(',').pop().trim();
+            const url = valuesUrl + '?header_id=' + encodeURIComponent(activeInput.dataset.filterKey) + (typed ? '&q=' + encodeURIComponent(typed) : '');
+
+            fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : { values: [], truncated: false })
+                .then(data => { if (mine === token) render(data.values || [], !!data.truncated); })
+                .catch(() => { if (mine === token) render([], false); });
+        }
+
+        function open(input) {
+            activeInput = input;
+            const headerCell = document.querySelector('thead th[data-header-id="' + input.dataset.filterKey + '"] .header-title');
+            head.textContent = headerCell ? headerCell.textContent.trim() : 'Values';
+            panel.classList.add('is-open');
+            place(input);
+            updateCount();
+            load();
+        }
+
+        function close() {
+            panel.classList.remove('is-open');
+            activeInput = null;
+        }
+
+        filterInputs.forEach(input => {
+            const key = input.dataset.filterKey;
+            if (!key || key === '__row') return;
+
+            // After a search the page reloads and puts focus back in the box by script;
+            // the list opens only once the user has clicked or pressed a key.
+            input.addEventListener('focus', () => { if (interacted) open(input); });
+            input.addEventListener('input', () => {
+                updateCount();
+                clearTimeout(timer);
+                timer = setTimeout(load, 250);
+            });
+        });
+
+        panel.addEventListener('mousedown', e => e.preventDefault()); // keep the box focused
+        panel.querySelector('[data-pick-apply]').addEventListener('click', () => { close(); submitServerSheetSearch(); });
+        panel.querySelector('[data-pick-clear]').addEventListener('click', () => {
+            if (activeInput) { activeInput.value = ''; updateCount(); load(); }
+        });
+        document.addEventListener('mousedown', e => {
+            if (!panel.classList.contains('is-open')) return;
+            if (panel.contains(e.target) || (activeInput && e.target === activeInput)) return;
+            close();
+        });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+        window.addEventListener('resize', () => activeInput && place(activeInput));
+        document.addEventListener('scroll', () => activeInput && place(activeInput), true);
+    })();
 
     /* Order Information boxes for a VARIED field carry a filter instead of a
      * value. Choosing one narrows the sheet through the same
