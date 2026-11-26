@@ -539,6 +539,51 @@ class ExcelFileController extends Controller
         ]);
     }
 
+    /**
+     * The distinct values a Workspace column holds in this file, for the tick-list
+     * under a column's search box. Read-only; only columns this user may view.
+     * Values that contain a comma are left out, because the search box separates
+     * its choices with commas.
+     */
+    public function columnValues(Request $request, ExcelFile $excelFile)
+    {
+        $data = $request->validate([
+            'header_id' => ['required', 'integer'],
+            'q' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $header = ExcelHeader::with(['ownerRole', 'editorRoles:id'])
+            ->where('is_active', true)
+            ->find((int) $data['header_id']);
+
+        abort_if(! $header || ! $this->canViewHeader($header, $this->getRoleIds()), 404);
+
+        $needle = trim((string) ($data['q'] ?? ''));
+        $limit = 300;
+
+        $query = ExcelCell::query()
+            ->whereIn('row_id', $excelFile->rows()->select('id'))
+            ->where('header_id', $header->id)
+            ->whereNotNull('value')
+            ->whereRaw("TRIM(value) <> ''");
+
+        if ($needle !== '') {
+            $query->whereLike('value', '%' . $needle . '%');
+        }
+
+        $values = $query->pluck('value')
+            ->map(fn ($value) => trim((string) $value))
+            ->filter(fn ($value) => $value !== '' && ! str_contains($value, ','))
+            ->unique()
+            ->sort(SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        return response()->json([
+            'values' => $values->take($limit)->all(),
+            'truncated' => $values->count() > $limit,
+        ]);
+    }
+
    public function update(Request $request, ExcelFile $excelFile)
     {
         $user = auth()->user();
