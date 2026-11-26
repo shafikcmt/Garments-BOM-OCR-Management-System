@@ -2408,7 +2408,14 @@
                                                 data-cell-value="{{ $value }}"
                                                 title="{{ ($isFileLockedForUser ?? false) ? 'This workspace file is locked by admin' : ($isPoRowLocked ? 'This PO row is locked by admin control' : ($isCalculated ? 'Calculated field - live auto update before save' : '')) }}"
                                             >
-                                                {{ $value !== '' && $value !== null ? $value : '-' }}
+                                                {{-- PI Amount is money: shown with 2 decimals (the saved value keeps its full
+                                                     precision, so PRA and totals are unaffected). --}}
+                                                @php
+                                                    $showMoney2 = $isCalculated
+                                                        && in_array($header->header_key, ['pi_amount'], true)
+                                                        && is_numeric(str_replace(',', '', (string) $value));
+                                                @endphp
+                                                {{ $showMoney2 ? number_format((float) str_replace(',', '', (string) $value), 2) : ($value !== '' && $value !== null ? $value : '-') }}
                                             </div>
                                         @endif
                                     </td>
@@ -3435,7 +3442,14 @@ document.addEventListener('DOMContentLoaded', function () {
         return n.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
     }
 
-    function setFormulaValue(row, keys, value) {
+    // Money shown with exactly two decimals (display only).
+    function fmtMoney2(value) {
+        if (value === null || value === undefined || value === '') return '';
+        const n = Number(value);
+        return Number.isFinite(n) ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+    }
+
+    function setFormulaValue(row, keys, value, shown) {
         let targetIndex;
 
         for (const key of keys) {
@@ -3455,8 +3469,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!display) return;
 
         const normalizedValue = value === null || value === undefined || value === '' ? '' : String(value);
+        // `shown` is what the cell displays when that differs from the value it holds
+        // (money with two decimals); dependent formulas still read the full value.
         display.dataset.cellValue = normalizedValue;
-        display.textContent = normalizedValue !== '' ? normalizedValue : '-';
+        const shownText = shown !== undefined && shown !== null && shown !== '' ? String(shown) : normalizedValue;
+        display.textContent = shownText !== '' ? shownText : '-';
         display.classList.add('formula-live-updated');
     }
 
@@ -3626,7 +3643,7 @@ document.addEventListener('DOMContentLoaded', function () {
             setFormulaValue(row, ['short_excess_ordered', 'short_excess_ordered_qty'], fmtNum(shortExcessOrdered));
             setFormulaValue(row, ['material_order_status'], materialOrderStatus);
             setFormulaValue(row, ['pi_status'], piStatus);
-            setFormulaValue(row, ['pi_amount'], fmtNum(piAmount));
+            setFormulaValue(row, ['pi_amount'], fmtNum(piAmount), fmtMoney2(piAmount));
             setFormulaNote(row, ['pi_amount'], piWorking, ppQtyBilled > 0);
             setFormulaValue(row, ['payment_reqd_date', 'payment_req_d_date', 'payment_required_date'], (pra && pra.reqd) ? pra.reqd : fmtDate(paymentReqdDate));
             if (pra && pra.submission) {
