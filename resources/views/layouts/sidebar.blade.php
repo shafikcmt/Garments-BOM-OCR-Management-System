@@ -2,7 +2,7 @@
     $isAdminMerch = request()->routeIs('merchant.status.*') || request()->routeIs('merchant.ocr.*') || request()->routeIs('merchant.samples.*') || request()->routeIs('merchant.inquiries.*') || request()->routeIs('merchant.meetings.*') || request()->routeIs('merchant.analytics.*') || request()->routeIs('merchant.consumption.*') || request()->routeIs('merchant.costing_templates.*') || request()->routeIs('merchant.reports.*');
     $isAdminSupply = request()->routeIs('store.purchasing.*') || request()->routeIs('admin.cs-signatures.*') || request()->routeIs('supply_chain.supplier_delivery') || request()->routeIs('supply_chain.reports.*');
     $isAdminCommercial = request()->routeIs('commercial.shipments.*') || request()->routeIs('commercial.reports.*');
-    $isAdminRequisitionSetup = request()->routeIs('admin.departments.*') || request()->routeIs('admin.requisition-signatures.*') || request()->routeIs('store.stock.requisitions.window.*') || request()->routeIs('admin.item-sku.*');
+    $isAdminRequisitionSetup = request()->routeIs('admin.departments.*') || request()->routeIs('admin.requisition-signatures.*') || request()->routeIs('store.stock.requisitions.window.*') || request()->routeIs('admin.item-sku.*') || request()->routeIs('store.purchasing.po.settings*');
     $isMerchDesk = request()->routeIs('merchant.inquiries.*') || request()->routeIs('merchant.samples.*') || request()->routeIs('merchant.meetings.*');
     $isMerchCosting = request()->routeIs('merchant.consumption.*') || request()->routeIs('merchant.costing_templates.*') || request()->routeIs('merchant.vendors.*');
     $isMerchReports = request()->routeIs('merchant.status.*') || request()->routeIs('merchant.reports.*') || request()->routeIs('merchant.analytics.*') || request()->routeIs('merchant.ocr.*') || request()->routeIs('store.reports.*');
@@ -219,10 +219,11 @@
                             <span class="sidebar-submenu-rail"></span>
                             <a href="{{ route('store.purchasing.queue') }}" class="sidebar-sub-link {{ request()->routeIs('store.purchasing.queue') ? 'is-active' : '' }}">To Purchase</a>
                             <a href="{{ route('store.purchasing.cs.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.purchasing.cs.*') ? 'is-active' : '' }}">Comparative Statement</a>
-                            <a href="{{ route('store.purchasing.po.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.purchasing.po.*') ? 'is-active' : '' }}">Internal PO</a>
+                            <a href="{{ route('store.purchasing.po.index') }}" class="sidebar-sub-link {{ request()->routeIs('store.purchasing.po.*') && ! request()->routeIs('store.purchasing.po.settings*') ? 'is-active' : '' }}">Internal PO</a>
                             <a href="{{ route('supply_chain.supplier_delivery') }}" class="sidebar-sub-link {{ request()->routeIs('supply_chain.supplier_delivery') ? 'is-active' : '' }}">Supplier Delivery</a>
                             <a href="{{ route('supply_chain.reports.index') }}" class="sidebar-sub-link {{ request()->routeIs('supply_chain.reports.*') ? 'is-active' : '' }}">Supply Chain Reports</a>
                             <a href="{{ route('admin.cs-signatures.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.cs-signatures.*') ? 'is-active' : '' }}">CS Signatures</a>
+                            <a href="{{ route('store.purchasing.po.settings') }}" class="sidebar-sub-link {{ request()->routeIs('store.purchasing.po.settings*') ? 'is-active' : '' }}">PO Format &amp; Approvers</a>
                         </div>
                     </li>
 
@@ -344,6 +345,7 @@
                             <a href="{{ route('admin.requisition-signatures.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.requisition-signatures.*') ? 'is-active' : '' }}">Requisition Signatures</a>
                             <a href="{{ route('store.stock.requisitions.window.edit') }}" class="sidebar-sub-link {{ request()->routeIs('store.stock.requisitions.window.*') ? 'is-active' : '' }}">Monthly Requisition Window</a>
                             <a href="{{ route('admin.item-sku.edit') }}" class="sidebar-sub-link {{ request()->routeIs('admin.item-sku.*') ? 'is-active' : '' }}">Item SKU</a>
+                            <a href="{{ route('store.purchasing.po.settings') }}" class="sidebar-sub-link {{ request()->routeIs('store.purchasing.po.settings*') ? 'is-active' : '' }}">PO Format &amp; Approvers</a>
                         </div>
                     </li>
 
