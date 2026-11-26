@@ -141,7 +141,19 @@ class PraStepController extends Controller
             $neighbour->update(['position' => $a]);
         });
 
-        return redirect()->route('admin.pra-steps.index')->with('success', 'Step order updated.');
+        // A PRA never goes back: one already past the new place of a moved step
+        // carries on from where it is and does not pass through that step.
+        $passed = PaymentRequest::query()
+            ->where('flow_version', PaymentRequest::FLOW_DEPARTMENTAL)
+            ->whereNotNull('current_sequence')
+            ->whereIn('current_sequence', PraStep::query()->where('position', '>', min($praStep->position, $neighbour->position))->pluck('sequence'))
+            ->count();
+
+        $redirect = redirect()->route('admin.pra-steps.index')->with('success', 'Step order updated.');
+
+        return $passed > 0
+            ? $redirect->with('warning', $passed . ' PRA(s) are already further along in the chain. They continue from their current step and will not go back through a step that was moved before them.')
+            : $redirect;
     }
 
     /** Switch a step off (out of the chain) or back on. */
