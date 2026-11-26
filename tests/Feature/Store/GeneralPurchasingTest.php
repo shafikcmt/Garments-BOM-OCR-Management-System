@@ -207,6 +207,37 @@ it('lists only approved, still-to-buy lines on the To Purchase queue', function 
         ->not->toContain('Monthly Dept Item');  // merged into a Final sheet, never bought from
 });
 
+it('groups the queue by requisition and filters it by section and requisition', function () {
+    $cutting = \App\Models\IndentSection::create(['name' => 'Cutting', 'department_key' => 'production', 'is_active' => true]);
+    $maint = \App\Models\IndentSection::create(['name' => 'Maintenance', 'department_key' => 'maintenance', 'is_active' => true]);
+    $dept = ['level' => PurchaseRequisition::LEVEL_DEPARTMENT, 'requisition_type' => PurchaseRequisition::TYPE_INDIVIDUAL];
+    $a = gpApproved([['Cutting Oil', 3], ['Cutting Blade', 4]], $dept + ['indent_section_id' => $cutting->id, 'requisition_no' => 'HAPL/CUTTING/2026/October/01']);
+    $b = gpApproved([['Pipe Nipple', 2]], $dept + ['indent_section_id' => $maint->id, 'requisition_no' => 'HAPL/MAINTENANCE/2026/October/02']);
+    $user = gpUser();
+
+    // Grouped by requisition: one block per requisition, with its own "make CS" button.
+    $html = $this->actingAs($user)->get(route('store.purchasing.queue', ['type' => 'individual']))->assertOk()->getContent();
+    expect($html)->toContain('HAPL/CUTTING/2026/October/01')->toContain('HAPL/MAINTENANCE/2026/October/02')
+        ->toContain('Make CS for this requisition only')
+        ->and(substr_count($html, 'data-only="'))->toBe(2);
+
+    // One section: only its requisition and items.
+    $html = $this->actingAs($user)->get(route('store.purchasing.queue', ['type' => 'individual', 'section' => $cutting->id]))->assertOk()->getContent();
+    expect($html)->toContain('Cutting Oil')->toContain('Cutting Blade')->not->toContain('Pipe Nipple');
+
+    // One requisition.
+    $html = $this->actingAs($user)->get(route('store.purchasing.queue', ['requisition' => $b->id]))->assertOk()->getContent();
+    expect($html)->toContain('Pipe Nipple')->not->toContain('Cutting Oil');
+
+    // The by-category view still works.
+    $this->actingAs($user)->get(route('store.purchasing.queue', ['group' => 'category']))->assertOk()->assertSee('Make CS for')->assertSee('only');
+
+    // Starting a CS from one requisition's lines carries just those lines.
+    $this->actingAs(gpUser(['store.purchase_cs.create'], 'Maker'))
+        ->post(route('store.purchasing.cs.start'), ['lines' => $a->items->pluck('id')->all()])
+        ->assertRedirect(route('store.purchasing.cs.create'));
+});
+
 // ------------------------------------------------------------- Comparative Statement
 
 it('makes a CS from queue lines, and takes the quantity off the queue', function () {

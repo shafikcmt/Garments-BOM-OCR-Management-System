@@ -1089,6 +1089,8 @@ Final or Individual requisition approved
 
 **1. To Purchase.** Open **General Stock Purchasing, To Purchase**. It lists every item of an approved Final or Individual requisition that is not on a Comparative Statement yet, with the quantity left to buy and the last rate. Tick the items (or the whole requisition) and press **Make Comparative Statement**. An item you have not ticked stays in the list. If a requisition has no items here, everything on it is already on a statement.
 
+**By category or by requisition.** The list is grouped by **Category** by default. Choose **Group by: Requisition** (it is chosen for you when **Requisition type** is **Individual**) to see one block per requisition, with its number, **Individual** or **Final**, the section, who requested it and the date. Each block has its own button, **Make CS for this requisition only**, so one department's one-off need becomes its own Comparative Statement in one click. Narrow the list with **Section** or **Requisition**, and with Requisition type, Category or the search box. In the by-requisition view the last column shows each item's category.
+
 **1a. Long monthly lists (200 to 500+ items).** The list is grouped by **category** (Electrical, Stationery, Cleaning and so on), because each supplier type gets its own Comparative Statement. Use the **Category** filter to look at one, or press **Make CS for [category] only** to start a statement for just that category in one click. You can still tick single items, a whole category (the box in its heading) or **Select all shown**. Items with no category appear under **Uncategorised**.
 
 **2. Make the Comparative Statement.**
