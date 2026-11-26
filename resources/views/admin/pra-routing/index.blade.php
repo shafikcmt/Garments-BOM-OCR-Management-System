@@ -8,9 +8,11 @@
     $namesOf = fn (array $ids) => collect($ids)->map(fn ($id) => $usersById[$id]['name'] ?? null)->filter()->values()->all();
     $stepData = collect($steps)->mapWithKeys(fn ($step) => [$step['sequence'] => [
         'label' => $step['label'],
+        'ordinal' => $step['ordinal'],
         'automatic' => $step['automatic'],
         'global_ids' => $step['global_ids'],
-        'buyer_rules' => collect($step['buyer_rules'])->mapWithKeys(fn ($rule) => [$rule['buyer_id'] => $rule['ids']])->all(),
+        // Rule per buyer, so choosing a buyer can show who is already set for it.
+        'buyer_rules' => collect($step['buyer_groups'])->flatMap(fn ($group) => collect($group['buyer_ids'])->mapWithKeys(fn ($id) => [$id => $group['ids']]))->all(),
     ]]);
 @endphp
 
@@ -60,7 +62,7 @@
         <div class="collapse mt-3" id="routingHelp">
             <ul class="small text-muted mb-0 ps-3">
                 <li>A PRA moves through five steps. Unless you choose people, each step goes to the right department <strong>automatically</strong> (the Merchandising steps only to people who have access to the PRA's buyer).</li>
-                <li>Press <strong>Change approvers</strong> to choose people for a step, for <strong>all buyers</strong> or for <strong>one buyer</strong>. A buyer rule is used instead of the all-buyers rule for that buyer.</li>
+                <li>Press <strong>Change approvers</strong> to choose people for a step, for <strong>all buyers</strong> or for <strong>specific buyers</strong> (one or several, but not all). A rule for specific buyers is used instead of the all-buyers rule for those buyers.</li>
                 <li>Any <strong>one</strong> of the chosen people can complete the step. People you choose do not need buyer access.</li>
                 <li>Clear everyone and save to go back to automatic. Changes apply to every PRA from now on, including ones already waiting.</li>
             </ul>
@@ -84,9 +86,9 @@
     @endunless
 
     @foreach($steps as $step)
-        @php $isCustom = count($step['global_ids']) || count($step['buyer_rules']); @endphp
+        @php $isCustom = count($step['global_ids']) || count($step['buyer_groups']); @endphp
         <div class="rt-step">
-            <div class="rt-num">{{ $step['sequence'] }}</div>
+            <div class="rt-num">{{ $step['ordinal'] }}</div>
             <div class="rt-body">
                 <div class="d-flex flex-wrap align-items-center gap-2">
                     <span class="rt-title">{{ $step['label'] }}</span>
@@ -108,21 +110,29 @@
                     @endif
                 </div>
 
-                @foreach($step['buyer_rules'] as $rule)
+                @foreach($step['buyer_groups'] as $group)
                     <div class="rt-rule">
                         <div class="min-w-0">
-                            <div class="small fw-semibold"><i class="bi bi-person-badge me-1" aria-hidden="true"></i>{{ $rule['buyer'] }}</div>
+                            <div class="rt-chips mt-0">
+                                <span class="small text-muted align-self-center me-1"><i class="bi bi-person-badge me-1" aria-hidden="true"></i>{{ count($group['buyers']) > 1 ? 'Buyers:' : 'Buyer:' }}</span>
+                                @foreach($group['buyers'] as $buyerName)<span class="rt-chip" style="background:#fff3cd;color:#7a4b00;">{{ $buyerName }}</span>@endforeach
+                            </div>
                             <div class="rt-chips mt-1">
-                                @foreach($rule['users'] as $name)<span class="rt-chip">{{ $name }}</span>@endforeach
+                                <span class="small text-muted align-self-center me-1">Approvers:</span>
+                                @foreach($group['users'] as $name)<span class="rt-chip">{{ $name }}</span>@endforeach
                             </div>
                         </div>
                         <div class="d-flex gap-1 flex-shrink-0">
-                            <button type="button" class="btn btn-sm btn-outline-primary js-open-routing" data-seq="{{ $step['sequence'] }}" data-mode="buyer" data-buyer="{{ $rule['buyer_id'] }}">
+                            <button type="button" class="btn btn-sm btn-outline-primary js-open-routing" data-seq="{{ $step['sequence'] }}" data-mode="buyer"
+                                    data-buyers="{{ implode(',', $group['buyer_ids']) }}" data-people="{{ implode(',', $group['ids']) }}">
                                 <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
                             </button>
-                            <form method="POST" action="{{ route('admin.pra-routing.remove_buyer', [$step['sequence'], $rule['buyer_id']]) }}" onsubmit="return confirm('Remove this buyer rule?');">
+                            {{-- Clearing the people for these buyers removes the rule. --}}
+                            <form method="POST" action="{{ route('admin.pra-routing.save_buyer', $step['sequence']) }}" onsubmit="return confirm('Remove this rule for {{ count($group['buyers']) > 1 ? 'these buyers' : 'this buyer' }}?');">
                                 @csrf
-                                @method('DELETE')
+                                @foreach($group['buyer_ids'] as $groupBuyerId)
+                                    <input type="hidden" name="buyer_ids[]" value="{{ $groupBuyerId }}">
+                                @endforeach
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1" aria-hidden="true"></i>Remove</button>
                             </form>
                         </div>
@@ -133,8 +143,8 @@
                 <button type="button" class="btn btn-primary btn-sm js-open-routing" data-seq="{{ $step['sequence'] }}" data-mode="all" {{ $available ? '' : 'disabled' }}>
                     <i class="bi bi-people me-1" aria-hidden="true"></i>Change approvers
                 </button>
-                <button type="button" class="btn btn-outline-primary btn-sm js-open-routing" data-seq="{{ $step['sequence'] }}" data-mode="buyer" data-buyer="" {{ $available ? '' : 'disabled' }}>
-                    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add buyer rule
+                <button type="button" class="btn btn-outline-primary btn-sm js-open-routing" data-seq="{{ $step['sequence'] }}" data-mode="buyer" data-buyers="" data-people="" {{ $available ? '' : 'disabled' }}>
+                    <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add specific buyers
                 </button>
             </div>
         </div>
@@ -160,17 +170,24 @@
                         <input type="radio" class="btn-check" name="routing_mode" id="modeAll" value="all" autocomplete="off">
                         <label class="btn btn-outline-primary btn-sm" for="modeAll">All buyers</label>
                         <input type="radio" class="btn-check" name="routing_mode" id="modeBuyer" value="buyer" autocomplete="off">
-                        <label class="btn btn-outline-primary btn-sm" for="modeBuyer">One buyer</label>
+                        <label class="btn btn-outline-primary btn-sm" for="modeBuyer">Specific buyers</label>
                     </div>
 
                     <div class="mb-3" id="routingBuyerWrap" hidden>
-                        <label class="form-label small fw-semibold mb-1" for="routingBuyer">Buyer</label>
-                        <select name="buyer_id" id="routingBuyer" class="form-select form-select-sm">
-                            <option value="">— Choose a buyer —</option>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label small fw-semibold mb-0">Buyers <span class="text-muted fw-normal">(tick one or more)</span></label>
+                            <span class="small text-muted"><strong id="routingBuyerCount">0</strong> selected</span>
+                        </div>
+                        <input type="search" class="form-control form-control-sm mb-2" id="routingBuyerSearch" placeholder="Search buyers" aria-label="Search buyers" autocomplete="off">
+                        <div class="rt-list" id="routingBuyerList" style="max-height:150px;">
                             @foreach($buyers as $buyer)
-                                <option value="{{ $buyer->id }}">{{ $buyer->buyer_name }}</option>
+                                <label class="rt-person" data-name="{{ strtolower($buyer->buyer_name) }}">
+                                    <input type="checkbox" class="form-check-input mt-0" name="buyer_ids[]" value="{{ $buyer->id }}" disabled>
+                                    <span class="flex-grow-1 fw-semibold">{{ $buyer->buyer_name }}</span>
+                                </label>
                             @endforeach
-                        </select>
+                        </div>
+                        <div id="routingOriginalBuyers"></div>
                     </div>
 
                     <div class="d-flex gap-2 mb-2">
@@ -213,13 +230,20 @@
         const onlySelected = document.getElementById('routingOnlySelected');
         const countEl = document.getElementById('routingCount');
         const buyerWrap = document.getElementById('routingBuyerWrap');
-        const buyerSelect = document.getElementById('routingBuyer');
+        const buyerList = document.getElementById('routingBuyerList');
+        const buyerSearch = document.getElementById('routingBuyerSearch');
+        const buyerCount = document.getElementById('routingBuyerCount');
+        const originalWrap = document.getElementById('routingOriginalBuyers');
+        const saveBtn = document.getElementById('routingSave');
+        const buyerBoxes = Array.from(buyerList.querySelectorAll('input[type=checkbox]'));
         const modeAll = document.getElementById('modeAll');
         const modeBuyer = document.getElementById('modeBuyer');
         const titleEl = document.getElementById('routingModalTitle');
         const subEl = document.getElementById('routingModalSub');
 
         let seq = null;
+        // The people to tick when the dialog is in "specific buyers" mode (from the rule being edited).
+        let buyerPeople = [];
 
         // The people list is drawn once; ticking and ordering happen on open.
         people.forEach(function (p) {
@@ -238,11 +262,8 @@
         const rows = Array.from(list.querySelectorAll('.rt-person'));
 
         function currentIds() {
-            const step = steps[seq] || { global_ids: [], buyer_rules: {} };
-            if (modeBuyer.checked) {
-                return (step.buyer_rules[buyerSelect.value] || []).map(Number);
-            }
-            return (step.global_ids || []).map(Number);
+            const step = steps[seq] || { global_ids: [] };
+            return (modeBuyer.checked ? buyerPeople : (step.global_ids || [])).map(Number);
         }
 
         function applyFilter() {
@@ -275,25 +296,62 @@
             applyFilter();
         }
 
+        function refreshBuyers() {
+            const picked = buyerBoxes.filter(function (box) { return box.checked; });
+            buyerCount.textContent = picked.length;
+            buyerBoxes.forEach(function (box) { box.closest('.rt-person').classList.toggle('is-checked', box.checked); });
+            // "Specific buyers" needs at least one buyer to save.
+            saveBtn.disabled = modeBuyer.checked && picked.length === 0;
+        }
+
+        function filterBuyers() {
+            const term = buyerSearch.value.trim().toLowerCase();
+            buyerList.querySelectorAll('.rt-person').forEach(function (row) {
+                if (term && row.dataset.name.indexOf(term) === -1) { row.style.setProperty('display', 'none', 'important'); }
+                else { row.style.removeProperty('display'); }
+            });
+        }
+
         function setMode(mode) {
             const buyer = mode === 'buyer';
             modeAll.checked = !buyer;
             modeBuyer.checked = buyer;
             buyerWrap.hidden = !buyer;
-            buyerSelect.required = buyer;
+            // Buyer ticks are only posted in "specific buyers" mode.
+            buyerBoxes.forEach(function (box) { box.disabled = !buyer; });
             form.action = (buyer ? urlBuyer : urlAll).replace(/0$/, seq).replace(/\/0\/buyer$/, '/' + seq + '/buyer');
-            subEl.textContent = buyer ? 'For one buyer only' : 'For every buyer';
-            if (!buyer) buyerSelect.value = '';
+            subEl.textContent = buyer ? 'For specific buyers only' : 'For every buyer';
+            refreshBuyers();
         }
 
         document.querySelectorAll('.js-open-routing').forEach(function (button) {
             button.addEventListener('click', function () {
                 seq = button.dataset.seq;
-                titleEl.textContent = 'Step ' + seq + ' — ' + (steps[seq] ? steps[seq].label : '');
+                titleEl.textContent = 'Step ' + (steps[seq] ? steps[seq].ordinal : seq) + ' — ' + (steps[seq] ? steps[seq].label : '');
                 search.value = '';
+                buyerSearch.value = '';
                 onlySelected.checked = false;
+
+                // Buyers (and people) of the rule being edited; empty for a new rule.
+                const tickedBuyers = (button.dataset.buyers || '').split(',').filter(Boolean).map(Number);
+                buyerPeople = (button.dataset.people || '').split(',').filter(Boolean).map(Number);
+                buyerBoxes.forEach(function (box) { box.checked = tickedBuyers.indexOf(Number(box.value)) !== -1; });
+                // Remember which buyers the rule covered, so one that is unticked loses it.
+                originalWrap.innerHTML = '';
+                tickedBuyers.forEach(function (id) {
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = 'original_buyer_ids[]';
+                    hidden.value = id;
+                    originalWrap.appendChild(hidden);
+                });
+                // Ticked buyers first.
+                buyerBoxes.map(function (box) { return box.closest('.rt-person'); })
+                    .sort(function (a, b) { return (b.querySelector('input').checked ? 1 : 0) - (a.querySelector('input').checked ? 1 : 0); })
+                    .forEach(function (row) { buyerList.appendChild(row); });
+                filterBuyers();
+
                 setMode(button.dataset.mode);
-                if (button.dataset.mode === 'buyer') buyerSelect.value = button.dataset.buyer || '';
                 loadSelection();
                 modal.show();
             });
@@ -301,7 +359,8 @@
 
         modeAll.addEventListener('change', function () { setMode('all'); loadSelection(); });
         modeBuyer.addEventListener('change', function () { setMode('buyer'); loadSelection(); });
-        buyerSelect.addEventListener('change', loadSelection);
+        buyerList.addEventListener('change', refreshBuyers);
+        buyerSearch.addEventListener('input', filterBuyers);
         search.addEventListener('input', applyFilter);
         onlySelected.addEventListener('change', applyFilter);
         list.addEventListener('change', function () { refreshCount(); applyFilter(); });

@@ -164,7 +164,7 @@ class PaymentRequest extends Model
             self::STATUS_REJECTED => 'Rejected — returned to creator',
             self::STATUS_CANCELLED => 'Cancelled',
             default => $this->current_sequence
-                ? 'Step ' . $this->current_sequence . ' — '
+                ? 'Step ' . app(\App\Services\PraStageResolver::class)->ordinal((int) $this->current_sequence) . ' — '
                     . app(\App\Services\PraStageResolver::class)
                         ->definitionFor((int) $this->current_sequence)['label']
                 : ucfirst(str_replace('_', ' ', (string) $this->status)),
