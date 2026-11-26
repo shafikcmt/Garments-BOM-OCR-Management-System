@@ -910,6 +910,12 @@ PP Qty can be typed with a unit (for example *25 yds*); only the number is used.
 
 **Two decimals, cut not rounded.** PI Amount is shown and saved with two decimals, and each line is **cut** to whole cents instead of rounded up (65.487 becomes 65.48), exactly as the supplier's proforma invoice prints it. So the Workspace total matches the invoice to the cent, and the PRA shows the same amounts.
 
+**Preview everything from the approval page.** Anyone checking or approving a PRA (Merchant, Accounts, Commercial, Supply Chain) can open **View PRA Sheet** and, under **Booking PO**, **Open Booking PO** to see the same documents Supply Chain prepared, plus the PI copy under **Supporting Documents**. A PRA only appears for the people at its current step, so the next step's users see it only after the step before is approved. People who already acted on it can still look back at it.
+
+**Figures are locked once a PRA uses them.** After a PRA is **submitted**, Merchant and Supply Chain can no longer change **Materials Ordered** or **Materials to be Ordered** for the rows on it (the order quantity, consumption and wastage that calculate them are locked too). After the PRA is **approved**, **PI Rate** and **PI Amount** are locked as well. The row shows a lock label such as "In PRA-0012", and those cells become read-only. If a save still includes such a change, it is refused and a message names the PRA. To change a row, Supply Chain first removes that line from the PRA (or the PRA is rejected and corrected). A rejected or cancelled PRA does not lock anything, and Admin users are never blocked.
+
+*Admin:* open **PRA Approval Steps** and use **Protect Workspace data once a PRA is created** to switch the two rules (after submit, after approval) on or off.
+
 **On the PRA preview:** if a line has a PP Qty, a **PP Qty billing** box appears above the sheet. Each line starts as **Free** (matching the Workspace). Choose **Billed** for a line and press **Update amount** to add its PP Qty for this PRA only; the Workspace is not changed. Every time a PRA is previewed or created, the Workspace amounts are recalculated first, so the PRA always shows the current figure.
 
 ## 4. Accounts

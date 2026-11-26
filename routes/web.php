@@ -197,6 +197,10 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('role_or_perm:admin|pra.departmental.act')->group(function () {
         Route::get('/pra-departmental/all', [PraDepartmentalApprovalController::class, 'all'])->name('pra_departmental.all');
         Route::get('/pra-departmental/{paymentRequest}', [PraDepartmentalApprovalController::class, 'show'])->name('pra_departmental.show');
+        // Read-only documents for the people taking part in this PRA (checked per record).
+        Route::get('/pra-departmental/{paymentRequest}/sheet', [\App\Http\Controllers\PraPreview\PraSheetController::class, 'sheet'])->name('pra_departmental.sheet');
+        Route::get('/pra-departmental/{paymentRequest}/po/{bookingPo}', [\App\Http\Controllers\PraPreview\PraBookingPoController::class, 'previewPo'])->name('pra_departmental.po');
+        Route::get('/pra-departmental/{paymentRequest}/po/{bookingPo}/pdf', [\App\Http\Controllers\PraPreview\PraBookingPoController::class, 'pdfPo'])->name('pra_departmental.po_pdf');
     });
 
     Route::middleware('can:pra.departmental.act')->group(function () {

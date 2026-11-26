@@ -182,6 +182,7 @@ class ExcelFileController extends Controller
 
         $lockedRowInfo = $this->poLockedRowInfoForUser($rows->getCollection(), $user);
         $lockedRowIds = $lockedRowInfo->keys()->flip();
+        $praCellLocks = $this->praCellLocksForUser($rows->getCollection()->pluck('id')->all(), $user);
 
         if (request('notification')) {
             AppNotification::where('id', request('notification'))
@@ -307,6 +308,7 @@ class ExcelFileController extends Controller
             'highlightedCellKeys',
             'lockedRowIds',
             'lockedRowInfo',
+            'praCellLocks',
             'isFileLockedForUser',
             'isBuyerLockedForUser',
             'fileLockInfo',
@@ -576,8 +578,12 @@ class ExcelFileController extends Controller
             $user
         );
         $lockedRowIds = $lockedRowInfo->keys()->flip();
+        // Rows a PRA already uses: their quantity (and, once approved, rate and
+        // amount) cells are refused below, and the user is told which PRA holds them.
+        $praCellLocks = $this->praCellLocksForUser($submittedRowIds->all(), $user);
+        $praBlocked = [];
 
-        DB::transaction(function () use ($request, $excelFile, $user, $editableHeaderIds, $validRowIds,$rowLookup,$headerLookup,$batchId,&$changedCells,$lockedRowIds) {
+        DB::transaction(function () use ($request, $excelFile, $user, $editableHeaderIds, $validRowIds,$rowLookup,$headerLookup,$batchId,&$changedCells,$lockedRowIds,$praCellLocks,&$praBlocked) {
             foreach ((array) $request->input('cells', []) as $rowId => $rowCells) {
                 $rowId = (int) $rowId;
 
@@ -587,6 +593,15 @@ class ExcelFileController extends Controller
 
                 foreach ((array) $rowCells as $headerId => $newValue) {
                     if (! $editableHeaderIds->has((int) $headerId)) {
+                        continue;
+                    }
+
+                    if (isset($praCellLocks[$rowId]) && in_array((int) $headerId, $praCellLocks[$rowId]['header_ids'], true)) {
+                        $existing = ExcelCell::where('row_id', $rowId)->where('header_id', $headerId)->value('value');
+                        $incoming = is_string($newValue) ? trim($newValue) : $newValue;
+                        if ((string) $existing !== (string) ($incoming === '' ? null : $incoming)) {
+                            $praBlocked[$rowId] = $praCellLocks[$rowId]['pra_no'];
+                        }
                         continue;
                     }
 
@@ -720,6 +735,13 @@ class ExcelFileController extends Controller
 
         if ($lockedRowIds->isNotEmpty()) {
             $redirect->with('warning', $lockedRowIds->count() . ' locked PO row(s) were skipped. Unlock the PO in Admin PO Control or change the lock scope before editing.');
+        }
+
+        if ($praBlocked !== []) {
+            $lines = collect($praBlocked)
+                ->map(fn ($praNo, $rowId) => 'row ' . ($rowLookup[$rowId] ?? $rowId) . ' (' . $praNo . ')')
+                ->implode(', ');
+            $redirect->with('warning', 'Not allowed: a Payment Request Approval already exists for ' . $lines . '. Quantity, PI Rate and PI Amount of these rows cannot be changed now. Ask Supply Chain to remove the line from the PRA first.');
         }
 
         if ($attemptedSyncedWrite) {
@@ -3251,6 +3273,48 @@ class ExcelFileController extends Controller
             'locked_by' => optional($excelFile->lockedBy)->name,
             'locked_at' => optional($excelFile->locked_at)->format('Y-m-d H:i'),
         ];
+    }
+
+    /**
+     * Cells of rows that a Payment Request Approval already uses, per row:
+     * which PRA holds it and which header ids are frozen. Empty for admin and
+     * when Admin has switched the rules off. See App\Support\PraDataLock.
+     *
+     * @return array<int, array{pra_no:string,phase:string,header_ids:array<int,int>}>
+     */
+    private function praCellLocksForUser(array $rowIds, User $user): array
+    {
+        if ($user->hasRole('admin')) {
+            return [];
+        }
+
+        $locks = \App\Support\PraDataLock::forRows($rowIds);
+
+        if ($locks === []) {
+            return [];
+        }
+
+        $headerIdsByKey = [];
+        foreach (ExcelHeader::where('is_active', true)->get(['id', 'header_name', 'header_key', 'formula_key']) as $header) {
+            foreach ([$header->header_key, $header->formula_key, $header->header_name] as $raw) {
+                $key = $this->normalizeHeaderKey($raw);
+                if ($key) {
+                    $headerIdsByKey[$key][] = (int) $header->id;
+                }
+            }
+        }
+
+        return collect($locks)->map(function (array $lock) use ($headerIdsByKey) {
+            $ids = [];
+            foreach ($lock['keys'] as $key) {
+                $normalised = $this->normalizeHeaderKey($key);
+                foreach ($headerIdsByKey[$normalised] ?? [] as $id) {
+                    $ids[$id] = $id;
+                }
+            }
+
+            return ['pra_no' => $lock['pra_no'], 'phase' => $lock['phase'], 'header_ids' => array_values($ids)];
+        })->all();
     }
 
     private function poLockedRowInfoForUser($rows, User $user)

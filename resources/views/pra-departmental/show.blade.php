@@ -187,6 +187,9 @@
             </div>
         </div>
         <div class="d-flex gap-2 flex-wrap align-items-center">
+            <a href="{{ route('pra_departmental.sheet', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-sm po-btn-quiet">
+                <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>View PRA Sheet
+            </a>
             @if($stage)
                 <span class="po-pill po-pill-blue"><i class="bi bi-diagram-3" aria-hidden="true"></i>Step {{ app(\App\Services\PraStageResolver::class)->ordinal($stage->sequence) }} — {{ $stage->label }}</span>
                 @if($stage->assignee)

@@ -26,7 +26,7 @@ use Illuminate\Support\Collection;
  */
 class BookingPoLink
 {
-    public static function urlFor(?User $user, BookingPo $bookingPo): ?string
+    public static function urlFor(?User $user, BookingPo $bookingPo, ?PaymentRequest $paymentRequest = null): ?string
     {
         if ($user === null) {
             return null;
@@ -36,16 +36,23 @@ class BookingPoLink
             return route('admin.po-generate-control.show', $bookingPo);
         }
 
-        if (! $user->hasRole('supply_chain')) {
-            return null;
+        if ($user->hasRole('supply_chain')) {
+            $bookingPo->loadMissing('excelFile');
+            $buyerId = $bookingPo->excelFile?->buyer_id;
+
+            if ($user->hasBuyerAccess($buyerId === null ? null : (int) $buyerId)) {
+                return route('supply_chain.bookings.show', $bookingPo);
+            }
         }
 
-        $bookingPo->loadMissing('excelFile');
-        $buyerId = $bookingPo->excelFile?->buyer_id;
+        // Everyone else taking part in the PRA (Merchant, Accounts, Commercial,
+        // a Supply Chain approver outside the PO's buyer) gets the read-only
+        // PO document, but only through the PRA that pays for it.
+        if ($paymentRequest !== null && \App\Support\PraViewAccess::mayView($paymentRequest, $user)) {
+            return route('pra_departmental.po', [$paymentRequest, $bookingPo]);
+        }
 
-        return $user->hasBuyerAccess($buyerId === null ? null : (int) $buyerId)
-            ? route('supply_chain.bookings.show', $bookingPo)
-            : null;
+        return null;
     }
 
     /**
@@ -67,7 +74,7 @@ class BookingPoLink
             ->groupBy('booking_po_id')
             ->map(fn (Collection $items) => [
                 'po' => $items->first()->bookingPo,
-                'url' => self::urlFor($user, $items->first()->bookingPo),
+                'url' => self::urlFor($user, $items->first()->bookingPo, $paymentRequest),
                 'items' => $items->values(),
             ]);
     }

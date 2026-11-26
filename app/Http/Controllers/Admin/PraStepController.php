@@ -49,6 +49,8 @@ class PraStepController extends Controller
             'waiting' => $waiting,
             'departments' => $departments,
             'boxTitles' => $steps->where('is_active', true)->pluck('signature_label')->filter(fn ($t) => trim((string) $t) !== '')->values(),
+            'lockAfterSubmit' => \App\Support\PraDataLock::submitLockEnabled(),
+            'lockAfterApproval' => \App\Support\PraDataLock::approvalLockEnabled(),
             'preparedEnabled' => PaymentRequestSettings::preparedBoxEnabled(),
             'preparedTitle' => PaymentRequestSettings::flow2Label('prepared'),
             'maxBoxes' => self::MAX_BOXES,
@@ -70,6 +72,15 @@ class PraStepController extends Controller
 
         return redirect()->route('admin.pra-steps.index')
             ->with('success', $enabled ? 'The creator\'s box will be printed.' : 'The creator\'s box is off: only the step boxes print.');
+    }
+
+    /** Switch on/off the rules that freeze Workspace figures once a PRA uses them. */
+    public function saveDataLocks(Request $request)
+    {
+        AppSetting::put(\App\Support\PraDataLock::KEY_AFTER_SUBMIT, $request->boolean('lock_after_submit') ? '1' : '0');
+        AppSetting::put(\App\Support\PraDataLock::KEY_AFTER_APPROVAL, $request->boolean('lock_after_approval') ? '1' : '0');
+
+        return redirect()->route('admin.pra-steps.index')->with('success', 'Workspace protection rules saved.');
     }
 
     public function store(Request $request)
@@ -130,7 +141,19 @@ class PraStepController extends Controller
             $neighbour->update(['position' => $a]);
         });
 
-        return redirect()->route('admin.pra-steps.index')->with('success', 'Step order updated.');
+        // A PRA never goes back: one already past the new place of a moved step
+        // carries on from where it is and does not pass through that step.
+        $passed = PaymentRequest::query()
+            ->where('flow_version', PaymentRequest::FLOW_DEPARTMENTAL)
+            ->whereNotNull('current_sequence')
+            ->whereIn('current_sequence', PraStep::query()->where('position', '>', min($praStep->position, $neighbour->position))->pluck('sequence'))
+            ->count();
+
+        $redirect = redirect()->route('admin.pra-steps.index')->with('success', 'Step order updated.');
+
+        return $passed > 0
+            ? $redirect->with('warning', $passed . ' PRA(s) are already further along in the chain. They continue from their current step and will not go back through a step that was moved before them.')
+            : $redirect;
     }
 
     /** Switch a step off (out of the chain) or back on. */
