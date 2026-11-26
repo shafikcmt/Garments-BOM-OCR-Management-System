@@ -17,6 +17,7 @@
         'deleted' => 'bg-danger-subtle text-danger',
         'corrected' => 'bg-warning-subtle text-warning-emphasis',
         'qty_changed' => 'bg-warning-subtle text-warning-emphasis',
+        'items_added' => 'bg-warning-subtle text-warning-emphasis',
         'merged' => 'bg-info-subtle text-info-emphasis',
         'merge_released' => 'bg-warning-subtle text-warning-emphasis',
     ];
@@ -65,7 +66,7 @@
                                     {{-- Store correction and approver quantity change
                                          alike: each line as "old → new", so the
                                          original request stays readable here. --}}
-                                    @if(in_array($action->action, ['corrected', 'qty_changed'], true) && ! empty($action->meta['lines']))
+                                    @if(in_array($action->action, ['corrected', 'qty_changed', 'items_added'], true) && ! empty($action->meta['lines']))
                                         <ul class="list-unstyled mb-0 mt-1 text-muted">
                                             @foreach($action->meta['lines'] as $change)
                                                 <li>

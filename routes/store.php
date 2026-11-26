@@ -500,6 +500,9 @@ Route::prefix('store')
             // The same person changes quantities at their stage (Step 3d).
             Route::post('/requisitions/{requisition}/stage-quantities', [PurchaseRequisitionController::class, 'stageQuantities'])
                 ->name('requisitions.stage-quantities');
+            // The Section / Department Head adds items to their staff's sheet.
+            Route::post('/requisitions/{requisition}/stage-add-items', [PurchaseRequisitionController::class, 'stageAddItems'])
+                ->name('requisitions.stage-add-items');
             Route::post('/requisitions/{requisition}/cancel', [PurchaseRequisitionController::class, 'cancel'])
                 ->name('requisitions.cancel');
 

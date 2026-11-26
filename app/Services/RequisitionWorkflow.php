@@ -917,6 +917,39 @@ class RequisitionWorkflow
     }
 
     /**
+     * Whether this user may ADD items to the sheet now: the Section / Department
+     * Head the sheet waits for, on their own staff's department sheet. Later
+     * stages (Store, Finance, Operation) may change quantities but not add items.
+     */
+    public function canAddItems(PurchaseRequisition $requisition, ?User $user): bool
+    {
+        $stage = $this->currentStage($requisition);
+
+        return $requisition->isDepartmentLevel()
+            && $stage !== null
+            && $stage->stamp_source === RequisitionSignatureBlock::STAMP_DEPARTMENT_HEAD
+            && $this->mayApprove($requisition, $stage, $user);
+    }
+
+    /**
+     * Record that the head added items (the lines are written by the caller),
+     * with the reason, in the history.
+     *
+     * @param  list<array{item: string, change: string, old_qty: float, new_qty: float}>  $lines
+     */
+    public function recordItemsAdded(PurchaseRequisition $requisition, array $lines, string $reason): void
+    {
+        $stage = $this->currentStage($requisition);
+
+        $this->history->record($requisition, PurchaseRequisitionAction::ITEMS_ADDED, [
+            'stage' => $this->historyStage($stage, $requisition),
+            'from' => $requisition->status,
+            'comment' => $reason,
+            'meta' => ['stage_sequence' => $stage->sequence, 'stage_label' => $stage->displayLabel(), 'lines' => $lines],
+        ]);
+    }
+
+    /**
      * The approver the sheet waits for changes line quantities at their stage
      * (Step 3d) — up or down, 0 meaning "not approved", with ONE reason for
      * the save. Only quantities: no line is added, removed or re-pointed; a

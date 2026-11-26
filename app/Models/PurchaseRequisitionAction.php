@@ -33,6 +33,8 @@ class PurchaseRequisitionAction extends Model
     public const CANCELLED = 'cancelled';
     /** An approver changed quantities at their stage (Step 3d); meta.lines lists them. */
     public const QTY_CHANGED = 'qty_changed';
+    /** The head the sheet waits for added items to it; meta.lines lists them as "added". */
+    public const ITEMS_ADDED = 'items_added';
 
     /** Step 4: a department sheet went into a final sheet (or a final sheet was made from some). */
     public const MERGED = 'merged';
@@ -109,6 +111,7 @@ class PurchaseRequisitionAction extends Model
             self::RETURNED => 'Returned',
             self::CANCELLED => 'Cancelled',
             self::QTY_CHANGED => 'Quantity Changed',
+            self::ITEMS_ADDED => 'Items Added',
             self::MERGED => 'Merged',
             self::MERGE_RELEASED => 'Released from Final',
         ][$this->displayAction($departmentSheet)] ?? ucfirst(str_replace('_', ' ', $this->action));

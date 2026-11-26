@@ -484,6 +484,56 @@
         </div>
     @endif
 
+    {{-- The Section / Department Head the sheet waits for may also add items
+         their staff forgot. Changing a quantity of a line already on the
+         sheet stays under Change Quantities above. --}}
+    @if($canAddItems ?? false)
+        <div class="card gx-stock-card mt-4" id="addItems">
+            <div class="gx-stock-card-body">
+                <div class="gx-stock-card-head">
+                    <h5 class="mb-0">Add Items</h5>
+                    <span class="text-muted small">Add items your staff missed. An item already on the list is changed under Change Quantities.</span>
+                </div>
+
+                @if($errors->has('new_items') || $errors->has('new_items.*') || $errors->has('add_comment'))
+                    <div class="alert alert-warning py-2 small">
+                        {{ $errors->first('new_items') ?: ($errors->first('new_items.*') ?: $errors->first('add_comment')) }}
+                    </div>
+                @endif
+
+                <form method="POST" action="{{ route('store.stock.requisitions.stage-add-items', $requisition) }}" id="addItemsForm">
+                    @csrf
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-2">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="text-end" style="width:130px;">Qty</th>
+                                    <th class="text-end" style="width:130px;">Rate (Appx.)</th>
+                                    <th style="width:220px;">Remarks</th>
+                                    <th style="width:100px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="addItemsRows"></tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm mb-3" id="addItemsAdd">
+                        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Another Item
+                    </button>
+
+                    <label class="form-label fw-semibold d-block" for="addItemsReason">Reason</label>
+                    <textarea name="add_comment" id="addItemsReason" class="form-control mb-2" rows="2" maxlength="1000" required
+                              placeholder="Why are these items being added?">{{ old('add_comment') }}</textarea>
+                    <div class="form-text mb-3">Saved in the requisition history with every item added. Stock and last purchase are filled in for each item.</div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Add Items
+                    </button>
+                </form>
+            </div>
+        </div>
+    @endif
+
     @include('store.stock.requisitions._history', ['requisition' => $requisition])
 
     <style>
@@ -543,6 +593,43 @@
 @endsection
 
 @section('scripts')
+@if($canAddItems ?? false)
+<script>
+    (function () {
+        var items = @json($addableItems);
+        var body = document.getElementById('addItemsRows');
+        var next = 0;
+        var old = @json(old('new_items', []));
+
+        function addRow(values) {
+            values = values || {};
+            var i = next++;
+            var tr = document.createElement('tr');
+            var select = '<select class="form-select form-select-sm" name="new_items[' + i + '][stock_item_id]" required aria-label="Item"><option value="">Select item…</option>';
+            items.forEach(function (it) {
+                select += '<option value="' + it.id + '"' + (String(values.stock_item_id) === String(it.id) ? ' selected' : '') + '>' +
+                    it.label.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>';
+            });
+            select += '</select>';
+            tr.innerHTML = '<td>' + select + '</td>' +
+                '<td><input type="number" step="0.0001" min="0.0001" required class="form-control form-control-sm text-end" name="new_items[' + i + '][qty_requested]" aria-label="Quantity"></td>' +
+                '<td><input type="number" step="0.01" min="0" class="form-control form-control-sm text-end" name="new_items[' + i + '][rate_appx]" aria-label="Rate"></td>' +
+                '<td><input type="text" maxlength="1000" class="form-control form-control-sm" name="new_items[' + i + '][remarks]" aria-label="Remarks"></td>' +
+                '<td><button type="button" class="btn btn-outline-danger btn-sm"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>Remove</button></td>';
+            tr.querySelector('[name$="[qty_requested]"]').value = values.qty_requested || '';
+            tr.querySelector('[name$="[rate_appx]"]').value = values.rate_appx || '';
+            tr.querySelector('[name$="[remarks]"]').value = values.remarks || '';
+            tr.querySelector('button').addEventListener('click', function () {
+                if (body.children.length > 1) { tr.remove(); }
+            });
+            body.appendChild(tr);
+        }
+
+        document.getElementById('addItemsAdd').addEventListener('click', function () { addRow(); });
+        (Object.keys(old).length ? Object.values(old) : [{}]).forEach(addRow);
+    })();
+</script>
+@endif
 <script>
     document.querySelectorAll('[data-print-pdf]').forEach(function (button) {
         button.addEventListener('click', function () {

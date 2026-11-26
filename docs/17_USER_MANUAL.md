@@ -878,6 +878,7 @@ Prepared (section staff) -> Checked by Section / Department Head -> Received by 
 
 1. Section staff open **Purchase Requisition**, fill the items and press **Submit Requisition** (or **Save as Draft** to finish later).
 2. The Section Head (or the Department Head if there is no section) finds it under **My Approvals** and presses **Approve**, or **Return** with a note so the requester can correct it and submit again.
+   Before approving, the head can change a quantity (**Change Quantities**, enter 0 if a line is not approved) and **add items** their staff forgot (**Add Items**: pick the item, the quantity, an approximate rate if known, and give a reason). Stock and last purchase are filled in for each added item, and the History lists what was added and why. An item already on the sheet is changed under **Change Quantities** instead. Only the head the sheet is waiting for can add items; later steps (Store, Finance, Operation) can change quantities but not add items. Adding items does not approve the sheet: press **Approve** when ready.
 3. Any Store user opens the **Requested** tab and presses **Received**.
    The number on the **Requested** tab counts only the sheets waiting for the Store to press **Received**. Sheets still with a head, already received, or with a later approver (Finance, Operation) are not counted, and neither are Final Requisitions.
 
