@@ -239,7 +239,7 @@ class BookingPoSourceService
             return $sourceAmount;
         }
 
-        return $rate * (($qty ?? 0) + $chargeablePp);
+        return \App\Support\Money::floorCents($rate * (($qty ?? 0) + $chargeablePp));
     }
 
     /**

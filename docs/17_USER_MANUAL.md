@@ -908,6 +908,8 @@ If a PP Qty is charged by the supplier, type **No** (or **Billed**) in the **PP 
 
 PP Qty can be typed with a unit (for example *25 yds*); only the number is used.
 
+**Two decimals, cut not rounded.** PI Amount is shown and saved with two decimals, and each line is **cut** to whole cents instead of rounded up (65.487 becomes 65.48), exactly as the supplier's proforma invoice prints it. So the Workspace total matches the invoice to the cent, and the PRA shows the same amounts.
+
 **On the PRA preview:** if a line has a PP Qty, a **PP Qty billing** box appears above the sheet. Each line starts as **Free** (matching the Workspace). Choose **Billed** for a line and press **Update amount** to add its PP Qty for this PRA only; the Workspace is not changed. Every time a PRA is previewed or created, the Workspace amounts are recalculated first, so the PRA always shows the current figure.
 
 ## 4. Accounts
