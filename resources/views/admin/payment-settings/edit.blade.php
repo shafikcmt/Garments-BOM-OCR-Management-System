@@ -110,38 +110,6 @@
                 </div>
             </div>
 
-            {{-- Departmental PRA signature labels. A separate card from Digital
-                 Signatures below because these are LABELS ONLY — the people are
-                 resolved from the approval chain, not configured here. --}}
-            <div class="col-12">
-                <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">
-                    <div class="card-body p-4">
-                        <h5 class="mb-1">Departmental PRA — Prepared By Title</h5>
-                        <p class="text-muted small mb-4">
-                            The heading of the creator's signature box on a PRA that follows the departmental approval chain.
-                            The other signature boxes (how many, their order and their titles) are set per step on
-                            <a href="{{ route('admin.pra-steps.index') }}">Settings &gt; PRA Approval Steps</a>.
-                            Leave the box empty to restore the default.
-                        </p>
-                        <div class="row g-3">
-                            @foreach($flow2Labels as $slug => $label)
-                                <div class="col-12 col-md-6">
-                                    <label for="flow2-label-{{ $slug }}" class="form-label fw-semibold">
-                                        {{ $flow2Defaults[$slug] }}
-                                    </label>
-                                    <input type="text" id="flow2-label-{{ $slug }}"
-                                           name="flow2_labels[{{ $slug }}]" maxlength="80"
-                                           class="form-control @error('flow2_labels.' . $slug) is-invalid @enderror"
-                                           value="{{ old('flow2_labels.' . $slug, $label) }}"
-                                           placeholder="{{ $flow2Defaults[$slug] }}">
-                                    @error('flow2_labels.' . $slug)<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             {{-- Signatures --}}
             <div class="col-12">
                 <div class="card border-0 shadow-sm" style="border-radius:var(--gx-radius);">

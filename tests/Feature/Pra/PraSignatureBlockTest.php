@@ -209,13 +209,12 @@ it('lets a super admin save the labels and nobody else reach the screen', functi
     $admin = User::factory()->create();
     $admin->assignRole('admin');
 
-    $this->actingAs($admin)->get(route('admin.payment-settings.edit'))
-        ->assertOk()->assertSee('Departmental PRA');
+    $this->actingAs($admin)->get(route('admin.payment-settings.edit'))->assertOk();
 
-    $this->actingAs($admin)->post(route('admin.payment-settings.update'), [
-        'pra_working_days' => 7,
-        'flow2_labels' => ['prepared' => 'Raised By'],
-    ])->assertRedirect();
+    $this->actingAs($admin)->post(route('admin.payment-settings.update'), ['pra_working_days' => 7])->assertRedirect();
+
+    // The creator's box title is edited on PRA Approval Steps, not here.
+    $this->actingAs($admin)->post(route('admin.pra-steps.prepared'), ['prepared_enabled' => 1, 'prepared_title' => 'Raised By'])->assertRedirect();
 
     expect(PaymentRequestSettings::flow2Label('prepared'))->toBe('Raised By');
 
