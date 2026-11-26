@@ -49,6 +49,8 @@ class PraStepController extends Controller
             'waiting' => $waiting,
             'departments' => $departments,
             'boxTitles' => $steps->where('is_active', true)->pluck('signature_label')->filter(fn ($t) => trim((string) $t) !== '')->values(),
+            'lockAfterSubmit' => \App\Support\PraDataLock::submitLockEnabled(),
+            'lockAfterApproval' => \App\Support\PraDataLock::approvalLockEnabled(),
             'preparedEnabled' => PaymentRequestSettings::preparedBoxEnabled(),
             'preparedTitle' => PaymentRequestSettings::flow2Label('prepared'),
             'maxBoxes' => self::MAX_BOXES,
@@ -70,6 +72,15 @@ class PraStepController extends Controller
 
         return redirect()->route('admin.pra-steps.index')
             ->with('success', $enabled ? 'The creator\'s box will be printed.' : 'The creator\'s box is off: only the step boxes print.');
+    }
+
+    /** Switch on/off the rules that freeze Workspace figures once a PRA uses them. */
+    public function saveDataLocks(Request $request)
+    {
+        AppSetting::put(\App\Support\PraDataLock::KEY_AFTER_SUBMIT, $request->boolean('lock_after_submit') ? '1' : '0');
+        AppSetting::put(\App\Support\PraDataLock::KEY_AFTER_APPROVAL, $request->boolean('lock_after_approval') ? '1' : '0');
+
+        return redirect()->route('admin.pra-steps.index')->with('success', 'Workspace protection rules saved.');
     }
 
     public function store(Request $request)

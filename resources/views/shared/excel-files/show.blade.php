@@ -2212,6 +2212,7 @@
                                 $cellsByHeaderId = $row->cells->keyBy('header_id');
                                 $rowLockedInfo = ($lockedRowInfo ?? collect())->get($row->id);
                                 $isPoRowLocked = ($lockedRowIds ?? collect())->has($row->id);
+                                $praLock = ($praCellLocks ?? [])[$row->id] ?? null;
                             @endphp
                             @php
                                 // Persisted, so the marker survives refresh and
@@ -2301,6 +2302,11 @@
                                             <i class="bi bi-lock-fill" aria-hidden="true"></i> File Locked
                                         </div>
                                     @endif
+                                    @if($praLock)
+                                        <div class="po-row-lock-badge" title="Payment Request {{ $praLock['pra_no'] }} already uses this row, so its quantity{{ $praLock['phase'] === 'approved' ? ', PI Rate and PI Amount' : '' }} cannot be changed.">
+                                            <i class="bi bi-lock-fill" aria-hidden="true"></i> In {{ $praLock['pra_no'] }}
+                                        </div>
+                                    @endif
                                     @if($isPoRowLocked)
                                         <div class="po-row-lock-badge" title="PO {{ $rowLockedInfo['po_no'] ?? '' }} locked{{ !empty($rowLockedInfo['reason'] ?? '') ? ': ' . $rowLockedInfo['reason'] : '' }}">
                                             <i class="bi bi-lock-fill" aria-hidden="true"></i> PO Locked
@@ -2314,7 +2320,8 @@
                                     $value = $cell->value ?? '';
                                     $isCalculated = in_array($header->id, $calculatedHeaderIds ?? [], true)
                                         || in_array($header->header_key, $calculatedHeaderKeys ?? [], true);
-                                    $editable = in_array($header->id, $editableHeaderIds, true) && !$isCalculated && !$isPoRowLocked && !($isFileLockedForUser ?? false) && !($isBuyerLockedForUser ?? false);
+                                    $editable = in_array($header->id, $editableHeaderIds, true) && !$isCalculated && !$isPoRowLocked && !($isFileLockedForUser ?? false) && !($isBuyerLockedForUser ?? false)
+                                        && !($praLock && in_array($header->id, $praLock['header_ids'], true));
                                     $cellHighlightKey = $row->id . '-' . $header->id;
                                     $isHighlightedCell = isset($highlightedCellKeys) && $highlightedCellKeys->contains($cellHighlightKey);
                                     $roleClass = $headerRoleClass($header);

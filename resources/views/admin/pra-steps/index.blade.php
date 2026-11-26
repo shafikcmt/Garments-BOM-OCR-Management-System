@@ -92,6 +92,26 @@
         </div>
     </div>
 
+    <div class="card border-0 shadow-sm mb-4" style="border-radius:var(--gx-radius);">
+        <div class="card-body p-4">
+            <h6 class="fw-bold mb-1">Protect Workspace data once a PRA is created</h6>
+            <div class="small text-muted mb-3">Stops Merchant and Supply Chain from changing figures a Payment Request already uses. Admin users are never blocked. If someone tries, the save is refused and a message names the PRA.</div>
+            <form method="POST" action="{{ route('admin.pra-steps.data-locks') }}">
+                @csrf
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="lockAfterSubmit" name="lock_after_submit" value="1" {{ $lockAfterSubmit ? 'checked' : '' }}>
+                    <label class="form-check-label fw-semibold" for="lockAfterSubmit">After a PRA is submitted: lock Materials Ordered and Materials to be Ordered</label>
+                    <div class="small text-muted">Also locks the order quantity, consumption and wastage that calculate them. A rejected or cancelled PRA does not lock.</div>
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="lockAfterApproval" name="lock_after_approval" value="1" {{ $lockAfterApproval ? 'checked' : '' }}>
+                    <label class="form-check-label fw-semibold" for="lockAfterApproval">After a PRA is approved: also lock PI Rate and PI Amount</label>
+                </div>
+                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check2 me-1" aria-hidden="true"></i>Save</button>
+            </form>
+        </div>
+    </div>
+
     @foreach($steps as $index => $step)
         @php $waitingHere = (int) ($waiting[$step->sequence] ?? 0); @endphp
         <div class="ps-card {{ $step->is_active ? '' : 'is-off' }}">
