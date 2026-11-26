@@ -1642,6 +1642,8 @@
 
     .po-row-locked { background: #fff7ed !important; }
     .file-row-locked { background: #f8fafc !important; }
+    .pi-total-chip { margin-top: 4px; display: inline-block; padding: 2px 9px; border-radius: 999px; background: #e7f6ec; color: #17673a; font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .pi-total-chip span { font-weight: 600; opacity: .8; }
     .po-row-lock-badge,
     .file-row-lock-badge { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 3px 7px; border-radius: 999px; background: #fee2e2; color: #b91c1c; font-size: 10px; font-weight: 800; }
     .file-row-lock-badge { background: #e0f2fe; color: #075985; }
@@ -2167,6 +2169,12 @@
                                             <span class="formula-chip">Auto</span>
                                         @endif
                                     </div>
+                                    {{-- Sum of this column over every row the search/filter matches. --}}
+                                    @if(($filteredPiTotal ?? null) !== null && in_array($header->id, $piAmountHeaderIds ?? [], true))
+                                        <div class="pi-total-chip" title="Total PI Amount of the {{ $filteredRowCount }} matching row(s), all pages">
+                                            Total {{ number_format($filteredPiTotal, 2) }} <span>({{ $filteredRowCount }} {{ \Illuminate\Support\Str::plural('row', $filteredRowCount) }})</span>
+                                        </div>
+                                    @endif
                                 </th>
                             @endforeach
                         </tr>
@@ -2190,7 +2198,7 @@
                                         type="text"
                                         class="form-control form-control-sm filter-input"
                                         {{-- Says how it submits: typing alone no longer reloads the sheet. --}}
-                                        placeholder="Search + Enter"
+                                        placeholder="{{ in_array($header->header_key, ['material_pi_number', 'pi_number', 'vendor_pi_number'], true) ? 'PI 1, PI 2 + Enter' : 'Search + Enter' }}"
                                         data-column="{{ $loop->index + 1 }}"
                                         data-filter-key="{{ $header->id }}"
                                         value="{{ $filterValues[$header->id] ?? '' }}"
@@ -3076,6 +3084,23 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!box || isOtherField(event.target)) return;
 
         event.preventDefault();
+        clearRange(box);
+    });
+
+    // Ctrl+X on the key itself, for the same reason Ctrl+C is: a block started on a
+    // read-only cell fires no 'cut' event. Copies the block, then clears what may be cleared.
+    document.addEventListener('keydown', function (event) {
+        if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return;
+        if (event.key !== 'x' && event.key !== 'X') return;
+
+        const box = selectedRange();
+        if (!box || isOtherField(event.target)) return;
+
+        const text = table.sheetSelectionText ? table.sheetSelectionText() : null;
+        if (text === null || typeof table.sheetCopy !== 'function') return;
+
+        event.preventDefault();
+        table.sheetCopy(text);
         clearRange(box);
     });
 

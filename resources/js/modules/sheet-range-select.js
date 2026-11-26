@@ -226,6 +226,72 @@ function setup(table) {
         event.clipboardData?.setData('text/plain', text);
     });
 
+    /**
+     * Ctrl+C / Cmd+C, handled on the key itself.
+     *
+     * The browser only fires a 'copy' event when there is something selected or
+     * an editable field is focused. A drag that starts on a read-only or
+     * calculated cell (Auto columns) leaves focus on the page with no text
+     * selection, so no 'copy' event came at all and the block never reached the
+     * clipboard — which is why pasting into Excel gave nothing. Writing the
+     * clipboard from the keydown removes that dependency.
+     */
+    document.addEventListener('keydown', (event) => {
+        if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return;
+        if (event.key !== 'c' && event.key !== 'C') return;
+
+        const box = rect();
+        if (!box || painted.size < 2) return;
+
+        // Typing in the search / header boxes keeps its own Ctrl+C.
+        const active = document.activeElement;
+        if (active && active.matches && active.matches('input, textarea, select') && !active.classList.contains('excel-editable-cell')) return;
+
+        const text = toTsv(box);
+        if (text === null) return;
+
+        event.preventDefault();
+        table.sheetCopy(text);
+
+        const rows = box.bottom - box.top + 1;
+        const cols = box.right - box.left + 1;
+        if (status) {
+            status.hidden = false;
+            status.textContent = `Copied ${rows} row${rows === 1 ? '' : 's'} x ${cols} column${cols === 1 ? '' : 's'} — paste into Excel with Ctrl+V`;
+        }
+    });
+
+    /**
+     * Put text on the system clipboard. The sheet is often served over plain
+     * http on the office network, where navigator.clipboard does not exist, so
+     * a hidden textarea and execCommand('copy') is the fallback.
+     */
+    table.sheetCopy = (text) => {
+        if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
+            return;
+        }
+
+        legacyCopy(text);
+    };
+
+    function legacyCopy(text) {
+        const previous = document.activeElement;
+        const area = document.createElement('textarea');
+
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0;';
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+
+        try { document.execCommand('copy'); } catch (e) { /* nothing more to try */ }
+
+        document.body.removeChild(area);
+        if (previous && previous.focus) previous.focus({ preventScroll: true });
+    }
+
     /** The selection as tab/newline text, which is what Excel reads. */
     function toTsv(box) {
         const rows = [];

@@ -116,9 +116,22 @@ class ExcelFileController extends Controller
             });
         }
 
+        // A column filter may hold several terms separated by commas, e.g.
+        // "PI-110647/26, EOC261116009": a row matches when it contains ANY of them.
+        $filterTerms = fn ($value) => collect(explode(',', (string) $value))
+            ->map(fn ($term) => trim($term))
+            ->filter(fn ($term) => $term !== '')
+            ->values()
+            ->all();
+
         foreach ($columnFilters as $filterKey => $filterValue) {
             if ($filterKey === '__row') {
-                $rowsQuery->whereLike('row_number', '%' . $filterValue . '%');
+                $terms = $filterTerms($filterValue);
+                $rowsQuery->where(function ($query) use ($terms) {
+                    foreach ($terms as $term) {
+                        $query->orWhereLike('row_number', '%' . $term . '%');
+                    }
+                });
                 continue;
             }
 
@@ -128,9 +141,19 @@ class ExcelFileController extends Controller
                 continue;
             }
 
-            $rowsQuery->whereHas('cells', function ($cellQuery) use ($headerId, $filterValue) {
+            $terms = $filterTerms($filterValue);
+
+            if ($terms === []) {
+                continue;
+            }
+
+            $rowsQuery->whereHas('cells', function ($cellQuery) use ($headerId, $terms) {
                 $cellQuery->where('header_id', $headerId)
-                    ->whereLike('value', '%' . $filterValue . '%');
+                    ->where(function ($valueQuery) use ($terms) {
+                        foreach ($terms as $term) {
+                            $valueQuery->orWhereLike('value', '%' . $term . '%');
+                        }
+                    });
             });
         }
 
@@ -138,6 +161,25 @@ class ExcelFileController extends Controller
         // page have no checkbox to tick, so "select all matching" has to be fed
         // ids directly. Ids only — a few hundred integers.
         $allMatchingRowIds = (clone $rowsQuery)->orderBy('row_number')->pluck('id')->all();
+
+        // Total PI Amount of every row the search/filter matches (all pages), shown
+        // under the PI Amount column title. Only while a filter or search is active,
+        // so an unfiltered sheet shows no total. Comma/space formatting is stripped.
+        $piAmountHeaderIds = array_values(array_intersect($this->headerIdsForCanonical('pi_amount'), $visibleHeaderIds));
+        $filteredPiTotal = null;
+        $filteredRowCount = count($allMatchingRowIds);
+
+        if (($globalSearch !== '' || $columnFilters !== []) && $piAmountHeaderIds !== []) {
+            $filteredPiTotal = round(
+                ExcelCell::query()
+                    ->whereIn('row_id', $allMatchingRowIds)
+                    ->whereIn('header_id', $piAmountHeaderIds)
+                    ->whereNotNull('value')
+                    ->pluck('value')
+                    ->sum(fn ($value) => (float) preg_replace('/[^0-9.\-]/', '', (string) $value)),
+                2
+            );
+        }
 
         // The exact-match style group, computed INDEPENDENTLY of the substring
         // filter above. The screen keeps showing what the merchant filtered —
@@ -317,6 +359,9 @@ class ExcelFileController extends Controller
             'piPraDates',
             'duplicateNeedsUpdateHeaderIds',
             'allMatchingRowIds',
+            'piAmountHeaderIds',
+            'filteredPiTotal',
+            'filteredRowCount',
             'styleMatchValues',
             'styleMatchRowIds',
             'styleMatchHeaderIds',
