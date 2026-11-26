@@ -100,7 +100,7 @@
                                 @unless($isAdmin)
                                     <td>
                                         @if($mine)
-                                            <div class="fw-semibold">{{ $mine->isApproved() ? 'Approved' : 'Rejected' }} — step {{ $mine->sequence }}</div>
+                                            <div class="fw-semibold">{{ $mine->isApproved() ? 'Approved' : 'Rejected' }} — step {{ app(\App\Services\PraStageResolver::class)->ordinal((int) $mine->sequence) }}</div>
                                             <div class="pra-sub">{{ optional($mine->acted_at)->format('d M Y') }}</div>
                                         @elseif((int) $pr->created_by === (int) auth()->id())
                                             <div class="pra-sub">Raised by you</div>
