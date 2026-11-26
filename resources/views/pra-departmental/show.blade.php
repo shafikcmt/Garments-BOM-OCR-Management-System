@@ -158,6 +158,13 @@
     .pra-review .po-btn-danger-quiet:hover,
     .pra-review .po-btn-danger-quiet:focus { background: var(--po-danger); border-color: var(--po-danger); color: #fff; }
     .pra-review .po-form .form-text { font-size: 12px; color: var(--po-muted); }
+    .pra-review .pra-doc { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--po-line-soft); border-radius: var(--po-r-control); background: #fff; }
+    .pra-review .pra-doc + .pra-doc { margin-top: 8px; }
+    .pra-review .pra-doc-icon { flex: 0 0 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; background: var(--po-paper); color: var(--po-blue-deep); }
+    .pra-review .pra-doc-body { flex: 1 1 auto; min-width: 0; }
+    .pra-review .pra-doc-title { font-size: 13.5px; font-weight: 700; color: var(--po-ink); }
+    .pra-review .pra-doc-meta { font-size: 12px; color: var(--po-muted); overflow-wrap: anywhere; }
+    .pra-review .pra-doc-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 </style>
 @endsection
 
@@ -187,9 +194,6 @@
             </div>
         </div>
         <div class="d-flex gap-2 flex-wrap align-items-center">
-            <a href="{{ route('pra_departmental.sheet', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-sm po-btn-quiet">
-                <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>View PRA Sheet
-            </a>
             @if($stage)
                 <span class="po-pill po-pill-blue"><i class="bi bi-diagram-3" aria-hidden="true"></i>Step {{ app(\App\Services\PraStageResolver::class)->ordinal($stage->sequence) }} — {{ $stage->label }}</span>
                 @if($stage->assignee)
@@ -234,6 +238,45 @@
             @include('partials.pra-documents')
             @include('partials.pra-removed-lines')
 
+            {{-- DOCUMENTS: the PRA sheet and each Booking PO, one row each with View and
+                 PDF. The viewer already passed the same access test the routes
+                 enforce, so every row shown here opens. --}}
+            <div class="po-panel mb-3">
+                <div class="po-panel-head">
+                    <div class="po-panel-head-title">
+                        <span class="po-panel-icon"><i class="bi bi-folder2-open" aria-hidden="true"></i></span>
+                        <div class="po-title">Documents to review</div>
+                    </div>
+                </div>
+                <div class="po-panel-body">
+                    <div class="pra-doc">
+                        <span class="pra-doc-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+                        <div class="pra-doc-body">
+                            <div class="pra-doc-title">Payment Request Approval sheet</div>
+                            <div class="pra-doc-meta">{{ $paymentRequest->request_no }} &middot; as it will be printed and signed</div>
+                        </div>
+                        <div class="pra-doc-actions">
+                            <a href="{{ route('pra_departmental.sheet', $paymentRequest) }}" class="btn btn-sm btn-primary"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</a>
+                            <a href="{{ route('pra_departmental.sheet_pdf', $paymentRequest) }}" target="_blank" rel="noopener" class="btn btn-sm po-btn-quiet"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF</a>
+                        </div>
+                    </div>
+                    @foreach($bookingPos as $docEntry)
+                        <div class="pra-doc">
+                            <span class="pra-doc-icon"><i class="bi bi-file-earmark-ruled" aria-hidden="true"></i></span>
+                            <div class="pra-doc-body">
+                                <div class="pra-doc-title">Booking PO {{ $docEntry['po']->po_no }}</div>
+                                <div class="pra-doc-meta">{{ $docEntry['po']->vendor_name ?: '—' }}@if($docEntry['po']->generated_at) &middot; Generated {{ $docEntry['po']->generated_at->format('d M Y') }}@endif</div>
+                            </div>
+                            <div class="pra-doc-actions">
+                                <a href="{{ route('pra_departmental.po', [$paymentRequest, $docEntry['po']]) }}" class="btn btn-sm btn-primary"><i class="bi bi-eye me-1" aria-hidden="true"></i>View</a>
+                                <a href="{{ route('pra_departmental.po_pdf', [$paymentRequest, $docEntry['po']]) }}" target="_blank" rel="noopener" class="btn btn-sm po-btn-quiet"><i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>PDF</a>
+                            </div>
+                        </div>
+                    @endforeach
+                    <div class="small text-muted mt-2">The PI copy is under Supporting Documents.</div>
+                </div>
+            </div>
+
             {{-- THE BOOKING PO(S) THIS PRA PAYS FOR. Every viewer sees the summary
                  — it is built from the PRA's own lines and the PO's header, which
                  they are already looking at. The "Open Booking PO" button appears
@@ -264,7 +307,10 @@
                                     </div>
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
                                         <span class="po-pill {{ $po->status === 'completed' ? 'po-pill-ok' : 'po-pill-blue' }}">{{ ucfirst($po->status ?: 'generated') }}</span>
-                                        @if($entry['url'])
+                                        {{-- The read-only copy lives in Documents to review above;
+                                             this button is for the full Booking PO screen that
+                                             Admin and Supply Chain have. --}}
+                                        @if($entry['url'] && ! str_contains($entry['url'], '/pra-departmental/'))
                                             <a href="{{ $entry['url'] }}" target="_blank" rel="noopener" class="btn btn-sm po-btn-quiet">
                                                 <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Open Booking PO
                                             </a>
