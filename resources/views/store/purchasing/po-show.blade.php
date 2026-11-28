@@ -18,6 +18,9 @@
             <a href="{{ route('store.purchasing.po.pdf', $order) }}" target="_blank" rel="noopener" class="btn btn-outline-secondary">
                 <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Print / PDF
             </a>
+            <a href="{{ route('store.purchasing.po.excel', $order) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-earmark-excel me-1" aria-hidden="true"></i>Excel Download
+            </a>
             @if(isset($allowed['edit']))
                 <a href="{{ route('store.purchasing.po.edit', $order) }}" class="btn btn-outline-primary">
                     <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
