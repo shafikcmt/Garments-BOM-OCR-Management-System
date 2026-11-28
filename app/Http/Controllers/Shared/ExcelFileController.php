@@ -168,6 +168,10 @@ class ExcelFileController extends Controller
         $piAmountHeaderIds = array_values(array_intersect($this->headerIdsForCanonical('pi_amount'), $visibleHeaderIds));
         $filteredPiTotal = null;
         $filteredRowCount = count($allMatchingRowIds);
+        // Who may change the PI Amount decimals from the column header: Admin and the
+        // owner role of the PI Amount column (Supply Chain).
+        $canSetPiDecimals = $this->mayChoosePiDecimals($user) && ! $isFileLockedForUser;
+        $piDecimals = \App\Support\PaymentRequestSettings::piDecimals();
 
         if (($globalSearch !== '' || $columnFilters !== []) && $piAmountHeaderIds !== []) {
             $filteredPiTotal = round(
@@ -360,6 +364,8 @@ class ExcelFileController extends Controller
             'duplicateNeedsUpdateHeaderIds',
             'allMatchingRowIds',
             'piAmountHeaderIds',
+            'canSetPiDecimals',
+            'piDecimals',
             'filteredPiTotal',
             'filteredRowCount',
             'styleMatchValues',
@@ -537,6 +543,55 @@ class ExcelFileController extends Controller
             'payment_term' => (string) $supplier->default_payment_terms,
             'ship_mode' => (string) $supplier->ship_mode,
         ]);
+    }
+
+    /** Admin, or a user holding the owner role of the PI Amount column. */
+    private function mayChoosePiDecimals(User $user): bool
+    {
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        $owners = ExcelHeader::with('ownerRole')
+            ->whereIn('id', $this->headerIdsForCanonical('pi_amount'))
+            ->get()
+            ->map(fn ($header) => optional($header->ownerRole)->name)
+            ->filter()
+            ->unique();
+
+        return $owners->contains(fn ($role) => $user->hasRole($role));
+    }
+
+    /**
+     * Change how many decimals PI Amount is cut to, then recalculate THIS file so
+     * the new precision shows at once. The setting is shared (it is also on the
+     * Admin PRA settings screen). Rows a PRA already uses, or locked rows, keep
+     * their saved amount.
+     */
+    public function updatePiDecimals(Request $request, ExcelFile $excelFile)
+    {
+        $user = auth()->user();
+        abort_unless($this->mayChoosePiDecimals($user), 403);
+
+        $back = redirect()->route('uploaded-files.show', $excelFile->id);
+
+        if ($excelFile->isLockedForUser($user) || $excelFile->isBuyerLockedForUser($user)) {
+            return $back->with('warning', 'This file is locked for you, so PI Amount cannot be recalculated.');
+        }
+
+        $decimals = (int) $request->validate(['decimals' => ['required', 'integer', 'min:2', 'max:6']])['decimals'];
+
+        \App\Models\AppSetting::put(\App\Support\PaymentRequestSettings::KEY_PI_DECIMALS, (string) $decimals);
+
+        $rowIds = $excelFile->rows()->pluck('id')->all();
+        $skip = collect($this->poLockedRowInfoForUser($excelFile->rows()->with('cells')->get(), $user)->keys())
+            ->merge(collect($this->praCellLocksForUser($rowIds, $user))->filter(fn ($l) => $l['phase'] === \App\Support\PraDataLock::PHASE_APPROVED)->keys())
+            ->unique()->values()->all();
+
+        DB::transaction(fn () => $this->recalculateFile($excelFile, $user->id, $skip));
+
+        return $back->with('success', 'PI Amount now uses ' . $decimals . ' decimals and this file was recalculated.'
+            . ($skip !== [] ? ' ' . count($skip) . ' locked row(s) kept their saved amount.' : ''));
     }
 
     /**
