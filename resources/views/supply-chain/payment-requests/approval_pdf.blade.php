@@ -57,7 +57,7 @@
         .style-cell { vertical-align:middle; font-weight:700; }
         .grand td { background:#eaf0fb !important; color:#000b6f; font-size: 10px; font-weight:700; padding: 5px 5px; }
         .sign { margin-top: 18px; color:#000b6f; }
-        .sign-box { height: 40px; }
+        .sign-box { height: 40px; overflow: hidden; }
         .sign td { border:0; width:33.33%; padding:0 22px; vertical-align:bottom; }
         /* Departmental PRAs print FOUR blocks instead of three. Narrower cells
            and tighter gutters keep the row on the same single page — the widths
@@ -73,7 +73,10 @@
         .sign-title { font-size:9px; font-weight:700; margin-bottom:6px; }
         .sign-text { font-size:9px; margin-bottom:9px; }
         .sign-line { border-bottom:1px solid #000b6f; height:1px; }
-        .sign-img { max-height:42px; max-width:100%; margin-bottom:4px; }
+        /* The image must sit INSIDE the 40px signing space (36px + 4px). It used to be
+           42px + 4px margin + the inline line gap, so it ran down over the line and
+           its white background hid part of it. */
+        .sign-img { display:block; max-height:36px; max-width:100%; margin:0 0 4px 0; }
         .sign-meta { font-size:8.5px; line-height:1.4; margin-top:4px; }
         .sign-meta .sign-name { font-weight:700; }
         {{-- 11 columns summing to 100, mirrored by .c-* in show.blade.php.
