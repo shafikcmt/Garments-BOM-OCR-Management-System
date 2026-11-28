@@ -1654,6 +1654,13 @@
     .col-pick-foot .col-pick-count { font-size: 11.5px; color: #64748b; }
     .col-pick-foot button { border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: #334155; }
     .col-pick-foot button.is-primary { background: #006C9D; border-color: #006C9D; color: #fff; }
+    .pi-dec-open { margin-top: 4px; border: 1px solid #006C9D; background: #fff; color: #006C9D; border-radius: 999px; font-size: 10.5px; font-weight: 800; padding: 1px 10px; }
+    .pi-dec-open:hover { background: #006C9D; color: #fff; }
+    .pi-dec-pop { position: fixed; z-index: 1090; width: 300px; max-width: calc(100vw - 16px); background: #fff; border: 1px solid #cbd5e1; border-radius: 12px; box-shadow: 0 14px 34px rgba(15,23,42,.2); padding: 14px; display: none; }
+    .pi-dec-pop.is-open { display: block; }
+    .pi-dec-pop h6 { font-size: 13px; font-weight: 800; margin: 0 0 4px; }
+    .pi-dec-pop p { font-size: 11.5px; color: #64748b; margin: 0 0 10px; }
+    .pi-dec-pop .btn { width: 100%; margin-top: 6px; }
     .pi-decimals-ctl { margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #334155; }
     .pi-decimals-ctl select { height: 22px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 2px; background: #fff; }
     .pi-decimals-ctl button { height: 22px; border: 1px solid #006C9D; background: #006C9D; color: #fff; border-radius: 6px; font-size: 10.5px; font-weight: 700; padding: 0 8px; }
@@ -2030,18 +2037,6 @@
                         @endif
                     @endif
 
-                    {{-- PI Amount decimals for the TICKED rows only. Shown once rows are ticked,
-                         to Admin and the owner role of the PI Amount column. --}}
-                    @if($canSetPiDecimals ?? false)
-                        <span id="piDecimalsBox" class="d-none align-items-center gap-1" style="display:inline-flex;">
-                            <label for="piDecimalsPick" class="small fw-semibold mb-0">PI Amount decimals</label>
-                            <select id="piDecimalsPick" class="form-select form-select-sm" style="width:auto;">
-                                <option value="default">Default ({{ $piDecimals ?? 2 }})</option>
-                                @foreach(range(0, 6) as $d)<option value="{{ $d }}">{{ $d }} {{ $d === 1 ? 'decimal' : 'decimals' }}</option>@endforeach
-                            </select>
-                            <button type="button" id="piDecimalsApply" class="btn btn-outline-primary btn-sm">Apply to <span id="piDecimalsCount">0</span> selected</button>
-                        </span>
-                    @endif
                     @if(count($editableHeaderIds) > 0)
                         <span id="pendingOtherPagesBadge" class="badge text-bg-warning d-none align-self-center" role="status"></span>
                         <button type="submit" class="btn btn-primary btn-sm" id="saveChangesButton">
@@ -2196,6 +2191,11 @@
                                             <span class="formula-chip">Auto</span>
                                         @endif
                                     </div>
+                                    {{-- Opens the decimals popover. The column is calculated, so it cannot be typed
+                                         into; this (or a double-click on a PI Amount cell) is how its precision is set. --}}
+                                    @if(($canSetPiDecimals ?? false) && in_array($header->id, $piAmountHeaderIds ?? [], true))
+                                        <button type="button" class="pi-dec-open" id="piDecOpen">Set decimals</button>
+                                    @endif
                                     {{-- Sum of this column over every row the search/filter matches. --}}
                                     @if(($filteredPiTotal ?? null) !== null && in_array($header->id, $piAmountHeaderIds ?? [], true))
                                         <div class="pi-total-chip" title="Total PI Amount of the {{ $filteredRowCount }} matching row(s), all pages">
@@ -4372,13 +4372,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (duplicateSelectedCount) duplicateSelectedCount.textContent = ids.length;
 
-        const piBox = document.getElementById('piDecimalsBox');
-        if (piBox) {
-            piBox.classList.toggle('d-none', ids.length === 0);
-            piBox.style.display = ids.length === 0 ? 'none' : 'inline-flex';
-            const piCount = document.getElementById('piDecimalsCount');
-            if (piCount) piCount.textContent = ids.length;
-        }
 
         // Shown only when there is a selection to act on, rather than sitting
         // greyed at (0) on every page load.
@@ -4458,25 +4451,95 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Returns false when the user chose to save first — the form submit is
     // already under way and this action must not also navigate.
-    // PI Amount decimals for the ticked rows. Posts as a plain form so the page reloads with the result.
-    document.getElementById('piDecimalsApply')?.addEventListener('click', function () {
-        const ids = selectedRowIds();
-        if (!ids.length || !passesUnsavedGuard()) return;
+    /* PI AMOUNT DECIMALS POPOVER
+     * PI Amount is a calculated column, so it cannot be typed into. "Set decimals" in
+     * its header (or a double-click on one of its cells) opens this: pick 0 to 6 and
+     * apply it to the ticked rows, or to every row the current search matches.
+     * Only those rows change. */
+    (function () {
+        const openBtn = document.getElementById('piDecOpen');
+        if (!openBtn) return;
 
-        const pick = document.getElementById('piDecimalsPick').value;
-        const label = pick === 'default' ? 'the default' : pick;
-        if (!confirm('Set PI Amount to ' + label + ' decimals for ' + ids.length + ' selected row(s)? Other rows are not changed.')) return;
+        const pop = document.createElement('div');
+        pop.className = 'pi-dec-pop';
+        pop.innerHTML = '<h6>PI Amount decimals</h6><p id="piDecHint"></p>'
+            + '<select class="form-select form-select-sm" id="piDecPick">'
+            + '<option value="default">Default ({{ $piDecimals ?? 2 }})</option>'
+            + @json(collect(range(0, 6))->map(fn ($d) => '<option value="'.$d.'">'.$d.($d === 1 ? ' decimal' : ' decimals').'</option>')->implode(''))
+            + '</select>'
+            + '<button type="button" class="btn btn-primary btn-sm" id="piDecTicked">Apply to ticked rows</button>'
+            + '<button type="button" class="btn btn-outline-primary btn-sm" id="piDecMatching">Apply to all matching rows</button>'
+            + '<button type="button" class="btn btn-light btn-sm" id="piDecClose">Cancel</button>';
+        document.body.appendChild(pop);
 
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = @json(route('uploaded-files.pi_decimals', $excelFile));
-        const add = (name, value) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = name; i.value = value; form.appendChild(i); };
-        add('_token', @json(csrf_token()));
-        add('decimals', pick);
-        ids.forEach(id => add('row_ids[]', id));
-        document.body.appendChild(form);
-        form.submit();
-    });
+        const hint = pop.querySelector('#piDecHint');
+        const tickedBtn = pop.querySelector('#piDecTicked');
+        const matchBtn = pop.querySelector('#piDecMatching');
+
+        function refresh() {
+            const ticked = Array.from(document.querySelectorAll('.row-select:checked')).map(cb => cb.value);
+            const matching = allMatchingRowIds;
+            hint.textContent = 'Tick rows, or search first, then choose how many decimals their PI Amount keeps. Other rows are not changed.';
+            tickedBtn.textContent = 'Apply to ' + ticked.length + ' ticked row' + (ticked.length === 1 ? '' : 's');
+            tickedBtn.disabled = ticked.length === 0;
+            matchBtn.textContent = 'Apply to all ' + matching.length + ' matching row' + (matching.length === 1 ? '' : 's');
+            matchBtn.disabled = matching.length === 0;
+            return { ticked, matching };
+        }
+
+        function openAt(x, y) {
+            refresh();
+            pop.classList.add('is-open');
+            pop.style.left = Math.max(8, Math.min(x, window.innerWidth - pop.offsetWidth - 8)) + 'px';
+            pop.style.top = Math.max(8, Math.min(y, window.innerHeight - pop.offsetHeight - 8)) + 'px';
+        }
+
+        function close() { pop.classList.remove('is-open'); }
+
+        function send(ids, what) {
+            if (!ids.length || !passesUnsavedGuard()) return;
+            const pick = pop.querySelector('#piDecPick').value;
+            const label = pick === 'default' ? 'the default' : pick;
+            if (!confirm('Set PI Amount to ' + label + ' decimals for ' + ids.length + ' ' + what + ' row(s)? Other rows are not changed.')) return;
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = @json(route('uploaded-files.pi_decimals', $excelFile));
+            const add = (name, value) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = name; i.value = value; form.appendChild(i); };
+            add('_token', @json(csrf_token()));
+            add('decimals', pick);
+            ids.slice(0, 500).forEach(id => add('row_ids[]', id));
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        openBtn.addEventListener('click', function () {
+            const box = openBtn.getBoundingClientRect();
+            openAt(box.left, box.bottom + 6);
+        });
+        tickedBtn.addEventListener('click', () => send(refresh().ticked, 'ticked'));
+        matchBtn.addEventListener('click', () => send(refresh().matching, 'matching'));
+        pop.querySelector('#piDecClose').addEventListener('click', close);
+
+        // Double-click a PI Amount cell: that row alone is ticked and the popover opens beside it.
+        document.addEventListener('dblclick', function (event) {
+            const cell = event.target.closest && event.target.closest('td[data-header-key="pi_amount"]');
+            if (!cell) return;
+            const tr = cell.closest('tr[data-row-id]');
+            const box = tr && tr.querySelector('.row-select');
+            if (!box) return;
+            document.querySelectorAll('.row-select').forEach(cb => { cb.checked = false; });
+            box.checked = true;
+            box.dispatchEvent(new Event('change', { bubbles: true }));
+            const r = cell.getBoundingClientRect();
+            openAt(r.left, r.bottom + 4);
+        });
+
+        document.addEventListener('mousedown', function (event) {
+            if (pop.classList.contains('is-open') && !pop.contains(event.target) && event.target !== openBtn) close();
+        });
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    })();
 
     function passesUnsavedGuard() {
         const changed = getChangedFields();
