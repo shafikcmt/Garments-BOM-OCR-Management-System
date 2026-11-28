@@ -16,6 +16,13 @@
          the component styles keep overriding it. --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
+    <style>
+        /* No up/down spinner arrows in number boxes: people type the figure, and the arrows only
+           get in the way (and step the value by accident). Typing, paste and Tab work as before. */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+    </style>
     @yield('styles')
 </head>
 <body>
@@ -351,6 +358,13 @@
     })();
     </script>
 
+    <script>
+        // Scrolling the page with the pointer over a focused number box used to change its value.
+        document.addEventListener('wheel', function (event) {
+            var el = document.activeElement;
+            if (el && el.tagName === 'INPUT' && el.type === 'number' && event.target === el) el.blur();
+        }, { passive: true });
+    </script>
     @yield('scripts')
 @include('layouts._password-toggle')
 </body>
