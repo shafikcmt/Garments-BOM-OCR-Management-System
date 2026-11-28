@@ -95,6 +95,44 @@ class PurchaseOrderService
             ->groupBy(fn (GsCsItem $i) => (int) $this->orderingQuote($i, $basis)->gs_cs_supplier_id);
     }
 
+    /**
+     * Active draft / checked POs of this statement that go to a supplier who is NOT the lowest
+     * on some of their lines (made before the lowest-price rule, or on the old "as chosen"
+     * basis). Each entry names the better supplier and how many lines it concerns.
+     *
+     * @return array<int, array{supplier: string, lines: int}> keyed by purchase order id
+     */
+    public function notLowestOrders(GsComparativeStatement $cs): array
+    {
+        $cs->loadMissing(['items.quotes', 'suppliers', 'purchaseOrders.items']);
+        $itemsById = $cs->items->keyBy('id');
+        $found = [];
+
+        foreach ($cs->purchaseOrders->whereIn('status', [GsPurchaseOrder::STATUS_DRAFT, GsPurchaseOrder::STATUS_CHECKED]) as $po) {
+            $better = collect();
+
+            foreach ($po->items as $line) {
+                $csItem = $itemsById->get($line->gs_cs_item_id);
+                $best = $csItem ? $this->orderingQuote($csItem, self::BASIS_LOWEST) : null;
+
+                if ($best && (int) $best->gs_cs_supplier_id !== (int) $po->gs_cs_supplier_id
+                    && (float) $best->unit_price < (float) $line->rate - 0.00005) {
+                    $better->push((int) $best->gs_cs_supplier_id);
+                }
+            }
+
+            if ($better->isNotEmpty()) {
+                $topId = $better->countBy()->sortDesc()->keys()->first();
+                $found[$po->id] = [
+                    'supplier' => (string) ($cs->suppliers->firstWhere('id', $topId)?->name ?? 'another supplier'),
+                    'lines' => $better->count(),
+                ];
+            }
+        }
+
+        return $found;
+    }
+
     /** Lines still untaken that nobody priced, so no PO can be made for them. @return Collection<int, GsCsItem> */
     public function unpricedLines(GsComparativeStatement $cs, string $basis = self::BASIS_LOWEST): Collection
     {

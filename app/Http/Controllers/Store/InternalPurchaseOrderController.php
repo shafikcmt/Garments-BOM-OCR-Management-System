@@ -81,6 +81,21 @@ class InternalPurchaseOrderController extends Controller
         ]);
     }
 
+    /**
+     * Cancel a draft / checked PO that is not on the lowest price and send the user back to the
+     * statement, where its items are to be ordered again (Preview Purchase Order).
+     */
+    public function replaceNotLowest(Request $request, GsPurchaseOrder $order)
+    {
+        abort_unless(isset($this->service->allowed($order, $request->user())['cancel']), 403);
+        abort_unless(in_array($order->status, [GsPurchaseOrder::STATUS_DRAFT, GsPurchaseOrder::STATUS_CHECKED], true), 422, 'Only a draft or checked PO can be replaced.');
+
+        $this->service->cancel($order, 'Replaced: another supplier has the lowest price.');
+
+        return redirect()->route('store.purchasing.cs.show', $order->gs_comparative_statement_id)
+            ->with('success', $order->po_no . ' was cancelled. Its items are back in the order list: press Preview Purchase Order to order them from the lowest price.');
+    }
+
     /** One draft PO per supplier chosen on the approved CS. */
     public function storeFromStatement(Request $request, GsComparativeStatement $cs)
     {
