@@ -180,22 +180,65 @@
         </div>
     @endif
 
+    {{-- Purchase orders made from this statement: live ones in a table, cancelled ones kept out of
+         the way (history only, nothing is deleted). --}}
+    @php
+        $livePos = $cs->purchaseOrders->where('status', '!=', \App\Models\GsPurchaseOrder::STATUS_CANCELLED)->values();
+        $cancelledPos = $cs->purchaseOrders->where('status', \App\Models\GsPurchaseOrder::STATUS_CANCELLED)->values();
+        $poBadge = fn ($status) => match ($status) {
+            'draft' => 'text-bg-secondary',
+            'checked' => 'text-bg-info',
+            'issued', 'received' => 'text-bg-success',
+            'partially_received' => 'text-bg-warning',
+            default => 'text-bg-light border',
+        };
+    @endphp
     @if($cs->purchaseOrders->isNotEmpty())
         <div class="card gx-stock-card mb-3">
             <div class="gx-stock-card-body">
-                <h6 class="mb-2">Purchase orders made from this statement</h6>
-                <ul class="mb-0">
-                    @foreach($cs->purchaseOrders as $po)
-                        <li>
-                            @can('store.purchase_po.view')
-                                <a href="{{ route('store.purchasing.po.show', $po) }}">{{ $po->po_no }}</a>
-                            @else
-                                {{ $po->po_no }}
-                            @endcan
-                            &middot; {{ $po->supplier_name }} &middot; {{ $po->statusLabel() }}
-                        </li>
-                    @endforeach
-                </ul>
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <h6 class="mb-0">Purchase orders</h6>
+                    <span class="small text-muted">{{ $livePos->count() }} active</span>
+                </div>
+
+                @if($livePos->isNotEmpty())
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0" style="min-width:0">
+                            <thead><tr><th>PO No.</th><th>Supplier</th><th>Status</th><th class="text-end">Amount (Tk)</th><th></th></tr></thead>
+                            <tbody>
+                            @foreach($livePos as $po)
+                                <tr>
+                                    <td class="fw-semibold">{{ $po->po_no }}</td>
+                                    <td>{{ $po->supplier_name }}</td>
+                                    <td><span class="badge {{ $poBadge($po->status) }}">{{ $po->statusLabel() }}</span></td>
+                                    <td class="text-end">{{ number_format((float) $po->total_amount, 2) }}</td>
+                                    <td class="text-end">
+                                        @can('store.purchase_po.view')
+                                            <a href="{{ route('store.purchasing.po.show', $po) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-eye me-1" aria-hidden="true"></i>Open</a>
+                                        @endcan
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="small text-muted">No active purchase order. Everything made from this statement was cancelled.</div>
+                @endif
+
+                @if($cancelledPos->isNotEmpty())
+                    <details class="mt-3">
+                        <summary class="small text-muted" style="cursor:pointer;">{{ $cancelledPos->count() }} cancelled purchase order{{ $cancelledPos->count() === 1 ? '' : 's' }} (history)</summary>
+                        <div class="small text-muted mt-2">
+                            @foreach($cancelledPos as $po)
+                                <div>
+                                    @can('store.purchase_po.view')<a href="{{ route('store.purchasing.po.show', $po) }}">{{ $po->po_no }}</a>@else{{ $po->po_no }}@endcan
+                                    &middot; {{ $po->supplier_name }} &middot; cancelled
+                                </div>
+                            @endforeach
+                        </div>
+                    </details>
+                @endif
             </div>
         </div>
     @endif
