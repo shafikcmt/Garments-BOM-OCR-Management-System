@@ -16,13 +16,6 @@
 @endsection
 
 @section('content')
-@if($canSetPiDecimals ?? false)
-    {{-- Target of the Decimals control in the PI Amount column header (linked by the form attribute). --}}
-    <form id="piDecimalsForm" method="POST" action="{{ route('uploaded-files.pi_decimals', $excelFile) }}"
-          onsubmit="return confirm('Change the PI Amount decimals and recalculate this file? Unsaved edits on this page will be lost.');">
-        @csrf
-    </form>
-@endif
 @php
     // Each entry is the field's own distribution, not a bare string — see
     // ExcelFileController::buildOrderInfo(). A box with one distinct value
@@ -2037,6 +2030,18 @@
                         @endif
                     @endif
 
+                    {{-- PI Amount decimals for the TICKED rows only. Shown once rows are ticked,
+                         to Admin and the owner role of the PI Amount column. --}}
+                    @if($canSetPiDecimals ?? false)
+                        <span id="piDecimalsBox" class="d-none align-items-center gap-1" style="display:inline-flex;">
+                            <label for="piDecimalsPick" class="small fw-semibold mb-0">PI Amount decimals</label>
+                            <select id="piDecimalsPick" class="form-select form-select-sm" style="width:auto;">
+                                <option value="default">Default ({{ $piDecimals ?? 2 }})</option>
+                                @foreach(range(0, 6) as $d)<option value="{{ $d }}">{{ $d }} {{ $d === 1 ? 'decimal' : 'decimals' }}</option>@endforeach
+                            </select>
+                            <button type="button" id="piDecimalsApply" class="btn btn-outline-primary btn-sm">Apply to <span id="piDecimalsCount">0</span> selected</button>
+                        </span>
+                    @endif
                     @if(count($editableHeaderIds) > 0)
                         <span id="pendingOtherPagesBadge" class="badge text-bg-warning d-none align-self-center" role="status"></span>
                         <button type="submit" class="btn btn-primary btn-sm" id="saveChangesButton">
@@ -2160,7 +2165,7 @@
                                  count($headers) + 1, so inserting a column would
                                  shift every index and break paste and filtering. --}}
                             <th>
-                                @if($canAddRow ?? false)
+                                @if(($canAddRow ?? false) || ($canSetPiDecimals ?? false))
                                     <label class="row-pick row-pick-all" title="Select all rows on this page">
                                         <input type="checkbox" id="rowSelectAll" class="form-check-input">
                                     </label>
@@ -2191,17 +2196,6 @@
                                             <span class="formula-chip">Auto</span>
                                         @endif
                                     </div>
-                                    {{-- Decimal places of PI Amount: for Admin and the column's owner role.
-                                         The form attribute points at the form below the table (forms cannot nest). --}}
-                                    @if(($canSetPiDecimals ?? false) && in_array($header->id, $piAmountHeaderIds ?? [], true))
-                                        <div class="pi-decimals-ctl">
-                                            <label for="piDecimalsSelect">Decimals</label>
-                                            <select id="piDecimalsSelect" name="decimals" form="piDecimalsForm" aria-label="PI Amount decimal places">
-                                                @foreach(range(2, 6) as $d)<option value="{{ $d }}" @selected(($piDecimals ?? 2) === $d)>{{ $d }}</option>@endforeach
-                                            </select>
-                                            <button type="submit" form="piDecimalsForm">Set</button>
-                                        </div>
-                                    @endif
                                     {{-- Sum of this column over every row the search/filter matches. --}}
                                     @if(($filteredPiTotal ?? null) !== null && in_array($header->id, $piAmountHeaderIds ?? [], true))
                                         <div class="pi-total-chip" title="Total PI Amount of the {{ $filteredRowCount }} matching row(s), all pages">
@@ -2280,10 +2274,10 @@
                                  cell also carries the duplicate badge, the lock
                                  badges and now the Delete button, so the number
                                  is not the only text in it. --}}
-                            <tr data-row-id="{{ $row->id }}" data-row-number="{{ $row->row_number }}" class="{{ trim(($isFileLockedForUser ?? false ? 'file-row-locked ' : '') . ($isPoRowLocked ? 'po-row-locked ' : '') . ($isFlaggedDuplicate ? 'row-is-duplicate ' : '') . ($isRunContinuation ? 'row-duplicate-run' : '')) }}">
+                            <tr data-row-id="{{ $row->id }}" data-row-number="{{ $row->row_number }}" @if($row->pi_decimals !== null) data-pi-decimals="{{ $row->pi_decimals }}" @endif class=""{{ trim(($isFileLockedForUser ?? false ? 'file-row-locked ' : '') . ($isPoRowLocked ? 'po-row-locked ' : '') . ($isFlaggedDuplicate ? 'row-is-duplicate ' : '') . ($isRunContinuation ? 'row-duplicate-run' : '')) }}">
                                 <td>
-                                    @if($canAddRow ?? false)
-                                        <label class="row-pick" title="Select row {{ $row->row_number }} for duplication">
+                                    @if(($canAddRow ?? false) || ($canSetPiDecimals ?? false))
+                                        <label class="row-pick" title="Select row {{ $row->row_number }} to set PI Amount decimals or duplicate it">
                                             <input type="checkbox" class="form-check-input row-select" value="{{ $row->id }}">
                                         </label>
                                     @endif
@@ -2463,7 +2457,7 @@
                                                         && in_array($header->header_key, ['pi_amount'], true)
                                                         && is_numeric(str_replace(',', '', (string) $value));
                                                 @endphp
-                                                {{ $showMoney2 ? number_format((float) str_replace(',', '', (string) $value), \App\Support\PaymentRequestSettings::piDecimals()) : ($value !== '' && $value !== null ? $value : '-') }}
+                                                {{ $showMoney2 ? number_format((float) str_replace(',', '', (string) $value), $row->pi_decimals !== null ? (int) $row->pi_decimals : \App\Support\PaymentRequestSettings::piDecimals()) : ($value !== '' && $value !== null ? $value : '-') }}
                                             </div>
                                         @endif
                                     </td>
@@ -3513,19 +3507,27 @@ document.addEventListener('DOMContentLoaded', function () {
     // Decimal places for PI Amount: 2 unless Admin raised it (Admin > PRA settings).
     const PI_DECIMALS = {{ \App\Support\PaymentRequestSettings::piDecimals() }};
 
-    function floorCents(value) {
+    // A row may carry its own precision (data-pi-decimals); otherwise the default.
+    function rowPiDecimals(row) {
+        const own = row && row.dataset ? row.dataset.piDecimals : undefined;
+        const n = own === undefined || own === '' ? PI_DECIMALS : parseInt(own, 10);
+        return Number.isFinite(n) ? n : PI_DECIMALS;
+    }
+
+    function floorCents(value, decimals) {
         const n = Number(value);
         if (!Number.isFinite(n)) return 0;
         const sign = n < 0 ? -1 : 1;
-        const scale = Math.pow(10, PI_DECIMALS);
+        const scale = Math.pow(10, decimals === undefined ? PI_DECIMALS : decimals);
         return sign * Math.floor(Number((Math.abs(n) * scale).toFixed(4))) / scale;
     }
 
     // PI Amount shown with exactly PI_DECIMALS decimals.
-    function fmtMoney2(value) {
+    function fmtMoney2(value, decimals) {
         if (value === null || value === undefined || value === '') return '';
         const n = Number(value);
-        return Number.isFinite(n) ? n.toLocaleString('en-US', { minimumFractionDigits: PI_DECIMALS, maximumFractionDigits: PI_DECIMALS }) : '';
+        const d = decimals === undefined ? PI_DECIMALS : decimals;
+        return Number.isFinite(n) ? n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }) : '';
     }
 
     function setFormulaValue(row, keys, value, shown) {
@@ -3658,7 +3660,8 @@ document.addEventListener('DOMContentLoaded', function () {
             const ppQtyBilled = ppQtyIsFree(valAny(rowData, ['pp_qty_free', 'pp_free', 'free_pp_qty']))
                 ? 0
                 : ppQtyNumber(valAny(rowData, ['pp_qty', 'p_p_qty', 'pp_quantity']));
-            const piAmount = floorCents(piRate * (materialsOrdered + ppQtyBilled));
+            const rowDecimals = rowPiDecimals(row);
+            const piAmount = floorCents(piRate * (materialsOrdered + ppQtyBilled), rowDecimals);
             const piWorking = ppQtyBilled > 0
                 ? 'PI Rate ' + piRate + ' x (Materials Ordered ' + materialsOrdered + ' + PP Qty ' + ppQtyBilled + ' billed) = ' + fmtNum(piAmount)
                     + '. PP Qty is billed because PP Qty Free says No.'
@@ -3722,7 +3725,7 @@ document.addEventListener('DOMContentLoaded', function () {
             setFormulaValue(row, ['short_excess_ordered', 'short_excess_ordered_qty'], fmtNum(shortExcessOrdered));
             setFormulaValue(row, ['material_order_status'], materialOrderStatus);
             setFormulaValue(row, ['pi_status'], piStatus);
-            setFormulaValue(row, ['pi_amount'], fmtNum(piAmount), fmtMoney2(piAmount));
+            setFormulaValue(row, ['pi_amount'], fmtNum(piAmount), fmtMoney2(piAmount, rowDecimals));
             setFormulaNote(row, ['pi_amount'], piWorking, ppQtyBilled > 0);
             setFormulaValue(row, ['payment_reqd_date', 'payment_req_d_date', 'payment_required_date'], (pra && pra.reqd) ? pra.reqd : fmtDate(paymentReqdDate));
             if (pra && pra.submission) {
@@ -4369,6 +4372,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (duplicateSelectedCount) duplicateSelectedCount.textContent = ids.length;
 
+        const piBox = document.getElementById('piDecimalsBox');
+        if (piBox) {
+            piBox.classList.toggle('d-none', ids.length === 0);
+            piBox.style.display = ids.length === 0 ? 'none' : 'inline-flex';
+            const piCount = document.getElementById('piDecimalsCount');
+            if (piCount) piCount.textContent = ids.length;
+        }
+
         // Shown only when there is a selection to act on, rather than sitting
         // greyed at (0) on every page load.
         if (duplicateSelectedButton) {
@@ -4447,6 +4458,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Returns false when the user chose to save first — the form submit is
     // already under way and this action must not also navigate.
+    // PI Amount decimals for the ticked rows. Posts as a plain form so the page reloads with the result.
+    document.getElementById('piDecimalsApply')?.addEventListener('click', function () {
+        const ids = selectedRowIds();
+        if (!ids.length || !passesUnsavedGuard()) return;
+
+        const pick = document.getElementById('piDecimalsPick').value;
+        const label = pick === 'default' ? 'the default' : pick;
+        if (!confirm('Set PI Amount to ' + label + ' decimals for ' + ids.length + ' selected row(s)? Other rows are not changed.')) return;
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = @json(route('uploaded-files.pi_decimals', $excelFile));
+        const add = (name, value) => { const i = document.createElement('input'); i.type = 'hidden'; i.name = name; i.value = value; form.appendChild(i); };
+        add('_token', @json(csrf_token()));
+        add('decimals', pick);
+        ids.forEach(id => add('row_ids[]', id));
+        document.body.appendChild(form);
+        form.submit();
+    });
+
     function passesUnsavedGuard() {
         const changed = getChangedFields();
 

@@ -563,35 +563,48 @@ class ExcelFileController extends Controller
     }
 
     /**
-     * Change how many decimals PI Amount is cut to, then recalculate THIS file so
-     * the new precision shows at once. The setting is shared (it is also on the
-     * Admin PRA settings screen). Rows a PRA already uses, or locked rows, keep
-     * their saved amount.
+     * Set how many decimals PI Amount is cut to for the SELECTED rows only, then
+     * recalculate just those rows. Every other row keeps the amount it has.
+     * "default" clears the row's own setting. Rows a PRA already uses, and PO-locked
+     * rows, are left alone and counted in the message.
      */
-    public function updatePiDecimals(Request $request, ExcelFile $excelFile)
+    public function setRowPiDecimals(Request $request, ExcelFile $excelFile)
     {
         $user = auth()->user();
         abort_unless($this->mayChoosePiDecimals($user), 403);
 
-        $back = redirect()->route('uploaded-files.show', $excelFile->id);
+        $back = redirect()->back();
 
         if ($excelFile->isLockedForUser($user) || $excelFile->isBuyerLockedForUser($user)) {
-            return $back->with('warning', 'This file is locked for you, so PI Amount cannot be recalculated.');
+            return $back->with('warning', 'This file is locked for you, so PI Amount cannot be changed.');
         }
 
-        $decimals = (int) $request->validate(['decimals' => ['required', 'integer', 'min:2', 'max:6']])['decimals'];
+        $data = $request->validate([
+            'row_ids' => ['required', 'array', 'min:1', 'max:500'],
+            'row_ids.*' => ['integer'],
+            'decimals' => ['required', 'string', 'in:default,0,1,2,3,4,5,6'],
+        ]);
 
-        \App\Models\AppSetting::put(\App\Support\PaymentRequestSettings::KEY_PI_DECIMALS, (string) $decimals);
-
-        $rowIds = $excelFile->rows()->pluck('id')->all();
-        $skip = collect($this->poLockedRowInfoForUser($excelFile->rows()->with('cells')->get(), $user)->keys())
+        $rowIds = $excelFile->rows()->whereIn('id', $data['row_ids'])->pluck('id')->all();
+        $locked = collect($this->poLockedRowInfoForUser($excelFile->rows()->whereIn('id', $rowIds)->with('cells')->get(), $user)->keys())
             ->merge(collect($this->praCellLocksForUser($rowIds, $user))->filter(fn ($l) => $l['phase'] === \App\Support\PraDataLock::PHASE_APPROVED)->keys())
-            ->unique()->values()->all();
+            ->map(fn ($id) => (int) $id)->unique()->values();
+        $target = array_values(array_diff($rowIds, $locked->all()));
 
+        if ($target === []) {
+            return $back->with('warning', 'None of the selected rows can be changed (they are locked or already on an approved PRA).');
+        }
+
+        $decimals = $data['decimals'] === 'default' ? null : (int) $data['decimals'];
+        \App\Models\ExcelRow::query()->whereIn('id', $target)->update(['pi_decimals' => $decimals]);
+
+        // Recalculate only the chosen rows: everyone else is passed as "skip".
+        $skip = $excelFile->rows()->whereNotIn('id', $target)->pluck('id')->all();
         DB::transaction(fn () => $this->recalculateFile($excelFile, $user->id, $skip));
 
-        return $back->with('success', 'PI Amount now uses ' . $decimals . ' decimals and this file was recalculated.'
-            . ($skip !== [] ? ' ' . count($skip) . ' locked row(s) kept their saved amount.' : ''));
+        return $back->with('success', count($target) . ' row(s) now use '
+            . ($decimals === null ? 'the default number of' : $decimals) . ' decimals for PI Amount.'
+            . ($locked->isNotEmpty() ? ' ' . $locked->count() . ' locked row(s) were not changed.' : ''));
     }
 
     /**
@@ -2781,7 +2794,11 @@ class ExcelFileController extends Controller
             );
             // Cut to whole cents (not rounded up), the way the supplier's proforma invoice
             // prints each line, so the sheet total matches the invoice.
-            $piAmount = \App\Support\Money::floorPi($piRate * ($materialsOrdered + $chargeablePpQty));
+            // A row can carry its own precision (set from the Workspace); otherwise the default.
+            $piAmount = \App\Support\Money::floorTo(
+                $piRate * ($materialsOrdered + $chargeablePpQty),
+                $row->pi_decimals !== null ? (int) $row->pi_decimals : \App\Support\PaymentRequestSettings::piDecimals()
+            );
 
             $paymentReqdDate = $committedExMill ? $committedExMill->copy()->subDays(7) : null;
 
