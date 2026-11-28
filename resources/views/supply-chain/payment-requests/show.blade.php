@@ -108,7 +108,8 @@
     .c-budget { width:7%; } .c-amount { width:9%; } .c-saving { width:8%; }
     .pra-sign-area { margin-top:52px; color:#000b6f; }
     .pra-sign-title { font-size:13px; font-weight:800; margin-bottom:10px; }
-    .pra-sign-text { font-size:13px; margin-bottom:22px; }
+    .pra-sign-text { font-size:13px; height:64px; margin-bottom:0; display:flex; align-items:flex-end; padding-bottom:6px; }
+    .pra-sign-space { height:64px; display:flex; align-items:flex-end; }
     .pra-sign-line { border-bottom:1px solid #000b6f; height:1px; }
     .pra-sign-sep { border-left:1px solid #8d9bd3; }
     .pra-sign-img { max-height:54px; max-width:100%; object-fit:contain; display:block; margin-bottom:6px; }
@@ -146,7 +147,8 @@
         .pra-total { font-size:13px; margin-bottom:6px; }
         .pra-sign-area { margin-top:22px; }
         .pra-sign-title { font-size:10.5px; margin-bottom:6px; }
-        .pra-sign-text { font-size:10.5px; margin-bottom:12px; }
+        .pra-sign-text { font-size:10.5px; height:44px; margin-bottom:0; padding-bottom:4px; }
+        .pra-sign-space { height:44px; }
         .pra-sign-img { max-height:38px; }
         .pra-sign-meta { font-size:9.5px; }
 
@@ -469,7 +471,7 @@
                     <div class="{{ $i === 0 ? 'pe-3' : ($loop->last ? 'ps-3 pra-sign-sep' : 'px-3 pra-sign-sep') }}">
                         <div class="pra-sign-title">{{ $sign['title'] }}</div>
                         @if($sign['src'])
-                            <img src="{{ $sign['src'] }}" alt="{{ $sign['title'] }} signature" class="pra-sign-img">
+                            <div class="pra-sign-space"><img src="{{ $sign['src'] }}" alt="{{ $sign['title'] }} signature" class="pra-sign-img"></div>
                             <div class="pra-sign-line"></div>
                             <div class="pra-sign-meta">
                                 @if($sign['designation'])<div>{{ $sign['designation'] }}</div>@endif
