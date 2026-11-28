@@ -20,6 +20,14 @@ class PaymentRequestSettings
 {
     public const KEY_WORKING_DAYS = 'pra_working_days';
 
+    /** Decimal places the Workspace PI Amount is cut to. Default 2; Admin may raise it (to 6). */
+    public const KEY_PI_DECIMALS = 'pi_amount_decimals';
+
+    public static function piDecimals(): int
+    {
+        return max(2, min(6, (int) AppSetting::get(self::KEY_PI_DECIMALS, 2)));
+    }
+
     /**
      * Whether a NEWLY CREATED PRA joins the 6-step departmental chain.
      *

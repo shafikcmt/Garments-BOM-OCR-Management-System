@@ -25,3 +25,9 @@ it('does not lose a cent to float error', function () {
         ->and(Money::floorCents(0.0))->toBe(0.0)
         ->and(Money::floorCents(-65.487))->toBe(-65.48);
 });
+
+it('cuts to the requested number of decimals', function () {
+    expect(Money::floorTo(6.35999, 4))->toBe(6.3599);
+    expect(Money::floorTo(65.487, 2))->toBe(65.48);
+    expect(Money::floorTo(0.0127 * 500, 2))->toBe(6.35);
+});

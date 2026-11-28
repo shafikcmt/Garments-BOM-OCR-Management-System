@@ -58,6 +58,15 @@
                             <span class="input-group-text">working days</span>
                         </div>
                         <div class="form-text">Default is 7 working days. Used when no manual date is entered on the PRA preview.</div>
+
+                        <hr class="my-4">
+                        <label class="form-label fw-semibold" for="piDecimals">PI Amount decimal places</label>
+                        <div class="input-group" style="max-width:260px;">
+                            <input type="number" id="piDecimals" name="pi_amount_decimals" min="2" max="6"
+                                   class="form-control" value="{{ old('pi_amount_decimals', $piDecimals) }}" required>
+                            <span class="input-group-text">decimals</span>
+                        </div>
+                        <div class="form-text">Default is 2, which matches the supplier's proforma invoice. Raise it only when a rate is so small that two decimals lose money. The Workspace PI Amount is cut to this many decimals; rows already saved change the next time they are recalculated.</div>
                     </div>
                 </div>
             </div>

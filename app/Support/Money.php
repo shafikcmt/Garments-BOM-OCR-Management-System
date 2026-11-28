@@ -18,8 +18,22 @@ final class Money
      */
     public static function floorCents(float $amount): float
     {
+        return self::floorTo($amount, 2);
+    }
+
+    /** Cut to a number of decimals (never rounded up), with the same float guard as floorCents(). */
+    public static function floorTo(float $amount, int $decimals): float
+    {
+        $decimals = max(0, min(8, $decimals));
+        $scale = 10 ** $decimals;
         $sign = $amount < 0 ? -1 : 1;
 
-        return $sign * floor(round(abs($amount) * 100, 4)) / 100;
+        return $sign * floor(round(abs($amount) * $scale, 4)) / $scale;
+    }
+
+    /** PI Amount: cut to the decimal places Admin set (2 unless changed). */
+    public static function floorPi(float $amount): float
+    {
+        return self::floorTo($amount, \App\Support\PaymentRequestSettings::piDecimals());
     }
 }

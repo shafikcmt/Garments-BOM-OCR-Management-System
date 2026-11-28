@@ -2726,7 +2726,7 @@ class ExcelFileController extends Controller
             );
             // Cut to whole cents (not rounded up), the way the supplier's proforma invoice
             // prints each line, so the sheet total matches the invoice.
-            $piAmount = \App\Support\Money::floorCents($piRate * ($materialsOrdered + $chargeablePpQty));
+            $piAmount = \App\Support\Money::floorPi($piRate * ($materialsOrdered + $chargeablePpQty));
 
             $paymentReqdDate = $committedExMill ? $committedExMill->copy()->subDays(7) : null;
 

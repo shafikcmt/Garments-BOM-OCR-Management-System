@@ -28,6 +28,7 @@ class PaymentSettingController extends Controller
 
         return view('admin.payment-settings.edit', [
             'workingDays' => PaymentRequestSettings::workingDays(),
+            'piDecimals' => PaymentRequestSettings::piDecimals(),
             'officers' => $officers,
             'departmentalFlowEnabled' => PaymentRequestSettings::departmentalFlowEnabled(),
             'mailEnabled' => \App\Support\PraApprovalSettings::mailEnabled(),
@@ -47,6 +48,7 @@ class PaymentSettingController extends Controller
 
         $rules = [
             'pra_working_days' => ['required', 'integer', 'min:1', 'max:60'],
+            'pi_amount_decimals' => ['required', 'integer', 'min:2', 'max:6'],
         ];
 
         foreach ($officerSlugs as $slug) {
@@ -59,6 +61,7 @@ class PaymentSettingController extends Controller
         $validated = $request->validate($rules);
 
         AppSetting::put(PaymentRequestSettings::KEY_WORKING_DAYS, (string) $validated['pra_working_days']);
+        AppSetting::put(PaymentRequestSettings::KEY_PI_DECIMALS, (string) $validated['pi_amount_decimals']);
 
         AppSetting::put(
             \App\Support\PraApprovalSettings::KEY_MAIL_ENABLED,
