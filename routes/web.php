@@ -131,7 +131,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/uploaded-files-supplier-defaults', [ExcelFileController::class, 'supplierDefaults'])->name('uploaded-files.supplier_defaults');
 
     Route::get('/uploaded-files/{excelFile}', [ExcelFileController::class, 'show'])->name('uploaded-files.show');
-    Route::post('/uploaded-files/{excelFile}/pi-decimals', [ExcelFileController::class, 'updatePiDecimals'])->name('uploaded-files.pi_decimals');
+    Route::post('/uploaded-files/{excelFile}/pi-decimals', [ExcelFileController::class, 'setRowPiDecimals'])->name('uploaded-files.pi_decimals');
     Route::get('/uploaded-files/{excelFile}/column-values', [ExcelFileController::class, 'columnValues'])->name('uploaded-files.column_values');
     Route::put('/uploaded-files/{excelFile}', [ExcelFileController::class, 'update'])->name('uploaded-files.update');
     Route::post('/uploaded-files/{excelFile}/rows', [ExcelFileController::class, 'addRow'])->name('uploaded-files.rows.store');
