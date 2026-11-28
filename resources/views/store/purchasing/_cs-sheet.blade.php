@@ -57,20 +57,22 @@
         </tr>
     </table>
 
+    {{-- Two stacked lines on each side, nothing in the middle: CS No and Category on the
+         left; "Prepared from ..." and Status on the top right, directly above the table. --}}
     <table style="margin-bottom:4px;" class="nb">
         <tr>
-            <td style="width:34%;">CS No: <strong>{{ $cs->cs_no }}</strong></td>
-            <td class="c" style="width:40%;">Prepared from approved purchase requisition lines</td>
-            {{-- Status at the top right corner, directly above the table. --}}
-            <td class="num" style="width:26%;">Status: <strong>{{ $cs->statusLabel() }}</strong></td>
+            <td style="width:40%;vertical-align:top;">
+                <div>CS No: <strong>{{ $cs->cs_no }}</strong></div>
+                @if($categories->isNotEmpty())
+                    <div style="padding-top:2px;">Category: <strong>{{ $categories->implode(', ') }}</strong></div>
+                @endif
+            </td>
+            <td style="width:20%;"></td>
+            <td class="num" style="width:40%;vertical-align:top;text-align:right;">
+                <div>Prepared from approved purchase requisition lines</div>
+                <div style="padding-top:2px;">Status: <strong>{{ $cs->statusLabel() }}</strong></div>
+            </td>
         </tr>
-        @if($categories->isNotEmpty())
-            {{-- Material category sits here, under CS No and outside the item
-                 table, instead of as a banner row inside it. --}}
-            <tr>
-                <td colspan="3" style="padding-top:2px;">Category: <strong>{{ $categories->implode(', ') }}</strong></td>
-            </tr>
-        @endif
     </table>
 
     <table>
