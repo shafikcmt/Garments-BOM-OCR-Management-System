@@ -908,7 +908,7 @@ If a PP Qty is charged by the supplier, type **No** (or **Billed**) in the **PP 
 
 PP Qty can be typed with a unit (for example *25 yds*); only the number is used.
 
-**More decimals when needed (Admin).** The Workspace PI Amount uses 2 decimals by default. When a rate is so small that two decimals lose money, Admin opens **PRA settings**, sets **PI Amount decimal places** (2 to 6) and saves. New and recalculated rows are cut to that many decimals and shown with them; the PRA sheet prints PI Amount with two decimals.
+**More decimals when needed (Admin and Supply Chain).** In the Workspace, under the **PI Amount** column title, Admin and Supply Chain users see **Decimals** with a number box and **Set**. Choose 2 to 6 and press **Set**: this file is recalculated at once (rows already on an approved PRA keep their amount). The setting is shared by everybody, and is also on Admin PRA settings.  The Workspace PI Amount uses 2 decimals by default. When a rate is so small that two decimals lose money, Admin opens **PRA settings**, sets **PI Amount decimal places** (2 to 6) and saves. New and recalculated rows are cut to that many decimals and shown with them; the PRA sheet prints PI Amount with two decimals.
 
 **Two decimals, cut not rounded.** PI Amount is shown and saved with two decimals, and each line is **cut** to whole cents instead of rounded up (65.487 becomes 65.48), exactly as the supplier's proforma invoice prints it. So the Workspace total matches the invoice to the cent, and the PRA shows the same amounts.
 

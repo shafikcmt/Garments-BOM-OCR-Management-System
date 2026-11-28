@@ -16,6 +16,13 @@
 @endsection
 
 @section('content')
+@if($canSetPiDecimals ?? false)
+    {{-- Target of the Decimals control in the PI Amount column header (linked by the form attribute). --}}
+    <form id="piDecimalsForm" method="POST" action="{{ route('uploaded-files.pi_decimals', $excelFile) }}"
+          onsubmit="return confirm('Change the PI Amount decimals and recalculate this file? Unsaved edits on this page will be lost.');">
+        @csrf
+    </form>
+@endif
 @php
     // Each entry is the field's own distribution, not a bare string — see
     // ExcelFileController::buildOrderInfo(). A box with one distinct value
@@ -1654,6 +1661,9 @@
     .col-pick-foot .col-pick-count { font-size: 11.5px; color: #64748b; }
     .col-pick-foot button { border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 700; color: #334155; }
     .col-pick-foot button.is-primary { background: #006C9D; border-color: #006C9D; color: #fff; }
+    .pi-decimals-ctl { margin-top: 4px; display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #334155; }
+    .pi-decimals-ctl select { height: 22px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 2px; background: #fff; }
+    .pi-decimals-ctl button { height: 22px; border: 1px solid #006C9D; background: #006C9D; color: #fff; border-radius: 6px; font-size: 10.5px; font-weight: 700; padding: 0 8px; }
     .pi-total-chip { margin-top: 4px; display: inline-block; padding: 2px 9px; border-radius: 999px; background: #e7f6ec; color: #17673a; font-size: 11px; font-weight: 800; white-space: nowrap; }
     .pi-total-chip span { font-weight: 600; opacity: .8; }
     .po-row-lock-badge,
@@ -2181,6 +2191,17 @@
                                             <span class="formula-chip">Auto</span>
                                         @endif
                                     </div>
+                                    {{-- Decimal places of PI Amount: for Admin and the column's owner role.
+                                         The form attribute points at the form below the table (forms cannot nest). --}}
+                                    @if(($canSetPiDecimals ?? false) && in_array($header->id, $piAmountHeaderIds ?? [], true))
+                                        <div class="pi-decimals-ctl">
+                                            <label for="piDecimalsSelect">Decimals</label>
+                                            <select id="piDecimalsSelect" name="decimals" form="piDecimalsForm" aria-label="PI Amount decimal places">
+                                                @foreach(range(2, 6) as $d)<option value="{{ $d }}" @selected(($piDecimals ?? 2) === $d)>{{ $d }}</option>@endforeach
+                                            </select>
+                                            <button type="submit" form="piDecimalsForm">Set</button>
+                                        </div>
+                                    @endif
                                     {{-- Sum of this column over every row the search/filter matches. --}}
                                     @if(($filteredPiTotal ?? null) !== null && in_array($header->id, $piAmountHeaderIds ?? [], true))
                                         <div class="pi-total-chip" title="Total PI Amount of the {{ $filteredRowCount }} matching row(s), all pages">
