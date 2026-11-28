@@ -908,6 +908,8 @@ If a PP Qty is charged by the supplier, type **No** (or **Billed**) in the **PP 
 
 PP Qty can be typed with a unit (for example *25 yds*); only the number is used.
 
+**More decimals when needed (Admin).** The Workspace PI Amount uses 2 decimals by default. When a rate is so small that two decimals lose money, Admin opens **PRA settings**, sets **PI Amount decimal places** (2 to 6) and saves. New and recalculated rows are cut to that many decimals and shown with them; the PRA sheet prints PI Amount with two decimals.
+
 **Two decimals, cut not rounded.** PI Amount is shown and saved with two decimals, and each line is **cut** to whole cents instead of rounded up (65.487 becomes 65.48), exactly as the supplier's proforma invoice prints it. So the Workspace total matches the invoice to the cent, and the PRA shows the same amounts.
 
 **Preview everything from the approval page.** Anyone checking or approving a PRA (Merchant, Accounts, Commercial, Supply Chain) sees a **Documents to review** card on the approval page. Press **View** to read the PRA sheet or a Booking PO inside the system (with **Back to PRA** and **Print**), or **PDF** to open the PDF. The PI copy is under **Supporting Documents**. A PRA only appears for the people at its current step, so the next step's users see it only after the step before is approved. People who already acted on it can still look back at it.

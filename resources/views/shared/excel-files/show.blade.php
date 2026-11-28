@@ -2435,14 +2435,14 @@
                                                 data-cell-value="{{ $value }}"
                                                 title="{{ ($isFileLockedForUser ?? false) ? 'This workspace file is locked by admin' : ($isPoRowLocked ? 'This PO row is locked by admin control' : ($isCalculated ? 'Calculated field - live auto update before save' : '')) }}"
                                             >
-                                                {{-- PI Amount is money: shown with 2 decimals (the saved value keeps its full
+                                                {{-- PI Amount is money: shown with the set decimals, 2 by default (the saved value keeps its full
                                                      precision, so PRA and totals are unaffected). --}}
                                                 @php
                                                     $showMoney2 = $isCalculated
                                                         && in_array($header->header_key, ['pi_amount'], true)
                                                         && is_numeric(str_replace(',', '', (string) $value));
                                                 @endphp
-                                                {{ $showMoney2 ? number_format((float) str_replace(',', '', (string) $value), 2) : ($value !== '' && $value !== null ? $value : '-') }}
+                                                {{ $showMoney2 ? number_format((float) str_replace(',', '', (string) $value), \App\Support\PaymentRequestSettings::piDecimals()) : ($value !== '' && $value !== null ? $value : '-') }}
                                             </div>
                                         @endif
                                     </td>
@@ -3489,18 +3489,22 @@ document.addEventListener('DOMContentLoaded', function () {
     // Cut an amount to whole cents WITHOUT rounding up: supplier proforma invoices
     // print each line cut to two decimals (65.487 -> 65.48), so PI Amount does the
     // same and the sheet total matches the invoice. Same rule as App\Support\Money.
+    // Decimal places for PI Amount: 2 unless Admin raised it (Admin > PRA settings).
+    const PI_DECIMALS = {{ \App\Support\PaymentRequestSettings::piDecimals() }};
+
     function floorCents(value) {
         const n = Number(value);
         if (!Number.isFinite(n)) return 0;
         const sign = n < 0 ? -1 : 1;
-        return sign * Math.floor(Number((Math.abs(n) * 100).toFixed(4))) / 100;
+        const scale = Math.pow(10, PI_DECIMALS);
+        return sign * Math.floor(Number((Math.abs(n) * scale).toFixed(4))) / scale;
     }
 
-    // Money shown with exactly two decimals.
+    // PI Amount shown with exactly PI_DECIMALS decimals.
     function fmtMoney2(value) {
         if (value === null || value === undefined || value === '') return '';
         const n = Number(value);
-        return Number.isFinite(n) ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+        return Number.isFinite(n) ? n.toLocaleString('en-US', { minimumFractionDigits: PI_DECIMALS, maximumFractionDigits: PI_DECIMALS }) : '';
     }
 
     function setFormulaValue(row, keys, value, shown) {
