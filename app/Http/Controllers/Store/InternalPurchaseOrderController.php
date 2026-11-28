@@ -211,6 +211,17 @@ class InternalPurchaseOrderController extends Controller
         return back()->with('success', $order->po_no.' cancelled.');
     }
 
+    /** The same PO as an Excel file. */
+    public function excel(GsPurchaseOrder $order)
+    {
+        $book = app(\App\Services\PurchaseOrderExcel::class)->build($order);
+        $name = 'PO-'.str_replace(['/', '\\'], '-', $order->po_no).'.xlsx';
+
+        return response()->streamDownload(function () use ($book) {
+            (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($book))->save('php://output');
+        }, $name, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    }
+
     /** The printed PO: A4 portrait. Only an authorised PO prints as final; a draft or checked one is marked. */
     public function pdf(GsPurchaseOrder $order)
     {

@@ -38,6 +38,13 @@
     .po-sheet .grand { background: #e5e7eb; color: #111827; border: 1px solid #d1d5db; font-weight: bold; font-size: 10.5px; }
     .po-sheet .words { margin-top: 8px; padding: 6px 8px; background: #f3f4f6; border-left: 3px solid #9ca3af; }
     .po-sheet .sig td { width: 50%; padding-top: 40px; }
+    .po-sheet .sig { page-break-inside: avoid; }
+    /* A long PO (many items) is drawn a little tighter so the signature boxes stay on the same
+       page as the items instead of moving alone to a second page. The signing space stays. */
+    .po-sheet.compact .items td { padding: 2px 5px; height: 12px; }
+    .po-sheet.compact .items th { padding: 3px 5px; }
+    .po-sheet.compact .words { margin-top: 5px; padding: 4px 8px; }
+    .po-sheet.compact .sig td { padding-top: 30px; }
     /* The signing line is only as long as its caption. */
     .po-sheet .sig .line { display: inline-block; border-top: 1px solid #111827; padding: 3px 2px 0; font-weight: bold; }
     .po-sheet .sig small { display: block; font-weight: normal; color: #6b7280; font-size: 8px; }
@@ -51,7 +58,7 @@
     .po-sheet .terms-pair td.cell { border: 1px solid #d1d5db; padding: 3px 8px; line-height: 1.4; vertical-align: top; }
     .po-sheet .terms-pair td.head { width: 24%; background: #f3f4f6; font-weight: bold; font-size: 8px; text-transform: uppercase; letter-spacing: .6px; color: #374151; vertical-align: middle; }
 </style>
-<div class="po-sheet">
+<div class="po-sheet {{ $order->items->count() > 14 ? 'compact' : '' }}">
     {{-- The title, centred. The PO's status is shown on the screen, not printed. --}}
     <div class="title" style="text-align:center;line-height:1;margin:6px 0 10px;">PURCHASE ORDER</div>
 

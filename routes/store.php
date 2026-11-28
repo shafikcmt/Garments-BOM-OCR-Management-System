@@ -652,6 +652,7 @@ Route::prefix('store/purchasing')
             Route::post('/po/{order}/send-back', [InternalPurchaseOrderController::class, 'sendBack'])->name('po.send-back');
             Route::post('/po/{order}/authorise', [InternalPurchaseOrderController::class, 'authorise'])->name('po.authorise');
             Route::post('/po/{order}/cancel', [InternalPurchaseOrderController::class, 'cancel'])->name('po.cancel');
+            Route::get('/po/{order}/excel', [InternalPurchaseOrderController::class, 'excel'])->name('po.excel');
             Route::get('/po/{order}/pdf', [InternalPurchaseOrderController::class, 'pdf'])->name('po.pdf');
         });
     });

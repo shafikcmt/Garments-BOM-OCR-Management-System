@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>{{ $order->po_no }}</title>
-    <style>@page { margin: 28px 30px; }</style>
+    <style>@page { margin: 22px 28px; }</style>
 </head>
 <body>
     @include('store.purchasing._po-sheet', ['order' => $order])
