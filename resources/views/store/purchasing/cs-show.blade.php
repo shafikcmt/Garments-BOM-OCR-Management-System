@@ -182,7 +182,7 @@
 
     {{-- Purchase orders made from this statement: live ones in a table, cancelled ones kept out of
          the way (history only, nothing is deleted). --}}
-    @php
+    <?php
         $livePos = $cs->purchaseOrders->where('status', '!=', \App\Models\GsPurchaseOrder::STATUS_CANCELLED)->values();
         $cancelledPos = $cs->purchaseOrders->where('status', \App\Models\GsPurchaseOrder::STATUS_CANCELLED)->values();
         $poBadge = fn ($status) => match ($status) {
@@ -192,7 +192,7 @@
             'partially_received' => 'text-bg-warning',
             default => 'text-bg-light border',
         };
-    @endphp
+    ?>
     @if($cs->purchaseOrders->isNotEmpty())
         <div class="card gx-stock-card mb-3">
             <div class="gx-stock-card-body">
