@@ -162,6 +162,41 @@ class PurchaseOrderService
      */
     public function createFromStatement(GsComparativeStatement $cs, User $user, ?int $supplierId = null, array $qtyOverrides = [], string $basis = self::BASIS_LOWEST): Collection
     {
+        $built = $this->buildOrders($cs, $user, $supplierId, $qtyOverrides, $basis);
+
+        return DB::transaction(function () use ($built) {
+            return $built->map(function (GsPurchaseOrder $po) {
+                $lines = $po->items;
+
+                $po->po_no = $poNo = $this->numbers->nextPo(now());
+                // PO-26-27/T-080 carries its own reference: T-080.
+                $po->reference_no = str_contains($poNo, '/') ? substr($poNo, strrpos($poNo, '/') + 1) : null;
+                $po->save();
+                $po->items()->saveMany($lines);
+
+                return $po;
+            });
+        });
+    }
+
+    /**
+     * The purchase orders createFromStatement() WOULD make, built in memory with the same
+     * rules and NOTHING saved: no PO number is used up and no row is written. This is what
+     * the preview screen shows, so what is previewed is exactly what is generated.
+     *
+     * @return Collection<int, GsPurchaseOrder> each with its lines loaded as the `items` relation
+     */
+    public function previewFromStatement(GsComparativeStatement $cs, User $user, ?int $supplierId = null, array $qtyOverrides = [], string $basis = self::BASIS_LOWEST): Collection
+    {
+        return $this->buildOrders($cs, $user, $supplierId, $qtyOverrides, $basis)->each(function (GsPurchaseOrder $po) {
+            $po->po_no = 'To be assigned';
+            $po->reference_no = null;
+        });
+    }
+
+    /** @return Collection<int, GsPurchaseOrder> unsaved, in supplier order, each with unsaved `items` */
+    private function buildOrders(GsComparativeStatement $cs, User $user, ?int $supplierId, array $qtyOverrides, string $basis): Collection
+    {
         if (! $cs->isApproved()) {
             throw ValidationException::withMessages(['cs' => 'A purchase order can only be made from an approved Comparative Statement.']);
         }
@@ -182,7 +217,6 @@ class PurchaseOrderService
                 : 'Every item of this Comparative Statement already has a purchase order.']);
         }
 
-        // Config values, overridden by what Admin / a department head saved on the PO Setup screen.
         // Quantity to order per line, chosen on the CS page before the POs are made. A line
         // left out keeps its approved quantity; 0 leaves that line out of this PO.
         $qtyOverrides = collect($qtyOverrides)
@@ -203,67 +237,65 @@ class PurchaseOrderService
             throw ValidationException::withMessages(['cs' => 'Every quantity to order is 0, so there is nothing to order.']);
         }
 
+        // Config values, overridden by what Admin / a department head saved on the PO Setup screen.
         $defaults = \App\Support\PurchasingSettings::poDefaults() + (array) config('purchasing.po_defaults');
 
-        return DB::transaction(function () use ($cs, $user, $groups, $defaults, $qtyOverrides, $basis) {
-            $orders = collect();
+        $orders = collect();
 
-            foreach ($groups as $supplierId => $items) {
-                $supplier = $cs->suppliers->firstWhere('id', (int) $supplierId);
+        foreach ($groups as $groupSupplierId => $items) {
+            $supplier = $cs->suppliers->firstWhere('id', (int) $groupSupplierId);
 
-                $po = GsPurchaseOrder::create([
-                    'po_no' => $poNo = $this->numbers->nextPo(now()),
-                    // PO-26-27/T-080 carries its own reference: T-080.
-                    'reference_no' => str_contains($poNo, '/') ? substr($poNo, strrpos($poNo, '/') + 1) : null,
-                    'po_date' => now()->toDateString(),
-                    'status' => GsPurchaseOrder::STATUS_DRAFT,
-                    'gs_comparative_statement_id' => $cs->id,
-                    'gs_cs_supplier_id' => $supplier?->id,
-                    'general_stock_supplier_id' => $supplier?->general_stock_supplier_id,
-                    'supplier_name' => $supplier?->name ?? '—',
-                    'supplier_address' => $supplier?->address,
-                    'supplier_phone' => $supplier?->phone,
-                    'bin_number' => $defaults['bin_number'] ?? null,
-                    'invoice_to' => $defaults['invoice_to'] ?? null,
-                    'consignee' => $defaults['consignee'] ?? null,
-                    'dispatched_through' => $defaults['dispatched_through'] ?? null,
-                    'destination' => $defaults['destination'] ?? null,
-                    'payment_terms' => filled($supplier?->terms) ? $supplier->terms : ($defaults['payment_terms'] ?? null),
-                    'delivery_terms' => $defaults['delivery_terms'] ?? null,
-                    'remarks' => $defaults['remarks'] ?? null,
-                    'created_by' => $user->id,
-                ]);
+            $po = new GsPurchaseOrder([
+                'po_date' => now()->toDateString(),
+                'status' => GsPurchaseOrder::STATUS_DRAFT,
+                'gs_comparative_statement_id' => $cs->id,
+                'gs_cs_supplier_id' => $supplier?->id,
+                'general_stock_supplier_id' => $supplier?->general_stock_supplier_id,
+                'supplier_name' => $supplier?->name ?? '—',
+                'supplier_address' => $supplier?->address,
+                'supplier_phone' => $supplier?->phone,
+                'bin_number' => $defaults['bin_number'] ?? null,
+                'invoice_to' => $defaults['invoice_to'] ?? null,
+                'consignee' => $defaults['consignee'] ?? null,
+                'dispatched_through' => $defaults['dispatched_through'] ?? null,
+                'destination' => $defaults['destination'] ?? null,
+                'payment_terms' => filled($supplier?->terms) ? $supplier->terms : ($defaults['payment_terms'] ?? null),
+                'delivery_terms' => $defaults['delivery_terms'] ?? null,
+                'remarks' => $defaults['remarks'] ?? null,
+                'created_by' => $user->id,
+            ]);
 
-                $total = 0.0;
+            $total = 0.0;
+            $lines = collect();
 
-                foreach ($items->values() as $i => $item) {
-                    /** @var GsCsItem $item */
-                    $rate = (float) $this->orderingQuote($item, $basis)->unit_price;
-                    $orderQty = (float) ($qtyOverrides[$item->id] ?? $item->qty);
-                    $amount = round($orderQty * $rate, 4);
-                    $total += $amount;
+            foreach ($items->values() as $i => $item) {
+                /** @var GsCsItem $item */
+                $rate = (float) $this->orderingQuote($item, $basis)->unit_price;
+                $orderQty = (float) ($qtyOverrides[$item->id] ?? $item->qty);
+                $amount = round($orderQty * $rate, 4);
+                $total += $amount;
 
-                    $po->items()->create([
-                        'gs_cs_item_id' => $item->id,
-                        'purchase_requisition_item_id' => $item->purchase_requisition_item_id,
-                        'stock_item_id' => $item->stock_item_id,
-                        'item_name' => $item->item_name,
-                        'uom' => $item->uom,
-                        'qty' => $orderQty,
-                        'rate' => $rate,
-                        'amount' => $amount,
-                        'due_on' => $defaults['due_on'] ?? null,
-                        'remarks' => $item->remarks,
-                        'sort_order' => $i,
-                    ]);
-                }
-
-                $po->update(['total_amount' => round($total, 2)]);
-                $orders->push($po);
+                $lines->push(new GsPurchaseOrderItem([
+                    'gs_cs_item_id' => $item->id,
+                    'purchase_requisition_item_id' => $item->purchase_requisition_item_id,
+                    'stock_item_id' => $item->stock_item_id,
+                    'item_name' => $item->item_name,
+                    'uom' => $item->uom,
+                    'qty' => $orderQty,
+                    'rate' => $rate,
+                    'amount' => $amount,
+                    'due_on' => $defaults['due_on'] ?? null,
+                    'remarks' => $item->remarks,
+                    'sort_order' => $i,
+                ]));
             }
 
-            return $orders;
-        });
+            $po->total_amount = round($total, 2);
+            $po->setRelation('items', $lines);
+            $orders->push($po);
+        }
+
+        return $orders;
     }
 
     /**

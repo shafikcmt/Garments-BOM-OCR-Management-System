@@ -47,6 +47,40 @@ class InternalPurchaseOrderController extends Controller
         ]);
     }
 
+    /**
+     * STEP BEFORE GENERATING: show the purchase orders exactly as they would be made, with
+     * the numbers and the printed layout, and write nothing. Generate is a second, deliberate
+     * press on the preview screen.
+     */
+    public function previewFromStatement(Request $request, GsComparativeStatement $cs)
+    {
+        abort_unless($request->user()->can('store.purchase_po.create'), 403);
+
+        $data = $request->validate([
+            'supplier' => ['nullable', 'integer'],
+            'basis' => ['nullable', 'string', 'in:lowest,chosen'],
+            'qty' => ['nullable', 'array'],
+            'qty.*' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
+        ]);
+
+        $orders = $this->service->previewFromStatement(
+            $cs, $request->user(),
+            isset($data['supplier']) ? (int) $data['supplier'] : null,
+            (array) ($data['qty'] ?? []),
+            \App\Services\PurchaseOrderService::cleanBasis($data['basis'] ?? null)
+        );
+
+        return view('store.purchasing.po-preview', [
+            'cs' => $cs,
+            'orders' => $orders,
+            'carry' => [
+                'supplier' => $data['supplier'] ?? null,
+                'basis' => \App\Services\PurchaseOrderService::cleanBasis($data['basis'] ?? null),
+                'qty' => (array) ($data['qty'] ?? []),
+            ],
+        ]);
+    }
+
     /** One draft PO per supplier chosen on the approved CS. */
     public function storeFromStatement(Request $request, GsComparativeStatement $cs)
     {

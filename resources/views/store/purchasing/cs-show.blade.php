@@ -67,9 +67,9 @@
 
             @if(in_array('make_po', $allowed, true))
                 @php($toOrder = $poPlan->where('items', '>', 0)->count())
-                <form method="POST" action="{{ route('store.purchasing.po.store', $cs) }}" data-po-form>@csrf
+                <form method="POST" action="{{ route('store.purchasing.po.preview', $cs) }}" data-po-form>@csrf
                     <input type="hidden" name="basis" value="{{ $basis }}">
-                    <button class="btn btn-success"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>{{ $toOrder > 1 ? 'Make All Purchase Orders (' . $toOrder . ')' : 'Make Purchase Order' }}</button>
+                    <button class="btn btn-success"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>{{ $toOrder > 1 ? 'Preview All Purchase Orders (' . $toOrder . ')' : 'Preview Purchase Order' }}</button>
                 </form>
             @endif
 
@@ -99,18 +99,8 @@
     @if(in_array('make_po', $allowed, true) && ($poPlan->isNotEmpty() || ($unpricedLines ?? collect())->isNotEmpty()))
         <div class="card gx-stock-card mb-3">
             <div class="gx-stock-card-body d-flex flex-wrap align-items-center gap-3">
-                <div class="fw-semibold">Order from</div>
-                <div class="btn-group btn-group-sm" role="group" aria-label="Who to order from">
-                    <a href="{{ route('store.purchasing.cs.show', [$cs, 'basis' => 'lowest']) }}" class="btn {{ $basis === 'lowest' ? 'btn-primary' : 'btn-outline-primary' }}">Lowest price</a>
-                    <a href="{{ route('store.purchasing.cs.show', [$cs, 'basis' => 'chosen']) }}" class="btn {{ $basis === 'chosen' ? 'btn-primary' : 'btn-outline-primary' }}">As chosen on the CS</a>
-                </div>
-                <div class="small text-muted">
-                    @if($basis === 'lowest')
-                        Each item goes to the supplier with the lowest price. A supplier with no price on an item is ignored for it.
-                    @else
-                        Each item goes to the supplier ticked on the CS, only if that supplier gave a price.
-                    @endif
-                </div>
+                <div class="fw-semibold">Order from the lowest price</div>
+                <div class="small text-muted">Each item goes to the supplier with the lowest price. A supplier with no price on an item is ignored for it. You see the purchase order and check it before it is generated.</div>
                 @if(($unpricedLines ?? collect())->isNotEmpty())
                     <div class="small text-warning w-100">{{ $unpricedLines->count() }} item(s) have no usable price on this basis and cannot be ordered: {{ $unpricedLines->pluck('item_name')->take(4)->implode(', ') }}{{ $unpricedLines->count() > 4 ? '…' : '' }}</div>
                 @endif
@@ -172,10 +162,10 @@
                                 <td>{{ $row['orders'] ? implode(', ', $row['orders']) : '—' }}</td>
                                 <td class="text-end">
                                     @if(in_array('make_po', $allowed, true) && $row['items'] > 0)
-                                        <form method="POST" action="{{ route('store.purchasing.po.store', $cs) }}" class="d-inline" data-po-form>@csrf
+                                        <form method="POST" action="{{ route('store.purchasing.po.preview', $cs) }}" class="d-inline" data-po-form>@csrf
                                             <input type="hidden" name="basis" value="{{ $basis }}">
                                             <input type="hidden" name="supplier" value="{{ $row['supplier']->id }}">
-                                            <button class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>Make PO for {{ $row['supplier']->name }}</button>
+                                            <button class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>Preview PO for {{ $row['supplier']->name }}</button>
                                         </form>
                                     @elseif($row['items'] === 0)
                                         <span class="text-muted small">All ordered</span>
