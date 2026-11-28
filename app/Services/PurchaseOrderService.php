@@ -36,13 +36,51 @@ class PurchaseOrderService
     {
     }
 
+    /** Order from whoever quoted the lowest price on each line (the default)... */
+    public const BASIS_LOWEST = 'lowest';
+
+    /** ...or from the supplier the committee chose on the Comparative Statement. */
+    public const BASIS_CHOSEN = 'chosen';
+
+    public static function cleanBasis(?string $basis): string
+    {
+        return $basis === self::BASIS_CHOSEN ? self::BASIS_CHOSEN : self::BASIS_LOWEST;
+    }
+
     /**
-     * The items still to order, grouped by the supplier chosen for them: the
-     * lines with a priced chosen supplier and no live PO yet.
+     * The quote a line is ordered on, or null when nobody gave a usable price.
+     *
+     * A price that is blank or 0 means "did not quote", so that supplier is IGNORED for
+     * the line: it can neither win it nor get a purchase order for it. On the lowest-price
+     * basis the cheapest real quote wins (the chosen supplier on a tie); on the chosen
+     * basis it is the committee's supplier, and only if that supplier really quoted.
+     */
+    public function orderingQuote(GsCsItem $item, string $basis = self::BASIS_LOWEST): ?\App\Models\GsCsQuote
+    {
+        $real = $item->quotes->filter(fn ($q) => $q->unit_price !== null && (float) $q->unit_price > 0);
+
+        if ($real->isEmpty()) {
+            return null;
+        }
+
+        if ($basis === self::BASIS_CHOSEN) {
+            return $real->firstWhere('gs_cs_supplier_id', (int) $item->selected_supplier_id);
+        }
+
+        $lowest = $real->min(fn ($q) => (float) $q->unit_price);
+        $ties = $real->filter(fn ($q) => (float) $q->unit_price === (float) $lowest);
+
+        return $ties->firstWhere('gs_cs_supplier_id', (int) $item->selected_supplier_id)
+            ?? $ties->sortBy('gs_cs_supplier_id')->first();
+    }
+
+    /**
+     * The items still to order, grouped by the supplier each is ordered from: the lines
+     * with a usable price and no live PO yet.
      *
      * @return Collection<int|string, Collection<int, GsCsItem>> supplier id => items
      */
-    private function pendingGroups(GsComparativeStatement $cs): Collection
+    private function pendingGroups(GsComparativeStatement $cs, string $basis = self::BASIS_LOWEST): Collection
     {
         $cs->loadMissing(['items.quotes', 'suppliers']);
 
@@ -53,8 +91,21 @@ class PurchaseOrderService
             ->all();
 
         return $cs->items
-            ->reject(fn (GsCsItem $i) => in_array($i->id, $taken, true) || ! $i->selectedQuote() || $i->selectedQuote()->unit_price === null)
-            ->groupBy('selected_supplier_id');
+            ->reject(fn (GsCsItem $i) => in_array($i->id, $taken, true) || ! $this->orderingQuote($i, $basis))
+            ->groupBy(fn (GsCsItem $i) => (int) $this->orderingQuote($i, $basis)->gs_cs_supplier_id);
+    }
+
+    /** Lines still untaken that nobody priced, so no PO can be made for them. @return Collection<int, GsCsItem> */
+    public function unpricedLines(GsComparativeStatement $cs, string $basis = self::BASIS_LOWEST): Collection
+    {
+        $cs->loadMissing(['items.quotes']);
+
+        $taken = GsPurchaseOrderItem::query()
+            ->whereIn('gs_cs_item_id', $cs->items->pluck('id'))
+            ->whereHas('order', fn ($q) => $q->where('status', '<>', GsPurchaseOrder::STATUS_CANCELLED))
+            ->pluck('gs_cs_item_id')->all();
+
+        return $cs->items->reject(fn (GsCsItem $i) => in_array($i->id, $taken, true) || $this->orderingQuote($i, $basis))->values();
     }
 
     /**
@@ -63,9 +114,16 @@ class PurchaseOrderService
      *
      * @return Collection<int, GsCsItem>
      */
-    public function pendingLines(GsComparativeStatement $cs): Collection
+    public function pendingLines(GsComparativeStatement $cs, string $basis = self::BASIS_LOWEST): Collection
     {
-        return $this->pendingGroups($cs)->flatten(1)->sortBy('sort_order')->values();
+        return $this->pendingGroups($cs, $basis)->flatten(1)
+            ->each(function (GsCsItem $i) use ($basis) {
+                $q = $this->orderingQuote($i, $basis);
+                // Not saved: what the screen shows for this line under the chosen basis.
+                $i->setAttribute('order_supplier_id', (int) $q->gs_cs_supplier_id);
+                $i->setAttribute('order_rate', (float) $q->unit_price);
+            })
+            ->sortBy('sort_order')->values();
     }
 
     /**
@@ -74,22 +132,26 @@ class PurchaseOrderService
      *
      * @return Collection<int, array{supplier: \App\Models\GsCsSupplier, items: int, amount: float, orders: list<string>}>
      */
-    public function plan(GsComparativeStatement $cs): Collection
+    public function plan(GsComparativeStatement $cs, string $basis = self::BASIS_LOWEST): Collection
     {
         $cs->loadMissing(['items.quotes', 'suppliers', 'purchaseOrders']);
-        $pending = $this->pendingGroups($cs);
+        $pending = $this->pendingGroups($cs, $basis);
 
-        return $cs->items->pluck('selected_supplier_id')->filter()->unique()->values()
-            ->map(function ($supplierId) use ($cs, $pending) {
-                $items = $pending->get($supplierId, collect());
+        // Every supplier that has, or already had, a line on this basis.
+        $supplierIds = $pending->keys()
+            ->merge($cs->purchaseOrders->where('status', '<>', GsPurchaseOrder::STATUS_CANCELLED)->pluck('gs_cs_supplier_id'))
+            ->filter()->unique()->values();
 
-                return [
-                    'supplier' => $cs->suppliers->firstWhere('id', (int) $supplierId),
-                    'items' => $items->count(),
-                    'amount' => round((float) $items->sum(fn (GsCsItem $i) => (float) $i->qty * (float) $i->selectedQuote()->unit_price), 2),
-                    'orders' => $cs->purchaseOrders->where('gs_cs_supplier_id', (int) $supplierId)->where('status', '<>', GsPurchaseOrder::STATUS_CANCELLED)->pluck('po_no')->values()->all(),
-                ];
-            })->filter(fn ($row) => $row['supplier'])->values();
+        return $supplierIds->map(function ($supplierId) use ($cs, $pending, $basis) {
+            $items = $pending->get((int) $supplierId, collect());
+
+            return [
+                'supplier' => $cs->suppliers->firstWhere('id', (int) $supplierId),
+                'items' => $items->count(),
+                'amount' => round((float) $items->sum(fn (GsCsItem $i) => (float) $i->qty * (float) $this->orderingQuote($i, $basis)->unit_price), 2),
+                'orders' => $cs->purchaseOrders->where('gs_cs_supplier_id', (int) $supplierId)->where('status', '<>', GsPurchaseOrder::STATUS_CANCELLED)->pluck('po_no')->values()->all(),
+            ];
+        })->filter(fn ($row) => $row['supplier'])->values();
     }
 
     /**
@@ -98,7 +160,7 @@ class PurchaseOrderService
      * @param  int|null  $supplierId  a supplier of this statement (gs_cs_suppliers.id); null = every chosen supplier
      * @return Collection<int, GsPurchaseOrder> the draft POs created
      */
-    public function createFromStatement(GsComparativeStatement $cs, User $user, ?int $supplierId = null, array $qtyOverrides = []): Collection
+    public function createFromStatement(GsComparativeStatement $cs, User $user, ?int $supplierId = null, array $qtyOverrides = [], string $basis = self::BASIS_LOWEST): Collection
     {
         if (! $cs->isApproved()) {
             throw ValidationException::withMessages(['cs' => 'A purchase order can only be made from an approved Comparative Statement.']);
@@ -106,7 +168,7 @@ class PurchaseOrderService
 
         $cs->load(['items.quotes', 'suppliers']);
 
-        $groups = $this->pendingGroups($cs);
+        $groups = $this->pendingGroups($cs, $basis);
         if ($supplierId !== null) {
             if (! $cs->suppliers->contains('id', $supplierId)) {
                 throw ValidationException::withMessages(['cs' => 'That supplier is not on this Comparative Statement.']);
@@ -143,7 +205,7 @@ class PurchaseOrderService
 
         $defaults = \App\Support\PurchasingSettings::poDefaults() + (array) config('purchasing.po_defaults');
 
-        return DB::transaction(function () use ($cs, $user, $groups, $defaults, $qtyOverrides) {
+        return DB::transaction(function () use ($cs, $user, $groups, $defaults, $qtyOverrides, $basis) {
             $orders = collect();
 
             foreach ($groups as $supplierId => $items) {
@@ -176,7 +238,7 @@ class PurchaseOrderService
 
                 foreach ($items->values() as $i => $item) {
                     /** @var GsCsItem $item */
-                    $rate = (float) $item->selectedQuote()->unit_price;
+                    $rate = (float) $this->orderingQuote($item, $basis)->unit_price;
                     $orderQty = (float) ($qtyOverrides[$item->id] ?? $item->qty);
                     $amount = round($orderQty * $rate, 4);
                     $total += $amount;

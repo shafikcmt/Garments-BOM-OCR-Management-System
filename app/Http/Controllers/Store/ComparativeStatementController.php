@@ -115,8 +115,10 @@ class ComparativeStatementController extends Controller
             'cs' => $cs,
             'allowed' => $this->service->allowed($cs, $request->user()),
             'comparison' => app(\App\Services\CsComparison::class)->for($cs),
-            'poPlan' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->plan($cs) : collect(),
-            'pendingLines' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->pendingLines($cs) : collect(),
+            'basis' => $basis = \App\Services\PurchaseOrderService::cleanBasis($request->query('basis')),
+            'poPlan' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->plan($cs, $basis) : collect(),
+            'pendingLines' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->pendingLines($cs, $basis) : collect(),
+            'unpricedLines' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->unpricedLines($cs, $basis) : collect(),
         ]);
     }
 

@@ -54,11 +54,12 @@ class InternalPurchaseOrderController extends Controller
 
         $data = $request->validate([
             'supplier' => ['nullable', 'integer'],
+            'basis' => ['nullable', 'string', 'in:lowest,chosen'],
             'qty' => ['nullable', 'array'],
             'qty.*' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
         ]);
         $supplierId = $data['supplier'] ?? null;
-        $orders = $this->service->createFromStatement($cs, $request->user(), $supplierId !== null ? (int) $supplierId : null, (array) ($data['qty'] ?? []));
+        $orders = $this->service->createFromStatement($cs, $request->user(), $supplierId !== null ? (int) $supplierId : null, (array) ($data['qty'] ?? []), \App\Services\PurchaseOrderService::cleanBasis($data['basis'] ?? null));
 
         return $orders->count() === 1
             ? redirect()->route('store.purchasing.po.show', $orders->first())->with('success', $orders->first()->po_no.' created as a draft. It needs to be checked, then authorised.')

@@ -68,6 +68,7 @@
             @if(in_array('make_po', $allowed, true))
                 @php($toOrder = $poPlan->where('items', '>', 0)->count())
                 <form method="POST" action="{{ route('store.purchasing.po.store', $cs) }}" data-po-form>@csrf
+                    <input type="hidden" name="basis" value="{{ $basis }}">
                     <button class="btn btn-success"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>{{ $toOrder > 1 ? 'Make All Purchase Orders (' . $toOrder . ')' : 'Make Purchase Order' }}</button>
                 </form>
             @endif
@@ -92,6 +93,31 @@
         </div>
     </div>
 
+    {{-- WHO THE PURCHASE ORDERS GO TO. By default each line is ordered from the supplier with the lowest
+         real price; a supplier that did not price a line (blank or 0) is ignored for it. The other
+         choice orders from the supplier the committee ticked on the CS. --}}
+    @if(in_array('make_po', $allowed, true) && ($poPlan->isNotEmpty() || ($unpricedLines ?? collect())->isNotEmpty()))
+        <div class="card gx-stock-card mb-3">
+            <div class="gx-stock-card-body d-flex flex-wrap align-items-center gap-3">
+                <div class="fw-semibold">Order from</div>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Who to order from">
+                    <a href="{{ route('store.purchasing.cs.show', [$cs, 'basis' => 'lowest']) }}" class="btn {{ $basis === 'lowest' ? 'btn-primary' : 'btn-outline-primary' }}">Lowest price</a>
+                    <a href="{{ route('store.purchasing.cs.show', [$cs, 'basis' => 'chosen']) }}" class="btn {{ $basis === 'chosen' ? 'btn-primary' : 'btn-outline-primary' }}">As chosen on the CS</a>
+                </div>
+                <div class="small text-muted">
+                    @if($basis === 'lowest')
+                        Each item goes to the supplier with the lowest price. A supplier with no price on an item is ignored for it.
+                    @else
+                        Each item goes to the supplier ticked on the CS, only if that supplier gave a price.
+                    @endif
+                </div>
+                @if(($unpricedLines ?? collect())->isNotEmpty())
+                    <div class="small text-warning w-100">{{ $unpricedLines->count() }} item(s) have no usable price on this basis and cannot be ordered: {{ $unpricedLines->pluck('item_name')->take(4)->implode(', ') }}{{ $unpricedLines->count() > 4 ? '…' : '' }}</div>
+                @endif
+            </div>
+        </div>
+    @endif
+
     {{-- QUANTITY TO ORDER. The approved quantities are the start; change a line here before the
          purchase orders are made. 0 leaves a line out (it stays to be ordered later). The rate is
          the approved one and cannot be changed. The numbers travel with whichever "Make PO"
@@ -106,11 +132,11 @@
                         <thead><tr><th>Item</th><th>Supplier</th><th class="text-end">Approved qty</th><th class="text-end">Rate</th><th class="text-end" style="width:140px;">Order qty</th><th class="text-end">Amount</th></tr></thead>
                         <tbody>
                         @foreach($pendingLines as $line)
-                            @php($rate = (float) $line->selectedQuote()->unit_price)
+                            @php($rate = (float) $line->order_rate)
                             @php($qtyShown = rtrim(rtrim(number_format((float) $line->qty, 4, '.', ''), '0'), '.'))
                             <tr>
                                 <td>{{ $line->item_name }} <span class="text-muted small">{{ $line->uom }}</span></td>
-                                <td class="small">{{ $cs->suppliers->firstWhere('id', $line->selected_supplier_id)?->name }}</td>
+                                <td class="small">{{ $cs->suppliers->firstWhere('id', $line->order_supplier_id)?->name }}@if((int) $line->selected_supplier_id !== (int) $line->order_supplier_id && $line->selected_supplier_id) <span class="text-muted">(CS chose {{ $cs->suppliers->firstWhere('id', $line->selected_supplier_id)?->name }})</span>@endif</td>
                                 <td class="text-end">{{ $qtyShown }}</td>
                                 <td class="text-end">{{ number_format($rate, 2) }}</td>
                                 <td class="text-end">
@@ -147,6 +173,7 @@
                                 <td class="text-end">
                                     @if(in_array('make_po', $allowed, true) && $row['items'] > 0)
                                         <form method="POST" action="{{ route('store.purchasing.po.store', $cs) }}" class="d-inline" data-po-form>@csrf
+                                            <input type="hidden" name="basis" value="{{ $basis }}">
                                             <input type="hidden" name="supplier" value="{{ $row['supplier']->id }}">
                                             <button class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>Make PO for {{ $row['supplier']->name }}</button>
                                         </form>
