@@ -641,6 +641,7 @@ Route::prefix('store/purchasing')
             Route::post('/po-setup/format', [\App\Http\Controllers\Store\PurchaseSettingsController::class, 'saveFormat'])->name('po.settings.format');
             Route::post('/po-setup/approvers', [\App\Http\Controllers\Store\PurchaseSettingsController::class, 'saveApprovers'])->name('po.settings.approvers');
             Route::post('/cs/{cs}/po', [InternalPurchaseOrderController::class, 'storeFromStatement'])->name('po.store');
+            Route::post('/po/{order}/replace', [InternalPurchaseOrderController::class, 'replaceNotLowest'])->name('po.replace');
             Route::post('/cs/{cs}/po/preview', [InternalPurchaseOrderController::class, 'previewFromStatement'])->name('po.preview');
             Route::get('/po/{order}', [InternalPurchaseOrderController::class, 'show'])->name('po.show');
             Route::get('/po/{order}/edit', [InternalPurchaseOrderController::class, 'edit'])->name('po.edit');

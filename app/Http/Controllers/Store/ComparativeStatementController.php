@@ -119,6 +119,7 @@ class ComparativeStatementController extends Controller
             'basis' => $basis = \App\Services\PurchaseOrderService::BASIS_LOWEST,
             'poPlan' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->plan($cs, $basis) : collect(),
             'pendingLines' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->pendingLines($cs, $basis) : collect(),
+            'notLowest' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->notLowestOrders($cs) : [],
             'unpricedLines' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->unpricedLines($cs, $basis) : collect(),
         ]);
     }

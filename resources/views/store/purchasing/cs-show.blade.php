@@ -210,12 +210,23 @@
                                 <tr>
                                     <td class="fw-semibold">{{ $po->po_no }}</td>
                                     <td>{{ $po->supplier_name }}</td>
-                                    <td><span class="badge {{ $poBadge($po->status) }}">{{ $po->statusLabel() }}</span></td>
+                                    <td>
+                                        <span class="badge {{ $poBadge($po->status) }}">{{ $po->statusLabel() }}</span>
+                                        @if(isset($notLowest[$po->id]))
+                                            <div class="small text-warning mt-1">{{ $notLowest[$po->id]['supplier'] }} has a lower price on {{ $notLowest[$po->id]['lines'] }} of these item{{ $notLowest[$po->id]['lines'] === 1 ? '' : 's' }}.</div>
+                                        @endif
+                                    </td>
                                     <td class="text-end">{{ number_format((float) $po->total_amount, 2) }}</td>
                                     <td class="text-end">
                                         @can('store.purchase_po.view')
                                             <a href="{{ route('store.purchasing.po.show', $po) }}" class="btn btn-outline-primary btn-sm"><i class="bi bi-eye me-1" aria-hidden="true"></i>Open</a>
                                         @endcan
+                                        @if(isset($notLowest[$po->id]) && in_array('make_po', $allowed, true))
+                                            <form method="POST" action="{{ route('store.purchasing.po.replace', $po) }}" class="d-inline"
+                                                  onsubmit="return confirm('Cancel {{ $po->po_no }}? Its items go back to the order list so they can be ordered from the lowest price.');">@csrf
+                                                <button class="btn btn-outline-warning btn-sm"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Cancel &amp; remake</button>
+                                            </form>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach
