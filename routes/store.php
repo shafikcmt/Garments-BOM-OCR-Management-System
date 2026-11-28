@@ -624,6 +624,7 @@ Route::prefix('store/purchasing')
             Route::get('/cs/create', [ComparativeStatementController::class, 'create'])->name('cs.create');
             Route::post('/cs', [ComparativeStatementController::class, 'store'])->name('cs.store');
             Route::get('/cs/{cs}', [ComparativeStatementController::class, 'show'])->name('cs.show');
+            Route::post('/cs/{cs}/reopen', [ComparativeStatementController::class, 'reopen'])->name('cs.reopen');
             Route::get('/cs/{cs}/edit', [ComparativeStatementController::class, 'edit'])->name('cs.edit');
             Route::put('/cs/{cs}', [ComparativeStatementController::class, 'update'])->name('cs.update');
             Route::post('/cs/{cs}/submit', [ComparativeStatementController::class, 'submit'])->name('cs.submit');

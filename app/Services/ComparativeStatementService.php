@@ -209,6 +209,45 @@ class ComparativeStatementService
         return $cs;
     }
 
+    /**
+     * The maker takes a statement back to edit it: Waiting for Check, Waiting for Approval or
+     * Approved -> Draft. The check and approval stamps are cleared, so it has to be submitted,
+     * checked and approved again. Not while a purchase order stands on it (cancel the PO first);
+     * a statement whose POs were all cancelled can be reopened.
+     */
+    public function reopen(GsComparativeStatement $cs, User $user): GsComparativeStatement
+    {
+        $this->assertStage($cs, [
+            GsComparativeStatement::STATUS_SUBMITTED,
+            GsComparativeStatement::STATUS_CHECKED,
+            GsComparativeStatement::STATUS_APPROVED,
+        ], 'reopened');
+
+        if ($cs->purchaseOrders()->where('status', '<>', GsPurchaseOrder::STATUS_CANCELLED)->exists()) {
+            throw ValidationException::withMessages(['cs' => 'A purchase order stands on this Comparative Statement. Cancel the PO first, then edit the statement.']);
+        }
+
+        if ($cs->status !== GsComparativeStatement::STATUS_SUBMITTED) {
+            $this->tellPermission($cs, 'store.purchase_cs.approve', $user, 'Comparative Statement reopened',
+                $user->name.' reopened '.$cs->cs_no.' to edit it. It will come back for checking and approval.');
+        }
+
+        $cs->forceFill([
+            'status' => GsComparativeStatement::STATUS_DRAFT,
+            'return_note' => 'Reopened for editing by '.$user->name.'.',
+            'returned_by' => $user->id,
+            'returned_at' => now(),
+            'prepared_by' => null,
+            'prepared_at' => null,
+            'checked_by' => null,
+            'checked_at' => null,
+            'approved_by' => null,
+            'approved_at' => null,
+        ])->save();
+
+        return $cs;
+    }
+
     public function cancel(GsComparativeStatement $cs, User $user, string $reason): GsComparativeStatement
     {
         if ($cs->status === GsComparativeStatement::STATUS_CANCELLED) {
@@ -245,6 +284,9 @@ class ComparativeStatementService
             'approve' => $cs->status === GsComparativeStatement::STATUS_CHECKED && $user->can('store.purchase_cs.approve') && $notPreparer,
             'send_back' => in_array($cs->status, [GsComparativeStatement::STATUS_SUBMITTED, GsComparativeStatement::STATUS_CHECKED], true)
                 && ($user->can('store.purchase_cs.review') || $user->can('store.purchase_cs.approve')) && $notPreparer,
+            'reopen' => in_array($cs->status, [GsComparativeStatement::STATUS_SUBMITTED, GsComparativeStatement::STATUS_CHECKED, GsComparativeStatement::STATUS_APPROVED], true)
+                && $user->can('store.purchase_cs.create')
+                && ! $cs->purchaseOrders()->where('status', '<>', GsPurchaseOrder::STATUS_CANCELLED)->exists(),
             'cancel' => $cs->status !== GsComparativeStatement::STATUS_CANCELLED && $user->can('store.purchase_cs.create'),
             'make_po' => $cs->isApproved() && $user->can('store.purchase_po.create'),
         ]));
