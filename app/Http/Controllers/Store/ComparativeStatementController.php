@@ -124,6 +124,17 @@ class ComparativeStatementController extends Controller
         ]);
     }
 
+    /** Take a submitted / approved statement back to Draft so it can be edited. */
+    public function reopen(GsComparativeStatement $cs, Request $request)
+    {
+        abort_unless(in_array('reopen', $this->service->allowed($cs, $request->user()), true), 403);
+
+        $this->service->reopen($cs, $request->user());
+
+        return redirect()->route('store.purchasing.cs.edit', $cs)
+            ->with('success', $cs->cs_no.' is back to Draft. Edit it, remove items if needed, save, then submit it again.');
+    }
+
     public function edit(GsComparativeStatement $cs, Request $request)
     {
         $this->authoriseAction($cs, $request, 'edit');

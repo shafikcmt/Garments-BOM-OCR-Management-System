@@ -247,7 +247,10 @@
                                         </td>
                                         <td data-slot="{{ $k }}" class="text-end" data-total="{{ $k }}" @unless($on) hidden @endunless>—</td>
                                     @endfor
-                                    <td><input type="text" name="lines[{{ $i }}][remarks]" value="{{ $line['remarks'] ?? '' }}" class="form-control form-control-sm" aria-label="Remarks"></td>
+                                    <td>
+                                        <input type="text" name="lines[{{ $i }}][remarks]" value="{{ $line['remarks'] ?? '' }}" class="form-control form-control-sm" aria-label="Remarks">
+                                        <button type="button" class="btn btn-sm btn-outline-danger mt-1" data-remove-line><i class="bi bi-trash me-1" aria-hidden="true"></i>Remove item</button>
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -435,6 +438,35 @@
     });
     form.querySelectorAll('[data-remove]').forEach(function (b) {
         b.addEventListener('click', function () { setSlot(parseInt(b.dataset.remove, 10), false); recalc(); });
+    });
+
+    // Take an item off this statement. The row (and its quotes) is not sent when the form is saved.
+    form.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-remove-line]');
+        if (!btn) return;
+
+        var tr = btn.closest('tr[data-line]');
+        if (form.querySelectorAll('tr[data-line]').length <= 1) {
+            alert('A statement needs at least one item.');
+            return;
+        }
+
+        var nameEl = tr.querySelector('.fw-semibold');
+        if (!confirm('Remove "' + (nameEl ? nameEl.textContent.trim() : 'this item') + '" from the statement? Press Save to keep the change.')) return;
+
+        var cat = tr.dataset.cat;
+        tr.remove();
+        rows = rows.filter(function (r) { return r !== tr; });
+
+        // A category heading with no item left under it goes too.
+        if (cat) {
+            var left = Array.prototype.some.call(form.querySelectorAll('tr[data-line]'), function (r) { return r.dataset.cat === cat; });
+            if (!left) form.querySelectorAll('tr[data-cat-row]').forEach(function (h) { if (h.dataset.catRow === cat) h.remove(); });
+        }
+
+        recalc();
+        applyFilter();
+        progress();
     });
 
     // Picking a saved supplier fills the details; they stay editable.

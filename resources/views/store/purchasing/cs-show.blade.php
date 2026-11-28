@@ -23,6 +23,12 @@
                     <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
                 </a>
             @endif
+            @if(in_array('reopen', $allowed, true))
+                <form method="POST" action="{{ route('store.purchasing.cs.reopen', $cs) }}" class="d-inline"
+                      onsubmit="return confirm('Edit this statement? It goes back to Draft and has to be submitted, checked and approved again.');">@csrf
+                    <button class="btn btn-outline-primary"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit statement</button>
+                </form>
+            @endif
         </x-slot:actions>
     </x-page-header>
 
