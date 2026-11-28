@@ -58,6 +58,17 @@ class PurchaseOrderService
     }
 
     /**
+     * The lines still to order (priced, supplier chosen, no live PO yet), flat, for the
+     * "quantity to order" step before the POs are made.
+     *
+     * @return Collection<int, GsCsItem>
+     */
+    public function pendingLines(GsComparativeStatement $cs): Collection
+    {
+        return $this->pendingGroups($cs)->flatten(1)->sortBy('sort_order')->values();
+    }
+
+    /**
      * What can be ordered from each chosen supplier of an approved statement:
      * the lines and the amount still to order, and the POs already made.
      *
@@ -87,7 +98,7 @@ class PurchaseOrderService
      * @param  int|null  $supplierId  a supplier of this statement (gs_cs_suppliers.id); null = every chosen supplier
      * @return Collection<int, GsPurchaseOrder> the draft POs created
      */
-    public function createFromStatement(GsComparativeStatement $cs, User $user, ?int $supplierId = null): Collection
+    public function createFromStatement(GsComparativeStatement $cs, User $user, ?int $supplierId = null, array $qtyOverrides = []): Collection
     {
         if (! $cs->isApproved()) {
             throw ValidationException::withMessages(['cs' => 'A purchase order can only be made from an approved Comparative Statement.']);
@@ -110,9 +121,29 @@ class PurchaseOrderService
         }
 
         // Config values, overridden by what Admin / a department head saved on the PO Setup screen.
+        // Quantity to order per line, chosen on the CS page before the POs are made. A line
+        // left out keeps its approved quantity; 0 leaves that line out of this PO.
+        $qtyOverrides = collect($qtyOverrides)
+            ->mapWithKeys(fn ($qty, $id) => [(int) $id => is_numeric($qty) ? round((float) $qty, 4) : null])
+            ->filter(fn ($qty) => $qty !== null);
+
+        foreach ($qtyOverrides as $id => $qty) {
+            if ($qty < 0) {
+                throw ValidationException::withMessages(['cs' => 'A quantity to order cannot be negative.']);
+            }
+        }
+
+        $groups = $groups
+            ->map(fn ($items) => $items->filter(fn (GsCsItem $i) => (float) ($qtyOverrides[$i->id] ?? $i->qty) > 0)->values())
+            ->filter(fn ($items) => $items->isNotEmpty());
+
+        if ($groups->isEmpty()) {
+            throw ValidationException::withMessages(['cs' => 'Every quantity to order is 0, so there is nothing to order.']);
+        }
+
         $defaults = \App\Support\PurchasingSettings::poDefaults() + (array) config('purchasing.po_defaults');
 
-        return DB::transaction(function () use ($cs, $user, $groups, $defaults) {
+        return DB::transaction(function () use ($cs, $user, $groups, $defaults, $qtyOverrides) {
             $orders = collect();
 
             foreach ($groups as $supplierId => $items) {
@@ -146,7 +177,8 @@ class PurchaseOrderService
                 foreach ($items->values() as $i => $item) {
                     /** @var GsCsItem $item */
                     $rate = (float) $item->selectedQuote()->unit_price;
-                    $amount = round((float) $item->qty * $rate, 4);
+                    $orderQty = (float) ($qtyOverrides[$item->id] ?? $item->qty);
+                    $amount = round($orderQty * $rate, 4);
                     $total += $amount;
 
                     $po->items()->create([
@@ -155,7 +187,7 @@ class PurchaseOrderService
                         'stock_item_id' => $item->stock_item_id,
                         'item_name' => $item->item_name,
                         'uom' => $item->uom,
-                        'qty' => $item->qty,
+                        'qty' => $orderQty,
                         'rate' => $rate,
                         'amount' => $amount,
                         'due_on' => $defaults['due_on'] ?? null,

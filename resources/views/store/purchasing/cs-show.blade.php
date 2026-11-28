@@ -67,7 +67,7 @@
 
             @if(in_array('make_po', $allowed, true))
                 @php($toOrder = $poPlan->where('items', '>', 0)->count())
-                <form method="POST" action="{{ route('store.purchasing.po.store', $cs) }}">@csrf
+                <form method="POST" action="{{ route('store.purchasing.po.store', $cs) }}" data-po-form>@csrf
                     <button class="btn btn-success"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>{{ $toOrder > 1 ? 'Make All Purchase Orders (' . $toOrder . ')' : 'Make Purchase Order' }}</button>
                 </form>
             @endif
@@ -92,6 +92,42 @@
         </div>
     </div>
 
+    {{-- QUANTITY TO ORDER. The approved quantities are the start; change a line here before the
+         purchase orders are made. 0 leaves a line out (it stays to be ordered later). The rate is
+         the approved one and cannot be changed. The numbers travel with whichever "Make PO"
+         button is pressed (see the script at the end). --}}
+    @if(in_array('make_po', $allowed, true) && ($pendingLines ?? collect())->isNotEmpty())
+        <div class="card gx-stock-card mb-3">
+            <div class="gx-stock-card-body">
+                <h6 class="mb-1">Quantity to order</h6>
+                <p class="small text-muted mb-2">Change a quantity before making the purchase order. The rate stays as approved. Enter 0 to leave a line out for now. Quantities you do not change are ordered as approved.</p>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0" style="min-width:0">
+                        <thead><tr><th>Item</th><th>Supplier</th><th class="text-end">Approved qty</th><th class="text-end">Rate</th><th class="text-end" style="width:140px;">Order qty</th><th class="text-end">Amount</th></tr></thead>
+                        <tbody>
+                        @foreach($pendingLines as $line)
+                            @php($rate = (float) $line->selectedQuote()->unit_price)
+                            @php($qtyShown = rtrim(rtrim(number_format((float) $line->qty, 4, '.', ''), '0'), '.'))
+                            <tr>
+                                <td>{{ $line->item_name }} <span class="text-muted small">{{ $line->uom }}</span></td>
+                                <td class="small">{{ $cs->suppliers->firstWhere('id', $line->selected_supplier_id)?->name }}</td>
+                                <td class="text-end">{{ $qtyShown }}</td>
+                                <td class="text-end">{{ number_format($rate, 2) }}</td>
+                                <td class="text-end">
+                                    <input type="number" step="any" min="0" class="form-control form-control-sm text-end" value="{{ $qtyShown }}"
+                                           data-order-qty="{{ $line->id }}" data-rate="{{ $rate }}" data-approved="{{ (float) $line->qty }}" aria-label="Quantity to order for {{ $line->item_name }}">
+                                </td>
+                                <td class="text-end" data-line-amount>{{ number_format((float) $line->qty * $rate, 2) }}</td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                        <tfoot><tr><th colspan="5" class="text-end">Total to order</th><th class="text-end" id="orderQtyTotal"></th></tr></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Order by supplier: one PO per chosen supplier, made together or one supplier at a time. --}}
     @if($poPlan->count() > 1)
         <div class="card gx-stock-card mb-3">
@@ -110,7 +146,7 @@
                                 <td>{{ $row['orders'] ? implode(', ', $row['orders']) : '—' }}</td>
                                 <td class="text-end">
                                     @if(in_array('make_po', $allowed, true) && $row['items'] > 0)
-                                        <form method="POST" action="{{ route('store.purchasing.po.store', $cs) }}" class="d-inline">@csrf
+                                        <form method="POST" action="{{ route('store.purchasing.po.store', $cs) }}" class="d-inline" data-po-form>@csrf
                                             <input type="hidden" name="supplier" value="{{ $row['supplier']->id }}">
                                             <button class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>Make PO for {{ $row['supplier']->name }}</button>
                                         </form>
@@ -212,4 +248,44 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+(function () {
+    var inputs = Array.prototype.slice.call(document.querySelectorAll('[data-order-qty]'));
+    if (!inputs.length) return;
+
+    function recalc() {
+        var total = 0;
+        inputs.forEach(function (input) {
+            var qty = parseFloat(input.value);
+            var amount = (isFinite(qty) && qty > 0 ? qty : 0) * parseFloat(input.dataset.rate);
+            total += amount;
+            input.closest('tr').querySelector('[data-line-amount]').textContent = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            input.classList.toggle('border-warning', isFinite(qty) && qty !== parseFloat(input.dataset.approved));
+        });
+        document.getElementById('orderQtyTotal').textContent = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    inputs.forEach(function (input) { input.addEventListener('input', recalc); });
+    recalc();
+
+    // Whichever "Make PO" button is pressed, the chosen quantities go with it.
+    document.querySelectorAll('form[data-po-form]').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (inputs.some(function (i) { return i.value.trim() === '' || !isFinite(parseFloat(i.value)) || parseFloat(i.value) < 0; })) {
+                event.preventDefault();
+                alert('Enter a quantity (0 or more) for every line.');
+                return;
+            }
+            form.querySelectorAll('input[data-injected]').forEach(function (n) { n.remove(); });
+            inputs.forEach(function (i) {
+                var h = document.createElement('input');
+                h.type = 'hidden'; h.name = 'qty[' + i.dataset.orderQty + ']'; h.value = i.value; h.setAttribute('data-injected', '1');
+                form.appendChild(h);
+            });
+        });
+    });
+})();
+</script>
 @endsection

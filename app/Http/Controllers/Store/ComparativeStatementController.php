@@ -116,6 +116,7 @@ class ComparativeStatementController extends Controller
             'allowed' => $this->service->allowed($cs, $request->user()),
             'comparison' => app(\App\Services\CsComparison::class)->for($cs),
             'poPlan' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->plan($cs) : collect(),
+            'pendingLines' => $cs->isApproved() ? app(\App\Services\PurchaseOrderService::class)->pendingLines($cs) : collect(),
         ]);
     }
 

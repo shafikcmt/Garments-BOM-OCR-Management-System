@@ -60,8 +60,9 @@
     <table style="margin-bottom:4px;" class="nb">
         <tr>
             <td style="width:34%;">CS No: <strong>{{ $cs->cs_no }}</strong></td>
-            <td class="c" style="width:33%;">Status: <strong>{{ $cs->statusLabel() }}</strong></td>
-            <td class="num">Prepared from approved purchase requisition lines</td>
+            <td class="c" style="width:40%;">Prepared from approved purchase requisition lines</td>
+            {{-- Status at the top right corner, directly above the table. --}}
+            <td class="num" style="width:26%;">Status: <strong>{{ $cs->statusLabel() }}</strong></td>
         </tr>
         @if($categories->isNotEmpty())
             {{-- Material category sits here, under CS No and outside the item
